@@ -1,0 +1,7 @@
+mode = "Indexer"
+warc_paths_file = "warc.paths"
+
+[s3]
+name = "us-east-1"
+endpoint = "https://s3.us-east-1.amazonaws.com"
+bucket = "commoncrawl"

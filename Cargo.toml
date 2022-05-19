@@ -1,0 +1,17 @@
+[package]
+name = "cuely"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "cuely"
+
+[dependencies]
+rusoto_core = "0.48.0"
+rusoto_s3 = "0.48.0"
+serde = "1.0.137"
+thiserror = "1.0.31"
+tokio = { version = "1.18.2", features = ["full"] }
+toml = "0.5.9"
