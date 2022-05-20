@@ -39,6 +39,7 @@ impl Indexer {
             let warc = WarcFile::new(&raw_object[..]);
             for record in warc {
                 println!("TEST: {:?}", record);
+                panic!();
             }
         }
 

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::io;
+use std::num::ParseIntError;
 use thiserror::Error;
 
 mod indexer;
@@ -41,7 +42,10 @@ pub enum Error {
     FromUTF8(#[from] std::string::FromUtf8Error),
 
     #[error("Failed to parse WARC file")]
-    WarcParse,
+    WarcParse(&'static str),
+
+    #[error("Could not parse string to int")]
+    IntParse(#[from] ParseIntError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
