@@ -9,6 +9,7 @@ edition = "2021"
 name = "cuely"
 
 [dependencies]
+flate2 = "1.0.23"
 rusoto_core = "0.48.0"
 rusoto_s3 = "0.48.0"
 serde = "1.0.137"
