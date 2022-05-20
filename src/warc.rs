@@ -129,15 +129,15 @@ struct RawWarcRecord {
 
 #[derive(Debug)]
 pub(crate) struct WarcRecord {
-    request: Request,
-    response: Response,
-    metadata: Metadata,
+    pub(crate) request: Request,
+    pub(crate) response: Response,
+    pub(crate) metadata: Metadata,
 }
 
 #[derive(Debug)]
-struct Request {
+pub(crate) struct Request {
     // WARC-Target-URI
-    url: String,
+    pub(crate) url: String,
 }
 
 impl Request {
@@ -153,8 +153,8 @@ impl Request {
 }
 
 #[derive(Debug)]
-struct Response {
-    body: String,
+pub(crate) struct Response {
+    pub(crate) body: String,
 }
 
 impl Response {
@@ -166,9 +166,9 @@ impl Response {
 }
 
 #[derive(Debug)]
-struct Metadata {
+pub(crate) struct Metadata {
     // fetchTimeMs
-    fetch_time_ms: usize,
+    pub(crate) fetch_time_ms: usize,
 }
 
 impl Metadata {
@@ -208,14 +208,12 @@ impl<R: BufRead> Iterator for WarcFile<R> {
         let mut metadata = None;
 
         for item in items {
-            if item.is_none() {
-                return None;
-            }
-            let item = item.unwrap();
+            let item = item?;
 
             if item.is_err() {
                 return Some(Err(item.err().unwrap()));
             }
+
             let item = item.unwrap();
 
             if let Some(warc_type) = item.header.get("WARC-TYPE") {

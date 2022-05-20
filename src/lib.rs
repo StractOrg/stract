@@ -5,6 +5,7 @@ use thiserror::Error;
 
 mod indexer;
 mod warc;
+mod webpage;
 
 pub use indexer::Indexer;
 
