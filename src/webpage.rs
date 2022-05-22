@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use scraper::{Html, Selector};
+use scraper::{Html, Node, Selector};
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
@@ -35,14 +35,28 @@ impl Webpage {
     fn grab_texts(&self, selector: &Selector) -> Vec<String> {
         self.dom
             .select(selector)
-            .flat_map(|el| el.text())
+            .filter(|el| selector.matches(el))
+            .map(|el| {
+                if let Some(node) = (*el).first_child() {
+                    if let Node::Text(text) = node.value() {
+                        Some(text)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .filter(|text| text.is_some())
+            .map(|text| text.unwrap())
             .map(|t| String::from(t.trim()))
             .filter(|t| !t.is_empty())
             .collect::<Vec<String>>()
     }
 
     pub(crate) fn text(&self) -> String {
-        let selector = Selector::parse("body").expect("Failed to parse selector");
+        let selector =
+            Selector::parse("body :not(script):not(style)").expect("Failed to parse selector");
         Itertools::intersperse(self.grab_texts(&selector).into_iter(), "\n".to_string())
             .collect::<String>()
             .trim()
@@ -112,5 +126,63 @@ mod tests {
         expected_meta.insert("content".to_string(), "value".to_string());
 
         assert_eq!(webpage.metadata(), vec![expected_meta]);
+    }
+
+    #[test]
+    fn script_tags_text_ignored() {
+        let raw = r#"
+            <html>
+                <head>
+                    <title>Best website</title>
+                    <meta name="meta1" content="value">
+                    <script>this should not be extracted</script>
+                </head>
+                <body>
+                    <script>this should not be extracted</script>
+                    <p>This text should be the first text extracted</p>
+                    <div>
+                        <script>this should not be extracted</script>
+                        <p>This text should be the second text extracted</p>
+                    </div>
+                    <script>this should not be extracted</script>
+                </body>
+            </html>
+        "#;
+
+        let webpage = Webpage::parse(raw);
+
+        assert_eq!(
+            webpage.text(),
+            "This text should be the first text extracted\nThis text should be the second text extracted"
+        );
+    }
+
+    #[test]
+    fn style_tags_text_ignored() {
+        let raw = r#"
+            <html>
+                <head>
+                    <title>Best website</title>
+                    <meta name="meta1" content="value">
+                    <style>this should not be extracted</style>
+                </head>
+                <body>
+                    <style>this should not be extracted</style>
+                    <p>This text should be the first text extracted</p>
+                    <div>
+                        <style>this should not be extracted</style>
+                        <p>This text should be the second text extracted</p>
+                    </div>
+                    <style>this should not be extracted</style>
+                </body>
+            </html>
+        "#;
+
+        let webpage = Webpage::parse(raw);
+
+        assert_eq!(
+            webpage.text(),
+            "This text should be the first text extracted\nThis text should be the second text extracted"
+        );
     }
 }

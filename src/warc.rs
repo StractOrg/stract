@@ -159,8 +159,14 @@ pub(crate) struct Response {
 
 impl Response {
     fn from_raw(record: RawWarcRecord) -> Result<Self> {
+        let content = decode(record.content);
+
+        let (_header, content) = content
+            .split_once("\r\n\r\n")
+            .ok_or(Error::WarcParse("Invalid http body"))?;
+
         Ok(Self {
-            body: decode(record.content),
+            body: content.to_string(),
         })
     }
 }
@@ -281,7 +287,9 @@ mod tests {
                 \r\n\
                 warc/1.0\r\n\
                 warc-tYPE: response\r\n\
-                cONTENT-lENGTH: 16\r\n\
+                cONTENT-lENGTH: 29\r\n\
+                \r\n\
+                http-body\r\n\
                 \r\n\
                 body of response\r\n\
                 \r\n\

@@ -5,6 +5,7 @@ use std::io::{self, BufRead};
 use tokio::io::AsyncReadExt;
 
 use crate::warc::WarcFile;
+use crate::webpage::Webpage;
 use crate::{Config, Error, Result};
 
 pub struct Indexer {
@@ -38,8 +39,11 @@ impl Indexer {
             println!("Downloaded {} bytes", raw_object.len());
             let warc = WarcFile::new(&raw_object[..]);
             for record in warc {
-                println!("TEST: {:?}", record);
-                panic!();
+                if let Ok(record) = record {
+                    let webpage = Webpage::parse(&record.response.body);
+                    println!("TEST: {:?}", webpage.text());
+                    panic!();
+                }
             }
         }
 
