@@ -3,7 +3,6 @@ mod sled_store;
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
 
-use itertools::TakeWhileRef;
 use memory_store::MemoryStore;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -106,14 +105,36 @@ impl<S: GraphStore> WebGraph<S> {
             |edge| edge.from.clone(),
         )
     }
+
+    pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
+        self.internal_store
+            .nodes()
+            .into_iter()
+            .map(|node| {
+                let mut centrality_values: HashMap<Node, f64> = self
+                    .reversed_distances(node.clone())
+                    .into_iter()
+                    .filter(|(other_node, _)| other_node != &node)
+                    .map(|(other_node, dist)| (other_node, 1f64 / dist as f64))
+                    .collect();
+
+                for other_node in self.internal_store.nodes() {
+                    centrality_values.entry(other_node).or_insert(0f64);
+                }
+
+                let centrality = centrality_values.into_iter().map(|(_, val)| val).sum();
+
+                (node, centrality)
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    #[test]
-    fn distance_calculation() {
+    fn test_graph() -> WebGraph<MemoryStore> {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -132,6 +153,13 @@ mod test {
         graph.insert(Edge::new(Node::from("A"), Node::from("C"), String::new()));
         graph.insert(Edge::new(Node::from("C"), Node::from("A"), String::new()));
         graph.insert(Edge::new(Node::from("D"), Node::from("C"), String::new()));
+
+        graph
+    }
+
+    #[test]
+    fn distance_calculation() {
+        let graph = test_graph();
 
         let distances = graph.distances(Node::from("D"));
 
@@ -142,24 +170,7 @@ mod test {
 
     #[test]
     fn reversed_distance_calculation() {
-        //     ┌────┐
-        //     │    │
-        // ┌───A◄─┐ │
-        // │      │ │
-        // ▼      │ │
-        // B─────►C◄┘
-        //        ▲
-        //        │
-        //        │
-        //        D
-
-        let mut graph = WebGraph::<MemoryStore>::new_memory();
-
-        graph.insert(Edge::new(Node::from("A"), Node::from("B"), String::new()));
-        graph.insert(Edge::new(Node::from("B"), Node::from("C"), String::new()));
-        graph.insert(Edge::new(Node::from("A"), Node::from("C"), String::new()));
-        graph.insert(Edge::new(Node::from("C"), Node::from("A"), String::new()));
-        graph.insert(Edge::new(Node::from("D"), Node::from("C"), String::new()));
+        let graph = test_graph();
 
         let distances = graph.reversed_distances(Node::from("D"));
 
@@ -172,5 +183,20 @@ mod test {
         assert_eq!(distances.get(&Node::from("C")), Some(&1));
         assert_eq!(distances.get(&Node::from("D")), Some(&2));
         assert_eq!(distances.get(&Node::from("B")), Some(&2));
+    }
+
+    #[test]
+    fn harmonic_centrality() {
+        let graph = test_graph();
+
+        let centrality = graph.harmonic_centrality();
+
+        assert_eq!(centrality.get(&Node::from("C")).unwrap(), &3.0);
+        assert_eq!(centrality.get(&Node::from("D")).unwrap(), &0.0);
+        assert_eq!(centrality.get(&Node::from("A")).unwrap(), &2.0);
+        assert_eq!(
+            (*centrality.get(&Node::from("B")).unwrap() * 100.0).round() / 100.0,
+            1.83
+        );
     }
 }
