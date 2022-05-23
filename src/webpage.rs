@@ -55,8 +55,23 @@ impl Webpage {
     }
 
     pub(crate) fn text(&self) -> String {
-        let selector =
-            Selector::parse("body :not(script):not(style)").expect("Failed to parse selector");
+        let selector = Selector::parse(
+            "body a,
+            body div,
+            body span,
+            body p,
+            body h1,
+            body h2,
+            body h3,
+            body h4,
+            body li,
+            body ul,
+            body ol,
+            body nav,
+            body pre
+            ",
+        )
+        .expect("Failed to parse selector");
         Itertools::intersperse(self.grab_texts(&selector).into_iter(), "\n".to_string())
             .collect::<String>()
             .trim()
