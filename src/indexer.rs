@@ -28,6 +28,7 @@ impl Indexer {
     pub async fn run(self) -> Result<()> {
         for warc_s3_path in self.warc_paths {
             println!("{}", warc_s3_path);
+
             let raw_object = Indexer::download_from_s3(
                 warc_s3_path,
                 self.config.s3.name.clone(),
@@ -42,9 +43,11 @@ impl Indexer {
                 if let Ok(record) = record {
                     let webpage = Webpage::parse(&record.response.body);
                     println!("TEST: {:?}", webpage.text());
-                    panic!();
+                    println!();
                 }
             }
+
+            panic!();
         }
 
         Ok(())
