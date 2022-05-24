@@ -17,7 +17,7 @@ pub struct Config {
     warc_paths_file: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type", content = "args")]
 pub enum WarcSource {
     S3(S3Config),
@@ -29,14 +29,14 @@ pub enum Mode {
     Indexer,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct S3Config {
     name: String,
     endpoint: String,
     bucket: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct HttpConfig {
     base_url: String,
 }
