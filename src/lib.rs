@@ -13,8 +13,15 @@ pub use indexer::Indexer;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub mode: Mode,
-    s3: S3Config,
+    warc_source: Option<WarcSource>,
     warc_paths_file: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", content = "args")]
+pub enum WarcSource {
+    S3(S3Config),
+    HTTP(HttpConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,10 +36,18 @@ pub struct S3Config {
     bucket: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct HttpConfig {
+    base_url: String,
+}
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to download object from S3")]
     S3DownloadError,
+
+    #[error("Failed to download object from HTTP")]
+    HTTPDownloadERror(#[from] reqwest::Error),
 
     #[error("Failed to get the object from S3")]
     GetObjectError(#[from] rusoto_core::RusotoError<rusoto_s3::GetObjectError>),
