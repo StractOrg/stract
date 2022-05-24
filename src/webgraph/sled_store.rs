@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::{Edge, InternalEdge, Node, NodeID};
 use crate::webgraph::GraphStore;
 
@@ -10,8 +12,7 @@ pub struct SledStore {
 }
 
 impl SledStore {
-    #[allow(dead_code)]
-    fn temporary() -> Self {
+    pub(crate) fn temporary() -> Self {
         let db = sled::Config::default()
             .temporary(true)
             .use_compression(true)
@@ -19,6 +20,21 @@ impl SledStore {
             .open()
             .expect("Failed to open database");
 
+        Self::from_db(db)
+    }
+
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let db = sled::Config::default()
+            .path(path)
+            .use_compression(true)
+            .mode(sled::Mode::LowSpace)
+            .open()
+            .expect("Failed to open database");
+
+        Self::from_db(db)
+    }
+
+    fn from_db(db: sled::Db) -> Self {
         Self {
             adjacency: db
                 .open_tree("adjacency")
@@ -100,14 +116,14 @@ impl SledStore {
     fn insert_adjacency(&mut self, from: NodeID, to: NodeID, label: String) {
         let from_bytes = bincode::serialize(&from).expect("Failed to serialize id");
 
-        let mut adjacency_list = self
+        let mut adjacency_list: Vec<_> = self
             .adjacency
             .get(&from_bytes)
             .expect("Failed to retrieve adjancecy list")
             .map(|bytes| {
                 bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
             })
-            .unwrap_or(Vec::new());
+            .unwrap_or_default();
 
         let internal_edge = InternalEdge { to_node: to, label };
         adjacency_list.push(internal_edge);
@@ -123,14 +139,14 @@ impl SledStore {
     fn insert_reverse_adjacency(&mut self, from: NodeID, to: NodeID, label: String) {
         let to_bytes = bincode::serialize(&to).expect("Failed to serialize id");
 
-        let mut adjacency_list = self
+        let mut adjacency_list: Vec<_> = self
             .reversed_adjacency
             .get(&to_bytes)
             .expect("Failed to retrieve adjacency list")
             .map(|bytes| {
                 bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
             })
-            .unwrap_or(Vec::new());
+            .unwrap_or_default();
 
         let internal_edge = InternalEdge {
             to_node: from,

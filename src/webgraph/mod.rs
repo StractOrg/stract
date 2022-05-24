@@ -3,8 +3,9 @@ mod sled_store;
 use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
+use std::path::Path;
 
-use memory_store::MemoryStore;
+use sled_store::SledStore;
 
 type NodeName = String;
 type NodeID = u64;
@@ -59,9 +60,15 @@ pub struct WebGraph<S: GraphStore> {
 }
 
 impl<S: GraphStore> WebGraph<S> {
-    pub fn new_memory() -> WebGraph<MemoryStore> {
+    pub fn new_memory() -> WebGraph<SledStore> {
         WebGraph {
-            internal_store: MemoryStore::default(),
+            internal_store: SledStore::temporary(),
+        }
+    }
+
+    pub fn open<P: AsRef<Path>>(path: P) -> WebGraph<SledStore> {
+        WebGraph {
+            internal_store: SledStore::open(path),
         }
     }
 
@@ -149,7 +156,7 @@ impl<S: GraphStore> WebGraph<S> {
 mod test {
     use super::*;
 
-    fn test_graph() -> WebGraph<MemoryStore> {
+    fn test_graph() -> WebGraph<SledStore> {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -161,7 +168,7 @@ mod test {
         //        │
         //        D
 
-        let mut graph = WebGraph::<MemoryStore>::new_memory();
+        let mut graph = WebGraph::<SledStore>::new_memory();
 
         graph.insert(Edge::new(Node::from("A"), Node::from("B"), String::new()));
         graph.insert(Edge::new(Node::from("B"), Node::from("C"), String::new()));
