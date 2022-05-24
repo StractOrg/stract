@@ -1,7 +1,16 @@
 mode = "Indexer"
 warc_paths_file = "warc.paths"
 
-[s3]
-name = "us-east-1"
-endpoint = "https://s3.us-east-1.amazonaws.com"
-bucket = "commoncrawl"
+# [warc_source]
+# type = "S3"
+# 
+# [warc_source.args]
+# name = "us-east-1"
+# endpoint = "https://s3.us-east-1.amazonaws.com"
+# bucket = "commoncrawl"
+
+[warc_source]
+type = "HTTP"
+
+[warc_source.args]
+base_url = "https://data.commoncrawl.org/"

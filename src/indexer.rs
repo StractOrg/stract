@@ -6,7 +6,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::warc::WarcFile;
 use crate::webpage::Webpage;
-use crate::{Config, Error, Result};
+use crate::{Config, Error, Result, WarcSource};
 
 pub struct Indexer {
     warc_paths: Vec<String>,
@@ -26,16 +26,27 @@ impl Indexer {
     }
 
     pub async fn run(self) -> Result<()> {
+        let download_config = self
+            .config
+            .warc_source
+            .expect("Indexing needs a warc source");
         for warc_s3_path in self.warc_paths {
             println!("{}", warc_s3_path);
 
-            let raw_object = Indexer::download_from_s3(
-                warc_s3_path,
-                self.config.s3.name.clone(),
-                self.config.s3.endpoint.clone(),
-                self.config.s3.bucket.clone(),
-            )
-            .await?;
+            let raw_object = match download_config {
+                WarcSource::S3(config) => {
+                    Indexer::download_from_s3(
+                        warc_s3_path,
+                        config.name.clone(),
+                        config.endpoint.clone(),
+                        config.bucket.clone(),
+                    )
+                    .await?
+                }
+                WarcSource::HTTP(config) => {
+                    Indexer::download_from_http(warc_s3_path, config.base_url.clone()).await?
+                }
+            };
 
             println!("Downloaded {} bytes", raw_object.len());
             let warc = WarcFile::new(&raw_object[..]);
@@ -49,6 +60,19 @@ impl Indexer {
         }
 
         Ok(())
+    }
+
+    async fn download_from_http(warc_path: String, base_url: String) -> Result<Vec<u8>> {
+        let mut url = base_url;
+        if !url.ends_with('/') {
+            url += "/";
+        }
+        url += &warc_path;
+
+        let client = reqwest::Client::new();
+        let res = client.get(url).send().await?;
+
+        Ok(Vec::from(&res.bytes().await?[..]))
     }
 
     async fn download_from_s3(
