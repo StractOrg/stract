@@ -1,3 +1,4 @@
+use futures::prelude::*;
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use std::fs::File;
@@ -26,38 +27,46 @@ impl Indexer {
     }
 
     pub async fn run(self) -> Result<()> {
-        let download_config = self
-            .config
-            .warc_source
-            .expect("Indexing needs a warc source");
-        for warc_s3_path in self.warc_paths {
-            println!("{}", warc_s3_path);
+        let warc_source = &self.config.warc_source;
 
-            let raw_object = match download_config {
-                WarcSource::S3(config) => {
-                    Indexer::download_from_s3(
-                        warc_s3_path,
-                        config.name.clone(),
-                        config.endpoint.clone(),
-                        config.bucket.clone(),
-                    )
-                    .await?
+        stream::iter(self.warc_paths)
+            .map(|warc_s3_path| async move {
+                println!("{}", warc_s3_path);
+                let download_config = warc_source.as_ref().expect("Indexing needs a warc source");
+
+                let raw_object = match download_config {
+                    WarcSource::S3(config) => {
+                        Indexer::download_from_s3(
+                            warc_s3_path,
+                            config.name.clone(),
+                            config.endpoint.clone(),
+                            config.bucket.clone(),
+                        )
+                        .await
+                    }
+                    WarcSource::HTTP(config) => {
+                        Indexer::download_from_http(warc_s3_path, config.base_url.clone()).await
+                    }
+                };
+
+                if raw_object.is_err() {
+                    return;
                 }
-                WarcSource::HTTP(config) => {
-                    Indexer::download_from_http(warc_s3_path, config.base_url.clone()).await?
+                let raw_object = raw_object.unwrap();
+
+                println!("Downloaded {} bytes", raw_object.len());
+                let warc = WarcFile::new(&raw_object[..]);
+                for record in warc.flatten() {
+                    let webpage = Webpage::parse(&record.response.body);
+                    println!("TEST: {:?}", webpage.text());
+                    println!();
                 }
-            };
 
-            println!("Downloaded {} bytes", raw_object.len());
-            let warc = WarcFile::new(&raw_object[..]);
-            for record in warc.flatten() {
-                let webpage = Webpage::parse(&record.response.body);
-                println!("TEST: {:?}", webpage.text());
-                println!();
-            }
-
-            panic!();
-        }
+                panic!();
+            })
+            .buffer_unordered(1)
+            .collect::<Vec<_>>()
+            .await;
 
         Ok(())
     }
