@@ -39,12 +39,10 @@ impl Indexer {
 
             println!("Downloaded {} bytes", raw_object.len());
             let warc = WarcFile::new(&raw_object[..]);
-            for record in warc {
-                if let Ok(record) = record {
-                    let webpage = Webpage::parse(&record.response.body);
-                    println!("TEST: {:?}", webpage.text());
-                    println!();
-                }
+            for record in warc.flatten() {
+                let webpage = Webpage::parse(&record.response.body);
+                println!("TEST: {:?}", webpage.text());
+                println!();
             }
 
             panic!();
