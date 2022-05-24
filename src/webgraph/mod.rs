@@ -1,11 +1,21 @@
 mod memory_store;
 mod sled_store;
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
 
 use memory_store::MemoryStore;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+type NodeName = String;
+type NodeID = u64;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct InternalEdge {
+    to_node: NodeID,
+    label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Node {
     name: String,
 }
@@ -31,7 +41,7 @@ pub trait GraphStore {
     fn insert(&mut self, edge: Edge);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Edge {
     from: Node,
     to: Node,
@@ -67,8 +77,8 @@ impl<S: GraphStore> WebGraph<S> {
         let mut distances: HashMap<Node, usize> = HashMap::default();
         let mut queue = BinaryHeap::new();
 
-        queue.push(cmp::Reverse((0 as usize, source.clone())));
-        distances.insert(source.clone(), 0);
+        queue.push(cmp::Reverse((0_usize, source.clone())));
+        distances.insert(source, 0);
 
         while let Some(state) = queue.pop() {
             let (cost, v) = state.0;
@@ -107,6 +117,7 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
+        let norm_factor = (self.internal_store.nodes().count() - 1) as f64;
         self.internal_store
             .nodes()
             .into_iter()
@@ -122,7 +133,11 @@ impl<S: GraphStore> WebGraph<S> {
                     centrality_values.entry(other_node).or_insert(0f64);
                 }
 
-                let centrality = centrality_values.into_iter().map(|(_, val)| val).sum();
+                let centrality = centrality_values
+                    .into_iter()
+                    .map(|(_, val)| val)
+                    .sum::<f64>()
+                    / norm_factor;
 
                 (node, centrality)
             })
@@ -191,12 +206,15 @@ mod test {
 
         let centrality = graph.harmonic_centrality();
 
-        assert_eq!(centrality.get(&Node::from("C")).unwrap(), &3.0);
+        assert_eq!(centrality.get(&Node::from("C")).unwrap(), &1.0);
         assert_eq!(centrality.get(&Node::from("D")).unwrap(), &0.0);
-        assert_eq!(centrality.get(&Node::from("A")).unwrap(), &2.0);
+        assert_eq!(
+            (*centrality.get(&Node::from("A")).unwrap() * 100.0).round() / 100.0,
+            0.67
+        );
         assert_eq!(
             (*centrality.get(&Node::from("B")).unwrap() * 100.0).round() / 100.0,
-            1.83
+            0.61
         );
     }
 }

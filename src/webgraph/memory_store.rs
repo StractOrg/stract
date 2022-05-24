@@ -1,15 +1,6 @@
-use super::{Edge, Node};
+use super::{Edge, InternalEdge, Node, NodeID, NodeName};
 use crate::webgraph::GraphStore;
 use std::collections::HashMap;
-
-type NodeName = String;
-type NodeID = u64;
-
-#[derive(Debug)]
-struct InternalEdge {
-    to_node: NodeID,
-    label: String,
-}
 
 #[derive(Default)]
 pub struct MemoryStore {
@@ -47,8 +38,7 @@ impl GraphStore for MemoryStore {
                 .adjacency
                 .get(id)
                 .unwrap_or(&Vec::new())
-                .clone()
-                .into_iter()
+                .iter()
                 .map(|internal_edge| {
                     let to_name = self
                         .id2node
@@ -67,6 +57,7 @@ impl GraphStore for MemoryStore {
         }
     }
 
+    #[allow(clippy::needless_collect)]
     fn nodes(&self) -> Self::Iter {
         let nodes: Vec<Node> = self
             .id2node
@@ -105,8 +96,7 @@ impl GraphStore for MemoryStore {
                 .reversed_adjacency
                 .get(id)
                 .unwrap_or(&Vec::new())
-                .clone()
-                .into_iter()
+                .iter()
                 .map(|internal_edge| {
                     let from_name = self
                         .id2node

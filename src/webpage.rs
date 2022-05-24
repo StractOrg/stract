@@ -36,7 +36,7 @@ impl Webpage {
         self.dom
             .select(selector)
             .filter(|el| selector.matches(el))
-            .map(|el| {
+            .filter_map(|el| {
                 if let Some(node) = (*el).first_child() {
                     if let Node::Text(text) = node.value() {
                         Some(text)
@@ -47,8 +47,6 @@ impl Webpage {
                     None
                 }
             })
-            .filter(|text| text.is_some())
-            .map(|text| text.unwrap())
             .map(|t| String::from(t.trim()))
             .filter(|t| !t.is_empty())
             .collect::<Vec<String>>()
