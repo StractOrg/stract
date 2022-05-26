@@ -123,7 +123,7 @@ impl<S: GraphStore> WebGraph<S> {
         )
     }
 
-    pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
+    pub fn calculate_harmonic_centrality(&self) -> HashMap<Node, f64> {
         let norm_factor = (self.internal_store.nodes().count() - 1) as f64;
         self.internal_store
             .nodes()
@@ -211,7 +211,7 @@ mod test {
     fn harmonic_centrality() {
         let graph = test_graph();
 
-        let centrality = graph.harmonic_centrality();
+        let centrality = graph.calculate_harmonic_centrality();
 
         assert_eq!(centrality.get(&Node::from("C")).unwrap(), &1.0);
         assert_eq!(centrality.get(&Node::from("D")).unwrap(), &0.0);

@@ -5,7 +5,7 @@ use thiserror::Error;
 
 mod indexer;
 mod query;
-mod ranker;
+mod ranking;
 mod search_index;
 mod searcher;
 mod warc;

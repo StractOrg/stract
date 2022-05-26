@@ -40,6 +40,8 @@ impl Index {
 
 pub struct FastWebpage {
     url: String,
+    doc_id: tantivy::DocId,
+    bm25_score: tantivy::Score,
 }
 pub struct RetrievedWebpage {
     title: String,
