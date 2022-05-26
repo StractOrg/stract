@@ -4,13 +4,17 @@ use std::num::ParseIntError;
 use thiserror::Error;
 
 mod indexer;
+mod query;
+mod ranker;
+mod search_index;
+mod searcher;
 mod warc;
 mod webgraph;
 mod webpage;
 
 pub use indexer::Indexer;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub mode: Mode,
     warc_source: Option<WarcSource>,
@@ -24,7 +28,7 @@ pub enum WarcSource {
     HTTP(HttpConfig),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub enum Mode {
     Indexer,
 }

@@ -3,18 +3,20 @@ use scraper::{Html, Node, Selector};
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
-pub(crate) struct Webpage {
+pub struct Webpage {
     dom: Html,
+    url: String,
 }
 
 impl Webpage {
-    pub(crate) fn parse(html: &str) -> Self {
+    pub fn parse(html: &str, url: &str) -> Self {
         Self {
             dom: Html::parse_document(html),
+            url: url.to_string(),
         }
     }
 
-    pub(crate) fn links(&self) -> Vec<Link> {
+    pub fn links(&self) -> Vec<Link> {
         let selector = Selector::parse("a").expect("Failed to parse selector");
         self.dom
             .select(&selector)
@@ -52,7 +54,7 @@ impl Webpage {
             .collect::<Vec<String>>()
     }
 
-    pub(crate) fn text(&self) -> String {
+    pub fn text(&self) -> String {
         let selector = Selector::parse(
             "body a,
             body div,
@@ -76,12 +78,20 @@ impl Webpage {
             .to_string()
     }
 
-    pub(crate) fn title(&self) -> Option<String> {
+    pub fn title(&self) -> Option<String> {
         let selector = Selector::parse("title").expect("Failed to parse selector");
         self.grab_texts(&selector).get(0).cloned()
     }
 
-    pub(crate) fn metadata(&self) -> Vec<Meta> {
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn host(&self) -> &str {
+        todo!();
+    }
+
+    pub fn metadata(&self) -> Vec<Meta> {
         let selector = Selector::parse("meta").expect("Failed to parse selector");
         self.dom
             .select(&selector)
@@ -97,12 +107,12 @@ impl Webpage {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Link {
+pub struct Link {
     destination: String,
     text: String,
 }
 
-pub(crate) type Meta = BTreeMap<String, String>;
+pub type Meta = BTreeMap<String, String>;
 
 #[cfg(test)]
 mod tests {
@@ -122,7 +132,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw);
+        let webpage = Webpage::parse(raw, "https://www.example.com/whatever");
 
         assert_eq!(&webpage.text(), "Best example website ever");
         assert_eq!(webpage.title(), Some("Best website".to_string()));
@@ -139,6 +149,8 @@ mod tests {
         expected_meta.insert("content".to_string(), "value".to_string());
 
         assert_eq!(webpage.metadata(), vec![expected_meta]);
+        assert_eq!(webpage.url(), "https://www.example.com/whatever");
+        assert_eq!(webpage.host(), "www.example.com");
     }
 
     #[test]
@@ -162,7 +174,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw);
+        let webpage = Webpage::parse(raw, "https://www.example.com");
 
         assert_eq!(
             webpage.text(),
@@ -191,7 +203,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw);
+        let webpage = Webpage::parse(raw, "https://www.example.com");
 
         assert_eq!(
             webpage.text(),

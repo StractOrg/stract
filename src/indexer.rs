@@ -1,11 +1,12 @@
 use futures::prelude::*;
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use std::fs::File;
 use std::io::{self, BufRead};
 use tokio::io::AsyncReadExt;
 
-use crate::warc::WarcFile;
+use crate::warc::{self, WarcFile};
 use crate::webpage::Webpage;
 use crate::{Config, Error, Result, WarcSource};
 
@@ -27,44 +28,65 @@ impl Indexer {
     }
 
     pub async fn run(self) -> Result<()> {
-        let warc_source = &self.config.warc_source;
+        let pb = ProgressBar::new(self.warc_paths.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
+                )
+                .progress_chars("#>-"),
+        );
 
-        stream::iter(self.warc_paths)
-            .map(|warc_s3_path| async move {
-                println!("{}", warc_s3_path);
-                let download_config = warc_source.as_ref().expect("Indexing needs a warc source");
+        stream::iter(self.warc_paths.into_iter().progress_with(pb))
+            .map(|warc_path| {
+                let download_config = self
+                    .config
+                    .warc_source
+                    .as_ref()
+                    .expect("Indexing needs a warc source")
+                    .clone();
 
-                let raw_object = match download_config {
-                    WarcSource::S3(config) => {
-                        Indexer::download_from_s3(
-                            warc_s3_path,
-                            config.name.clone(),
-                            config.endpoint.clone(),
-                            config.bucket.clone(),
-                        )
-                        .await
-                    }
-                    WarcSource::HTTP(config) => {
-                        Indexer::download_from_http(warc_s3_path, config.base_url.clone()).await
-                    }
-                };
+                tokio::spawn(async move {
+                    let raw_object = match download_config {
+                        WarcSource::S3(config) => {
+                            Indexer::download_from_s3(
+                                warc_path.clone(),
+                                config.name.clone(),
+                                config.endpoint.clone(),
+                                config.bucket.clone(),
+                            )
+                            .await
+                        }
+                        WarcSource::HTTP(config) => {
+                            Indexer::download_from_http(warc_path.clone(), config.base_url.clone())
+                                .await
+                        }
+                    };
 
-                if raw_object.is_err() {
-                    return;
-                }
-                let raw_object = raw_object.unwrap();
-
-                println!("Downloaded {} bytes", raw_object.len());
-                let warc = WarcFile::new(&raw_object[..]);
-                for record in warc.flatten() {
-                    let webpage = Webpage::parse(&record.response.body);
-                    println!("TEST: {:?}", webpage.text());
-                    println!();
-                }
-
-                panic!();
+                    raw_object
+                })
             })
-            .buffer_unordered(1)
+            .buffer_unordered(10)
+            .map(|raw_bytes| {
+                tokio::task::spawn_blocking(move || {
+                    if raw_bytes.is_err() {
+                        return;
+                    }
+                    let raw_bytes = raw_bytes.unwrap();
+                    if raw_bytes.is_err() {
+                        return;
+                    }
+                    let raw_bytes = raw_bytes.unwrap();
+                    let warc = WarcFile::new(&raw_bytes[..]);
+                    for record in warc.flatten() {
+                        let webpage = Webpage::parse(&record.response.body, &record.request.url);
+                        // println!("TEST: {:?}", webpage.title());
+                        // println!();
+                    }
+                    // panic!();
+                })
+            })
+            .buffer_unordered(10)
             .collect::<Vec<_>>()
             .await;
 
