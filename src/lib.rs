@@ -1,13 +1,13 @@
 use serde::Deserialize;
 use std::io;
 use std::num::ParseIntError;
+use tantivy::TantivyError;
 use thiserror::Error;
 
 mod indexer;
 mod query;
 mod ranking;
 mod search_index;
-mod searcher;
 mod warc;
 mod webgraph;
 mod webpage;
@@ -67,6 +67,18 @@ pub enum Error {
 
     #[error("Could not parse string to int")]
     IntParse(#[from] ParseIntError),
+
+    #[error("Encountered a tantivy error")]
+    Tantivy(#[from] TantivyError),
+
+    #[error("Encountered an empty required field when converting to tantivy")]
+    EmptyField(&'static str),
+
+    #[error("Parsing error")]
+    ParsingError(String),
+
+    #[error("Error while serializing/deserializing to/from bytes")]
+    Serialization(#[from] bincode::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

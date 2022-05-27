@@ -1,6 +1,9 @@
+use crate::{Error, Result};
 use itertools::Itertools;
 use scraper::{Html, Node, Selector};
 use std::collections::BTreeMap;
+
+use crate::search_index::{Field, ALL_FIELDS};
 
 #[derive(Debug)]
 pub struct Webpage {
@@ -68,7 +71,8 @@ impl Webpage {
             body ul,
             body ol,
             body nav,
-            body pre
+            body pre,
+            body
             ",
         )
         .expect("Failed to parse selector");
@@ -88,7 +92,24 @@ impl Webpage {
     }
 
     pub fn host(&self) -> &str {
-        todo!();
+        let mut start_host = 0;
+        if self.url().starts_with("http://") || self.url().starts_with("https://") {
+            start_host = self
+                .url()
+                .find('/')
+                .expect("It was checked that url starts with protocol");
+            start_host += 2; // skip the two '/'
+        }
+
+        let mut end_host = self.url.len();
+        if self.url()[start_host..].contains('/') {
+            end_host = self.url()[start_host..]
+                .find('/')
+                .expect("The url contains atleast 1 '/'");
+            end_host += start_host; // offset the start position
+        }
+
+        &self.url()[start_host..end_host]
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
@@ -103,6 +124,30 @@ impl Webpage {
                     .collect::<BTreeMap<String, String>>()
             })
             .collect()
+    }
+
+    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
+        let mut doc = tantivy::Document::new();
+
+        for field in &ALL_FIELDS {
+            let tantivy_field = schema
+                .get_field(field.as_str())
+                .expect(format!("Unknown field: {}", field.as_str()).as_str());
+
+            match field {
+                Field::Title => {
+                    if self.title().is_none() {
+                        return Err(Error::EmptyField("title"));
+                    }
+
+                    doc.add_text(tantivy_field, self.title().unwrap())
+                }
+                Field::Body => doc.add_text(tantivy_field, self.text()),
+                Field::Url => doc.add_text(tantivy_field, self.url()),
+            }
+        }
+
+        Ok(doc)
     }
 }
 
@@ -151,6 +196,21 @@ mod tests {
         assert_eq!(webpage.metadata(), vec![expected_meta]);
         assert_eq!(webpage.url(), "https://www.example.com/whatever");
         assert_eq!(webpage.host(), "www.example.com");
+    }
+
+    #[test]
+    fn text_raw_body() {
+        let raw = r#"
+            <html>
+                <body>
+                    test website
+                </body>
+            </html>
+        "#;
+
+        let webpage = Webpage::parse(raw, "https://www.example.com/whatever");
+
+        assert_eq!(&webpage.text(), "test website");
     }
 
     #[test]
