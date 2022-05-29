@@ -1,56 +1,13 @@
 use tantivy::collector::Count;
-use tantivy::schema::{IndexRecordOption, TextFieldIndexing, TextOptions};
 use tantivy::{DocAddress, Document, LeasedItem, Searcher};
 
 use crate::query::Query;
 use crate::ranking;
-use crate::{webpage::Webpage, Result};
+use crate::schema::{create_schema, Field, ALL_FIELDS};
+use crate::webpage::Webpage;
+use crate::Result;
 use std::path::Path;
 
-#[derive(Clone)]
-pub enum Field {
-    Title,
-    Body,
-    Url,
-}
-pub static ALL_FIELDS: [Field; 3] = [Field::Title, Field::Body, Field::Url];
-
-impl Field {
-    fn default_options(&self) -> tantivy::schema::TextOptions {
-        TextOptions::default()
-            .set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_tokenizer("en_stem")
-                    .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-            )
-            .set_stored()
-    }
-    pub fn options(&self) -> tantivy::schema::TextOptions {
-        match self {
-            Field::Title => self.default_options(),
-            Field::Body => self.default_options(),
-            Field::Url => self.default_options(),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Field::Title => "title",
-            Field::Body => "body",
-            Field::Url => "url",
-        }
-    }
-}
-
-fn create_schema() -> tantivy::schema::Schema {
-    let mut builder = tantivy::schema::Schema::builder();
-
-    for field in &ALL_FIELDS {
-        builder.add_text_field(field.as_str(), field.options());
-    }
-
-    builder.build()
-}
 pub struct Index {
     tantivy_index: tantivy::Index,
     writer: tantivy::IndexWriter,
@@ -156,6 +113,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
+                Field::BacklinkText | Field::Centrality => {}
             }
         }
 
@@ -165,6 +123,8 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
+    use crate::webpage::Link;
+
     use super::*;
 
     #[test]
@@ -177,7 +137,7 @@ mod tests {
         assert_eq!(result.num_docs, 0);
 
         index
-            .insert(Webpage::parse(
+            .insert(Webpage::new(
                 r#"
             <html>
                 <head>
@@ -186,6 +146,8 @@ mod tests {
             </html>
             "#,
                 "https://www.example.com",
+                vec![],
+                1.0,
             ))
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
@@ -202,7 +164,7 @@ mod tests {
         let query = Query::parse("this query should not match").expect("Failed to parse query");
 
         index
-            .insert(Webpage::parse(
+            .insert(Webpage::new(
                 r#"
             <html>
                 <head>
@@ -211,6 +173,8 @@ mod tests {
             </html>
             "#,
                 "https://www.example.com",
+                vec![],
+                1.0,
             ))
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
@@ -226,7 +190,7 @@ mod tests {
         let query = Query::parse("runner").expect("Failed to parse query");
 
         index
-            .insert(Webpage::parse(
+            .insert(Webpage::new(
                 r#"
             <html>
                 <head>
@@ -235,6 +199,8 @@ mod tests {
             </html>
             "#,
                 "https://www.example.com",
+                vec![],
+                1.0,
             ))
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
@@ -242,6 +208,58 @@ mod tests {
         let result = index.search(&query).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn searchable_backlinks() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("great site").expect("Failed to parse query");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Website A</title>
+                </head>
+                <a href="https://www.b.com">B site is great</a>
+            </html>
+            "#,
+                "https://www.a.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Website B</title>
+                </head>
+            </html>
+            "#,
+                "https://www.b.com",
+                vec![Link {
+                    source: "https://www.a.com".to_string(),
+                    destination: "https://www.b.com".to_string(),
+                    text: "B site is great".to_string(),
+                }],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let mut result = index.search(&query).expect("Search failed");
+
+        result
+            .documents
+            .sort_by(|a, b| a.url.partial_cmp(&b.url).unwrap());
+
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.a.com");
+        assert_eq!(result.documents[1].url, "https://www.b.com");
     }
 
     // #[test]

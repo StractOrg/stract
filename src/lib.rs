@@ -7,6 +7,7 @@ use thiserror::Error;
 mod indexer;
 mod query;
 mod ranking;
+mod schema;
 mod search_index;
 mod warc;
 mod webgraph;
