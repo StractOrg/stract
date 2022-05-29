@@ -1,4 +1,6 @@
-use tantivy::schema::{IndexRecordOption, TextFieldIndexing, TextOptions};
+use tantivy::schema::{
+    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+};
 
 #[derive(Clone)]
 pub enum Field {
@@ -17,7 +19,7 @@ pub static ALL_FIELDS: [Field; 5] = [
 ];
 
 impl Field {
-    fn default_options(&self) -> tantivy::schema::TextOptions {
+    fn default_text_options(&self) -> tantivy::schema::TextOptions {
         TextOptions::default().set_indexing_options(
             TextFieldIndexing::default()
                 .set_tokenizer("en_stem")
@@ -25,13 +27,17 @@ impl Field {
         )
     }
 
-    pub fn options(&self) -> tantivy::schema::TextOptions {
+    fn options(&self) -> IndexingOption {
         match self {
-            Field::Title => self.default_options().set_stored(),
-            Field::Body => self.default_options().set_stored(),
-            Field::Url => self.default_options().set_stored(),
-            Field::BacklinkText => self.default_options(),
-            Field::Centrality => self.default_options().set_fast(),
+            Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
+            Field::Centrality => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -50,8 +56,16 @@ pub fn create_schema() -> tantivy::schema::Schema {
     let mut builder = tantivy::schema::Schema::builder();
 
     for field in &ALL_FIELDS {
-        builder.add_text_field(field.as_str(), field.options());
+        match field.options() {
+            IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
+            IndexingOption::Numeric(options) => builder.add_f64_field(field.as_str(), options),
+        };
     }
 
     builder.build()
+}
+
+enum IndexingOption {
+    Text(tantivy::schema::TextOptions),
+    Numeric(tantivy::schema::NumericOptions),
 }

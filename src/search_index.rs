@@ -20,7 +20,7 @@ impl Index {
         todo!();
     }
 
-    fn temporary() -> Result<Self> {
+    pub(crate) fn temporary() -> Result<Self> {
         let schema = create_schema();
         let tantivy_index = tantivy::Index::create_in_ram(schema);
 
@@ -74,16 +74,16 @@ impl Index {
 }
 
 pub struct SearchResult {
-    num_docs: usize,
-    documents: Vec<RetrievedWebpage>,
+    pub num_docs: usize,
+    pub documents: Vec<RetrievedWebpage>,
 }
 
 #[derive(Default)]
 pub struct RetrievedWebpage {
-    title: String,
-    url: String,
-    snippet: String,
-    body: String,
+    pub title: String,
+    pub url: String,
+    pub snippet: String,
+    pub body: String,
 }
 
 impl From<Document> for RetrievedWebpage {
