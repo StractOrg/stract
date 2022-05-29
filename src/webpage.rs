@@ -1,20 +1,65 @@
 use crate::{Error, Result};
 use itertools::Itertools;
-use scraper::{Html, Node, Selector};
+use scraper::Html as ScraperHtml;
+use scraper::{Node, Selector};
 use std::collections::BTreeMap;
 
-use crate::search_index::{Field, ALL_FIELDS};
+use crate::schema::{Field, ALL_FIELDS};
 
-#[derive(Debug)]
 pub struct Webpage {
-    dom: Html,
-    url: String,
+    pub html: Html,
+    pub backlinks: Vec<Link>,
+    pub centrality: f64,
 }
 
 impl Webpage {
+    pub fn new(html: &str, url: &str, backlinks: Vec<Link>, centrality: f64) -> Self {
+        let html = Html::parse(html, url);
+
+        Self {
+            html,
+            backlinks,
+            centrality,
+        }
+    }
+
+    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
+        let mut doc = self.html.into_tantivy(schema)?;
+
+        let backlink_text: String = itertools::intersperse(
+            self.backlinks.into_iter().map(|link| link.text),
+            "\n".to_string(),
+        )
+        .collect();
+
+        doc.add_text(
+            schema
+                .get_field(Field::BacklinkText.as_str())
+                .expect("Failed to get backlink-text field"),
+            backlink_text,
+        );
+
+        doc.add_f64(
+            schema
+                .get_field(Field::Centrality.as_str())
+                .expect("Failed to get centrality field"),
+            self.centrality,
+        );
+
+        Ok(doc)
+    }
+}
+
+#[derive(Debug)]
+pub struct Html {
+    dom: ScraperHtml,
+    url: String,
+}
+
+impl Html {
     pub fn parse(html: &str, url: &str) -> Self {
         Self {
-            dom: Html::parse_document(html),
+            dom: ScraperHtml::parse_document(html),
             url: url.to_string(),
         }
     }
@@ -32,7 +77,11 @@ impl Webpage {
             .filter(|(dest, _)| dest.is_some())
             .map(|(destination, text)| {
                 let destination = destination.unwrap().to_string();
-                Link { destination, text }
+                Link {
+                    source: self.url.clone(),
+                    destination,
+                    text,
+                }
             })
             .collect()
     }
@@ -144,6 +193,7 @@ impl Webpage {
                 }
                 Field::Body => doc.add_text(tantivy_field, self.text()),
                 Field::Url => doc.add_text(tantivy_field, self.url()),
+                Field::BacklinkText | Field::Centrality => {}
             }
         }
 
@@ -153,8 +203,9 @@ impl Webpage {
 
 #[derive(Debug, PartialEq)]
 pub struct Link {
-    destination: String,
-    text: String,
+    pub source: String,
+    pub destination: String,
+    pub text: String,
 }
 
 pub type Meta = BTreeMap<String, String>;
@@ -177,13 +228,14 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(raw, "https://www.example.com/whatever");
 
         assert_eq!(&webpage.text(), "Best example website ever");
         assert_eq!(webpage.title(), Some("Best website".to_string()));
         assert_eq!(
             webpage.links(),
             vec![Link {
+                source: "https://www.example.com/whatever".to_string(),
                 destination: "example.com".to_string(),
                 text: "Best example website ever".to_string()
             }]
@@ -208,7 +260,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(raw, "https://www.example.com/whatever");
 
         assert_eq!(&webpage.text(), "test website");
     }
@@ -234,7 +286,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw, "https://www.example.com");
+        let webpage = Html::parse(raw, "https://www.example.com");
 
         assert_eq!(
             webpage.text(),
@@ -263,7 +315,7 @@ mod tests {
             </html>
         "#;
 
-        let webpage = Webpage::parse(raw, "https://www.example.com");
+        let webpage = Html::parse(raw, "https://www.example.com");
 
         assert_eq!(
             webpage.text(),
