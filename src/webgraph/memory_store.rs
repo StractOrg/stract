@@ -205,7 +205,7 @@ mod test {
         assert_eq!(
             store.ingoing_edges(a.clone()),
             vec![Edge {
-                from: c.clone(),
+                from: c,
                 to: a.clone(),
                 label: String::new()
             },]
@@ -213,8 +213,8 @@ mod test {
         assert_eq!(
             store.ingoing_edges(b.clone()),
             vec![Edge {
-                from: a.clone(),
-                to: b.clone(),
+                from: a,
+                to: b,
                 label: String::new()
             },]
         );

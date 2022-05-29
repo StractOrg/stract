@@ -16,7 +16,7 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(_path: P) -> Result<Self> {
         todo!();
     }
 

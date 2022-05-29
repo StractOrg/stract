@@ -25,7 +25,7 @@ pub(crate) fn initial_collector() -> impl Collector<Fruit = Vec<(f64, tantivy::D
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::{
         query::Query,
         search_index::Index,
