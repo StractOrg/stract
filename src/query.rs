@@ -9,7 +9,8 @@ use nom::{
 };
 use tantivy::{
     query::{BooleanQuery, Occur, TermQuery},
-    schema::{IndexRecordOption, Schema},
+    schema::{Field, FieldEntry, IndexRecordOption, Schema},
+    tokenizer::{TextAnalyzer, TokenizerManager},
     Term,
 };
 
@@ -48,7 +49,48 @@ impl Query {
         }
     }
 
-    pub fn tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query> {
+    fn get_tantivy_analyzer(
+        entry: &FieldEntry,
+        tokenizer_manager: &TokenizerManager,
+    ) -> Option<TextAnalyzer> {
+        match entry.field_type() {
+            tantivy::schema::FieldType::Str(options) => {
+                options.get_indexing_options().map(|indexing_options| {
+                    let tokenizer_name = indexing_options.tokenizer();
+                    tokenizer_manager
+                        .get(tokenizer_name)
+                        .expect("Unknown tokenizer")
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn process_tantivy_term(
+        term: &str,
+        analyzer: Option<TextAnalyzer>,
+        tantivy_field: Field,
+    ) -> Term {
+        match analyzer {
+            None => Term::from_field_text(tantivy_field, term),
+            Some(tokenizer) => {
+                let mut terms: Vec<Term> = Vec::new();
+                let mut token_stream = tokenizer.token_stream(term);
+                token_stream.process(&mut |token| {
+                    let term = Term::from_field_text(tantivy_field, &token.text);
+                    terms.push(term);
+                });
+
+                terms.into_iter().next().unwrap()
+            }
+        }
+    }
+
+    pub fn tantivy(
+        &self,
+        schema: &Schema,
+        tokenizer_manager: &TokenizerManager,
+    ) -> Box<dyn tantivy::query::Query> {
         let queries = self
             .terms
             .iter()
@@ -56,14 +98,16 @@ impl Query {
                 let one_term = schema
                     .fields()
                     .into_iter()
-                    .map(|(field, _)| {
-                        (
-                            Occur::Should,
-                            Box::new(TermQuery::new(
-                                Term::from_field_text(field, term),
-                                IndexRecordOption::Basic,
-                            )) as Box<dyn tantivy::query::Query>,
-                        )
+                    .map(|(field, entry)| {
+                        let analyzer = Query::get_tantivy_analyzer(entry, tokenizer_manager);
+                        let term = Query::process_tantivy_term(term, analyzer, field);
+
+                        let term_query = Box::new(TermQuery::new(
+                            term,
+                            IndexRecordOption::WithFreqsAndPositions,
+                        ))
+                            as Box<dyn tantivy::query::Query>;
+                        (Occur::Should, term_query)
                     })
                     .collect();
 

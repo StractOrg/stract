@@ -20,7 +20,7 @@ impl Field {
         TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
-                    // .set_tokenizer("en_stem")
+                    .set_tokenizer("en_stem")
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored()
@@ -88,7 +88,7 @@ impl Index {
     }
 
     pub fn search(&self, query: &Query) -> Result<SearchResult> {
-        let tantivy_query = query.tantivy(&self.schema);
+        let tantivy_query = query.tantivy(&self.schema, self.tantivy_index.tokenizers());
         let searcher = self.reader.searcher();
 
         let (count, docs) =
@@ -196,34 +196,6 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
 
-    // #[test]
-    fn retrieve_doc() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("website").expect("Failed to parse query");
-
-        index
-            .insert(Webpage::parse(
-                r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    website website website
-                </body>
-            </html>
-            "#,
-                "https://www.example.com",
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index.search(&query).expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-        assert_eq!(result.documents[0].title, "Test website");
-    }
-
     #[test]
     fn document_not_matching() {
         let mut index = Index::temporary().expect("Unable to open index");
@@ -248,7 +220,7 @@ mod tests {
         assert_eq!(result.num_docs, 0);
     }
 
-    // #[test]
+    #[test]
     fn english_stemming() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("runner").expect("Failed to parse query");
@@ -271,4 +243,9 @@ mod tests {
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
+
+    // #[test]
+    // fn snippet() {
+    //     todo!();
+    // }
 }
