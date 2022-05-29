@@ -66,7 +66,7 @@ impl Indexer {
                     raw_object
                 })
             })
-            .buffer_unordered(10)
+            .buffer_unordered(20)
             .map(|raw_bytes| {
                 tokio::task::spawn_blocking(move || {
                     if raw_bytes.is_err() {
@@ -86,7 +86,7 @@ impl Indexer {
                     // panic!();
                 })
             })
-            .buffer_unordered(10)
+            .buffer_unordered(20)
             .collect::<Vec<_>>()
             .await;
 
