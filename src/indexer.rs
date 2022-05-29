@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use tokio::io::AsyncReadExt;
 
-use crate::warc::{self, WarcFile};
+use crate::warc::{WarcFile};
 use crate::webpage::Html;
 use crate::{Config, Error, Result, WarcSource};
 
@@ -79,7 +79,7 @@ impl Indexer {
                     let raw_bytes = raw_bytes.unwrap();
                     let warc = WarcFile::new(&raw_bytes[..]);
                     for record in warc.flatten() {
-                        let webpage = Html::parse(&record.response.body, &record.request.url);
+                        let _webpage = Html::parse(&record.response.body, &record.request.url);
                         // println!("TEST: {:?}", webpage.title());
                         // println!();
                     }

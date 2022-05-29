@@ -181,7 +181,7 @@ impl Html {
         for field in &ALL_FIELDS {
             let tantivy_field = schema
                 .get_field(field.as_str())
-                .expect(format!("Unknown field: {}", field.as_str()).as_str());
+                .unwrap_or_else(|| panic!("Unknown field: {}", field.as_str()));
 
             match field {
                 Field::Title => {
