@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::schema::{
-    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+    BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
 #[derive(Clone)]
@@ -23,13 +23,15 @@ pub enum Field {
     Title,
     Body,
     Url,
+    Domain,
     BacklinkText,
     Centrality,
 }
-pub static ALL_FIELDS: [Field; 5] = [
+pub static ALL_FIELDS: [Field; 6] = [
     Field::Title,
     Field::Body,
     Field::Url,
+    Field::Domain,
     Field::BacklinkText,
     Field::Centrality,
 ];
@@ -48,6 +50,9 @@ impl Field {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Domain => {
+                IndexingOption::Bytes(BytesOptions::default().set_fast().set_indexed())
+            }
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
             Field::Centrality => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -62,6 +67,7 @@ impl Field {
             Field::Title => "title",
             Field::Body => "body",
             Field::Url => "url",
+            Field::Domain => "host",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
         }
@@ -75,6 +81,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
             IndexingOption::Numeric(options) => builder.add_f64_field(field.as_str(), options),
+            IndexingOption::Bytes(options) => builder.add_bytes_field(field.as_str(), options),
         };
     }
 
@@ -84,4 +91,5 @@ pub fn create_schema() -> tantivy::schema::Schema {
 enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Numeric(tantivy::schema::NumericOptions),
+    Bytes(tantivy::schema::BytesOptions),
 }

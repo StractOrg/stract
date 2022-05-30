@@ -176,6 +176,23 @@ impl Html {
         &self.url()[start_host..end_host]
     }
 
+    pub fn domain(&self) -> &str {
+        let host = self.host();
+        let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
+        if num_punctuations > 1 {
+            let domain_index = host.rfind(".").unwrap();
+            let mut start_index = host[..domain_index].rfind(".").unwrap();
+
+            if &host[start_index + 1..] == "co.uk" {
+                start_index = host[start_index..].rfind(".").unwrap();
+            }
+
+            &host[start_index + 1..]
+        } else {
+            host
+        }
+    }
+
     pub fn metadata(&self) -> Vec<Meta> {
         let selector = Selector::parse("meta").expect("Failed to parse selector");
         self.dom
@@ -208,6 +225,10 @@ impl Html {
                 }
                 Field::Body => doc.add_text(tantivy_field, self.text()),
                 Field::Url => doc.add_text(tantivy_field, self.url()),
+                Field::Domain => doc.add_bytes(
+                    tantivy_field,
+                    bincode::serialize(self.domain()).expect("Failed to serialize bytes"),
+                ),
                 Field::BacklinkText | Field::Centrality => {}
             }
         }
@@ -263,6 +284,7 @@ mod tests {
         assert_eq!(webpage.metadata(), vec![expected_meta]);
         assert_eq!(webpage.url(), "https://www.example.com/whatever");
         assert_eq!(webpage.host(), "www.example.com");
+        assert_eq!(webpage.domain(), "example.com");
     }
 
     #[test]
@@ -336,5 +358,13 @@ mod tests {
             webpage.text(),
             "This text should be the first text extracted\nThis text should be the second text extracted"
         );
+    }
+
+    #[test]
+    fn co_uk_domain() {
+        let raw = "";
+
+        let webpage = Html::parse(raw, "https://www.domain.co.uk");
+        assert_eq!(webpage.domain(), "domain.co.uk");
     }
 }
