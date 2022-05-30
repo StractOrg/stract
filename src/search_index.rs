@@ -63,8 +63,10 @@ impl Index {
         let tantivy_query = query.tantivy(&self.schema, self.tantivy_index.tokenizers());
         let searcher = self.reader.searcher();
 
-        let (count, docs) =
-            searcher.search(&tantivy_query, &(Count, ranking::initial_collector()))?;
+        let (count, docs) = searcher.search(
+            &tantivy_query,
+            &(Count, ranking::initial_collector(query.clone())),
+        )?;
 
         let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
@@ -95,6 +97,11 @@ impl Index {
 pub struct SearchResult {
     pub num_docs: usize,
     pub documents: Vec<RetrievedWebpage>,
+}
+
+#[derive(Default)]
+pub struct FastWebpage {
+    pub host: String,
 }
 
 #[derive(Default)]
@@ -132,7 +139,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::BacklinkText | Field::Centrality => {}
+                Field::BacklinkText | Field::Centrality | Field::Domain => {}
             }
         }
 
@@ -279,5 +286,59 @@ mod tests {
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.a.com");
         assert_eq!(result.documents[1].url, "https://www.b.com");
+    }
+
+    #[test]
+    fn limited_top_docs() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("runner").expect("Failed to parse query");
+
+        for _ in 0..100 {
+            index
+                .insert(Webpage::new(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website for runners</title>
+                        </head>
+                    </html>
+                    "#,
+                    "https://www.example.com",
+                    vec![],
+                    1.0,
+                ))
+                .expect("failed to parse webpage");
+        }
+
+        index.commit().expect("failed to commit index");
+
+        let result = index.search(&query).expect("Search failed");
+        assert_eq!(result.documents.len(), 20);
+    }
+
+    #[test]
+    fn host_search() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("dr").expect("Failed to parse query");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>News website</title>
+                </head>
+            </html>
+            "#,
+                "https://www.dr.dk",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let result = index.search(&query).expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
 }

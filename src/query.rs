@@ -43,8 +43,9 @@ where
 fn term(term: &str) -> IResult<&str, &str> {
     ws(take_while(|c: char| !c.is_whitespace()))(term)
 }
+#[derive(Clone)]
 pub struct Query {
-    terms: Vec<String>,
+    pub terms: Vec<String>,
 }
 
 impl Query {
