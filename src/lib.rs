@@ -24,6 +24,7 @@ mod query;
 mod ranking;
 mod schema;
 mod search_index;
+mod snippet;
 mod warc;
 mod webgraph;
 mod webpage;
