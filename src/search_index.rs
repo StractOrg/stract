@@ -17,10 +17,10 @@ use tantivy::collector::Count;
 use tantivy::{DocAddress, Document, LeasedItem, Searcher};
 
 use crate::query::Query;
-use crate::ranking;
 use crate::schema::{create_schema, Field, ALL_FIELDS};
 use crate::webpage::Webpage;
 use crate::Result;
+use crate::{ranking, snippet};
 use std::path::Path;
 
 pub struct Index {
@@ -66,16 +66,20 @@ impl Index {
         let (count, docs) =
             searcher.search(&tantivy_query, &(Count, ranking::initial_collector()))?;
 
-        let fast_pages: Vec<RetrievedWebpage> = docs
+        let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
             .map(|(_score, doc_address)| Index::retrieve_doc(doc_address, &searcher))
             .filter(|page| page.is_ok())
             .map(|page| page.unwrap())
             .collect();
 
+        for page in &mut webpages {
+            page.snippet = snippet::generate(query, &page.body, &searcher)?;
+        }
+
         Ok(SearchResult {
             num_docs: count,
-            documents: fast_pages,
+            documents: webpages,
         })
     }
 
@@ -276,9 +280,4 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.a.com");
         assert_eq!(result.documents[1].url, "https://www.b.com");
     }
-
-    // #[test]
-    // fn snippet() {
-    //     todo!();
-    // }
 }
