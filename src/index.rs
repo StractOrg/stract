@@ -130,7 +130,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::BacklinkText | Field::Centrality | Field::Domain => {}
+                Field::BacklinkText | Field::Centrality | Field::FastUrl => {}
             }
         }
 
