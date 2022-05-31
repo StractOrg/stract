@@ -40,7 +40,7 @@ impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
         TextOptions::default().set_indexing_options(
             TextFieldIndexing::default()
-                .set_tokenizer("en_stem")
+                .set_tokenizer("tokenizer")
                 .set_index_option(IndexRecordOption::WithFreqsAndPositions),
         )
     }

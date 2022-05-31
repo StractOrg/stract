@@ -43,7 +43,6 @@ impl Ranker {
 mod tests {
     use crate::{
         index::Index,
-        query::Query,
         searcher::Searcher,
         webpage::{Link, Webpage},
     };
