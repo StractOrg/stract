@@ -26,6 +26,7 @@ mod ranking;
 mod schema;
 mod searcher;
 mod snippet;
+mod tokenizer;
 mod warc;
 mod webgraph;
 mod webpage;

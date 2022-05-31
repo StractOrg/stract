@@ -42,8 +42,6 @@ pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Resu
 mod tests {
     use crate::{index::Index, searcher::Searcher, webpage::Webpage};
 
-    use super::*;
-
     const TEST_TEXT: &str = r#"Rust is a systems programming language sponsored by
 Mozilla which describes it as a "safe, concurrent, practical language", supporting functional and
 imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?],

@@ -19,9 +19,10 @@ use tantivy::{DocAddress, Document, LeasedItem};
 use crate::query::Query;
 use crate::schema::{create_schema, Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
+use crate::snippet;
+use crate::tokenizer::Tokenizer;
 use crate::webpage::Webpage;
 use crate::Result;
-use crate::{ranking, snippet};
 use std::path::Path;
 
 pub struct Index {
@@ -40,6 +41,10 @@ impl Index {
         let schema = create_schema();
         let tantivy_index = tantivy::Index::create_in_ram(schema);
 
+        tantivy_index
+            .tokenizers()
+            .register("tokenizer", Tokenizer::default());
+
         Ok(Self {
             writer: tantivy_index.writer(100_000_000)?,
             reader: tantivy_index.reader()?,
@@ -57,6 +62,7 @@ impl Index {
     pub fn commit(&mut self) -> Result<()> {
         self.writer.commit()?;
         self.reader.reload()?;
+
         Ok(())
     }
 
