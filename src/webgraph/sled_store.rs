@@ -27,6 +27,7 @@ pub struct SledStore {
 }
 
 impl SledStore {
+    #[cfg(test)]
     pub(crate) fn temporary() -> Self {
         let db = sled::Config::default()
             .temporary(true)

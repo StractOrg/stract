@@ -22,6 +22,8 @@ use std::path::Path;
 
 use sled_store::SledStore;
 
+use crate::webpage;
+
 type NodeName = String;
 type NodeID = u64;
 
@@ -68,30 +70,43 @@ impl Edge {
     pub fn new(from: Node, to: Node, label: String) -> Self {
         Edge { from, to, label }
     }
+
+    fn host(self) -> Edge {
+        Edge {
+            from: Node::from(webpage::host(&self.from.name).to_string()),
+            to: Node::from(webpage::host(&self.to.name).to_string()),
+            label: self.label,
+        }
+    }
 }
 
 pub struct WebGraph<S: GraphStore> {
-    internal_store: S,
+    full_graph: S,
+    host_graph: S,
 }
 
 impl<S: GraphStore> WebGraph<S> {
+    #[cfg(test)]
     pub fn new_memory() -> WebGraph<SledStore> {
         WebGraph {
-            internal_store: SledStore::temporary(),
+            full_graph: SledStore::temporary(),
+            host_graph: SledStore::temporary(),
         }
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> WebGraph<SledStore> {
-        WebGraph {
-            internal_store: SledStore::open(path),
-        }
+        todo!();
+        // WebGraph {
+        //     internal_store: SledStore::open(path),
+        // }
     }
 
     pub fn insert(&mut self, edge: Edge) {
-        self.internal_store.insert(edge)
+        self.full_graph.insert(edge.clone());
+        self.host_graph.insert(edge.host());
     }
 
-    fn dijkstra<F1, F2>(&self, source: Node, node_edges: F1, edge_node: F2) -> HashMap<Node, usize>
+    fn dijkstra<F1, F2>(source: Node, node_edges: F1, edge_node: F2) -> HashMap<Node, usize>
     where
         F1: Fn(Node) -> Vec<Edge>,
         F2: Fn(&Edge) -> Node,
@@ -123,35 +138,53 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     pub fn distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.dijkstra(
+        WebGraph::<S>::dijkstra(
             source,
-            |node| self.internal_store.outgoing_edges(node),
+            |node| self.full_graph.outgoing_edges(node),
             |edge| edge.to.clone(),
         )
     }
 
     pub fn reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.dijkstra(
+        WebGraph::<S>::dijkstra(
             source,
-            |node| self.internal_store.ingoing_edges(node),
+            |node| self.full_graph.ingoing_edges(node),
             |edge| edge.from.clone(),
         )
     }
 
-    pub fn calculate_harmonic_centrality(&self) -> HashMap<Node, f64> {
-        let norm_factor = (self.internal_store.nodes().count() - 1) as f64;
-        self.internal_store
+    pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
+        WebGraph::<S>::dijkstra(
+            source,
+            |node| self.host_graph.outgoing_edges(node),
+            |edge| edge.to.clone(),
+        )
+    }
+
+    pub fn host_reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
+        WebGraph::<S>::dijkstra(
+            source,
+            |node| self.host_graph.ingoing_edges(node),
+            |edge| edge.from.clone(),
+        )
+    }
+
+    fn calculate_centrality<F>(graph: &S, node_distances: F) -> HashMap<Node, f64>
+    where
+        F: Fn(Node) -> HashMap<Node, usize>,
+    {
+        let norm_factor = (graph.nodes().count() - 1) as f64;
+        graph
             .nodes()
             .into_iter()
             .map(|node| {
-                let mut centrality_values: HashMap<Node, f64> = self
-                    .reversed_distances(node.clone())
+                let mut centrality_values: HashMap<Node, f64> = node_distances(node.clone())
                     .into_iter()
                     .filter(|(other_node, _)| other_node != &node)
                     .map(|(other_node, dist)| (other_node, 1f64 / dist as f64))
                     .collect();
 
-                for other_node in self.internal_store.nodes() {
+                for other_node in graph.nodes() {
                     centrality_values.entry(other_node).or_insert(0f64);
                 }
 
@@ -164,6 +197,16 @@ impl<S: GraphStore> WebGraph<S> {
                 (node, centrality)
             })
             .collect()
+    }
+
+    pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
+        WebGraph::<S>::calculate_centrality(&self.full_graph, |node| self.reversed_distances(node))
+    }
+
+    pub fn host_harmonic_centrality(&self) -> HashMap<Node, f64> {
+        WebGraph::<S>::calculate_centrality(&self.host_graph, |node| {
+            self.host_reversed_distances(node)
+        })
     }
 }
 
@@ -206,6 +249,13 @@ mod test {
     }
 
     #[test]
+    fn nonexisting_node() {
+        let graph = test_graph();
+        assert_eq!(graph.distances(Node::from("E")).len(), 1);
+        assert_eq!(graph.reversed_distances(Node::from("E")).len(), 1);
+    }
+
+    #[test]
     fn reversed_distance_calculation() {
         let graph = test_graph();
 
@@ -226,7 +276,7 @@ mod test {
     fn harmonic_centrality() {
         let graph = test_graph();
 
-        let centrality = graph.calculate_harmonic_centrality();
+        let centrality = graph.harmonic_centrality();
 
         assert_eq!(centrality.get(&Node::from("C")).unwrap(), &1.0);
         assert_eq!(centrality.get(&Node::from("D")).unwrap(), &0.0);
@@ -237,6 +287,94 @@ mod test {
         assert_eq!(
             (*centrality.get(&Node::from("B")).unwrap() * 100.0).round() / 100.0,
             0.61
+        );
+    }
+
+    #[test]
+    fn host_harmonic_centrality() {
+        let mut graph = WebGraph::<SledStore>::new_memory();
+
+        graph.insert(Edge::new(
+            Node::from("A.com/1"),
+            Node::from("A.com/2"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/1"),
+            Node::from("A.com/3"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/1"),
+            Node::from("A.com/4"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/2"),
+            Node::from("A.com/1"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/2"),
+            Node::from("A.com/3"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/2"),
+            Node::from("A.com/4"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/3"),
+            Node::from("A.com/1"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/3"),
+            Node::from("A.com/2"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/3"),
+            Node::from("A.com/4"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/4"),
+            Node::from("A.com/1"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/4"),
+            Node::from("A.com/2"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("A.com/4"),
+            Node::from("A.com/3"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("C.com"),
+            Node::from("B.com"),
+            String::new(),
+        ));
+        graph.insert(Edge::new(
+            Node::from("D.com"),
+            Node::from("B.com"),
+            String::new(),
+        ));
+
+        let centrality = graph.harmonic_centrality();
+        assert!(
+            centrality.get(&Node::from("A.com/1")).unwrap()
+                > centrality.get(&Node::from("B.com")).unwrap()
+        );
+
+        let host_centrality = graph.host_harmonic_centrality();
+        assert!(
+            host_centrality.get(&Node::from("B.com")).unwrap()
+                > host_centrality.get(&Node::from("A.com")).unwrap()
         );
     }
 }
