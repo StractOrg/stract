@@ -19,11 +19,12 @@ use std::num::ParseIntError;
 use tantivy::TantivyError;
 use thiserror::Error;
 
+mod index;
 mod indexer;
 mod query;
 mod ranking;
 mod schema;
-mod search_index;
+mod searcher;
 mod snippet;
 mod warc;
 mod webgraph;

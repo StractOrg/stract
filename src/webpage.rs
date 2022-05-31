@@ -180,11 +180,11 @@ impl Html {
         let host = self.host();
         let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
         if num_punctuations > 1 {
-            let domain_index = host.rfind(".").unwrap();
-            let mut start_index = host[..domain_index].rfind(".").unwrap();
+            let domain_index = host.rfind('.').unwrap();
+            let mut start_index = host[..domain_index].rfind('.').unwrap();
 
             if &host[start_index + 1..] == "co.uk" {
-                start_index = host[start_index..].rfind(".").unwrap();
+                start_index = host[start_index..].rfind('.').unwrap();
             }
 
             &host[start_index + 1..]

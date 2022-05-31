@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::{Document, Searcher, SnippetGenerator};
+use tantivy::Searcher as TantivySearcher;
+use tantivy::SnippetGenerator;
 
 use crate::{query::Query, schema::Field, Result};
 
@@ -22,9 +23,9 @@ use crate::{query::Query, schema::Field, Result};
 /// In the future we want to implement something closer to the method described in https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf.
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
-pub fn generate(query: &Query, text: &str, searcher: &Searcher) -> Result<String> {
+pub fn generate(query: &Query, text: &str, searcher: &TantivySearcher) -> Result<String> {
     let generator = SnippetGenerator::create(
-        &searcher,
+        searcher,
         &query.tantivy(searcher.schema(), searcher.index().tokenizers()),
         searcher
             .schema()
@@ -40,7 +41,7 @@ pub fn generate(query: &Query, text: &str, searcher: &Searcher) -> Result<String
 
 #[cfg(test)]
 mod tests {
-    use crate::{search_index::Index, webpage::Webpage};
+    use crate::{index::Index, searcher::Searcher, webpage::Webpage};
 
     use super::*;
 
@@ -59,7 +60,6 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn snippet_during_search() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("rust language").expect("Failed to parse query");
 
         index
             .insert(Webpage::new(
@@ -81,7 +81,9 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let searcher = Searcher::from(index);
+
+        let result = searcher.search("rust language").expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);

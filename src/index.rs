@@ -13,11 +13,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use tantivy::collector::Count;
+use tantivy::collector::{Collector, Count};
 use tantivy::{DocAddress, Document, LeasedItem, Searcher};
 
 use crate::query::Query;
 use crate::schema::{create_schema, Field, ALL_FIELDS};
+use crate::searcher::SearchResult;
 use crate::webpage::Webpage;
 use crate::Result;
 use crate::{ranking, snippet};
@@ -59,14 +60,14 @@ impl Index {
         Ok(())
     }
 
-    pub fn search(&self, query: &Query) -> Result<SearchResult> {
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
+    where
+        C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
+    {
         let tantivy_query = query.tantivy(&self.schema, self.tantivy_index.tokenizers());
         let searcher = self.reader.searcher();
 
-        let (count, docs) = searcher.search(
-            &tantivy_query,
-            &(Count, ranking::initial_collector(query.clone())),
-        )?;
+        let (count, docs) = searcher.search(&tantivy_query, &(Count, collector))?;
 
         let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
@@ -92,16 +93,6 @@ impl Index {
         let doc = searcher.doc(doc_address)?;
         Ok(RetrievedWebpage::from(doc))
     }
-}
-
-pub struct SearchResult {
-    pub num_docs: usize,
-    pub documents: Vec<RetrievedWebpage>,
-}
-
-#[derive(Default)]
-pub struct FastWebpage {
-    pub host: String,
 }
 
 #[derive(Default)]
@@ -149,7 +140,7 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
-    use crate::webpage::Link;
+    use crate::{ranking::Ranker, webpage::Link};
 
     use super::*;
 
@@ -157,8 +148,11 @@ mod tests {
     fn simple_search() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("website").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -178,7 +172,9 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -188,6 +184,7 @@ mod tests {
     fn document_not_matching() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("this query should not match").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
         index
             .insert(Webpage::new(
@@ -205,7 +202,9 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
     }
@@ -214,6 +213,7 @@ mod tests {
     fn english_stemming() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("runner").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
         index
             .insert(Webpage::new(
@@ -231,7 +231,9 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
@@ -240,6 +242,7 @@ mod tests {
     fn searchable_backlinks() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("great site").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
         index
             .insert(Webpage::new(
@@ -277,7 +280,9 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut result = index.search(&query).expect("Search failed");
+        let mut result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
 
         result
             .documents
@@ -292,6 +297,7 @@ mod tests {
     fn limited_top_docs() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("runner").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
         for _ in 0..100 {
             index
@@ -312,7 +318,9 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.documents.len(), 20);
     }
 
@@ -320,6 +328,7 @@ mod tests {
     fn host_search() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("dr").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
 
         index
             .insert(Webpage::new(
@@ -337,7 +346,9 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index.search(&query).expect("Search failed");
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
