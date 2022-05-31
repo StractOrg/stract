@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::Searcher as TantivySearcher;
 use tantivy::SnippetGenerator;
 
 use crate::{query::Query, schema::Field, Result};
@@ -23,7 +22,7 @@ use crate::{query::Query, schema::Field, Result};
 /// In the future we want to implement something closer to the method described in https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf.
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
-pub fn generate(query: &Query, text: &str, searcher: &TantivySearcher) -> Result<String> {
+pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Result<String> {
     let generator = SnippetGenerator::create(
         searcher,
         &query.tantivy(searcher.schema(), searcher.index().tokenizers()),
