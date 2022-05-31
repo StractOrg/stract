@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use tantivy::collector::{Collector, Count};
-use tantivy::{DocAddress, Document, LeasedItem, Searcher};
+use tantivy::{DocAddress, Document, LeasedItem};
 
 use crate::query::Query;
 use crate::schema::{create_schema, Field, ALL_FIELDS};
@@ -88,7 +88,7 @@ impl Index {
 
     fn retrieve_doc(
         doc_address: DocAddress,
-        searcher: &LeasedItem<Searcher>,
+        searcher: &LeasedItem<tantivy::Searcher>,
     ) -> Result<RetrievedWebpage> {
         let doc = searcher.doc(doc_address)?;
         Ok(RetrievedWebpage::from(doc))
