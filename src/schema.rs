@@ -23,7 +23,7 @@ pub enum Field {
     Title,
     Body,
     Url,
-    Domain,
+    FastUrl,
     BacklinkText,
     Centrality,
 }
@@ -31,7 +31,7 @@ pub static ALL_FIELDS: [Field; 6] = [
     Field::Title,
     Field::Body,
     Field::Url,
-    Field::Domain,
+    Field::FastUrl,
     Field::BacklinkText,
     Field::Centrality,
 ];
@@ -50,7 +50,7 @@ impl Field {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Domain => {
+            Field::FastUrl => {
                 IndexingOption::Bytes(BytesOptions::default().set_fast().set_indexed())
             }
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
@@ -67,7 +67,7 @@ impl Field {
             Field::Title => "title",
             Field::Body => "body",
             Field::Url => "url",
-            Field::Domain => "host",
+            Field::FastUrl => "fast_url",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
         }

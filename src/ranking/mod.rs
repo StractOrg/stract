@@ -105,11 +105,25 @@ mod tests {
                 r#"
                     <html>
                         <head>
-                            <title>Website A</title>
+                            <title>DR Homepage</title>
                         </head>
                     </html>
                 "#,
                 "https://www.dr.dk",
+                vec![],
+                0.0,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                r#"
+                    <html>
+                        <head>
+                            <title>Subsite dr</title>
+                        </head>
+                    </html>
+                "#,
+                "https://www.dr.dk/whatever",
                 vec![],
                 0.0,
             ))
@@ -126,15 +140,16 @@ mod tests {
                 "#,
                 "https://www.b.com",
                 vec![],
-                0.0003,
+                0.003,
             ))
             .expect("failed to parse webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher.search("dr dk").expect("Search failed");
-        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
         assert_eq!(result.documents[1].url, "https://www.b.com");
+        assert_eq!(result.documents[2].url, "https://www.dr.dk/whatever");
     }
 }

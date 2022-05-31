@@ -16,6 +16,7 @@
 
 use crate::query::Query;
 use crate::schema::Field;
+use crate::webpage;
 use std::sync::Arc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::fastfield::{BytesFastFieldReader, DynamicFastFieldReader, FastFieldReader};
@@ -33,16 +34,16 @@ impl InitialScoreTweaker {
 
 pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<f64>,
-    domain_reader: BytesFastFieldReader,
+    fast_url_reader: BytesFastFieldReader,
     sorted_dedupped_terms: Vec<String>,
 }
 
 impl InitialSegmentScoreTweaker {
     fn navigational_score(&self, sorted_dedupped_terms: &[String], doc: DocId) -> f64 {
-        let bytes = self.domain_reader.get_bytes(doc);
-        let domain = bincode::deserialize(bytes).expect("Failed to deserialize domain");
+        let bytes = self.fast_url_reader.get_bytes(doc);
+        let url = bincode::deserialize(bytes).expect("Failed to deserialize domain");
 
-        if is_navigational(sorted_dedupped_terms, domain) {
+        if is_navigational(sorted_dedupped_terms, url) {
             1.0
         } else {
             0.0
@@ -63,13 +64,13 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .f64(centrality_field)
             .expect("Failed to get centrality fast-field reader");
 
-        let domain_field = segment_reader
+        let fast_url_field = segment_reader
             .schema()
-            .get_field(Field::Domain.as_str())
+            .get_field(Field::FastUrl.as_str())
             .expect("Faild to load domain field");
-        let domain_reader = segment_reader
+        let fast_url_reader = segment_reader
             .fast_fields()
-            .bytes(domain_field)
+            .bytes(fast_url_field)
             .expect("Failed to get domain fast-field reader");
 
         let mut sorted_dedupped_terms = self.query.terms.clone();
@@ -79,7 +80,7 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
 
         Ok(InitialSegmentScoreTweaker {
             centrality_reader,
-            domain_reader,
+            fast_url_reader,
             sorted_dedupped_terms,
         })
     }
@@ -111,7 +112,12 @@ fn jaccard_sim(sorted_dedupped_terms: &[String], domain_parts: &[&str]) -> f64 {
         / (sorted_dedupped_terms.len() as f64 + domain_parts.len() as f64 - intersection_size)
 }
 
-fn is_navigational(sorted_dedupped_terms: &[String], domain: &str) -> bool {
+fn is_navigational(sorted_dedupped_terms: &[String], url: &str) -> bool {
+    if !webpage::is_homepage(url) {
+        return false;
+    }
+    let domain = webpage::domain(url);
+
     let (name, remaining) = domain.split_once('.').unwrap();
     jaccard_sim(sorted_dedupped_terms, &[name, remaining]) >= 0.5
 }
@@ -119,11 +125,6 @@ fn is_navigational(sorted_dedupped_terms: &[String], domain: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        index::Index,
-        query::Query,
-        webpage::{Link, Webpage},
-    };
 
     #[test]
     fn test_jaccard_sim() {

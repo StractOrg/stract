@@ -21,6 +21,54 @@ use std::collections::BTreeMap;
 
 use crate::schema::{Field, ALL_FIELDS};
 
+fn strip_protocol<'a>(url: &'a str) -> &'a str {
+    let mut start_host = 0;
+    if url.starts_with("http://") || url.starts_with("https://") {
+        start_host = url
+            .find('/')
+            .expect("It was checked that url starts with protocol");
+        start_host += 2; // skip the two '/'
+    }
+
+    &url[start_host..]
+}
+
+pub(crate) fn host<'a>(url: &'a str) -> &'a str {
+    let url = strip_protocol(url);
+
+    let mut end_host = url.len();
+    if url.contains('/') {
+        end_host = url.find('/').expect("The url contains atleast 1 '/'");
+    }
+
+    &url[..end_host]
+}
+
+pub(crate) fn is_homepage<'a>(url: &'a str) -> bool {
+    let url = strip_protocol(url);
+    match url.find('/') {
+        Some(idx) => idx == url.len() - 1,
+        None => true,
+    }
+}
+
+pub(crate) fn domain<'a>(url: &'a str) -> &'a str {
+    let host = host(url);
+    let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
+    if num_punctuations > 1 {
+        let domain_index = host.rfind('.').unwrap();
+        let mut start_index = host[..domain_index].rfind('.').unwrap();
+
+        if &host[start_index + 1..] == "co.uk" {
+            start_index = host[start_index..].rfind('.').unwrap();
+        }
+
+        &host[start_index + 1..]
+    } else {
+        host
+    }
+}
+
 pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
@@ -156,41 +204,15 @@ impl Html {
     }
 
     pub fn host(&self) -> &str {
-        let mut start_host = 0;
-        if self.url().starts_with("http://") || self.url().starts_with("https://") {
-            start_host = self
-                .url()
-                .find('/')
-                .expect("It was checked that url starts with protocol");
-            start_host += 2; // skip the two '/'
-        }
-
-        let mut end_host = self.url.len();
-        if self.url()[start_host..].contains('/') {
-            end_host = self.url()[start_host..]
-                .find('/')
-                .expect("The url contains atleast 1 '/'");
-            end_host += start_host; // offset the start position
-        }
-
-        &self.url()[start_host..end_host]
+        host(self.url())
     }
 
     pub fn domain(&self) -> &str {
-        let host = self.host();
-        let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
-        if num_punctuations > 1 {
-            let domain_index = host.rfind('.').unwrap();
-            let mut start_index = host[..domain_index].rfind('.').unwrap();
+        domain(self.url())
+    }
 
-            if &host[start_index + 1..] == "co.uk" {
-                start_index = host[start_index..].rfind('.').unwrap();
-            }
-
-            &host[start_index + 1..]
-        } else {
-            host
-        }
+    pub fn is_homepage(&self) -> bool {
+        is_homepage(self.url())
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
@@ -225,9 +247,9 @@ impl Html {
                 }
                 Field::Body => doc.add_text(tantivy_field, self.text()),
                 Field::Url => doc.add_text(tantivy_field, self.url()),
-                Field::Domain => doc.add_bytes(
+                Field::FastUrl => doc.add_bytes(
                     tantivy_field,
-                    bincode::serialize(self.domain()).expect("Failed to serialize bytes"),
+                    bincode::serialize(self.url()).expect("Failed to serialize bytes"),
                 ),
                 Field::BacklinkText | Field::Centrality => {}
             }
@@ -366,5 +388,29 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.domain.co.uk");
         assert_eq!(webpage.domain(), "domain.co.uk");
+    }
+
+    #[test]
+    fn is_homepage() {
+        let webpage = Html::parse("", "https://www.example.com");
+        assert!(webpage.is_homepage());
+
+        let webpage = Html::parse("", "https://www.example.com/");
+        assert!(webpage.is_homepage());
+
+        let webpage = Html::parse("", "https://www.example.com/test");
+        assert!(!webpage.is_homepage());
+
+        let webpage = Html::parse("", "https://example.com/test");
+        assert!(!webpage.is_homepage());
+
+        let webpage = Html::parse("", "https://example.com/");
+        assert!(webpage.is_homepage());
+
+        let webpage = Html::parse("", "https://example.com");
+        assert!(webpage.is_homepage());
+
+        let webpage = Html::parse("", "http://example.com");
+        assert!(webpage.is_homepage());
     }
 }
