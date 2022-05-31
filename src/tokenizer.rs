@@ -29,9 +29,9 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
         // wrong stemming. I tried merging multiple token streams but it
         // caused tantivy to crash. A solution might be to create a separate index
         // for stem and non-stemmed and do merging in the searcher. This
-        // might cause too much space.
+        // might use too much space.
         analyzer = analyzer.filter(Stemmer::new(Language::English));
 
-        tantivy::tokenizer::BoxTokenStream::from(analyzer.clone().token_stream(text.clone()))
+        analyzer.token_stream(text.clone())
     }
 }
