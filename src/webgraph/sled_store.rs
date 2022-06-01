@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::path::Path;
 
-use super::{Edge, InternalEdge, Node, NodeID};
+use super::{Edge, InternalEdge, Node, NodeID, NodeIterator};
 use crate::webgraph::GraphStore;
 
 pub struct SledStore {
@@ -228,9 +228,6 @@ impl SledStore {
 }
 
 impl GraphStore for SledStore {
-    type NodesIter = IntoIter;
-    type EdgesIter = std::vec::IntoIter<Edge>;
-
     fn outgoing_edges(&self, node: Node) -> Vec<Edge> {
         self.out_edges(node.clone())
             .into_iter()
@@ -267,10 +264,12 @@ impl GraphStore for SledStore {
             .collect()
     }
 
-    fn nodes(&self) -> Self::NodesIter {
-        IntoIter {
+    fn nodes(&self) -> NodeIterator {
+        let iter = IntoIter {
             inner: self.node2id.into_iter(),
-        }
+        };
+
+        NodeIterator::from(iter)
     }
 
     fn insert(&mut self, edge: Edge) {

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{Edge, InternalEdge, Node, NodeID, NodeName};
+use super::{Edge, InternalEdge, Node, NodeID, NodeIterator, NodeName};
 use crate::webgraph::GraphStore;
 use std::collections::HashMap;
 
@@ -45,9 +45,6 @@ impl MemoryStore {
 }
 
 impl GraphStore for MemoryStore {
-    type NodesIter = std::vec::IntoIter<Node>;
-    type EdgesIter = std::vec::IntoIter<Edge>;
-
     fn outgoing_edges(&self, node: Node) -> Vec<Edge> {
         match self.node2id.get(&node.name) {
             None => Vec::new(),
@@ -74,15 +71,8 @@ impl GraphStore for MemoryStore {
         }
     }
 
-    #[allow(clippy::needless_collect)]
-    fn nodes(&self) -> Self::NodesIter {
-        let nodes: Vec<Node> = self
-            .id2node
-            .iter()
-            .map(|name| Node { name: name.clone() })
-            .collect();
-
-        nodes.into_iter()
+    fn nodes(&self) -> NodeIterator {
+        NodeIterator::from(self.id2node.iter().map(|name| Node { name: name.clone() }))
     }
 
     fn insert(&mut self, edge: Edge) {

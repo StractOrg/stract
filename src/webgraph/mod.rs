@@ -51,12 +51,9 @@ impl From<&str> for Node {
 }
 
 pub trait GraphStore {
-    type NodesIter: Iterator<Item = Node>;
-    type EdgesIter: Iterator<Item = Edge>;
-
     fn outgoing_edges(&self, node: Node) -> Vec<Edge>;
     fn ingoing_edges(&self, node: Node) -> Vec<Edge>;
-    fn nodes(&self) -> Self::NodesIter;
+    fn nodes<'a>(&'a self) -> NodeIterator;
     fn insert(&mut self, edge: Edge);
 
     fn edges<'a>(&'a self) -> EdgeIterator<'a> {
@@ -84,6 +81,26 @@ impl<'a> EdgeIterator<'a> {
 
 impl<'a> Iterator for EdgeIterator<'a> {
     type Item = Edge;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+pub struct NodeIterator<'a> {
+    inner: Box<dyn Iterator<Item = Node> + 'a>,
+}
+
+impl<'a> NodeIterator<'a> {
+    fn from<T: 'a + Iterator<Item = Node>>(iterator: T) -> NodeIterator<'a> {
+        NodeIterator {
+            inner: Box::new(iterator),
+        }
+    }
+}
+
+impl<'a> Iterator for NodeIterator<'a> {
+    type Item = Node;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
