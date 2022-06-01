@@ -23,15 +23,15 @@ use tokio::io::AsyncReadExt;
 
 use crate::warc::WarcFile;
 use crate::webpage::Html;
-use crate::{Config, Error, Result, WarcSource};
+use crate::{Config, Error, Result};
 
 pub struct Indexer {
     warc_paths: Vec<String>,
     config: Config,
 }
 
-impl Indexer {
-    pub fn from_config(config: Config) -> Self {
+impl From<Config> for Indexer {
+    fn from(config: Config) -> Self {
         let file = File::open(&config.warc_paths_file).unwrap();
         let mut warc_paths = Vec::new();
 
@@ -41,7 +41,9 @@ impl Indexer {
 
         Self { warc_paths, config }
     }
+}
 
+impl Indexer {
     pub async fn run(self) -> Result<()> {
         let pb = ProgressBar::new(self.warc_paths.len() as u64);
         pb.set_style(
