@@ -177,7 +177,7 @@ mod test {
 
         let nodes: Vec<Node> = store.nodes().collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
-        let edges = assert_eq!(
+        assert_eq!(
             store.outgoing_edges(a.clone()),
             vec![
                 Edge {

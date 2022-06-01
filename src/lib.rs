@@ -19,8 +19,8 @@ use std::num::ParseIntError;
 use tantivy::TantivyError;
 use thiserror::Error;
 
+pub mod entrypoint;
 mod index;
-mod indexer;
 mod query;
 mod ranking;
 mod schema;
@@ -30,8 +30,6 @@ mod tokenizer;
 mod warc;
 mod webgraph;
 mod webpage;
-
-pub use indexer::Indexer;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -49,7 +47,10 @@ pub enum WarcSource {
 
 #[derive(Debug, Deserialize, Clone)]
 pub enum Mode {
+    /// Index warc documents into index
     Indexer,
+    /// Create webgraph from warc documents
+    Webgraph,
 }
 
 #[derive(Debug, Deserialize, Clone)]

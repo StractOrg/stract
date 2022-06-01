@@ -13,27 +13,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use cuely::entrypoint::{Indexer, WebgraphBuilder};
-use cuely::{Config, Mode};
-use std::fs;
+use crate::{Config, Result};
 
-#[tokio::main]
-async fn main() {
-    let raw_config =
-        fs::read_to_string("configs/indexer.toml").expect("Failed to read config file");
+pub struct WebgraphBuilder {}
 
-    let config: Config = toml::from_str(&raw_config).expect("Failed to parse config");
+impl From<Config> for WebgraphBuilder {
+    fn from(config: Config) -> Self {
+        Self {}
+    }
+}
 
-    match config.mode {
-        Mode::Indexer => {
-            Indexer::from(config)
-                .run()
-                .await
-                .expect("Failed to index documents");
-        }
-        Mode::Webgraph => WebgraphBuilder::from(config)
-            .run()
-            .await
-            .expect("Failed to build webgraph"),
+impl WebgraphBuilder {
+    pub async fn run(&self) -> Result<()> {
+        todo!();
     }
 }
