@@ -45,7 +45,8 @@ impl MemoryStore {
 }
 
 impl GraphStore for MemoryStore {
-    type Iter = std::vec::IntoIter<Node>;
+    type NodesIter = std::vec::IntoIter<Node>;
+    type EdgesIter = std::vec::IntoIter<Edge>;
 
     fn outgoing_edges(&self, node: Node) -> Vec<Edge> {
         match self.node2id.get(&node.name) {
@@ -74,7 +75,7 @@ impl GraphStore for MemoryStore {
     }
 
     #[allow(clippy::needless_collect)]
-    fn nodes(&self) -> Self::Iter {
+    fn nodes(&self) -> Self::NodesIter {
         let nodes: Vec<Node> = self
             .id2node
             .iter()
@@ -157,30 +158,36 @@ mod test {
             name: "C".to_string(),
         };
 
-        store.insert(Edge {
-            from: a.clone(),
-            to: b.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: b.clone(),
-            to: c.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: c.clone(),
-            to: a.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: a.clone(),
-            to: c.clone(),
-            label: String::new(),
-        });
+        let edges = vec![
+            Edge {
+                from: a.clone(),
+                to: b.clone(),
+                label: String::new(),
+            },
+            Edge {
+                from: b.clone(),
+                to: c.clone(),
+                label: String::new(),
+            },
+            Edge {
+                from: c.clone(),
+                to: a.clone(),
+                label: String::new(),
+            },
+            Edge {
+                from: a.clone(),
+                to: c.clone(),
+                label: String::new(),
+            },
+        ];
+
+        for edge in &edges {
+            store.insert(edge.clone());
+        }
 
         let nodes: Vec<Node> = store.nodes().collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
-        assert_eq!(
+        let edges = assert_eq!(
             store.outgoing_edges(a.clone()),
             vec![
                 Edge {

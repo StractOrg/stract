@@ -228,7 +228,8 @@ impl SledStore {
 }
 
 impl GraphStore for SledStore {
-    type Iter = IntoIter;
+    type NodesIter = IntoIter;
+    type EdgesIter = std::vec::IntoIter<Edge>;
 
     fn outgoing_edges(&self, node: Node) -> Vec<Edge> {
         self.out_edges(node.clone())
@@ -266,7 +267,7 @@ impl GraphStore for SledStore {
             .collect()
     }
 
-    fn nodes(&self) -> Self::Iter {
+    fn nodes(&self) -> Self::NodesIter {
         IntoIter {
             inner: self.node2id.into_iter(),
         }

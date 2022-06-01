@@ -51,12 +51,43 @@ impl From<&str> for Node {
 }
 
 pub trait GraphStore {
-    type Iter: Iterator<Item = Node>;
+    type NodesIter: Iterator<Item = Node>;
+    type EdgesIter: Iterator<Item = Edge>;
 
     fn outgoing_edges(&self, node: Node) -> Vec<Edge>;
     fn ingoing_edges(&self, node: Node) -> Vec<Edge>;
-    fn nodes(&self) -> Self::Iter;
+    fn nodes(&self) -> Self::NodesIter;
     fn insert(&mut self, edge: Edge);
+
+    fn edges<'a>(&'a self) -> EdgeIterator<'a> {
+        EdgeIterator::from(self.nodes().flat_map(|node| self.outgoing_edges(node)))
+    }
+
+    fn append<S: GraphStore>(&mut self, other: S) {
+        for edge in other.edges() {
+            self.insert(edge);
+        }
+    }
+}
+
+pub struct EdgeIterator<'a> {
+    inner: Box<dyn Iterator<Item = Edge> + 'a>,
+}
+
+impl<'a> EdgeIterator<'a> {
+    fn from<T: 'a + Iterator<Item = Edge>>(iterator: T) -> EdgeIterator<'a> {
+        EdgeIterator {
+            inner: Box::new(iterator),
+        }
+    }
+}
+
+impl<'a> Iterator for EdgeIterator<'a> {
+    type Item = Edge;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +135,11 @@ impl<S: GraphStore> WebGraph<S> {
     pub fn insert(&mut self, edge: Edge) {
         self.full_graph.insert(edge.clone());
         self.host_graph.insert(edge.host());
+    }
+
+    pub fn merge(&mut self, other: WebGraph<S>) {
+        self.full_graph.append(other.full_graph);
+        self.host_graph.append(other.host_graph);
     }
 
     fn dijkstra<F1, F2>(source: Node, node_edges: F1, edge_node: F2) -> HashMap<Node, usize>
@@ -376,5 +412,22 @@ mod test {
             host_centrality.get(&Node::from("B.com")).unwrap()
                 > host_centrality.get(&Node::from("A.com")).unwrap()
         );
+    }
+
+    #[test]
+    fn merge() {
+        let mut graph1 = WebGraph::<SledStore>::new_memory();
+
+        graph1.insert(Edge::new(Node::from("A"), Node::from("B"), String::new()));
+
+        let mut graph2 = WebGraph::<SledStore>::new_memory();
+        graph2.insert(Edge::new(Node::from("B"), Node::from("C"), String::new()));
+
+        graph1.merge(graph2);
+
+        assert_eq!(
+            graph1.distances(Node::from("A")).get(&Node::from("C")),
+            Some(&2)
+        )
     }
 }
