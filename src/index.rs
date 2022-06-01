@@ -245,6 +245,35 @@ mod tests {
     }
 
     #[test]
+    fn stemmed_query_english() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("runners").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Fast runner</title>
+                </head>
+            </html>
+            "#,
+                "https://www.example.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
     fn searchable_backlinks() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = Query::parse("great site").expect("Failed to parse query");

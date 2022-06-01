@@ -86,9 +86,9 @@ impl Query {
         term: &str,
         analyzer: Option<TextAnalyzer>,
         tantivy_field: Field,
-    ) -> Term {
+    ) -> impl Iterator<Item = Term> {
         match analyzer {
-            None => Term::from_field_text(tantivy_field, term),
+            None => vec![Term::from_field_text(tantivy_field, term)].into_iter(),
             Some(tokenizer) => {
                 let mut terms: Vec<Term> = Vec::new();
                 let mut token_stream = tokenizer.token_stream(term);
@@ -97,7 +97,7 @@ impl Query {
                     terms.push(term);
                 });
 
-                terms.into_iter().next().unwrap()
+                terms.into_iter()
             }
         }
     }
@@ -116,14 +116,26 @@ impl Query {
                     .into_iter()
                     .map(|(field, entry)| {
                         let analyzer = Query::get_tantivy_analyzer(entry, tokenizer_manager);
-                        let term = Query::process_tantivy_term(term, analyzer, field);
+                        let processed_terms = Query::process_tantivy_term(term, analyzer, field);
 
-                        let term_query = Box::new(TermQuery::new(
-                            term,
-                            IndexRecordOption::WithFreqsAndPositions,
-                        ))
-                            as Box<dyn tantivy::query::Query>;
-                        (Occur::Should, term_query)
+                        let processed_queries = processed_terms
+                            .map(|term| {
+                                (
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(
+                                        term,
+                                        IndexRecordOption::WithFreqsAndPositions,
+                                    ))
+                                        as Box<dyn tantivy::query::Query>,
+                                )
+                            })
+                            .collect();
+
+                        (
+                            Occur::Should,
+                            Box::new(BooleanQuery::new(processed_queries))
+                                as Box<dyn tantivy::query::Query>,
+                        )
                     })
                     .collect();
 
