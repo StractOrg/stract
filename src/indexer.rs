@@ -54,46 +54,29 @@ impl Indexer {
 
         stream::iter(self.warc_paths.into_iter().progress_with(pb))
             .map(|warc_path| {
-                let download_config = self
+                let source = self
                     .config
                     .warc_source
                     .as_ref()
                     .expect("Indexing needs a warc source")
                     .clone();
 
-                tokio::spawn(async move {
-                    let raw_object = match download_config {
-                        WarcSource::S3(config) => {
-                            Indexer::download_from_s3(
-                                warc_path.clone(),
-                                config.name.clone(),
-                                config.endpoint.clone(),
-                                config.bucket.clone(),
-                            )
-                            .await
-                        }
-                        WarcSource::HTTP(config) => {
-                            Indexer::download_from_http(warc_path.clone(), config.base_url.clone())
-                                .await
-                        }
-                    };
-
-                    raw_object
-                })
+                tokio::spawn(async move { WarcFile::download(source, &warc_path).await })
             })
             .buffer_unordered(20)
-            .map(|raw_bytes| {
+            .map(|warc| {
                 tokio::task::spawn_blocking(move || {
-                    if raw_bytes.is_err() {
+                    if warc.is_err() {
                         return;
                     }
-                    let raw_bytes = raw_bytes.unwrap();
-                    if raw_bytes.is_err() {
+                    let warc = warc.unwrap();
+
+                    if warc.is_err() {
                         return;
                     }
-                    let raw_bytes = raw_bytes.unwrap();
-                    let warc = WarcFile::new(&raw_bytes[..]);
-                    for record in warc.flatten() {
+                    let warc = warc.unwrap();
+
+                    for record in warc.records().flatten() {
                         let _webpage = Html::parse(&record.response.body, &record.request.url);
                         // println!("TEST: {:?}", webpage.title());
                         // println!();
