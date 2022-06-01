@@ -13,15 +13,17 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{Error, Result};
+use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
+use tokio::io::AsyncReadExt;
 
 use flate2::read::MultiGzDecoder;
+use rusoto_core::Region;
+use rusoto_s3::{GetObjectRequest, S3Client, S3};
 
-pub(crate) struct WarcFile<R: Read> {
-    bytes: BufReader<MultiGzDecoder<R>>,
-    num_reads: usize,
+pub(crate) struct WarcFile {
+    bytes: Vec<u8>,
 }
 
 fn rtrim(s: &mut String) {
@@ -52,87 +54,80 @@ fn decode(raw: Vec<u8>) -> String {
     }
 }
 
-impl<R: Read> WarcFile<R> {
-    pub(crate) fn new(bytes: R) -> Self {
-        Self {
-            bytes: BufReader::new(MultiGzDecoder::new(bytes)),
+impl WarcFile {
+    pub(crate) fn new(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+
+    pub fn records(&self) -> RecordIterator<&[u8]> {
+        RecordIterator {
+            reader: BufReader::new(MultiGzDecoder::new(&self.bytes[..])),
             num_reads: 0,
         }
     }
 
-    fn next_raw(&mut self) -> Option<Result<RawWarcRecord>> {
-        let mut version = String::new();
-
-        if let Err(_io) = self.bytes.read_line(&mut version) {
-            return None;
-        }
-
-        if version.is_empty() {
-            return None;
-        }
-
-        rtrim(&mut version);
-
-        if !version.to_uppercase().starts_with("WARC/1.") {
-            return Some(Err(Error::WarcParse("Unknown WARC version")));
-        }
-
-        let mut header = BTreeMap::<String, String>::new();
-
-        loop {
-            let mut line_buf = String::new();
-
-            if let Err(io) = self.bytes.read_line(&mut line_buf) {
-                return Some(Err(Error::IOError(io)));
+    pub(crate) async fn download(source: WarcSource, path: &str) -> Result<Self> {
+        match source {
+            WarcSource::S3(config) => {
+                WarcFile::download_from_s3(
+                    path,
+                    config.name.clone(),
+                    config.endpoint.clone(),
+                    config.bucket.clone(),
+                )
+                .await
             }
-
-            rtrim(&mut line_buf);
-
-            if &line_buf == "\r\n" || line_buf.is_empty() {
-                // end of header
-                break;
-            }
-            if let Some(semi) = line_buf.find(':') {
-                let value = line_buf.split_off(semi + 1).trim().to_string();
-                line_buf.pop(); // remove colon
-                let key = line_buf;
-
-                header.insert(key.to_ascii_uppercase(), value);
-            } else {
-                return Some(Err(Error::WarcParse(
-                    "All header lines must contain a colon",
-                )));
+            WarcSource::HTTP(config) => {
+                WarcFile::download_from_http(path, config.base_url.clone()).await
             }
         }
+    }
 
-        let content_len = header.get("CONTENT-LENGTH");
-        if content_len.is_none() {
-            return Some(Err(Error::WarcParse("Record has no content-length")));
+    async fn download_from_http(path: &str, base_url: String) -> Result<Self> {
+        let mut url = base_url;
+        if !url.ends_with('/') {
+            url += "/";
         }
+        url += path;
 
-        let content_len = content_len.unwrap().parse::<usize>();
-        if content_len.is_err() {
-            return Some(Err(Error::WarcParse("Could not parse content length")));
-        }
+        let client = reqwest::Client::new();
+        let res = client.get(url).send().await?;
 
-        let content_len = content_len.unwrap();
-        let mut content = vec![0; content_len];
-        if let Err(io) = self.bytes.read_exact(&mut content) {
-            return Some(Err(Error::IOError(io)));
-        }
+        let bytes = Vec::from(&res.bytes().await?[..]);
 
-        let mut linefeed = [0u8; 4];
-        if let Err(io) = self.bytes.read_exact(&mut linefeed) {
-            return Some(Err(Error::IOError(io)));
-        }
+        Ok(WarcFile::new(bytes))
+    }
 
-        if linefeed != [13, 10, 13, 10] {
-            return Some(Err(Error::WarcParse("Invalid record ending")));
-        }
+    async fn download_from_s3(
+        path: &str,
+        region_name: String,
+        region_endpoint: String,
+        bucket: String,
+    ) -> Result<Self> {
+        let path = path.to_string();
+        let region = Region::Custom {
+            name: region_name,
+            endpoint: region_endpoint,
+        };
 
-        let record = RawWarcRecord { header, content };
+        let client = S3Client::new(region);
 
-        Some(Ok(record))
+        let obj = client
+            .get_object(GetObjectRequest {
+                bucket,
+                key: path,
+                ..Default::default()
+            })
+            .await?;
+
+        let mut bytes = Vec::new();
+        obj.body
+            .ok_or(Error::S3DownloadError)?
+            .into_async_read()
+            .read_to_end(&mut bytes)
+            .await?;
+
+        Ok(WarcFile::new(bytes))
     }
 }
 
@@ -213,7 +208,89 @@ impl Metadata {
     }
 }
 
-impl<R: BufRead> Iterator for WarcFile<R> {
+pub(crate) struct RecordIterator<R: Read> {
+    reader: BufReader<MultiGzDecoder<R>>,
+    num_reads: usize,
+}
+
+impl<R: Read> RecordIterator<R> {
+    fn next_raw(&mut self) -> Option<Result<RawWarcRecord>> {
+        let mut version = String::new();
+
+        if let Err(_io) = self.reader.read_line(&mut version) {
+            return None;
+        }
+
+        if version.is_empty() {
+            return None;
+        }
+
+        rtrim(&mut version);
+
+        if !version.to_uppercase().starts_with("WARC/1.") {
+            return Some(Err(Error::WarcParse("Unknown WARC version")));
+        }
+
+        let mut header = BTreeMap::<String, String>::new();
+
+        loop {
+            let mut line_buf = String::new();
+
+            if let Err(io) = self.reader.read_line(&mut line_buf) {
+                return Some(Err(Error::IOError(io)));
+            }
+
+            rtrim(&mut line_buf);
+
+            if &line_buf == "\r\n" || line_buf.is_empty() {
+                // end of header
+                break;
+            }
+            if let Some(semi) = line_buf.find(':') {
+                let value = line_buf.split_off(semi + 1).trim().to_string();
+                line_buf.pop(); // remove colon
+                let key = line_buf;
+
+                header.insert(key.to_ascii_uppercase(), value);
+            } else {
+                return Some(Err(Error::WarcParse(
+                    "All header lines must contain a colon",
+                )));
+            }
+        }
+
+        let content_len = header.get("CONTENT-LENGTH");
+        if content_len.is_none() {
+            return Some(Err(Error::WarcParse("Record has no content-length")));
+        }
+
+        let content_len = content_len.unwrap().parse::<usize>();
+        if content_len.is_err() {
+            return Some(Err(Error::WarcParse("Could not parse content length")));
+        }
+
+        let content_len = content_len.unwrap();
+        let mut content = vec![0; content_len];
+        if let Err(io) = self.reader.read_exact(&mut content) {
+            return Some(Err(Error::IOError(io)));
+        }
+
+        let mut linefeed = [0u8; 4];
+        if let Err(io) = self.reader.read_exact(&mut linefeed) {
+            return Some(Err(Error::IOError(io)));
+        }
+
+        if linefeed != [13, 10, 13, 10] {
+            return Some(Err(Error::WarcParse("Invalid record ending")));
+        }
+
+        let record = RawWarcRecord { header, content };
+
+        Some(Ok(record))
+    }
+}
+
+impl<R: Read> Iterator for RecordIterator<R> {
     type Item = Result<WarcRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -318,7 +395,8 @@ mod tests {
         e.write_all(raw).unwrap();
         let compressed = e.finish().unwrap();
 
-        let records: Vec<WarcRecord> = WarcFile::new(&compressed[..])
+        let records: Vec<WarcRecord> = WarcFile::new(compressed)
+            .records()
             .map(|res| res.unwrap())
             .collect();
 
