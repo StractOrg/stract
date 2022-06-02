@@ -21,6 +21,15 @@ use thiserror::Error;
 
 pub mod entrypoint;
 mod index;
+
+/// Stuff to fix for mapreduce:
+///     * we should handle the case where the job exceeds the 4096 bytes buffer.
+///     * manager should keep track of which workers are currently busy
+///     * manager should keep track of failing vs alive workers
+///     * if a job fails, the manager should re-allocate the job to another worker if possible
+///     * functions should return result instead of unwrapping everywhere
+pub mod mapreduce;
+
 mod query;
 mod ranking;
 mod schema;
