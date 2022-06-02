@@ -28,6 +28,7 @@ mod index;
 ///     * manager should keep track of failing vs alive workers
 ///     * if a job fails, the manager should re-allocate the job to another worker if possible
 ///     * functions should return result instead of unwrapping everywhere
+///     * manager should stop workers when done
 pub mod mapreduce;
 
 mod query;
