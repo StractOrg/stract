@@ -55,6 +55,9 @@ impl RemoteWorker {
         loop {
             if let Ok(size) = stream.read(&mut buf).await {
                 debug!("read {:?} bytes", size);
+                if size == 0 && bytes.len() == 0 {
+                    return Err(Error::NoResponse);
+                }
                 bytes.extend_from_slice(&buf);
                 if size < buf.len() {
                     break;
@@ -91,6 +94,10 @@ impl<'a> WorkerGuard<'a> {
             from_pool: pool,
         }
     }
+
+    fn success(self) {
+        self.from_pool.insert(Arc::clone(&self.worker))
+    }
 }
 
 impl<'a> Deref for WorkerGuard<'a> {
@@ -103,7 +110,7 @@ impl<'a> Deref for WorkerGuard<'a> {
 
 impl<'a> Drop for WorkerGuard<'a> {
     fn drop(&mut self) {
-        self.from_pool.put_back(Arc::clone(&self.worker))
+        self.from_pool.put_back()
     }
 }
 
@@ -142,12 +149,15 @@ impl WorkerPool {
         }
     }
 
-    fn put_back(&self, worker: Arc<RemoteWorker>) {
+    fn put_back(&self) {
+        self.running_workers.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    fn insert(&self, worker: Arc<RemoteWorker>) {
         let ch = self.alive_workers.0.clone();
         tokio::spawn(async move {
             ch.send(worker).await.unwrap();
         });
-        self.running_workers.fetch_sub(1, Ordering::SeqCst);
     }
 
     async fn get_worker<'a>(&'a self) -> Result<WorkerGuard<'a>> {
@@ -202,7 +212,10 @@ impl Manager {
         O: Reduce<O> + Send,
     {
         let worker = self.pool.get_worker().await?;
-        worker.perform(job).await
+        let res = worker.perform(job).await?;
+        worker.success();
+
+        Ok(res)
     }
 
     /// Execute job on one of the remote machines. If the remote machine fails for some reason,
@@ -217,7 +230,7 @@ impl Manager {
                 Ok(res) => return res,
                 Err(Error::NoAvailableWorker) => panic!("{}", Error::NoAvailableWorker),
                 Err(_) => {
-                    debug!("rescheduling job");
+                    debug!("got err - rescheduling job");
                 }
             }
         }

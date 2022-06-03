@@ -36,14 +36,14 @@ pub enum Error {
     #[error("error while serializing/deserializing to/from bytes")]
     Serialization(#[from] bincode::Error),
 
-    #[error("failed to stop some of the workers")]
-    StopWorker,
-
     #[error("could not get a working worker")]
     NoAvailableWorker,
 
     #[error("failed to get value from channel")]
     ChannelRecv(#[from] async_channel::RecvError),
+
+    #[error("did not get a reponse")]
+    NoResponse,
 }
 
 pub trait Map<T>
@@ -76,7 +76,7 @@ where
 impl<I, O, T> MapReduce<I, O> for T
 where
     T: Iterator<Item = I> + Sized,
-    I: Map<O> + Send + Sync,
+    I: Map<O> + Sync,
     O: Reduce<O> + Send,
 {
 }
