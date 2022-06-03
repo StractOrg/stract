@@ -7,7 +7,7 @@ use tracing_subscriber::FmtSubscriber;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Job {
-    contents: Vec<usize>,
+    id: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -16,7 +16,7 @@ struct Count(usize);
 impl Map<Count> for Job {
     fn map(self) -> Count {
         std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
-        Count(self.contents.into_iter().filter(|d| *d == 0).count())
+        Count(1)
     }
 }
 

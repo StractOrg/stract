@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 
-use super::Result;
-use super::{Map, Task};
+use super::{Error, Map, Result, Task};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncReadExt;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -27,6 +26,9 @@ impl Worker {
         loop {
             if let Ok(size) = stream.read(&mut buf).await {
                 debug!("read {:?} bytes", size);
+                if size == 0 && bytes.len() == 0 {
+                    return Err(Error::NoResponse);
+                }
                 bytes.extend_from_slice(&buf);
                 if size < buf.len() {
                     break;
