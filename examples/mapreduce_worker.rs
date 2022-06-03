@@ -15,6 +15,7 @@ struct Count(usize);
 
 impl Map<Count> for Job {
     fn map(self) -> Count {
+        std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
         Count(self.contents.into_iter().filter(|d| *d == 0).count())
     }
 }
@@ -32,5 +33,9 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    Worker::run::<Job, Count>("0.0.0.0:1337".parse::<SocketAddr>().unwrap()).await;
+    let args: Vec<_> = std::env::args().collect();
+
+    Worker::run::<Job, Count>(args[1].parse::<SocketAddr>().unwrap())
+        .await
+        .expect("failed to run worker");
 }

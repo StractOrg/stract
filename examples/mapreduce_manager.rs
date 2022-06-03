@@ -15,6 +15,7 @@ struct Count(usize);
 
 impl Map<Count> for Job {
     fn map(self) -> Count {
+        std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
         Count(self.contents.into_iter().filter(|d| *d == 0).count())
     }
 }
@@ -42,11 +43,24 @@ async fn main() {
         Job {
             contents: vec![0, 0],
         },
+        Job {
+            contents: vec![1, 2, 0, 1, 0, 1, 0],
+        },
+        Job {
+            contents: vec![3, 2, 1],
+        },
+        Job {
+            contents: vec![0, 0],
+        },
     ];
 
     let res = jobs
         .into_iter()
-        .map_reduce(&["0.0.0.0:1337".parse::<SocketAddr>().unwrap()])
+        .map_reduce(&[
+            "0.0.0.0:1337".parse::<SocketAddr>().unwrap(),
+            "0.0.0.0:1338".parse::<SocketAddr>().unwrap(),
+            "0.0.0.0:1339".parse::<SocketAddr>().unwrap(),
+        ])
         .await
         .unwrap();
     println!("{:?}", res.0);

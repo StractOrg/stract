@@ -23,7 +23,28 @@ mod manager;
 mod worker;
 
 pub use manager::Manager;
+use thiserror::Error;
 pub use worker::Worker;
+
+pub(crate) type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("I/O error")]
+    IO(#[from] std::io::Error),
+
+    #[error("error while serializing/deserializing to/from bytes")]
+    Serialization(#[from] bincode::Error),
+
+    #[error("failed to stop some of the workers")]
+    StopWorker,
+
+    #[error("could not get a working worker")]
+    NoAvailableWorker,
+
+    #[error("failed to get value from channel")]
+    ChannelRecv(#[from] async_channel::RecvError),
+}
 
 pub trait Map<T>
 where
@@ -41,19 +62,22 @@ where
 }
 
 #[async_trait]
-pub trait MapReduce<I, O>: Iterator<Item = I>
+pub trait MapReduce<I, O>
 where
-    Self: Sized,
-    I: Map<O>,
+    Self: Sized + Iterator<Item = I>,
+    I: Map<O> + Sync,
     O: Reduce<O> + Send,
 {
     async fn map_reduce(self, workers: &[SocketAddr]) -> Option<O> {
-        let manager = Manager::new(workers);
+        let manager = Manager::new(workers).await;
         manager.run(self.collect()).await
     }
 }
-impl<I: Map<O> + Send, O: Reduce<O> + Send, T: Sized> MapReduce<I, O> for T where
-    T: Iterator<Item = I>
+impl<I, O, T> MapReduce<I, O> for T
+where
+    T: Iterator<Item = I> + Sized,
+    I: Map<O> + Send + Sync,
+    O: Reduce<O> + Send,
 {
 }
 
