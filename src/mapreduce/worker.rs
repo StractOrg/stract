@@ -1,54 +1,73 @@
 use std::net::SocketAddr;
 
+use super::Result;
 use super::{Map, Task};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncReadExt;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio::net::TcpListener;
 use tracing::{debug, info};
 
 pub struct Worker {}
 
+enum State {
+    Continue,
+    Finished,
+}
+
 impl Worker {
-    async fn run_stream<I, O, S>(mut stream: S)
+    async fn run_stream<I, O, S>(mut stream: S) -> Result<State>
     where
         I: Map<O>,
         O: Serialize + DeserializeOwned + Send,
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut buf = vec![0; 4096];
+        let mut buf = [0; 4096];
+        let mut bytes = Vec::new();
         loop {
             if let Ok(size) = stream.read(&mut buf).await {
-                if size == 0 {
+                debug!("read {:?} bytes", size);
+                bytes.extend_from_slice(&buf);
+                if size < buf.len() {
                     break;
                 }
-                debug!("read {:?} bytes", size);
-                match bincode::deserialize::<Task<I>>(&buf[..size]).unwrap() {
-                    Task::Job(job) => {
-                        debug!("received job");
-                        let res = job.map();
-                        let bytes = bincode::serialize(&res).unwrap();
-                        stream.write_all(&bytes[..]).await.unwrap();
-                    }
-                    Task::AllFinished => break,
-                };
             }
         }
+
+        match bincode::deserialize::<Task<I>>(&bytes)? {
+            Task::Job(job) => {
+                debug!("received job");
+                let res = job.map();
+                let bytes = bincode::serialize(&res)?;
+                stream.write_all(&bytes[..]).await?;
+            }
+            Task::AllFinished => {
+                debug!("shutting down");
+                return Ok(State::Finished);
+            }
+        };
+
+        Ok(State::Continue)
     }
 
-    pub async fn run<I, O>(addr: SocketAddr)
+    pub async fn run<I, O>(addr: SocketAddr) -> Result<()>
     where
         I: Map<O>,
         O: Serialize + DeserializeOwned + Send,
     {
-        let listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await?;
         info!("worker listening on: {:}", addr);
 
         loop {
-            let (socket, _) = listener.accept().await.unwrap();
+            let (socket, _) = listener.accept().await?;
             debug!("received connection");
-            Worker::run_stream::<I, O, _>(socket).await;
+            match Worker::run_stream::<I, O, _>(socket).await? {
+                State::Finished => break,
+                State::Continue => {}
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -95,7 +114,7 @@ mod tests {
             self: Pin<&mut Self>,
             _: &mut Context<'_>,
             buf: &[u8],
-        ) -> Poll<Result<usize, std::io::Error>> {
+        ) -> Poll<std::result::Result<usize, std::io::Error>> {
             self.get_mut().result = Vec::from(buf);
             Poll::Ready(Ok(buf.len()))
         }
@@ -103,14 +122,14 @@ mod tests {
         fn poll_flush(
             self: Pin<&mut Self>,
             _: &mut Context<'_>,
-        ) -> Poll<Result<(), std::io::Error>> {
+        ) -> Poll<std::result::Result<(), std::io::Error>> {
             Poll::Ready(Ok(()))
         }
 
         fn poll_shutdown(
             self: Pin<&mut Self>,
             _: &mut Context<'_>,
-        ) -> Poll<Result<(), std::io::Error>> {
+        ) -> Poll<std::result::Result<(), std::io::Error>> {
             Poll::Ready(Ok(()))
         }
     }
@@ -137,7 +156,9 @@ mod tests {
         .unwrap();
 
         let mut stream = MockTcpStream::new(job);
-        Worker::run_stream::<MockJob, _, _>(&mut stream).await;
+        Worker::run_stream::<MockJob, _, _>(&mut stream)
+            .await
+            .expect("worker failed");
 
         let res: Count = bincode::deserialize(&stream.result).unwrap();
 
