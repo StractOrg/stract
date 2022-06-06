@@ -10,15 +10,15 @@ struct Job {
     id: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Count(usize);
-
 impl Map<Count> for Job {
     fn map(self) -> Count {
         std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
         Count(1)
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Count(usize);
 
 impl Reduce for Count {
     fn reduce(self, element: Self) -> Self {
