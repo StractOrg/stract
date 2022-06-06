@@ -95,8 +95,8 @@ impl<'a> WorkerGuard<'a> {
         }
     }
 
-    fn success(self) {
-        self.from_pool.insert(Arc::clone(&self.worker))
+    async fn success(self) {
+        self.from_pool.insert(Arc::clone(&self.worker)).await
     }
 }
 
@@ -153,11 +153,9 @@ impl WorkerPool {
         self.running_workers.fetch_sub(1, Ordering::SeqCst);
     }
 
-    fn insert(&self, worker: Arc<RemoteWorker>) {
+    async fn insert(&self, worker: Arc<RemoteWorker>) {
         let ch = self.alive_workers.0.clone();
-        tokio::spawn(async move {
-            ch.send(worker).await.unwrap();
-        });
+        ch.send(worker).await.unwrap();
     }
 
     async fn get_worker<'a>(&'a self) -> Result<WorkerGuard<'a>> {
@@ -213,7 +211,7 @@ impl Manager {
     {
         let worker = self.pool.get_worker().await?;
         let res = worker.perform(job).await?;
-        worker.success();
+        worker.success().await;
 
         Ok(res)
     }
