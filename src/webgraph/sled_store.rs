@@ -13,14 +13,83 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::path::Path;
+use std::{collections::HashMap, path::Path, sync::Mutex};
 
-use super::{Edge, InternalEdge, Node, NodeID, NodeIterator};
+use lru::LruCache;
+
+use super::{Edge, Node, NodeID, NodeIterator, StoredEdge};
 use crate::webgraph::GraphStore;
 
+const DEFAULT_CACHE_SIZE: usize = 10;
+const DEFAULT_BLOCK_SIZE: u64 = 1_024;
+
+struct Adjacency {
+    store: sled::Tree,
+    cache: Mutex<LruCache<u64, HashMap<NodeID, Vec<StoredEdge>>>>,
+}
+
+impl Adjacency {
+    fn new(store: sled::Tree) -> Self {
+        Self {
+            store,
+            cache: Mutex::new(LruCache::new(DEFAULT_CACHE_SIZE)),
+        }
+    }
+
+    fn invalidate_cache(&mut self, block_id: u64) {
+        self.cache.lock().unwrap().pop(&block_id);
+    }
+
+    fn retrieve_block(&self, block_id: u64) -> HashMap<NodeID, Vec<StoredEdge>> {
+        let block_bytes = bincode::serialize(&block_id).expect("failed to serialize block id");
+        self.store
+            .get(&block_bytes)
+            .expect("failed to retrieve block")
+            .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize block"))
+            .unwrap_or_default()
+    }
+
+    fn save_block(&mut self, block_id: u64, block: HashMap<NodeID, Vec<StoredEdge>>) {
+        let block_id_bytes = bincode::serialize(&block_id).expect("failed to serialize block id");
+        let block_bytes = bincode::serialize(&block).expect("failed to serialize block");
+
+        self.store
+            .insert(block_id_bytes, block_bytes)
+            .expect("failed to save block");
+    }
+
+    fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
+        let block_id = from / DEFAULT_BLOCK_SIZE;
+        self.invalidate_cache(block_id);
+
+        let mut block = self.retrieve_block(block_id);
+        block
+            .entry(from)
+            .or_default()
+            .push(StoredEdge { other: to, label });
+
+        self.save_block(block_id, block);
+    }
+
+    fn edges(&self, node: NodeID) -> Vec<StoredEdge> {
+        let block_id = node / DEFAULT_BLOCK_SIZE;
+        let mut cache_lock = self.cache.lock().unwrap();
+        match cache_lock.get(&block_id) {
+            Some(block) => block.get(&node).map(|v| v.clone()).unwrap_or_default(),
+            None => {
+                let block = self.retrieve_block(block_id);
+                let res = block.get(&node).map(|v| v.clone()).unwrap_or_default();
+                cache_lock.push(block_id, block);
+
+                res
+            }
+        }
+    }
+}
+
 pub struct SledStore {
-    adjacency: sled::Tree,
-    reversed_adjacency: sled::Tree,
+    adjacency: Adjacency,
+    reversed_adjacency: Adjacency,
     node2id: sled::Tree,
     id2node: sled::Tree,
     meta: sled::Tree,
@@ -52,12 +121,14 @@ impl SledStore {
 
     fn from_db(db: sled::Db) -> Self {
         Self {
-            adjacency: db
-                .open_tree("adjacency")
-                .expect("Could not open adjacency tree"),
-            reversed_adjacency: db
-                .open_tree("reversed_adjacency")
-                .expect("Could not open reversed adjacency tree"),
+            adjacency: Adjacency::new(
+                db.open_tree("adjacency")
+                    .expect("Could not open adjacency tree"),
+            ),
+            reversed_adjacency: Adjacency::new(
+                db.open_tree("reversed_adjacency")
+                    .expect("Could not open reversed adjacency tree"),
+            ),
             node2id: db
                 .open_tree("node2id")
                 .expect("Could not open node2id tree"),
@@ -129,97 +200,8 @@ impl SledStore {
         }
     }
 
-    fn insert_adjacency(&mut self, from: NodeID, to: NodeID, label: String) {
-        let from_bytes = bincode::serialize(&from).expect("Failed to serialize id");
-
-        let mut adjacency_list: Vec<_> = self
-            .adjacency
-            .get(&from_bytes)
-            .expect("Failed to retrieve adjancecy list")
-            .map(|bytes| {
-                bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
-            })
-            .unwrap_or_default();
-
-        let internal_edge = InternalEdge { to_node: to, label };
-        adjacency_list.push(internal_edge);
-
-        let serialized_adjacency =
-            bincode::serialize(&adjacency_list).expect("Failed to serialize adjacency list");
-
-        self.adjacency
-            .insert(from_bytes, serialized_adjacency)
-            .expect("Failed to store new adjacency list");
-    }
-
-    fn insert_reverse_adjacency(&mut self, from: NodeID, to: NodeID, label: String) {
-        let to_bytes = bincode::serialize(&to).expect("Failed to serialize id");
-
-        let mut adjacency_list: Vec<_> = self
-            .reversed_adjacency
-            .get(&to_bytes)
-            .expect("Failed to retrieve adjacency list")
-            .map(|bytes| {
-                bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
-            })
-            .unwrap_or_default();
-
-        let internal_edge = InternalEdge {
-            to_node: from,
-            label,
-        };
-        adjacency_list.push(internal_edge);
-
-        let serialized_adjacency =
-            bincode::serialize(&adjacency_list).expect("Failed to serialize adjacency list");
-
-        self.reversed_adjacency
-            .insert(to_bytes, serialized_adjacency)
-            .expect("Failed to store new adjacency list");
-    }
-
-    fn out_edges(&self, node: Node) -> Vec<InternalEdge> {
-        let id = self.get_id(&node);
-        if id.is_none() {
-            return Vec::new();
-        }
-        let id = id.expect("ID was deemed to not be None");
-        let id_bytes = bincode::serialize(&id).expect("Failed to serialize id");
-
-        match self
-            .adjacency
-            .get(&id_bytes)
-            .expect("Failed to retrieve adjacency list")
-        {
-            Some(bytes) => {
-                bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
-            }
-            None => Vec::new(),
-        }
-    }
-
-    fn in_edges(&self, node: Node) -> Vec<InternalEdge> {
-        let id = self.get_id(&node);
-        if id.is_none() {
-            return Vec::new();
-        }
-        let id = id.expect("ID was deemed to not be None");
-        let id_bytes = bincode::serialize(&id).expect("Failed to serialize id");
-
-        match self
-            .reversed_adjacency
-            .get(&id_bytes)
-            .expect("Failed to retrieve adjacency list")
-        {
-            Some(bytes) => {
-                bincode::deserialize(&bytes).expect("Failed to deserialize adjacency list")
-            }
-            None => Vec::new(),
-        }
-    }
-
-    fn get_node(&self, id: NodeID) -> Option<Node> {
-        let id_bytes = bincode::serialize(&id).expect("Failed to serialize id");
+    fn get_node(&self, id: &NodeID) -> Option<Node> {
+        let id_bytes = bincode::serialize(id).expect("Failed to serialize id");
         self.id2node
             .get(&id_bytes)
             .expect("Failed to retrieve node by id")
@@ -228,56 +210,53 @@ impl SledStore {
 }
 
 impl GraphStore for SledStore {
-    fn outgoing_edges(&self, node: Node) -> Vec<Edge> {
-        self.out_edges(node.clone())
+    fn outgoing_edges(&self, node: NodeID) -> Vec<Edge> {
+        self.adjacency
+            .edges(node)
             .into_iter()
-            .map(|internal_edge| {
-                let to = self
-                    .get_node(internal_edge.to_node)
-                    .expect("Node and ids are out of sync");
-                let from = node.clone();
-
-                Edge {
-                    from,
-                    to,
-                    label: internal_edge.label,
-                }
+            .map(|edge| Edge {
+                from: node,
+                to: edge.other,
+                label: edge.label,
             })
             .collect()
     }
 
-    fn ingoing_edges(&self, node: Node) -> Vec<Edge> {
-        self.in_edges(node.clone())
+    fn ingoing_edges(&self, node: NodeID) -> Vec<Edge> {
+        self.reversed_adjacency
+            .edges(node)
             .into_iter()
-            .map(|internal_edge| {
-                let from = self
-                    .get_node(internal_edge.to_node)
-                    .expect("Node and ids are out of sync");
-                let to = node.clone();
-
-                Edge {
-                    from,
-                    to,
-                    label: internal_edge.label,
-                }
+            .map(|edge| Edge {
+                from: edge.other,
+                to: node,
+                label: edge.label,
             })
             .collect()
     }
 
     fn nodes(&self) -> NodeIterator {
         let iter = IntoIter {
-            inner: self.node2id.into_iter(),
+            inner: self.id2node.into_iter(),
         };
 
         NodeIterator::from(iter)
     }
 
-    fn insert(&mut self, edge: Edge) {
-        let from_id = self.id_or_assign(&edge.from);
-        let to_id = self.id_or_assign(&edge.to);
+    fn insert(&mut self, from: Node, to: Node, label: String) {
+        let from_id = self.id_or_assign(&from);
+        let to_id = self.id_or_assign(&to);
 
-        self.insert_adjacency(from_id, to_id, edge.label.clone());
-        self.insert_reverse_adjacency(from_id, to_id, edge.label);
+        self.adjacency.insert(from_id, to_id, label.clone());
+        self.reversed_adjacency
+            .insert(to_id, from_id, label.clone());
+    }
+
+    fn node2id(&self, node: &Node) -> Option<NodeID> {
+        self.get_id(node)
+    }
+
+    fn id2node(&self, id: &NodeID) -> Option<Node> {
+        self.get_node(id)
     }
 }
 
@@ -286,7 +265,7 @@ pub struct IntoIter {
 }
 
 impl Iterator for IntoIter {
-    type Item = Node;
+    type Item = NodeID;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|res| {
@@ -321,80 +300,76 @@ mod test {
             name: "C".to_string(),
         };
 
-        store.insert(Edge {
-            from: a.clone(),
-            to: b.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: b.clone(),
-            to: c.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: c.clone(),
-            to: a.clone(),
-            label: String::new(),
-        });
-        store.insert(Edge {
-            from: a.clone(),
-            to: c.clone(),
-            label: String::new(),
-        });
+        store.insert(a.clone(), b.clone(), String::new());
+        store.insert(b.clone(), c.clone(), String::new());
+        store.insert(c.clone(), a.clone(), String::new());
+        store.insert(a.clone(), c.clone(), String::new());
 
-        let nodes: Vec<Node> = store.nodes().collect();
+        let nodes: Vec<Node> = store
+            .nodes()
+            .map(|id| store.get_node(&id).unwrap())
+            .collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
+
+        let a_id = store.node2id(&a).unwrap();
+        let b_id = store.node2id(&b).unwrap();
+        let c_id = store.node2id(&c).unwrap();
+
         assert_eq!(
-            store.outgoing_edges(a.clone()),
+            store.outgoing_edges(a_id),
             vec![
                 Edge {
-                    from: a.clone(),
-                    to: b.clone(),
+                    from: a_id,
+                    to: b_id,
                     label: String::new()
                 },
                 Edge {
-                    from: a.clone(),
-                    to: c.clone(),
+                    from: a_id,
+                    to: c_id,
                     label: String::new()
                 },
             ]
         );
+
         assert_eq!(
-            store.outgoing_edges(b.clone()),
+            store.outgoing_edges(b_id),
             vec![Edge {
-                from: b.clone(),
-                to: c.clone(),
+                from: b_id,
+                to: c_id,
                 label: String::new()
             },]
         );
+
         assert_eq!(
-            store.ingoing_edges(c.clone()),
+            store.ingoing_edges(c_id),
             vec![
                 Edge {
-                    from: b.clone(),
-                    to: c.clone(),
+                    from: b_id,
+                    to: c_id,
                     label: String::new()
                 },
                 Edge {
-                    from: a.clone(),
-                    to: c.clone(),
+                    from: a_id,
+                    to: c_id,
                     label: String::new()
                 },
             ]
         );
+
         assert_eq!(
-            store.ingoing_edges(a.clone()),
+            store.ingoing_edges(a_id),
             vec![Edge {
-                from: c,
-                to: a.clone(),
+                from: c_id,
+                to: a_id,
                 label: String::new()
             },]
         );
+
         assert_eq!(
-            store.ingoing_edges(b.clone()),
+            store.ingoing_edges(b_id),
             vec![Edge {
-                from: a,
-                to: b,
+                from: a_id,
+                to: b_id,
                 label: String::new()
             },]
         );
