@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::io;
 use std::num::ParseIntError;
 use tantivy::TantivyError;
@@ -35,35 +35,53 @@ mod webgraph;
 mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Config {
-    pub mode: Mode,
-    warc_source: Option<WarcSource>,
+#[serde(tag = "type")]
+pub enum Config {
+    Indexer(IndexingConfig),
+    Webgraph(WebgraphConfig),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingConfig {
+    warc_source: WarcSource,
     warc_paths_file: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "type", content = "args")]
+#[serde(tag = "mode")]
+pub enum WebgraphConfig {
+    Master(WebgraphMasterConfig),
+    Worker(WebgraphWorkerConfig),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct WebgraphMasterConfig {
+    warc_source: WarcSource,
+    warc_paths_file: String,
+    addr: String,
+    workers: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct WebgraphWorkerConfig {
+    addr: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
 pub enum WarcSource {
     S3(S3Config),
     HTTP(HttpConfig),
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub enum Mode {
-    /// Index warc documents into index
-    Indexer,
-    /// Create webgraph from warc documents
-    Webgraph,
-}
-
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct S3Config {
     name: String,
     endpoint: String,
     bucket: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HttpConfig {
     base_url: String,
 }

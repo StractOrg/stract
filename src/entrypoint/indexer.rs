@@ -23,15 +23,15 @@ use tokio::io::AsyncReadExt;
 
 use crate::warc::WarcFile;
 use crate::webpage::Html;
-use crate::{Config, Error, Result};
+use crate::{Error, IndexingConfig, Result};
 
 pub struct Indexer {
     warc_paths: Vec<String>,
-    config: Config,
+    config: IndexingConfig,
 }
 
-impl From<Config> for Indexer {
-    fn from(config: Config) -> Self {
+impl From<IndexingConfig> for Indexer {
+    fn from(config: IndexingConfig) -> Self {
         let file = File::open(&config.warc_paths_file).unwrap();
         let mut warc_paths = Vec::new();
 
@@ -56,12 +56,7 @@ impl Indexer {
 
         stream::iter(self.warc_paths.into_iter().progress_with(pb))
             .map(|warc_path| {
-                let source = self
-                    .config
-                    .warc_source
-                    .as_ref()
-                    .expect("Indexing needs a warc source")
-                    .clone();
+                let source = self.config.warc_source.clone();
 
                 tokio::spawn(async move { WarcFile::download(source, &warc_path).await })
             })
