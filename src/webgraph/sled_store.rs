@@ -13,11 +13,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::{collections::HashMap, path::Path, sync::Mutex};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
+};
 
 use lru::LruCache;
 
-use super::{Edge, Node, NodeID, NodeIterator, StoredEdge};
+use super::{dir_entry, Edge, Node, NodeID, NodeIterator, StoredEdge};
 use crate::webgraph::GraphStore;
 
 const DEFAULT_CACHE_SIZE: usize = 10;
@@ -85,6 +92,36 @@ impl Adjacency {
             }
         }
     }
+
+    fn flush(&self) {
+        self.store.flush().expect("unable to flush tree");
+    }
+}
+
+// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
+fn gen_temp_path() -> PathBuf {
+    use std::time::SystemTime;
+
+    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
+
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos()
+        << 48;
+
+    let pid = u128::from(std::process::id());
+
+    let salt = (pid << 16) + now + seed;
+
+    if cfg!(target_os = "linux") {
+        // use shared memory for temporary linux files
+        format!("/dev/shm/pagecache.tmp.{}", salt).into()
+    } else {
+        std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
+    }
 }
 
 pub struct SledStore {
@@ -93,22 +130,23 @@ pub struct SledStore {
     node2id: sled::Tree,
     id2node: sled::Tree,
     meta: sled::Tree,
+    pub(crate) path: String,
 }
 
 impl SledStore {
     #[cfg(test)]
     pub(crate) fn temporary() -> Self {
-        let db = sled::Config::default()
-            .temporary(true)
-            .use_compression(true)
-            .mode(sled::Mode::LowSpace)
-            .open()
-            .expect("Failed to open database");
-
-        Self::from_db(db)
+        Self::open(gen_temp_path())
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let p = path
+            .as_ref()
+            .as_os_str()
+            .to_str()
+            .expect("unknown path")
+            .to_string();
+
         let db = sled::Config::default()
             .path(path)
             .use_compression(true)
@@ -116,10 +154,10 @@ impl SledStore {
             .open()
             .expect("Failed to open database");
 
-        Self::from_db(db)
+        Self::from_db(db, p)
     }
 
-    fn from_db(db: sled::Db) -> Self {
+    fn from_db(db: sled::Db, path: String) -> Self {
         Self {
             adjacency: Adjacency::new(
                 db.open_tree("adjacency")
@@ -136,6 +174,7 @@ impl SledStore {
                 .open_tree("id2node")
                 .expect("Could not open id2node tree"),
             meta: db.open_tree("meta").expect("Could not open metadata tree"),
+            path,
         }
     }
 
@@ -207,6 +246,14 @@ impl SledStore {
             .expect("Failed to retrieve node by id")
             .map(|bytes| bincode::deserialize(&bytes).expect("Failed to deserialize node"))
     }
+
+    fn flush(&self) {
+        self.adjacency.flush();
+        self.reversed_adjacency.flush();
+        self.node2id.flush().expect("unable to flush tree");
+        self.id2node.flush().expect("unable to flush tree");
+        self.meta.flush().expect("unable to flush tree");
+    }
 }
 
 impl GraphStore for SledStore {
@@ -257,6 +304,16 @@ impl GraphStore for SledStore {
 
     fn id2node(&self, id: &NodeID) -> Option<Node> {
         self.get_node(id)
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.flush();
+        dir_entry::serialize_folder(self.path.clone()).unwrap()
+    }
+
+    fn deserialize(bytes: &[u8]) -> Self {
+        let path = dir_entry::deserialize_folder(bytes).unwrap();
+        Self::open(path)
     }
 }
 
@@ -367,6 +424,53 @@ mod test {
 
         assert_eq!(
             store.ingoing_edges(b_id),
+            vec![Edge {
+                from: a_id,
+                to: b_id,
+                label: String::new()
+            },]
+        );
+    }
+
+    #[test]
+    fn serialize_deserialize() {
+        let mut store = SledStore::temporary();
+
+        let a = Node {
+            name: "A".to_string(),
+        };
+        let b = Node {
+            name: "B".to_string(),
+        };
+
+        store.insert(a.clone(), b.clone(), String::new());
+        let a_id = store.node2id(&a).unwrap();
+        let b_id = store.node2id(&b).unwrap();
+
+        let bytes = store.serialize();
+
+        assert!(bytes.len() > 0);
+
+        std::fs::remove_dir_all(store.path).unwrap();
+
+        let store2 = SledStore::deserialize(&bytes);
+        let a_id2 = store2.node2id(&a).unwrap();
+        let b_id2 = store2.node2id(&b).unwrap();
+
+        assert_eq!(a_id2, a_id);
+        assert_eq!(b_id2, b_id);
+
+        assert_eq!(
+            store2.outgoing_edges(a_id),
+            vec![Edge {
+                from: a_id,
+                to: b_id,
+                label: String::new()
+            },]
+        );
+
+        assert_eq!(
+            store2.ingoing_edges(b_id),
             vec![Edge {
                 from: a_id,
                 to: b_id,

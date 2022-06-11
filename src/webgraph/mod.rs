@@ -13,17 +13,20 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-mod sled_store;
+mod dir_entry;
+pub mod sled_store;
+
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
 
-use sled_store::SledStore;
+pub use sled_store::SledStore;
 
 use crate::webpage;
 
-type NodeName = String;
 type NodeID = u64;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -64,6 +67,8 @@ pub trait GraphStore {
     fn ingoing_edges(&self, node: NodeID) -> Vec<Edge>;
     fn nodes<'a>(&'a self) -> NodeIterator;
     fn insert(&mut self, from: Node, to: Node, label: String);
+    fn serialize(&self) -> Vec<u8>;
+    fn deserialize(bytes: &[u8]) -> Self;
 
     fn edges<'a>(&'a self) -> EdgeIterator<'a> {
         EdgeIterator::from(self.nodes().flat_map(|node| self.outgoing_edges(node)))
@@ -126,21 +131,21 @@ pub struct Edge {
     label: String,
 }
 
-pub struct WebGraph<S: GraphStore> {
+pub struct Webgraph<S: GraphStore> {
     full_graph: S,
     host_graph: S,
 }
 
-impl<S: GraphStore> WebGraph<S> {
+impl<S: GraphStore> Webgraph<S> {
     #[cfg(test)]
-    pub fn new_memory() -> WebGraph<SledStore> {
-        WebGraph {
+    pub fn new_memory() -> Webgraph<SledStore> {
+        Webgraph {
             full_graph: SledStore::temporary(),
             host_graph: SledStore::temporary(),
         }
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> WebGraph<SledStore> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Webgraph<SledStore> {
         todo!();
         // WebGraph {
         //     internal_store: SledStore::open(path),
@@ -155,7 +160,7 @@ impl<S: GraphStore> WebGraph<S> {
             .insert(from.into_host(), to.into_host(), label);
     }
 
-    pub fn merge(&mut self, other: WebGraph<S>) {
+    pub fn merge(&mut self, other: Webgraph<S>) {
         self.full_graph.append(other.full_graph);
         self.host_graph.append(other.host_graph);
     }
@@ -204,7 +209,7 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     pub fn distances(&self, source: Node) -> HashMap<Node, usize> {
-        let distances = WebGraph::<S>::dijkstra(
+        let distances = Webgraph::<S>::dijkstra(
             source,
             |node_id| self.full_graph.outgoing_edges(node_id),
             |edge| edge.to.clone(),
@@ -218,7 +223,7 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
-        WebGraph::<S>::dijkstra(
+        Webgraph::<S>::dijkstra(
             source,
             |node| self.full_graph.ingoing_edges(node),
             |edge| edge.from.clone(),
@@ -234,7 +239,7 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
-        let distances = WebGraph::<S>::dijkstra(
+        let distances = Webgraph::<S>::dijkstra(
             source,
             |node| self.host_graph.outgoing_edges(node),
             |edge| edge.to.clone(),
@@ -248,7 +253,7 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     fn raw_host_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
-        WebGraph::<S>::dijkstra(
+        Webgraph::<S>::dijkstra(
             source,
             |node| self.host_graph.ingoing_edges(node),
             |edge| edge.from.clone(),
@@ -295,15 +300,104 @@ impl<S: GraphStore> WebGraph<S> {
     }
 
     pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
-        WebGraph::<S>::calculate_centrality(&self.full_graph, |node| {
+        Webgraph::<S>::calculate_centrality(&self.full_graph, |node| {
             self.raw_reversed_distances(node)
         })
     }
 
     pub fn host_harmonic_centrality(&self) -> HashMap<Node, f64> {
-        WebGraph::<S>::calculate_centrality(&self.host_graph, |node| {
+        Webgraph::<S>::calculate_centrality(&self.host_graph, |node| {
             self.raw_host_reversed_distances(node)
         })
+    }
+}
+
+impl Serialize for Webgraph<SledStore> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("WebgraphSled", 2)?;
+
+        state.serialize_field("full", &self.full_graph.serialize())?;
+        state.serialize_field("host", &self.host_graph.serialize())?;
+
+        state.end()
+    }
+}
+
+use serde::de;
+impl<'de> Deserialize<'de> for Webgraph<SledStore> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct GraphVisitor;
+        impl<'de> Visitor<'de> for GraphVisitor {
+            type Value = Webgraph<SledStore>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct WebgraphSled")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut full = None;
+                let mut host = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "full" => {
+                            if full.is_some() {
+                                return Err(de::Error::duplicate_field("full"));
+                            }
+                            full = Some(map.next_value()?);
+                        }
+                        "host" => {
+                            if host.is_some() {
+                                return Err(de::Error::duplicate_field("host"));
+                            }
+                            host = Some(map.next_value()?);
+                        }
+                        _ => return Err(de::Error::unknown_field(key, &["full", "graph"])),
+                    }
+                }
+                let full: Vec<u8> = full.ok_or_else(|| de::Error::missing_field("full"))?;
+                let host: Vec<u8> = host.ok_or_else(|| de::Error::missing_field("host"))?;
+
+                let full = SledStore::deserialize(&full);
+                let host = SledStore::deserialize(&host);
+
+                Ok(Webgraph {
+                    full_graph: full,
+                    host_graph: host,
+                })
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let full: Vec<u8> = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let host: Vec<u8> = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+
+                let full = SledStore::deserialize(&full);
+                let host = SledStore::deserialize(&host);
+
+                Ok(Webgraph {
+                    full_graph: full,
+                    host_graph: host,
+                })
+            }
+        }
+
+        deserializer.deserialize_struct("WebgraphSled", &["full", "host"], GraphVisitor)
     }
 }
 
@@ -311,7 +405,7 @@ impl<S: GraphStore> WebGraph<S> {
 mod test {
     use super::*;
 
-    fn test_graph() -> WebGraph<SledStore> {
+    fn test_graph() -> Webgraph<SledStore> {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -323,7 +417,7 @@ mod test {
         //        │
         //        D
 
-        let mut graph = WebGraph::<SledStore>::new_memory();
+        let mut graph = Webgraph::<SledStore>::new_memory();
 
         graph.insert(Node::from("A"), Node::from("B"), String::new());
         graph.insert(Node::from("B"), Node::from("C"), String::new());
@@ -389,7 +483,7 @@ mod test {
 
     #[test]
     fn host_harmonic_centrality() {
-        let mut graph = WebGraph::<SledStore>::new_memory();
+        let mut graph = Webgraph::<SledStore>::new_memory();
 
         graph.insert(Node::from("A.com/1"), Node::from("A.com/2"), String::new());
         graph.insert(Node::from("A.com/1"), Node::from("A.com/3"), String::new());
@@ -421,11 +515,11 @@ mod test {
 
     #[test]
     fn merge() {
-        let mut graph1 = WebGraph::<SledStore>::new_memory();
+        let mut graph1 = Webgraph::<SledStore>::new_memory();
 
         graph1.insert(Node::from("A"), Node::from("B"), String::new());
 
-        let mut graph2 = WebGraph::<SledStore>::new_memory();
+        let mut graph2 = Webgraph::<SledStore>::new_memory();
         graph2.insert(Node::from("B"), Node::from("C"), String::new());
 
         graph1.merge(graph2);
@@ -434,5 +528,21 @@ mod test {
             graph1.distances(Node::from("A")).get(&Node::from("C")),
             Some(&2)
         )
+    }
+
+    #[test]
+    fn serialize_deserialize_bincode() {
+        let graph = test_graph();
+        let bytes = bincode::serialize(&graph).unwrap();
+
+        std::fs::remove_dir_all(graph.full_graph.path).unwrap();
+        std::fs::remove_dir_all(graph.host_graph.path).unwrap();
+
+        let deserialized_graph: Webgraph<SledStore> = bincode::deserialize(&bytes).unwrap();
+        let distances = deserialized_graph.distances(Node::from("D"));
+
+        assert_eq!(distances.get(&Node::from("C")), Some(&1));
+        assert_eq!(distances.get(&Node::from("A")), Some(&2));
+        assert_eq!(distances.get(&Node::from("B")), Some(&3));
     }
 }

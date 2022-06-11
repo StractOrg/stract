@@ -13,18 +13,58 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{Config, Result};
+use crate::{
+    mapreduce::{Map, Reduce},
+    webgraph::{SledStore, Webgraph},
+    Result, WarcSource, WebgraphConfig, WebgraphMasterConfig, WebgraphWorkerConfig,
+};
+use serde::{Deserialize, Serialize};
 
-pub struct WebgraphBuilder {}
+pub struct WebgraphBuilder {
+    config: WebgraphConfig,
+}
 
-impl From<Config> for WebgraphBuilder {
-    fn from(config: Config) -> Self {
-        Self {}
+impl From<WebgraphConfig> for WebgraphBuilder {
+    fn from(config: WebgraphConfig) -> Self {
+        Self { config }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct SingleJob {
+    warc_source: WarcSource,
+    warc_path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Job(Vec<SingleJob>);
+
+impl Map<Webgraph<SledStore>> for Job {
+    fn map(self) -> Webgraph<SledStore> {
+        todo!()
+    }
+}
+
+impl Reduce<Webgraph<SledStore>> for Webgraph<SledStore> {
+    fn reduce(mut self, other: Webgraph<SledStore>) -> Webgraph<SledStore> {
+        self.merge(other);
+        self
     }
 }
 
 impl WebgraphBuilder {
-    pub async fn run(&self) -> Result<()> {
+    fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         todo!();
+    }
+
+    fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
+        todo!();
+    }
+
+    pub fn run(&self) -> Result<()> {
+        match &self.config {
+            WebgraphConfig::Master(config) => WebgraphBuilder::run_master(config),
+            WebgraphConfig::Worker(config) => WebgraphBuilder::run_worker(config),
+        }
     }
 }

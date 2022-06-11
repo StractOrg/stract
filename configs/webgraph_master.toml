@@ -1,5 +1,10 @@
-type = "Indexer"
+type = "Webgraph"
+mode = "Master"
+
 warc_paths_file = "warc.paths"
+addr = "0.0.0.0:1337"
+workers = ["0.0.0.0:1338"]
+
 
 # [warc_source]
 # type = "S3"
