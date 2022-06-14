@@ -24,6 +24,7 @@ pub mod index;
 
 pub mod mapreduce;
 
+mod directory;
 mod query;
 mod ranking;
 mod schema;
@@ -58,7 +59,6 @@ pub enum WebgraphConfig {
 pub struct WebgraphMasterConfig {
     warc_source: WarcSource,
     warc_paths_file: String,
-    addr: String,
     workers: Vec<String>,
 }
 
@@ -120,6 +120,9 @@ pub enum Error {
 
     #[error("Error while serializing/deserializing to/from bytes")]
     Serialization(#[from] bincode::Error),
+
+    #[error("Error executing distributed jobs")]
+    MapReduce(#[from] mapreduce::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

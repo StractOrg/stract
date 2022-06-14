@@ -87,48 +87,4 @@ impl Indexer {
 
         Ok(())
     }
-
-    async fn download_from_http(warc_path: String, base_url: String) -> Result<Vec<u8>> {
-        let mut url = base_url;
-        if !url.ends_with('/') {
-            url += "/";
-        }
-        url += &warc_path;
-
-        let client = reqwest::Client::new();
-        let res = client.get(url).send().await?;
-
-        Ok(Vec::from(&res.bytes().await?[..]))
-    }
-
-    async fn download_from_s3(
-        key: String,
-        region_name: String,
-        region_endpoint: String,
-        bucket: String,
-    ) -> Result<Vec<u8>> {
-        let region = Region::Custom {
-            name: region_name,
-            endpoint: region_endpoint,
-        };
-
-        let client = S3Client::new(region);
-
-        let obj = client
-            .get_object(GetObjectRequest {
-                bucket,
-                key,
-                ..Default::default()
-            })
-            .await?;
-
-        let mut res = Vec::new();
-        obj.body
-            .ok_or(Error::S3DownloadError)?
-            .into_async_read()
-            .read_to_end(&mut res)
-            .await?;
-
-        Ok(res)
-    }
 }

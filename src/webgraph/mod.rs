@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-mod dir_entry;
 pub mod sled_store;
 
 use serde::de::{MapAccess, SeqAccess, Visitor};
@@ -146,10 +145,10 @@ impl<S: GraphStore> Webgraph<S> {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Webgraph<SledStore> {
-        todo!();
-        // WebGraph {
-        //     internal_store: SledStore::open(path),
-        // }
+        Webgraph {
+            full_graph: SledStore::open(path.as_ref().join("full")),
+            host_graph: SledStore::open(path.as_ref().join("host")),
+        }
     }
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
@@ -327,6 +326,7 @@ impl Serialize for Webgraph<SledStore> {
 }
 
 use serde::de;
+
 impl<'de> Deserialize<'de> for Webgraph<SledStore> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

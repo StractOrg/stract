@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{
     collections::HashMap,
+    hash::Hash,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -23,51 +24,35 @@ use std::{
 };
 
 use lru::LruCache;
+use serde::{de::DeserializeOwned, Serialize};
 
-use super::{dir_entry, Edge, Node, NodeID, NodeIterator, StoredEdge};
+use super::{Edge, Node, NodeID, NodeIterator, StoredEdge};
+use crate::directory;
 use crate::webgraph::GraphStore;
 
-const DEFAULT_CACHE_SIZE: usize = 10;
-const DEFAULT_BLOCK_SIZE: u64 = 1_024;
-
 struct Adjacency {
-    store: sled::Tree,
-    cache: Mutex<LruCache<u64, HashMap<NodeID, Vec<StoredEdge>>>>,
+    tree: CachedTree<u64, HashMap<NodeID, Vec<StoredEdge>>>,
+    block_size: u64,
 }
 
 impl Adjacency {
     fn new(store: sled::Tree) -> Self {
         Self {
-            store,
-            cache: Mutex::new(LruCache::new(DEFAULT_CACHE_SIZE)),
+            tree: CachedTree::new(store, 100),
+            block_size: 1_024,
         }
     }
 
-    fn invalidate_cache(&mut self, block_id: u64) {
-        self.cache.lock().unwrap().pop(&block_id);
-    }
-
     fn retrieve_block(&self, block_id: u64) -> HashMap<NodeID, Vec<StoredEdge>> {
-        let block_bytes = bincode::serialize(&block_id).expect("failed to serialize block id");
-        self.store
-            .get(&block_bytes)
-            .expect("failed to retrieve block")
-            .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize block"))
-            .unwrap_or_default()
+        self.tree.get(&block_id).unwrap_or_default()
     }
 
     fn save_block(&mut self, block_id: u64, block: HashMap<NodeID, Vec<StoredEdge>>) {
-        let block_id_bytes = bincode::serialize(&block_id).expect("failed to serialize block id");
-        let block_bytes = bincode::serialize(&block).expect("failed to serialize block");
-
-        self.store
-            .insert(block_id_bytes, block_bytes)
-            .expect("failed to save block");
+        self.tree.insert(block_id, block)
     }
 
     fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
-        let block_id = from / DEFAULT_BLOCK_SIZE;
-        self.invalidate_cache(block_id);
+        let block_id = from / self.block_size;
 
         let mut block = self.retrieve_block(block_id);
         block
@@ -79,26 +64,95 @@ impl Adjacency {
     }
 
     fn edges(&self, node: NodeID) -> Vec<StoredEdge> {
-        let block_id = node / DEFAULT_BLOCK_SIZE;
-        let mut cache_lock = self.cache.lock().unwrap();
-        match cache_lock.get(&block_id) {
-            Some(block) => block.get(&node).map(|v| v.clone()).unwrap_or_default(),
+        let block_id = node / self.block_size;
+        match self.tree.get(&block_id) {
+            Some(block) => block.get(&node).cloned().unwrap_or_default(),
             None => {
                 let block = self.retrieve_block(block_id);
-                let res = block.get(&node).map(|v| v.clone()).unwrap_or_default();
-                cache_lock.push(block_id, block);
+                let res = block.get(&node).cloned().unwrap_or_default();
 
                 res
             }
         }
     }
+}
+
+struct CachedTree<K, V> {
+    store: sled::Tree,
+    cache: Mutex<LruCache<K, V>>,
+}
+
+impl<K, V> CachedTree<K, V>
+where
+    K: Hash + Eq + Serialize + Clone,
+    V: Serialize + DeserializeOwned + Clone,
+{
+    fn new(store: sled::Tree, cache_size: usize) -> Self {
+        Self {
+            store,
+            cache: Mutex::new(LruCache::new(cache_size)),
+        }
+    }
+
+    fn get(&self, key: &K) -> Option<V> {
+        let mut cache_lock = self.cache.lock().expect("could not get cache lock");
+
+        match cache_lock.get(key) {
+            Some(val) => Some(val.clone()),
+            None => {
+                let key_bytes = bincode::serialize(key).expect("failed to serialize key");
+                self.store
+                    .get(&key_bytes)
+                    .expect("failed to retrieve block")
+                    .map(|bytes| {
+                        let val: V =
+                            bincode::deserialize(&bytes).expect("failed to deserialize value");
+                        cache_lock.put(key.clone(), val.clone());
+
+                        val
+                    })
+            }
+        }
+    }
+
+    fn insert_persisted(&self, key: K, value: V) {
+        let key_bytes = bincode::serialize(&key).expect("failed to serialize key");
+        let value_bytes = bincode::serialize(&value).expect("failed to serialize value");
+
+        self.store
+            .insert(key_bytes, value_bytes)
+            .expect("failed to save block");
+    }
+
+    fn insert(&mut self, key: K, value: V) {
+        let mut cache_lock = self.cache.lock().unwrap();
+
+        if cache_lock.len() == cache_lock.cap() {
+            if let Some((key, value)) = cache_lock.pop_lru() {
+                self.insert_persisted(key, value);
+            }
+        }
+
+        cache_lock.push(key, value);
+    }
 
     fn flush(&self) {
+        let mut cache_lock = self.cache.lock().unwrap();
+
+        while let Some((key, value)) = cache_lock.pop_lru() {
+            self.insert_persisted(key, value);
+        }
+
         self.store.flush().expect("unable to flush tree");
+    }
+
+    fn iter(&self) -> sled::Iter {
+        self.store.into_iter()
     }
 }
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
+#[allow(unused)]
 fn gen_temp_path() -> PathBuf {
     use std::time::SystemTime;
 
@@ -127,9 +181,9 @@ fn gen_temp_path() -> PathBuf {
 pub struct SledStore {
     adjacency: Adjacency,
     reversed_adjacency: Adjacency,
-    node2id: sled::Tree,
-    id2node: sled::Tree,
-    meta: sled::Tree,
+    node2id: CachedTree<Node, NodeID>,
+    id2node: CachedTree<NodeID, Node>,
+    meta: CachedTree<String, u64>,
     pub(crate) path: String,
 }
 
@@ -167,38 +221,32 @@ impl SledStore {
                 db.open_tree("reversed_adjacency")
                     .expect("Could not open reversed adjacency tree"),
             ),
-            node2id: db
-                .open_tree("node2id")
-                .expect("Could not open node2id tree"),
-            id2node: db
-                .open_tree("id2node")
-                .expect("Could not open id2node tree"),
-            meta: db.open_tree("meta").expect("Could not open metadata tree"),
+            node2id: CachedTree::new(
+                db.open_tree("node2id")
+                    .expect("Could not open node2id tree"),
+                1_000,
+            ),
+            id2node: CachedTree::new(
+                db.open_tree("id2node")
+                    .expect("Could not open id2node tree"),
+                1_000,
+            ),
+            meta: CachedTree::new(
+                db.open_tree("meta").expect("Could not open metadata tree"),
+                1_000,
+            ),
             path,
         }
     }
 
     fn next_id(&self) -> NodeID {
-        match self
-            .meta
-            .get("next_id")
-            .expect("Encountered error when retrieving next_id from metadata tree")
-        {
-            Some(next_id) => bincode::deserialize(&next_id).expect("Could not desialize"),
-            None => 0,
-        }
+        self.meta.get(&"next_id".to_string()).unwrap_or(0)
     }
 
     fn increment_next_id(&mut self) {
         let current_id = self.next_id();
         let next_id = current_id + 1;
-        self.meta
-            .insert(
-                "next_id",
-                bincode::serialize(&next_id).expect("Failed to serialize integer"),
-            )
-            .expect("Failed to insert next_id into metadata tree");
-        self.meta.flush().expect("Failed to flush");
+        self.meta.insert("next_id".to_string(), next_id);
     }
 
     fn id_and_increment(&mut self) -> NodeID {
@@ -207,29 +255,13 @@ impl SledStore {
         id
     }
 
-    fn assign_id(&self, node: &Node, id: NodeID) {
-        let node_bytes = bincode::serialize(node).expect("Failed to serialize node");
-        let id_bytes = bincode::serialize(&id).expect("Failed to serialize integer");
-
-        self.node2id
-            .insert(node_bytes.clone(), id_bytes.clone())
-            .expect("Failed to assign id to node");
-
-        self.id2node
-            .insert(id_bytes, node_bytes)
-            .expect("Failed to assign id to node");
+    fn assign_id(&mut self, node: Node, id: NodeID) {
+        self.node2id.insert(node.clone(), id);
+        self.id2node.insert(id, node);
     }
 
-    fn get_id(&self, node: &Node) -> Option<NodeID> {
-        let serialized_node = bincode::serialize(node).expect("Failed to serialize node");
-        self.node2id
-            .get(serialized_node)
-            .expect("Failed to use node2id tree")
-            .map(|id| bincode::deserialize(&id).expect("Failed to deserialize integer"))
-    }
-
-    fn id_or_assign(&mut self, node: &Node) -> NodeID {
-        match self.get_id(node) {
+    fn id_or_assign(&mut self, node: Node) -> NodeID {
+        match self.node2id.get(&node) {
             Some(id) => id,
             None => {
                 let id = self.id_and_increment();
@@ -239,20 +271,12 @@ impl SledStore {
         }
     }
 
-    fn get_node(&self, id: &NodeID) -> Option<Node> {
-        let id_bytes = bincode::serialize(id).expect("Failed to serialize id");
-        self.id2node
-            .get(&id_bytes)
-            .expect("Failed to retrieve node by id")
-            .map(|bytes| bincode::deserialize(&bytes).expect("Failed to deserialize node"))
-    }
-
     fn flush(&self) {
-        self.adjacency.flush();
-        self.reversed_adjacency.flush();
-        self.node2id.flush().expect("unable to flush tree");
-        self.id2node.flush().expect("unable to flush tree");
-        self.meta.flush().expect("unable to flush tree");
+        self.adjacency.tree.flush();
+        self.reversed_adjacency.tree.flush();
+        self.node2id.flush();
+        self.id2node.flush();
+        self.meta.flush();
     }
 }
 
@@ -282,16 +306,18 @@ impl GraphStore for SledStore {
     }
 
     fn nodes(&self) -> NodeIterator {
+        self.flush();
+
         let iter = IntoIter {
-            inner: self.id2node.into_iter(),
+            inner: self.id2node.iter(),
         };
 
         NodeIterator::from(iter)
     }
 
     fn insert(&mut self, from: Node, to: Node, label: String) {
-        let from_id = self.id_or_assign(&from);
-        let to_id = self.id_or_assign(&to);
+        let from_id = self.id_or_assign(from);
+        let to_id = self.id_or_assign(to);
 
         self.adjacency.insert(from_id, to_id, label.clone());
         self.reversed_adjacency
@@ -299,20 +325,20 @@ impl GraphStore for SledStore {
     }
 
     fn node2id(&self, node: &Node) -> Option<NodeID> {
-        self.get_id(node)
+        self.node2id.get(node)
     }
 
     fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.get_node(id)
+        self.id2node.get(id)
     }
 
     fn serialize(&self) -> Vec<u8> {
         self.flush();
-        dir_entry::serialize_folder(self.path.clone()).unwrap()
+        directory::serialize(self.path.clone()).unwrap()
     }
 
     fn deserialize(bytes: &[u8]) -> Self {
-        let path = dir_entry::deserialize_folder(bytes).unwrap();
+        let path = directory::deserialize(bytes).unwrap();
         Self::open(path)
     }
 }
@@ -362,9 +388,11 @@ mod test {
         store.insert(c.clone(), a.clone(), String::new());
         store.insert(a.clone(), c.clone(), String::new());
 
+        store.flush();
+
         let nodes: Vec<Node> = store
             .nodes()
-            .map(|id| store.get_node(&id).unwrap())
+            .map(|id| store.id2node.get(&id).unwrap())
             .collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
 
