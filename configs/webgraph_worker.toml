@@ -1,0 +1,4 @@
+type = "Webgraph"
+mode = "Worker"
+
+addr = "0.0.0.0:1338"

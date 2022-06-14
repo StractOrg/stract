@@ -17,6 +17,8 @@ use clap::Parser;
 use cuely::entrypoint::{Indexer, WebgraphBuilder};
 use cuely::Config;
 use std::fs;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -25,6 +27,11 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::DEBUG)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let args = Args::parse();
 
     let raw_config = fs::read_to_string(args.config_file).expect("Failed to read config file");
@@ -40,6 +47,7 @@ async fn main() {
         }
         Config::Webgraph(config) => WebgraphBuilder::from(config)
             .run()
+            .await
             .expect("Failed to build webgraph"),
     }
 }

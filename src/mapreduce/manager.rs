@@ -26,7 +26,7 @@ struct RemoteWorker {
 
 impl RemoteWorker {
     fn retry_strategy() -> impl Iterator<Item = Duration> {
-        ExponentialBackoff::from_millis(10).take(4)
+        ExponentialBackoff::from_millis(10).take(5)
     }
 
     async fn connect(&self) -> Result<TcpStream> {
