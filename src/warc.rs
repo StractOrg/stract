@@ -15,7 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
+use std::path::Path;
 use tokio::io::AsyncReadExt;
 
 use flate2::read::MultiGzDecoder;
@@ -80,7 +82,18 @@ impl WarcFile {
             WarcSource::HTTP(config) => {
                 WarcFile::download_from_http(path, config.base_url.clone()).await
             }
+            WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
         }
+    }
+
+    fn load_from_folder(name: &str, folder: &str) -> Result<Self> {
+        let mut bytes = Vec::new();
+        let f = File::open(dbg!(Path::new(folder).join(name)))?;
+
+        let mut reader = BufReader::new(f);
+        reader.read_to_end(&mut bytes)?;
+
+        Ok(WarcFile::new(bytes))
     }
 
     async fn download_from_http(path: &str, base_url: String) -> Result<Self> {

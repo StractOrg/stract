@@ -16,7 +16,7 @@
 
 use crate::Result;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, path::Path};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DirEntry {
@@ -31,10 +31,11 @@ pub enum DirEntry {
 }
 
 fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
+    dbg!(&path);
     let mut res = Vec::new();
 
     for f in fs::read_dir(path)? {
-        let entry = f?;
+        let entry = dbg!(f?);
         let metadata = entry.metadata()?;
 
         if metadata.is_dir() {
@@ -56,6 +57,9 @@ fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
 fn recreate_folder(entry: &DirEntry) -> Result<()> {
     match entry {
         DirEntry::Folder { name, entries } => {
+            if Path::new(name).exists() {
+                fs::remove_dir_all(name)?;
+            }
             fs::create_dir(name)?;
 
             for entry in entries {

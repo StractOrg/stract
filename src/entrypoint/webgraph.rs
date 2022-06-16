@@ -18,15 +18,11 @@ use crate::{
     warc::WarcFile,
     webgraph::{Node, SledStore, Webgraph},
     webpage::{self, Html},
-    HttpConfig, Result, WarcSource, WebgraphConfig, WebgraphMasterConfig, WebgraphWorkerConfig,
+    HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
+    WebgraphMasterConfig, WebgraphWorkerConfig,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::File,
-    io::{self, BufRead},
-    net::SocketAddr,
-    path::Path,
-};
+use std::{net::SocketAddr, path::Path};
 use tracing::{debug, info};
 
 pub struct WebgraphBuilder {
@@ -39,47 +35,51 @@ impl From<WebgraphConfig> for WebgraphBuilder {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+enum JobConfig {
+    HTTP(HttpConfig),
+    Local(LocalConfig),
+}
+
 #[derive(Serialize, Deserialize)]
 struct Job {
-    http_config: HttpConfig,
+    config: JobConfig,
     warc_path: String,
 }
 
-impl Map<Webgraph<SledStore>> for Job {
-    fn map(self) -> Webgraph<SledStore> {
-        let name = self.warc_path.split("/").last().unwrap();
+impl Map<Webgraph> for Job {
+    fn map(self) -> Webgraph {
+        let name = self.warc_path.split('/').last().unwrap();
 
         info!("processing {}", name);
 
         let mut graph = Webgraph::<SledStore>::open(Path::new("webgraph").join(name));
 
-        let file = futures::executor::block_on(WarcFile::download(
-            WarcSource::HTTP(self.http_config),
-            &self.warc_path,
-        ))
-        .unwrap();
+        let source = match self.config {
+            JobConfig::HTTP(config) => WarcSource::HTTP(config),
+            JobConfig::Local(config) => WarcSource::Local(config),
+        };
 
-        for record in file.records() {
-            if let Ok(record) = record {
-                let webpage = Html::parse(&record.response.body, &record.request.url);
-                for link in webpage
-                    .links()
-                    .into_iter()
-                    .filter(|link| {
-                        link.destination.starts_with("http://")
-                            || link.destination.starts_with("https://")
-                    })
-                    .filter(|link| {
-                        webpage::domain(&link.source) != webpage::domain(&link.destination)
-                    })
-                {
-                    debug!("inserting link {:?}", link);
-                    graph.insert(
-                        Node::from(link.source),
-                        Node::from(link.destination),
-                        link.text,
-                    );
-                }
+        let file =
+            futures::executor::block_on(WarcFile::download(source, &self.warc_path)).unwrap();
+
+        for record in file.records().flatten() {
+            let webpage = Html::parse(&record.response.body, &record.request.url);
+            for link in webpage
+                .links()
+                .into_iter()
+                .filter(|link| {
+                    link.destination.starts_with("http://")
+                        || link.destination.starts_with("https://")
+                })
+                .filter(|link| webpage::domain(&link.source) != webpage::domain(&link.destination))
+            {
+                debug!("inserting link {:?}", link);
+                graph.insert(
+                    Node::from(link.source),
+                    Node::from(link.destination),
+                    link.text,
+                );
             }
         }
 
@@ -89,8 +89,8 @@ impl Map<Webgraph<SledStore>> for Job {
     }
 }
 
-impl Reduce<Webgraph<SledStore>> for Webgraph<SledStore> {
-    fn reduce(mut self, other: Webgraph<SledStore>) -> Webgraph<SledStore> {
+impl Reduce<Webgraph> for Webgraph {
+    fn reduce(mut self, other: Webgraph) -> Webgraph {
         self.merge(other);
         self
     }
@@ -100,12 +100,7 @@ impl WebgraphBuilder {
     async fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         info!("Running master for webgraph construction");
 
-        let file = File::open(&config.warc_paths_file)?;
-        let mut warc_paths = Vec::new();
-
-        for line in io::BufReader::new(file).lines() {
-            warc_paths.push(line?);
-        }
+        let warc_paths = config.warc_source.paths()?;
 
         let workers: Vec<SocketAddr> = config
             .workers
@@ -113,18 +108,16 @@ impl WebgraphBuilder {
             .map(|worker| worker.parse().unwrap())
             .collect();
 
-        let http_config = if let WarcSource::HTTP(http_config) = config.warc_source.clone() {
-            Some(http_config)
-        } else {
-            None
+        let job_config = match config.warc_source.clone() {
+            WarcSource::S3(_) => todo!("s3 not supported yet"),
+            WarcSource::HTTP(config) => JobConfig::HTTP(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
         };
-
-        let http_config = http_config.unwrap();
 
         warc_paths
             .into_iter()
             .map(|warc_path| Job {
-                http_config: http_config.clone(),
+                config: job_config.clone(),
                 warc_path,
             })
             .map_reduce(&workers)
@@ -135,7 +128,31 @@ impl WebgraphBuilder {
     }
 
     async fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
-        Worker::run::<Job, Webgraph<SledStore>>(config.addr.parse::<SocketAddr>().unwrap()).await?;
+        Worker::run::<Job, Webgraph>(config.addr.parse::<SocketAddr>().unwrap()).await?;
+        Ok(())
+    }
+
+    fn run_locally(config: &WebgraphLocalConfig) -> Result<()> {
+        let warc_paths = config.warc_source.paths()?;
+
+        let job_config = match config.warc_source.clone() {
+            WarcSource::S3(_) => todo!("s3 not supported yet"),
+            WarcSource::HTTP(config) => JobConfig::HTTP(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
+        };
+
+        warc_paths
+            .into_iter()
+            .map(|path| Job {
+                config: job_config.clone(),
+                warc_path: path,
+            })
+            .map(|job| job.map())
+            .fold(None, |acc: Option<Webgraph>, elem| match acc {
+                Some(acc) => Some(acc.reduce(elem)),
+                None => Some(elem),
+            });
+
         Ok(())
     }
 
@@ -143,6 +160,7 @@ impl WebgraphBuilder {
         match &self.config {
             WebgraphConfig::Master(config) => WebgraphBuilder::run_master(config).await,
             WebgraphConfig::Worker(config) => WebgraphBuilder::run_worker(config).await,
+            WebgraphConfig::Local(config) => WebgraphBuilder::run_locally(config),
         }
     }
 }

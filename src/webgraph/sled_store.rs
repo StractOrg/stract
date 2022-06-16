@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{
+    cell::RefCell,
     collections::HashMap,
     hash::Hash,
     path::{Path, PathBuf},
@@ -43,8 +44,8 @@ impl Adjacency {
         }
     }
 
-    fn retrieve_block(&self, block_id: u64) -> HashMap<NodeID, Vec<StoredEdge>> {
-        self.tree.get(&block_id).unwrap_or_default()
+    fn retrieve_block(&mut self, block_id: u64) -> HashMap<NodeID, Vec<StoredEdge>> {
+        self.tree.get(&block_id).cloned().unwrap_or_default()
     }
 
     fn save_block(&mut self, block_id: u64, block: HashMap<NodeID, Vec<StoredEdge>>) {
@@ -54,16 +55,21 @@ impl Adjacency {
     fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
         let block_id = from / self.block_size;
 
-        let mut block = self.retrieve_block(block_id);
-        block
-            .entry(from)
-            .or_default()
-            .push(StoredEdge { other: to, label });
+        if let Some(block) = self.tree.get_mut(&block_id) {
+            block
+                .entry(from)
+                .or_default()
+                .push(StoredEdge { other: to, label });
+            return;
+        }
 
-        self.save_block(block_id, block);
+        let mut new_block = HashMap::new();
+        new_block.insert(from, vec![StoredEdge { other: to, label }]);
+
+        self.tree.insert(block_id, new_block);
     }
 
-    fn edges(&self, node: NodeID) -> Vec<StoredEdge> {
+    fn edges(&mut self, node: NodeID) -> Vec<StoredEdge> {
         let block_id = node / self.block_size;
         match self.tree.get(&block_id) {
             Some(block) => block.get(&node).cloned().unwrap_or_default(),
@@ -79,7 +85,7 @@ impl Adjacency {
 
 struct CachedTree<K, V> {
     store: sled::Tree,
-    cache: Mutex<LruCache<K, V>>,
+    cache: LruCache<K, V>,
 }
 
 impl<K, V> CachedTree<K, V>
@@ -90,29 +96,33 @@ where
     fn new(store: sled::Tree, cache_size: usize) -> Self {
         Self {
             store,
-            cache: Mutex::new(LruCache::new(cache_size)),
+            cache: LruCache::new(cache_size),
         }
     }
 
-    fn get(&self, key: &K) -> Option<V> {
-        let mut cache_lock = self.cache.lock().expect("could not get cache lock");
+    fn update_cache(&mut self, key: &K) {
+        if !self.cache.contains(key) {
+            let key_bytes = bincode::serialize(key).expect("failed to serialize key");
+            let val: Option<V> = self
+                .store
+                .get(&key_bytes)
+                .expect("failed to retrieve block")
+                .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize value"));
 
-        match cache_lock.get(key) {
-            Some(val) => Some(val.clone()),
-            None => {
-                let key_bytes = bincode::serialize(key).expect("failed to serialize key");
-                self.store
-                    .get(&key_bytes)
-                    .expect("failed to retrieve block")
-                    .map(|bytes| {
-                        let val: V =
-                            bincode::deserialize(&bytes).expect("failed to deserialize value");
-                        cache_lock.put(key.clone(), val.clone());
-
-                        val
-                    })
+            if let Some(val) = val {
+                self.cache.put(key.clone(), val.clone());
             }
         }
+    }
+
+    fn get(&mut self, key: &K) -> Option<&V> {
+        self.update_cache(key);
+        self.cache.get(key)
+    }
+
+    fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.update_cache(key);
+        self.cache.get_mut(key)
     }
 
     fn insert_persisted(&self, key: K, value: V) {
@@ -125,21 +135,17 @@ where
     }
 
     fn insert(&mut self, key: K, value: V) {
-        let mut cache_lock = self.cache.lock().unwrap();
-
-        if cache_lock.len() == cache_lock.cap() {
-            if let Some((key, value)) = cache_lock.pop_lru() {
+        if self.cache.len() == self.cache.cap() {
+            if let Some((key, value)) = self.cache.pop_lru() {
                 self.insert_persisted(key, value);
             }
         }
 
-        cache_lock.push(key, value);
+        self.cache.push(key, value);
     }
 
-    fn flush(&self) {
-        let mut cache_lock = self.cache.lock().unwrap();
-
-        while let Some((key, value)) = cache_lock.pop_lru() {
+    fn flush(&mut self) {
+        while let Some((key, value)) = self.cache.pop_lru() {
             self.insert_persisted(key, value);
         }
 
@@ -179,11 +185,11 @@ fn gen_temp_path() -> PathBuf {
 }
 
 pub struct SledStore {
-    adjacency: Adjacency,
-    reversed_adjacency: Adjacency,
-    node2id: CachedTree<Node, NodeID>,
-    id2node: CachedTree<NodeID, Node>,
-    meta: CachedTree<String, u64>,
+    adjacency: RefCell<Adjacency>,
+    reversed_adjacency: RefCell<Adjacency>,
+    node2id: RefCell<CachedTree<Node, NodeID>>,
+    id2node: RefCell<CachedTree<NodeID, Node>>,
+    meta: RefCell<CachedTree<String, u64>>,
     pub(crate) path: String,
 }
 
@@ -213,76 +219,81 @@ impl SledStore {
 
     fn from_db(db: sled::Db, path: String) -> Self {
         Self {
-            adjacency: Adjacency::new(
+            adjacency: RefCell::new(Adjacency::new(
                 db.open_tree("adjacency")
                     .expect("Could not open adjacency tree"),
-            ),
-            reversed_adjacency: Adjacency::new(
+            )),
+            reversed_adjacency: RefCell::new(Adjacency::new(
                 db.open_tree("reversed_adjacency")
                     .expect("Could not open reversed adjacency tree"),
-            ),
-            node2id: CachedTree::new(
+            )),
+            node2id: RefCell::new(CachedTree::new(
                 db.open_tree("node2id")
                     .expect("Could not open node2id tree"),
                 1_000,
-            ),
-            id2node: CachedTree::new(
+            )),
+            id2node: RefCell::new(CachedTree::new(
                 db.open_tree("id2node")
                     .expect("Could not open id2node tree"),
                 1_000,
-            ),
-            meta: CachedTree::new(
+            )),
+            meta: RefCell::new(CachedTree::new(
                 db.open_tree("meta").expect("Could not open metadata tree"),
                 1_000,
-            ),
+            )),
             path,
         }
     }
 
     fn next_id(&self) -> NodeID {
-        self.meta.get(&"next_id".to_string()).unwrap_or(0)
+        self.meta
+            .borrow_mut()
+            .get(&"next_id".to_string())
+            .cloned()
+            .unwrap_or(0)
     }
 
-    fn increment_next_id(&mut self) {
+    fn increment_next_id(&self) {
         let current_id = self.next_id();
         let next_id = current_id + 1;
-        self.meta.insert("next_id".to_string(), next_id);
+        self.meta
+            .borrow_mut()
+            .insert("next_id".to_string(), next_id);
     }
 
-    fn id_and_increment(&mut self) -> NodeID {
+    fn id_and_increment(&self) -> NodeID {
         let id = self.next_id();
         self.increment_next_id();
         id
     }
 
-    fn assign_id(&mut self, node: Node, id: NodeID) {
-        self.node2id.insert(node.clone(), id);
-        self.id2node.insert(id, node);
+    fn assign_id(&self, node: Node, id: NodeID) {
+        self.node2id.borrow_mut().insert(node.clone(), id);
+        self.id2node.borrow_mut().insert(id, node);
     }
 
-    fn id_or_assign(&mut self, node: Node) -> NodeID {
-        match self.node2id.get(&node) {
-            Some(id) => id,
-            None => {
-                let id = self.id_and_increment();
-                self.assign_id(node, id);
-                id
-            }
+    fn id_or_assign(&self, node: Node) -> NodeID {
+        if let Some(id) = self.node2id.borrow_mut().get(&node) {
+            return *id;
         }
+        let id = self.id_and_increment();
+        self.assign_id(node, id);
+        id
     }
 
     fn flush(&self) {
-        self.adjacency.tree.flush();
-        self.reversed_adjacency.tree.flush();
-        self.node2id.flush();
-        self.id2node.flush();
-        self.meta.flush();
+        self.adjacency.borrow_mut().tree.flush();
+        self.reversed_adjacency.borrow_mut().tree.flush();
+        self.node2id.borrow_mut().flush();
+        self.id2node.borrow_mut().flush();
+        self.meta.borrow_mut().flush();
     }
 }
 
 impl GraphStore for SledStore {
     fn outgoing_edges(&self, node: NodeID) -> Vec<Edge> {
         self.adjacency
+            .borrow_mut()
             .edges(node)
             .into_iter()
             .map(|edge| Edge {
@@ -295,6 +306,7 @@ impl GraphStore for SledStore {
 
     fn ingoing_edges(&self, node: NodeID) -> Vec<Edge> {
         self.reversed_adjacency
+            .borrow_mut()
             .edges(node)
             .into_iter()
             .map(|edge| Edge {
@@ -309,7 +321,7 @@ impl GraphStore for SledStore {
         self.flush();
 
         let iter = IntoIter {
-            inner: self.id2node.iter(),
+            inner: self.id2node.borrow_mut().iter(),
         };
 
         NodeIterator::from(iter)
@@ -319,17 +331,20 @@ impl GraphStore for SledStore {
         let from_id = self.id_or_assign(from);
         let to_id = self.id_or_assign(to);
 
-        self.adjacency.insert(from_id, to_id, label.clone());
+        self.adjacency
+            .borrow_mut()
+            .insert(from_id, to_id, label.clone());
         self.reversed_adjacency
+            .borrow_mut()
             .insert(to_id, from_id, label.clone());
     }
 
     fn node2id(&self, node: &Node) -> Option<NodeID> {
-        self.node2id.get(node)
+        self.node2id.borrow_mut().get(node).cloned()
     }
 
     fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node.get(id)
+        self.id2node.borrow_mut().get(id).cloned()
     }
 
     fn serialize(&self) -> Vec<u8> {
@@ -392,7 +407,7 @@ mod test {
 
         let nodes: Vec<Node> = store
             .nodes()
-            .map(|id| store.id2node.get(&id).unwrap())
+            .map(|id| store.id2node.borrow_mut().get(&id).unwrap().clone())
             .collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
 

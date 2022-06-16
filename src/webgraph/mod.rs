@@ -130,21 +130,21 @@ pub struct Edge {
     label: String,
 }
 
-pub struct Webgraph<S: GraphStore> {
+pub struct Webgraph<S: GraphStore = SledStore> {
     full_graph: S,
     host_graph: S,
 }
 
 impl<S: GraphStore> Webgraph<S> {
     #[cfg(test)]
-    pub fn new_memory() -> Webgraph<SledStore> {
+    pub fn new_memory() -> Webgraph {
         Webgraph {
             full_graph: SledStore::temporary(),
             host_graph: SledStore::temporary(),
         }
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Webgraph<SledStore> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Webgraph {
         Webgraph {
             full_graph: SledStore::open(path.as_ref().join("full")),
             host_graph: SledStore::open(path.as_ref().join("host")),
@@ -311,7 +311,7 @@ impl<S: GraphStore> Webgraph<S> {
     }
 }
 
-impl Serialize for Webgraph<SledStore> {
+impl Serialize for Webgraph {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -327,14 +327,14 @@ impl Serialize for Webgraph<SledStore> {
 
 use serde::de;
 
-impl<'de> Deserialize<'de> for Webgraph<SledStore> {
+impl<'de> Deserialize<'de> for Webgraph {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         struct GraphVisitor;
         impl<'de> Visitor<'de> for GraphVisitor {
-            type Value = Webgraph<SledStore>;
+            type Value = Webgraph;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("struct WebgraphSled")
@@ -405,7 +405,7 @@ impl<'de> Deserialize<'de> for Webgraph<SledStore> {
 mod test {
     use super::*;
 
-    fn test_graph() -> Webgraph<SledStore> {
+    fn test_graph() -> Webgraph {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -538,7 +538,7 @@ mod test {
         std::fs::remove_dir_all(graph.full_graph.path).unwrap();
         std::fs::remove_dir_all(graph.host_graph.path).unwrap();
 
-        let deserialized_graph: Webgraph<SledStore> = bincode::deserialize(&bytes).unwrap();
+        let deserialized_graph: Webgraph = bincode::deserialize(&bytes).unwrap();
         let distances = deserialized_graph.distances(Node::from("D"));
 
         assert_eq!(distances.get(&Node::from("C")), Some(&1));

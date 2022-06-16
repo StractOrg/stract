@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use serde::{Deserialize, Serialize};
-use std::io;
+use std::fs::File;
+use std::io::{self, BufRead};
 use std::num::ParseIntError;
 use tantivy::TantivyError;
 use thiserror::Error;
@@ -53,12 +54,12 @@ pub struct IndexingConfig {
 pub enum WebgraphConfig {
     Master(WebgraphMasterConfig),
     Worker(WebgraphWorkerConfig),
+    Local(WebgraphLocalConfig),
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphMasterConfig {
     warc_source: WarcSource,
-    warc_paths_file: String,
     workers: Vec<String>,
 }
 
@@ -67,23 +68,62 @@ pub struct WebgraphWorkerConfig {
     addr: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct WebgraphLocalConfig {
+    warc_source: WarcSource,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum WarcSource {
     S3(S3Config),
     HTTP(HttpConfig),
+    Local(LocalConfig),
+}
+
+impl WarcSource {
+    pub fn paths(&self) -> Result<Vec<String>> {
+        let mut warc_paths = Vec::new();
+        match &self {
+            WarcSource::S3(config) => {
+                let file = File::open(&config.warc_paths_file)?;
+                for line in io::BufReader::new(file).lines() {
+                    warc_paths.push(line?);
+                }
+            }
+            WarcSource::HTTP(config) => {
+                let file = File::open(&config.warc_paths_file)?;
+                for line in io::BufReader::new(file).lines() {
+                    warc_paths.push(line?);
+                }
+            }
+            WarcSource::Local(config) => {
+                warc_paths = config.names.clone();
+            }
+        }
+
+        Ok(warc_paths)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalConfig {
+    folder: String,
+    names: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct S3Config {
     name: String,
     endpoint: String,
+    warc_paths_file: String,
     bucket: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HttpConfig {
     base_url: String,
+    warc_paths_file: String,
 }
 
 #[derive(Error, Debug)]
