@@ -15,15 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use futures::prelude::*;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
-use rusoto_core::Region;
-use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use std::fs::File;
 use std::io::{self, BufRead};
-use tokio::io::AsyncReadExt;
 
 use crate::warc::WarcFile;
 use crate::webpage::Html;
-use crate::{Error, IndexingConfig, Result};
+use crate::{IndexingConfig, Result};
 
 pub struct Indexer {
     warc_paths: Vec<String>,

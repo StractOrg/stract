@@ -41,6 +41,7 @@ impl Worker {
                 debug!("received job");
                 let res = job.map();
                 let bytes = bincode::serialize(&res)?;
+                debug!("serialized result into {} bytes", bytes.len());
                 stream.write_all(&bytes[..]).await?;
             }
             Task::AllFinished => {

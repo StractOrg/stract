@@ -1,2 +1,5 @@
 /target
 /Cargo.lock
+flamegraph.svg
+warc_files/
+webgraph
