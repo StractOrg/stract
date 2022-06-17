@@ -28,7 +28,7 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::DEBUG)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 

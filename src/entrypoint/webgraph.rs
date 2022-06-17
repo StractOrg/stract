@@ -16,7 +16,7 @@
 use crate::{
     mapreduce::{Map, MapReduce, Reduce, Worker},
     warc::WarcFile,
-    webgraph::{Node, SledStore, Webgraph},
+    webgraph::{FrozenWebgraph, Node, SledStore, Webgraph},
     webpage::{self, Html},
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
     WebgraphMasterConfig, WebgraphWorkerConfig,
@@ -47,8 +47,8 @@ struct Job {
     warc_path: String,
 }
 
-impl Map<Webgraph> for Job {
-    fn map(self) -> Webgraph {
+impl Map<FrozenWebgraph> for Job {
+    fn map(self) -> FrozenWebgraph {
         let name = self.warc_path.split('/').last().unwrap();
 
         info!("processing {}", name);
@@ -85,14 +85,18 @@ impl Map<Webgraph> for Job {
 
         info!("{} done", name);
 
-        graph
+        graph.into()
     }
 }
 
-impl Reduce<Webgraph> for Webgraph {
-    fn reduce(mut self, other: Webgraph) -> Webgraph {
-        self.merge(other);
-        self
+impl Reduce<FrozenWebgraph> for FrozenWebgraph {
+    fn reduce(mut self, other: FrozenWebgraph) -> FrozenWebgraph {
+        let mut graph: Webgraph = self.into();
+        let other = other.into();
+
+        graph.merge(other);
+
+        graph.into()
     }
 }
 
@@ -128,7 +132,7 @@ impl WebgraphBuilder {
     }
 
     async fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
-        Worker::run::<Job, Webgraph>(config.addr.parse::<SocketAddr>().unwrap()).await?;
+        Worker::run::<Job, FrozenWebgraph>(config.addr.parse::<SocketAddr>().unwrap()).await?;
         Ok(())
     }
 
@@ -148,7 +152,7 @@ impl WebgraphBuilder {
                 warc_path: path,
             })
             .map(|job| job.map())
-            .fold(None, |acc: Option<Webgraph>, elem| match acc {
+            .fold(None, |acc: Option<FrozenWebgraph>, elem| match acc {
                 Some(acc) => Some(acc.reduce(elem)),
                 None => Some(elem),
             });
