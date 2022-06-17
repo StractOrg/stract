@@ -133,8 +133,8 @@ mod tests {
                     <html>
                         <head>
                             <title>Website B</title>
-                            dr dk dr dk dr dk dr dk
                         </head>
+                        dr dk dr dk dr dk dr dk
                     </html>
                 "#,
                 "https://www.b.com",
@@ -146,6 +146,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher.search("dr dk").expect("Search failed");
+
         assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
         assert_eq!(result.documents[1].url, "https://www.b.com");
