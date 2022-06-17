@@ -54,7 +54,7 @@ fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
     Ok(res)
 }
 
-fn recreate_folder(entry: &DirEntry) -> Result<()> {
+pub fn recreate_folder(entry: &DirEntry) -> Result<()> {
     match entry {
         DirEntry::Folder { name, entries } => {
             if Path::new(name).exists() {

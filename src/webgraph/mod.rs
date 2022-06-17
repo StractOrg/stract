@@ -15,18 +15,45 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod sled_store;
 
-use serde::de::{MapAccess, SeqAccess, Visitor};
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub use sled_store::SledStore;
 
+use crate::directory::{self, DirEntry};
 use crate::webpage;
 
 type NodeID = u64;
+
+// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
+#[allow(unused)]
+fn gen_temp_path() -> PathBuf {
+    use std::time::SystemTime;
+
+    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
+
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos()
+        << 48;
+
+    let pid = u128::from(std::process::id());
+
+    let salt = (pid << 16) + now + seed;
+
+    if cfg!(target_os = "linux") {
+        // use shared memory for temporary linux files
+        format!("/dev/shm/pagecache.tmp.{}", salt).into()
+    } else {
+        std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct StoredEdge {
@@ -66,8 +93,7 @@ pub trait GraphStore {
     fn ingoing_edges(&self, node: NodeID) -> Vec<Edge>;
     fn nodes<'a>(&'a self) -> NodeIterator;
     fn insert(&mut self, from: Node, to: Node, label: String);
-    fn serialize(&self) -> Vec<u8>;
-    fn deserialize(bytes: &[u8]) -> Self;
+    fn flush(&self);
 
     fn edges<'a>(&'a self) -> EdgeIterator<'a> {
         EdgeIterator::from(self.nodes().flat_map(|node| self.outgoing_edges(node)))
@@ -131,6 +157,7 @@ pub struct Edge {
 }
 
 pub struct Webgraph<S: GraphStore = SledStore> {
+    path: String,
     full_graph: S,
     host_graph: S,
 }
@@ -138,16 +165,15 @@ pub struct Webgraph<S: GraphStore = SledStore> {
 impl<S: GraphStore> Webgraph<S> {
     #[cfg(test)]
     pub fn new_memory() -> Webgraph {
-        Webgraph {
-            full_graph: SledStore::temporary(),
-            host_graph: SledStore::temporary(),
-        }
+        let path = gen_temp_path();
+        Self::open(path)
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Webgraph {
         Webgraph {
             full_graph: SledStore::open(path.as_ref().join("full")),
             host_graph: SledStore::open(path.as_ref().join("host")),
+            path: path.as_ref().to_str().unwrap().to_string(),
         }
     }
 
@@ -309,96 +335,37 @@ impl<S: GraphStore> Webgraph<S> {
             self.raw_host_reversed_distances(node)
         })
     }
-}
 
-impl Serialize for Webgraph {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("WebgraphSled", 2)?;
-
-        state.serialize_field("full", &self.full_graph.serialize())?;
-        state.serialize_field("host", &self.host_graph.serialize())?;
-
-        state.end()
+    pub fn flush(&self) {
+        self.full_graph.flush();
+        self.host_graph.flush();
     }
 }
 
-use serde::de;
-
-impl<'de> Deserialize<'de> for Webgraph {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct GraphVisitor;
-        impl<'de> Visitor<'de> for GraphVisitor {
-            type Value = Webgraph;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("struct WebgraphSled")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                let mut full = None;
-                let mut host = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        "full" => {
-                            if full.is_some() {
-                                return Err(de::Error::duplicate_field("full"));
-                            }
-                            full = Some(map.next_value()?);
-                        }
-                        "host" => {
-                            if host.is_some() {
-                                return Err(de::Error::duplicate_field("host"));
-                            }
-                            host = Some(map.next_value()?);
-                        }
-                        _ => return Err(de::Error::unknown_field(key, &["full", "graph"])),
-                    }
-                }
-                let full: Vec<u8> = full.ok_or_else(|| de::Error::missing_field("full"))?;
-                let host: Vec<u8> = host.ok_or_else(|| de::Error::missing_field("host"))?;
-
-                let full = SledStore::deserialize(&full);
-                let host = SledStore::deserialize(&host);
-
-                Ok(Webgraph {
-                    full_graph: full,
-                    host_graph: host,
-                })
-            }
-
-            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                let full: Vec<u8> = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let host: Vec<u8> = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-
-                let full = SledStore::deserialize(&full);
-                let host = SledStore::deserialize(&host);
-
-                Ok(Webgraph {
-                    full_graph: full,
-                    host_graph: host,
-                })
-            }
+impl From<FrozenWebgraph> for Webgraph<SledStore> {
+    fn from(frozen: FrozenWebgraph) -> Self {
+        directory::recreate_folder(&frozen.root).unwrap();
+        match frozen.root {
+            DirEntry::Folder { name, entries: _ } => Webgraph::<SledStore>::open(name),
+            DirEntry::File { name, content: _ } => Webgraph::<SledStore>::open(name),
         }
-
-        deserializer.deserialize_struct("WebgraphSled", &["full", "host"], GraphVisitor)
     }
+}
+
+impl From<Webgraph> for FrozenWebgraph {
+    fn from(graph: Webgraph) -> Self {
+        graph.flush();
+        let path = graph.path.clone();
+        drop(graph);
+        let root = directory::scan_folder(path).unwrap();
+
+        Self { root }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FrozenWebgraph {
+    root: DirEntry,
 }
 
 #[cfg(test)]
@@ -533,13 +500,16 @@ mod test {
     #[test]
     fn serialize_deserialize_bincode() {
         let graph = test_graph();
-        let bytes = bincode::serialize(&graph).unwrap();
+        let path = graph.path.clone();
+        let frozen: FrozenWebgraph = graph.into();
+        let bytes = bincode::serialize(&frozen).unwrap();
 
-        std::fs::remove_dir_all(graph.full_graph.path).unwrap();
-        std::fs::remove_dir_all(graph.host_graph.path).unwrap();
+        std::fs::remove_dir_all(path).unwrap();
 
-        let deserialized_graph: Webgraph = bincode::deserialize(&bytes).unwrap();
-        let distances = deserialized_graph.distances(Node::from("D"));
+        let deserialized_frozen: FrozenWebgraph = bincode::deserialize(&bytes).unwrap();
+        let graph: Webgraph = deserialized_frozen.into();
+
+        let distances = graph.distances(Node::from("D"));
 
         assert_eq!(distances.get(&Node::from("C")), Some(&1));
         assert_eq!(distances.get(&Node::from("A")), Some(&2));

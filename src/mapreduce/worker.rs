@@ -1,5 +1,7 @@
 use std::net::SocketAddr;
 
+use crate::mapreduce::manager::{BUF_SIZE, END_OF_MESSAGE};
+
 use super::{Error, Map, Result, Task};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncReadExt;
@@ -21,20 +23,26 @@ impl Worker {
         O: Serialize + DeserializeOwned + Send,
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut buf = [0; 4096];
+        let mut buf = [0; BUF_SIZE];
         let mut bytes = Vec::new();
         loop {
             if let Ok(size) = stream.read(&mut buf).await {
                 debug!("read {:?} bytes", size);
-                if size == 0 && bytes.len() == 0 {
+                if size == 0 && bytes.is_empty() {
                     return Err(Error::NoResponse);
                 }
-                bytes.extend_from_slice(&buf);
-                if size < buf.len() {
+
+                bytes.extend_from_slice(&buf[..size]);
+
+                if bytes.len() >= END_OF_MESSAGE.len()
+                    && bytes[bytes.len() - END_OF_MESSAGE.len()..] == END_OF_MESSAGE
+                {
                     break;
                 }
             }
         }
+
+        bytes = bytes[..bytes.len() - END_OF_MESSAGE.len()].to_vec();
 
         match bincode::deserialize::<Task<I>>(&bytes)? {
             Task::Job(job) => {
@@ -42,7 +50,8 @@ impl Worker {
                 let res = job.map();
                 let bytes = bincode::serialize(&res)?;
                 debug!("serialized result into {} bytes", bytes.len());
-                stream.write_all(&bytes[..]).await?;
+                stream.write_all(&bytes).await?;
+                stream.write_all(&END_OF_MESSAGE).await?;
             }
             Task::AllFinished => {
                 debug!("shutting down");
@@ -89,12 +98,14 @@ mod tests {
     struct MockTcpStream {
         contents: Vec<u8>,
         result: Vec<u8>,
+        num_read: usize,
     }
 
     impl MockTcpStream {
         fn new(contents: Vec<u8>) -> Self {
             Self {
                 contents,
+                num_read: 0,
                 result: Vec::new(),
             }
         }
@@ -106,8 +117,17 @@ mod tests {
             _: &mut Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            buf.put_slice(&self.contents[..]);
-            self.get_mut().contents = Vec::new();
+            let mut_self = self.get_mut();
+
+            if mut_self.num_read == 0 {
+                buf.put_slice(&mut_self.contents[..]);
+            } else if mut_self.num_read == 1 {
+                buf.put_slice(&END_OF_MESSAGE);
+            }
+
+            mut_self.contents = Vec::new();
+            mut_self.num_read += 1;
+
             Poll::Ready(Ok(()))
         }
     }
@@ -118,7 +138,7 @@ mod tests {
             _: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<std::result::Result<usize, std::io::Error>> {
-            self.get_mut().result = Vec::from(buf);
+            self.get_mut().result.extend(Vec::from(buf));
             Poll::Ready(Ok(buf.len()))
         }
 
@@ -153,17 +173,16 @@ mod tests {
 
     #[tokio::test]
     async fn execute() {
-        let job = bincode::serialize(&Task::Job(MockJob {
-            contents: vec![1, 2, 0, 1, 0, 1, 0],
-        }))
-        .unwrap();
+        let contents = vec![1, 2, 0, 1, 0, 1, 0];
+        let job = bincode::serialize(&Task::Job(MockJob { contents })).unwrap();
 
         let mut stream = MockTcpStream::new(job);
         Worker::run_stream::<MockJob, _, _>(&mut stream)
             .await
             .expect("worker failed");
 
-        let res: Count = bincode::deserialize(&stream.result).unwrap();
+        let result_bytes = &stream.result[..stream.result.len() - END_OF_MESSAGE.len()];
+        let res: Count = bincode::deserialize(result_bytes).unwrap();
 
         assert_eq!(res.0, 3);
     }

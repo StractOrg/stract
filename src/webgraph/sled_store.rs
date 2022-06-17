@@ -13,16 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    hash::Hash,
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Mutex,
-    },
-};
+use std::{cell::RefCell, collections::HashMap, hash::Hash, path::Path};
 
 use lru::LruCache;
 use serde::{de::DeserializeOwned, Serialize};
@@ -157,46 +148,18 @@ where
     }
 }
 
-// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-#[allow(unused)]
-fn gen_temp_path() -> PathBuf {
-    use std::time::SystemTime;
-
-    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
-
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        << 48;
-
-    let pid = u128::from(std::process::id());
-
-    let salt = (pid << 16) + now + seed;
-
-    if cfg!(target_os = "linux") {
-        // use shared memory for temporary linux files
-        format!("/dev/shm/pagecache.tmp.{}", salt).into()
-    } else {
-        std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
-    }
-}
-
 pub struct SledStore {
     adjacency: RefCell<Adjacency>,
     reversed_adjacency: RefCell<Adjacency>,
     node2id: RefCell<CachedTree<Node, NodeID>>,
     id2node: RefCell<CachedTree<NodeID, Node>>,
     meta: RefCell<CachedTree<String, u64>>,
-    pub(crate) path: String,
 }
 
 impl SledStore {
     #[cfg(test)]
     pub(crate) fn temporary() -> Self {
-        Self::open(gen_temp_path())
+        Self::open(super::gen_temp_path())
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
@@ -241,7 +204,6 @@ impl SledStore {
                 db.open_tree("meta").expect("Could not open metadata tree"),
                 1_000,
             )),
-            path,
         }
     }
 
@@ -279,14 +241,6 @@ impl SledStore {
         let id = self.id_and_increment();
         self.assign_id(node, id);
         id
-    }
-
-    fn flush(&self) {
-        self.adjacency.borrow_mut().tree.flush();
-        self.reversed_adjacency.borrow_mut().tree.flush();
-        self.node2id.borrow_mut().flush();
-        self.id2node.borrow_mut().flush();
-        self.meta.borrow_mut().flush();
     }
 }
 
@@ -347,14 +301,12 @@ impl GraphStore for SledStore {
         self.id2node.borrow_mut().get(id).cloned()
     }
 
-    fn serialize(&self) -> Vec<u8> {
-        self.flush();
-        directory::serialize(self.path.clone()).unwrap()
-    }
-
-    fn deserialize(bytes: &[u8]) -> Self {
-        let path = directory::deserialize(bytes).unwrap();
-        Self::open(path)
+    fn flush(&self) {
+        self.adjacency.borrow_mut().tree.flush();
+        self.reversed_adjacency.borrow_mut().tree.flush();
+        self.node2id.borrow_mut().flush();
+        self.id2node.borrow_mut().flush();
+        self.meta.borrow_mut().flush();
     }
 }
 
@@ -467,53 +419,6 @@ mod test {
 
         assert_eq!(
             store.ingoing_edges(b_id),
-            vec![Edge {
-                from: a_id,
-                to: b_id,
-                label: String::new()
-            },]
-        );
-    }
-
-    #[test]
-    fn serialize_deserialize() {
-        let mut store = SledStore::temporary();
-
-        let a = Node {
-            name: "A".to_string(),
-        };
-        let b = Node {
-            name: "B".to_string(),
-        };
-
-        store.insert(a.clone(), b.clone(), String::new());
-        let a_id = store.node2id(&a).unwrap();
-        let b_id = store.node2id(&b).unwrap();
-
-        let bytes = store.serialize();
-
-        assert!(bytes.len() > 0);
-
-        std::fs::remove_dir_all(store.path).unwrap();
-
-        let store2 = SledStore::deserialize(&bytes);
-        let a_id2 = store2.node2id(&a).unwrap();
-        let b_id2 = store2.node2id(&b).unwrap();
-
-        assert_eq!(a_id2, a_id);
-        assert_eq!(b_id2, b_id);
-
-        assert_eq!(
-            store2.outgoing_edges(a_id),
-            vec![Edge {
-                from: a_id,
-                to: b_id,
-                label: String::new()
-            },]
-        );
-
-        assert_eq!(
-            store2.ingoing_edges(b_id),
             vec![Edge {
                 from: a_id,
                 to: b_id,

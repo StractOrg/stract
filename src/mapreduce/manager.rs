@@ -23,6 +23,9 @@ use tracing::debug;
 struct RemoteWorker {
     addr: SocketAddr,
 }
+pub const BUF_SIZE: usize = 4096;
+
+pub const END_OF_MESSAGE: [u8; BUF_SIZE] = [42; BUF_SIZE];
 
 impl RemoteWorker {
     fn retry_strategy() -> impl Iterator<Item = Duration> {
@@ -48,22 +51,28 @@ impl RemoteWorker {
         let mut stream = self.connect().await?;
         let serialized_job = bincode::serialize(&Task::Job(job))?;
         debug!("sending {:?} bytes", serialized_job.len());
-        stream.write(&serialized_job).await?;
+        stream.write_all(&serialized_job).await?;
+        stream.write_all(&END_OF_MESSAGE).await?;
 
-        let mut buf = [0; 4096];
+        let mut buf = [0; BUF_SIZE];
         let mut bytes = Vec::new();
         loop {
             if let Ok(size) = stream.read(&mut buf).await {
                 debug!("read {:?} bytes", size);
-                if size == 0 && bytes.len() == 0 {
+                if size == 0 && bytes.is_empty() {
                     return Err(Error::NoResponse);
                 }
-                bytes.extend_from_slice(&buf);
-                if size < buf.len() {
+                bytes.extend_from_slice(&buf[..size]);
+
+                if bytes.len() >= END_OF_MESSAGE.len()
+                    && bytes[bytes.len() - END_OF_MESSAGE.len()..] == END_OF_MESSAGE
+                {
                     break;
                 }
             }
         }
+        bytes = bytes[..bytes.len() - END_OF_MESSAGE.len()].to_vec();
+        debug!("finished reading {:?} bytes", bytes.len());
 
         Ok(bincode::deserialize(&bytes)?)
     }
@@ -77,7 +86,8 @@ impl RemoteWorker {
         let mut stream = self.connect().await?;
         let serialized_job = bincode::serialize(&Task::<I>::AllFinished)?;
         debug!("sending {:?} bytes", serialized_job.len());
-        stream.write(&serialized_job).await?;
+        stream.write_all(&serialized_job).await?;
+        stream.write_all(&END_OF_MESSAGE).await?;
         Ok(())
     }
 }
@@ -128,10 +138,9 @@ impl WorkerPool {
         let all_workers = workers
             .iter()
             .flat_map(|addr| {
-                addr.to_socket_addrs().expect(&format!(
-                    "failed to transform {:?} into a socket address",
-                    addr
-                ))
+                addr.to_socket_addrs().unwrap_or_else(|_| {
+                    panic!("failed to transform {:?} into a socket address", addr)
+                })
             })
             .map(|addr| Arc::new(RemoteWorker { addr }))
             .collect();
@@ -158,7 +167,7 @@ impl WorkerPool {
         ch.send(worker).await.unwrap();
     }
 
-    async fn get_worker<'a>(&'a self) -> Result<WorkerGuard<'a>> {
+    async fn get_worker(&self) -> Result<WorkerGuard<'_>> {
         if self.alive_workers.0.len() as u32 + self.running_workers.load(Ordering::SeqCst) == 0 {
             return Err(Error::NoAvailableWorker);
         }
@@ -181,7 +190,7 @@ impl WorkerPool {
             }
         }
 
-        if failing_workers.len() > 0 {
+        if !failing_workers.is_empty() {
             debug!(
                 "failed to stop the following workers: {:#?}",
                 failing_workers
