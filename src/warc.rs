@@ -88,7 +88,7 @@ impl WarcFile {
 
     fn load_from_folder(name: &str, folder: &str) -> Result<Self> {
         let mut bytes = Vec::new();
-        let f = File::open(dbg!(Path::new(folder).join(name)))?;
+        let f = File::open(Path::new(folder).join(name))?;
 
         let mut reader = BufReader::new(f);
         reader.read_to_end(&mut bytes)?;

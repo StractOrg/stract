@@ -325,7 +325,9 @@ Survey in 2016, 2017, and 2018."#;
                             <head>
                                 <title>Website for runners</title>
                             </head>
-                            {}
+                            <body>
+                                {}
+                            </body>
                         </html>
                     "#,
                     TEST_TEXT

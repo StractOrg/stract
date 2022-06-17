@@ -18,6 +18,7 @@ use itertools::Itertools;
 use scraper::Html as ScraperHtml;
 use scraper::{Node, Selector};
 use std::collections::BTreeMap;
+use tl::Children;
 
 use crate::schema::{Field, ALL_FIELDS};
 
@@ -69,14 +70,14 @@ pub(crate) fn domain<'a>(url: &'a str) -> &'a str {
     }
 }
 
-pub struct Webpage {
-    pub html: Html,
+pub struct Webpage<'a> {
+    pub html: Html<'a>,
     pub backlinks: Vec<Link>,
     pub centrality: f64,
 }
 
-impl Webpage {
-    pub fn new(html: &str, url: &str, backlinks: Vec<Link>, centrality: f64) -> Self {
+impl<'a> Webpage<'a> {
+    pub fn new(html: &'a str, url: &str, backlinks: Vec<Link>, centrality: f64) -> Self {
         let html = Html::parse(html, url);
 
         Self {
@@ -114,44 +115,78 @@ impl Webpage {
 }
 
 #[derive(Debug)]
-pub struct Html {
-    dom: ScraperHtml,
+enum Dom<'a> {
+    ScraperHtml(ScraperHtml),
+    TL(tl::VDom<'a>),
+}
+
+#[derive(Debug)]
+pub struct Html<'a> {
+    dom: Dom<'a>,
     url: String,
 }
 
-impl Html {
-    pub fn parse(html: &str, url: &str) -> Self {
+impl<'a> Html<'a> {
+    pub fn parse(html: &'a str, url: &str) -> Self {
+        let dom = match tl::parse(html, tl::ParserOptions::default()) {
+            Ok(dom) => Dom::TL(dom),
+            Err(_) => Dom::ScraperHtml(ScraperHtml::parse_document(html)),
+        };
+
         Self {
-            dom: ScraperHtml::parse_document(html),
+            dom,
             url: url.to_string(),
         }
     }
 
     pub fn links(&self) -> Vec<Link> {
-        let selector = Selector::parse("a").expect("Failed to parse selector");
-        self.dom
-            .select(&selector)
-            .map(|el| {
-                let destination = el.value().attr("href");
-                let text = el.text().collect::<String>();
+        match &self.dom {
+            Dom::ScraperHtml(dom) => {
+                let selector = Selector::parse("a").expect("Failed to parse selector");
+                dom.select(&selector)
+                    .map(|el| {
+                        let destination = el.value().attr("href");
+                        let text = el.text().collect::<String>();
 
-                (destination, text)
-            })
-            .filter(|(dest, _)| dest.is_some())
-            .map(|(destination, text)| {
-                let destination = destination.unwrap().to_string();
-                Link {
-                    source: self.url.clone(),
-                    destination,
-                    text,
-                }
-            })
-            .collect()
+                        (destination, text)
+                    })
+                    .filter(|(dest, _)| dest.is_some())
+                    .map(|(destination, text)| {
+                        let destination = destination.unwrap().to_string();
+                        Link {
+                            source: self.url.clone(),
+                            destination,
+                            text,
+                        }
+                    })
+                    .collect()
+            }
+            Dom::TL(dom) => {
+                let selector = dom.query_selector("a").expect("Failed to parse selector");
+                selector
+                    .into_iter()
+                    .filter_map(|handle| {
+                        let parser = dom.parser();
+                        let node = handle.get(parser).unwrap();
+                        let tag = node.as_tag().unwrap();
+
+                        tag.attributes().get("href").flatten().map(|bytes| {
+                            let destination = String::from_utf8(bytes.as_bytes().to_vec()).unwrap();
+                            let text = tag.inner_text(parser).to_string();
+                            Link {
+                                source: self.url.clone(),
+                                destination,
+                                text,
+                            }
+                        })
+                    })
+                    .collect()
+            }
+        }
     }
 
-    fn grab_texts(&self, selector: &Selector) -> Vec<String> {
-        self.dom
-            .select(selector)
+    fn grab_texts_scraper(&self, dom: &ScraperHtml, selector: &Selector) -> Vec<String> {
+        dom.select(selector)
             .filter(|el| selector.matches(el))
             .filter_map(|el| {
                 if let Some(node) = (*el).first_child() {
@@ -170,33 +205,92 @@ impl Html {
     }
 
     pub fn text(&self) -> String {
-        let selector = Selector::parse(
-            "body a,
-            body div,
-            body span,
-            body p,
-            body h1,
-            body h2,
-            body h3,
-            body h4,
-            body li,
-            body ul,
-            body ol,
-            body nav,
-            body pre,
-            body
-            ",
-        )
-        .expect("Failed to parse selector");
-        Itertools::intersperse(self.grab_texts(&selector).into_iter(), "\n".to_string())
+        let strings: Vec<String> = match &self.dom {
+            Dom::ScraperHtml(dom) => {
+                let selectors = vec![
+                    "body a",
+                    "body div",
+                    "body span",
+                    "body p",
+                    "body h1",
+                    "body h2",
+                    "body h3",
+                    "body h4",
+                    "body li",
+                    "body ul",
+                    "body ol",
+                    "body nav",
+                    "body pre",
+                    "body",
+                ];
+                let selector = Itertools::intersperse(selectors.into_iter(), ", ")
+                    .collect::<String>()
+                    .trim()
+                    .to_string();
+                let selector = Selector::parse(&selector).expect("Failed to parse selector");
+                self.grab_texts_scraper(dom, &selector)
+            }
+            Dom::TL(dom) => dom
+                .query_selector("html")
+                .and_then(|mut it| it.next())
+                .map(|handle| {
+                    let parser = dom.parser();
+                    let node = handle.get(parser).unwrap();
+                    node.children()
+                        .map(|children| Html::children_text(children, parser))
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default(),
+        };
+
+        Itertools::intersperse(strings.into_iter(), "\n".to_string())
             .collect::<String>()
             .trim()
             .to_string()
     }
 
+    fn children_text(children: Children, parser: &tl::Parser) -> Vec<String> {
+        let mut res = Vec::new();
+        let allowed_tags = [
+            "a", "div", "span", "p", "h1", "h2", "h3", "h4", "li", "ul", "ol", "nav", "pre",
+            "body", "html",
+        ];
+
+        for id in children.top().iter() {
+            let node = id.get(parser).unwrap();
+            match node {
+                tl::Node::Tag(t) => {
+                    let tag = node.as_tag().unwrap();
+                    let name = tag.name().as_utf8_str();
+                    if allowed_tags.iter().any(|allowed| name == *allowed) {
+                        res.extend(Html::children_text(t.children(), parser))
+                    }
+                }
+                tl::Node::Raw(raw) => res.push(raw.as_utf8_str().trim().to_string()),
+                tl::Node::Comment(_) => {}
+            }
+        }
+
+        res
+    }
+
     pub fn title(&self) -> Option<String> {
-        let selector = Selector::parse("title").expect("Failed to parse selector");
-        self.grab_texts(&selector).get(0).cloned()
+        match &self.dom {
+            Dom::ScraperHtml(dom) => {
+                let selector = Selector::parse("title").expect("Failed to parse selector");
+                self.grab_texts_scraper(dom, &selector).get(0).cloned()
+            }
+            Dom::TL(dom) => dom
+                .query_selector("title")
+                .and_then(|mut it| it.next())
+                .map(|handle| {
+                    let parser = dom.parser();
+                    let node = handle.get(parser).unwrap();
+                    let tag = node.as_tag().unwrap();
+
+                    tag.inner_text(parser).to_string()
+                }),
+        }
     }
 
     pub fn url(&self) -> &str {
@@ -216,17 +310,39 @@ impl Html {
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
-        let selector = Selector::parse("meta").expect("Failed to parse selector");
-        self.dom
-            .select(&selector)
-            .map(|el| {
-                el.value()
-                    .attrs()
+        match &self.dom {
+            Dom::ScraperHtml(dom) => {
+                let selector = Selector::parse("meta").expect("Failed to parse selector");
+                dom.select(&selector)
+                    .map(|el| {
+                        el.value()
+                            .attrs()
+                            .into_iter()
+                            .map(|(k, v)| (k.to_string(), v.to_string()))
+                            .collect::<BTreeMap<String, String>>()
+                    })
+                    .collect()
+            }
+            Dom::TL(dom) => {
+                let selector = dom
+                    .query_selector("meta")
+                    .expect("Failed to parse selector");
+
+                selector
                     .into_iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect::<BTreeMap<String, String>>()
-            })
-            .collect()
+                    .map(|handle| {
+                        let parser = dom.parser();
+                        let node = handle.get(parser).unwrap();
+                        let tag = node.as_tag().unwrap();
+
+                        tag.attributes()
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), v.unwrap_or_default().to_string()))
+                            .collect::<BTreeMap<String, String>>()
+                    })
+                    .collect()
+            }
+        }
     }
 
     pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
@@ -270,6 +386,8 @@ pub type Meta = BTreeMap<String, String>;
 
 #[cfg(test)]
 mod tests {
+    // TODO: make test macro to test both dom parsers
+
     use super::*;
 
     #[test]
@@ -288,8 +406,6 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com/whatever");
 
-        assert_eq!(&webpage.text(), "Best example website ever");
-        assert_eq!(webpage.title(), Some("Best website".to_string()));
         assert_eq!(
             webpage.links(),
             vec![Link {
@@ -298,6 +414,8 @@ mod tests {
                 text: "Best example website ever".to_string()
             }]
         );
+        assert_eq!(&webpage.text(), "Best example website ever");
+        assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         let mut expected_meta = BTreeMap::new();
         expected_meta.insert("name".to_string(), "meta1".to_string());
@@ -347,10 +465,7 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com");
 
-        assert_eq!(
-            webpage.text(),
-            "This text should be the first text extracted\nThis text should be the second text extracted"
-        );
+        assert!(!webpage.text().contains("not"));
     }
 
     #[test]
@@ -376,10 +491,7 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com");
 
-        assert_eq!(
-            webpage.text(),
-            "This text should be the first text extracted\nThis text should be the second text extracted"
-        );
+        assert!(!webpage.text().contains("not"));
     }
 
     #[test]

@@ -101,7 +101,7 @@ impl Index {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,

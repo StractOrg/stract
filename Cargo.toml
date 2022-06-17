@@ -32,6 +32,7 @@ serde = "1.0.137"
 sled = { version = "0.34.7", features = ["compression"] }
 tantivy = "0.18.0"
 thiserror = "1.0.31"
+tl = "0.7.5"
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-retry = "0.3.0"
 toml = "0.5.9"
