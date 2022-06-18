@@ -36,13 +36,13 @@ impl From<WebgraphConfig> for WebgraphBuilder {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 enum JobConfig {
-    HTTP(HttpConfig),
+    Http(HttpConfig),
     Local(LocalConfig),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Job {
     config: JobConfig,
     warc_path: String,
@@ -57,7 +57,7 @@ impl Map<FrozenWebgraph> for Job {
         let mut graph = Webgraph::<SledStore>::open(Path::new("webgraph").join(name));
 
         let source = match self.config {
-            JobConfig::HTTP(config) => WarcSource::HTTP(config),
+            JobConfig::Http(config) => WarcSource::HTTP(config),
             JobConfig::Local(config) => WarcSource::Local(config),
         };
 
@@ -91,18 +91,26 @@ impl Map<FrozenWebgraph> for Job {
 }
 
 impl Reduce<FrozenWebgraph> for FrozenWebgraph {
-    fn reduce(mut self, other: FrozenWebgraph) -> FrozenWebgraph {
+    fn reduce(self, other: FrozenWebgraph) -> FrozenWebgraph {
         let mut graph: Webgraph = self.into();
+
+        let other_path = match &other.root {
+            crate::directory::DirEntry::Folder { name, entries: _ } => name.clone(),
+            crate::directory::DirEntry::File { name, content: _ } => name.clone(),
+        };
+
         let other = other.into();
 
         graph.merge(other);
+
+        std::fs::remove_dir_all(other_path).unwrap();
 
         graph.into()
     }
 }
 
 impl WebgraphBuilder {
-    async fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
+    fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         info!("Running master for webgraph construction");
 
         let warc_paths = config.warc_source.paths()?;
@@ -115,7 +123,7 @@ impl WebgraphBuilder {
 
         let job_config = match config.warc_source.clone() {
             WarcSource::S3(_) => todo!("s3 not supported yet"),
-            WarcSource::HTTP(config) => JobConfig::HTTP(config),
+            WarcSource::HTTP(config) => JobConfig::Http(config),
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
@@ -130,20 +138,19 @@ impl WebgraphBuilder {
 
         warc_paths
             .into_iter()
+            .take(10)
             .map(|warc_path| Job {
                 config: job_config.clone(),
                 warc_path,
             })
-            .progress_with(pb)
             .map_reduce(&workers)
-            .await
             .expect("failed to build webgraph");
 
         Ok(())
     }
 
-    async fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
-        Worker::run::<Job, FrozenWebgraph>(config.addr.parse::<SocketAddr>().unwrap()).await?;
+    fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
+        Worker::run::<Job, FrozenWebgraph>(config.addr.parse::<SocketAddr>().unwrap())?;
         Ok(())
     }
 
@@ -152,7 +159,7 @@ impl WebgraphBuilder {
 
         let job_config = match config.warc_source.clone() {
             WarcSource::S3(_) => todo!("s3 not supported yet"),
-            WarcSource::HTTP(config) => JobConfig::HTTP(config),
+            WarcSource::HTTP(config) => JobConfig::Http(config),
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
@@ -171,10 +178,10 @@ impl WebgraphBuilder {
         Ok(())
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<()> {
         match &self.config {
-            WebgraphConfig::Master(config) => WebgraphBuilder::run_master(config).await,
-            WebgraphConfig::Worker(config) => WebgraphBuilder::run_worker(config).await,
+            WebgraphConfig::Master(config) => WebgraphBuilder::run_master(config),
+            WebgraphConfig::Worker(config) => WebgraphBuilder::run_worker(config),
             WebgraphConfig::Local(config) => WebgraphBuilder::run_locally(config),
         }
     }

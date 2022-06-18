@@ -1,7 +1,8 @@
-use std::net::SocketAddr;
-use std::ops::Deref;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::mapreduce::Task;
@@ -9,15 +10,11 @@ use crate::mapreduce::Task;
 use super::{Error, Result};
 use super::{Map, Reduce};
 use async_channel::{unbounded, Receiver, Sender};
-use futures::{stream::FuturesUnordered, StreamExt};
+use rayon::iter::ParallelBridge;
+use rayon::prelude::*;
 use std::net::ToSocketAddrs;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_retry::Retry;
-use tracing::debug;
+use tracing::{debug, warn};
 
 #[derive(Debug)]
 struct RemoteWorker {
@@ -32,32 +29,35 @@ impl RemoteWorker {
         ExponentialBackoff::from_millis(10).take(5)
     }
 
-    async fn connect(&self) -> Result<TcpStream> {
+    fn connect(&self) -> Result<TcpStream> {
         debug!("connecting to {:}", self.addr);
-        let stream = Retry::spawn(RemoteWorker::retry_strategy(), || async {
-            TcpStream::connect(self.addr).await
-        })
-        .await?;
-        debug!("connected");
+        for dur in RemoteWorker::retry_strategy() {
+            if let Ok(stream) = TcpStream::connect(&self.addr) {
+                debug!("connected");
+                return Ok(stream);
+            }
 
-        Ok(stream)
+            std::thread::sleep(dur);
+        }
+
+        Err(Error::NoResponse)
     }
 
-    async fn perform<I, O>(&self, job: &I) -> Result<O>
+    fn perform<I, O>(&self, job: &I) -> Result<O>
     where
-        I: Map<O>,
+        I: Map<O> + Send,
         O: Reduce<O> + Send,
     {
-        let mut stream = self.connect().await?;
+        let mut stream = self.connect()?;
         let serialized_job = bincode::serialize(&Task::Job(job))?;
         debug!("sending {:?} bytes", serialized_job.len());
-        stream.write_all(&serialized_job).await?;
-        stream.write_all(&END_OF_MESSAGE).await?;
+        stream.write_all(&serialized_job)?;
+        stream.write_all(&END_OF_MESSAGE)?;
 
         let mut buf = [0; BUF_SIZE];
         let mut bytes = Vec::new();
         loop {
-            if let Ok(size) = stream.read(&mut buf).await {
+            if let Ok(size) = stream.read(&mut buf) {
                 debug!("read {:?} bytes", size);
                 if size == 0 && bytes.is_empty() {
                     return Err(Error::NoResponse);
@@ -77,17 +77,17 @@ impl RemoteWorker {
         Ok(bincode::deserialize(&bytes)?)
     }
 
-    async fn stop<I, O>(&self) -> Result<()>
+    fn stop<I, O>(&self) -> Result<()>
     where
-        I: Map<O>,
+        I: Map<O> + Send,
         O: Reduce<O> + Send,
     {
         debug!("closing worker {:}", self.addr);
-        let mut stream = self.connect().await?;
+        let mut stream = self.connect()?;
         let serialized_job = bincode::serialize(&Task::<I>::AllFinished)?;
         debug!("sending {:?} bytes", serialized_job.len());
-        stream.write_all(&serialized_job).await?;
-        stream.write_all(&END_OF_MESSAGE).await?;
+        stream.write_all(&serialized_job)?;
+        stream.write_all(&END_OF_MESSAGE)?;
         Ok(())
     }
 }
@@ -105,8 +105,8 @@ impl<'a> WorkerGuard<'a> {
         }
     }
 
-    async fn success(self) {
-        self.from_pool.insert(Arc::clone(&self.worker)).await
+    fn success(self) {
+        self.from_pool.insert(Arc::clone(&self.worker))
     }
 }
 
@@ -126,16 +126,16 @@ impl<'a> Drop for WorkerGuard<'a> {
 
 struct WorkerPool {
     all_workers: Vec<Arc<RemoteWorker>>,
-    alive_workers: (Sender<Arc<RemoteWorker>>, Receiver<Arc<RemoteWorker>>),
+    ready_workers: Mutex<Vec<Arc<RemoteWorker>>>,
     running_workers: AtomicU32,
 }
 
 impl WorkerPool {
-    async fn new<A>(workers: &[A]) -> Self
+    fn new<A>(workers: &[A]) -> Self
     where
         A: ToSocketAddrs + std::fmt::Debug,
     {
-        let all_workers = workers
+        let all_workers: Vec<Arc<RemoteWorker>> = workers
             .iter()
             .flat_map(|addr| {
                 addr.to_socket_addrs().unwrap_or_else(|_| {
@@ -145,15 +145,9 @@ impl WorkerPool {
             .map(|addr| Arc::new(RemoteWorker { addr }))
             .collect();
 
-        let (s, r) = unbounded();
-
-        for worker in &all_workers {
-            s.send(Arc::clone(worker)).await.unwrap();
-        }
-
         Self {
+            ready_workers: Mutex::new(all_workers.clone()),
             all_workers,
-            alive_workers: (s, r),
             running_workers: AtomicU32::new(0),
         }
     }
@@ -162,30 +156,32 @@ impl WorkerPool {
         self.running_workers.fetch_sub(1, Ordering::SeqCst);
     }
 
-    async fn insert(&self, worker: Arc<RemoteWorker>) {
-        let ch = self.alive_workers.0.clone();
-        ch.send(worker).await.unwrap();
+    fn insert(&self, worker: Arc<RemoteWorker>) {
+        self.ready_workers.lock().unwrap().push(worker);
     }
 
-    async fn get_worker(&self) -> Result<WorkerGuard<'_>> {
-        if self.alive_workers.0.len() as u32 + self.running_workers.load(Ordering::SeqCst) == 0 {
+    fn get_worker(&self) -> Result<Option<WorkerGuard<'_>>> {
+        let mut ready_workers = self.ready_workers.lock().unwrap();
+        if ready_workers.len() as u32 + self.running_workers.load(Ordering::SeqCst) == 0 {
             return Err(Error::NoAvailableWorker);
         }
 
-        let worker = self.alive_workers.1.recv().await?;
-        self.running_workers.fetch_add(1, Ordering::SeqCst);
-
-        Ok(WorkerGuard::new(self, worker))
+        if let Some(worker) = ready_workers.pop() {
+            self.running_workers.fetch_add(1, Ordering::SeqCst);
+            Ok(Some(WorkerGuard::new(self, worker)))
+        } else {
+            Ok(None)
+        }
     }
 
-    async fn stop_workers<I, O>(&self)
+    fn stop_workers<I, O>(&self)
     where
-        I: Map<O>,
+        I: Map<O> + Send,
         O: Reduce<O> + Send,
     {
         let mut failing_workers = Vec::new();
         for worker in &self.all_workers {
-            if worker.stop::<I, O>().await.is_err() {
+            if worker.stop::<I, O>().is_err() {
                 failing_workers.push(worker)
             }
         }
@@ -204,40 +200,46 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub async fn new<A>(workers: &[A]) -> Self
+    pub fn new<A>(workers: &[A]) -> Self
     where
         A: ToSocketAddrs + std::fmt::Debug,
     {
         Self {
-            pool: WorkerPool::new(workers).await,
+            pool: WorkerPool::new(workers),
         }
     }
 
-    async fn try_map<I, O>(&self, job: &I) -> Result<O>
+    fn try_map<I, O>(&self, job: &I) -> Result<O>
     where
-        I: Map<O>,
+        I: Map<O> + Send,
         O: Reduce<O> + Send,
     {
-        let worker = self.pool.get_worker().await?;
-        let res = worker.perform(job).await?;
-        worker.success().await;
+        loop {
+            match self.pool.get_worker()? {
+                Some(worker) => {
+                    let res = worker.perform(job)?;
+                    worker.success();
 
-        Ok(res)
+                    return Ok(res);
+                }
+                None => std::thread::sleep(std::time::Duration::from_millis(1000)),
+            }
+        }
     }
 
     /// Execute job on one of the remote machines. If the remote machine fails for some reason,
     /// the job should be allocated to another machine.
-    pub async fn map<I, O>(&self, job: I) -> O
+    pub fn map<I, O>(&self, job: I) -> O
     where
-        I: Map<O>,
+        I: Map<O> + Send,
         O: Reduce<O> + Send,
     {
         loop {
-            match self.try_map(&job).await {
+            match self.try_map(&job) {
                 Ok(res) => return res,
                 Err(Error::NoAvailableWorker) => panic!("{}", Error::NoAvailableWorker),
                 Err(_) => {
-                    debug!("got err - rescheduling job");
+                    warn!("Worker failed - rescheduling job");
                 }
             }
         }
@@ -250,32 +252,31 @@ impl Manager {
         }
     }
 
-    async fn get_results<I, O>(&self, jobs: Vec<I>) -> Option<O>
+    fn get_results<I, O>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
     where
-        I: Map<O>,
-        O: Reduce<O> + Send,
+        I: Map<O> + Send,
+        O: Reduce<O> + Send + Sync,
     {
-        jobs.into_iter()
+        let acc = Arc::new(Mutex::new(None));
+
+        jobs.par_bridge()
             .map(|job| self.map::<I, O>(job))
-            .collect::<FuturesUnordered<_>>()
-            .map(|d| {
-                println!("TEST");
-                d
-            })
-            .fold(
-                None,
-                |acc, elem| async move { Some(Manager::reduce(acc, elem)) },
-            )
-            .await
+            .for_each(|res| {
+                let mut lock = acc.lock().unwrap();
+                *lock = Some(Manager::reduce(lock.take(), res));
+            });
+
+        let x = acc.lock().unwrap().take();
+        x
     }
 
-    pub async fn run<I, O>(&self, jobs: Vec<I>) -> Option<O>
+    pub fn run<I, O>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
     where
-        I: Map<O>,
-        O: Reduce<O> + Send,
+        I: Map<O> + Send + Sync,
+        O: Reduce<O> + Send + Sync,
     {
-        let result = self.get_results(jobs).await;
-        self.pool.stop_workers::<I, O>().await;
+        let result = self.get_results(jobs);
+        self.pool.stop_workers::<I, O>();
 
         result
     }

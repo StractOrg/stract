@@ -47,7 +47,6 @@ async fn main() {
         }
         Config::Webgraph(config) => WebgraphBuilder::from(config)
             .run()
-            .await
             .expect("Failed to build webgraph"),
     }
 }
