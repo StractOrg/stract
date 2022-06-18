@@ -13,64 +13,75 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::{cell::RefCell, collections::HashMap, hash::Hash, path::Path};
+use std::{cell::RefCell, collections::HashMap, hash::Hash, ops::Div, path::Path};
 
 use lru::LruCache;
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{Edge, Node, NodeID, NodeIterator, StoredEdge};
-use crate::directory;
+use super::{Edge, EdgeIterator, Node, NodeID, NodeIterator, StoredEdge};
 use crate::webgraph::GraphStore;
 
 struct Adjacency {
-    tree: CachedTree<u64, HashMap<NodeID, Vec<StoredEdge>>>,
-    block_size: u64,
+    tree: BlockedCachedTree<NodeID, Vec<StoredEdge>>,
 }
 
 impl Adjacency {
-    fn new(store: sled::Tree) -> Self {
-        Self {
-            tree: CachedTree::new(store, 100),
-            block_size: 1_024,
-        }
-    }
-
-    fn retrieve_block(&mut self, block_id: u64) -> HashMap<NodeID, Vec<StoredEdge>> {
-        self.tree.get(&block_id).cloned().unwrap_or_default()
-    }
-
-    fn save_block(&mut self, block_id: u64, block: HashMap<NodeID, Vec<StoredEdge>>) {
-        self.tree.insert(block_id, block)
-    }
-
     fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
-        let block_id = from / self.block_size;
+        self.tree.insert(from, &mut |block| {
+            block.entry(from).or_default().push(StoredEdge {
+                other: to,
+                label: label.clone(),
+            })
+        });
+    }
 
-        if let Some(block) = self.tree.get_mut(&block_id) {
-            block
-                .entry(from)
-                .or_default()
-                .push(StoredEdge { other: to, label });
+    fn edges(&mut self, node: NodeID) -> Vec<StoredEdge> {
+        self.tree.get(&node).cloned().unwrap_or_default()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (u64, HashMap<NodeID, Vec<StoredEdge>>)> {
+        self.tree.inner.iter().map(|res| {
+            let (block_id, block) = res.expect("failed to iterate tree");
+            (
+                bincode::deserialize(&block_id).unwrap(),
+                bincode::deserialize(&block).unwrap(),
+            )
+        })
+    }
+}
+
+struct BlockedCachedTree<K, V> {
+    inner: CachedTree<u64, HashMap<K, V>>,
+    block_size: u64,
+}
+
+impl<K, V> BlockedCachedTree<K, V>
+where
+    K: Hash + Eq + Serialize + Clone + Div<u64, Output = u64> + DeserializeOwned,
+    V: Serialize + DeserializeOwned + Clone,
+{
+    fn insert<B>(&mut self, key: K, mutate_block: &mut B)
+    where
+        B: FnMut(&mut HashMap<K, V>),
+    {
+        let block_id = key / self.block_size;
+
+        if let Some(block) = self.inner.get_mut(&block_id) {
+            // block.entry(key).or_default().push(value);
+            // block.insert(key, value);
+            mutate_block(block);
             return;
         }
 
         let mut new_block = HashMap::new();
-        new_block.insert(from, vec![StoredEdge { other: to, label }]);
+        mutate_block(&mut new_block);
 
-        self.tree.insert(block_id, new_block);
+        self.inner.insert(block_id, new_block);
     }
 
-    fn edges(&mut self, node: NodeID) -> Vec<StoredEdge> {
-        let block_id = node / self.block_size;
-        match self.tree.get(&block_id) {
-            Some(block) => block.get(&node).cloned().unwrap_or_default(),
-            None => {
-                let block = self.retrieve_block(block_id);
-                let res = block.get(&node).cloned().unwrap_or_default();
-
-                res
-            }
-        }
+    fn get(&mut self, key: &K) -> Option<&V> {
+        let block_id = key.clone() / self.block_size;
+        self.inner.get(&block_id).and_then(|block| block.get(key))
     }
 }
 
@@ -84,7 +95,13 @@ where
     K: Hash + Eq + Serialize + Clone,
     V: Serialize + DeserializeOwned + Clone,
 {
-    fn new(store: sled::Tree, cache_size: usize) -> Self {
+    fn new(db: &sled::Db, name: &str, cache_size: usize) -> Self {
+        let name = name.to_string();
+
+        let store = db
+            .open_tree(name.clone())
+            .expect("unable to open sled tree");
+
         Self {
             store,
             cache: LruCache::new(cache_size),
@@ -101,7 +118,7 @@ where
                 .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize value"));
 
             if let Some(val) = val {
-                self.cache.put(key.clone(), val.clone());
+                self.cache.put(key.clone(), val);
             }
         }
     }
@@ -136,8 +153,8 @@ where
     }
 
     fn flush(&mut self) {
-        while let Some((key, value)) = self.cache.pop_lru() {
-            self.insert_persisted(key, value);
+        for (key, value) in self.cache.iter() {
+            self.insert_persisted(key.clone(), value.clone());
         }
 
         self.store.flush().expect("unable to flush tree");
@@ -152,7 +169,7 @@ pub struct SledStore {
     adjacency: RefCell<Adjacency>,
     reversed_adjacency: RefCell<Adjacency>,
     node2id: RefCell<CachedTree<Node, NodeID>>,
-    id2node: RefCell<CachedTree<NodeID, Node>>,
+    id2node: RefCell<BlockedCachedTree<NodeID, Node>>,
     meta: RefCell<CachedTree<String, u64>>,
 }
 
@@ -163,13 +180,6 @@ impl SledStore {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let p = path
-            .as_ref()
-            .as_os_str()
-            .to_str()
-            .expect("unknown path")
-            .to_string();
-
         let db = sled::Config::default()
             .path(path)
             .use_compression(true)
@@ -177,33 +187,29 @@ impl SledStore {
             .open()
             .expect("Failed to open database");
 
-        Self::from_db(db, p)
+        Self::from_db(db)
     }
 
-    fn from_db(db: sled::Db, path: String) -> Self {
+    fn from_db(db: sled::Db) -> Self {
         Self {
-            adjacency: RefCell::new(Adjacency::new(
-                db.open_tree("adjacency")
-                    .expect("Could not open adjacency tree"),
-            )),
-            reversed_adjacency: RefCell::new(Adjacency::new(
-                db.open_tree("reversed_adjacency")
-                    .expect("Could not open reversed adjacency tree"),
-            )),
-            node2id: RefCell::new(CachedTree::new(
-                db.open_tree("node2id")
-                    .expect("Could not open node2id tree"),
-                1_000,
-            )),
-            id2node: RefCell::new(CachedTree::new(
-                db.open_tree("id2node")
-                    .expect("Could not open id2node tree"),
-                1_000,
-            )),
-            meta: RefCell::new(CachedTree::new(
-                db.open_tree("meta").expect("Could not open metadata tree"),
-                1_000,
-            )),
+            adjacency: RefCell::new(Adjacency {
+                tree: BlockedCachedTree {
+                    inner: CachedTree::new(&db, "adjacency", 100),
+                    block_size: 1_024,
+                },
+            }),
+            reversed_adjacency: RefCell::new(Adjacency {
+                tree: BlockedCachedTree {
+                    inner: CachedTree::new(&db, "reversed_adjacency", 100),
+                    block_size: 1_024,
+                },
+            }),
+            node2id: RefCell::new(CachedTree::new(&db, "node2id", 1_000)),
+            id2node: RefCell::new(BlockedCachedTree {
+                inner: CachedTree::new(&db, "id2node", 1_000),
+                block_size: 1_024,
+            }),
+            meta: RefCell::new(CachedTree::new(&db, "meta", 1_000)),
         }
     }
 
@@ -231,7 +237,9 @@ impl SledStore {
 
     fn assign_id(&self, node: Node, id: NodeID) {
         self.node2id.borrow_mut().insert(node.clone(), id);
-        self.id2node.borrow_mut().insert(id, node);
+        self.id2node.borrow_mut().insert(id, &mut |block| {
+            block.insert(id, node.clone());
+        });
     }
 
     fn id_or_assign(&self, node: Node) -> NodeID {
@@ -275,7 +283,7 @@ impl GraphStore for SledStore {
         self.flush();
 
         let iter = IntoIter {
-            inner: self.id2node.borrow_mut().iter(),
+            inner: self.node2id.borrow_mut().iter(),
         };
 
         NodeIterator::from(iter)
@@ -290,7 +298,7 @@ impl GraphStore for SledStore {
             .insert(from_id, to_id, label.clone());
         self.reversed_adjacency
             .borrow_mut()
-            .insert(to_id, from_id, label.clone());
+            .insert(to_id, from_id, label);
     }
 
     fn node2id(&self, node: &Node) -> Option<NodeID> {
@@ -302,11 +310,30 @@ impl GraphStore for SledStore {
     }
 
     fn flush(&self) {
-        self.adjacency.borrow_mut().tree.flush();
-        self.reversed_adjacency.borrow_mut().tree.flush();
+        self.adjacency.borrow_mut().tree.inner.flush();
+        self.reversed_adjacency.borrow_mut().tree.inner.flush();
         self.node2id.borrow_mut().flush();
-        self.id2node.borrow_mut().flush();
+        self.id2node.borrow_mut().inner.flush();
         self.meta.borrow_mut().flush();
+    }
+
+    fn edges(&self) -> EdgeIterator<'_> {
+        self.flush();
+
+        EdgeIterator::from(
+            self.adjacency
+                .borrow()
+                .iter()
+                .flat_map(|(_block_id, block)| {
+                    block.into_iter().flat_map(|(node_id, edges)| {
+                        edges.into_iter().map(move |edge| Edge {
+                            from: node_id,
+                            to: edge.other,
+                            label: edge.label,
+                        })
+                    })
+                }),
+        )
     }
 }
 
@@ -319,8 +346,8 @@ impl Iterator for IntoIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|res| {
-            let (node_bytes, _) = res.expect("Failed to get next record from sled tree");
-            bincode::deserialize(&node_bytes).expect("Failed to deserialize node")
+            let (_, id_bytes) = res.expect("Failed to get next record from sled tree");
+            bincode::deserialize(&id_bytes).expect("Failed to deserialize node")
         })
     }
 }

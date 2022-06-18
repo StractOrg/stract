@@ -91,11 +91,11 @@ pub trait GraphStore {
     fn id2node(&self, id: &NodeID) -> Option<Node>;
     fn outgoing_edges(&self, node: NodeID) -> Vec<Edge>;
     fn ingoing_edges(&self, node: NodeID) -> Vec<Edge>;
-    fn nodes<'a>(&'a self) -> NodeIterator;
+    fn nodes(&self) -> NodeIterator;
     fn insert(&mut self, from: Node, to: Node, label: String);
     fn flush(&self);
 
-    fn edges<'a>(&'a self) -> EdgeIterator<'a> {
+    fn edges(&self) -> EdgeIterator<'_> {
         EdgeIterator::from(self.nodes().flat_map(|node| self.outgoing_edges(node)))
     }
 

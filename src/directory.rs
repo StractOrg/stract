@@ -31,11 +31,10 @@ pub enum DirEntry {
 }
 
 fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
-    dbg!(&path);
     let mut res = Vec::new();
 
     for f in fs::read_dir(path)? {
-        let entry = dbg!(f?);
+        let entry = f?;
         let metadata = entry.metadata()?;
 
         if metadata.is_dir() {

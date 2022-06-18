@@ -172,7 +172,13 @@ impl<'a> Html<'a> {
 
                         tag.attributes().get("href").flatten().map(|bytes| {
                             let destination = String::from_utf8(bytes.as_bytes().to_vec()).unwrap();
-                            let text = tag.inner_text(parser).to_string();
+                            let children = tag.children();
+                            let text: String = Itertools::intersperse(
+                                Html::children_text(children, parser).into_iter(),
+                                ". ".to_string(),
+                            )
+                            .collect();
+
                             Link {
                                 source: self.url.clone(),
                                 destination,
@@ -250,24 +256,28 @@ impl<'a> Html<'a> {
     }
 
     fn children_text(children: Children, parser: &tl::Parser) -> Vec<String> {
+        let mut stack = vec![children];
+
         let mut res = Vec::new();
         let allowed_tags = [
             "a", "div", "span", "p", "h1", "h2", "h3", "h4", "li", "ul", "ol", "nav", "pre",
             "body", "html",
         ];
 
-        for id in children.top().iter() {
-            let node = id.get(parser).unwrap();
-            match node {
-                tl::Node::Tag(t) => {
-                    let tag = node.as_tag().unwrap();
-                    let name = tag.name().as_utf8_str();
-                    if allowed_tags.iter().any(|allowed| name == *allowed) {
-                        res.extend(Html::children_text(t.children(), parser))
+        while let Some(children) = stack.pop() {
+            for id in children.top().iter() {
+                let node = id.get(parser).unwrap();
+                match node {
+                    tl::Node::Tag(t) => {
+                        let tag = node.as_tag().unwrap();
+                        let name = tag.name().as_utf8_str();
+                        if allowed_tags.iter().any(|allowed| name == *allowed) {
+                            stack.push(t.children())
+                        }
                     }
+                    tl::Node::Raw(raw) => res.push(raw.as_utf8_str().trim().to_string()),
+                    tl::Node::Comment(_) => {}
                 }
-                tl::Node::Raw(raw) => res.push(raw.as_utf8_str().trim().to_string()),
-                tl::Node::Comment(_) => {}
             }
         }
 
