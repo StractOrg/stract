@@ -21,6 +21,7 @@ use crate::{
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
     WebgraphMasterConfig, WebgraphWorkerConfig,
 };
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
 use tracing::{debug, info};
@@ -118,12 +119,22 @@ impl WebgraphBuilder {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
+        let pb = ProgressBar::new(warc_paths.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
+                )
+                .progress_chars("#>-"),
+        );
+
         warc_paths
             .into_iter()
             .map(|warc_path| Job {
                 config: job_config.clone(),
                 warc_path,
             })
+            .progress_with(pb)
             .map_reduce(&workers)
             .await
             .expect("failed to build webgraph");

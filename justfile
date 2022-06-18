@@ -1,4 +1,5 @@
 @flamegraph:
+    sudo rm -rf webgraph
     cargo flamegraph --root -- configs/webgraph/local/profile.toml
 
 @worker:

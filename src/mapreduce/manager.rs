@@ -258,6 +258,10 @@ impl Manager {
         jobs.into_iter()
             .map(|job| self.map::<I, O>(job))
             .collect::<FuturesUnordered<_>>()
+            .map(|d| {
+                println!("TEST");
+                d
+            })
             .fold(
                 None,
                 |acc, elem| async move { Some(Manager::reduce(acc, elem)) },
