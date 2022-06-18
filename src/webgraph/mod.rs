@@ -365,7 +365,7 @@ impl From<Webgraph> for FrozenWebgraph {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FrozenWebgraph {
-    root: DirEntry,
+    pub root: DirEntry,
 }
 
 #[cfg(test)]

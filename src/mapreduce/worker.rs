@@ -1,12 +1,12 @@
-use std::net::SocketAddr;
+use std::{
+    io::{Read, Write},
+    net::{SocketAddr, TcpListener},
+};
 
 use crate::mapreduce::manager::{BUF_SIZE, END_OF_MESSAGE};
 
 use super::{Error, Map, Result, Task};
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::io::AsyncReadExt;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::net::TcpListener;
 use tracing::{debug, info};
 
 pub struct Worker {}
@@ -17,16 +17,16 @@ enum State {
 }
 
 impl Worker {
-    async fn run_stream<I, O, S>(mut stream: S) -> Result<State>
+    fn run_stream<I, O, S>(mut stream: S) -> Result<State>
     where
         I: Map<O>,
         O: Serialize + DeserializeOwned + Send,
-        S: AsyncRead + AsyncWrite + Unpin,
+        S: Read + Write + Unpin,
     {
         let mut buf = [0; BUF_SIZE];
         let mut bytes = Vec::new();
         loop {
-            if let Ok(size) = stream.read(&mut buf).await {
+            if let Ok(size) = stream.read(&mut buf) {
                 debug!("read {:?} bytes", size);
                 if size == 0 && bytes.is_empty() {
                     return Err(Error::NoResponse);
@@ -50,8 +50,8 @@ impl Worker {
                 let res = job.map();
                 let bytes = bincode::serialize(&res)?;
                 debug!("serialized result into {} bytes", bytes.len());
-                stream.write_all(&bytes).await?;
-                stream.write_all(&END_OF_MESSAGE).await?;
+                stream.write_all(&bytes)?;
+                stream.write_all(&END_OF_MESSAGE)?;
             }
             Task::AllFinished => {
                 debug!("shutting down");
@@ -62,18 +62,18 @@ impl Worker {
         Ok(State::Continue)
     }
 
-    pub async fn run<I, O>(addr: SocketAddr) -> Result<()>
+    pub fn run<I, O>(addr: SocketAddr) -> Result<()>
     where
         I: Map<O>,
         O: Serialize + DeserializeOwned + Send,
     {
-        let listener = TcpListener::bind(addr).await?;
+        let listener = TcpListener::bind(addr)?;
         info!("worker listening on: {:}", addr);
 
         loop {
-            let (socket, _) = listener.accept().await?;
+            let (socket, _) = listener.accept()?;
             debug!("received connection");
-            match Worker::run_stream::<I, O, _>(socket).await? {
+            match Worker::run_stream::<I, O, _>(socket)? {
                 State::Finished => break,
                 State::Continue => {}
             }
@@ -111,49 +111,28 @@ mod tests {
         }
     }
 
-    impl AsyncRead for MockTcpStream {
-        fn poll_read(
-            self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-            buf: &mut ReadBuf<'_>,
-        ) -> Poll<std::io::Result<()>> {
-            let mut_self = self.get_mut();
-
-            if mut_self.num_read == 0 {
-                buf.put_slice(&mut_self.contents[..]);
-            } else if mut_self.num_read == 1 {
-                buf.put_slice(&END_OF_MESSAGE);
+    impl Read for MockTcpStream {
+        fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.num_read == 0 {
+                buf.write_all(&self.contents[..]);
+            } else if self.num_read == 1 {
+                buf.write_all(&END_OF_MESSAGE);
             }
 
-            mut_self.contents = Vec::new();
-            mut_self.num_read += 1;
-
-            Poll::Ready(Ok(()))
+            self.contents = Vec::new();
+            self.num_read += 1;
+            Ok(buf.len())
         }
     }
 
-    impl AsyncWrite for MockTcpStream {
-        fn poll_write(
-            self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-            buf: &[u8],
-        ) -> Poll<std::result::Result<usize, std::io::Error>> {
-            self.get_mut().result.extend(Vec::from(buf));
-            Poll::Ready(Ok(buf.len()))
+    impl Write for MockTcpStream {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.result.extend(Vec::from(buf));
+            Ok(buf.len())
         }
 
-        fn poll_flush(
-            self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-        ) -> Poll<std::result::Result<(), std::io::Error>> {
-            Poll::Ready(Ok(()))
-        }
-
-        fn poll_shutdown(
-            self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-        ) -> Poll<std::result::Result<(), std::io::Error>> {
-            Poll::Ready(Ok(()))
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
     }
 
@@ -171,15 +150,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn execute() {
+    fn execute() {
         let contents = vec![1, 2, 0, 1, 0, 1, 0];
         let job = bincode::serialize(&Task::Job(MockJob { contents })).unwrap();
 
         let mut stream = MockTcpStream::new(job);
-        Worker::run_stream::<MockJob, _, _>(&mut stream)
-            .await
-            .expect("worker failed");
+        Worker::run_stream::<MockJob, _, _>(&mut stream).expect("worker failed");
 
         let result_bytes = &stream.result[..stream.result.len() - END_OF_MESSAGE.len()];
         let res: Count = bincode::deserialize(result_bytes).unwrap();

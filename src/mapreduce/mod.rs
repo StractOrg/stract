@@ -64,20 +64,20 @@ where
 #[async_trait]
 pub trait MapReduce<I, O>
 where
-    Self: Sized + Iterator<Item = I>,
+    Self: Sized + Iterator<Item = I> + Send,
     I: Map<O> + Sync,
-    O: Reduce<O> + Send,
+    O: Reduce<O> + Send + Sync,
 {
-    async fn map_reduce(self, workers: &[SocketAddr]) -> Option<O> {
-        let manager = Manager::new(workers).await;
-        manager.run(self.collect()).await
+    fn map_reduce(self, workers: &[SocketAddr]) -> Option<O> {
+        let manager = Manager::new(workers);
+        manager.run(self)
     }
 }
 impl<I, O, T> MapReduce<I, O> for T
 where
-    T: Iterator<Item = I> + Sized,
+    T: Iterator<Item = I> + Sized + Send,
     I: Map<O> + Sync,
-    O: Reduce<O> + Send,
+    O: Reduce<O> + Send + Sync,
 {
 }
 
