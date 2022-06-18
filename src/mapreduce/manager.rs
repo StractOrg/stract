@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -9,7 +9,6 @@ use crate::mapreduce::Task;
 
 use super::{Error, Result};
 use super::{Map, Reduce};
-use async_channel::{unbounded, Receiver, Sender};
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use std::net::ToSocketAddrs;
@@ -255,15 +254,18 @@ impl Manager {
     fn get_results<I, O>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send + Sync,
+        O: Reduce<O> + Send,
     {
         let acc = Arc::new(Mutex::new(None));
 
         jobs.par_bridge()
             .map(|job| self.map::<I, O>(job))
+            .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
             .for_each(|res| {
-                let mut lock = acc.lock().unwrap();
-                *lock = Some(Manager::reduce(lock.take(), res));
+                if let Some(res) = res {
+                    let mut lock = acc.lock().unwrap();
+                    *lock = Some(Manager::reduce(lock.take(), res));
+                }
             });
 
         let x = acc.lock().unwrap().take();
@@ -272,8 +274,8 @@ impl Manager {
 
     pub fn run<I, O>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
     where
-        I: Map<O> + Send + Sync,
-        O: Reduce<O> + Send + Sync,
+        I: Map<O> + Send,
+        O: Reduce<O> + Send,
     {
         let result = self.get_results(jobs);
         self.pool.stop_workers::<I, O>();

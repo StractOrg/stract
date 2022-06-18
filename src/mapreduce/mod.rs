@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
-
-use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::net::SocketAddr;
 
 mod manager;
 mod worker;
@@ -61,12 +59,11 @@ where
     fn reduce(self, element: T) -> T;
 }
 
-#[async_trait]
 pub trait MapReduce<I, O>
 where
     Self: Sized + Iterator<Item = I> + Send,
-    I: Map<O> + Sync,
-    O: Reduce<O> + Send + Sync,
+    I: Map<O>,
+    O: Reduce<O> + Send,
 {
     fn map_reduce(self, workers: &[SocketAddr]) -> Option<O> {
         let manager = Manager::new(workers);
@@ -76,8 +73,8 @@ where
 impl<I, O, T> MapReduce<I, O> for T
 where
     T: Iterator<Item = I> + Sized + Send,
-    I: Map<O> + Sync,
-    O: Reduce<O> + Send + Sync,
+    I: Map<O>,
+    O: Reduce<O> + Send,
 {
 }
 
