@@ -52,29 +52,28 @@ where
     fn map(self) -> T;
 }
 
-pub trait Reduce<T = Self>
-where
-    Self: Serialize + DeserializeOwned,
-{
-    fn reduce(self, element: T) -> T;
+pub trait Reduce<T> {
+    fn reduce(self, element: T) -> Self;
 }
 
-pub trait MapReduce<I, O>
+pub trait MapReduce<I, O1, O2>
 where
     Self: Sized + Iterator<Item = I> + Send,
-    I: Map<O>,
-    O: Reduce<O> + Send,
+    I: Map<O1>,
+    O1: Serialize + DeserializeOwned + Send,
+    O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
 {
-    fn map_reduce(self, workers: &[SocketAddr]) -> Option<O> {
+    fn map_reduce(self, workers: &[SocketAddr]) -> Option<O2> {
         let manager = Manager::new(workers);
         manager.run(self)
     }
 }
-impl<I, O, T> MapReduce<I, O> for T
+impl<I, O1, O2, T> MapReduce<I, O1, O2> for T
 where
     T: Iterator<Item = I> + Sized + Send,
-    I: Map<O>,
-    O: Reduce<O> + Send,
+    I: Map<O1>,
+    O1: Serialize + DeserializeOwned + Send,
+    O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
 {
 }
 

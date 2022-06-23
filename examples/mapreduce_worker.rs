@@ -20,7 +20,7 @@ impl Map<Count> for Job {
     }
 }
 
-impl Reduce for Count {
+impl Reduce<Count> for Count {
     fn reduce(self, element: Self) -> Self {
         Count(self.0 + element.0)
     }

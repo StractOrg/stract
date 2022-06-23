@@ -423,7 +423,7 @@ impl<S: GraphStore> Webgraph<S> {
     }
 }
 
-impl From<FrozenWebgraph> for Webgraph<SledStore> {
+impl From<FrozenWebgraph> for Webgraph {
     fn from(frozen: FrozenWebgraph) -> Self {
         directory::recreate_folder(&frozen.root).unwrap();
 

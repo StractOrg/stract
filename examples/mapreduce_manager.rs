@@ -20,7 +20,7 @@ impl Map<Count> for Job {
     }
 }
 
-impl Reduce for Count {
+impl Reduce<Count> for Count {
     fn reduce(self, element: Self) -> Self {
         Count(self.0 + element.0)
     }
@@ -41,7 +41,7 @@ fn main() {
         Job { id: 5 },
     ];
 
-    let res = jobs
+    let res: Count = jobs
         .into_iter()
         .map_reduce(&["0.0.0.0:1337".parse::<SocketAddr>().unwrap()])
         .unwrap();
