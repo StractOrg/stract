@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use clap::Parser;
-use cuely::entrypoint::{CentralityEntrypoint, Indexer, WebgraphEntrypoint};
+use cuely::entrypoint::{CentralityEntrypoint, Indexer, ServerEntrypoint, WebgraphEntrypoint};
 use cuely::Config;
 use std::fs;
 use tracing::Level;
@@ -26,7 +26,8 @@ struct Args {
     mapreduce_worker_addr: Option<String>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
@@ -49,5 +50,6 @@ fn main() {
             .expect("Failed to build webgraph"),
 
         Config::Centrality(config) => CentralityEntrypoint::from(config).run(),
+        Config::Server(config) => ServerEntrypoint::from(config).run().await.unwrap(),
     }
 }

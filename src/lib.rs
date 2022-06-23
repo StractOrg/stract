@@ -32,6 +32,7 @@ mod query;
 pub mod ranking;
 mod schema;
 pub mod searcher;
+pub mod server;
 mod snippet;
 mod tokenizer;
 mod warc;
@@ -44,6 +45,12 @@ pub enum Config {
     Indexer(IndexingConfig),
     Webgraph(WebgraphConfig),
     Centrality(CentralityConfig),
+    Server(ServerConfig),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ServerConfig {
+    pub index_path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -1,0 +1,10 @@
+type = "Indexer"
+mode = "Local"
+
+warc_paths_file = "warc.paths"
+centrality_store_path = "centrality"
+
+[warc_source]
+type = "Local"
+folder = "./warc_files"
+names = ["CC-MAIN-20220116093137-20220116123137-00000.warc.gz", "CC-MAIN-20220116093137-20220116123137-00001.warc.gz", "CC-MAIN-20220116093137-20220116123137-00003.warc.gz"]
