@@ -1,0 +1,11 @@
+<form method="GET">
+    <input name="q" />
+    <input type="submit" />
+</form>
+
+{% for item in search_result %}
+<div>
+    <p><a href="{{ item.url }}">{{ item.title }}</a></p>
+    <p>{{ item.snippet }} </p>
+</div>
+{% endfor %}

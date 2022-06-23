@@ -19,6 +19,7 @@ use crate::query::Query;
 use crate::ranking::Ranker;
 use crate::Result;
 
+#[derive(Debug)]
 pub struct SearchResult {
     pub num_docs: usize,
     pub documents: Vec<RetrievedWebpage>,
