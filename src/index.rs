@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 // Cuely is an open source web search engine.
 // Copyright (C) 2022 Cuely ApS
 //
@@ -16,15 +17,19 @@
 use tantivy::collector::{Collector, Count};
 use tantivy::{DocAddress, Document, LeasedItem};
 
+use crate::directory::{self, DirEntry};
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
 use crate::snippet;
 use crate::webpage::Webpage;
 use crate::Result;
+use crate::{schema::create_schema, tokenizer::Tokenizer};
+use std::fs;
 use std::path::Path;
 
 pub struct Index {
+    path: String,
     tantivy_index: tantivy::Index,
     writer: tantivy::IndexWriter,
     reader: tantivy::IndexReader,
@@ -33,11 +38,20 @@ pub struct Index {
 
 impl Index {
     #[cfg(test)]
-    pub fn temporary() -> Result<Index> {
-        use crate::{schema::create_schema, tokenizer::Tokenizer};
+    pub fn temporary() -> Result<Self> {
+        let path = crate::gen_temp_path();
+        Self::open(path)
+    }
 
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = create_schema();
-        let tantivy_index = tantivy::Index::create_in_ram(schema);
+
+        let tantivy_index = if path.as_ref().exists() {
+            tantivy::Index::open_in_dir(path.as_ref())?
+        } else {
+            fs::create_dir_all(path.as_ref())?;
+            tantivy::Index::create_in_dir(path.as_ref(), schema.clone())?
+        };
 
         tantivy_index
             .tokenizers()
@@ -46,12 +60,10 @@ impl Index {
         Ok(Index {
             writer: tantivy_index.writer(100_000_000)?,
             reader: tantivy_index.reader()?,
-            schema: create_schema(),
+            schema,
+            path: path.as_ref().to_str().unwrap().to_string(),
             tantivy_index,
         })
-    }
-    pub fn open<P: AsRef<Path>>(_path: P) -> Result<Self> {
-        todo!();
     }
 
     pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
@@ -100,6 +112,52 @@ impl Index {
         let doc = searcher.doc(doc_address)?;
         Ok(RetrievedWebpage::from(doc))
     }
+
+    pub fn merge(mut self, mut other: Index) -> Self {
+        other.commit().expect("failed to commit index");
+        self.commit().expect("failed to commit index");
+
+        let other_meta = other
+            .tantivy_index
+            .load_metas()
+            .expect("failed to laod tantivy metadata for index");
+
+        let mut meta = self
+            .tantivy_index
+            .load_metas()
+            .expect("failed to laod tantivy metadata for index");
+
+        let x = other.path.clone();
+        let other_path = Path::new(x.as_str());
+        drop(other);
+
+        let path = self.path.clone();
+        let self_path = Path::new(path.as_str());
+        drop(self);
+
+        for segment in other_meta.segments {
+            // TODO: handle case where current index has segment with same name
+            for file in segment.list_files() {
+                let p = other_path.join(&file);
+                if p.exists() {
+                    fs::rename(p, self_path.join(&file)).unwrap();
+                }
+            }
+            meta.segments.push(segment);
+        }
+
+        fs::remove_dir_all(other_path).unwrap();
+
+        let self_path = Path::new(&path);
+
+        std::fs::write(
+            self_path.join("meta.json"),
+            serde_json::to_string(&meta).unwrap(),
+        )
+        .unwrap();
+
+        Self::open(path).expect("failed to open index")
+    }
 }
 
 #[derive(Default, Debug)]
@@ -142,6 +200,40 @@ impl From<Document> for RetrievedWebpage {
         }
 
         webpage
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FrozenIndex {
+    pub root: DirEntry,
+}
+
+impl From<FrozenIndex> for Index {
+    fn from(frozen: FrozenIndex) -> Self {
+        directory::recreate_folder(&frozen.root).unwrap();
+
+        match frozen.root {
+            DirEntry::Folder { name, entries: _ } => {
+                Index::open(name).expect("failed to open index")
+            }
+            DirEntry::File {
+                name: _,
+                content: _,
+            } => {
+                panic!("Cannot open index from a file - must be directory.")
+            }
+        }
+    }
+}
+
+impl From<Index> for FrozenIndex {
+    fn from(mut index: Index) -> Self {
+        index.commit().expect("failed to commit index");
+        let path = index.path.clone();
+        drop(index);
+        let root = directory::scan_folder(path).unwrap();
+
+        Self { root }
     }
 }
 
@@ -387,5 +479,93 @@ mod tests {
             .expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
+    }
+
+    #[test]
+    fn serialize_deserialize_bincode() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+            </html>
+            "#,
+                "https://www.example.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+
+        let path = index.path.clone();
+        let frozen: FrozenIndex = index.into();
+        let bytes = bincode::serialize(&frozen).unwrap();
+
+        std::fs::remove_dir_all(path).unwrap();
+
+        let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
+        let index: Index = deserialized_frozen.into();
+        let query = Query::parse("website").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn merge() {
+        let mut index1 = Index::temporary().expect("Unable to open index");
+
+        index1
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+            </html>
+            "#,
+                "https://www.example.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+
+        let mut index2 = Index::temporary().expect("Unable to open index");
+
+        index2
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+            </html>
+            "#,
+                "https://www.example.com",
+                vec![],
+                1.,
+            ))
+            .expect("failed to parse webpage");
+
+        let index = index1.merge(index2);
+
+        let query = Query::parse("website").expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[1].url, "https://www.example.com");
     }
 }
