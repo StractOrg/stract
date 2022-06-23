@@ -16,7 +16,7 @@
 use crate::{
     mapreduce::{Map, MapReduce, Reduce, Worker},
     warc::WarcFile,
-    webgraph::{FrozenWebgraph, Node, SledStore, Webgraph},
+    webgraph::{FrozenWebgraph, Node, Webgraph, WebgraphBuilder},
     webpage::{self, Html},
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
     WebgraphMasterConfig, WebgraphWorkerConfig,
@@ -25,11 +25,11 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
 use tracing::{debug, info};
 
-pub struct WebgraphBuilder {
+pub struct WebgraphEntrypoint {
     config: WebgraphConfig,
 }
 
-impl From<WebgraphConfig> for WebgraphBuilder {
+impl From<WebgraphConfig> for WebgraphEntrypoint {
     fn from(config: WebgraphConfig) -> Self {
         Self { config }
     }
@@ -53,7 +53,9 @@ impl Map<FrozenWebgraph> for Job {
 
         info!("processing {}", name);
 
-        let mut graph = Webgraph::<SledStore>::open(Path::new("webgraph").join(name));
+        let mut graph = WebgraphBuilder::new(Path::new("webgraph").join(name))
+            .with_host_graph()
+            .open();
 
         let source = match self.config {
             JobConfig::Http(config) => WarcSource::HTTP(config),
@@ -109,7 +111,7 @@ impl Reduce<FrozenWebgraph> for FrozenWebgraph {
     }
 }
 
-impl WebgraphBuilder {
+impl WebgraphEntrypoint {
     fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         info!("Running master for webgraph construction");
 
@@ -171,9 +173,9 @@ impl WebgraphBuilder {
 
     pub fn run(&self) -> Result<()> {
         match &self.config {
-            WebgraphConfig::Master(config) => WebgraphBuilder::run_master(config),
-            WebgraphConfig::Worker(config) => WebgraphBuilder::run_worker(config),
-            WebgraphConfig::Local(config) => WebgraphBuilder::run_locally(config),
+            WebgraphConfig::Master(config) => WebgraphEntrypoint::run_master(config),
+            WebgraphConfig::Worker(config) => WebgraphEntrypoint::run_worker(config),
+            WebgraphConfig::Local(config) => WebgraphEntrypoint::run_locally(config),
         }
     }
 }

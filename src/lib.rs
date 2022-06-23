@@ -170,25 +170,3 @@ pub enum Error {
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
-
-#[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use crate::{index::Index, schema::create_schema, tokenizer::Tokenizer};
-
-    pub fn temporary_index() -> Result<Index> {
-        let schema = create_schema();
-        let tantivy_index = tantivy::Index::create_in_ram(schema);
-
-        tantivy_index
-            .tokenizers()
-            .register("tokenizer", Tokenizer::default());
-
-        Ok(Index {
-            writer: tantivy_index.writer(100_000_000)?,
-            reader: tantivy_index.reader()?,
-            schema: create_schema(),
-            tantivy_index,
-        })
-    }
-}

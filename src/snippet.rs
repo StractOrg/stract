@@ -297,8 +297,7 @@ pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::temporary_index;
-    use crate::{searcher::Searcher, webpage::Webpage};
+    use crate::{index::Index, searcher::Searcher, webpage::Webpage};
     use maplit::btreemap;
     use tantivy::tokenizer::SimpleTokenizer;
 
@@ -316,7 +315,7 @@ Survey in 2016, 2017, and 2018."#;
 
     #[test]
     fn snippet_during_search() {
-        let mut index = temporary_index().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
