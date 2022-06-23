@@ -17,4 +17,4 @@ mod indexer;
 mod webgraph;
 
 pub use indexer::Indexer;
-pub use webgraph::WebgraphBuilder;
+pub use webgraph::WebgraphEntrypoint;
