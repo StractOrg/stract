@@ -1,5 +1,6 @@
 use super::{Error, Result};
 use super::{Map, Reduce};
+use crate::exponential_backoff::ExponentialBackoff;
 use crate::mapreduce::Task;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::ParallelBridge;
@@ -11,7 +12,6 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio_retry::strategy::ExponentialBackoff;
 use tracing::{debug, warn};
 
 #[derive(Debug)]

@@ -1,3 +1,4 @@
+use crate::exponential_backoff::ExponentialBackoff;
 // Cuely is an open source web search engine.
 // Copyright (C) 2022 Cuely ApS
 //
@@ -18,9 +19,11 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
+use std::thread::sleep;
 use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
+use tracing::debug;
 
 pub(crate) struct WarcFile {
     bytes: Vec<u8>,
@@ -67,16 +70,28 @@ impl WarcFile {
     }
 
     pub(crate) fn download(source: WarcSource, path: &str) -> Result<Self> {
-        match source {
-            WarcSource::S3(config) => WarcFile::download_from_s3(
-                path,
-                config.name.clone(),
-                config.endpoint.clone(),
-                config.bucket,
-            ),
-            WarcSource::HTTP(config) => WarcFile::download_from_http(path, config.base_url),
-            WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
+        for dur in ExponentialBackoff::from_millis(10).take(5) {
+            let res = match source.clone() {
+                WarcSource::S3(config) => WarcFile::download_from_s3(
+                    path,
+                    config.name.clone(),
+                    config.endpoint.clone(),
+                    config.bucket,
+                ),
+                WarcSource::HTTP(config) => WarcFile::download_from_http(path, config.base_url),
+                WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
+            };
+
+            if res.is_ok() {
+                return res;
+            }
+
+            debug!("warc download failed, retrying in {} ms", dur.as_millis());
+
+            sleep(dur);
         }
+
+        Err(Error::DownloadFailed)
     }
 
     fn load_from_folder(name: &str, folder: &str) -> Result<Self> {
