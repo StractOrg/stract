@@ -9,17 +9,19 @@ use super::{Error, Map, Result, Task};
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, info};
 
-pub struct Worker {}
+#[derive(Default)]
+pub struct StatelessWorker {}
 
-enum State {
+pub enum State {
     Continue,
     Finished,
 }
 
-impl Worker {
-    fn run_stream<I, O, S>(mut stream: S) -> Result<State>
+pub trait Worker {
+    fn run_stream<W, I, O, S>(&self, mut stream: S) -> Result<State>
     where
-        I: Map<O>,
+        Self: Sized,
+        I: Map<Self, O>,
         O: Serialize + DeserializeOwned + Send,
         S: Read + Write + Unpin,
     {
@@ -47,7 +49,7 @@ impl Worker {
         match bincode::deserialize::<Task<I>>(&bytes)? {
             Task::Job(job) => {
                 debug!("received job");
-                let res = job.map();
+                let res = job.map(self);
                 let bytes = bincode::serialize(&res)?;
                 debug!("serialized result into {} bytes", bytes.len());
                 stream.write_all(&bytes)?;
@@ -62,9 +64,10 @@ impl Worker {
         Ok(State::Continue)
     }
 
-    pub fn run<I, O>(addr: SocketAddr) -> Result<()>
+    fn run<I, O>(&self, addr: SocketAddr) -> Result<()>
     where
-        I: Map<O>,
+        Self: Sized,
+        I: Map<Self, O>,
         O: Serialize + DeserializeOwned + Send,
     {
         let listener = TcpListener::bind(addr)?;
@@ -73,7 +76,7 @@ impl Worker {
         loop {
             let (socket, _) = listener.accept()?;
             debug!("received connection");
-            match Worker::run_stream::<I, O, _>(socket)? {
+            match self.run_stream::<Self, I, O, _>(socket)? {
                 State::Finished => break,
                 State::Continue => {}
             }
@@ -82,6 +85,8 @@ impl Worker {
         Ok(())
     }
 }
+
+impl Worker for StatelessWorker {}
 
 #[cfg(test)]
 mod tests {
@@ -138,8 +143,8 @@ mod tests {
     #[derive(Serialize, Deserialize, Debug)]
     struct Count(usize);
 
-    impl Map<Count> for MockJob {
-        fn map(self) -> Count {
+    impl Map<StatelessWorker, Count> for MockJob {
+        fn map(self, _worker: &StatelessWorker) -> Count {
             Count(self.contents.into_iter().filter(|d| *d == 0).count())
         }
     }
@@ -150,7 +155,9 @@ mod tests {
         let job = bincode::serialize(&Task::Job(MockJob { contents })).unwrap();
 
         let mut stream = MockTcpStream::new(job);
-        Worker::run_stream::<MockJob, _, _>(&mut stream).expect("worker failed");
+        StatelessWorker::default()
+            .run_stream::<StatelessWorker, MockJob, _, _>(&mut stream)
+            .expect("worker failed");
 
         let result_bytes = &stream.result[..stream.result.len() - END_OF_MESSAGE.len()];
         let res: Count = bincode::deserialize(result_bytes).unwrap();

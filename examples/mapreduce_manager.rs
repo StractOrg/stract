@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use cuely::mapreduce::{Map, MapReduce, Reduce};
+use cuely::mapreduce::{Map, MapReduce, Reduce, StatelessWorker};
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -13,8 +13,8 @@ struct Job {
 #[derive(Serialize, Deserialize, Debug)]
 struct Count(usize);
 
-impl Map<Count> for Job {
-    fn map(self) -> Count {
+impl Map<StatelessWorker, Count> for Job {
+    fn map(self, _worker: &StatelessWorker) -> Count {
         std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
         Count(1)
     }

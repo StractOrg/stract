@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use clap::Parser;
-use cuely::entrypoint::{Indexer, WebgraphEntrypoint};
+use cuely::entrypoint::{CentralityEntrypoint, Indexer, WebgraphEntrypoint};
 use cuely::Config;
 use std::fs;
 use tracing::Level;
@@ -40,12 +40,14 @@ fn main() {
 
     match config {
         Config::Indexer(config) => {
-            Indexer::from(config)
+            Indexer::new(config, args.mapreduce_worker_addr)
                 .run()
                 .expect("Failed to index documents");
         }
         Config::Webgraph(config) => WebgraphEntrypoint::new(config, args.mapreduce_worker_addr)
             .run()
             .expect("Failed to build webgraph"),
+
+        Config::Centrality(config) => CentralityEntrypoint::from(config).run(),
     }
 }

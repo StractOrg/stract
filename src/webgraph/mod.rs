@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod sled_store;
 
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
@@ -35,7 +36,7 @@ struct StoredEdge {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Node {
-    name: String,
+    pub name: String,
 }
 
 impl Node {
@@ -102,11 +103,11 @@ impl<'a> Iterator for EdgeIterator<'a> {
 }
 
 pub struct NodeIterator<'a> {
-    inner: Box<dyn Iterator<Item = NodeID> + 'a>,
+    inner: Box<dyn Iterator<Item = NodeID> + 'a + Send>,
 }
 
 impl<'a> NodeIterator<'a> {
-    fn from<T: 'a + Iterator<Item = NodeID>>(iterator: T) -> NodeIterator<'a> {
+    fn from<T: 'a + Iterator<Item = NodeID> + Send>(iterator: T) -> NodeIterator<'a> {
         NodeIterator {
             inner: Box::new(iterator),
         }
@@ -171,7 +172,7 @@ impl WebgraphBuilder {
 }
 
 pub struct Webgraph<S: GraphStore = SledStore> {
-    path: String,
+    pub path: String,
     full_graph: Option<S>,
     host_graph: Option<S>,
 }
@@ -338,21 +339,26 @@ impl<S: GraphStore> Webgraph<S> {
     where
         F: Fn(Node) -> HashMap<NodeID, usize>,
     {
-        let norm_factor = (graph.nodes().count() - 1) as f64;
-        graph
-            .nodes()
-            .into_iter()
+        let nodes: Vec<_> = graph.nodes().collect();
+        let pb = ProgressBar::new(nodes.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
+                )
+                .progress_chars("#>-"),
+        );
+        let norm_factor = (nodes.len() - 1) as f64;
+        nodes
+            .iter()
+            .progress_with(pb)
             .map(|node_id| {
-                let node = graph.id2node(&node_id).expect("unknown node");
-                let mut centrality_values: HashMap<NodeID, f64> = node_distances(node.clone())
+                let node = graph.id2node(node_id).expect("unknown node");
+                let centrality_values: HashMap<NodeID, f64> = node_distances(node.clone())
                     .into_iter()
-                    .filter(|(other_id, _)| *other_id != node_id)
+                    .filter(|(other_id, _)| *other_id != *node_id)
                     .map(|(other_node, dist)| (other_node, 1f64 / dist as f64))
                     .collect();
-
-                for other_id in graph.nodes() {
-                    centrality_values.entry(other_id).or_insert(0f64);
-                }
 
                 let centrality = centrality_values
                     .into_iter()

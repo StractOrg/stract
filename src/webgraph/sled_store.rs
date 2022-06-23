@@ -192,19 +192,19 @@ impl SledStore {
         Self {
             adjacency: RefCell::new(Adjacency {
                 tree: BlockedCachedTree {
-                    inner: CachedTree::new(&db, "adjacency", 100),
+                    inner: CachedTree::new(&db, "adjacency", 10_000),
                     block_size: 1_024,
                 },
             }),
             reversed_adjacency: RefCell::new(Adjacency {
                 tree: BlockedCachedTree {
-                    inner: CachedTree::new(&db, "reversed_adjacency", 100),
+                    inner: CachedTree::new(&db, "reversed_adjacency", 10_000),
                     block_size: 1_024,
                 },
             }),
-            node2id: RefCell::new(CachedTree::new(&db, "node2id", 1_000)),
+            node2id: RefCell::new(CachedTree::new(&db, "node2id", 100_000)),
             id2node: RefCell::new(BlockedCachedTree {
-                inner: CachedTree::new(&db, "id2node", 1_000),
+                inner: CachedTree::new(&db, "id2node", 100_000),
                 block_size: 1_024,
             }),
             meta: RefCell::new(CachedTree::new(&db, "meta", 1_000)),

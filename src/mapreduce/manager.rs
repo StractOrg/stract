@@ -1,4 +1,4 @@
-use super::{Error, Result};
+use super::{Error, Result, Worker};
 use super::{Map, Reduce};
 use crate::exponential_backoff::ExponentialBackoff;
 use crate::mapreduce::Task;
@@ -43,9 +43,10 @@ impl RemoteWorker {
         Err(Error::NoResponse)
     }
 
-    fn perform<I, O>(&self, job: &I) -> Result<O>
+    fn perform<W, I, O>(&self, job: &I) -> Result<O>
     where
-        I: Map<O> + Send,
+        W: Worker,
+        I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
         let mut stream = self.connect()?;
@@ -77,9 +78,10 @@ impl RemoteWorker {
         Ok(bincode::deserialize(&bytes)?)
     }
 
-    fn stop<I, O>(&self) -> Result<()>
+    fn stop<W, I, O>(&self) -> Result<()>
     where
-        I: Map<O> + Send,
+        W: Worker,
+        I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
         debug!("closing worker {:}", self.addr);
@@ -174,14 +176,15 @@ impl WorkerPool {
         }
     }
 
-    fn stop_workers<I, O>(&self)
+    fn stop_workers<W, I, O>(&self)
     where
-        I: Map<O> + Send,
+        W: Worker,
+        I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
         let mut failing_workers = Vec::new();
         for worker in &self.all_workers {
-            if worker.stop::<I, O>().is_err() {
+            if worker.stop::<W, I, O>().is_err() {
                 failing_workers.push(worker)
             }
         }
@@ -209,9 +212,10 @@ impl Manager {
         }
     }
 
-    fn try_map<I, O>(&self, job: &I) -> Result<O>
+    fn try_map<W, I, O>(&self, job: &I) -> Result<O>
     where
-        I: Map<O> + Send,
+        W: Worker,
+        I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
         loop {
@@ -229,9 +233,10 @@ impl Manager {
 
     /// Execute job on one of the remote machines. If the remote machine fails for some reason,
     /// the job should be allocated to another machine.
-    pub fn map<I, O>(&self, job: I) -> O
+    pub fn map<W, I, O>(&self, job: I) -> O
     where
-        I: Map<O> + Send,
+        W: Worker,
+        I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
         loop {
@@ -266,9 +271,10 @@ impl Manager {
         }
     }
 
-    fn get_results<I, O1, O2>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
+    fn get_results<W, I, O1, O2>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
-        I: Map<O1> + Send,
+        W: Worker,
+        I: Map<W, O1> + Send,
         O1: Serialize + DeserializeOwned + Send,
         O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
@@ -287,7 +293,7 @@ impl Manager {
                 .progress_chars("#>-"),
         );
                 jobs.par_bridge()
-                    .map(|job| self.map::<I, O1>(job))
+                    .map(|job| self.map::<W, I, O1>(job))
                     .progress_with(pb)
                     .fold(
                         || None,
@@ -302,7 +308,7 @@ impl Manager {
             }
             None => {
                 jobs.par_bridge()
-                    .map(|job| self.map::<I, O1>(job))
+                    .map(|job| self.map::<W, I, O1>(job))
                     .fold(
                         || None,
                         |acc: Option<O2>, elem| Some(Manager::reduce(acc, elem)),
@@ -320,14 +326,15 @@ impl Manager {
         x
     }
 
-    pub fn run<I, O1, O2>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
+    pub fn run<W, I, O1, O2>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
-        I: Map<O1> + Send,
+        W: Worker,
+        I: Map<W, O1> + Send,
         O1: Serialize + DeserializeOwned + Send,
         O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
         let result = self.get_results(jobs);
-        self.pool.stop_workers::<I, O1>();
+        self.pool.stop_workers::<W, I, O1>();
 
         result
     }

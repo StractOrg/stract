@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    mapreduce::{Map, MapReduce, Reduce, Worker},
+    mapreduce::{Map, MapReduce, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{FrozenWebgraph, Node, Webgraph, WebgraphBuilder},
     webpage::{self, Html},
@@ -38,8 +38,8 @@ struct Job {
     graph_base_path: String,
 }
 
-impl Map<FrozenWebgraph> for Job {
-    fn map(self) -> FrozenWebgraph {
+impl Map<StatelessWorker, FrozenWebgraph> for Job {
+    fn map(self, _worker: &StatelessWorker) -> FrozenWebgraph {
         let name = self.warc_path.split('/').last().unwrap();
 
         info!("processing {}", name);
@@ -102,7 +102,11 @@ impl Reduce<FrozenWebgraph> for Webgraph {
 
 impl Reduce<Webgraph> for Webgraph {
     fn reduce(mut self, element: Webgraph) -> Self {
+        let other_path = element.path.clone();
+
         self.merge(element);
+
+        std::fs::remove_dir_all(other_path).unwrap();
         self
     }
 }
@@ -160,7 +164,7 @@ impl WebgraphEntrypoint {
     }
 
     fn run_worker(worker_addr: String) -> Result<()> {
-        Worker::run::<Job, FrozenWebgraph>(
+        StatelessWorker::default().run::<Job, FrozenWebgraph>(
             worker_addr
                 .parse::<SocketAddr>()
                 .expect("Could not parse worker address"),
@@ -176,6 +180,7 @@ impl WebgraphEntrypoint {
             WarcSource::HTTP(config) => JobConfig::Http(config),
             WarcSource::Local(config) => JobConfig::Local(config),
         };
+        let worker = StatelessWorker::default();
 
         warc_paths
             .into_iter()
@@ -184,7 +189,7 @@ impl WebgraphEntrypoint {
                 warc_path: path,
                 graph_base_path: "webgraph".to_string(),
             })
-            .map(|job| job.map())
+            .map(|job| job.map(&worker))
             .fold(
                 None,
                 |acc: Option<Webgraph>, elem: FrozenWebgraph| match acc {
