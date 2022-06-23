@@ -19,21 +19,11 @@ use crate::{
     webgraph::{FrozenWebgraph, Node, Webgraph, WebgraphBuilder},
     webpage::{self, Html},
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
-    WebgraphMasterConfig, WebgraphWorkerConfig,
+    WebgraphMasterConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
-use tracing::{debug, info};
-
-pub struct WebgraphEntrypoint {
-    config: WebgraphConfig,
-}
-
-impl From<WebgraphConfig> for WebgraphEntrypoint {
-    fn from(config: WebgraphConfig) -> Self {
-        Self { config }
-    }
-}
+use tracing::{debug, info, trace};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 enum JobConfig {
@@ -45,6 +35,7 @@ enum JobConfig {
 struct Job {
     config: JobConfig,
     warc_path: String,
+    graph_base_path: String,
 }
 
 impl Map<FrozenWebgraph> for Job {
@@ -53,7 +44,7 @@ impl Map<FrozenWebgraph> for Job {
 
         info!("processing {}", name);
 
-        let mut graph = WebgraphBuilder::new(Path::new("webgraph").join(name))
+        let mut graph = WebgraphBuilder::new(Path::new(&self.graph_base_path).join(name))
             .with_host_graph()
             .open();
 
@@ -77,7 +68,7 @@ impl Map<FrozenWebgraph> for Job {
                 })
                 .filter(|link| webpage::domain(&link.source) != webpage::domain(&link.destination))
             {
-                debug!("inserting link {:?}", link);
+                trace!("inserting link {:?}", link);
                 graph.insert(
                     Node::from(link.source),
                     Node::from(link.destination),
@@ -111,7 +102,18 @@ impl Reduce<FrozenWebgraph> for FrozenWebgraph {
     }
 }
 
+pub struct WebgraphEntrypoint {
+    config: WebgraphConfig,
+    worker_addr: Option<String>,
+}
+
 impl WebgraphEntrypoint {
+    pub fn new(config: WebgraphConfig, worker_addr: Option<String>) -> Self {
+        Self {
+            config,
+            worker_addr,
+        }
+    }
     fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         info!("Running master for webgraph construction");
 
@@ -129,21 +131,35 @@ impl WebgraphEntrypoint {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
+        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> =
+            Box::new(warc_paths.into_iter().map(|warc_path| {
+                Job {
+                    config: job_config.clone(),
+                    warc_path,
+                    graph_base_path: config
+                        .graph_base_path
+                        .clone()
+                        .unwrap_or_else(|| "webgraph".to_string()),
+                }
+            }));
+
+        if let Some(limit) = config.limit_warc_files {
+            warc_paths = Box::new(warc_paths.take(limit));
+        }
+
         warc_paths
-            .into_iter()
-            .take(15)
-            .map(|warc_path| Job {
-                config: job_config.clone(),
-                warc_path,
-            })
             .map_reduce(&workers)
             .expect("failed to build webgraph");
 
         Ok(())
     }
 
-    fn run_worker(config: &WebgraphWorkerConfig) -> Result<()> {
-        Worker::run::<Job, FrozenWebgraph>(config.addr.parse::<SocketAddr>().unwrap())?;
+    fn run_worker(worker_addr: String) -> Result<()> {
+        Worker::run::<Job, FrozenWebgraph>(
+            worker_addr
+                .parse::<SocketAddr>()
+                .expect("Could not parse worker address"),
+        )?;
         Ok(())
     }
 
@@ -161,6 +177,7 @@ impl WebgraphEntrypoint {
             .map(|path| Job {
                 config: job_config.clone(),
                 warc_path: path,
+                graph_base_path: "webgraph".to_string(),
             })
             .map(|job| job.map())
             .fold(None, |acc: Option<FrozenWebgraph>, elem| match acc {
@@ -174,7 +191,11 @@ impl WebgraphEntrypoint {
     pub fn run(&self) -> Result<()> {
         match &self.config {
             WebgraphConfig::Master(config) => WebgraphEntrypoint::run_master(config),
-            WebgraphConfig::Worker(config) => WebgraphEntrypoint::run_worker(config),
+            WebgraphConfig::Worker => WebgraphEntrypoint::run_worker(
+                self.worker_addr
+                    .clone()
+                    .expect("Worker address not specified"),
+            ),
             WebgraphConfig::Local(config) => WebgraphEntrypoint::run_locally(config),
         }
     }
