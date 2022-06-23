@@ -18,8 +18,7 @@ pub mod sled_store;
 use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 
 pub use sled_store::SledStore;
 
@@ -27,33 +26,6 @@ use crate::directory::{self, DirEntry};
 use crate::webpage;
 
 type NodeID = u64;
-
-// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-#[allow(unused)]
-fn gen_temp_path() -> PathBuf {
-    use std::time::SystemTime;
-
-    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
-
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        << 48;
-
-    let pid = u128::from(std::process::id());
-
-    let salt = (pid << 16) + now + seed;
-
-    if cfg!(target_os = "linux") {
-        // use shared memory for temporary linux files
-        format!("/dev/shm/pagecache.tmp.{}", salt).into()
-    } else {
-        std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct StoredEdge {
@@ -165,6 +137,8 @@ pub struct WebgraphBuilder {
 impl WebgraphBuilder {
     #[cfg(test)]
     pub fn new_memory() -> Self {
+        use crate::gen_temp_path;
+
         let path = gen_temp_path();
         Self::new(path)
     }

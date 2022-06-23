@@ -174,7 +174,7 @@ pub struct SledStore {
 impl SledStore {
     #[cfg(test)]
     pub(crate) fn temporary() -> Self {
-        Self::open(super::gen_temp_path())
+        Self::open(crate::gen_temp_path())
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Self {

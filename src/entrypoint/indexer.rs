@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use std::fs::File;
 use std::io::{self, BufRead};
 
@@ -41,18 +40,8 @@ impl From<IndexingConfig> for Indexer {
 
 impl Indexer {
     pub fn run(self) -> Result<()> {
-        let pb = ProgressBar::new(self.warc_paths.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
-                )
-                .progress_chars("#>-"),
-        );
-
         self.warc_paths
             .into_iter()
-            .progress_with(pb)
             .map(|warc_path| {
                 let source = self.config.warc_source.clone();
 
