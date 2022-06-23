@@ -90,7 +90,7 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: Score) -> f64 {
         let centrality = self.centrality_reader.get(doc);
         let navigational = self.navigational_score(&self.sorted_dedupped_terms, doc);
-        score as f64 + 1000.0 * centrality + 100.0 * navigational
+        score as f64 + 10_000.0 * centrality + 100.0 * navigational
     }
 }
 

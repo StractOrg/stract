@@ -43,12 +43,40 @@ pub mod webpage;
 pub enum Config {
     Indexer(IndexingConfig),
     Webgraph(WebgraphConfig),
+    Centrality(CentralityConfig),
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct IndexingConfig {
+pub struct CentralityConfig {
+    pub webgraph_path: String,
+    pub output_path: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "mode")]
+pub enum IndexingConfig {
+    Master(IndexingMasterConfig),
+    Worker(IndexingWorkerConfig),
+    Local(IndexingLocalConfig),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingMasterConfig {
+    limit_warc_files: Option<usize>,
     warc_source: WarcSource,
-    warc_paths_file: String,
+    workers: Vec<String>,
+    graph_base_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingWorkerConfig {
+    centrality_store_path: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingLocalConfig {
+    warc_source: WarcSource,
+    centrality_store_path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -29,7 +29,7 @@ use std::fs;
 use std::path::Path;
 
 pub struct Index {
-    path: String,
+    pub path: String,
     tantivy_index: tantivy::Index,
     writer: tantivy::IndexWriter,
     reader: tantivy::IndexReader,

@@ -13,55 +13,203 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::fs::File;
-use std::io::{self, BufRead};
+use std::net::SocketAddr;
+use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info, trace};
+
+use crate::index::{FrozenIndex, Index};
+use crate::mapreduce::{Map, MapReduce, Reduce, Worker};
+use crate::ranking::centrality_store::CentralityStore;
 use crate::warc::WarcFile;
-use crate::webpage::Html;
-use crate::{IndexingConfig, Result};
+use crate::webpage::{Html, Link, Webpage};
+use crate::{
+    HttpConfig, IndexingConfig, IndexingLocalConfig, IndexingMasterConfig, IndexingWorkerConfig,
+    LocalConfig, Result, WarcSource,
+};
 
 pub struct Indexer {
-    warc_paths: Vec<String>,
     config: IndexingConfig,
+    worker_addr: Option<String>,
 }
 
-impl From<IndexingConfig> for Indexer {
-    fn from(config: IndexingConfig) -> Self {
-        let file = File::open(&config.warc_paths_file).unwrap();
-        let mut warc_paths = Vec::new();
+#[derive(Debug, Serialize, Deserialize, Clone)]
+enum JobConfig {
+    Http(HttpConfig),
+    Local(LocalConfig),
+}
 
-        for line in io::BufReader::new(file).lines() {
-            warc_paths.push(line.unwrap());
+#[derive(Debug, Serialize, Deserialize)]
+struct Job {
+    config: JobConfig,
+    warc_path: String,
+    base_path: String,
+}
+
+struct IndexingWorker {
+    centrality_store: CentralityStore,
+}
+
+impl IndexingWorker {
+    fn new(centrality_store_path: String) -> Self {
+        Self {
+            centrality_store: CentralityStore::new(centrality_store_path),
         }
+    }
+}
 
-        Self { warc_paths, config }
+impl Worker for IndexingWorker {}
+
+impl Map<IndexingWorker, FrozenIndex> for Job {
+    fn map(self, worker: &IndexingWorker) -> FrozenIndex {
+        let name = self.warc_path.split('/').last().unwrap();
+
+        info!("processing {}", name);
+
+        let mut index = Index::open(Path::new(&self.base_path).join(name)).unwrap();
+
+        let source = match self.config {
+            JobConfig::Http(config) => WarcSource::HTTP(config),
+            JobConfig::Local(config) => WarcSource::Local(config),
+        };
+
+        debug!("downlooading warc file");
+        let file = WarcFile::download(source, &self.warc_path).unwrap();
+        debug!("finished downloading");
+
+        for record in file.records().flatten() {
+            let html = Html::parse(&record.response.body, &record.request.url);
+            let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
+            let centrality = worker.centrality_store.get(html.host()).unwrap_or_default();
+
+            trace!("inserting webpage: {:?}", html.url());
+
+            let webpage = Webpage {
+                html,
+                backlinks,
+                centrality,
+            };
+
+            if let Err(err) = index.insert(webpage) {
+                debug!("{:?}", err);
+            }
+        }
+        index.commit().unwrap();
+
+        info!("{} done", name);
+
+        index.into()
+    }
+}
+
+impl Reduce<FrozenIndex> for Index {
+    fn reduce(self, element: FrozenIndex) -> Self {
+        let other = element.into();
+
+        self.merge(other)
+    }
+}
+
+impl Reduce<Index> for Index {
+    fn reduce(self, element: Index) -> Self {
+        self.merge(element)
     }
 }
 
 impl Indexer {
-    pub fn run(self) -> Result<()> {
-        self.warc_paths
-            .into_iter()
-            .map(|warc_path| {
-                let source = self.config.warc_source.clone();
+    pub fn new(config: IndexingConfig, worker_addr: Option<String>) -> Self {
+        Self {
+            config,
+            worker_addr,
+        }
+    }
+    fn run_master(config: &IndexingMasterConfig) -> Result<()> {
+        info!("Running master for index construction");
 
-                WarcFile::download(source, &warc_path)
-            })
-            .map(|warc| {
-                if warc.is_err() {
-                    return;
-                }
-                let warc = warc.unwrap();
+        let warc_paths = config.warc_source.paths()?;
 
-                for record in warc.records().flatten() {
-                    let _webpage = Html::parse(&record.response.body, &record.request.url);
-                    // println!("TEST: {:?}", webpage.title());
-                    // println!();
+        let workers: Vec<SocketAddr> = config
+            .workers
+            .iter()
+            .map(|worker| worker.parse().unwrap())
+            .collect();
+
+        let job_config = match config.warc_source.clone() {
+            WarcSource::S3(_) => todo!("s3 not supported yet"),
+            WarcSource::HTTP(config) => JobConfig::Http(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
+        };
+
+        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> =
+            Box::new(warc_paths.into_iter().map(|warc_path| {
+                Job {
+                    config: job_config.clone(),
+                    warc_path,
+                    base_path: config
+                        .graph_base_path
+                        .clone()
+                        .unwrap_or_else(|| "index".to_string()),
                 }
-                // panic!();
-            })
-            .for_each(drop);
+            }));
+
+        if let Some(limit) = config.limit_warc_files {
+            warc_paths = Box::new(warc_paths.take(limit));
+        }
+
+        let _index: Index = warc_paths
+            .map_reduce(&workers)
+            .expect("failed to build index");
 
         Ok(())
+    }
+
+    fn run_worker(worker_addr: String, config: &IndexingWorkerConfig) -> Result<()> {
+        IndexingWorker::new(config.centrality_store_path.clone()).run::<Job, FrozenIndex>(
+            worker_addr
+                .parse::<SocketAddr>()
+                .expect("Could not parse worker address"),
+        )?;
+        Ok(())
+    }
+
+    fn run_locally(config: &IndexingLocalConfig) -> Result<()> {
+        let warc_paths = config.warc_source.paths()?;
+
+        let job_config = match config.warc_source.clone() {
+            WarcSource::S3(_) => todo!("s3 not supported yet"),
+            WarcSource::HTTP(config) => JobConfig::Http(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
+        };
+
+        let worker = IndexingWorker::new(config.centrality_store_path.clone());
+
+        warc_paths
+            .into_iter()
+            .map(|path| Job {
+                config: job_config.clone(),
+                warc_path: path,
+                base_path: "index".to_string(),
+            })
+            .map(|job| job.map(&worker))
+            .fold(None, |acc: Option<Index>, elem: FrozenIndex| match acc {
+                Some(acc) => Some(acc.reduce(elem)),
+                None => Some(elem.into()),
+            });
+
+        Ok(())
+    }
+
+    pub fn run(&self) -> Result<()> {
+        match &self.config {
+            IndexingConfig::Master(config) => Self::run_master(config),
+            IndexingConfig::Worker(config) => Self::run_worker(
+                self.worker_addr
+                    .clone()
+                    .expect("Worker address not specified"),
+                config,
+            ),
+            IndexingConfig::Local(config) => Self::run_locally(config),
+        }
     }
 }

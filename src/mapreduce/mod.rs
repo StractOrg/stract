@@ -22,6 +22,7 @@ mod worker;
 
 pub use manager::Manager;
 use thiserror::Error;
+pub use worker::StatelessWorker;
 pub use worker::Worker;
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -44,22 +45,24 @@ pub enum Error {
     NoResponse,
 }
 
-pub trait Map<T>
+pub trait Map<W, T>
 where
     Self: Serialize + DeserializeOwned + Send,
     T: Serialize + DeserializeOwned + Send,
+    W: Worker,
 {
-    fn map(self) -> T;
+    fn map(self, worker: &W) -> T;
 }
 
 pub trait Reduce<T> {
     fn reduce(self, element: T) -> Self;
 }
 
-pub trait MapReduce<I, O1, O2>
+pub trait MapReduce<W, I, O1, O2>
 where
     Self: Sized + Iterator<Item = I> + Send,
-    I: Map<O1>,
+    W: Worker,
+    I: Map<W, O1>,
     O1: Serialize + DeserializeOwned + Send,
     O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
 {
@@ -68,10 +71,11 @@ where
         manager.run(self)
     }
 }
-impl<I, O1, O2, T> MapReduce<I, O1, O2> for T
+impl<W, I, O1, O2, T> MapReduce<W, I, O1, O2> for T
 where
+    W: Worker,
     T: Iterator<Item = I> + Sized + Send,
-    I: Map<O1>,
+    I: Map<W, O1>,
     O1: Serialize + DeserializeOwned + Send,
     O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
 {
