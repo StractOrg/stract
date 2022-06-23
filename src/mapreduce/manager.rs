@@ -5,6 +5,8 @@ use crate::mapreduce::Task;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::io::{Read, Write};
 use std::net::ToSocketAddrs;
 use std::net::{SocketAddr, TcpStream};
@@ -44,7 +46,7 @@ impl RemoteWorker {
     fn perform<I, O>(&self, job: &I) -> Result<O>
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        O: Serialize + DeserializeOwned + Send,
     {
         let mut stream = self.connect()?;
         let serialized_job = bincode::serialize(&Task::Job(job))?;
@@ -78,7 +80,7 @@ impl RemoteWorker {
     fn stop<I, O>(&self) -> Result<()>
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        O: Serialize + DeserializeOwned + Send,
     {
         debug!("closing worker {:}", self.addr);
         let mut stream = self.connect()?;
@@ -175,7 +177,7 @@ impl WorkerPool {
     fn stop_workers<I, O>(&self)
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        O: Serialize + DeserializeOwned + Send,
     {
         let mut failing_workers = Vec::new();
         for worker in &self.all_workers {
@@ -210,7 +212,7 @@ impl Manager {
     fn try_map<I, O>(&self, job: &I) -> Result<O>
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        O: Serialize + DeserializeOwned + Send,
     {
         loop {
             match self.pool.get_worker()? {
@@ -230,7 +232,7 @@ impl Manager {
     pub fn map<I, O>(&self, job: I) -> O
     where
         I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        O: Serialize + DeserializeOwned + Send,
     {
         loop {
             match self.try_map(&job) {
@@ -243,19 +245,34 @@ impl Manager {
         }
     }
 
-    fn reduce<O: Reduce<O>>(acc: Option<O>, elem: O) -> O {
+    fn reduce<O1, O2>(acc: Option<O2>, elem: O1) -> O2
+    where
+        O1: Serialize + DeserializeOwned + Send,
+        O2: From<O1> + Reduce<O1> + Send,
+    {
+        match acc {
+            Some(acc) => acc.reduce(elem),
+            None => elem.into(),
+        }
+    }
+
+    fn reduce_end<O>(acc: Option<O>, elem: O) -> O
+    where
+        O: Reduce<O> + Send,
+    {
         match acc {
             Some(acc) => acc.reduce(elem),
             None => elem,
         }
     }
 
-    fn get_results<I, O>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
+    fn get_results<I, O1, O2>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
-        I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        I: Map<O1> + Send,
+        O1: Serialize + DeserializeOwned + Send,
+        O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
-        let acc = Arc::new(Mutex::new(None));
+        let acc: Arc<Mutex<Option<O2>>> = Arc::new(Mutex::new(None));
 
         let size = jobs.size_hint();
 
@@ -270,24 +287,30 @@ impl Manager {
                 .progress_chars("#>-"),
         );
                 jobs.par_bridge()
-                    .map(|job| self.map::<I, O>(job))
+                    .map(|job| self.map::<I, O1>(job))
                     .progress_with(pb)
-                    .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
+                    .fold(
+                        || None,
+                        |acc: Option<O2>, elem| Some(Manager::reduce(acc, elem)),
+                    )
                     .for_each(|res| {
                         if let Some(res) = res {
                             let mut lock = acc.lock().unwrap();
-                            *lock = Some(Manager::reduce(lock.take(), res));
+                            *lock = Some(Manager::reduce_end(lock.take(), res));
                         }
                     });
             }
             None => {
                 jobs.par_bridge()
-                    .map(|job| self.map::<I, O>(job))
-                    .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
+                    .map(|job| self.map::<I, O1>(job))
+                    .fold(
+                        || None,
+                        |acc: Option<O2>, elem| Some(Manager::reduce(acc, elem)),
+                    )
                     .for_each(|res| {
                         if let Some(res) = res {
                             let mut lock = acc.lock().unwrap();
-                            *lock = Some(Manager::reduce(lock.take(), res));
+                            *lock = Some(Manager::reduce_end(lock.take(), res));
                         }
                     });
             }
@@ -297,13 +320,14 @@ impl Manager {
         x
     }
 
-    pub fn run<I, O>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O>
+    pub fn run<I, O1, O2>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
-        I: Map<O> + Send,
-        O: Reduce<O> + Send,
+        I: Map<O1> + Send,
+        O1: Serialize + DeserializeOwned + Send,
+        O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
         let result = self.get_results(jobs);
-        self.pool.stop_workers::<I, O>();
+        self.pool.stop_workers::<I, O1>();
 
         result
     }

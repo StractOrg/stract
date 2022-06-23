@@ -83,10 +83,8 @@ impl Map<FrozenWebgraph> for Job {
     }
 }
 
-impl Reduce<FrozenWebgraph> for FrozenWebgraph {
-    fn reduce(self, other: FrozenWebgraph) -> FrozenWebgraph {
-        let mut graph: Webgraph = self.into();
-
+impl Reduce<FrozenWebgraph> for Webgraph {
+    fn reduce(mut self, other: FrozenWebgraph) -> Webgraph {
         let other_path = match &other.root {
             crate::directory::DirEntry::Folder { name, entries: _ } => name.clone(),
             crate::directory::DirEntry::File { name, content: _ } => name.clone(),
@@ -94,11 +92,18 @@ impl Reduce<FrozenWebgraph> for FrozenWebgraph {
 
         let other = other.into();
 
-        graph.merge(other);
+        self.merge(other);
 
         std::fs::remove_dir_all(other_path).unwrap();
 
-        graph.into()
+        self
+    }
+}
+
+impl Reduce<Webgraph> for Webgraph {
+    fn reduce(mut self, element: Webgraph) -> Self {
+        self.merge(element);
+        self
     }
 }
 
@@ -147,7 +152,7 @@ impl WebgraphEntrypoint {
             warc_paths = Box::new(warc_paths.take(limit));
         }
 
-        warc_paths
+        let _graph: Webgraph = warc_paths
             .map_reduce(&workers)
             .expect("failed to build webgraph");
 
@@ -180,10 +185,13 @@ impl WebgraphEntrypoint {
                 graph_base_path: "webgraph".to_string(),
             })
             .map(|job| job.map())
-            .fold(None, |acc: Option<FrozenWebgraph>, elem| match acc {
-                Some(acc) => Some(acc.reduce(elem)),
-                None => Some(elem),
-            });
+            .fold(
+                None,
+                |acc: Option<Webgraph>, elem: FrozenWebgraph| match acc {
+                    Some(acc) => Some(acc.reduce(elem)),
+                    None => Some(elem.into()),
+                },
+            );
 
         Ok(())
     }
