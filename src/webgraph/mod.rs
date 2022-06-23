@@ -237,7 +237,7 @@ impl<S: GraphStore> Webgraph<S> {
         let distances = Webgraph::<S>::dijkstra(
             source,
             |node_id| self.full_graph.outgoing_edges(node_id),
-            |edge| edge.to.clone(),
+            |edge| edge.to,
             &self.full_graph,
         );
 
@@ -251,7 +251,7 @@ impl<S: GraphStore> Webgraph<S> {
         Webgraph::<S>::dijkstra(
             source,
             |node| self.full_graph.ingoing_edges(node),
-            |edge| edge.from.clone(),
+            |edge| edge.from,
             &self.full_graph,
         )
     }
@@ -267,7 +267,7 @@ impl<S: GraphStore> Webgraph<S> {
         let distances = Webgraph::<S>::dijkstra(
             source,
             |node| self.host_graph.outgoing_edges(node),
-            |edge| edge.to.clone(),
+            |edge| edge.to,
             &self.host_graph,
         );
 
@@ -281,7 +281,7 @@ impl<S: GraphStore> Webgraph<S> {
         Webgraph::<S>::dijkstra(
             source,
             |node| self.host_graph.ingoing_edges(node),
-            |edge| edge.from.clone(),
+            |edge| edge.from,
             &self.host_graph,
         )
     }

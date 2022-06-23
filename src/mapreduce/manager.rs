@@ -1,17 +1,16 @@
+use super::{Error, Result};
+use super::{Map, Reduce};
+use crate::mapreduce::Task;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use rayon::iter::ParallelBridge;
+use rayon::prelude::*;
 use std::io::{Read, Write};
+use std::net::ToSocketAddrs;
 use std::net::{SocketAddr, TcpStream};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-use crate::mapreduce::Task;
-
-use super::{Error, Result};
-use super::{Map, Reduce};
-use rayon::iter::ParallelBridge;
-use rayon::prelude::*;
-use std::net::ToSocketAddrs;
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::{debug, warn};
 
@@ -258,15 +257,41 @@ impl Manager {
     {
         let acc = Arc::new(Mutex::new(None));
 
-        jobs.par_bridge()
-            .map(|job| self.map::<I, O>(job))
-            .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
-            .for_each(|res| {
-                if let Some(res) = res {
-                    let mut lock = acc.lock().unwrap();
-                    *lock = Some(Manager::reduce(lock.take(), res));
-                }
-            });
+        let size = jobs.size_hint();
+
+        match size.1 {
+            Some(size) => {
+                let pb = ProgressBar::new(size as u64);
+                pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
+                )
+                .progress_chars("#>-"),
+        );
+                jobs.par_bridge()
+                    .map(|job| self.map::<I, O>(job))
+                    .progress_with(pb)
+                    .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
+                    .for_each(|res| {
+                        if let Some(res) = res {
+                            let mut lock = acc.lock().unwrap();
+                            *lock = Some(Manager::reduce(lock.take(), res));
+                        }
+                    });
+            }
+            None => {
+                jobs.par_bridge()
+                    .map(|job| self.map::<I, O>(job))
+                    .fold(|| None, |acc, elem| Some(Manager::reduce(acc, elem)))
+                    .for_each(|res| {
+                        if let Some(res) = res {
+                            let mut lock = acc.lock().unwrap();
+                            *lock = Some(Manager::reduce(lock.take(), res));
+                        }
+                    });
+            }
+        }
 
         let x = acc.lock().unwrap().take();
         x

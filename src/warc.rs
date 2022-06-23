@@ -18,11 +18,9 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
-use tokio::io::AsyncReadExt;
+use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
-use rusoto_core::Region;
-use rusoto_s3::{GetObjectRequest, S3Client, S3};
 
 pub(crate) struct WarcFile {
     bytes: Vec<u8>,
@@ -68,20 +66,15 @@ impl WarcFile {
         }
     }
 
-    pub(crate) async fn download(source: WarcSource, path: &str) -> Result<Self> {
+    pub(crate) fn download(source: WarcSource, path: &str) -> Result<Self> {
         match source {
-            WarcSource::S3(config) => {
-                WarcFile::download_from_s3(
-                    path,
-                    config.name.clone(),
-                    config.endpoint.clone(),
-                    config.bucket.clone(),
-                )
-                .await
-            }
-            WarcSource::HTTP(config) => {
-                WarcFile::download_from_http(path, config.base_url.clone()).await
-            }
+            WarcSource::S3(config) => WarcFile::download_from_s3(
+                path,
+                config.name.clone(),
+                config.endpoint.clone(),
+                config.bucket,
+            ),
+            WarcSource::HTTP(config) => WarcFile::download_from_http(path, config.base_url),
             WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
         }
     }
@@ -96,51 +89,59 @@ impl WarcFile {
         Ok(WarcFile::new(bytes))
     }
 
-    async fn download_from_http(path: &str, base_url: String) -> Result<Self> {
+    fn download_from_http(path: &str, base_url: String) -> Result<Self> {
         let mut url = base_url;
         if !url.ends_with('/') {
             url += "/";
         }
         url += path;
 
-        let client = reqwest::Client::new();
-        let res = client.get(url).send().await?;
+        let client = reqwest::blocking::ClientBuilder::new()
+            .tcp_keepalive(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(300))
+            .pool_idle_timeout(Duration::from_secs(0))
+            .pool_max_idle_per_host(0)
+            .connection_verbose(true)
+            .build()?;
+        let res = client.get(url).send()?;
 
-        let bytes = Vec::from(&res.bytes().await?[..]);
+        let bytes = Vec::from(&res.bytes()?[..]);
 
         Ok(WarcFile::new(bytes))
     }
 
-    async fn download_from_s3(
-        path: &str,
-        region_name: String,
-        region_endpoint: String,
-        bucket: String,
+    fn download_from_s3(
+        _path: &str,
+        _region_name: String,
+        _region_endpoint: String,
+        _bucket: String,
     ) -> Result<Self> {
-        let path = path.to_string();
-        let region = Region::Custom {
-            name: region_name,
-            endpoint: region_endpoint,
-        };
+        todo!();
+        // let path = path.to_string();
+        // let region = Region::Custom {
+        //     name: region_name,
+        //     endpoint: region_endpoint,
+        // };
 
-        let client = S3Client::new(region);
+        // let client = S3Client::new(region);
 
-        let obj = client
-            .get_object(GetObjectRequest {
-                bucket,
-                key: path,
-                ..Default::default()
-            })
-            .await?;
+        // let obj = client
+        //     .get_object(GetObjectRequest {
+        //         bucket,
+        //         key: path,
+        //         ..Default::default()
+        //     })
+        //     .await?;
 
-        let mut bytes = Vec::new();
-        obj.body
-            .ok_or(Error::S3DownloadError)?
-            .into_async_read()
-            .read_to_end(&mut bytes)
-            .await?;
+        // let mut bytes = Vec::new();
+        // obj.body
+        //     .ok_or(Error::S3DownloadError)?
+        //     .into_async_read()
+        //     .read_to_end(&mut bytes)
+        //     .await?;
 
-        Ok(WarcFile::new(bytes))
+        // Ok(WarcFile::new(bytes))
     }
 }
 

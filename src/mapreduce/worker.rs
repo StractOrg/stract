@@ -85,13 +85,7 @@ impl Worker {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
     use serde::Deserialize;
-    use tokio::io::ReadBuf;
 
     use super::*;
 
@@ -114,9 +108,9 @@ mod tests {
     impl Read for MockTcpStream {
         fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
             if self.num_read == 0 {
-                buf.write_all(&self.contents[..]);
+                buf.write_all(&self.contents[..]).unwrap();
             } else if self.num_read == 1 {
-                buf.write_all(&END_OF_MESSAGE);
+                buf.write_all(&END_OF_MESSAGE).unwrap();
             }
 
             self.contents = Vec::new();
@@ -150,6 +144,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn execute() {
         let contents = vec![1, 2, 0, 1, 0, 1, 0];
         let job = bincode::serialize(&Task::Job(MockJob { contents })).unwrap();

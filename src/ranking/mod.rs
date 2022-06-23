@@ -42,15 +42,15 @@ impl Ranker {
 #[cfg(test)]
 mod tests {
     use crate::{
-        index::Index,
         searcher::Searcher,
+        tests::temporary_index,
         webpage::{Link, Webpage},
     };
 
     #[test]
     fn harmonic_ranking() {
         for _ in 0..10 {
-            let mut index = Index::temporary().expect("Unable to open index");
+            let mut index = temporary_index().expect("Unable to open index");
 
             index
                 .insert(Webpage::new(
@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn navigational_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
 
         index
             .insert(Webpage::new(

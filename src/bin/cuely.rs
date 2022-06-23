@@ -25,10 +25,9 @@ struct Args {
     config_file: String,
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -42,7 +41,6 @@ async fn main() {
         Config::Indexer(config) => {
             Indexer::from(config)
                 .run()
-                .await
                 .expect("Failed to index documents");
         }
         Config::Webgraph(config) => WebgraphBuilder::from(config)

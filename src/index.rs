@@ -17,40 +17,23 @@ use tantivy::collector::{Collector, Count};
 use tantivy::{DocAddress, Document, LeasedItem};
 
 use crate::query::Query;
-use crate::schema::{create_schema, Field, ALL_FIELDS};
+use crate::schema::{Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
 use crate::snippet;
-use crate::tokenizer::Tokenizer;
 use crate::webpage::Webpage;
 use crate::Result;
 use std::path::Path;
 
 pub struct Index {
-    tantivy_index: tantivy::Index,
-    writer: tantivy::IndexWriter,
-    reader: tantivy::IndexReader,
-    schema: tantivy::schema::Schema,
+    pub(crate) tantivy_index: tantivy::Index,
+    pub(crate) writer: tantivy::IndexWriter,
+    pub(crate) reader: tantivy::IndexReader,
+    pub(crate) schema: tantivy::schema::Schema,
 }
 
 impl Index {
     pub fn open<P: AsRef<Path>>(_path: P) -> Result<Self> {
         todo!();
-    }
-
-    pub(crate) fn temporary() -> Result<Self> {
-        let schema = create_schema();
-        let tantivy_index = tantivy::Index::create_in_ram(schema);
-
-        tantivy_index
-            .tokenizers()
-            .register("tokenizer", Tokenizer::default());
-
-        Ok(Self {
-            writer: tantivy_index.writer(100_000_000)?,
-            reader: tantivy_index.reader()?,
-            schema: create_schema(),
-            tantivy_index,
-        })
     }
 
     pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
@@ -146,13 +129,14 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
+    use crate::tests::temporary_index;
     use crate::{ranking::Ranker, webpage::Link};
 
     use super::*;
 
     #[test]
     fn simple_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("website").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -188,7 +172,7 @@ mod tests {
 
     #[test]
     fn document_not_matching() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("this query should not match").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -217,7 +201,7 @@ mod tests {
 
     #[test]
     fn english_stemming() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("runner").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -246,7 +230,7 @@ mod tests {
 
     #[test]
     fn stemmed_query_english() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("runners").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -275,7 +259,7 @@ mod tests {
 
     #[test]
     fn searchable_backlinks() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("great site").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -330,7 +314,7 @@ mod tests {
 
     #[test]
     fn limited_top_docs() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("runner").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -361,7 +345,7 @@ mod tests {
 
     #[test]
     fn host_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = temporary_index().expect("Unable to open index");
         let query = Query::parse("dr").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 

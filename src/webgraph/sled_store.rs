@@ -98,9 +98,7 @@ where
     fn new(db: &sled::Db, name: &str, cache_size: usize) -> Self {
         let name = name.to_string();
 
-        let store = db
-            .open_tree(name.clone())
-            .expect("unable to open sled tree");
+        let store = db.open_tree(name).expect("unable to open sled tree");
 
         Self {
             store,
