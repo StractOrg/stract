@@ -110,7 +110,7 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
         tokens.sort_by(|a, b| {
             a.offset_from
                 .partial_cmp(&b.offset_from)
-                .unwrap_or(a.offset_to.cmp(&b.offset_to))
+                .unwrap_or_else(|| a.offset_to.cmp(&b.offset_to))
         });
 
         tantivy::tokenizer::BoxTokenStream::from(PreTokenizedStream::from(PreTokenizedString {

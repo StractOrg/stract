@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use futures::prelude::*;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -41,7 +40,7 @@ impl From<IndexingConfig> for Indexer {
 }
 
 impl Indexer {
-    pub async fn run(self) -> Result<()> {
+    pub fn run(self) -> Result<()> {
         let pb = ProgressBar::new(self.warc_paths.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -51,36 +50,28 @@ impl Indexer {
                 .progress_chars("#>-"),
         );
 
-        stream::iter(self.warc_paths.into_iter().progress_with(pb))
+        self.warc_paths
+            .into_iter()
+            .progress_with(pb)
             .map(|warc_path| {
                 let source = self.config.warc_source.clone();
 
-                tokio::spawn(async move { WarcFile::download(source, &warc_path).await })
+                WarcFile::download(source, &warc_path)
             })
-            .buffer_unordered(20)
             .map(|warc| {
-                tokio::task::spawn_blocking(move || {
-                    if warc.is_err() {
-                        return;
-                    }
-                    let warc = warc.unwrap();
+                if warc.is_err() {
+                    return;
+                }
+                let warc = warc.unwrap();
 
-                    if warc.is_err() {
-                        return;
-                    }
-                    let warc = warc.unwrap();
-
-                    for record in warc.records().flatten() {
-                        let _webpage = Html::parse(&record.response.body, &record.request.url);
-                        // println!("TEST: {:?}", webpage.title());
-                        // println!();
-                    }
-                    // panic!();
-                })
+                for record in warc.records().flatten() {
+                    let _webpage = Html::parse(&record.response.body, &record.request.url);
+                    // println!("TEST: {:?}", webpage.title());
+                    // println!();
+                }
+                // panic!();
             })
-            .buffer_unordered(20)
-            .collect::<Vec<_>>()
-            .await;
+            .for_each(drop);
 
         Ok(())
     }

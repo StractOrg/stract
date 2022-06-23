@@ -27,14 +27,14 @@ pub mod mapreduce;
 
 mod directory;
 mod query;
-mod ranking;
+pub mod ranking;
 mod schema;
-mod searcher;
+pub mod searcher;
 mod snippet;
 mod tokenizer;
 mod warc;
-mod webgraph;
-mod webpage;
+pub mod webgraph;
+pub mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
@@ -166,3 +166,25 @@ pub enum Error {
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::{index::Index, schema::create_schema, tokenizer::Tokenizer};
+
+    pub fn temporary_index() -> Result<Index> {
+        let schema = create_schema();
+        let tantivy_index = tantivy::Index::create_in_ram(schema);
+
+        tantivy_index
+            .tokenizers()
+            .register("tokenizer", Tokenizer::default());
+
+        Ok(Index {
+            writer: tantivy_index.writer(100_000_000)?,
+            reader: tantivy_index.reader()?,
+            schema: create_schema(),
+            tantivy_index,
+        })
+    }
+}

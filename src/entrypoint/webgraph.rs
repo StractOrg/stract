@@ -21,7 +21,6 @@ use crate::{
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphConfig, WebgraphLocalConfig,
     WebgraphMasterConfig, WebgraphWorkerConfig,
 };
-use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
 use tracing::{debug, info};
@@ -61,8 +60,9 @@ impl Map<FrozenWebgraph> for Job {
             JobConfig::Local(config) => WarcSource::Local(config),
         };
 
-        let file =
-            futures::executor::block_on(WarcFile::download(source, &self.warc_path)).unwrap();
+        debug!("downlooading warc file");
+        let file = WarcFile::download(source, &self.warc_path).unwrap();
+        debug!("finished downloading");
 
         for record in file.records().flatten() {
             let webpage = Html::parse(&record.response.body, &record.request.url);
@@ -127,18 +127,9 @@ impl WebgraphBuilder {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
-        let pb = ProgressBar::new(warc_paths.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
-                )
-                .progress_chars("#>-"),
-        );
-
         warc_paths
             .into_iter()
-            .take(10)
+            .take(15)
             .map(|warc_path| Job {
                 config: job_config.clone(),
                 warc_path,

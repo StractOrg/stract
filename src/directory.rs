@@ -77,18 +77,3 @@ pub fn scan_folder(path: String) -> Result<DirEntry> {
         name: path,
     })
 }
-
-pub fn serialize(path: String) -> Result<Vec<u8>> {
-    let folder = scan_folder(path)?;
-    Ok(bincode::serialize(&folder)?)
-}
-
-pub fn deserialize(bytes: &[u8]) -> Result<String> {
-    let entry = bincode::deserialize(bytes)?;
-    recreate_folder(&entry)?;
-
-    match entry {
-        DirEntry::Folder { name, entries: _ } => Ok(name),
-        DirEntry::File { name, content: _ } => Ok(name),
-    }
-}
