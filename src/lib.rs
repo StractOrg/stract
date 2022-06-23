@@ -26,6 +26,7 @@ pub mod index;
 pub mod mapreduce;
 
 mod directory;
+mod exponential_backoff;
 mod query;
 pub mod ranking;
 mod schema;
@@ -132,7 +133,7 @@ pub enum Error {
     S3DownloadError,
 
     #[error("Failed to download object from HTTP")]
-    HTTPDownloadERror(#[from] reqwest::Error),
+    HTTPDownloadError(#[from] reqwest::Error),
 
     #[error("Failed to get the object from S3")]
     GetObjectError(#[from] rusoto_core::RusotoError<rusoto_s3::GetObjectError>),
@@ -163,6 +164,9 @@ pub enum Error {
 
     #[error("Error executing distributed jobs")]
     MapReduce(#[from] mapreduce::Error),
+
+    #[error("Failed to download warc files after all retries")]
+    DownloadFailed,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
