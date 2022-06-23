@@ -54,19 +54,16 @@ pub struct IndexingConfig {
 #[serde(tag = "mode")]
 pub enum WebgraphConfig {
     Master(WebgraphMasterConfig),
-    Worker(WebgraphWorkerConfig),
+    Worker,
     Local(WebgraphLocalConfig),
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphMasterConfig {
+    limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     workers: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct WebgraphWorkerConfig {
-    addr: String,
+    graph_base_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

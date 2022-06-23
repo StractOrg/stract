@@ -23,11 +23,12 @@ use tracing_subscriber::FmtSubscriber;
 #[derive(Parser, Debug)]
 struct Args {
     config_file: String,
+    mapreduce_worker_addr: Option<String>,
 }
 
 fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -43,7 +44,7 @@ fn main() {
                 .run()
                 .expect("Failed to index documents");
         }
-        Config::Webgraph(config) => WebgraphEntrypoint::from(config)
+        Config::Webgraph(config) => WebgraphEntrypoint::new(config, args.mapreduce_worker_addr)
             .run()
             .expect("Failed to build webgraph"),
     }
