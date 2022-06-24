@@ -1,7 +1,5 @@
 /target
 /Cargo.lock
+.DS_Store
 flamegraph.svg
-warc_files/
-webgraph
-centrality
-index
+data

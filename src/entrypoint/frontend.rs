@@ -14,8 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::index::Index;
+use anyhow::Result;
 
-pub struct Server {
-    pub index: Index,
+use crate::frontend::router;
+
+pub async fn run(index_path: &str, host: &str) -> Result<()> {
+    let app = router(index_path)?;
+    let addr = host.parse()?;
+    tracing::info!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
 }

@@ -38,9 +38,6 @@ pub enum Error {
     #[error("could not get a working worker")]
     NoAvailableWorker,
 
-    #[error("failed to get value from channel")]
-    ChannelRecv(#[from] async_channel::RecvError),
-
     #[error("did not get a reponse")]
     NoResponse,
 }

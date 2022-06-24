@@ -1,3 +1,0 @@
-type = "Indexer"
-mode = "Worker"
-centrality_store_path = "centrality"

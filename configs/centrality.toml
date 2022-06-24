@@ -1,3 +1,0 @@
-type = "Centrality"
-webgraph_path = "webgraph"
-output_path = "centrality"

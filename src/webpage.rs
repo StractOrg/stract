@@ -210,7 +210,7 @@ impl<'a> Html<'a> {
             .collect::<Vec<String>>()
     }
 
-    pub fn text(&self) -> String {
+    pub fn text(&self) -> Option<String> {
         let strings: Vec<String> = match &self.dom {
             Dom::ScraperHtml(dom) => {
                 let selectors = vec![
@@ -249,10 +249,19 @@ impl<'a> Html<'a> {
                 .unwrap_or_default(),
         };
 
-        Itertools::intersperse(strings.into_iter(), "\n".to_string())
-            .collect::<String>()
-            .trim()
-            .to_string()
+        let s = Itertools::intersperse(
+            strings.into_iter().filter(|s| !s.is_empty()),
+            "\n".to_string(),
+        )
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     }
 
     fn children_text(children: Children, parser: &tl::Parser) -> Vec<String> {
@@ -371,7 +380,13 @@ impl<'a> Html<'a> {
 
                     doc.add_text(tantivy_field, self.title().unwrap())
                 }
-                Field::Body => doc.add_text(tantivy_field, self.text()),
+                Field::Body => {
+                    let text = self.text();
+                    if text.is_none() {
+                        return Err(Error::EmptyField("body"));
+                    }
+                    doc.add_text(tantivy_field, text.unwrap())
+                }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
                 Field::FastUrl => doc.add_bytes(
                     tantivy_field,
@@ -424,7 +439,10 @@ mod tests {
                 text: "Best example website ever".to_string()
             }]
         );
-        assert_eq!(&webpage.text(), "Best example website ever");
+        assert_eq!(
+            webpage.text(),
+            Some("Best example website ever".to_string())
+        );
         assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         let mut expected_meta = BTreeMap::new();
@@ -449,7 +467,7 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com/whatever");
 
-        assert_eq!(&webpage.text(), "test website");
+        assert_eq!(webpage.text(), Some("test website".to_string()));
     }
 
     #[test]
@@ -475,7 +493,7 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com");
 
-        assert!(!webpage.text().contains("not"));
+        assert!(!webpage.text().unwrap().contains("not"));
     }
 
     #[test]
@@ -501,7 +519,7 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com");
 
-        assert!(!webpage.text().contains("not"));
+        assert!(!webpage.text().unwrap().contains("not"));
     }
 
     #[test]

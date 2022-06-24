@@ -14,27 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilder, CentralityConfig,
-};
+use std::path::Path;
 
-pub struct CentralityEntrypoint {
-    config: CentralityConfig,
-}
+use crate::{ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilder};
 
-impl From<CentralityConfig> for CentralityEntrypoint {
-    fn from(config: CentralityConfig) -> Self {
-        Self { config }
-    }
-}
+pub struct CentralityEntrypoint {}
 
 impl CentralityEntrypoint {
-    pub fn run(self) {
-        let graph = WebgraphBuilder::new(&self.config.webgraph_path)
-            .with_host_graph()
-            .open();
+    pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
+        let graph = WebgraphBuilder::new(webgraph_path).with_host_graph().open();
 
-        let mut centrality_store = CentralityStore::new(&self.config.output_path);
+        let mut centrality_store = CentralityStore::new(output_path);
 
         centrality_store.append(
             graph
