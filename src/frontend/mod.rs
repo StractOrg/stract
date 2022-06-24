@@ -14,15 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
-
 use axum::{Extension, Router};
 
-use crate::{
-    index::{Index, RetrievedWebpage},
-    server::Server,
-    Result, ServerConfig,
-};
+use crate::index::{Index, RetrievedWebpage};
+use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -36,38 +31,9 @@ use axum::{
     routing::get,
 };
 
-pub struct ServerEntrypoint {
-    config: ServerConfig,
-}
-
-impl From<ServerConfig> for ServerEntrypoint {
-    fn from(config: ServerConfig) -> Self {
-        Self { config }
-    }
-}
-
-impl ServerEntrypoint {
-    pub async fn run(self) -> Result<()> {
-        let search_index = Index::open(&self.config.index_path)?;
-        let state = Arc::new(Server {
-            index: search_index,
-        });
-
-        let app = Router::new().route("/", get(index)).layer(Extension(state));
-        let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-        tracing::debug!("listening on {}", addr);
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-
-        Ok(())
-    }
-}
-
 async fn index(
     extract::Query(params): extract::Query<HashMap<String, String>>,
-    Extension(state): Extension<Arc<Server>>,
+    Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let mut search_result = Vec::new();
 
@@ -80,7 +46,7 @@ async fn index(
             .search(&query, ranker.collector())
             .expect("Search failed");
 
-        search_result = result.documents;
+        search_result = dbg!(result.documents);
     }
 
     let template = IndexTemplate { search_result };
@@ -88,12 +54,16 @@ async fn index(
 }
 
 #[derive(Template)]
-#[template(path = "index.html")]
+#[template(path = "index.html", escape = "none")]
 struct IndexTemplate {
     search_result: Vec<RetrievedWebpage>,
 }
 
 struct HtmlTemplate<T>(T);
+
+pub struct State {
+    pub index: Index,
+}
 
 impl<T> IntoResponse for HtmlTemplate<T>
 where
@@ -109,4 +79,13 @@ where
                 .into_response(),
         }
     }
+}
+
+pub fn router(index_path: &str) -> Result<Router> {
+    let search_index = Index::open(index_path)?;
+    let state = Arc::new(State {
+        index: search_index,
+    });
+
+    Ok(Router::new().route("/", get(index)).layer(Extension(state)))
 }

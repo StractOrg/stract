@@ -25,14 +25,10 @@ use crate::ranking::centrality_store::CentralityStore;
 use crate::warc::WarcFile;
 use crate::webpage::{Html, Link, Webpage};
 use crate::{
-    HttpConfig, IndexingConfig, IndexingLocalConfig, IndexingMasterConfig, IndexingWorkerConfig,
-    LocalConfig, Result, WarcSource,
+    HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig, Result, WarcSource,
 };
 
-pub struct Indexer {
-    config: IndexingConfig,
-    worker_addr: Option<String>,
-}
+pub struct Indexer {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 enum JobConfig {
@@ -85,6 +81,9 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
 
             trace!("inserting webpage: {:?}", html.url());
 
+            trace!("title = {:?}", html.title());
+            trace!("text = {:?}", html.text());
+
             let webpage = Webpage {
                 html,
                 backlinks,
@@ -118,13 +117,7 @@ impl Reduce<Index> for Index {
 }
 
 impl Indexer {
-    pub fn new(config: IndexingConfig, worker_addr: Option<String>) -> Self {
-        Self {
-            config,
-            worker_addr,
-        }
-    }
-    fn run_master(config: &IndexingMasterConfig) -> Result<()> {
+    pub fn run_master(config: &IndexingMasterConfig) -> Result<()> {
         info!("Running master for index construction");
 
         let warc_paths = config.warc_source.paths()?;
@@ -147,9 +140,9 @@ impl Indexer {
                     config: job_config.clone(),
                     warc_path,
                     base_path: config
-                        .graph_base_path
+                        .index_base_path
                         .clone()
-                        .unwrap_or_else(|| "index".to_string()),
+                        .unwrap_or_else(|| "data/index".to_string()),
                 }
             }));
 
@@ -164,8 +157,8 @@ impl Indexer {
         Ok(())
     }
 
-    fn run_worker(worker_addr: String, config: &IndexingWorkerConfig) -> Result<()> {
-        IndexingWorker::new(config.centrality_store_path.clone()).run::<Job, FrozenIndex>(
+    pub fn run_worker(worker_addr: String, centrality_store_path: String) -> Result<()> {
+        IndexingWorker::new(centrality_store_path).run::<Job, FrozenIndex>(
             worker_addr
                 .parse::<SocketAddr>()
                 .expect("Could not parse worker address"),
@@ -173,7 +166,7 @@ impl Indexer {
         Ok(())
     }
 
-    fn run_locally(config: &IndexingLocalConfig) -> Result<()> {
+    pub fn run_locally(config: &IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
         let job_config = match config.warc_source.clone() {
@@ -189,7 +182,7 @@ impl Indexer {
             .map(|path| Job {
                 config: job_config.clone(),
                 warc_path: path,
-                base_path: "index".to_string(),
+                base_path: "data/index".to_string(),
             })
             .map(|job| job.map(&worker))
             .fold(None, |acc: Option<Index>, elem: FrozenIndex| match acc {
@@ -198,18 +191,5 @@ impl Indexer {
             });
 
         Ok(())
-    }
-
-    pub fn run(&self) -> Result<()> {
-        match &self.config {
-            IndexingConfig::Master(config) => Self::run_master(config),
-            IndexingConfig::Worker(config) => Self::run_worker(
-                self.worker_addr
-                    .clone()
-                    .expect("Worker address not specified"),
-                config,
-            ),
-            IndexingConfig::Local(config) => Self::run_locally(config),
-        }
     }
 }

@@ -146,13 +146,16 @@ impl Index {
             meta.segments.push(segment);
         }
 
+        meta.segments
+            .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
+
         fs::remove_dir_all(other_path).unwrap();
 
         let self_path = Path::new(&path);
 
         std::fs::write(
             self_path.join("meta.json"),
-            serde_json::to_string(&meta).unwrap(),
+            serde_json::to_string_pretty(&meta).unwrap(),
         )
         .unwrap();
 
@@ -262,6 +265,9 @@ mod tests {
                 <head>
                     <title>Test website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -292,6 +298,9 @@ mod tests {
                 <head>
                     <title>Test website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -321,6 +330,9 @@ mod tests {
                 <head>
                     <title>Website for runners</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -350,6 +362,9 @@ mod tests {
                 <head>
                     <title>Fast runner</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -394,6 +409,9 @@ mod tests {
                 <head>
                     <title>Website B</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.b.com",
@@ -435,6 +453,9 @@ mod tests {
                         <head>
                             <title>Website for runners</title>
                         </head>
+                <body>
+                    body
+                </body>
                     </html>
                     "#,
                     "https://www.example.com",
@@ -465,6 +486,9 @@ mod tests {
                 <head>
                     <title>News website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.dr.dk",
@@ -492,6 +516,9 @@ mod tests {
                 <head>
                     <title>Test website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -530,6 +557,9 @@ mod tests {
                 <head>
                     <title>Test website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -547,6 +577,9 @@ mod tests {
                 <head>
                     <title>Test website</title>
                 </head>
+                <body>
+                    body
+                </body>
             </html>
             "#,
                 "https://www.example.com",
@@ -555,7 +588,8 @@ mod tests {
             ))
             .expect("failed to parse webpage");
 
-        let index = index1.merge(index2);
+        let mut index = index1.merge(index2);
+        index.commit().unwrap();
 
         let query = Query::parse("website").expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());

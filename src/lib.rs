@@ -28,11 +28,11 @@ pub mod mapreduce;
 
 mod directory;
 mod exponential_backoff;
-mod query;
+mod frontend;
+pub mod query;
 pub mod ranking;
 mod schema;
 pub mod searcher;
-pub mod server;
 mod snippet;
 mod tokenizer;
 mod warc;
@@ -40,58 +40,17 @@ pub mod webgraph;
 pub mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum Config {
-    Indexer(IndexingConfig),
-    Webgraph(WebgraphConfig),
-    Centrality(CentralityConfig),
-    Server(ServerConfig),
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ServerConfig {
-    pub index_path: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct CentralityConfig {
-    pub webgraph_path: String,
-    pub output_path: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "mode")]
-pub enum IndexingConfig {
-    Master(IndexingMasterConfig),
-    Worker(IndexingWorkerConfig),
-    Local(IndexingLocalConfig),
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     workers: Vec<String>,
-    graph_base_path: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct IndexingWorkerConfig {
-    centrality_store_path: String,
+    index_base_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
     warc_source: WarcSource,
     centrality_store_path: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "mode")]
-pub enum WebgraphConfig {
-    Master(WebgraphMasterConfig),
-    Worker,
-    Local(WebgraphLocalConfig),
 }
 
 #[derive(Debug, Deserialize, Clone)]

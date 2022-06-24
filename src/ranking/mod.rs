@@ -34,7 +34,7 @@ impl Ranker {
         }
     }
 
-    pub(crate) fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
+    pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
         let score_tweaker = InitialScoreTweaker::new(self.query.clone());
         TopDocs::with_limit(20).tweak_score(score_tweaker)
     }
@@ -75,6 +75,9 @@ mod tests {
                             <head>
                                 <title>Website B</title>
                             </head>
+                            <body>
+                                body
+                            </body>
                         </html>
                     "#,
                     "https://www.b.com",
@@ -107,6 +110,9 @@ mod tests {
                         <head>
                             <title>DR Homepage</title>
                         </head>
+                        <body>
+                            body
+                        </body>
                     </html>
                 "#,
                 "https://www.dr.dk",
@@ -121,6 +127,9 @@ mod tests {
                         <head>
                             <title>Subsite dr</title>
                         </head>
+                        <body>
+                            body
+                        </body>
                     </html>
                 "#,
                 "https://www.dr.dk/whatever",
