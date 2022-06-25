@@ -3,3 +3,6 @@
 .DS_Store
 flamegraph.svg
 data
+static/**/*.css
+node_modules
+package-lock.json

@@ -1,0 +1,39 @@
+{% macro searchbar(autofocus) %}
+
+
+<style>
+    .searchbar {
+        border-color: #dadada;
+    }
+
+    .searchbar:hover {
+        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px,
+            rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+    }
+
+    .searchbar:focus-within {
+        border-width: 0px;
+        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px,
+            rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+    }
+</style>
+
+<form class="w-full md:max-w-2xl pl-1 pr-1 relative" method="GET" action="/search" autocomplete="off">
+    <div class="searchbar rounded-full h-12 flex flex-col relative bg-white border">
+        <div class="flex h-full">
+            <div class="flex ml-4 w-5 items-center">
+                <img class="h-5" loading="lazy" src="/static/images/search.svg" />
+            </div>
+            <input type="text" {{ autofocus }} name="q" class="flex w-full h-full grow focus:ring-0"
+                placeholder="Search" style="background-color: transparent; border: none; outline: none;" />
+
+            <div class="flex w-12 h-full justify-center items-center">
+                <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
+                    <img loading="lazy" src="/static/images/arrow.svg" class="h-5 cursor-pointer bg-transparent" />
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endmacro %}

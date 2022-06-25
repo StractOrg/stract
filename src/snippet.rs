@@ -14,21 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::frontend::search::html_escape;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::Range;
 
-use htmlescape::encode_minimal;
-
 use tantivy::tokenizer::{TextAnalyzer, Token};
-use tantivy::{Document, Score, Searcher};
+use tantivy::{Score, Searcher};
 
 /// For now we use the snippet generator from tantivy with a minor modification to support our TokenStreamMerger.
 /// In the future we want to implement something closer to the method described in https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf.
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
 
-const DEFAULT_MAX_NUM_CHARS: usize = 150;
+const DEFAULT_MAX_NUM_CHARS: usize = 200;
 
 #[derive(Debug)]
 struct FragmentCandidate {
@@ -80,14 +79,6 @@ const HIGHLIGHTEN_PREFIX: &str = "<b>";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
 impl Snippet {
-    /// Create a new, empty, `Snippet`
-    fn empty() -> Snippet {
-        Snippet {
-            fragment: String::new(),
-            highlighted: Vec::new(),
-        }
-    }
-
     /// Returns a hignlightned html from the `Snippet`.
     fn to_html(&self) -> String {
         let mut html = String::new();
@@ -98,26 +89,16 @@ impl Snippet {
                 start_from = item.end;
                 continue;
             }
-            html.push_str(&encode_minimal(&self.fragment[start_from..item.start]));
+            html.push_str(&html_escape(&self.fragment[start_from..item.start]));
             html.push_str(HIGHLIGHTEN_PREFIX);
-            html.push_str(&encode_minimal(&self.fragment[item.clone()]));
+            html.push_str(&html_escape(&self.fragment[item.clone()]));
             html.push_str(HIGHLIGHTEN_POSTFIX);
             start_from = item.end;
         }
-        html.push_str(&encode_minimal(
+        html.push_str(&html_escape(
             &self.fragment[start_from..self.fragment.len()],
         ));
         html
-    }
-
-    /// Returns the fragment of text used in the  snippet.
-    fn fragment(&self) -> &str {
-        &self.fragment
-    }
-
-    /// Returns a list of higlighted positions from the `Snippet`.
-    fn highlighted(&self) -> &[Range<usize>] {
-        &self.highlighted
     }
 }
 
@@ -207,7 +188,6 @@ fn select_best_fragment_combination(fragments: &[FragmentCandidate], text: &str)
 struct SnippetGenerator {
     terms_text: BTreeMap<String, Score>,
     tokenizer: TextAnalyzer,
-    field: tantivy::schema::Field,
     max_num_chars: usize,
 }
 
@@ -240,32 +220,13 @@ impl SnippetGenerator {
         Ok(SnippetGenerator {
             terms_text,
             tokenizer,
-            field,
             max_num_chars: DEFAULT_MAX_NUM_CHARS,
         })
-    }
-
-    /// Sets a maximum number of chars.
-    fn set_max_num_chars(&mut self, max_num_chars: usize) {
-        self.max_num_chars = max_num_chars;
     }
 
     #[cfg(test)]
     fn terms_text(&self) -> &BTreeMap<String, Score> {
         &self.terms_text
-    }
-
-    /// Generates a snippet for the given `Document`.
-    ///
-    /// This method extract the text associated to the `SnippetGenerator`'s field
-    /// and computes a snippet.
-    fn snippet_from_doc(&self, doc: &Document) -> Snippet {
-        let text: String = doc
-            .get_all(self.field)
-            .flat_map(tantivy::schema::Value::as_text)
-            .collect::<Vec<&str>>()
-            .join(" ");
-        self.snippet(&text)
     }
 
     /// Generates a snippet for the given text.
@@ -288,7 +249,12 @@ pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Resu
             .expect("Failed to get body field"),
     )?;
 
-    let snippet = generator.snippet(text);
+    let mut snippet = generator.snippet(text);
+
+    if snippet.fragment.is_empty() {
+        snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+    }
+
     let highlighted = snippet.to_html() + "...";
 
     Ok(highlighted)
@@ -347,7 +313,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.documents.len(), 1);
         assert_eq!(
             result.documents[0].snippet,
-                "<b>Rust</b> is a systems programming <b>language</b> sponsored by\nMozilla which describes it as a &quot;safe, concurrent, practical <b>language</b>&quot;, supporting functional and..."
+                "<b>Rust</b> is a systems programming <b>language</b> sponsored by\nMozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and\nimperative-procedural paradigms. <b>Rust</b> is..."
                 .to_string()
         );
     }
@@ -374,7 +340,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(
             snippet.to_html(),
             "<b>Rust</b> is a systems programming <b>language</b> sponsored by\nMozilla which \
-             describes it as a &quot;safe"
+             describes it as a \"safe"
         )
     }
 
@@ -585,24 +551,12 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = index.reader().unwrap().searcher();
         let query_parser = tantivy::query::QueryParser::for_index(&index, vec![text_field]);
         let query = query_parser.parse_query("rust design").unwrap();
-        let mut snippet_generator =
-            SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+        let snippet_generator = SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
         {
             let snippet = snippet_generator.snippet(TEST_TEXT);
             assert_eq!(
                 snippet.to_html(),
-                "imperative-procedural paradigms. <b>Rust</b> is syntactically similar to \
-                 C++[according to whom?],\nbut its <b>designers</b> intend it to provide better \
-                 memory safety"
-            );
-        }
-        {
-            snippet_generator.set_max_num_chars(90);
-            let snippet = snippet_generator.snippet(TEST_TEXT);
-            assert_eq!(
-                snippet.to_html(),
-                "<b>Rust</b> is syntactically similar to C++[according to whom?],\nbut its \
-                 <b>designers</b> intend it to"
+                "<b>Rust</b> is a systems programming language sponsored by\nMozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and\nimperative-procedural paradigms. <b>Rust</b> is"
             );
         }
         Ok(())
