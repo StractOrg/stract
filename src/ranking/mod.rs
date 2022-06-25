@@ -17,25 +17,19 @@
 pub mod centrality_store;
 mod initial;
 
-use std::sync::Arc;
-
 use crate::query::Query;
 use initial::InitialScoreTweaker;
 use tantivy::collector::{Collector, TopDocs};
 
-pub struct Ranker {
-    query: Arc<Query>,
-}
+pub struct Ranker {}
 
 impl Ranker {
-    pub fn new(query: Query) -> Self {
-        Ranker {
-            query: Arc::new(query),
-        }
+    pub fn new(_query: Query) -> Self {
+        Ranker {}
     }
 
     pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
-        let score_tweaker = InitialScoreTweaker::new(self.query.clone());
+        let score_tweaker = InitialScoreTweaker::default();
         TopDocs::with_limit(20).tweak_score(score_tweaker)
     }
 }
@@ -159,7 +153,7 @@ mod tests {
 
         assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
-        assert_eq!(result.documents[1].url, "https://www.b.com");
-        assert_eq!(result.documents[2].url, "https://www.dr.dk/whatever");
+        assert_eq!(result.documents[1].url, "https://www.dr.dk/whatever");
+        assert_eq!(result.documents[2].url, "https://www.b.com");
     }
 }

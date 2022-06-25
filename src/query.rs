@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{Error, Result};
+use crate::{schema::ALL_FIELDS, Error, Result};
 use nom::{
     bytes::complete::{tag, take_while},
     character::complete::multispace0,
@@ -23,7 +23,7 @@ use nom::{
     IResult,
 };
 use tantivy::{
-    query::{BooleanQuery, Occur, TermQuery},
+    query::{BooleanQuery, BoostQuery, Occur, TermQuery},
     schema::{Field, FieldEntry, IndexRecordOption, Schema},
     tokenizer::{TextAnalyzer, TokenizerManager},
     Term,
@@ -130,11 +130,14 @@ impl Query {
                                 )
                             })
                             .collect();
+                        let boost = ALL_FIELDS[field.field_id() as usize].boost();
 
                         (
                             Occur::Should,
-                            Box::new(BooleanQuery::new(processed_queries))
-                                as Box<dyn tantivy::query::Query>,
+                            Box::new(BoostQuery::new(
+                                Box::new(BooleanQuery::new(processed_queries)),
+                                boost.unwrap_or(1.0),
+                            )) as Box<dyn tantivy::query::Query>,
                         )
                     })
                     .collect();

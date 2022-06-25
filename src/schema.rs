@@ -15,15 +15,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::schema::{
-    BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
+
+pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
 #[derive(Clone)]
 pub enum Field {
     Title,
     Body,
     Url,
-    FastUrl,
+    Host,
     BacklinkText,
     Centrality,
 }
@@ -31,7 +33,7 @@ pub static ALL_FIELDS: [Field; 6] = [
     Field::Title,
     Field::Body,
     Field::Url,
-    Field::FastUrl,
+    Field::Host,
     Field::BacklinkText,
     Field::Centrality,
 ];
@@ -50,9 +52,7 @@ impl Field {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::FastUrl => {
-                IndexingOption::Bytes(BytesOptions::default().set_fast().set_indexed())
-            }
+            Field::Host => IndexingOption::Text(self.default_text_options()),
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
             Field::Centrality => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -67,9 +67,18 @@ impl Field {
             Field::Title => "title",
             Field::Body => "body",
             Field::Url => "url",
-            Field::FastUrl => "fast_url",
+            Field::Host => "host",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
+        }
+    }
+
+    pub fn boost(&self) -> Option<f32> {
+        match self {
+            Field::Host => Some(30.0),
+            Field::Title | Field::Body | Field::BacklinkText | Field::Centrality | Field::Url => {
+                None
+            }
         }
     }
 }
@@ -80,8 +89,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
     for field in &ALL_FIELDS {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
-            IndexingOption::Numeric(options) => builder.add_f64_field(field.as_str(), options),
-            IndexingOption::Bytes(options) => builder.add_bytes_field(field.as_str(), options),
+            IndexingOption::Numeric(options) => builder.add_u64_field(field.as_str(), options),
         };
     }
 
@@ -91,5 +99,4 @@ pub fn create_schema() -> tantivy::schema::Schema {
 enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Numeric(tantivy::schema::NumericOptions),
-    Bytes(tantivy::schema::BytesOptions),
 }
