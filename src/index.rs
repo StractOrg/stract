@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use tantivy::collector::{Collector, Count};
+use tantivy::merge_policy::LogMergePolicy;
 use tantivy::{DocAddress, Document, LeasedItem};
 
 use crate::directory::{self, DirEntry};
@@ -57,8 +58,15 @@ impl Index {
             .tokenizers()
             .register("tokenizer", Tokenizer::default());
 
+        let writer = tantivy_index.writer(10_000_000_000)?;
+
+        let mut merge_policy = LogMergePolicy::default();
+        merge_policy.set_max_docs_before_merge(100_000_000);
+
+        writer.set_merge_policy(Box::new(merge_policy));
+
         Ok(Index {
-            writer: tantivy_index.writer(100_000_000)?,
+            writer,
             reader: tantivy_index.reader()?,
             schema,
             path: path.as_ref().to_str().unwrap().to_string(),
@@ -198,7 +206,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::BacklinkText | Field::Centrality | Field::FastUrl => {}
+                Field::BacklinkText | Field::Centrality | Field::Host => {}
             }
         }
 

@@ -20,7 +20,7 @@ use scraper::{Node, Selector};
 use std::collections::BTreeMap;
 use tl::Children;
 
-use crate::schema::{Field, ALL_FIELDS};
+use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 pub fn strip_protocol(url: &str) -> &'_ str {
     let mut start_host = 0;
@@ -112,11 +112,11 @@ impl<'a> Webpage<'a> {
             backlink_text,
         );
 
-        doc.add_f64(
+        doc.add_u64(
             schema
                 .get_field(Field::Centrality.as_str())
                 .expect("Failed to get centrality field"),
-            self.centrality,
+            (self.centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         Ok(doc)
@@ -397,10 +397,7 @@ impl<'a> Html<'a> {
                     doc.add_text(tantivy_field, text.unwrap())
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
-                Field::FastUrl => doc.add_bytes(
-                    tantivy_field,
-                    bincode::serialize(self.url()).expect("Failed to serialize bytes"),
-                ),
+                Field::Host => doc.add_text(tantivy_field, self.host()),
                 Field::BacklinkText | Field::Centrality => {}
             }
         }

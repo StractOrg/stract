@@ -14,41 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::query::Query;
-use crate::schema::Field;
-use crate::webpage;
-use std::sync::Arc;
+use crate::schema::{Field, CENTRALITY_SCALING};
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
-use tantivy::fastfield::{BytesFastFieldReader, DynamicFastFieldReader, FastFieldReader};
+use tantivy::fastfield::{DynamicFastFieldReader, FastFieldReader};
 use tantivy::{DocId, Score, SegmentReader};
 
-pub(crate) struct InitialScoreTweaker {
-    query: Arc<Query>,
-}
-
-impl InitialScoreTweaker {
-    pub fn new(query: Arc<Query>) -> Self {
-        Self { query }
-    }
-}
+#[derive(Default)]
+pub(crate) struct InitialScoreTweaker {}
 
 pub(crate) struct InitialSegmentScoreTweaker {
-    centrality_reader: DynamicFastFieldReader<f64>,
-    fast_url_reader: BytesFastFieldReader,
-    sorted_dedupped_terms: Vec<String>,
-}
-
-impl InitialSegmentScoreTweaker {
-    fn navigational_score(&self, sorted_dedupped_terms: &[String], doc: DocId) -> f64 {
-        let bytes = self.fast_url_reader.get_bytes(doc);
-        let url = bincode::deserialize(bytes).expect("Failed to deserialize domain");
-
-        if is_navigational(sorted_dedupped_terms, url) {
-            1.0
-        } else {
-            0.0
-        }
-    }
+    centrality_reader: DynamicFastFieldReader<u64>,
 }
 
 impl ScoreTweaker<f64> for InitialScoreTweaker {
@@ -61,87 +36,16 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .expect("Faild to load centrality field");
         let centrality_reader = segment_reader
             .fast_fields()
-            .f64(centrality_field)
+            .u64(centrality_field)
             .expect("Failed to get centrality fast-field reader");
 
-        let fast_url_field = segment_reader
-            .schema()
-            .get_field(Field::FastUrl.as_str())
-            .expect("Faild to load domain field");
-        let fast_url_reader = segment_reader
-            .fast_fields()
-            .bytes(fast_url_field)
-            .expect("Failed to get domain fast-field reader");
-
-        let mut sorted_dedupped_terms = self.query.terms.clone();
-
-        sorted_dedupped_terms.sort();
-        sorted_dedupped_terms.dedup();
-
-        Ok(InitialSegmentScoreTweaker {
-            centrality_reader,
-            fast_url_reader,
-            sorted_dedupped_terms,
-        })
+        Ok(InitialSegmentScoreTweaker { centrality_reader })
     }
 }
 
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: Score) -> f64 {
-        let centrality = self.centrality_reader.get(doc);
-        let navigational = self.navigational_score(&self.sorted_dedupped_terms, doc);
-        score as f64 + 10_000.0 * centrality + 100.0 * navigational
-    }
-}
-
-fn jaccard_sim(sorted_dedupped_terms: &[String], domain_parts: &[&str]) -> f64 {
-    debug_assert_eq!(domain_parts.len(), 2);
-
-    let intersection_size: f64 = sorted_dedupped_terms
-        .iter()
-        .map(|term| {
-            if domain_parts.contains(&term.as_str()) {
-                1.0
-            } else {
-                0.0
-            }
-        })
-        .sum();
-
-    intersection_size
-        / (sorted_dedupped_terms.len() as f64 + domain_parts.len() as f64 - intersection_size)
-}
-
-fn is_navigational(sorted_dedupped_terms: &[String], url: &str) -> bool {
-    if !webpage::is_homepage(url) {
-        return false;
-    }
-    let domain = webpage::domain(url);
-
-    let (name, remaining) = domain.split_once('.').unwrap();
-    jaccard_sim(sorted_dedupped_terms, &[name, remaining]) >= 0.5
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_jaccard_sim() {
-        assert_eq!(
-            jaccard_sim(&["dr".to_string(), "dk".to_string()], &["dr", "dk"]),
-            1.0
-        );
-
-        assert_eq!(jaccard_sim(&["dr".to_string()], &["dr", "dk"]), 0.5);
-    }
-
-    #[test]
-    fn navigational() {
-        assert!(is_navigational(&["dr".to_string()], "dr.dk"));
-        assert!(is_navigational(
-            &["dk".to_string(), "dr".to_string()],
-            "dr.dk"
-        ));
+        let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
+        score as f64 + 10_000.0 * centrality
     }
 }
