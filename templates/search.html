@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "searchbar.html" as scope %}
+
+{% block content %}
+
+<div class="flex flex-col w-full">
+    <div class="flex items-center h-24 border">
+        <div class="ml-14 mr-14">
+            <img src="/static/images/logo.svg" />
+        </div>
+        {% call scope::searchbar("") %}
+    </div>
+
+    <div class="search-result flex flex-col space-y-3 pt-8 pb-8 pl-40">
+        {% for item in search_result %}
+        <div class="search-result-item bg-white max-w-2xl p-3">
+            <div class="text-sm mb-1">
+                <a class="hover:no-underline text-gray-500" href="{{ item.url }}">{{ item.pretty_url }}</a>
+            </div>
+            <div class="text-lg font-medium mb-1">
+                <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
+            </div>
+            <div class="text-sm">
+                {{ item.snippet }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .title-link {
+        color: #1a0dab;
+    }
+
+    .title-link:visited {
+        color: #609;
+    }
+
+    .search-result {
+        text-rendering: optimizeLegibility;
+        font-smooth: grayscale;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    .search-result-item {
+        border-color: rgb(241 245 249);
+    }
+</style>
+
+{% endblock %}

@@ -22,7 +22,7 @@ use tl::Children;
 
 use crate::schema::{Field, ALL_FIELDS};
 
-fn strip_protocol(url: &str) -> &'_ str {
+pub fn strip_protocol(url: &str) -> &'_ str {
     let mut start_host = 0;
     if url.starts_with("http://") || url.starts_with("https://") {
         start_host = url
@@ -34,7 +34,16 @@ fn strip_protocol(url: &str) -> &'_ str {
     &url[start_host..]
 }
 
-pub(crate) fn host(url: &str) -> &'_ str {
+pub fn strip_query(url: &str) -> &'_ str {
+    let mut start_query = url.len();
+    if url.contains('?') {
+        start_query = url.find('?').expect("The url contains atleast 1 '?'");
+    }
+
+    &url[..start_query]
+}
+
+pub fn host(url: &str) -> &'_ str {
     let url = strip_protocol(url);
 
     let mut end_host = url.len();
@@ -45,7 +54,7 @@ pub(crate) fn host(url: &str) -> &'_ str {
     &url[..end_host]
 }
 
-pub(crate) fn is_homepage(url: &str) -> bool {
+pub fn is_homepage(url: &str) -> bool {
     let url = strip_protocol(url);
     match url.find('/') {
         Some(idx) => idx == url.len() - 1,
@@ -53,7 +62,7 @@ pub(crate) fn is_homepage(url: &str) -> bool {
     }
 }
 
-pub(crate) fn domain(url: &str) -> &'_ str {
+pub fn domain(url: &str) -> &'_ str {
     let host = host(url);
     let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
     if num_punctuations > 1 {

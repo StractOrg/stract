@@ -14,32 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::index::{Index, RetrievedWebpage};
-use crate::query::Query;
-use crate::ranking::Ranker;
-use crate::Result;
+use super::HtmlTemplate;
+use askama::Template;
+use axum::response::IntoResponse;
 
-#[derive(Debug)]
-pub struct SearchResult {
-    pub num_docs: usize,
-    pub documents: Vec<RetrievedWebpage>,
+pub async fn route() -> impl IntoResponse {
+    let template = IndexTemplate {};
+    HtmlTemplate(template)
 }
 
-pub struct Searcher {
-    index: Index,
-}
-
-#[cfg(test)]
-impl From<Index> for Searcher {
-    fn from(index: Index) -> Self {
-        Searcher { index }
-    }
-}
-
-impl Searcher {
-    pub fn search(&self, query: &str) -> Result<SearchResult> {
-        let query = Query::parse(query)?;
-        let ranker = Ranker::new(query.clone());
-        self.index.search(&query, ranker.collector())
-    }
-}
+#[derive(Template)]
+#[template(path = "index.html")]
+struct IndexTemplate {}

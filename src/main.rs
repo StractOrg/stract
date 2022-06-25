@@ -77,8 +77,7 @@ fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
     toml::from_str(&raw_config).expect("Failed to parse config")
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
@@ -120,7 +119,10 @@ async fn main() -> Result<()> {
                 WebgraphEntrypoint::run_locally(&config)?;
             }
         },
-        Commands::Frontend { index_path, host } => frontend::run(&index_path, &host).await?,
+        Commands::Frontend { index_path, host } => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?
+            .block_on(frontend::run(&index_path, &host))?,
     }
 
     Ok(())

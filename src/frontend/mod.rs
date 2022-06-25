@@ -16,50 +16,22 @@
 
 use axum::{Extension, Router};
 
-use crate::index::{Index, RetrievedWebpage};
+use crate::index::Index;
 use anyhow::Result;
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::query::Query;
-use crate::ranking::Ranker;
 use askama::Template;
 use axum::{
-    extract,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     routing::get,
 };
+use axum_extra::routing::SpaRouter;
 
-async fn index(
-    extract::Query(params): extract::Query<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
-) -> impl IntoResponse {
-    let mut search_result = Vec::new();
+mod index;
+pub mod search;
 
-    if let Some(query) = params.get("q") {
-        let query = Query::parse(query).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        let result = state
-            .index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-
-        search_result = dbg!(result.documents);
-    }
-
-    let template = IndexTemplate { search_result };
-    HtmlTemplate(template)
-}
-
-#[derive(Template)]
-#[template(path = "index.html", escape = "none")]
-struct IndexTemplate {
-    search_result: Vec<RetrievedWebpage>,
-}
-
-struct HtmlTemplate<T>(T);
+pub struct HtmlTemplate<T>(T);
 
 pub struct State {
     pub index: Index,
@@ -87,5 +59,9 @@ pub fn router(index_path: &str) -> Result<Router> {
         index: search_index,
     });
 
-    Ok(Router::new().route("/", get(index)).layer(Extension(state)))
+    Ok(Router::new()
+        .route("/", get(index::route))
+        .route("/search", get(search::route))
+        .merge(SpaRouter::new("/static", "static"))
+        .layer(Extension(state)))
 }
