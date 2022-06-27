@@ -1,5 +1,6 @@
-limit_warc_files = 1000
+limit_warc_files = 10000
 workers = ["0.0.0.0:1337", "0.0.0.0:1338", "0.0.0.0:1339", "0.0.0.0:1340", "0.0.0.0:1341", "0.0.0.0:1342", "0.0.0.0:1343"]
+graph_base_path = "/mnt/webgraph"
 
 [warc_source]
 type = "HTTP"

@@ -14,51 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::tokenizer::{
-    Language, LowerCaser, PreTokenizedStream, PreTokenizedString, SimpleTokenizer, Stemmer,
-    TextAnalyzer, TokenStream,
-};
+use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
 use whatlang::Lang;
-
-struct TokenStreamMerger<'a> {
-    streams: Vec<tantivy::tokenizer::BoxTokenStream<'a>>,
-    current_stream: usize,
-}
-
-impl<'a> TokenStreamMerger<'a> {
-    fn merge(streams: Vec<tantivy::tokenizer::BoxTokenStream<'a>>) -> Self {
-        Self {
-            streams,
-            current_stream: 0,
-        }
-    }
-}
-
-impl<'a> tantivy::tokenizer::TokenStream for TokenStreamMerger<'a> {
-    fn advance(&mut self) -> bool {
-        if let Some(stream) = self.streams.get_mut(self.current_stream) {
-            let mut has_more = stream.advance();
-
-            if !has_more {
-                self.current_stream += 1;
-                has_more = self.current_stream < self.streams.len()
-                    && self.streams[self.current_stream].advance();
-            }
-
-            has_more
-        } else {
-            false
-        }
-    }
-
-    fn token(&self) -> &tantivy::tokenizer::Token {
-        self.streams[self.current_stream].token()
-    }
-
-    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
-        self.streams[self.current_stream].token_mut()
-    }
-}
 
 struct MyStemmer(Stemmer);
 
@@ -86,36 +43,72 @@ impl From<Lang> for MyStemmer {
     }
 }
 
+#[derive(Clone)]
+pub enum Tokenizer {
+    NormalTokenizer(NormalTokenizer),
+    StemmedTokenizer(StemmedTokenizer),
+}
+
+impl Tokenizer {
+    pub fn new_stemmed() -> Self {
+        Self::StemmedTokenizer(Default::default())
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Tokenizer::NormalTokenizer(_) => NormalTokenizer::as_str(),
+            Tokenizer::StemmedTokenizer(_) => StemmedTokenizer::as_str(),
+        }
+    }
+}
+
+impl Default for Tokenizer {
+    fn default() -> Self {
+        Self::NormalTokenizer(Default::default())
+    }
+}
+
 #[derive(Clone, Default)]
-pub struct Tokenizer {}
+pub struct NormalTokenizer {}
+
+impl NormalTokenizer {
+    pub fn as_str() -> &'static str {
+        "tokenizer"
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct StemmedTokenizer {}
+
+impl StemmedTokenizer {
+    pub fn as_str() -> &'static str {
+        "stemmed_tokenizer"
+    }
+}
 
 impl tantivy::tokenizer::Tokenizer for Tokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+        match self {
+            Tokenizer::NormalTokenizer(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::StemmedTokenizer(tokenizer) => tokenizer.token_stream(text),
+        }
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for NormalTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+        TextAnalyzer::from(SimpleTokenizer)
+            .filter(LowerCaser)
+            .token_stream(text)
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for StemmedTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         let analyzer = TextAnalyzer::from(SimpleTokenizer).filter(LowerCaser);
-
-        let mut streams = vec![analyzer.token_stream(text)];
-
         if let Some(lang) = whatlang::detect_lang(text) {
-            let stemmed_analyser = analyzer.clone().filter(MyStemmer::from(lang).0);
-            streams.push(stemmed_analyser.token_stream(text));
+            analyzer.filter(MyStemmer::from(lang).0).token_stream(text)
+        } else {
+            analyzer.token_stream(text)
         }
-
-        let mut merger = TokenStreamMerger::merge(streams);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = merger.next() {
-            tokens.push(token.clone());
-        }
-
-        tokens.sort_by(|a, b| {
-            a.offset_from
-                .partial_cmp(&b.offset_from)
-                .unwrap_or_else(|| a.offset_to.cmp(&b.offset_to))
-        });
-
-        tantivy::tokenizer::BoxTokenStream::from(PreTokenizedStream::from(PreTokenizedString {
-            text: text.to_string(),
-            tokens,
-        }))
     }
 }

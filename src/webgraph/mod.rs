@@ -17,9 +17,9 @@ pub mod sled_store;
 
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::cmp;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
+use std::{cmp, fs};
 
 pub use sled_store::SledStore;
 
@@ -405,29 +405,33 @@ impl<S: GraphStore> Webgraph<S> {
 
 impl From<FrozenWebgraph> for Webgraph {
     fn from(frozen: FrozenWebgraph) -> Self {
-        directory::recreate_folder(&frozen.root).unwrap();
-
-        match frozen.root {
-            DirEntry::Folder { name, entries: _ } => {
-                let mut builder = WebgraphBuilder::new(name);
-
-                if frozen.has_full {
-                    builder = builder.with_full_graph();
-                }
-
-                if frozen.has_host {
-                    builder = builder.with_host_graph();
-                }
-
-                builder.open()
-            }
+        let path = match &frozen.root {
+            DirEntry::Folder { name, entries: _ } => name.clone(),
             DirEntry::File {
                 name: _,
                 content: _,
             } => {
                 panic!("Cannot open webgraph from a file - must be directory.")
             }
+        };
+
+        if Path::new(&path).exists() {
+            fs::remove_dir_all(&path).unwrap();
         }
+
+        directory::recreate_folder(&frozen.root).unwrap();
+
+        let mut builder = WebgraphBuilder::new(path);
+
+        if frozen.has_full {
+            builder = builder.with_full_graph();
+        }
+
+        if frozen.has_host {
+            builder = builder.with_host_graph();
+        }
+
+        builder.open()
     }
 }
 

@@ -18,20 +18,26 @@ use tantivy::schema::{
     Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
+use crate::tokenizer::{NormalTokenizer, StemmedTokenizer};
+
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
 #[derive(Clone)]
 pub enum Field {
     Title,
     Body,
+    StemmedTitle,
+    StemmedBody,
     Url,
     Host,
     BacklinkText,
     Centrality,
 }
-pub static ALL_FIELDS: [Field; 6] = [
+pub static ALL_FIELDS: [Field; 8] = [
     Field::Title,
     Field::Body,
+    Field::StemmedTitle,
+    Field::StemmedBody,
     Field::Url,
     Field::Host,
     Field::BacklinkText,
@@ -39,12 +45,19 @@ pub static ALL_FIELDS: [Field; 6] = [
 ];
 
 impl Field {
-    fn default_text_options(&self) -> tantivy::schema::TextOptions {
+    fn default_text_options_with_tokenizer(
+        &self,
+        tokenizer_name: &str,
+    ) -> tantivy::schema::TextOptions {
         TextOptions::default().set_indexing_options(
             TextFieldIndexing::default()
-                .set_tokenizer("tokenizer")
+                .set_tokenizer(tokenizer_name)
                 .set_index_option(IndexRecordOption::WithFreqsAndPositions),
         )
+    }
+
+    fn default_text_options(&self) -> tantivy::schema::TextOptions {
+        self.default_text_options_with_tokenizer(NormalTokenizer::as_str())
     }
 
     fn options(&self) -> IndexingOption {
@@ -59,6 +72,12 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
+            Field::StemmedTitle => IndexingOption::Text(
+                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
+            ),
+            Field::StemmedBody => IndexingOption::Text(
+                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
+            ),
         }
     }
 
@@ -70,12 +89,15 @@ impl Field {
             Field::Host => "host",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
+            Field::StemmedTitle => "stemmed_title",
+            Field::StemmedBody => "stemmed_body",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
             Field::Host => Some(5.0),
+            Field::StemmedBody | Field::StemmedTitle => Some(0.5),
             Field::Title | Field::Body | Field::BacklinkText | Field::Centrality | Field::Url => {
                 None
             }

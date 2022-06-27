@@ -383,18 +383,22 @@ impl<'a> Html<'a> {
                 .unwrap_or_else(|| panic!("Unknown field: {}", field.as_str()));
 
             match field {
-                Field::Title => {
-                    if self.title().is_none() {
+                Field::Title | Field::StemmedTitle => {
+                    let title = self.title();
+
+                    if title.is_none() {
                         return Err(Error::EmptyField("title"));
                     }
 
-                    doc.add_text(tantivy_field, self.title().unwrap())
+                    doc.add_text(tantivy_field, title.unwrap())
                 }
-                Field::Body => {
+                Field::Body | Field::StemmedBody => {
                     let text = self.text();
+
                     if text.is_none() {
                         return Err(Error::EmptyField("body"));
                     }
+
                     doc.add_text(tantivy_field, text.unwrap())
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
