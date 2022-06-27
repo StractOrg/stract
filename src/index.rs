@@ -54,9 +54,15 @@ impl Index {
             tantivy::Index::create_in_dir(path.as_ref(), schema.clone())?
         };
 
+        let tokenizer = Tokenizer::default();
         tantivy_index
             .tokenizers()
-            .register("tokenizer", Tokenizer::default());
+            .register(tokenizer.as_str(), tokenizer);
+
+        let tokenizer = Tokenizer::new_stemmed();
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
 
         let writer = tantivy_index.writer(10_000_000_000)?;
 
@@ -218,7 +224,11 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::BacklinkText | Field::Centrality | Field::Host => {}
+                Field::BacklinkText
+                | Field::Centrality
+                | Field::Host
+                | Field::StemmedTitle
+                | Field::StemmedBody => {}
             }
         }
 
