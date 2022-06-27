@@ -30,16 +30,22 @@ pub enum Field {
     StemmedBody,
     Url,
     Host,
+    Domain,
+    DomainIfHomepage, // this field is only set if the webpage is the homepage for the site. Allows us to boost
+    IsHomepage,
     BacklinkText,
     Centrality,
 }
-pub static ALL_FIELDS: [Field; 8] = [
+pub static ALL_FIELDS: [Field; 11] = [
     Field::Title,
     Field::Body,
     Field::StemmedTitle,
     Field::StemmedBody,
     Field::Url,
     Field::Host,
+    Field::Domain,
+    Field::DomainIfHomepage,
+    Field::IsHomepage,
     Field::BacklinkText,
     Field::Centrality,
 ];
@@ -66,6 +72,13 @@ impl Field {
             Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Host => IndexingOption::Text(self.default_text_options()),
+            Field::Domain => IndexingOption::Text(self.default_text_options()),
+            Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
+            Field::IsHomepage => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
             Field::Centrality => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -91,16 +104,24 @@ impl Field {
             Field::Centrality => "centrality",
             Field::StemmedTitle => "stemmed_title",
             Field::StemmedBody => "stemmed_body",
+            Field::Domain => "domain",
+            Field::DomainIfHomepage => "domain_if_homepage",
+            Field::IsHomepage => "is_homepage",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Host => Some(5.0),
+            Field::Host => Some(2.0),
+            Field::DomainIfHomepage => Some(50.0),
             Field::StemmedBody | Field::StemmedTitle => Some(0.5),
-            Field::Title | Field::Body | Field::BacklinkText | Field::Centrality | Field::Url => {
-                None
-            }
+            Field::Title
+            | Field::Body
+            | Field::BacklinkText
+            | Field::Centrality
+            | Field::Url
+            | Field::Domain
+            | Field::IsHomepage => None,
         }
     }
 }

@@ -24,6 +24,7 @@ pub(crate) struct InitialScoreTweaker {}
 
 pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<u64>,
+    is_homepage_reader: DynamicFastFieldReader<u64>,
 }
 
 impl ScoreTweaker<f64> for InitialScoreTweaker {
@@ -39,13 +40,28 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .u64(centrality_field)
             .expect("Failed to get centrality fast-field reader");
 
-        Ok(InitialSegmentScoreTweaker { centrality_reader })
+        let is_homepage_field = segment_reader
+            .schema()
+            .get_field(Field::IsHomepage.as_str())
+            .expect("Faild to load is_homepage field");
+        let is_homepage_reader = segment_reader
+            .fast_fields()
+            .u64(is_homepage_field)
+            .expect("Failed to get is_homepage fast-field reader");
+
+        Ok(InitialSegmentScoreTweaker {
+            centrality_reader,
+            is_homepage_reader,
+        })
     }
 }
 
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: Score) -> f64 {
+        let score = score as f64;
         let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
-        score as f64 + 10_000.0 * centrality
+        let is_homepage = self.is_homepage_reader.get(doc) as f64;
+
+        score + 10_000.0 * centrality + 50.0 * is_homepage
     }
 }
