@@ -1,4 +1,4 @@
-{% macro searchbar(autofocus) %}
+{% macro searchbar(autofocus, query) %}
 
 
 <style>
@@ -24,8 +24,9 @@
             <div class="flex ml-4 w-5 items-center">
                 <img class="h-5" loading="lazy" src="/static/images/search.svg" />
             </div>
-            <input type="text" {{ autofocus }} name="q" class="flex w-full h-full grow focus:ring-0"
-                placeholder="Search" style="background-color: transparent; border: none; outline: none;" />
+            <input type="text" value="{{ query|escape }}" {{ autofocus }} name="q"
+                class="flex w-full h-full grow focus:ring-0" placeholder="Search"
+                style="background-color: transparent; border: none; outline: none;" />
 
             <div class="flex w-12 h-full justify-center items-center">
                 <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
