@@ -138,7 +138,7 @@ mod tests {
                         <head>
                             <title>Website B</title>
                         </head>
-                        dr dk dr dk dr dk dr dk
+                        dr dk dr dk and some other text
                     </html>
                 "#,
                 "https://www.b.com",
