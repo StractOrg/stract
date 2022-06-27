@@ -83,6 +83,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 #[template(path = "search.html", escape = "none")]
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
+    query: String,
 }
 
 pub async fn route(
@@ -90,8 +91,10 @@ pub async fn route(
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let mut search_result = Vec::new();
+    let mut displayed_query = String::new();
 
     if let Some(query) = params.get("q") {
+        displayed_query = query.clone();
         let query = Query::parse(query).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
@@ -107,6 +110,9 @@ pub async fn route(
             .collect();
     }
 
-    let template = SearchTemplate { search_result };
+    let template = SearchTemplate {
+        search_result,
+        query: displayed_query,
+    };
     HtmlTemplate(template)
 }
