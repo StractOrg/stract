@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use tantivy::collector::{Collector, Count};
-use tantivy::merge_policy::LogMergePolicy;
+use tantivy::merge_policy::NoMergePolicy;
 use tantivy::{DocAddress, Document, LeasedItem};
 
 use crate::directory::{self, DirEntry};
@@ -60,9 +60,7 @@ impl Index {
 
         let writer = tantivy_index.writer(10_000_000_000)?;
 
-        let mut merge_policy = LogMergePolicy::default();
-        merge_policy.set_max_docs_before_merge(100_000_000);
-
+        let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
 
         Ok(Index {
@@ -113,6 +111,20 @@ impl Index {
         })
     }
 
+    pub fn merge_all_segments(&mut self) -> Result<()> {
+        let segment_ids: Vec<_> = self
+            .tantivy_index
+            .load_metas()?
+            .segments
+            .into_iter()
+            .map(|segment| segment.id())
+            .collect();
+
+        self.writer.merge(&segment_ids[..]).wait()?;
+
+        Ok(())
+    }
+
     fn retrieve_doc(
         doc_address: DocAddress,
         searcher: &LeasedItem<tantivy::Searcher>,
@@ -137,11 +149,11 @@ impl Index {
 
         let x = other.path.clone();
         let other_path = Path::new(x.as_str());
-        drop(other);
+        other.writer.wait_merging_threads().unwrap();
 
         let path = self.path.clone();
         let self_path = Path::new(path.as_str());
-        drop(self);
+        self.writer.wait_merging_threads().unwrap();
 
         for segment in other_meta.segments {
             // TODO: handle case where current index has segment with same name
@@ -221,19 +233,22 @@ pub struct FrozenIndex {
 
 impl From<FrozenIndex> for Index {
     fn from(frozen: FrozenIndex) -> Self {
-        directory::recreate_folder(&frozen.root).unwrap();
-
-        match frozen.root {
-            DirEntry::Folder { name, entries: _ } => {
-                Index::open(name).expect("failed to open index")
-            }
+        let path = match &frozen.root {
+            DirEntry::Folder { name, entries: _ } => name.clone(),
             DirEntry::File {
                 name: _,
                 content: _,
             } => {
                 panic!("Cannot open index from a file - must be directory.")
             }
+        };
+
+        if Path::new(&path).exists() {
+            fs::remove_dir_all(&path).unwrap();
         }
+
+        directory::recreate_folder(&frozen.root).unwrap();
+        Index::open(path).expect("failed to open index")
     }
 }
 
@@ -241,7 +256,7 @@ impl From<Index> for FrozenIndex {
     fn from(mut index: Index) -> Self {
         index.commit().expect("failed to commit index");
         let path = index.path.clone();
-        drop(index);
+        index.writer.wait_merging_threads().unwrap();
         let root = directory::scan_folder(path).unwrap();
 
         Self { root }

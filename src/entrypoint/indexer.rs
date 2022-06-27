@@ -95,6 +95,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             }
         }
         index.commit().unwrap();
+        index.merge_all_segments().unwrap();
 
         info!("{} done", name);
 

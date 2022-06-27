@@ -219,6 +219,7 @@ impl<'a> Html<'a> {
             .collect::<Vec<String>>()
     }
 
+    // TODO: implement something like this: http://corpus.tools/wiki/Justext/Algorithm
     pub fn text(&self) -> Option<String> {
         let strings: Vec<String> = match &self.dom {
             Dom::ScraperHtml(dom) => {

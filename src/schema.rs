@@ -75,7 +75,7 @@ impl Field {
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Host => Some(30.0),
+            Field::Host => Some(5.0),
             Field::Title | Field::Body | Field::BacklinkText | Field::Centrality | Field::Url => {
                 None
             }

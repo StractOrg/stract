@@ -243,8 +243,9 @@ impl Manager {
             match self.try_map(&job) {
                 Ok(res) => return res,
                 Err(Error::NoAvailableWorker) => panic!("{}", Error::NoAvailableWorker),
-                Err(_) => {
+                Err(err) => {
                     warn!("Worker failed - rescheduling job");
+                    debug!("{:?}", err);
                 }
             }
         }
