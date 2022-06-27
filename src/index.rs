@@ -228,7 +228,10 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Centrality
                 | Field::Host
                 | Field::StemmedTitle
-                | Field::StemmedBody => {}
+                | Field::StemmedBody
+                | Field::Domain
+                | Field::DomainIfHomepage
+                | Field::IsHomepage => {}
             }
         }
 

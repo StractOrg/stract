@@ -166,7 +166,6 @@ struct RawWarcRecord {
     content: Vec<u8>,
 }
 
-#[derive(Debug)]
 pub(crate) struct WarcRecord {
     pub(crate) request: Request,
     pub(crate) response: Response,
@@ -210,7 +209,6 @@ impl Response {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct Metadata {
     // fetchTimeMs
     pub(crate) fetch_time_ms: usize,

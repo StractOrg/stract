@@ -403,6 +403,17 @@ impl<'a> Html<'a> {
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
                 Field::Host => doc.add_text(tantivy_field, self.host()),
+                Field::Domain => doc.add_text(tantivy_field, self.domain()),
+                Field::DomainIfHomepage => {
+                    if self.is_homepage() {
+                        doc.add_text(tantivy_field, self.domain())
+                    } else {
+                        doc.add_text(tantivy_field, "")
+                    }
+                }
+                Field::IsHomepage => {
+                    doc.add_u64(tantivy_field, self.is_homepage().then(|| 1).unwrap_or(0))
+                }
                 Field::BacklinkText | Field::Centrality => {}
             }
         }
