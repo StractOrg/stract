@@ -287,12 +287,12 @@ impl Manager {
             Some(size) => {
                 let pb = ProgressBar::new(size as u64);
                 pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
-                )
-                .progress_chars("#>-"),
-        );
+                    ProgressStyle::default_bar()
+                        .template(
+                            "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
+                        )
+                        .progress_chars("#>-"),
+                );
                 jobs.par_bridge()
                     .map(|job| self.map::<W, I, O1>(job))
                     .progress_with(pb)

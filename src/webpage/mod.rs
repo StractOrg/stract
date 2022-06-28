@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{Error, Result};
-use itertools::Itertools;
-use scraper::Html as ScraperHtml;
-use scraper::{Node, Selector};
-use std::collections::BTreeMap;
-use tl::Children;
+use logos::{Lexer, Logos};
+use std::collections::HashMap;
+
+mod lexer;
 
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
+
+use self::lexer::{Tag, Token};
 
 pub fn strip_protocol(url: &str) -> &'_ str {
     let mut start_host = 0;
@@ -124,202 +125,185 @@ impl<'a> Webpage<'a> {
 }
 
 #[derive(Debug)]
-enum Dom<'a> {
-    ScraperHtml(ScraperHtml),
-    TL(tl::VDom<'a>),
-}
-
-#[derive(Debug)]
 pub struct Html<'a> {
-    dom: Dom<'a>,
+    raw: &'a str,
+    tokens: Lexer<'a, Token<'a>>,
     url: String,
 }
 
 impl<'a> Html<'a> {
     pub fn parse(html: &'a str, url: &str) -> Self {
-        let dom = match tl::parse(html, tl::ParserOptions::default()) {
-            Ok(dom) => Dom::TL(dom),
-            Err(_) => Dom::ScraperHtml(ScraperHtml::parse_document(html)),
-        };
+        let tokens = Token::lexer(html);
 
         Self {
-            dom,
+            raw: html,
+            tokens,
             url: url.to_string(),
         }
     }
 
     pub fn links(&self) -> Vec<Link> {
-        match &self.dom {
-            Dom::ScraperHtml(dom) => {
-                let selector = Selector::parse("a").expect("Failed to parse selector");
-                dom.select(&selector)
-                    .map(|el| {
-                        let destination = el.value().attr("href");
-                        let text = el.text().collect::<String>();
+        let mut tokens = self.tokens.clone();
+        let mut links = Vec::new();
+        let mut open_links = Vec::new();
 
-                        (destination, text)
-                    })
-                    .filter(|(dest, _)| dest.is_some())
-                    .map(|(destination, text)| {
-                        let destination = destination.unwrap().to_string();
-                        Link {
-                            source: self.url.clone(),
-                            destination,
-                            text,
-                        }
-                    })
-                    .collect()
-            }
-            Dom::TL(dom) => {
-                let selector = dom.query_selector("a").expect("Failed to parse selector");
-                selector
-                    .into_iter()
-                    .filter_map(|handle| {
-                        let parser = dom.parser();
-                        let node = handle.get(parser).unwrap();
-                        let tag = node.as_tag().unwrap();
-
-                        tag.attributes().get("href").flatten().map(|bytes| {
-                            let destination = String::from_utf8(bytes.as_bytes().to_vec()).unwrap();
-                            let children = tag.children();
-                            let text: String = Itertools::intersperse(
-                                Html::children_text(children, parser).into_iter(),
-                                ". ".to_string(),
-                            )
-                            .collect();
-
-                            Link {
+        while let Some(tok) = tokens.next() {
+            match tok {
+                Token::StartTag(tag) if tag.name() == "a" => {
+                    open_links.push((String::new(), tag.attributes()));
+                }
+                Token::EndTag(tag) if tag.name() == "a" => {
+                    if let Some((text, attributes)) = open_links.pop() {
+                        if let Some(dest) = attributes.get("href") {
+                            links.push(Link {
                                 source: self.url.clone(),
-                                destination,
+                                destination: dest.to_string(),
                                 text,
-                            }
+                            })
+                        }
+                    }
+                }
+                Token::Error => {
+                    for (text, _) in &mut open_links {
+                        let span = tokens.span();
+                        text.push_str(&self.raw[span]);
+                    }
+                }
+                Token::SelfTerminatingTag(tag) if tag.name() == "a" => {
+                    if let Some(dest) = tag.attributes().get("href") {
+                        links.push(Link {
+                            source: self.url.clone(),
+                            destination: dest.to_string(),
+                            text: String::new(),
                         })
-                    })
-                    .collect()
+                    }
+                }
+                Token::StartTag(_) | Token::EndTag(_) | Token::SelfTerminatingTag(_) => {}
             }
         }
-    }
 
-    fn grab_texts_scraper(&self, dom: &ScraperHtml, selector: &Selector) -> Vec<String> {
-        dom.select(selector)
-            .filter(|el| selector.matches(el))
-            .filter_map(|el| {
-                if let Some(node) = (*el).first_child() {
-                    if let Node::Text(text) = node.value() {
-                        Some(text)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .map(|t| String::from(t.trim()))
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<String>>()
+        links
     }
 
     // TODO: implement something like this: http://corpus.tools/wiki/Justext/Algorithm
     pub fn text(&self) -> Option<String> {
-        let strings: Vec<String> = match &self.dom {
-            Dom::ScraperHtml(dom) => {
-                let selectors = vec![
-                    "body a",
-                    "body div",
-                    "body span",
-                    "body p",
-                    "body h1",
-                    "body h2",
-                    "body h3",
-                    "body h4",
-                    "body li",
-                    "body ul",
-                    "body ol",
-                    "body nav",
-                    "body pre",
-                    "body",
-                ];
-                let selector = Itertools::intersperse(selectors.into_iter(), ", ")
-                    .collect::<String>()
-                    .trim()
-                    .to_string();
-                let selector = Selector::parse(&selector).expect("Failed to parse selector");
-                self.grab_texts_scraper(dom, &selector)
-            }
-            Dom::TL(dom) => dom
-                .query_selector("html")
-                .and_then(|mut it| it.next())
-                .map(|handle| {
-                    let parser = dom.parser();
-                    let node = handle.get(parser).unwrap();
-                    node.children()
-                        .map(|children| Html::children_text(children, parser))
-                        .unwrap_or_default()
-                })
-                .unwrap_or_default(),
-        };
+        let mut tokens = self.tokens.clone();
+        let mut text = None;
+        let mut open_tags: Vec<Tag<'a>> = Vec::new();
 
-        let s = Itertools::intersperse(
-            strings.into_iter().filter(|s| !s.is_empty()),
-            "\n".to_string(),
-        )
-        .collect::<String>()
-        .trim()
-        .to_string();
+        let mut least_deep_ignore = None;
 
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
-        }
-    }
+        while let Some(tok) = tokens.next() {
+            match tok {
+                Token::StartTag(tag) => {
+                    // self-closing tags; http://xahlee.info/js/html5_non-closing_tag.html
+                    if matches!(
+                        tag.name(),
+                        "area"
+                            | "base"
+                            | "br"
+                            | "col"
+                            | "embed"
+                            | "hr"
+                            | "img"
+                            | "input"
+                            | "link"
+                            | "meta"
+                            | "param"
+                            | "source"
+                            | "track"
+                            | "wbr"
+                            | "command"
+                            | "keygen"
+                            | "menuitem"
+                    ) {
+                        continue;
+                    }
 
-    fn children_text(children: Children, parser: &tl::Parser) -> Vec<String> {
-        let mut stack = vec![children];
+                    if !open_tags.is_empty()
+                        && matches!(open_tags[open_tags.len() - 1].name(), "style" | "script")
+                    {
+                        continue;
+                    }
 
-        let mut res = Vec::new();
-        let allowed_tags = [
-            "a", "div", "span", "p", "h1", "h2", "h3", "h4", "li", "ul", "ol", "nav", "pre",
-            "body", "html",
-        ];
+                    if matches!(tag.name(), "style" | "script" | "title")
+                        && least_deep_ignore.is_none()
+                    {
+                        least_deep_ignore = Some(open_tags.len());
+                    }
 
-        while let Some(children) = stack.pop() {
-            for id in children.top().iter() {
-                let node = id.get(parser).unwrap();
-                match node {
-                    tl::Node::Tag(t) => {
-                        let tag = node.as_tag().unwrap();
-                        let name = tag.name().as_utf8_str();
-                        if allowed_tags.iter().any(|allowed| name == *allowed) {
-                            stack.push(t.children())
+                    open_tags.push(tag);
+                }
+                Token::EndTag(tag) => {
+                    if let Some(removed_tag) = open_tags.pop() {
+                        // debug_assert_eq!(tag.name, removed_tag);
+                        if tag.name() != removed_tag.name() {
+                            open_tags.push(removed_tag);
                         }
                     }
-                    tl::Node::Raw(raw) => res.push(raw.as_utf8_str().trim().to_string()),
-                    tl::Node::Comment(_) => {}
+
+                    if let Some(idx) = least_deep_ignore {
+                        if idx >= open_tags.len() {
+                            least_deep_ignore = None;
+                        }
+                    }
                 }
+                Token::Error => {
+                    if least_deep_ignore.is_some() {
+                        continue;
+                    }
+
+                    let span = tokens.span();
+                    if let Some(cur_text) = text {
+                        text = Some(cur_text + &self.raw[span]);
+                    } else {
+                        text = Some(self.raw[span].to_string());
+                    }
+                }
+                Token::SelfTerminatingTag(_) => {}
             }
         }
 
-        res
+        if let Some(text) = &mut text {
+            let words: Vec<_> = text.split_whitespace().collect();
+            *text = words.join(" ");
+        }
+
+        text
     }
 
     pub fn title(&self) -> Option<String> {
-        match &self.dom {
-            Dom::ScraperHtml(dom) => {
-                let selector = Selector::parse("title").expect("Failed to parse selector");
-                self.grab_texts_scraper(dom, &selector).get(0).cloned()
-            }
-            Dom::TL(dom) => dom
-                .query_selector("title")
-                .and_then(|mut it| it.next())
-                .map(|handle| {
-                    let parser = dom.parser();
-                    let node = handle.get(parser).unwrap();
-                    let tag = node.as_tag().unwrap();
+        let mut tokens = self.tokens.clone();
+        let mut title = None;
+        let mut open_tags = 0;
 
-                    tag.inner_text(parser).to_string()
-                }),
+        while let Some(tok) = tokens.next() {
+            match tok {
+                Token::StartTag(tag) if tag.name() == "title" => {
+                    open_tags += 1;
+                }
+                Token::EndTag(tag) if tag.name() == "title" => {
+                    open_tags -= 1;
+
+                    if open_tags == 0 {
+                        break;
+                    }
+                }
+                Token::Error => {
+                    if open_tags > 0 {
+                        let span = tokens.span();
+                        if let Some(cur_title) = title {
+                            title = Some(cur_title + &self.raw[span]);
+                        } else {
+                            title = Some(self.raw[span].to_string());
+                        }
+                    }
+                }
+                Token::SelfTerminatingTag(_) | Token::StartTag(_) | Token::EndTag(_) => {}
+            }
         }
+
+        title
     }
 
     pub fn url(&self) -> &str {
@@ -339,39 +323,35 @@ impl<'a> Html<'a> {
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
-        match &self.dom {
-            Dom::ScraperHtml(dom) => {
-                let selector = Selector::parse("meta").expect("Failed to parse selector");
-                dom.select(&selector)
-                    .map(|el| {
-                        el.value()
-                            .attrs()
-                            .into_iter()
-                            .map(|(k, v)| (k.to_string(), v.to_string()))
-                            .collect::<BTreeMap<String, String>>()
-                    })
-                    .collect()
-            }
-            Dom::TL(dom) => {
-                let selector = dom
-                    .query_selector("meta")
-                    .expect("Failed to parse selector");
+        let tokens = self.tokens.clone();
+        let mut metas = Vec::new();
 
-                selector
-                    .into_iter()
-                    .map(|handle| {
-                        let parser = dom.parser();
-                        let node = handle.get(parser).unwrap();
-                        let tag = node.as_tag().unwrap();
-
+        for tok in tokens {
+            match tok {
+                Token::StartTag(tag) if tag.name() == "meta" => {
+                    metas.push(
                         tag.attributes()
-                            .iter()
-                            .map(|(k, v)| (k.to_string(), v.unwrap_or_default().to_string()))
-                            .collect::<BTreeMap<String, String>>()
-                    })
-                    .collect()
+                            .into_iter()
+                            .map(|(key, value)| (key.to_string(), value.to_string()))
+                            .collect(),
+                    );
+                }
+                Token::SelfTerminatingTag(tag) if tag.name() == "meta" => {
+                    metas.push(
+                        tag.attributes()
+                            .into_iter()
+                            .map(|(key, value)| (key.to_string(), value.to_string()))
+                            .collect(),
+                    );
+                }
+                Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::SelfTerminatingTag(_)
+                | Token::Error => {}
             }
         }
+
+        metas
     }
 
     pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
@@ -429,7 +409,7 @@ pub struct Link {
     pub text: String,
 }
 
-pub type Meta = BTreeMap<String, String>;
+pub type Meta = HashMap<String, String>;
 
 #[cfg(test)]
 mod tests {
@@ -453,6 +433,8 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.example.com/whatever");
 
+        assert_eq!(webpage.title(), Some("Best website".to_string()));
+
         assert_eq!(
             webpage.links(),
             vec![Link {
@@ -465,9 +447,8 @@ mod tests {
             webpage.text(),
             Some("Best example website ever".to_string())
         );
-        assert_eq!(webpage.title(), Some("Best website".to_string()));
 
-        let mut expected_meta = BTreeMap::new();
+        let mut expected_meta = HashMap::new();
         expected_meta.insert("name".to_string(), "meta1".to_string());
         expected_meta.insert("content".to_string(), "value".to_string());
 
@@ -574,5 +555,35 @@ mod tests {
 
         let webpage = Html::parse("", "http://example.com");
         assert!(webpage.is_homepage());
+    }
+
+    #[test]
+    fn hard_parsing() {
+        let webpage = Html::parse(include_str!("../../testcases_parsing/yasudaya.html"), "");
+        assert_eq!(
+            webpage.title(),
+            Some("パチンコ大当たり情報 - Ｐジューシーハニー３ 大当たり詳細ページ - やすだひばりヶ丘店".to_string())
+        );
+        assert!(webpage.text().is_some());
+        assert!(!webpage.text().unwrap().is_empty());
+
+        let webpage = Html::parse(include_str!("../../testcases_parsing/5390001.html"), "");
+        assert_eq!(
+            webpage.title(),
+            Some("特效烟机系列_山东壹线文化传播有限公司".to_string())
+        );
+        assert!(webpage.text().is_some());
+        assert!(!webpage.text().unwrap().is_empty());
+
+        let webpage = Html::parse(
+            include_str!("../../testcases_parsing/77p2p-7.live-105.html"),
+            "",
+        );
+        assert_eq!(
+            webpage.title(),
+            Some("77p2pЅu¤WЖ[¬Э - ҐDјЅ :: іnєс ".to_string())
+        );
+        assert!(webpage.text().is_some());
+        assert!(!webpage.text().unwrap().is_empty());
     }
 }
