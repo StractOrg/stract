@@ -166,6 +166,7 @@ struct RawWarcRecord {
     content: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub(crate) struct WarcRecord {
     pub(crate) request: Request,
     pub(crate) response: Response,
@@ -193,6 +194,7 @@ impl Request {
 #[derive(Debug)]
 pub(crate) struct Response {
     pub(crate) body: String,
+    pub(crate) payload_type: Option<String>,
 }
 
 impl Response {
@@ -205,10 +207,12 @@ impl Response {
 
         Ok(Self {
             body: content.to_string(),
+            payload_type: record.header.get("WARC-IDENTIFIED-PAYLOAD-TYPE").cloned(),
         })
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Metadata {
     // fetchTimeMs
     pub(crate) fetch_time_ms: usize,

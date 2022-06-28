@@ -91,7 +91,28 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             };
 
             if let Err(err) = index.insert(webpage) {
+                if record.response.body.is_empty() {
+                    continue;
+                }
+                if let Some(payload) = &record.response.payload_type {
+                    if payload == "application/pdf" {
+                        continue;
+                    }
+                }
+
                 debug!("{:?}", err);
+                // these url's actually have errors (no title etc)
+                // if matches!(
+                //     record.request.url.as_str(),
+                //     "http://ain.liberzic.com/agenda-date-26-5-2008.html"
+                // ) {
+                //     continue;
+                // }
+                // dbg!(&record);
+                // println!();
+                // println!();
+                // println!("{}", record.response.body);
+                // panic!();
             }
         }
         index.commit().unwrap();

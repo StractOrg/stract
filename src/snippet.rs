@@ -311,11 +311,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(
-            result.documents[0].snippet,
-                "<b>Rust</b> is a systems programming <b>language</b> sponsored by\nMozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and\nimperative-procedural paradigms. <b>Rust</b> is..."
-                .to_string()
-        );
+        assert_eq!(result.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is...".to_string());
     }
 
     #[test]
