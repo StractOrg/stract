@@ -46,6 +46,7 @@ enum Commands {
     },
     Frontend {
         index_path: String,
+        queries_csv_path: String,
         #[clap(default_value = "0.0.0.0:3000")]
         host: String,
     },
@@ -119,10 +120,14 @@ fn main() -> Result<()> {
                 WebgraphEntrypoint::run_locally(&config)?;
             }
         },
-        Commands::Frontend { index_path, host } => tokio::runtime::Builder::new_multi_thread()
+        Commands::Frontend {
+            index_path,
+            queries_csv_path,
+            host,
+        } => tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
-            .block_on(frontend::run(&index_path, &host))?,
+            .block_on(frontend::run(&index_path, &queries_csv_path, &host))?,
     }
 
     Ok(())

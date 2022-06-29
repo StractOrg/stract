@@ -14,17 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::frontend::router;
+use axum::{extract, response::IntoResponse, Extension, Json};
 
-pub async fn run(index_path: &str, queries_csv_path: &str, host: &str) -> Result<()> {
-    let app = router(index_path, queries_csv_path)?;
-    let addr = host.parse()?;
-    tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+use super::State;
 
-    Ok(())
+pub async fn route(
+    extract::Query(params): extract::Query<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    if let Some(query) = params.get("q") {
+        Json(state.autosuggest.suggestions(query).unwrap())
+    } else {
+        Json(Vec::new())
+    }
 }
