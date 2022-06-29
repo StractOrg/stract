@@ -20,7 +20,7 @@ use lazy_static::lazy_static;
 use logos::{Lexer, Logos};
 use whatlang::Lang;
 
-use super::lexer::Token;
+use super::{lexer::Token, Preprocessor};
 
 // implementation of the JustText algorithm described in this thesis: https://is.muni.cz/th/45523/fi_d/phdthesis.pdf
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py
@@ -194,51 +194,6 @@ struct ClassifiedParagraph {
     classification: Classification,
 }
 
-// preprocessor removes scripts, comments, style, embed, forms and head.
-struct Preprocessor<const N: usize> {
-    removed_tags: [&'static str; N],
-    num_open_tags: [usize; N],
-}
-
-impl<const N: usize> Preprocessor<N> {
-    fn new(removed_tags: [&'static str; N]) -> Self {
-        Self {
-            removed_tags,
-            num_open_tags: [0; N],
-        }
-    }
-
-    fn update(&mut self, tok: &Token) {
-        match tok {
-            Token::StartTag(tag) => {
-                if let Some((_, n)) = self
-                    .removed_tags
-                    .iter()
-                    .zip(self.num_open_tags.iter_mut())
-                    .find(|(name, _)| **name == tag.name())
-                {
-                    *n += 1;
-                }
-            }
-            Token::EndTag(tag) => {
-                if let Some((_, n)) = self
-                    .removed_tags
-                    .iter()
-                    .zip(self.num_open_tags.iter_mut())
-                    .find(|(name, _)| **name == tag.name())
-                {
-                    *n -= 1;
-                }
-            }
-            Token::SelfTerminatingTag(_) | Token::Error => {}
-        }
-    }
-
-    fn is_inside_removed(&self) -> bool {
-        self.num_open_tags.iter().any(|n| *n > 0)
-    }
-}
-
 impl JustText {
     fn paragraphs<'a>(&self, mut tokens: Lexer<'a, Token<'a>>, raw: &str) -> Vec<Paragraph> {
         let mut res = Vec::new();
@@ -360,7 +315,7 @@ impl JustText {
 
                     br = false;
                 }
-                Token::SelfTerminatingTag(_) => {}
+                Token::SelfTerminatingTag(_) | Token::BeginComment | Token::EndComment => {}
             }
         }
 
