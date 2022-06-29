@@ -282,6 +282,8 @@ mod tests {
 
     use super::*;
 
+    const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
+
     #[test]
     fn simple_search() {
         let mut index = Index::temporary().expect("Unable to open index");
@@ -296,16 +298,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    body
-                </body>
-            </html>
-            "#,
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -329,16 +333,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    body
-                </body>
-            </html>
-            "#,
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -361,16 +367,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Website for runners</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -393,16 +401,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Fast runner</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -425,14 +435,17 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Website A</title>
                 </head>
                 <a href="https://www.b.com">B site is great</a>
+                {CONTENT}
             </html>
-            "#,
+            "#
+                ),
                 "https://www.a.com",
                 vec![],
                 1.0,
@@ -440,16 +453,18 @@ mod tests {
             .expect("failed to parse webpage");
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Website B</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.b.com",
                 vec![Link {
                     source: "https://www.a.com".to_string(),
@@ -484,16 +499,18 @@ mod tests {
         for _ in 0..100 {
             index
                 .insert(Webpage::new(
-                    r#"
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Website for runners</title>
                         </head>
-                <body>
-                    body
-                </body>
+                        <body>
+                            {CONTENT}
+                        </body>
                     </html>
-                    "#,
+                    "#
+                    ),
                     "https://www.example.com",
                     vec![],
                     1.0,
@@ -517,16 +534,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>News website</title>
-                </head>
-                <body>
-                    body
-                </body>
-            </html>
-            "#,
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
                 "https://www.dr.dk",
                 vec![],
                 1.0,
@@ -547,16 +566,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Test website</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -588,16 +609,18 @@ mod tests {
 
         index1
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Test website</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.0,
@@ -608,16 +631,18 @@ mod tests {
 
         index2
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Test website</title>
                 </head>
                 <body>
-                    body
+                    {CONTENT}
                 </body>
             </html>
-            "#,
+            "#
+                ),
                 "https://www.example.com",
                 vec![],
                 1.,
