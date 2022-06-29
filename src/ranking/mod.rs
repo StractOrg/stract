@@ -42,6 +42,8 @@ mod tests {
         webpage::{Link, Webpage},
     };
 
+    const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
+
     #[test]
     fn harmonic_ranking() {
         for _ in 0..10 {
@@ -49,14 +51,17 @@ mod tests {
 
             index
                 .insert(Webpage::new(
-                    r#"
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Website A</title>
                             </head>
+                            {CONTENT}
                             <a href="https://www.b.com">B site is great</a>
                         </html>
-                    "#,
+                    "#
+                    ),
                     "https://www.a.com",
                     vec![],
                     0.0,
@@ -64,16 +69,18 @@ mod tests {
                 .expect("failed to parse webpage");
             index
                 .insert(Webpage::new(
-                    r#"
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Website B</title>
                             </head>
                             <body>
-                                body
+                                {CONTENT}
                             </body>
                         </html>
-                    "#,
+                    "#
+                    ),
                     "https://www.b.com",
                     vec![Link {
                         source: "https://www.a.com".to_string(),
@@ -99,16 +106,18 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
                     <html>
                         <head>
                             <title>DR Homepage</title>
                         </head>
                         <body>
-                            body
+                            {CONTENT}
                         </body>
                     </html>
-                "#,
+                "#
+                ),
                 "https://www.dr.dk",
                 vec![],
                 0.0,
@@ -116,16 +125,18 @@ mod tests {
             .expect("failed to parse webpage");
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
                     <html>
                         <head>
                             <title>Subsite dr</title>
                         </head>
                         <body>
-                            body
+                            {CONTENT}
                         </body>
                     </html>
-                "#,
+                "#
+                ),
                 "https://www.dr.dk/whatever",
                 vec![],
                 0.0,
@@ -133,14 +144,16 @@ mod tests {
             .expect("failed to parse webpage");
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
                     <html>
                         <head>
                             <title>Website B</title>
                         </head>
-                        dr dk dr dk and some other text
+                        dr dk dr dk and some other text {CONTENT}
                     </html>
-                "#,
+                "#
+                ),
                 "https://www.b.com",
                 vec![],
                 0.003,
