@@ -81,6 +81,54 @@ pub fn domain(url: &str) -> &'_ str {
     }
 }
 
+pub struct Preprocessor<const N: usize> {
+    removed_tags: [&'static str; N],
+    num_open_tags: [usize; N],
+    open_comments: usize,
+}
+
+impl<const N: usize> Preprocessor<N> {
+    pub fn new(removed_tags: [&'static str; N]) -> Self {
+        Self {
+            removed_tags,
+            num_open_tags: [0; N],
+            open_comments: 0,
+        }
+    }
+
+    pub fn update(&mut self, tok: &Token) {
+        match tok {
+            Token::StartTag(tag) => {
+                if let Some((_, n)) = self
+                    .removed_tags
+                    .iter()
+                    .zip(self.num_open_tags.iter_mut())
+                    .find(|(name, _)| **name == tag.name())
+                {
+                    *n += 1;
+                }
+            }
+            Token::EndTag(tag) => {
+                if let Some((_, n)) = self
+                    .removed_tags
+                    .iter()
+                    .zip(self.num_open_tags.iter_mut())
+                    .find(|(name, _)| **name == tag.name())
+                {
+                    *n -= 1;
+                }
+            }
+            Token::SelfTerminatingTag(_) | Token::Error => {}
+            Token::BeginComment => self.open_comments += 1,
+            Token::EndComment => self.open_comments -= 1,
+        }
+    }
+
+    pub fn is_inside_removed(&self) -> bool {
+        self.num_open_tags.iter().any(|n| *n > 0) || self.open_comments > 0
+    }
+}
+
 pub struct Webpage<'a> {
     pub html: Html<'a>,
     pub backlinks: Vec<Link>,
@@ -147,8 +195,14 @@ impl<'a> Html<'a> {
         let mut tokens = self.tokens.clone();
         let mut links = Vec::new();
         let mut open_links = Vec::new();
+        let mut preprocessor = Preprocessor::new(["script", "style", "head"]);
 
         while let Some(tok) = tokens.next() {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
+            }
+
             match tok {
                 Token::StartTag(tag) if tag.name() == "a" => {
                     open_links.push((String::new(), tag.attributes()));
@@ -179,7 +233,11 @@ impl<'a> Html<'a> {
                         })
                     }
                 }
-                Token::StartTag(_) | Token::EndTag(_) | Token::SelfTerminatingTag(_) => {}
+                Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::SelfTerminatingTag(_)
+                | Token::BeginComment
+                | Token::EndComment => {}
             }
         }
 
@@ -200,8 +258,14 @@ impl<'a> Html<'a> {
         let mut tokens = self.tokens.clone();
         let mut title = None;
         let mut open_tags = 0;
+        let mut preprocessor = Preprocessor::new(["script", "style"]);
 
         while let Some(tok) = tokens.next() {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
+            }
+
             match tok {
                 Token::StartTag(tag) if tag.name() == "title" => {
                     open_tags += 1;
@@ -223,7 +287,11 @@ impl<'a> Html<'a> {
                         }
                     }
                 }
-                Token::SelfTerminatingTag(_) | Token::StartTag(_) | Token::EndTag(_) => {}
+                Token::SelfTerminatingTag(_)
+                | Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::BeginComment
+                | Token::EndComment => {}
             }
         }
 
@@ -249,8 +317,14 @@ impl<'a> Html<'a> {
     pub fn metadata(&self) -> Vec<Meta> {
         let tokens = self.tokens.clone();
         let mut metas = Vec::new();
+        let mut preprocessor = Preprocessor::new(["script", "style"]);
 
         for tok in tokens {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
+            }
+
             match tok {
                 Token::StartTag(tag) if tag.name() == "meta" => {
                     metas.push(
@@ -271,7 +345,9 @@ impl<'a> Html<'a> {
                 Token::StartTag(_)
                 | Token::EndTag(_)
                 | Token::SelfTerminatingTag(_)
-                | Token::Error => {}
+                | Token::Error
+                | Token::BeginComment
+                | Token::EndComment => {}
             }
         }
 

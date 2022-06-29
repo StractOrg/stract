@@ -137,6 +137,12 @@ pub enum Token<'a> {
     #[regex(r"<[^[/>]]+/>", start_tag)]
     SelfTerminatingTag(Tag<'a>),
 
+    #[token("<!--")]
+    BeginComment,
+
+    #[token("-->")]
+    EndComment,
+
     #[error]
     Error,
 }
