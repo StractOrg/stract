@@ -40,6 +40,8 @@ anyhow = "1.0.58"
 axum-extra = { version = "0.3.4", features = ["spa"] }
 html-escape = "0.2.11"
 logos = "0.12.1"
+csv = "1.1.6"
+fst = "0.4.7"
 
 [dev-dependencies]
 maplit = "1.0.2"

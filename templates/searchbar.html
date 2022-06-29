@@ -4,37 +4,155 @@
 <style>
     .searchbar {
         border-color: #dadada;
+        border-radius: 30px;
+        border-width: 1px;
     }
 
     .searchbar:hover {
-        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px,
-            rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
     }
 
     .searchbar:focus-within {
-        border-width: 0px;
-        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px,
-            rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+        border-radius: 25px 25px 0px 0px;
+        border-width: 1px 1px 0px 1px;
+        box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+    }
+
+    .suggestions {
+        top: 100%;
+        box-shadow: rgba(0, 0, 0, 0.08) 0px 2px 3px 0px;
+        visibility: hidden;
+        border-color: #dadada;
+        border-radius: 0px 0px 25px 25px;
+        border-width: 0px 1px 1px 1px;
+        padding-bottom: 10px;
+        padding-top: 0px;
+    }
+
+    .sep-bar {
+        margin-right: 20px;
+        margin-left: 20px;
+    }
+
+    .sep-bar-margin-bottom {
+        margin-bottom: 20px;
+    }
+
+    .suggestions-visible {
+        visibility: visible;
+        overflow: hidden;
+    }
+
+    .suggestion-item {
+        padding-bottom: 7px;
+        padding-top: 7px;
+        padding-left: 19px;
+    }
+
+    .suggestions:last-child {
+        padding-bottom: 0px;
+    }
+
+    .suggestions:nth-child(2) {
+        padding-top: 0px;
+    }
+
+    .suggestion-item:hover {
+        background-color: rgb(245, 245, 245);
+        cursor: pointer;
     }
 </style>
 
-<form class="w-full md:max-w-2xl pl-1 pr-1 relative" method="GET" action="/search" autocomplete="off">
-    <div class="searchbar rounded-full h-12 flex flex-col relative bg-white border">
-        <div class="flex h-full">
-            <div class="flex ml-4 w-5 items-center">
-                <img class="h-5" loading="lazy" src="/static/images/search.svg" />
-            </div>
-            <input type="text" value="{{ query|escape }}" {{ autofocus }} name="q"
-                class="flex w-full h-full grow focus:ring-0" placeholder="Search"
-                style="background-color: transparent; border: none; outline: none;" />
+<form class="w-full md:max-w-2xl relative" method="GET" action="/search" autocomplete="off">
+    <div class="searchbar w-full flex flex-col bg-white overflow-hidden">
+        <div class="h-12 w-full flex flex-col">
+            <div class="flex h-full">
+                <div class="flex ml-5 mr-1 w-5 items-center">
+                    <img class="h-5" loading="lazy" src="/static/images/search.svg" />
+                </div>
+                <input type="text" value="{{ query|escape }}" {{ autofocus }} name="q"
+                    class="searchbar-input flex w-full h-full grow focus:ring-0" placeholder="Search"
+                    style="background-color: transparent; border: none; outline: none;" />
 
-            <div class="flex w-12 h-full justify-center items-center">
-                <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
-                    <img loading="lazy" src="/static/images/arrow.svg" class="h-5 cursor-pointer bg-transparent" />
-                </button>
+                <div class="flex w-12 h-full justify-center items-center">
+                    <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
+                        <img loading="lazy" src="/static/images/arrow.svg" class="h-5 cursor-pointer bg-transparent" />
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+    <div class="suggestions absolute flex flex-col w-full bg-white">
+        <div class="sep-bar sep-bar-margin-bottom">
+            <hr />
+        </div>
+    </div>
 </form>
+
+<script>
+    const searchbarInput = document.querySelector('.searchbar-input');
+    const suggestions = document.querySelector('.suggestions');
+    const sepBar = document.querySelector('.sep-bar');
+    let suggestionItem = document.querySelectorAll('.suggestion-item');
+
+    function updateSuggestions(suggestionsData) {
+        suggestionItem.forEach(item => {
+            item.remove();
+        });
+
+        if (suggestionsData.length == 0) {
+            sepBar.classList.add("sep-bar-margin-bottom");
+        } else {
+            sepBar.classList.remove("sep-bar-margin-bottom");
+        }
+
+        suggestionsData.forEach(item => {
+            const node = document.createElement("div");
+
+            node.classList.add("flex");
+            node.classList.add("suggestion-item");
+
+            node.innerHTML = `
+                <div class="flex w-4 mr-3 items-center">
+                    <img class="h-5" loading="lazy" src="/static/images/search.svg" />
+                </div>
+                <div>
+                    ${item}
+                </div>
+            `.trim();
+
+            suggestions.appendChild(node);
+        });
+
+        suggestionItem = document.querySelectorAll('.suggestion-item')
+    }
+
+    function fetchAndUpdateSuggestions() {
+        const q = searchbarInput.value;
+
+        if (q == "") {
+            return;
+        }
+
+        fetch('/autosuggest?' + new URLSearchParams({
+            q: q,
+        }))
+            .then(response => response.json())
+            .then(data => updateSuggestions(data));
+    }
+
+    searchbarInput.addEventListener('keyup', (event) => {
+        fetchAndUpdateSuggestions();
+    });
+
+    searchbarInput.addEventListener("focus", (event) => {
+        suggestions.classList.add("suggestions-visible");
+        fetchAndUpdateSuggestions();
+    });
+
+    searchbarInput.addEventListener("blur", (event) => {
+        suggestions.classList.remove("suggestions-visible");
+    });
+</script>
 
 {% endmacro %}

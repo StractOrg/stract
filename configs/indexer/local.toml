@@ -1,5 +1,5 @@
 warc_paths_file = "warc.paths"
-centrality_store_path = "centrality"
+centrality_store_path = "./data/centrality"
 
 [warc_source]
 type = "Local"

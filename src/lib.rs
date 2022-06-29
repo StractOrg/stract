@@ -26,6 +26,7 @@ pub mod index;
 
 pub mod mapreduce;
 
+mod autosuggest;
 mod directory;
 mod exponential_backoff;
 mod frontend;
@@ -159,6 +160,12 @@ pub enum Error {
 
     #[error("Failed to download warc files after all retries")]
     DownloadFailed,
+
+    #[error("Encountered an error when reading CSV file")]
+    Csv(#[from] csv::Error),
+
+    #[error("Encountered an error in the FST crate")]
+    Fst(#[from] fst::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

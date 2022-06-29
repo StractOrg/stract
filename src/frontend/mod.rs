@@ -16,7 +16,7 @@
 
 use axum::{Extension, Router};
 
-use crate::index::Index;
+use crate::{autosuggest::Autosuggest, index::Index};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -28,6 +28,7 @@ use axum::{
 };
 use axum_extra::routing::SpaRouter;
 
+mod autosuggest;
 mod index;
 pub mod search;
 
@@ -35,6 +36,7 @@ pub struct HtmlTemplate<T>(T);
 
 pub struct State {
     pub index: Index,
+    pub autosuggest: Autosuggest,
 }
 
 impl<T> IntoResponse for HtmlTemplate<T>
@@ -53,15 +55,19 @@ where
     }
 }
 
-pub fn router(index_path: &str) -> Result<Router> {
+pub fn router(index_path: &str, queries_csv_path: &str) -> Result<Router> {
     let search_index = Index::open(index_path)?;
+    let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
+
     let state = Arc::new(State {
         index: search_index,
+        autosuggest,
     });
 
     Ok(Router::new()
         .route("/", get(index::route))
         .route("/search", get(search::route))
+        .route("/autosuggest", get(autosuggest::route))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state)))
 }

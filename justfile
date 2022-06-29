@@ -9,4 +9,4 @@
     cargo run --release -- configs/webgraph/master.toml
 
 @frontend:
-    cargo watch -x 'run -- frontend data/index'
+    cargo watch -x 'run -- frontend data/index queries_us.csv'
