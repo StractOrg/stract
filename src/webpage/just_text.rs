@@ -16,6 +16,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use lazy_static::lazy_static;
 use logos::{Lexer, Logos};
 use whatlang::Lang;
 
@@ -39,10 +40,86 @@ enum IntermediateClassification {
     Bad,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Classification {
+    Final(FinalClassification),
+    Intermediate(IntermediateClassification),
+}
+
+#[derive(Debug, Clone)]
+enum FinalClassification {
     Good,
     Bad,
+}
+
+macro_rules! include_stopwords {
+    ($($file:expr => $lang:expr),*) => {{
+        let mut stopwords = HashMap::new();
+
+        $(
+            stopwords.insert(
+                $lang,
+                include_str!($file)
+                    .lines()
+                    .map(|s| s.to_lowercase())
+                    .collect(),
+            );
+        )*
+
+        stopwords
+    }};
+}
+
+lazy_static! {
+    static ref STOPWORDS: HashMap<Lang, HashSet<String>> = {
+        include_stopwords!(
+                "../../stopwords/Afrikaans.txt" => Lang::Afr,
+                "../../stopwords/Arabic.txt" => Lang::Ara,
+                "../../stopwords/Armenian.txt" => Lang::Hye,
+                "../../stopwords/Azerbaijani.txt" => Lang::Aze,
+                "../../stopwords/Belarusian.txt" => Lang::Bel,
+                "../../stopwords/Bengali.txt" => Lang::Ben,
+                "../../stopwords/Bulgarian.txt" => Lang::Bul,
+                "../../stopwords/Catalan.txt" => Lang::Cat,
+                "../../stopwords/Croatian.txt" => Lang::Hrv,
+                "../../stopwords/Czech.txt" => Lang::Ces,
+                "../../stopwords/Danish.txt" => Lang::Dan,
+                "../../stopwords/Dutch.txt" => Lang::Nld,
+                "../../stopwords/English.txt" => Lang::Eng,
+                "../../stopwords/Esperanto.txt" => Lang::Epo,
+                "../../stopwords/Estonian.txt" => Lang::Est,
+                "../../stopwords/Finnish.txt" => Lang::Fin,
+                "../../stopwords/French.txt" => Lang::Fra,
+                "../../stopwords/Georgian.txt" => Lang::Kat,
+                "../../stopwords/German.txt" => Lang::Deu,
+                "../../stopwords/Greek.txt" => Lang::Ell,
+                "../../stopwords/Gujarati.txt" => Lang::Guj,
+                "../../stopwords/Hebrew.txt" => Lang::Heb,
+                "../../stopwords/Hindi.txt" => Lang::Hin,
+                "../../stopwords/Hungarian.txt" => Lang::Hun,
+                "../../stopwords/Indonesian.txt" => Lang::Ind,
+                "../../stopwords/Italian.txt" => Lang::Ita,
+                "../../stopwords/Javanese.txt" => Lang::Jav,
+                "../../stopwords/Kannada.txt" => Lang::Kan,
+                "../../stopwords/Korean.txt" => Lang::Kor,
+                "../../stopwords/Latin.txt" => Lang::Lat,
+                "../../stopwords/Latvian.txt" => Lang::Lav,
+                "../../stopwords/Lithuanian.txt" => Lang::Lit,
+                "../../stopwords/Macedonian.txt" => Lang::Mkd,
+                "../../stopwords/Malayalam.txt" => Lang::Mal,
+                "../../stopwords/Marathi.txt" => Lang::Mar,
+                "../../stopwords/Nepali.txt" => Lang::Nep,
+                "../../stopwords/Persian.txt" => Lang::Pes,
+                "../../stopwords/Polish.txt" => Lang::Pol,
+                "../../stopwords/Portuguese.txt" => Lang::Por,
+                "../../stopwords/Romanian.txt" => Lang::Ron,
+                "../../stopwords/Russian.txt" => Lang::Rus,
+                "../../stopwords/Serbian.txt" => Lang::Srp,
+                "../../stopwords/Slovak.txt" => Lang::Slk,
+                "../../stopwords/Slovenian.txt" => Lang::Slv,
+                "../../stopwords/Spanish.txt" => Lang::Spa
+        )
+    };
 }
 
 pub struct JustText {
@@ -52,23 +129,10 @@ pub struct JustText {
     stopwords_low: f64,
     stopwords_high: f64,
     max_heading_distance: usize,
-
-    stopwords: HashMap<Lang, HashSet<String>>,
 }
 
 impl Default for JustText {
     fn default() -> Self {
-        // TODO: make this static and oncecell
-        let mut stopwords = HashMap::new();
-
-        stopwords.insert(
-            Lang::Eng,
-            include_str!("../../stopwords/English.txt")
-                .lines()
-                .map(|s| s.to_lowercase())
-                .collect(),
-        );
-
         Self {
             max_link_density: MAX_LINK_DENSITY_DEFAULT,
             length_low: LENGTH_LOW_DEFAULT,
@@ -76,7 +140,6 @@ impl Default for JustText {
             stopwords_low: STOPWORDS_LOW_DEFAULT,
             stopwords_high: STOPWORDS_HIGH_DEFAULT,
             max_heading_distance: MAX_HEADING_DISTANCE_DEFAULT,
-            stopwords,
         }
     }
 }
@@ -129,12 +192,6 @@ impl Paragraph {
 struct ClassifiedParagraph {
     paragraph: Paragraph,
     classification: Classification,
-}
-
-#[derive(Debug)]
-struct IntermediateClassifiedParagraph {
-    paragraph: Paragraph,
-    classification: IntermediateClassification,
 }
 
 // preprocessor removes scripts, comments, style, embed, forms and head.
@@ -314,13 +371,11 @@ impl JustText {
         res
     }
 
-    fn calculate_stopword_density(&self, paragraph: &Paragraph) -> f64 {
-        let lang = whatlang::detect_lang(&paragraph.text).unwrap_or(Lang::Eng);
-        let stopwords = self
-            .stopwords
-            .get(&lang)
-            .unwrap_or_else(|| self.stopwords.get(&Lang::Eng).unwrap());
-
+    fn calculate_stopword_density(
+        &self,
+        paragraph: &Paragraph,
+        stopwords: &HashSet<String>,
+    ) -> f64 {
         paragraph
             .text
             .split_whitespace()
@@ -329,16 +384,21 @@ impl JustText {
             / paragraph.text.split_whitespace().count() as f64
     }
 
-    fn initial_classification(
-        &self,
-        paragraphs: Vec<Paragraph>,
-    ) -> Vec<IntermediateClassifiedParagraph> {
-        // TODO: re-use paragraphs to save allocations
+    fn initial_classification(&self, paragraphs: Vec<Paragraph>) -> Vec<ClassifiedParagraph> {
         let mut res = Vec::new();
+
+        let stopwords = paragraphs
+            .iter()
+            .max_by_key(|p| p.text.len())
+            .and_then(|paragraph| {
+                let lang = whatlang::detect_lang(&paragraph.text).unwrap_or(Lang::Eng);
+                STOPWORDS.get(&lang)
+            })
+            .unwrap_or_else(|| STOPWORDS.get(&Lang::Eng).unwrap());
 
         for paragraph in paragraphs {
             let classification = {
-                let stopword_density: f64 = self.calculate_stopword_density(&paragraph);
+                let stopword_density: f64 = self.calculate_stopword_density(&paragraph, stopwords);
 
                 if paragraph.link_density() > self.max_link_density
                     || paragraph.text.contains("\\xa9")
@@ -364,19 +424,16 @@ impl JustText {
                 }
             };
 
-            res.push(IntermediateClassifiedParagraph {
+            res.push(ClassifiedParagraph {
                 paragraph,
-                classification,
+                classification: Classification::Intermediate(classification),
             });
         }
 
         res
     }
 
-    fn contextual_classification(
-        &self,
-        mut paragraphs: Vec<IntermediateClassifiedParagraph>,
-    ) -> Vec<ClassifiedParagraph> {
+    fn contextual_classification(&self, paragraphs: &mut Vec<ClassifiedParagraph>) {
         // good headings
         let num_paragraphs = paragraphs.len();
         for i in 0..num_paragraphs {
@@ -390,10 +447,11 @@ impl JustText {
             while j < num_paragraphs && distance < self.max_heading_distance {
                 if matches!(
                     paragraphs[j].classification,
-                    IntermediateClassification::Good
+                    Classification::Intermediate(IntermediateClassification::Good)
                 ) {
                     let paragraph = &mut paragraphs[i];
-                    paragraph.classification = IntermediateClassification::NearGood;
+                    paragraph.classification =
+                        Classification::Intermediate(IntermediateClassification::NearGood);
                 }
                 distance += paragraphs[j].paragraph.text.len();
                 j += 1;
@@ -409,36 +467,46 @@ impl JustText {
         for i in 0..num_paragraphs {
             if !matches!(
                 paragraphs[i].classification,
-                IntermediateClassification::Short
+                Classification::Intermediate(IntermediateClassification::Short)
             ) {
                 continue;
             }
 
-            let prev_neighbour = Self::get_prev_neighbour(&paragraphs, i, true);
-            let next_neighbour = Self::get_next_neighbour(&paragraphs, i, true);
+            let prev_neighbour = Self::get_prev_neighbour(paragraphs, i, true);
+            let next_neighbour = Self::get_next_neighbour(paragraphs, i, true);
 
-            if matches!(prev_neighbour, IntermediateClassification::Good)
-                && matches!(next_neighbour, IntermediateClassification::Good)
-            {
-                new_classes[i] = IntermediateClassification::Good;
-            } else if matches!(prev_neighbour, IntermediateClassification::Bad)
-                && matches!(next_neighbour, IntermediateClassification::Bad)
-            {
-                new_classes[i] = IntermediateClassification::Bad;
-            } else if (matches!(prev_neighbour, IntermediateClassification::Bad)
-                && matches!(
-                    Self::get_prev_neighbour(&paragraphs, i, false),
-                    IntermediateClassification::NearGood
-                ))
-                || (matches!(next_neighbour, IntermediateClassification::Bad)
-                    && matches!(
-                        Self::get_next_neighbour(&paragraphs, i, false),
-                        IntermediateClassification::NearGood
-                    ))
-            {
-                new_classes[i] = IntermediateClassification::Good;
+            if matches!(
+                prev_neighbour,
+                Classification::Intermediate(IntermediateClassification::Good)
+            ) && matches!(
+                next_neighbour,
+                Classification::Intermediate(IntermediateClassification::Good)
+            ) {
+                new_classes[i] = Classification::Intermediate(IntermediateClassification::Good);
+            } else if matches!(
+                prev_neighbour,
+                Classification::Intermediate(IntermediateClassification::Bad)
+            ) && matches!(
+                next_neighbour,
+                Classification::Intermediate(IntermediateClassification::Bad)
+            ) {
+                new_classes[i] = Classification::Intermediate(IntermediateClassification::Bad);
+            } else if (matches!(
+                prev_neighbour,
+                Classification::Intermediate(IntermediateClassification::Bad)
+            ) && matches!(
+                Self::get_prev_neighbour(paragraphs, i, false),
+                Classification::Intermediate(IntermediateClassification::NearGood)
+            )) || (matches!(
+                next_neighbour,
+                Classification::Intermediate(IntermediateClassification::Bad)
+            ) && matches!(
+                Self::get_next_neighbour(paragraphs, i, false),
+                Classification::Intermediate(IntermediateClassification::NearGood)
+            )) {
+                new_classes[i] = Classification::Intermediate(IntermediateClassification::Good);
             } else {
-                new_classes[i] = IntermediateClassification::Bad;
+                new_classes[i] = Classification::Intermediate(IntermediateClassification::Bad);
             }
         }
 
@@ -450,94 +518,106 @@ impl JustText {
         for i in 0..num_paragraphs {
             if !matches!(
                 paragraphs[i].classification,
-                IntermediateClassification::NearGood
+                Classification::Intermediate(IntermediateClassification::NearGood)
             ) {
                 continue;
             }
 
-            let prev_neighbour = Self::get_prev_neighbour(&paragraphs, i, true);
-            let next_neighbour = Self::get_next_neighbour(&paragraphs, i, true);
+            let prev_neighbour = Self::get_prev_neighbour(paragraphs, i, true);
+            let next_neighbour = Self::get_next_neighbour(paragraphs, i, true);
 
             let mut paragraph = &mut paragraphs[i];
 
             match (prev_neighbour, next_neighbour) {
-                (IntermediateClassification::Bad, IntermediateClassification::Bad) => {
-                    paragraph.classification = IntermediateClassification::Bad;
+                (
+                    Classification::Intermediate(IntermediateClassification::Bad),
+                    Classification::Intermediate(IntermediateClassification::Bad),
+                ) => {
+                    paragraph.classification =
+                        Classification::Intermediate(IntermediateClassification::Bad);
                 }
                 _ => {
-                    paragraph.classification = IntermediateClassification::Good;
+                    paragraph.classification =
+                        Classification::Intermediate(IntermediateClassification::Good);
                 }
             }
         }
 
-        let mut res = Vec::new();
-        for paragraph in &paragraphs {
-            res.push(ClassifiedParagraph {
-                paragraph: paragraph.paragraph.clone(),
-                classification: match paragraph.classification {
-                    IntermediateClassification::Good => Classification::Good,
-                    IntermediateClassification::NearGood => Classification::Good,
-                    IntermediateClassification::Short => Classification::Bad,
-                    IntermediateClassification::Bad => Classification::Bad,
+        for paragraph in paragraphs.iter_mut() {
+            paragraph.classification = match &paragraph.classification {
+                Classification::Final(_) => paragraph.classification.clone(),
+                Classification::Intermediate(intermediate) => match intermediate {
+                    IntermediateClassification::Good => {
+                        Classification::Final(FinalClassification::Good)
+                    }
+                    IntermediateClassification::NearGood => {
+                        Classification::Final(FinalClassification::Good)
+                    }
+                    IntermediateClassification::Short => {
+                        Classification::Final(FinalClassification::Bad)
+                    }
+                    IntermediateClassification::Bad => {
+                        Classification::Final(FinalClassification::Bad)
+                    }
                 },
-            })
+            };
         }
-
-        res
     }
 
     fn get_prev_neighbour(
-        paragraphs: &[IntermediateClassifiedParagraph],
+        paragraphs: &[ClassifiedParagraph],
         idx: usize,
         ignore_neargood: bool,
-    ) -> IntermediateClassification {
+    ) -> Classification {
         Self::get_neighbour(paragraphs, idx, ignore_neargood, -1, -1)
     }
 
     fn get_next_neighbour(
-        paragraphs: &[IntermediateClassifiedParagraph],
+        paragraphs: &[ClassifiedParagraph],
         idx: usize,
         ignore_neargood: bool,
-    ) -> IntermediateClassification {
+    ) -> Classification {
         Self::get_neighbour(paragraphs, idx, ignore_neargood, 1, paragraphs.len() as i32)
     }
 
     fn get_neighbour(
-        paragraphs: &[IntermediateClassifiedParagraph],
+        paragraphs: &[ClassifiedParagraph],
         idx: usize,
         ignore_neargood: bool,
         inc: i32,
         boundary: i32,
-    ) -> IntermediateClassification {
+    ) -> Classification {
         let mut idx = idx as i32;
 
         while idx + inc != boundary {
             idx += inc;
             if matches!(
                 paragraphs[idx as usize].classification,
-                IntermediateClassification::Good
+                Classification::Intermediate(IntermediateClassification::Good)
             ) || matches!(
                 paragraphs[idx as usize].classification,
-                IntermediateClassification::Bad
+                Classification::Intermediate(IntermediateClassification::Bad)
             ) || (!ignore_neargood
                 && matches!(
                     paragraphs[idx as usize].classification,
-                    IntermediateClassification::NearGood,
+                    Classification::Intermediate(IntermediateClassification::NearGood),
                 ))
             {
                 return paragraphs[idx as usize].classification.clone();
             }
         }
 
-        IntermediateClassification::Bad
+        Classification::Intermediate(IntermediateClassification::Bad)
     }
 
     fn extract_text(&self, paragraphs: Vec<ClassifiedParagraph>) -> String {
         paragraphs
             .into_iter()
-            .filter(|paragraph| match paragraph.classification {
-                Classification::Good => true,
-                Classification::Bad => false,
+            .filter(|paragraph| {
+                matches!(
+                    paragraph.classification,
+                    Classification::Final(FinalClassification::Good)
+                )
             })
             .map(|paragraph| paragraph.paragraph.text)
             .collect::<Vec<_>>()
@@ -548,13 +628,13 @@ impl JustText {
         let lex = Token::lexer(html);
 
         let paragraphs = self.paragraphs(lex, html);
-        let init_classified = self
+        let mut classified = self
             .initial_classification(paragraphs)
             .into_iter()
             .filter(|par| par.paragraph.text.chars().any(|c| !c.is_whitespace()))
             .collect();
 
-        let classified = self.contextual_classification(init_classified);
+        self.contextual_classification(&mut classified);
 
         self.extract_text(classified)
             .split_whitespace()
@@ -562,9 +642,12 @@ impl JustText {
             .join(" ")
     }
 }
-impl IntermediateClassification {
+impl Classification {
     fn is_short(&self) -> bool {
-        matches!(self, IntermediateClassification::Short)
+        matches!(
+            self,
+            Classification::Intermediate(IntermediateClassification::Short)
+        )
     }
 }
 
@@ -613,30 +696,39 @@ mod tests {
         ];
 
         let just_text = JustText::default();
-        let initial_classification = just_text.initial_classification(paragraphs);
+        let mut classifications = just_text.initial_classification(paragraphs);
 
+        assert!(classifications[0].classification.is_short());
         assert!(matches!(
-            initial_classification[0].classification,
-            IntermediateClassification::Short
+            classifications[1].classification,
+            Classification::Intermediate(IntermediateClassification::Bad)
         ));
         assert!(matches!(
-            initial_classification[1].classification,
-            IntermediateClassification::Bad
+            classifications[2].classification,
+            Classification::Intermediate(IntermediateClassification::Bad)
         ));
         assert!(matches!(
-            initial_classification[2].classification,
-            IntermediateClassification::Bad
-        ));
-        assert!(matches!(
-            initial_classification[3].classification,
-            IntermediateClassification::Bad
+            classifications[3].classification,
+            Classification::Intermediate(IntermediateClassification::Bad)
         ));
 
-        let res = just_text.contextual_classification(initial_classification);
+        just_text.contextual_classification(&mut classifications);
 
-        assert!(matches!(res[0].classification, Classification::Bad));
-        assert!(matches!(res[1].classification, Classification::Bad));
-        assert!(matches!(res[2].classification, Classification::Bad));
-        assert!(matches!(res[3].classification, Classification::Bad));
+        assert!(matches!(
+            classifications[0].classification,
+            Classification::Final(FinalClassification::Bad)
+        ));
+        assert!(matches!(
+            classifications[1].classification,
+            Classification::Final(FinalClassification::Bad)
+        ));
+        assert!(matches!(
+            classifications[2].classification,
+            Classification::Final(FinalClassification::Bad)
+        ));
+        assert!(matches!(
+            classifications[3].classification,
+            Classification::Final(FinalClassification::Bad)
+        ));
     }
 }
