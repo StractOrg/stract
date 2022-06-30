@@ -245,7 +245,7 @@ pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Resu
         &query.tantivy(searcher.schema(), searcher.index().tokenizers()),
         searcher
             .schema()
-            .get_field(Field::Body.as_str())
+            .get_field(Field::StemmedBody.as_str())
             .expect("Failed to get body field"),
     )?;
 
@@ -312,6 +312,41 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is...".to_string());
+    }
+
+    #[test]
+    fn stemmed_words_snippet_highlight() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Website for runners</title>
+                            </head>
+                            <body>
+                                {}
+                            </body>
+                        </html>
+                    "#,
+                    TEST_TEXT
+                ),
+                "https://www.example.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = Searcher::from(index);
+
+        let result = searcher.search("describe").expect("Search failed");
+
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is...".to_string());
     }
 
     #[test]
