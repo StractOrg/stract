@@ -13,6 +13,8 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+mod graph_store;
+mod kv;
 pub mod sled_store;
 
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
@@ -21,15 +23,17 @@ use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
 use std::{cmp, fs};
 
-pub use sled_store::SledStore;
+use graph_store::GraphStore;
 
 use crate::directory::{self, DirEntry};
 use crate::webpage;
 
+use self::sled_store::SledStore;
+
 type NodeID = u64;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct StoredEdge {
+pub(crate) struct StoredEdge {
     other: NodeID,
     label: String,
 }
@@ -59,29 +63,6 @@ impl From<&str> for Node {
     }
 }
 
-pub trait GraphStore {
-    fn node2id(&self, node: &Node) -> Option<NodeID>;
-    fn id2node(&self, id: &NodeID) -> Option<Node>;
-    fn outgoing_edges(&self, node: NodeID) -> Vec<Edge>;
-    fn ingoing_edges(&self, node: NodeID) -> Vec<Edge>;
-    fn nodes(&self) -> NodeIterator;
-    fn insert(&mut self, from: Node, to: Node, label: String);
-    fn flush(&self);
-
-    fn edges(&self) -> EdgeIterator<'_> {
-        EdgeIterator::from(self.nodes().flat_map(|node| self.outgoing_edges(node)))
-    }
-
-    fn append<S: GraphStore>(&mut self, other: S) {
-        for edge in other.edges() {
-            let from = other.id2node(&edge.from).expect("node not found");
-            let to = other.id2node(&edge.to).expect("node not found");
-
-            self.insert(from, to, edge.label);
-        }
-    }
-}
-
 pub struct EdgeIterator<'a> {
     inner: Box<dyn Iterator<Item = Edge> + 'a>,
 }
@@ -96,26 +77,6 @@ impl<'a> EdgeIterator<'a> {
 
 impl<'a> Iterator for EdgeIterator<'a> {
     type Item = Edge;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-pub struct NodeIterator<'a> {
-    inner: Box<dyn Iterator<Item = NodeID> + 'a + Send>,
-}
-
-impl<'a> NodeIterator<'a> {
-    fn from<T: 'a + Iterator<Item = NodeID> + Send>(iterator: T) -> NodeIterator<'a> {
-        NodeIterator {
-            inner: Box::new(iterator),
-        }
-    }
-}
-
-impl<'a> Iterator for NodeIterator<'a> {
-    type Item = NodeID;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -164,20 +125,31 @@ impl WebgraphBuilder {
 
     pub fn open(self) -> Webgraph {
         Webgraph {
-            full_graph: self.full_graph_path.map(SledStore::open),
-            host_graph: self.host_graph_path.map(SledStore::open),
+            full_graph: self.full_graph_path.map(GraphStore::open),
+            host_graph: self.host_graph_path.map(GraphStore::open),
             path: self.path.to_str().unwrap().to_string(),
         }
     }
 }
 
-pub struct Webgraph<S: GraphStore = SledStore> {
-    pub path: String,
-    full_graph: Option<S>,
-    host_graph: Option<S>,
+pub trait Store
+where
+    Self: Sized,
+{
+    fn open<P: AsRef<Path>>(path: P) -> GraphStore<Self>;
+
+    fn temporary() -> GraphStore<Self> {
+        Self::open(crate::gen_temp_path())
+    }
 }
 
-impl<S: GraphStore> Webgraph<S> {
+pub struct Webgraph<S: Store = SledStore> {
+    pub path: String,
+    full_graph: Option<GraphStore<S>>,
+    host_graph: Option<GraphStore<S>>,
+}
+
+impl<S: Store> Webgraph<S> {
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
         if let Some(full_graph) = &mut self.full_graph {
             full_graph.insert(from.clone(), to.clone(), label.clone());
@@ -200,13 +172,15 @@ impl<S: GraphStore> Webgraph<S> {
             (None, Some(other_graph)) => self.host_graph = Some(other_graph),
             (Some(_), None) | (None, None) => {}
         }
+
+        self.flush();
     }
 
     fn dijkstra<F1, F2>(
         source: Node,
         node_edges: F1,
         edge_node: F2,
-        store: &S,
+        store: &GraphStore<S>,
     ) -> HashMap<NodeID, usize>
     where
         F1: Fn(NodeID) -> Vec<Edge>,
@@ -249,7 +223,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.full_graph
             .as_ref()
             .map(|full_graph| {
-                let distances = Webgraph::<S>::dijkstra(
+                let distances = Webgraph::dijkstra(
                     source,
                     |node_id| full_graph.outgoing_edges(node_id),
                     |edge| edge.to,
@@ -268,7 +242,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.full_graph
             .as_ref()
             .map(|full_graph| {
-                Webgraph::<S>::dijkstra(
+                Webgraph::dijkstra(
                     source,
                     |node| full_graph.ingoing_edges(node),
                     |edge| edge.from,
@@ -294,7 +268,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.host_graph
             .as_ref()
             .map(|host_graph| {
-                let distances = Webgraph::<S>::dijkstra(
+                let distances = Webgraph::dijkstra(
                     source,
                     |node| host_graph.outgoing_edges(node),
                     |edge| edge.to,
@@ -313,7 +287,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.host_graph
             .as_ref()
             .map(|host_graph| {
-                Webgraph::<S>::dijkstra(
+                Webgraph::dijkstra(
                     source,
                     |node| host_graph.ingoing_edges(node),
                     |edge| edge.from,
@@ -335,11 +309,12 @@ impl<S: GraphStore> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    fn calculate_centrality<F>(graph: &S, node_distances: F) -> HashMap<Node, f64>
+    fn calculate_centrality<F>(graph: &GraphStore<S>, node_distances: F) -> HashMap<Node, f64>
     where
         F: Fn(Node) -> HashMap<NodeID, usize>,
     {
         let nodes: Vec<_> = graph.nodes().collect();
+        dbg!(&nodes);
         let pb = ProgressBar::new(nodes.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -375,9 +350,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.full_graph
             .as_ref()
             .map(|full_graph| {
-                Webgraph::<S>::calculate_centrality(full_graph, |node| {
-                    self.raw_reversed_distances(node)
-                })
+                Webgraph::calculate_centrality(full_graph, |node| self.raw_reversed_distances(node))
             })
             .unwrap_or_default()
     }
@@ -386,7 +359,7 @@ impl<S: GraphStore> Webgraph<S> {
         self.host_graph
             .as_ref()
             .map(|host_graph| {
-                Webgraph::<S>::calculate_centrality(host_graph, |node| {
+                Webgraph::calculate_centrality(host_graph, |node| {
                     self.raw_host_reversed_distances(node)
                 })
             })
@@ -486,6 +459,8 @@ mod test {
         graph.insert(Node::from("C"), Node::from("A"), String::new());
         graph.insert(Node::from("D"), Node::from("C"), String::new());
 
+        graph.flush();
+
         graph
     }
 
@@ -563,6 +538,8 @@ mod test {
         graph.insert(Node::from("A.com/4"), Node::from("A.com/3"), String::new());
         graph.insert(Node::from("C.com"), Node::from("B.com"), String::new());
         graph.insert(Node::from("D.com"), Node::from("B.com"), String::new());
+
+        graph.flush();
 
         let centrality = graph.harmonic_centrality();
         assert!(
