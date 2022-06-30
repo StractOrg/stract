@@ -21,7 +21,7 @@ use std::{
 use lru::LruCache;
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{kv::Kv, sled_store::SledStore, Edge, EdgeIterator, Node, NodeID, Store, StoredEdge};
+use super::{kv::Kv, Edge, EdgeIterator, Node, NodeID, Store, StoredEdge};
 pub(crate) struct Adjacency {
     pub(crate) tree: BlockedCachedTree<NodeID, Vec<StoredEdge>>,
 }
@@ -38,10 +38,6 @@ impl Adjacency {
 
     fn edges(&mut self, node: NodeID) -> Vec<StoredEdge> {
         self.tree.get(&node).cloned().unwrap_or_default()
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (u64, HashMap<NodeID, Vec<StoredEdge>>)> {
-        self.tree.inner.iter()
     }
 }
 
@@ -115,7 +111,7 @@ where
         }
     }
 
-    fn get(&mut self, key: &K) -> Option<&V> {
+    pub(crate) fn get(&mut self, key: &K) -> Option<&V> {
         self.update_cache(key);
         self.cache.get(key)
     }
@@ -143,12 +139,12 @@ where
         self.store.flush();
     }
 
-    fn iter(&self) -> impl Iterator<Item = (K, V)> {
+    fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.store.iter()
     }
 }
 
-pub struct GraphStore<S: Store = SledStore> {
+pub struct GraphStore<S> {
     pub(crate) adjacency: RefCell<Adjacency>,
     pub(crate) reversed_adjacency: RefCell<Adjacency>,
     pub(crate) node2id: RefCell<CachedTree<Node, NodeID>>,
@@ -231,7 +227,12 @@ impl<S: Store> GraphStore<S> {
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> {
-        self.node2id.borrow_mut().iter().map(|(_, id)| id)
+        self.node2id
+            .borrow_mut()
+            .iter()
+            .map(|(_, id)| id)
+            .collect::<Vec<u64>>()
+            .into_iter()
     }
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
@@ -265,20 +266,7 @@ impl<S: Store> GraphStore<S> {
     pub fn edges(&self) -> EdgeIterator<'_> {
         self.flush();
 
-        EdgeIterator::from(
-            self.adjacency
-                .borrow()
-                .iter()
-                .flat_map(|(_block_id, block)| {
-                    block.into_iter().flat_map(|(node_id, edges)| {
-                        edges.into_iter().map(move |edge| Edge {
-                            from: node_id,
-                            to: edge.other,
-                            label: edge.label,
-                        })
-                    })
-                }),
-        )
+        EdgeIterator::new(&self.adjacency)
     }
 
     pub fn append(&mut self, other: GraphStore<S>) {
@@ -293,6 +281,8 @@ impl<S: Store> GraphStore<S> {
 
 #[cfg(test)]
 mod test {
+    use crate::webgraph::rocksdb_store::RocksDbStore;
+
     use super::*;
 
     #[test]
@@ -304,7 +294,7 @@ mod test {
         // ▼      │ │
         // B─────►C◄┘
 
-        let mut store: GraphStore<SledStore> = GraphStore::temporary();
+        let mut store: GraphStore<RocksDbStore> = GraphStore::temporary();
 
         let a = Node {
             name: "A".to_string(),

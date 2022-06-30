@@ -24,7 +24,7 @@ where
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>);
     fn flush(&self);
-    fn iter(&self) -> Box<dyn Iterator<Item = (K, V)>>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a>;
 
     fn get(&self, key: &K) -> Option<V> {
         let key_bytes = bincode::serialize(key).expect("failed to serialize key");

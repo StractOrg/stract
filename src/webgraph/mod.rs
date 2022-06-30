@@ -15,10 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod graph_store;
 mod kv;
+mod rocksdb_store;
 pub mod sled_store;
 
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
 use std::{cmp, fs};
@@ -28,7 +30,8 @@ use graph_store::GraphStore;
 use crate::directory::{self, DirEntry};
 use crate::webpage;
 
-use self::sled_store::SledStore;
+use self::graph_store::Adjacency;
+use self::rocksdb_store::RocksDbStore;
 
 type NodeID = u64;
 
@@ -64,13 +67,52 @@ impl From<&str> for Node {
 }
 
 pub struct EdgeIterator<'a> {
-    inner: Box<dyn Iterator<Item = Edge> + 'a>,
+    current_block_idx: usize,
+    blocks: Vec<u64>,
+    adjacency: &'a RefCell<Adjacency>,
+    current_block: Option<Box<dyn Iterator<Item = Edge>>>,
 }
 
 impl<'a> EdgeIterator<'a> {
-    fn from<T: 'a + Iterator<Item = Edge>>(iterator: T) -> EdgeIterator<'a> {
+    fn new(adjacency: &'a RefCell<Adjacency>) -> EdgeIterator<'a> {
+        let blocks: Vec<_> = adjacency
+            .borrow()
+            .tree
+            .inner
+            .store
+            .iter()
+            .map(|(key, _)| key)
+            .collect();
+
         EdgeIterator {
-            inner: Box::new(iterator),
+            current_block_idx: 0,
+            blocks,
+            adjacency,
+            current_block: None,
+        }
+    }
+
+    fn load_next_block(&mut self) {
+        if self.current_block_idx < self.blocks.len() {
+            let block_id = self.blocks[self.current_block_idx];
+            let block = self
+                .adjacency
+                .borrow_mut()
+                .tree
+                .inner
+                .get(&block_id)
+                .unwrap()
+                .clone();
+
+            self.current_block = Some(Box::new(block.into_iter().flat_map(|(node_id, edges)| {
+                edges.into_iter().map(move |edge| Edge {
+                    from: node_id,
+                    to: edge.other,
+                    label: edge.label,
+                })
+            })));
+
+            self.current_block_idx += 1;
         }
     }
 }
@@ -79,7 +121,15 @@ impl<'a> Iterator for EdgeIterator<'a> {
     type Item = Edge;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        if let Some(res) = self.current_block.as_mut().and_then(|it| it.next()) {
+            return Some(res);
+        }
+
+        if self.current_block.is_none() {
+            self.load_next_block();
+        }
+
+        self.current_block.as_mut().and_then(|it| it.next())
     }
 }
 
@@ -143,7 +193,7 @@ where
     }
 }
 
-pub struct Webgraph<S: Store = SledStore> {
+pub struct Webgraph<S: Store = RocksDbStore> {
     pub path: String,
     full_graph: Option<GraphStore<S>>,
     host_graph: Option<GraphStore<S>>,
