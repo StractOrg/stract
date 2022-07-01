@@ -13,9 +13,13 @@
     }
 
     .searchbar:focus-within {
-        border-radius: 25px 25px 0px 0px;
-        border-width: 1px 1px 0px 1px;
+        border-width: 1px 1px 1px 1px;
         box-shadow: rgba(0, 0, 0, 0.08) 0px 1px 3px 1px;
+    }
+
+    .searchbar-suggestions-visible {
+        border-width: 1px 1px 0px 1px !important;
+        border-radius: 25px 25px 0px 0px;
     }
 
     .suggestions {
@@ -57,46 +61,57 @@
         padding-top: 0px;
     }
 
-    .suggestion-item:hover {
+    .suggestion-item-hover {
         background-color: rgb(245, 245, 245);
         cursor: pointer;
     }
 </style>
 
 <form class="w-full md:max-w-2xl relative" method="GET" action="/search" autocomplete="off">
-    <div class="searchbar w-full flex flex-col bg-white overflow-hidden">
-        <div class="h-12 w-full flex flex-col">
-            <div class="flex h-full">
-                <div class="flex ml-5 mr-1 w-5 items-center">
-                    <img class="h-5" loading="lazy" src="/static/images/search.svg" />
-                </div>
-                <input type="text" value="{{ query|escape }}" {{ autofocus }} name="q"
-                    class="searchbar-input flex w-full h-full grow focus:ring-0" placeholder="Search"
-                    style="background-color: transparent; border: none; outline: none;" />
+    <div class="searchbar-container">
+        <div class="searchbar w-full flex flex-col bg-white overflow-hidden">
+            <div class="h-12 w-full flex flex-col">
+                <div class="flex h-full">
+                    <div class="flex ml-5 mr-1 w-5 items-center">
+                        <img class="h-5" loading="lazy" src="/static/images/search.svg" />
+                    </div>
+                    <input type="text" value="{{ query|escape }}" {{ autofocus }} name="q"
+                        class="searchbar-input flex w-full h-full grow focus:ring-0" placeholder="Search"
+                        style="background-color: transparent; border: none; outline: none;" />
 
-                <div class="flex w-12 h-full justify-center items-center">
-                    <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
-                        <img loading="lazy" src="/static/images/arrow.svg" class="h-5 cursor-pointer bg-transparent" />
-                    </button>
+                    <div class="flex w-12 h-full justify-center items-center">
+                        <button type="submit" class="bg-transparent p-0 m-0" style="border: none">
+                            <img loading="lazy" src="/static/images/arrow.svg"
+                                class="h-5 cursor-pointer bg-transparent" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="suggestions absolute flex flex-col w-full bg-white">
-        <div class="sep-bar sep-bar-margin-bottom">
-            <hr />
+        <div class="suggestions absolute flex flex-col w-full bg-white">
+            <div class="sep-bar sep-bar-margin-bottom">
+                <hr />
+            </div>
         </div>
+
     </div>
 </form>
 
 <script>
+    const searchbarContainer = document.querySelector('.searchbar-container');
+    const searchbar = document.querySelector('.searchbar');
     const searchbarInput = document.querySelector('.searchbar-input');
     const suggestions = document.querySelector('.suggestions');
     const sepBar = document.querySelector('.sep-bar');
-    let suggestionItem = document.querySelectorAll('.suggestion-item');
+    let suggestionItems = document.querySelectorAll('.suggestion-item');
+
+    let currentHighlighted = -1;
+    let currentSuggestions = [];
+    let originalQuery = "{{ query|escape}}";
+
 
     function updateSuggestions(suggestionsData) {
-        suggestionItem.forEach(item => {
+        suggestionItems.forEach(item => {
             item.remove();
         });
 
@@ -106,11 +121,16 @@
             sepBar.classList.remove("sep-bar-margin-bottom");
         }
 
+        currentSuggestions = suggestionsData;
+        currentHighlighted = -1;
+
         suggestionsData.forEach(item => {
             const node = document.createElement("div");
 
             node.classList.add("flex");
             node.classList.add("suggestion-item");
+            node.setAttribute("data-suggestion", item)
+
 
             node.innerHTML = `
                 <div class="flex w-4 mr-3 items-center">
@@ -124,7 +144,19 @@
             suggestions.appendChild(node);
         });
 
-        suggestionItem = document.querySelectorAll('.suggestion-item')
+        suggestionItems = document.querySelectorAll('.suggestion-item')
+
+        suggestionItems.forEach(item => item.addEventListener("mousedown", (event) => {
+            var suggestion = event.target.dataset.suggestion;
+            var searchParams = new URLSearchParams(window.location.search);
+            searchParams.set("q", suggestion);
+            window.location = "/search?" + searchParams.toString();
+        }));
+
+        suggestionItems.forEach((item, idx) => item.addEventListener("mouseenter", (event) => {
+            currentHighlighted = idx;
+            updateHighlighted(false);
+        }));
     }
 
     function fetchAndUpdateSuggestions() {
@@ -141,17 +173,104 @@
             .then(data => updateSuggestions(data));
     }
 
+    function updateHighlighted(updateInputField) {
+        if (updateInputField) {
+            if (currentHighlighted == -1) {
+                searchbarInput.value = originalQuery;
+            } else {
+                searchbarInput.value = htmlDecode(currentSuggestions[currentHighlighted]);
+            }
+        }
+
+        suggestionItems.forEach(item => item.classList.remove("suggestion-item-hover"))
+
+        if (currentHighlighted != -1) {
+            suggestionItems[currentHighlighted].classList.add("suggestion-item-hover");
+        }
+    }
+
+    function handleUpKey(event) {
+        event.preventDefault();
+
+        if (!suggestions.classList.contains("suggestions-visible")) {
+            return;
+        }
+
+        if (currentHighlighted < 0) {
+            currentHighlighted = currentSuggestions.length - 1;
+        } else {
+            currentHighlighted--;
+        }
+        updateHighlighted(true);
+    }
+
+    function handleDownKey(event) {
+        event.preventDefault();
+
+        if (!suggestions.classList.contains("suggestions-visible")) {
+            return;
+        }
+
+        if (currentHighlighted == currentSuggestions.length - 1) {
+            currentHighlighted = -1;
+        } else {
+            currentHighlighted++;
+        }
+
+        updateHighlighted(true);
+    }
+
+    function handleArrowKeys(event) {
+        if (event.keyCode == 38) {
+            handleUpKey(event);
+        } else if (event.keyCode == 40) {
+            handleDownKey(event);
+        }
+    }
+
+    function htmlDecode(input) {
+        var doc = new DOMParser().parseFromString(input, "text/html");
+        return doc.documentElement.textContent;
+    }
+
+
+    searchbarInput.addEventListener('keydown', (event) => {
+        handleArrowKeys(event);
+    });
+
     searchbarInput.addEventListener('keyup', (event) => {
+        if (event.keyCode == 38 || event.keyCode == 40) {
+            return;
+        }
+
+        if (event.keyCode == 27) {
+            suggestions.classList.remove("suggestions-visible");
+            searchbar.classList.remove("searchbar-suggestions-visible");
+            return;
+        }
+
+        originalQuery = searchbarInput.value;
+
+        if (![16, 224, 18, 17, 27].includes(event.keyCode)) {
+            suggestions.classList.add("suggestions-visible");
+            searchbar.classList.add("searchbar-suggestions-visible");
+        }
         fetchAndUpdateSuggestions();
     });
 
-    searchbarInput.addEventListener("focus", (event) => {
+    searchbarContainer.addEventListener("focusin", (event) => {
         suggestions.classList.add("suggestions-visible");
+        searchbar.classList.add("searchbar-suggestions-visible");
         fetchAndUpdateSuggestions();
     });
+    searchbarInput.addEventListener("click", (event) => {
+        suggestions.classList.add("suggestions-visible");
+        searchbar.classList.add("searchbar-suggestions-visible");
+    });
 
-    searchbarInput.addEventListener("blur", (event) => {
+    searchbarContainer.addEventListener("focusout", (event) => {
         suggestions.classList.remove("suggestions-visible");
+        searchbar.classList.remove("searchbar-suggestions-visible");
     });
 </script>
 
