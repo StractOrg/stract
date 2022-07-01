@@ -83,8 +83,8 @@ pub fn domain(url: &str) -> &'_ str {
 
 pub struct Preprocessor<const N: usize> {
     removed_tags: [&'static str; N],
-    num_open_tags: [usize; N],
-    open_comments: usize,
+    num_open_tags: [i64; N],
+    open_comments: i64,
 }
 
 impl<const N: usize> Preprocessor<N> {

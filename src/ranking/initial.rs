@@ -62,6 +62,6 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
         let is_homepage = self.is_homepage_reader.get(doc) as f64;
 
-        score + 10_000.0 * centrality + 50.0 * is_homepage
+        score + 1_000.0 * centrality + 5.0 * is_homepage
     }
 }

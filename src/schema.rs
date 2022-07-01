@@ -114,7 +114,7 @@ impl Field {
         match self {
             Field::Host => Some(2.0),
             Field::DomainIfHomepage => Some(50.0),
-            Field::StemmedBody | Field::StemmedTitle => Some(0.5),
+            Field::StemmedBody | Field::StemmedTitle => Some(0.01),
             Field::Title
             | Field::Body
             | Field::BacklinkText
