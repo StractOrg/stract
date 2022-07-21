@@ -29,7 +29,6 @@ pub struct Searcher {
     index: Index,
 }
 
-#[cfg(test)]
 impl From<Index> for Searcher {
     fn from(index: Index) -> Self {
         Searcher { index }
@@ -38,7 +37,7 @@ impl From<Index> for Searcher {
 
 impl Searcher {
     pub fn search(&self, query: &str) -> Result<SearchResult> {
-        let query = Query::parse(query)?;
+        let query = Query::parse(query, self.index.schema())?;
         let ranker = Ranker::new(query.clone());
         self.index.search(&query, ranker.collector())
     }

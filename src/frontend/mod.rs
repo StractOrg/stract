@@ -16,7 +16,7 @@
 
 use axum::{Extension, Router};
 
-use crate::{autosuggest::Autosuggest, index::Index};
+use crate::{autosuggest::Autosuggest, index::Index, searcher::Searcher};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -35,7 +35,7 @@ pub mod search;
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
-    pub index: Index,
+    pub searcher: Searcher,
     pub autosuggest: Autosuggest,
 }
 
@@ -58,9 +58,10 @@ where
 pub fn router(index_path: &str, queries_csv_path: &str) -> Result<Router> {
     let search_index = Index::open(index_path)?;
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
+    let searcher = Searcher::from(search_index);
 
     let state = Arc::new(State {
-        index: search_index,
+        searcher,
         autosuggest,
     });
 

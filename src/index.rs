@@ -16,7 +16,8 @@ use serde::{Deserialize, Serialize};
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
-use tantivy::{DocAddress, Document, LeasedItem};
+use tantivy::schema::Schema;
+use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
 
 use crate::directory::{self, DirEntry};
 use crate::query::Query;
@@ -28,13 +29,14 @@ use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 pub struct Index {
     pub path: String,
     tantivy_index: tantivy::Index,
-    writer: tantivy::IndexWriter,
-    reader: tantivy::IndexReader,
-    schema: tantivy::schema::Schema,
+    writer: IndexWriter,
+    reader: IndexReader,
+    schema: Arc<Schema>,
 }
 
 impl Index {
@@ -72,7 +74,7 @@ impl Index {
         Ok(Index {
             writer,
             reader: tantivy_index.reader()?,
-            schema,
+            schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
             tantivy_index,
         })
@@ -95,10 +97,9 @@ impl Index {
     where
         C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
     {
-        let tantivy_query = query.tantivy(&self.schema, self.tantivy_index.tokenizers());
         let searcher = self.reader.searcher();
 
-        let (count, docs) = searcher.search(&tantivy_query, &(Count, collector))?;
+        let (count, docs) = searcher.search(query, &(Count, collector))?;
 
         let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
@@ -186,6 +187,10 @@ impl Index {
         .unwrap();
 
         Self::open(path).expect("failed to open index")
+    }
+
+    pub fn schema(&self) -> Arc<Schema> {
+        Arc::clone(&self.schema)
     }
 }
 
@@ -287,7 +292,7 @@ mod tests {
     #[test]
     fn simple_search() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("website").expect("Failed to parse query");
+        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
@@ -328,7 +333,8 @@ mod tests {
     #[test]
     fn document_not_matching() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("this query should not match").expect("Failed to parse query");
+        let query = Query::parse("this query should not match", index.schema())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -362,7 +368,7 @@ mod tests {
     #[test]
     fn english_stemming() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runner").expect("Failed to parse query");
+        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -396,7 +402,7 @@ mod tests {
     #[test]
     fn stemmed_query_english() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runners").expect("Failed to parse query");
+        let query = Query::parse("runners", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -430,7 +436,7 @@ mod tests {
     #[test]
     fn searchable_backlinks() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("great site").expect("Failed to parse query");
+        let query = Query::parse("great site", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -493,7 +499,7 @@ mod tests {
     #[test]
     fn limited_top_docs() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runner").expect("Failed to parse query");
+        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         for _ in 0..100 {
@@ -529,7 +535,7 @@ mod tests {
     #[test]
     fn host_search() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("dr").expect("Failed to parse query");
+        let query = Query::parse("dr", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -592,7 +598,7 @@ mod tests {
 
         let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
         let index: Index = deserialized_frozen.into();
-        let query = Query::parse("website").expect("Failed to parse query");
+        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
@@ -652,7 +658,7 @@ mod tests {
         let mut index = index1.merge(index2);
         index.commit().unwrap();
 
-        let query = Query::parse("website").expect("Failed to parse query");
+        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index

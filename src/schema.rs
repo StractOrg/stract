@@ -66,7 +66,7 @@ impl Field {
         self.default_text_options_with_tokenizer(NormalTokenizer::as_str())
     }
 
-    fn options(&self) -> IndexingOption {
+    pub fn options(&self) -> IndexingOption {
         match self {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
@@ -139,7 +139,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
     builder.build()
 }
 
-enum IndexingOption {
+pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Numeric(tantivy::schema::NumericOptions),
 }
