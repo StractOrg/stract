@@ -26,9 +26,9 @@ use super::{lexer::Token, Preprocessor};
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py
 
 const MAX_LINK_DENSITY_DEFAULT: f64 = 0.2;
-const LENGTH_LOW_DEFAULT: usize = 70;
+const LENGTH_LOW_DEFAULT: usize = 50;
 const LENGTH_HIGH_DEFAULT: usize = 200;
-const STOPWORDS_LOW_DEFAULT: f64 = 0.30;
+const STOPWORDS_LOW_DEFAULT: f64 = 0.28;
 const STOPWORDS_HIGH_DEFAULT: f64 = 0.32;
 const MAX_HEADING_DISTANCE_DEFAULT: usize = 200;
 
@@ -117,7 +117,8 @@ lazy_static! {
                 "../../stopwords/Serbian.txt" => Lang::Srp,
                 "../../stopwords/Slovak.txt" => Lang::Slk,
                 "../../stopwords/Slovenian.txt" => Lang::Slv,
-                "../../stopwords/Spanish.txt" => Lang::Spa
+                "../../stopwords/Spanish.txt" => Lang::Spa,
+                "../../stopwords/Japanese.txt" => Lang::Jpn
         )
     };
 }

@@ -24,8 +24,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{HtmlTemplate, State};
-use crate::query::Query;
-use crate::ranking::Ranker;
 use askama::Template;
 use axum::{extract, response::IntoResponse};
 
@@ -95,13 +93,7 @@ pub async fn route(
 
     if let Some(query) = params.get("q") {
         displayed_query = query.clone();
-        let query = Query::parse(query).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        let result = state
-            .index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = state.searcher.search(query).expect("Search failed");
 
         search_result = result
             .documents

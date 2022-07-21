@@ -566,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "JustText doesn't find any content on the sites. Maybe we should tune parameters?"]
+    #[ignore = "JustText doesn't find any content on the sites. How should we split into words for Japanese, Chinese etc.?"]
     fn hard_parsing() {
         let webpage = Html::parse(include_str!("../../testcases_parsing/yasudaya.html"), "");
         assert_eq!(
