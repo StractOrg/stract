@@ -33,13 +33,14 @@ impl tantivy::query::Weight for Weight {
         reader: &SegmentReader,
         boost: Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
-        let mut field_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
+        let mut term_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
 
-        for field_data in &self.fields {
-            let inverted_index = reader.inverted_index(field_data.tantivy)?;
-            let mut term_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
+        for term_text in &self.terms {
+            let mut field_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
 
-            for term_text in &self.terms {
+            for field_data in &self.fields {
+                let inverted_index = reader.inverted_index(field_data.tantivy)?;
+
                 let processed_terms: Vec<String> = field_data
                     .analyzer
                     .as_ref()
@@ -79,7 +80,7 @@ impl tantivy::query::Weight for Weight {
 
                     let posting = postings_opt.unwrap_or_else(SegmentPostings::empty);
 
-                    term_scorers.push(Box::new(Scorer::new(
+                    field_scorers.push(Box::new(Scorer::new(
                         posting,
                         fieldnorm_reader,
                         similarity_weight,
@@ -87,10 +88,10 @@ impl tantivy::query::Weight for Weight {
                 }
             }
 
-            field_scorers.push(intersect_scorers(term_scorers));
+            term_scorers.push(Box::new(Union::from(field_scorers)));
         }
 
-        Ok(Box::new(Union::from(field_scorers)))
+        Ok(intersect_scorers(term_scorers))
     }
 
     fn explain(&self, _reader: &SegmentReader, _doc: DocId) -> tantivy::Result<Explanation> {
