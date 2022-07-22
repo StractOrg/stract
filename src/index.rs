@@ -669,4 +669,45 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.example.com");
         assert_eq!(result.documents[1].url, "https://www.example.com");
     }
+
+    #[test]
+    fn match_across_fields() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("example test", index.schema()).expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.documents.len(), 0);
+        assert_eq!(result.num_docs, 0);
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.example.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
 }
