@@ -13,14 +13,16 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use itertools::Itertools;
 use tantivy::query::{EmptyScorer, Scorer};
 use tantivy::{DocId, DocSet, Postings, Score, TERMINATED};
 
 use super::field_union::FieldUnion;
-use super::term_scorer;
 
-const MAX_WIDTH: u32 = 10;
+const MAX_WIDTH: u32 = 45;
+const LAMBDA: f32 = 0.55;
+const GAMMA: f32 = 0.25;
 
 pub fn intersect_terms(mut scorers: Vec<FieldUnion>) -> Box<dyn Scorer> {
     if scorers.is_empty() {
@@ -105,7 +107,7 @@ impl Scorer for TermIntersection {
                 docset
                     .docsets
                     .iter_mut()
-                    .map(|docset| &mut docset.postings)
+                    .map(|docset| (&mut docset.postings, &docset.similarity_weight))
                     .collect_vec()
             })
             .collect_vec();
@@ -131,8 +133,11 @@ impl Scorer for TermIntersection {
 
         fields
             .into_iter()
-            .map(|terms| {
-                for (i, term) in terms.into_iter().enumerate() {
+            .enumerate()
+            .map(|(field_id, terms)| {
+                let mut weights = Vec::new();
+                for (i, (term, weight)) in terms.into_iter().enumerate() {
+                    weights.push(weight);
                     if term.doc() == TERMINATED {
                         for pos in &mut positions[i..] {
                             if !pos.is_empty() {
@@ -150,29 +155,48 @@ impl Scorer for TermIntersection {
                     return 0.0;
                 }
 
-                1.0
-            })
-            .sum::<Score>();
+                let spans: Vec<Span> = SpansIterator::new(positions.clone()).collect();
 
-        self.docsets.iter_mut().map(Scorer::score).sum::<Score>()
+                positions
+                    .iter()
+                    .zip_eq(weights.iter())
+                    .enumerate()
+                    .map(|(term_id, (_pos, weight))| {
+                        let rc = spans
+                            .iter()
+                            .filter(|span| span.has_term(term_id as u32))
+                            .map(|span| span.relevance_contribution())
+                            .sum::<f32>();
+
+                        weight.score(field_id.try_into().unwrap(), rc)
+                    })
+                    .sum::<Score>()
+            })
+            .sum::<Score>()
     }
 }
 
 struct SpansIterator {
     num_terms: usize,
     hits: HitsIterator,
+    max_width: u32,
     current_hit: Option<Hit>,
     spillover_hit: Option<Hit>,
 }
 
 impl SpansIterator {
     pub fn new(positions: Vec<Vec<u32>>) -> Self {
+        Self::new_with_max_width(positions, MAX_WIDTH)
+    }
+
+    fn new_with_max_width(positions: Vec<Vec<u32>>, max_width: u32) -> Self {
         let num_terms = positions.len();
         let hits = HitsIterator::new(positions);
 
         Self {
             hits,
             num_terms,
+            max_width,
             current_hit: None,
             spillover_hit: None,
         }
@@ -183,7 +207,10 @@ impl Iterator for SpansIterator {
     type Item = Span;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut current_span = Span::default();
+        let mut current_span = Span {
+            max_width: self.max_width,
+            ..Default::default()
+        };
         let mut term_seen_before = vec![None; self.num_terms];
 
         if let Some(spillover) = self.spillover_hit.take() {
@@ -213,7 +240,7 @@ impl Iterator for SpansIterator {
                     term_seen_before[current_hit.term_id as usize] = Some(current_hit.position);
 
                     let dist = next_hit.position - current_hit.position + 1;
-                    if dist > MAX_WIDTH || current_hit.term_id == next_hit.term_id {
+                    if dist > self.max_width || current_hit.term_id == next_hit.term_id {
                         // case 1 and 2 from paper
                         current_span.terms.push(SpanTermInfo {
                             term_id: current_hit.term_id,
@@ -259,18 +286,28 @@ struct SpanTermInfo {
     position: u32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct Span {
+    max_width: u32,
     terms: Vec<SpanTermInfo>,
+}
+
+impl Default for Span {
+    fn default() -> Self {
+        Self {
+            max_width: MAX_WIDTH,
+            terms: Default::default(),
+        }
+    }
 }
 
 impl Span {
     fn width(&self) -> u32 {
         match (self.terms.first(), self.terms.last()) {
             (Some(first), Some(last)) if first.term_id != last.term_id => {
-                (last.position - first.position + 1).min(MAX_WIDTH)
+                (last.position - first.position + 1).min(self.max_width)
             }
-            _ => MAX_WIDTH,
+            _ => self.max_width,
         }
     }
 
@@ -280,6 +317,10 @@ impl Span {
 
     fn has_term(&self, term_id: u32) -> bool {
         self.terms.iter().any(|term| term.term_id == term_id)
+    }
+
+    fn relevance_contribution(&self) -> f32 {
+        (self.num_terms() as f32).powf(LAMBDA) / (self.width() as f32).powf(GAMMA)
     }
 }
 
@@ -418,6 +459,7 @@ mod tests {
                     position: 3,
                 },
             ],
+            ..Default::default()
         };
 
         assert_eq!(span.width(), 4);
@@ -432,6 +474,7 @@ mod tests {
                 term_id: 1,
                 position: 0,
             }],
+            ..Default::default()
         };
 
         assert_eq!(span.width(), MAX_WIDTH);
@@ -447,6 +490,7 @@ mod tests {
                     position: MAX_WIDTH + 10,
                 },
             ],
+            ..Default::default()
         };
 
         assert_eq!(span.width(), MAX_WIDTH);
@@ -462,7 +506,7 @@ mod tests {
 
         let positions = vec![vec![5, 29], vec![7, 10], vec![8, 11]];
 
-        let spans: Vec<Span> = SpansIterator::new(positions).collect();
+        let spans: Vec<Span> = SpansIterator::new_with_max_width(positions, 10).collect();
 
         assert_eq!(spans.len(), 3);
         assert_eq!(spans[0].width(), 4);
