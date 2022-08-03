@@ -24,7 +24,7 @@ use tantivy::{DocId, Score};
 pub struct TermScorerForField {
     pub postings: SegmentPostings,
     fieldnorm_reader: FieldNormReader,
-    similarity_weight: Bm25Weight,
+    pub similarity_weight: Bm25Weight,
 }
 
 impl TermScorerForField {
@@ -71,6 +71,7 @@ impl tantivy::query::Scorer for TermScorerForField {
     fn score(&mut self) -> Score {
         let fieldnorm_id = self.fieldnorm_id();
         let term_freq = self.term_freq();
-        self.similarity_weight.score(fieldnorm_id, term_freq)
+        self.similarity_weight
+            .score(fieldnorm_id, term_freq as Score)
     }
 }

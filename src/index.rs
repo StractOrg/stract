@@ -710,4 +710,79 @@ mod tests {
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
+
+    #[test]
+    fn proximity_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = Query::parse("termA termB", index.schema()).expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA termB d d d d d d d d d
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.first.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA d d d d d d d d d termB
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.third.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA d d d d termB d d d d d
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.second.com",
+                vec![],
+                1.0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 3);
+        assert_eq!(result.documents.len(), 3);
+        assert_eq!(result.documents[0].url, "https://www.first.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.documents[2].url, "https://www.third.com");
+    }
 }
