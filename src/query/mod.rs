@@ -32,8 +32,10 @@ use tantivy::{
 use self::bm25::Bm25Weight;
 
 mod bm25;
-mod scorer;
-mod union;
+mod field_union;
+mod term_intersection;
+mod term_scorer;
+mod vec_docset;
 mod weight;
 
 /// A combinator that takes a parser `inner` and produces a parser that also consumes leading
@@ -50,12 +52,20 @@ where
 fn term(term: &str) -> IResult<&str, &str> {
     ws(take_while(|c: char| !c.is_whitespace()))(term)
 }
+
 pub struct FieldData {
     tantivy: tantivy::schema::Field,
     scoring: Bm25Weight,
     index_record_option: Option<IndexRecordOption>,
     boost: Option<f32>,
     analyzer: Option<TextAnalyzer>,
+}
+impl std::fmt::Debug for FieldData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FieldData")
+            .field("tanitvy", &self.tantivy)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug)]
