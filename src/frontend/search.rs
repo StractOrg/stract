@@ -34,6 +34,17 @@ pub fn html_escape(s: &str) -> String {
         .collect()
 }
 
+pub fn find_protocol(url: &str) -> &'_ str {
+    let mut start_host = 0;
+    if url.starts_with("http://") || url.starts_with("https://") {
+        start_host = url
+            .find(':')
+            .expect("It was checked that url starts with protocol");
+    }
+
+    &url[..start_host]
+}
+
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
@@ -47,13 +58,15 @@ const MAX_TITLE_LEN: usize = 50;
 
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
-        let mut pretty_url = strip_query(strip_protocol(&webpage.url)).to_string();
+        let mut pretty_url = strip_query(&webpage.url).to_string();
 
         if pretty_url.ends_with('/') {
             pretty_url = pretty_url.chars().take(pretty_url.len() - 1).collect();
         }
 
-        pretty_url = pretty_url.replace('/', " › ");
+        let protocol = find_protocol(&pretty_url).to_string() + "://";
+        pretty_url = strip_protocol(&pretty_url).replace('/', " › ");
+        pretty_url = protocol + &pretty_url;
 
         if pretty_url.len() > MAX_PRETTY_URL_LEN {
             pretty_url = pretty_url.chars().take(MAX_PRETTY_URL_LEN).collect();
@@ -107,4 +120,15 @@ pub async fn route(
         query: displayed_query,
     };
     HtmlTemplate(template)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_protocol() {
+        assert_eq!(find_protocol("https://example.com"), "https");
+        assert_eq!(find_protocol("http://example.com"), "http");
+    }
 }
