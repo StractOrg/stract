@@ -13,12 +13,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use super::scorer::Scorer;
-use super::union::Union;
+
+use super::field_union::FieldUnion;
+use super::term_intersection::intersect_terms;
+use super::term_scorer::TermScorerForField;
 use super::FieldData;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
-use tantivy::query::{intersect_scorers, Explanation};
+use tantivy::query::Explanation;
 use tantivy::{DocId, Score, SegmentReader};
 
 pub struct Weight {
@@ -33,10 +35,12 @@ impl tantivy::query::Weight for Weight {
         reader: &SegmentReader,
         boost: Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
-        let mut term_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
+        // each term has a union over the fields
+        // e.g. if the term both occurs in the title and body
+        let mut term_scorers: Vec<FieldUnion> = Vec::new();
 
         for term_text in &self.terms {
-            let mut field_scorers: Vec<Box<dyn tantivy::query::Scorer>> = Vec::new();
+            let mut field_scorers: Vec<TermScorerForField> = Vec::new();
 
             for field_data in &self.fields {
                 let inverted_index = reader.inverted_index(field_data.tantivy)?;
@@ -80,18 +84,18 @@ impl tantivy::query::Weight for Weight {
 
                     let posting = postings_opt.unwrap_or_else(SegmentPostings::empty);
 
-                    field_scorers.push(Box::new(Scorer::new(
+                    field_scorers.push(TermScorerForField::new(
                         posting,
                         fieldnorm_reader,
                         similarity_weight,
-                    )));
+                    ));
                 }
             }
 
-            term_scorers.push(Box::new(Union::from(field_scorers)));
+            term_scorers.push(FieldUnion::from(field_scorers));
         }
 
-        Ok(intersect_scorers(term_scorers))
+        Ok(intersect_terms(term_scorers))
     }
 
     fn explain(&self, _reader: &SegmentReader, _doc: DocId) -> tantivy::Result<Explanation> {

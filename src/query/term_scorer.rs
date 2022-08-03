@@ -21,19 +21,19 @@ use tantivy::DocSet;
 use tantivy::{DocId, Score};
 
 #[derive(Clone)]
-pub struct Scorer {
-    postings: SegmentPostings,
+pub struct TermScorerForField {
+    pub postings: SegmentPostings,
     fieldnorm_reader: FieldNormReader,
     similarity_weight: Bm25Weight,
 }
 
-impl Scorer {
+impl TermScorerForField {
     pub fn new(
         postings: SegmentPostings,
         fieldnorm_reader: FieldNormReader,
         similarity_weight: Bm25Weight,
-    ) -> Scorer {
-        Scorer {
+    ) -> TermScorerForField {
+        TermScorerForField {
             postings,
             fieldnorm_reader,
             similarity_weight,
@@ -49,7 +49,7 @@ impl Scorer {
     }
 }
 
-impl DocSet for Scorer {
+impl DocSet for TermScorerForField {
     fn advance(&mut self) -> DocId {
         self.postings.advance()
     }
@@ -67,7 +67,7 @@ impl DocSet for Scorer {
     }
 }
 
-impl tantivy::query::Scorer for Scorer {
+impl tantivy::query::Scorer for TermScorerForField {
     fn score(&mut self) -> Score {
         let fieldnorm_id = self.fieldnorm_id();
         let term_freq = self.term_freq();
