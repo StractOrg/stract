@@ -78,6 +78,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             let html = Html::parse(&record.response.body, &record.request.url);
             let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
             let centrality = worker.centrality_store.get(html.host()).unwrap_or_default();
+            let fetch_time_ms = record.metadata.fetch_time_ms as u64;
 
             trace!("inserting webpage: {:?}", html.url());
 
@@ -88,6 +89,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                 html,
                 backlinks,
                 centrality,
+                fetch_time_ms,
             };
 
             if let Err(err) = index.insert(webpage) {

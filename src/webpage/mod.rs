@@ -144,16 +144,24 @@ pub struct Webpage<'a> {
     pub html: Html<'a>,
     pub backlinks: Vec<Link>,
     pub centrality: f64,
+    pub fetch_time_ms: u64,
 }
 
 impl<'a> Webpage<'a> {
-    pub fn new(html: &'a str, url: &str, backlinks: Vec<Link>, centrality: f64) -> Self {
+    pub fn new(
+        html: &'a str,
+        url: &str,
+        backlinks: Vec<Link>,
+        centrality: f64,
+        fetch_time_ms: u64,
+    ) -> Self {
         let html = Html::parse(html, url);
 
         Self {
             html,
             backlinks,
             centrality,
+            fetch_time_ms,
         }
     }
 
@@ -178,6 +186,13 @@ impl<'a> Webpage<'a> {
                 .get_field(Field::Centrality.as_str())
                 .expect("Failed to get centrality field"),
             (self.centrality * CENTRALITY_SCALING as f64) as u64,
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::FetchTimeMs.as_str())
+                .expect("Failed to get fetch_time_ms field"),
+            self.fetch_time_ms,
         );
 
         Ok(doc)
@@ -405,7 +420,7 @@ impl<'a> Html<'a> {
                 Field::IsHomepage => {
                     doc.add_u64(tantivy_field, self.is_homepage().then(|| 1).unwrap_or(0))
                 }
-                Field::BacklinkText | Field::Centrality => {}
+                Field::BacklinkText | Field::Centrality | Field::FetchTimeMs => {}
             }
         }
 

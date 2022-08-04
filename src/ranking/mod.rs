@@ -65,6 +65,7 @@ mod tests {
                     "https://www.a.com",
                     vec![],
                     0.0,
+                    500,
                 ))
                 .expect("failed to parse webpage");
             index
@@ -88,6 +89,7 @@ mod tests {
                         text: "B site is great".to_string(),
                     }],
                     5.0,
+                    500,
                 ))
                 .expect("failed to parse webpage");
 
@@ -121,6 +123,7 @@ mod tests {
                 "https://www.dr.dk",
                 vec![],
                 0.0,
+                500,
             ))
             .expect("failed to parse webpage");
         index
@@ -140,6 +143,7 @@ mod tests {
                 "https://www.dr.dk/whatever",
                 vec![],
                 0.0,
+                500,
             ))
             .expect("failed to parse webpage");
         index
@@ -157,6 +161,7 @@ mod tests {
                 "https://www.b.com",
                 vec![],
                 0.003,
+                500,
             ))
             .expect("failed to parse webpage");
 

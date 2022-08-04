@@ -301,6 +301,7 @@ Survey in 2016, 2017, and 2018."#;
                 "https://www.example.com",
                 vec![],
                 1.0,
+                500,
             ))
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");

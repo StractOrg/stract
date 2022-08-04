@@ -35,8 +35,9 @@ pub enum Field {
     IsHomepage,
     BacklinkText,
     Centrality,
+    FetchTimeMs,
 }
-pub static ALL_FIELDS: [Field; 11] = [
+pub static ALL_FIELDS: [Field; 12] = [
     Field::Title,
     Field::Body,
     Field::StemmedTitle,
@@ -48,6 +49,7 @@ pub static ALL_FIELDS: [Field; 11] = [
     Field::IsHomepage,
     Field::BacklinkText,
     Field::Centrality,
+    Field::FetchTimeMs,
 ];
 
 impl Field {
@@ -91,6 +93,11 @@ impl Field {
             Field::StemmedBody => IndexingOption::Text(
                 self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
             ),
+            Field::FetchTimeMs => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -107,6 +114,7 @@ impl Field {
             Field::Domain => "domain",
             Field::DomainIfHomepage => "domain_if_homepage",
             Field::IsHomepage => "is_homepage",
+            Field::FetchTimeMs => "fetch_time_ms",
         }
     }
 
@@ -121,7 +129,8 @@ impl Field {
             | Field::Centrality
             | Field::Url
             | Field::Domain
-            | Field::IsHomepage => None,
+            | Field::IsHomepage
+            | Field::FetchTimeMs => None,
         }
     }
 }
