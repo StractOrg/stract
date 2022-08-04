@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{Error, Result};
 use logos::{Lexer, Logos};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 mod just_text;
 mod lexer;
@@ -23,6 +23,17 @@ mod lexer;
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 use self::{just_text::JustText, lexer::Token};
+
+pub fn find_protocol(url: &str) -> &'_ str {
+    let mut start_host = 0;
+    if url.starts_with("http://") || url.starts_with("https://") {
+        start_host = url
+            .find(':')
+            .expect("It was checked that url starts with protocol");
+    }
+
+    &url[..start_host]
+}
 
 pub fn strip_protocol(url: &str) -> &'_ str {
     let mut start_host = 0;
@@ -177,7 +188,7 @@ impl<'a> Webpage<'a> {
 pub struct Html<'a> {
     raw: &'a str,
     tokens: Lexer<'a, Token<'a>>,
-    url: String,
+    url: Url,
 }
 
 impl<'a> Html<'a> {
@@ -187,7 +198,7 @@ impl<'a> Html<'a> {
         Self {
             raw: html,
             tokens,
-            url: url.to_string(),
+            url: Url(url.to_string()),
         }
     }
 
@@ -212,7 +223,7 @@ impl<'a> Html<'a> {
                         if let Some(dest) = attributes.get("href") {
                             links.push(Link {
                                 source: self.url.clone(),
-                                destination: dest.to_string(),
+                                destination: dest.to_string().into(),
                                 text,
                             })
                         }
@@ -228,7 +239,7 @@ impl<'a> Html<'a> {
                     if let Some(dest) = tag.attributes().get("href") {
                         links.push(Link {
                             source: self.url.clone(),
-                            destination: dest.to_string(),
+                            destination: dest.to_string().into(),
                             text: String::new(),
                         })
                     }
@@ -298,20 +309,20 @@ impl<'a> Html<'a> {
         title
     }
 
-    pub fn url(&self) -> &str {
+    pub fn url(&self) -> &Url {
         &self.url
     }
 
     pub fn host(&self) -> &str {
-        host(self.url())
+        self.url.host()
     }
 
     pub fn domain(&self) -> &str {
-        domain(self.url())
+        self.url.domain()
     }
 
     pub fn is_homepage(&self) -> bool {
-        is_homepage(self.url())
+        self.url.is_homepage()
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
@@ -402,10 +413,43 @@ impl<'a> Html<'a> {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Url(String);
+
+impl Display for Url {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+impl From<String> for Url {
+    fn from(url: String) -> Self {
+        Url(url)
+    }
+}
+
+impl Url {
+    pub fn host(&self) -> &str {
+        host(&self.0)
+    }
+
+    pub fn domain(&self) -> &str {
+        domain(&self.0)
+    }
+
+    pub fn is_homepage(&self) -> bool {
+        is_homepage(&self.0)
+    }
+
+    pub fn protocol(&self) -> &str {
+        find_protocol(&self.0)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Link {
-    pub source: String,
-    pub destination: String,
+    pub source: Url,
+    pub destination: Url,
     pub text: String,
 }
 
@@ -443,8 +487,8 @@ mod tests {
         assert_eq!(
             webpage.links(),
             vec![Link {
-                source: "https://www.example.com/whatever".to_string(),
-                destination: "example.com".to_string(),
+                source: "https://www.example.com/whatever".to_string().into(),
+                destination: "example.com".to_string().into(),
                 text: "Link to example".to_string()
             }]
         );
@@ -455,7 +499,10 @@ mod tests {
         expected_meta.insert("content".to_string(), "value".to_string());
 
         assert_eq!(webpage.metadata(), vec![expected_meta]);
-        assert_eq!(webpage.url(), "https://www.example.com/whatever");
+        assert_eq!(
+            webpage.url().to_string().as_str(),
+            "https://www.example.com/whatever"
+        );
         assert_eq!(webpage.host(), "www.example.com");
         assert_eq!(webpage.domain(), "example.com");
     }
@@ -594,5 +641,11 @@ mod tests {
         );
         assert!(webpage.text().is_some());
         assert!(!webpage.text().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_find_protocol() {
+        assert_eq!(find_protocol("https://example.com"), "https");
+        assert_eq!(find_protocol("http://example.com"), "http");
     }
 }

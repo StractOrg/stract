@@ -28,7 +28,7 @@ use std::{cmp, fs};
 use graph_store::GraphStore;
 
 use crate::directory::{self, DirEntry};
-use crate::webpage;
+use crate::webpage::{self, Url};
 
 use self::graph_store::Adjacency;
 use self::rocksdb_store::RocksDbStore;
@@ -63,6 +63,14 @@ impl From<String> for Node {
 impl From<&str> for Node {
     fn from(name: &str) -> Self {
         Self::from(name.to_string())
+    }
+}
+
+impl From<Url> for Node {
+    fn from(url: Url) -> Self {
+        Self {
+            name: url.to_string(),
+        }
     }
 }
 

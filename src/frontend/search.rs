@@ -18,7 +18,7 @@ use axum::Extension;
 
 use crate::{
     index::RetrievedWebpage,
-    webpage::{strip_protocol, strip_query},
+    webpage::{strip_protocol, strip_query, Url},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,17 +32,6 @@ pub fn html_escape(s: &str) -> String {
         .chars()
         .filter(|c| !matches!(c, '<' | '>' | '&'))
         .collect()
-}
-
-pub fn find_protocol(url: &str) -> &'_ str {
-    let mut start_host = 0;
-    if url.starts_with("http://") || url.starts_with("https://") {
-        start_host = url
-            .find(':')
-            .expect("It was checked that url starts with protocol");
-    }
-
-    &url[..start_host]
 }
 
 pub struct DisplayedWebpage {
@@ -64,7 +53,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             pretty_url = pretty_url.chars().take(pretty_url.len() - 1).collect();
         }
 
-        let protocol = find_protocol(&pretty_url).to_string() + "://";
+        let protocol = Url::from(pretty_url.clone()).protocol().to_string() + "://";
         pretty_url = strip_protocol(&pretty_url).replace('/', " › ");
         pretty_url = protocol + &pretty_url;
 
@@ -120,15 +109,4 @@ pub async fn route(
         query: displayed_query,
     };
     HtmlTemplate(template)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_find_protocol() {
-        assert_eq!(find_protocol("https://example.com"), "https");
-        assert_eq!(find_protocol("http://example.com"), "http");
-    }
 }
