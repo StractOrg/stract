@@ -473,8 +473,8 @@ mod tests {
                 ),
                 "https://www.b.com",
                 vec![Link {
-                    source: "https://www.a.com".to_string(),
-                    destination: "https://www.b.com".to_string(),
+                    source: "https://www.a.com".to_string().into(),
+                    destination: "https://www.b.com".to_string().into(),
                     text: "B site is great".to_string(),
                 }],
                 1.0,

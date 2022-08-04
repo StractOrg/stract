@@ -17,7 +17,7 @@ use crate::{
     mapreduce::{Map, MapReduce, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{FrozenWebgraph, Node, Webgraph, WebgraphBuilder},
-    webpage::{self, Html},
+    webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -61,11 +61,8 @@ impl Map<StatelessWorker, FrozenWebgraph> for Job {
             for link in webpage
                 .links()
                 .into_iter()
-                .filter(|link| {
-                    link.destination.starts_with("http://")
-                        || link.destination.starts_with("https://")
-                })
-                .filter(|link| webpage::domain(&link.source) != webpage::domain(&link.destination))
+                .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
+                .filter(|link| link.source.domain() != link.destination.domain())
             {
                 trace!("inserting link {:?}", link);
                 graph.insert(
