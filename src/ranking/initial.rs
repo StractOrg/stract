@@ -25,6 +25,7 @@ pub(crate) struct InitialScoreTweaker {}
 pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<u64>,
     is_homepage_reader: DynamicFastFieldReader<u64>,
+    fetch_time_ms_reader: DynamicFastFieldReader<u64>,
 }
 
 impl ScoreTweaker<f64> for InitialScoreTweaker {
@@ -49,9 +50,19 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .u64(is_homepage_field)
             .expect("Failed to get is_homepage fast-field reader");
 
+        let fetch_time_ms_field = segment_reader
+            .schema()
+            .get_field(Field::FetchTimeMs.as_str())
+            .expect("Faild to load fetch_time_ms field");
+        let fetch_time_ms_reader = segment_reader
+            .fast_fields()
+            .u64(fetch_time_ms_field)
+            .expect("Failed to get fetch_time_ms fast-field reader");
+
         Ok(InitialSegmentScoreTweaker {
             centrality_reader,
             is_homepage_reader,
+            fetch_time_ms_reader,
         })
     }
 }
@@ -61,7 +72,8 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let score = score as f64;
         let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
         let is_homepage = self.is_homepage_reader.get(doc) as f64;
+        let fetch_time_ms = self.fetch_time_ms_reader.get(doc) as f64;
 
-        score + 400.0 * centrality + 5.0 * is_homepage
+        score + (400.0 * centrality) + (5.0 * is_homepage) + (10.0 / (fetch_time_ms + 1.0))
     }
 }
