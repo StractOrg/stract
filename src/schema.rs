@@ -71,7 +71,7 @@ impl Field {
     pub fn options(&self) -> IndexingOption {
         match self {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Body => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Body => IndexingOption::Text(self.default_text_options()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Host => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
@@ -91,7 +91,8 @@ impl Field {
                 self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
             ),
             Field::StemmedBody => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
+                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str())
+                    .set_stored(),
             ),
             Field::FetchTimeMs => IndexingOption::Numeric(
                 NumericOptions::default()
