@@ -215,7 +215,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Title field should be text")
                         .to_string()
                 }
-                Field::Body => {
+                Field::StemmedBody => {
                     webpage.body = value
                         .value
                         .as_text()
@@ -233,7 +233,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Centrality
                 | Field::Host
                 | Field::StemmedTitle
-                | Field::StemmedBody
+                | Field::Body
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage

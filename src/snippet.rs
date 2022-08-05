@@ -15,12 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::frontend::search::html_escape;
+use crate::tokenizer::StemmedTokenizer;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::Range;
 
 use tantivy::tokenizer::{TextAnalyzer, Token};
 use tantivy::{Score, Searcher};
+use whatlang::Lang;
 
 /// For now we use the snippet generator from tantivy with a minor modification to support our TokenStreamMerger.
 /// In the future we want to implement something closer to the method described in https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf.
@@ -197,26 +199,33 @@ impl SnippetGenerator {
         searcher: &Searcher,
         query: &dyn tantivy::query::Query,
         field: tantivy::schema::Field,
+        tokenizer: tantivy::tokenizer::TextAnalyzer,
     ) -> crate::Result<SnippetGenerator> {
         let mut terms = BTreeMap::new();
         query.query_terms(&mut terms);
         let mut terms_text: BTreeMap<String, Score> = Default::default();
-        for (term, _) in terms {
+
+        for (mut term, _) in terms {
             if term.field() != field {
                 continue;
             }
             let term_str = if let Some(term_str) = term.as_str() {
-                term_str
+                tokenizer
+                    .token_stream(term_str)
+                    .next()
+                    .unwrap()
+                    .text
+                    .clone()
             } else {
                 continue;
             };
+            term.set_text(&term_str);
             let doc_freq = searcher.doc_freq(&term)?;
             if doc_freq > 0 {
                 let score = 1.0 / (1.0 + doc_freq as Score);
-                terms_text.insert(term_str.to_string(), score);
+                terms_text.insert(term_str, score);
             }
         }
-        let tokenizer = searcher.index().tokenizer_for_field(field)?;
         Ok(SnippetGenerator {
             terms_text,
             tokenizer,
@@ -240,14 +249,14 @@ impl SnippetGenerator {
 use crate::{query::Query, schema::Field, Result};
 
 pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Result<String> {
-    let generator = SnippetGenerator::create(
-        searcher,
-        query,
-        searcher
-            .schema()
-            .get_field(Field::Body.as_str())
-            .expect("Failed to get body field"),
-    )?;
+    let field = searcher
+        .schema()
+        .get_field(Field::StemmedBody.as_str())
+        .expect("Failed to get body field");
+    let tokenizer =
+        StemmedTokenizer::with_forced_language(whatlang::detect_lang(text).unwrap_or(Lang::Eng))
+            .into();
+    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
     let mut snippet = generator.snippet(text);
 
@@ -313,6 +322,42 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is...".to_string());
+    }
+
+    #[test]
+    fn stemmed_words_snippet_highlight() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Website for runners</title>
+                            </head>
+                            <body>
+                                {}
+                            </body>
+                        </html>
+                    "#,
+                    TEST_TEXT
+                ),
+                "https://www.example.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = Searcher::from(index);
+
+        let result = searcher.search("describe").expect("Search failed");
+
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is...".to_string());
     }
 
     #[test]
@@ -476,6 +521,7 @@ Survey in 2016, 2017, and 2018."#;
         let text_field = schema_builder.add_text_field("text", tantivy::schema::TEXT);
         let schema = schema_builder.build();
         let index = tantivy::Index::create_in_ram(schema);
+        let tokenizer: TextAnalyzer = SimpleTokenizer.into();
         {
             // writing the segment
             let mut index_writer = index.writer_with_num_threads(1, 10_000_000).unwrap();
@@ -495,13 +541,15 @@ Survey in 2016, 2017, and 2018."#;
         {
             let query = query_parser.parse_query("e").unwrap();
             let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
+                    .unwrap();
             assert!(snippet_generator.terms_text().is_empty());
         }
         {
             let query = query_parser.parse_query("a").unwrap();
             let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
+                    .unwrap();
             assert_eq!(
                 &btreemap!("a".to_string() => 0.25),
                 snippet_generator.terms_text()
@@ -510,7 +558,8 @@ Survey in 2016, 2017, and 2018."#;
         {
             let query = query_parser.parse_query("a b").unwrap();
             let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
+                    .unwrap();
             assert_eq!(
                 &btreemap!("a".to_string() => 0.25, "b".to_string() => 0.5),
                 snippet_generator.terms_text()
@@ -519,7 +568,7 @@ Survey in 2016, 2017, and 2018."#;
         {
             let query = query_parser.parse_query("a b c").unwrap();
             let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer).unwrap();
             assert_eq!(
                 &btreemap!("a".to_string() => 0.25, "b".to_string() => 0.5),
                 snippet_generator.terms_text()
@@ -546,9 +595,11 @@ Survey in 2016, 2017, and 2018."#;
             index_writer.commit()?;
         }
         let searcher = index.reader().unwrap().searcher();
+        let tokenizer = searcher.index().tokenizer_for_field(text_field).unwrap();
         let query_parser = tantivy::query::QueryParser::for_index(&index, vec![text_field]);
         let query = query_parser.parse_query("rust design").unwrap();
-        let snippet_generator = SnippetGenerator::create(&searcher, &*query, text_field).unwrap();
+        let snippet_generator =
+            SnippetGenerator::create(&searcher, &*query, text_field, tokenizer).unwrap();
         {
             let snippet = snippet_generator.snippet(TEST_TEXT);
             assert_eq!(

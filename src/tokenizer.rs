@@ -77,11 +77,18 @@ impl NormalTokenizer {
 }
 
 #[derive(Clone, Default)]
-pub struct StemmedTokenizer {}
+pub struct StemmedTokenizer {
+    force_language: Option<Lang>,
+}
 
 impl StemmedTokenizer {
     pub fn as_str() -> &'static str {
         "stemmed_tokenizer"
+    }
+    pub fn with_forced_language(lang: Lang) -> Self {
+        Self {
+            force_language: Some(lang),
+        }
     }
 }
 
@@ -105,10 +112,15 @@ impl tantivy::tokenizer::Tokenizer for NormalTokenizer {
 impl tantivy::tokenizer::Tokenizer for StemmedTokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         let analyzer = TextAnalyzer::from(SimpleTokenizer).filter(LowerCaser);
-        if let Some(lang) = whatlang::detect_lang(text) {
-            analyzer.filter(MyStemmer::from(lang).0).token_stream(text)
-        } else {
-            analyzer.token_stream(text)
+
+        let lang = match self.force_language {
+            Some(lang) => Some(lang),
+            None => whatlang::detect_lang(text),
+        };
+
+        match lang {
+            Some(lang) => analyzer.filter(MyStemmer::from(lang).0).token_stream(text),
+            None => analyzer.token_stream(text),
         }
     }
 }
