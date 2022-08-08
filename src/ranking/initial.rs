@@ -74,6 +74,6 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let is_homepage = self.is_homepage_reader.get(doc) as f64;
         let fetch_time_ms = self.fetch_time_ms_reader.get(doc) as f64;
 
-        score + (400.0 * centrality) + (5.0 * is_homepage) + (10.0 / (fetch_time_ms + 1.0))
+        (2.0 * score) + (400.0 * centrality) + (5.0 * is_homepage) + (10.0 / (fetch_time_ms + 1.0))
     }
 }

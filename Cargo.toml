@@ -44,6 +44,7 @@ csv = "1.1.6"
 fst = "0.4.7"
 lazy_static = "1.4.0"
 rocksdb = "0.18.0"
+image = "0.24.3"
 
 [dev-dependencies]
 maplit = "1.0.2"
