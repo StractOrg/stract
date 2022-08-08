@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod graph_store;
-mod kv;
-mod rocksdb_store;
-pub mod sled_store;
 
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
@@ -31,7 +28,7 @@ use crate::directory::{self, DirEntry};
 use crate::webpage::{self, Url};
 
 use self::graph_store::Adjacency;
-use self::rocksdb_store::RocksDbStore;
+use crate::kv::rocksdb_store::RocksDbStore;
 
 type NodeID = u64;
 

@@ -14,21 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cell::RefCell, fs, marker::PhantomData};
+use std::{fs, marker::PhantomData};
 
 use rocksdb::{DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, SingleThreaded, DB};
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{
-    graph_store::{Adjacency, BlockedCachedTree, CachedTree, GraphStore},
-    kv::Kv,
-    Store,
-};
+use crate::kv::Kv;
 
 pub struct RocksDbStore {}
 
 impl RocksDbStore {
-    fn open_db<K, V, P>(path: P) -> Box<dyn Kv<K, V> + Send + Sync>
+    pub fn open<K, V, P>(path: P) -> Box<dyn Kv<K, V> + Send + Sync>
     where
         P: AsRef<std::path::Path>,
         K: Serialize + DeserializeOwned + 'static,
@@ -39,38 +35,6 @@ impl RocksDbStore {
         }
 
         Box::new(DB::open_default(path).expect("unable to open rocks db"))
-    }
-}
-
-impl Store for RocksDbStore {
-    fn open<P: AsRef<std::path::Path>>(path: P) -> GraphStore<Self> {
-        let adjacency = RocksDbStore::open_db(path.as_ref().join("adjacency"));
-        let reversed_adjacency = RocksDbStore::open_db(path.as_ref().join("reversed_adjacency"));
-        let node2id = RocksDbStore::open_db(path.as_ref().join("node2id"));
-        let id2node = RocksDbStore::open_db(path.as_ref().join("id2node"));
-        let meta = RocksDbStore::open_db(path.as_ref().join("meta"));
-
-        GraphStore {
-            adjacency: RefCell::new(Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(adjacency, 10_000),
-                    block_size: 1_024,
-                },
-            }),
-            reversed_adjacency: RefCell::new(Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(reversed_adjacency, 10_000),
-                    block_size: 1_024,
-                },
-            }),
-            node2id: RefCell::new(CachedTree::new(node2id, 100_000)),
-            id2node: RefCell::new(BlockedCachedTree {
-                inner: CachedTree::new(id2node, 100_000),
-                block_size: 1_024,
-            }),
-            meta: RefCell::new(CachedTree::new(meta, 1_000)),
-            store: Default::default(),
-        }
     }
 }
 

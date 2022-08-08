@@ -14,60 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cell::RefCell, marker::PhantomData};
+use std::marker::PhantomData;
 
 use nom::AsBytes;
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{
-    graph_store::{Adjacency, BlockedCachedTree, CachedTree, GraphStore},
-    kv::Kv,
-    Store,
-};
+use crate::kv::Kv;
 
 pub struct SledStore {}
-
-impl Store for SledStore {
-    fn open<P: AsRef<std::path::Path>>(path: P) -> GraphStore<Self> {
-        let db = sled::Config::default()
-            .path(path)
-            .use_compression(true)
-            .mode(sled::Mode::LowSpace)
-            .open()
-            .expect("Failed to open database");
-
-        let adjacency = Box::new(db.open_tree("adjacency").expect("unable to open sled tree"));
-        let reversed_adjacency = Box::new(
-            db.open_tree("reversed_adjacency")
-                .expect("unable to open sled tree"),
-        );
-        let node2id = Box::new(db.open_tree("node2id").expect("unable to open sled tree"));
-        let id2node = Box::new(db.open_tree("id2node").expect("unable to open sled tree"));
-        let meta = Box::new(db.open_tree("meta").expect("unable to open sled tree"));
-
-        GraphStore {
-            adjacency: RefCell::new(Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(adjacency, 10_000),
-                    block_size: 1_024,
-                },
-            }),
-            reversed_adjacency: RefCell::new(Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(reversed_adjacency, 10_000),
-                    block_size: 1_024,
-                },
-            }),
-            node2id: RefCell::new(CachedTree::new(node2id, 100_000)),
-            id2node: RefCell::new(BlockedCachedTree {
-                inner: CachedTree::new(id2node, 100_000),
-                block_size: 1_024,
-            }),
-            meta: RefCell::new(CachedTree::new(meta, 1_000)),
-            store: Default::default(),
-        }
-    }
-}
 
 impl<K, V> Kv<K, V> for sled::Tree
 where
