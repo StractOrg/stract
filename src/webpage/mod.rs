@@ -92,6 +92,14 @@ pub fn domain(url: &str) -> &'_ str {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct FaviconLink {
+    link: Url,
+    width: Option<u32>,
+    height: Option<u32>,
+    image_type: Option<String>,
+}
+
 pub struct Preprocessor<const N: usize> {
     removed_tags: [&'static str; N],
     num_open_tags: [i64; N],
@@ -270,6 +278,61 @@ impl<'a> Html<'a> {
         links
     }
 
+    pub fn favicon(&self) -> Option<FaviconLink> {
+        let mut preprocessor = Preprocessor::new(["script", "style", "body"]);
+
+        let tokens = self.tokens.clone();
+        for tok in tokens {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
+            }
+
+            match tok {
+                Token::StartTag(tag) | Token::SelfTerminatingTag(tag) if tag.name() == "link" => {
+                    let rel = tag.attributes().get("rel").cloned();
+                    if rel.is_none() {
+                        continue;
+                    }
+                    if rel.unwrap() != "icon" {
+                        continue;
+                    }
+
+                    if let Some(link) = tag.attributes().get("href") {
+                        let (width, height) = match tag.attributes().get("sizes") {
+                            Some(size) => {
+                                if let Some((width, height)) = size.split_once('x') {
+                                    (Some(width.parse().unwrap()), Some(height.parse().unwrap()))
+                                } else {
+                                    (None, None)
+                                }
+                            }
+                            _ => (None, None),
+                        };
+
+                        let image_type = tag.attributes().get("type").map(|t| t.to_string());
+
+                        let favicon = FaviconLink {
+                            link: link.to_string().into(),
+                            image_type,
+                            width,
+                            height,
+                        };
+                        return Some(favicon);
+                    }
+                }
+                Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::SelfTerminatingTag(_)
+                | Token::BeginComment
+                | Token::Error
+                | Token::EndComment => {}
+            }
+        }
+
+        None
+    }
+
     pub fn text(&self) -> Option<String> {
         let text = JustText::default().extract(self.raw);
 
@@ -428,7 +491,7 @@ impl<'a> Html<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Url(String);
 
 impl Display for Url {
@@ -662,5 +725,28 @@ mod tests {
     fn test_find_protocol() {
         assert_eq!(find_protocol("https://example.com"), "https");
         assert_eq!(find_protocol("http://example.com"), "http");
+    }
+
+    #[test]
+    fn favicon() {
+        let raw = r#"
+            <html>
+                <head>
+                    <link rel="icon" sizes="192x192" href="favicon_link.png" />
+                </head>
+            </html>
+        "#
+        .to_string();
+
+        let webpage = Html::parse(&raw, "https://www.example.com");
+        assert_eq!(
+            webpage.favicon(),
+            Some(FaviconLink {
+                link: "favicon_link.png".to_string().into(),
+                width: Some(192),
+                height: Some(192),
+                image_type: None
+            })
+        )
     }
 }
