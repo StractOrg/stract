@@ -134,6 +134,12 @@ impl Field {
             | Field::FetchTimeMs => None,
         }
     }
+
+    pub fn is_searchable(&self) -> bool {
+        match self {
+            _ => true,
+        }
+    }
 }
 
 pub fn create_schema() -> tantivy::schema::Schema {

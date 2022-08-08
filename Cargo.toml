@@ -45,6 +45,7 @@ fst = "0.4.7"
 lazy_static = "1.4.0"
 rocksdb = "0.18.0"
 image = "0.24.3"
+chrono = "0.4.20"
 
 [dev-dependencies]
 maplit = "1.0.2"
