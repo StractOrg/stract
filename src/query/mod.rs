@@ -102,6 +102,7 @@ impl tantivy::query::Query for Query {
 
         let fields: Vec<_> = ALL_FIELDS
             .iter()
+            .filter(|field| field.is_searchable())
             .map(|field| {
                 let tantivy_field = searcher.schema().get_field(field.as_str()).unwrap();
                 let analyzer = searcher.index().tokenizer_for_field(tantivy_field).ok();

@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{image_store::Image, schema_org::SchemaOrg, Error, Result};
+use chrono::{DateTime, FixedOffset};
 use logos::{Lexer, Logos};
 use std::{collections::HashMap, time::Duration};
 
@@ -495,6 +496,23 @@ impl<'a> Html<'a> {
 
         schemas
     }
+
+    pub fn updated_time(&self) -> Option<DateTime<FixedOffset>> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(property) = metadata.get("property") {
+                    property == &String::from("og:updated_time")
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| {
+                metadata
+                    .get("content")
+                    .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
+            })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -867,5 +885,62 @@ mod tests {
         let html = Html::parse(html, "example.com");
 
         assert!(html.schema_org().is_empty())
+    }
+
+    #[test]
+    fn metadata_updated_time() {
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.updated_time(),
+            Some(DateTime::parse_from_rfc3339("2022-06-22T19:37:34+00:00").unwrap())
+        );
+
+        let html = r#"
+    <html>
+        <head>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.updated_time(), None);
+
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:whutwhut" content="2022-06-22T19:37:34+00:00" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.updated_time(), None);
+
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:updated_time" content="2ss022-06-22T19:37:34+00:00" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.updated_time(), None);
     }
 }
