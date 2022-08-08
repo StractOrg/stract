@@ -29,6 +29,7 @@ use axum::{
 use axum_extra::routing::SpaRouter;
 
 mod autosuggest;
+mod favicons;
 mod index;
 pub mod search;
 
@@ -69,6 +70,7 @@ pub fn router(index_path: &str, queries_csv_path: &str) -> Result<Router> {
         .route("/", get(index::route))
         .route("/search", get(search::route))
         .route("/autosuggest", get(autosuggest::route))
+        .route("/favicons/:site", get(favicons::route))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state)))
 }

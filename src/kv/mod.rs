@@ -23,6 +23,7 @@ pub trait Kv<K, V>
 where
     K: Serialize + DeserializeOwned,
     V: Serialize + DeserializeOwned,
+    Self: Send + Sync,
 {
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>);

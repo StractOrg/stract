@@ -20,16 +20,20 @@ use tantivy::schema::Schema;
 use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
 
 use crate::directory::{self, DirEntry};
+use crate::image_store::{FaviconStore, Image};
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
 use crate::snippet;
-use crate::webpage::Webpage;
+use crate::webpage::{Url, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+
+const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
+const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 
 pub struct Index {
     pub path: String,
@@ -37,6 +41,7 @@ pub struct Index {
     writer: IndexWriter,
     reader: IndexReader,
     schema: Arc<Schema>,
+    favicon_store: FaviconStore,
 }
 
 impl Index {
@@ -49,12 +54,20 @@ impl Index {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = create_schema();
 
-        let tantivy_index = if path.as_ref().exists() {
-            tantivy::Index::open_in_dir(path.as_ref())?
-        } else {
+        if !path.as_ref().exists() {
             fs::create_dir_all(path.as_ref())?;
-            tantivy::Index::create_in_dir(path.as_ref(), schema.clone())?
+        }
+
+        let tv_path = path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME);
+
+        let tantivy_index = if tv_path.exists() {
+            tantivy::Index::open_in_dir(tv_path)?
+        } else {
+            fs::create_dir_all(&tv_path)?;
+            tantivy::Index::create_in_dir(tv_path, schema.clone())?
         };
+
+        let favicon_store = FaviconStore::open(path.as_ref().join(FAVICON_STORE_SUBFOLDER_NAME));
 
         let tokenizer = Tokenizer::default();
         tantivy_index
@@ -76,11 +89,13 @@ impl Index {
             reader: tantivy_index.reader()?,
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
+            favicon_store,
             tantivy_index,
         })
     }
 
     pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
+        self.maybe_insert_favicon(&webpage);
         self.writer
             .add_document(webpage.into_tantivy(&self.schema)?)?;
         Ok(())
@@ -103,7 +118,7 @@ impl Index {
 
         let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
-            .map(|(_score, doc_address)| Index::retrieve_doc(doc_address, &searcher))
+            .map(|(_score, doc_address)| self.retrieve_doc(doc_address, &searcher))
             .filter(|page| page.is_ok())
             .map(|page| page.unwrap())
             .collect();
@@ -133,6 +148,7 @@ impl Index {
     }
 
     fn retrieve_doc(
+        &self,
         doc_address: DocAddress,
         searcher: &LeasedItem<tantivy::Searcher>,
     ) -> Result<RetrievedWebpage> {
@@ -155,11 +171,11 @@ impl Index {
             .expect("failed to laod tantivy metadata for index");
 
         let x = other.path.clone();
-        let other_path = Path::new(x.as_str());
+        let other_path = Path::new(x.as_str()).join(INVERTED_INDEX_SUBFOLDER_NAME);
         other.writer.wait_merging_threads().unwrap();
 
         let path = self.path.clone();
-        let self_path = Path::new(path.as_str());
+        let self_path = Path::new(path.as_str()).join(INVERTED_INDEX_SUBFOLDER_NAME);
         self.writer.wait_merging_threads().unwrap();
 
         for segment in other_meta.segments {
@@ -178,7 +194,7 @@ impl Index {
 
         fs::remove_dir_all(other_path).unwrap();
 
-        let self_path = Path::new(&path);
+        let self_path = Path::new(&path).join(INVERTED_INDEX_SUBFOLDER_NAME);
 
         std::fs::write(
             self_path.join("meta.json"),
@@ -186,11 +202,28 @@ impl Index {
         )
         .unwrap();
 
+        self.favicon_store.merge(other.favicon_store);
+        drop(self.favicon_store);
+
         Self::open(path).expect("failed to open index")
     }
 
     pub fn schema(&self) -> Arc<Schema> {
         Arc::clone(&self.schema)
+    }
+
+    fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
+        if !webpage.html.is_homepage() || self.favicon_store.contains(webpage.html.domain()) {
+            return;
+        }
+
+        if let Some(favicon) = webpage.download_favicon() {
+            self.favicon_store.insert(webpage.html.domain(), favicon);
+        }
+    }
+
+    pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
+        self.favicon_store.get(url.domain())
     }
 }
 
@@ -200,6 +233,7 @@ pub struct RetrievedWebpage {
     pub url: String,
     pub snippet: String,
     pub body: String,
+    pub favicon: Option<Image>,
 }
 
 impl From<Document> for RetrievedWebpage {

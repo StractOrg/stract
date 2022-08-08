@@ -168,6 +168,9 @@ pub enum Error {
 
     #[error("Encountered an error in the FST crate")]
     Fst(#[from] fst::Error),
+
+    #[error("Image error")]
+    Image(#[from] image::ImageError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

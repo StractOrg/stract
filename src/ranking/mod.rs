@@ -46,60 +46,58 @@ mod tests {
 
     #[test]
     fn harmonic_ranking() {
-        for _ in 0..10 {
-            let mut index = Index::temporary().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
-            index
-                .insert(Webpage::new(
-                    &format!(
-                        r#"
-                        <html>
-                            <head>
-                                <title>Website A</title>
-                            </head>
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        {CONTENT}
+                        <a href="https://www.b.com">B site is great</a>
+                    </html>
+                "#
+                ),
+                "https://www.a.com",
+                vec![],
+                0.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
                             {CONTENT}
-                            <a href="https://www.b.com">B site is great</a>
-                        </html>
-                    "#
-                    ),
-                    "https://www.a.com",
-                    vec![],
-                    0.0,
-                    500,
-                ))
-                .expect("failed to parse webpage");
-            index
-                .insert(Webpage::new(
-                    &format!(
-                        r#"
-                        <html>
-                            <head>
-                                <title>Website B</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                    ),
-                    "https://www.b.com",
-                    vec![Link {
-                        source: "https://www.a.com".to_string().into(),
-                        destination: "https://www.b.com".to_string().into(),
-                        text: "B site is great".to_string(),
-                    }],
-                    5.0,
-                    500,
-                ))
-                .expect("failed to parse webpage");
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.b.com",
+                vec![Link {
+                    source: "https://www.a.com".to_string().into(),
+                    destination: "https://www.b.com".to_string().into(),
+                    text: "B site is great".to_string(),
+                }],
+                5.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
 
-            index.commit().expect("failed to commit index");
-            let searcher = Searcher::from(index);
-            let result = searcher.search("great site").expect("Search failed");
-            assert_eq!(result.documents.len(), 2);
-            assert_eq!(result.documents[0].url, "https://www.b.com");
-            assert_eq!(result.documents[1].url, "https://www.a.com");
-        }
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::from(index);
+        let result = searcher.search("great site").expect("Search failed");
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.b.com");
+        assert_eq!(result.documents[1].url, "https://www.a.com");
     }
 
     #[test]
@@ -171,7 +169,7 @@ mod tests {
 
         assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
-        assert_eq!(result.documents[1].url, "https://www.b.com");
-        assert_eq!(result.documents[2].url, "https://www.dr.dk/whatever");
+        assert_eq!(result.documents[1].url, "https://www.dr.dk/whatever");
+        assert_eq!(result.documents[2].url, "https://www.b.com");
     }
 }
