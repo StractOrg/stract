@@ -30,6 +30,8 @@ mod autosuggest;
 mod directory;
 mod exponential_backoff;
 mod frontend;
+mod image_store;
+mod kv;
 pub mod query;
 pub mod ranking;
 mod schema;
