@@ -16,10 +16,7 @@
 
 use axum::Extension;
 
-use crate::{
-    index::RetrievedWebpage,
-    webpage::{strip_protocol, strip_query, Url},
-};
+use crate::{index::RetrievedWebpage, webpage::Url};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -37,6 +34,7 @@ pub fn html_escape(s: &str) -> String {
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
+    pub domain: String,
     pub pretty_url: String,
     pub snippet: String,
     pub body: String,
@@ -47,14 +45,18 @@ const MAX_TITLE_LEN: usize = 50;
 
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
-        let mut pretty_url = strip_query(&webpage.url).to_string();
+        let url: Url = webpage.url.clone().into();
+        let domain = url.domain().to_string();
+        let mut pretty_url = url.strip_query().to_string();
 
         if pretty_url.ends_with('/') {
             pretty_url = pretty_url.chars().take(pretty_url.len() - 1).collect();
         }
 
         let protocol = Url::from(pretty_url.clone()).protocol().to_string() + "://";
-        pretty_url = strip_protocol(&pretty_url).replace('/', " › ");
+        pretty_url = Url::from(pretty_url.clone())
+            .strip_protocol()
+            .replace('/', " › ");
         pretty_url = protocol + &pretty_url;
 
         if pretty_url.len() > MAX_PRETTY_URL_LEN {
@@ -73,6 +75,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             title,
             url: webpage.url,
             pretty_url,
+            domain,
             snippet: webpage.snippet, // snippet has already been html-escaped.
             body: webpage.body,
         }

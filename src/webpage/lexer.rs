@@ -30,14 +30,14 @@ impl<'a> Tag<'a> {
         for tok in self.raw.split_whitespace().skip(1) {
             if tok.contains('=') {
                 if let Some((key, value)) = tok.split_once('=') {
-                    attributes.insert(key.trim(), trim_html_stuff(value));
+                    attributes.insert(key.trim(), trim_html_stuff(value, false));
                 }
             } else {
                 if tok == ">" || tok.starts_with(self.name.as_ref()) || tok == "/>" {
                     continue;
                 }
 
-                attributes.insert(trim_html_stuff(tok), "");
+                attributes.insert(trim_html_stuff(tok, true), "");
             }
         }
 
@@ -49,7 +49,7 @@ impl<'a> Tag<'a> {
     }
 }
 
-fn trim_html_stuff(s: &str) -> &str {
+fn trim_html_stuff(s: &str, break_on_dash: bool) -> &str {
     let mut start_val = 0;
     let mut end_val = s.len();
 
@@ -62,7 +62,11 @@ fn trim_html_stuff(s: &str) -> &str {
 
     for (idx, c) in s[start_val..].char_indices() {
         end_val = start_val + idx;
-        if c == ' ' || c == '"' || c == '>' || c == '/' {
+        if break_on_dash && c == '/' {
+            break;
+        }
+
+        if c == ' ' || c == '"' || c == '>' {
             break;
         }
     }

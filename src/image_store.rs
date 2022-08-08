@@ -15,28 +15,24 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+use crate::Result;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageOutputFormat};
 use serde::{de, ser::SerializeStruct, Serialize};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
 
+const FAVICON_SIZE: u32 = 32;
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Image(DynamicImage);
 
 impl Serialize for Image {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut cursor = Cursor::new(Vec::new());
-        self.0
-            .write_to(&mut cursor, ImageOutputFormat::Png)
-            .unwrap();
-        cursor.seek(SeekFrom::Start(0)).unwrap();
-
-        let mut bytes = Vec::new();
-        cursor.read_to_end(&mut bytes).unwrap();
+        let bytes = self.as_raw_bytes();
 
         let mut image = serializer.serialize_struct("image", 1)?;
         image.serialize_field("0", &bytes)?;
@@ -45,7 +41,7 @@ impl Serialize for Image {
 }
 
 impl<'de> de::Deserialize<'de> for Image {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -58,7 +54,7 @@ impl<'de> de::Deserialize<'de> for Image {
                 formatter.write_str("a serialized `Image` struct")
             }
 
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
             where
                 A: serde::de::SeqAccess<'de>,
             {
@@ -85,6 +81,7 @@ struct ImageStore {
 }
 
 impl ImageStore {
+    #[cfg(test)]
     fn open<P: AsRef<Path>>(path: P) -> Self {
         Self::open_with_filters(path, Vec::new())
     }
@@ -110,9 +107,15 @@ impl ImageStore {
     fn get(&self, key: &str) -> Option<Image> {
         self.store.get(&key.to_string())
     }
+
+    fn merge(&mut self, other: ImageStore) {
+        for (key, image) in other.store.iter() {
+            self.insert(&key, image);
+        }
+    }
 }
 
-trait ImageFilter {
+trait ImageFilter: Send + Sync {
     fn transform(&self, image: Image) -> Image;
 }
 
@@ -138,8 +141,8 @@ impl FaviconStore {
         let store = ImageStore::open_with_filters(
             path,
             vec![Box::new(ResizeFilter {
-                width: 16,
-                height: 16,
+                width: FAVICON_SIZE,
+                height: FAVICON_SIZE,
             })],
         );
 
@@ -156,6 +159,29 @@ impl FaviconStore {
 
     pub fn get(&self, key: &str) -> Option<Image> {
         self.0.get(key)
+    }
+
+    pub fn merge(&mut self, other: FaviconStore) {
+        self.0.merge(other.0)
+    }
+}
+
+impl Image {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Image> {
+        Ok(Self(image::load_from_memory(&bytes)?))
+    }
+
+    pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {
+        let mut cursor = Cursor::new(Vec::new());
+        self.0
+            .write_to(&mut cursor, ImageOutputFormat::Png)
+            .unwrap();
+        cursor.seek(SeekFrom::Start(0)).unwrap();
+
+        let mut bytes = Vec::new();
+        cursor.read_to_end(&mut bytes).unwrap();
+
+        bytes
     }
 }
 
@@ -214,11 +240,15 @@ mod tests {
     #[test]
     fn favicon_store() {
         let image = Image(
-            ImageBuffer::from_pixel(32, 32, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX]))
-                .into(),
+            ImageBuffer::from_pixel(
+                FAVICON_SIZE * 2,
+                FAVICON_SIZE * 2,
+                image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX]),
+            )
+            .into(),
         );
-        assert_eq!(image.0.width(), 32);
-        assert_eq!(image.0.height(), 32);
+        assert_eq!(image.0.width(), FAVICON_SIZE * 2);
+        assert_eq!(image.0.height(), FAVICON_SIZE * 2);
 
         let mut store = FaviconStore::open(crate::gen_temp_path());
 
@@ -230,7 +260,7 @@ mod tests {
         assert!(store.contains(key));
 
         let retrieved_image = store.get(key).unwrap();
-        assert_eq!(retrieved_image.0.width(), 16);
-        assert_eq!(retrieved_image.0.height(), 16);
+        assert_eq!(retrieved_image.0.width(), FAVICON_SIZE);
+        assert_eq!(retrieved_image.0.height(), FAVICON_SIZE);
     }
 }

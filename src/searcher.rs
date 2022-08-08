@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::image_store::Image;
 use crate::index::{Index, RetrievedWebpage};
 use crate::query::Query;
 use crate::ranking::Ranker;
+use crate::webpage::Url;
 use crate::Result;
 
 #[derive(Debug)]
@@ -40,5 +42,9 @@ impl Searcher {
         let query = Query::parse(query, self.index.schema())?;
         let ranker = Ranker::new(query.clone());
         self.index.search(&query, ranker.collector())
+    }
+
+    pub fn favicon(&self, site: &Url) -> Option<Image> {
+        self.index.retrieve_favicon(site)
     }
 }

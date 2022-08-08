@@ -16,8 +16,13 @@
     <div class="search-result flex flex-col space-y-3 pt-8 pb-8 pl-40">
         {% for item in search_result %}
         <div class="search-result-item bg-white max-w-2xl p-3">
-            <div class="text-sm mb-1">
-                <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+            <div class="text-sm mb-1 flex">
+                <div class="flex items-center mr-2">
+                    <img src="/favicons/{{ item.domain }}" width="13px" />
+                </div>
+                <div>
+                    <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+                </div>
             </div>
             <div class="text-lg font-medium mb-1">
                 <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>

@@ -25,7 +25,7 @@ use std::{cmp, fs};
 use graph_store::GraphStore;
 
 use crate::directory::{self, DirEntry};
-use crate::webpage::{self, Url};
+use crate::webpage::Url;
 
 use self::graph_store::Adjacency;
 use crate::kv::rocksdb_store::RocksDbStore;
@@ -46,7 +46,7 @@ pub struct Node {
 impl Node {
     fn into_host(self) -> Node {
         Node {
-            name: webpage::host(&self.name).to_string(),
+            name: Url::from(self.name).host().to_string(),
         }
     }
 }

@@ -13,9 +13,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{Error, Result};
+use crate::{image_store::Image, Error, Result};
 use logos::{Lexer, Logos};
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, time::Duration};
 
 mod just_text;
 mod lexer;
@@ -23,74 +23,6 @@ mod lexer;
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 use self::{just_text::JustText, lexer::Token};
-
-pub fn find_protocol(url: &str) -> &'_ str {
-    let mut start_host = 0;
-    if url.starts_with("http://") || url.starts_with("https://") {
-        start_host = url
-            .find(':')
-            .expect("It was checked that url starts with protocol");
-    }
-
-    &url[..start_host]
-}
-
-pub fn strip_protocol(url: &str) -> &'_ str {
-    let mut start_host = 0;
-    if url.starts_with("http://") || url.starts_with("https://") {
-        start_host = url
-            .find('/')
-            .expect("It was checked that url starts with protocol");
-        start_host += 2; // skip the two '/'
-    }
-
-    &url[start_host..]
-}
-
-pub fn strip_query(url: &str) -> &'_ str {
-    let mut start_query = url.len();
-    if url.contains('?') {
-        start_query = url.find('?').expect("The url contains atleast 1 '?'");
-    }
-
-    &url[..start_query]
-}
-
-pub fn host(url: &str) -> &'_ str {
-    let url = strip_protocol(url);
-
-    let mut end_host = url.len();
-    if url.contains('/') {
-        end_host = url.find('/').expect("The url contains atleast 1 '/'");
-    }
-
-    &url[..end_host]
-}
-
-pub fn is_homepage(url: &str) -> bool {
-    let url = strip_protocol(url);
-    match url.find('/') {
-        Some(idx) => idx == url.len() - 1,
-        None => true,
-    }
-}
-
-pub fn domain(url: &str) -> &'_ str {
-    let host = host(url);
-    let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
-    if num_punctuations > 1 {
-        let domain_index = host.rfind('.').unwrap();
-        let mut start_index = host[..domain_index].rfind('.').unwrap();
-
-        if &host[start_index + 1..] == "co.uk" {
-            start_index = host[start_index..].rfind('.').unwrap();
-        }
-
-        &host[start_index + 1..]
-    } else {
-        host
-    }
-}
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct FaviconLink {
@@ -205,6 +137,27 @@ impl<'a> Webpage<'a> {
 
         Ok(doc)
     }
+
+    pub(crate) fn download_favicon(&self) -> Option<Image> {
+        self.html.favicon().and_then(|favicon_link| {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(1))
+                .build()
+                .unwrap();
+
+            match client.get(&favicon_link.link.0).send() {
+                Ok(mut res) => {
+                    let mut bytes = Vec::new();
+                    if res.copy_to(&mut bytes).is_err() {
+                        None
+                    } else {
+                        Image::from_bytes(bytes).ok()
+                    }
+                }
+                Err(_) => None,
+            }
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -311,9 +264,14 @@ impl<'a> Html<'a> {
                         };
 
                         let image_type = tag.attributes().get("type").map(|t| t.to_string());
+                        let mut link: Url = link.to_string().into();
+
+                        if !link.is_full_path() {
+                            link.prefix_with(&self.url);
+                        }
 
                         let favicon = FaviconLink {
-                            link: link.to_string().into(),
+                            link,
                             image_type,
                             width,
                             height,
@@ -507,20 +465,102 @@ impl From<String> for Url {
 }
 
 impl Url {
+    pub fn strip_protocol(&self) -> &str {
+        let mut start_host = 0;
+        let url = &self.0;
+        if url.starts_with("http://") || url.starts_with("https://") {
+            start_host = url
+                .find('/')
+                .expect("It was checked that url starts with protocol");
+            start_host += 2; // skip the two '/'
+        }
+
+        &url[start_host..]
+    }
+
+    pub fn strip_query(&self) -> &str {
+        let url = &self.0;
+        let mut start_query = url.len();
+        if url.contains('?') {
+            start_query = url.find('?').expect("The url contains atleast 1 '?'");
+        }
+
+        &url[..start_query]
+    }
+
     pub fn host(&self) -> &str {
-        host(&self.0)
+        let url = self.strip_protocol();
+
+        let mut end_host = url.len();
+        if url.contains('/') {
+            end_host = url.find('/').expect("The url contains atleast 1 '/'");
+        }
+
+        &url[..end_host]
     }
 
     pub fn domain(&self) -> &str {
-        domain(&self.0)
+        let host = self.host();
+        let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
+        if num_punctuations > 1 {
+            let domain_index = host.rfind('.').unwrap();
+            let mut start_index = host[..domain_index].rfind('.').unwrap();
+
+            if &host[start_index + 1..] == "co.uk" {
+                start_index = host[start_index..].rfind('.').unwrap();
+            }
+
+            &host[start_index + 1..]
+        } else {
+            host
+        }
     }
 
     pub fn is_homepage(&self) -> bool {
-        is_homepage(&self.0)
+        let url = self.strip_protocol();
+        match url.find('/') {
+            Some(idx) => idx == url.len() - 1,
+            None => true,
+        }
     }
 
+    fn find_protocol_end(&self) -> usize {
+        let mut start_host = 0;
+        let url = &self.0;
+        if url.starts_with("http://") || url.starts_with("https://") {
+            start_host = url
+                .find(':')
+                .expect("It was checked that url starts with protocol");
+        }
+        start_host
+    }
     pub fn protocol(&self) -> &str {
-        find_protocol(&self.0)
+        &self.0[..self.find_protocol_end()]
+    }
+
+    pub fn site(&self) -> &str {
+        let start = self.find_protocol_end() + 3;
+        let url = &self.0[start..];
+
+        let mut end_host = url.len();
+        if url.contains('/') {
+            end_host = url.find('/').expect("The url contains atleast 1 '/'");
+        }
+
+        &self.0[..end_host + start]
+    }
+
+    fn is_full_path(&self) -> bool {
+        matches!(self.protocol(), "http" | "https" | "pdf")
+    }
+
+    fn prefix_with(&mut self, url: &Url) {
+        self.0 = match (url.0.ends_with('/'), self.0.starts_with('/')) {
+            (true, true) => url.site().to_string() + &self.0,
+            (true, false) => url.0.clone() + &self.0,
+            (false, true) => url.site().to_string() + &self.0,
+            (false, false) => url.0.clone() + "/" + &self.0,
+        };
     }
 }
 
@@ -723,16 +763,22 @@ mod tests {
 
     #[test]
     fn test_find_protocol() {
-        assert_eq!(find_protocol("https://example.com"), "https");
-        assert_eq!(find_protocol("http://example.com"), "http");
+        assert_eq!(
+            Url::from("https://example.com".to_string()).protocol(),
+            "https"
+        );
+        assert_eq!(
+            Url::from("http://example.com".to_string()).protocol(),
+            "http"
+        );
     }
 
     #[test]
-    fn favicon() {
+    fn simple_favicon() {
         let raw = r#"
             <html>
                 <head>
-                    <link rel="icon" sizes="192x192" href="favicon_link.png" />
+                    <link rel="icon" sizes="192x192" href="https://example.com/favicon.png" />
                 </head>
             </html>
         "#
@@ -742,11 +788,74 @@ mod tests {
         assert_eq!(
             webpage.favicon(),
             Some(FaviconLink {
-                link: "favicon_link.png".to_string().into(),
+                link: "https://example.com/favicon.png".to_string().into(),
                 width: Some(192),
                 height: Some(192),
                 image_type: None
             })
         )
+    }
+
+    fn full_link_favicon(href: &str, site_url: &str, expected: &str) {
+        let raw = format!(
+            r#"
+            <html>
+                <head>
+                    <link rel="icon" sizes="192x192" href="{href}" />
+                </head>
+            </html>
+        "#
+        );
+
+        let webpage = Html::parse(&raw, site_url);
+        assert_eq!(
+            webpage.favicon(),
+            Some(FaviconLink {
+                link: expected.to_string().into(),
+                width: Some(192),
+                height: Some(192),
+                image_type: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_full_link_favicon_simple() {
+        full_link_favicon(
+            "/favicon.png",
+            "https://www.example.com/",
+            "https://www.example.com/favicon.png",
+        );
+        full_link_favicon(
+            "/favicon.png",
+            "https://www.example.com",
+            "https://www.example.com/favicon.png",
+        );
+        full_link_favicon(
+            "favicon.png",
+            "https://www.example.com",
+            "https://www.example.com/favicon.png",
+        );
+        full_link_favicon(
+            "favicon.png",
+            "https://www.example.com/",
+            "https://www.example.com/favicon.png",
+        );
+        full_link_favicon(
+            "favicon.png",
+            "https://www.example.com/test",
+            "https://www.example.com/test/favicon.png",
+        );
+        full_link_favicon(
+            "/favicon.png",
+            "https://www.example.com/test",
+            "https://www.example.com/favicon.png",
+        );
+    }
+
+    #[test]
+    fn domain_from_domain_url() {
+        let url: Url = "example.com".to_string().into();
+        assert_eq!(url.domain(), "example.com");
     }
 }
