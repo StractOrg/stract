@@ -35,6 +35,7 @@ mod kv;
 pub mod query;
 pub mod ranking;
 mod schema;
+mod schema_org;
 pub mod searcher;
 mod snippet;
 mod tokenizer;

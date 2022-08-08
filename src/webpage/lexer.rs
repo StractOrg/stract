@@ -17,7 +17,7 @@
 use logos::{Lexer, Logos};
 use std::{borrow::Cow, collections::HashMap};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tag<'a> {
     name: Cow<'a, str>,
     raw: &'a str,
@@ -130,7 +130,7 @@ fn name(s: &str) -> &str {
     s[start..end].trim()
 }
 
-#[derive(Clone, Logos, Debug, PartialEq)]
+#[derive(Clone, Logos, Debug, PartialEq, Eq)]
 pub enum Token<'a> {
     #[regex(r"<[^>]+>", start_tag)]
     StartTag(Tag<'a>),

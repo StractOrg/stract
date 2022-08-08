@@ -13,15 +13,17 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{image_store::Image, Error, Result};
+use crate::{image_store::Image, schema_org::SchemaOrg, Error, Result};
 use logos::{Lexer, Logos};
-use std::{collections::HashMap, fmt::Display, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 mod just_text;
 mod lexer;
+mod url;
 
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
+pub use self::url::Url;
 use self::{just_text::JustText, lexer::Token};
 
 #[derive(PartialEq, Eq, Debug)]
@@ -145,7 +147,7 @@ impl<'a> Webpage<'a> {
                 .build()
                 .unwrap();
 
-            match client.get(&favicon_link.link.0).send() {
+            match client.get(favicon_link.link.full()).send() {
                 Ok(mut res) => {
                     let mut bytes = Vec::new();
                     if res.copy_to(&mut bytes).is_err() {
@@ -174,7 +176,7 @@ impl<'a> Html<'a> {
         Self {
             raw: html,
             tokens,
-            url: Url(url.to_string()),
+            url: url.to_string().into(),
         }
     }
 
@@ -447,124 +449,55 @@ impl<'a> Html<'a> {
 
         Ok(doc)
     }
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Url(String);
+    pub fn schema_org(&self) -> Vec<SchemaOrg> {
+        let mut tokens = self.tokens.clone();
+        let mut schemas = Vec::new();
+        let mut preprocessor = Preprocessor::new([]);
+        let mut open_schemas = 0;
+        let mut json = String::new();
 
-impl Display for Url {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.0)
-    }
-}
-
-impl From<String> for Url {
-    fn from(url: String) -> Self {
-        Url(url)
-    }
-}
-
-impl Url {
-    pub fn strip_protocol(&self) -> &str {
-        let mut start_host = 0;
-        let url = &self.0;
-        if url.starts_with("http://") || url.starts_with("https://") {
-            start_host = url
-                .find('/')
-                .expect("It was checked that url starts with protocol");
-            start_host += 2; // skip the two '/'
-        }
-
-        &url[start_host..]
-    }
-
-    pub fn strip_query(&self) -> &str {
-        let url = &self.0;
-        let mut start_query = url.len();
-        if url.contains('?') {
-            start_query = url.find('?').expect("The url contains atleast 1 '?'");
-        }
-
-        &url[..start_query]
-    }
-
-    pub fn host(&self) -> &str {
-        let url = self.strip_protocol();
-
-        let mut end_host = url.len();
-        if url.contains('/') {
-            end_host = url.find('/').expect("The url contains atleast 1 '/'");
-        }
-
-        &url[..end_host]
-    }
-
-    pub fn domain(&self) -> &str {
-        let host = self.host();
-        let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
-        if num_punctuations > 1 {
-            let domain_index = host.rfind('.').unwrap();
-            let mut start_index = host[..domain_index].rfind('.').unwrap();
-
-            if &host[start_index + 1..] == "co.uk" {
-                start_index = host[start_index..].rfind('.').unwrap();
+        while let Some(tok) = tokens.next() {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
             }
 
-            &host[start_index + 1..]
-        } else {
-            host
-        }
-    }
+            match tok {
+                Token::StartTag(tag) if tag.name() == "script" => {
+                    if let Some(&"application/ld+json") = tag.attributes().get("type") {
+                        open_schemas += 1;
+                    }
+                }
+                Token::EndTag(tag) if tag.name() == "script" => {
+                    if open_schemas > 0 {
+                        open_schemas -= 1;
 
-    pub fn is_homepage(&self) -> bool {
-        let url = self.strip_protocol();
-        match url.find('/') {
-            Some(idx) => idx == url.len() - 1,
-            None => true,
-        }
-    }
-
-    fn find_protocol_end(&self) -> usize {
-        let mut start_host = 0;
-        let url = &self.0;
-        if url.starts_with("http://") || url.starts_with("https://") {
-            start_host = url
-                .find(':')
-                .expect("It was checked that url starts with protocol");
-        }
-        start_host
-    }
-    pub fn protocol(&self) -> &str {
-        &self.0[..self.find_protocol_end()]
-    }
-
-    pub fn site(&self) -> &str {
-        let start = self.find_protocol_end() + 3;
-        let url = &self.0[start..];
-
-        let mut end_host = url.len();
-        if url.contains('/') {
-            end_host = url.find('/').expect("The url contains atleast 1 '/'");
+                        if open_schemas == 0 {
+                            if let Ok(schema) = serde_json::from_str(&json) {
+                                schemas.push(schema);
+                            }
+                            json = String::new();
+                        }
+                    }
+                }
+                Token::Error => {
+                    let span = tokens.span();
+                    json.push_str(&self.raw[span]);
+                }
+                Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::SelfTerminatingTag(_)
+                | Token::BeginComment
+                | Token::EndComment => {}
+            }
         }
 
-        &self.0[..end_host + start]
-    }
-
-    fn is_full_path(&self) -> bool {
-        matches!(self.protocol(), "http" | "https" | "pdf")
-    }
-
-    fn prefix_with(&mut self, url: &Url) {
-        self.0 = match (url.0.ends_with('/'), self.0.starts_with('/')) {
-            (true, true) => url.site().to_string() + &self.0,
-            (true, false) => url.0.clone() + &self.0,
-            (false, true) => url.site().to_string() + &self.0,
-            (false, false) => url.0.clone() + "/" + &self.0,
-        };
+        schemas
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Link {
     pub source: Url,
     pub destination: Url,
@@ -576,6 +509,8 @@ pub type Meta = HashMap<String, String>;
 #[cfg(test)]
 mod tests {
     // TODO: make test macro to test both dom parsers
+
+    use crate::schema_org::ImageObject;
 
     use super::*;
 
@@ -857,5 +792,80 @@ mod tests {
     fn domain_from_domain_url() {
         let url: Url = "example.com".to_string().into();
         assert_eq!(url.domain(), "example.com");
+    }
+
+    #[test]
+    fn schema_dot_org_json_ld() {
+        let html = r#"
+    <html>
+        <head>
+            <script type="application/ld+json">
+                {
+                "@context": "https://schema.org",
+                "@type": "ImageObject",
+                "author": "Jane Doe",
+                "contentLocation": "Puerto Vallarta, Mexico",
+                "contentUrl": "mexico-beach.jpg",
+                "datePublished": "2008-01-25",
+                "description": "I took this picture while on vacation last year.",
+                "name": "Beach in Mexico"
+                }
+            </script>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.schema_org(),
+            vec![SchemaOrg::ImageObject(ImageObject {
+                name: Some("Beach in Mexico".to_string()),
+                description: Some("I took this picture while on vacation last year.".to_string()),
+                author: Some("Jane Doe".to_string()),
+                content_url: Some("mexico-beach.jpg".to_string()),
+            })]
+        )
+    }
+
+    #[test]
+    fn no_schema_dot_org_json_ld() {
+        let html = r#"
+    <html>
+        <head>
+            <script>
+                {
+                "invalid": "schema"
+                }
+            </script>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+
+        let html = Html::parse(html, "example.com");
+
+        assert!(html.schema_org().is_empty());
+
+        let html = r#"
+    <html>
+        <head>
+            <script type="application/ld+json">
+                {
+                "invalid": "schema"
+                }
+            </script>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+
+        let html = Html::parse(html, "example.com");
+
+        assert!(html.schema_org().is_empty())
     }
 }
