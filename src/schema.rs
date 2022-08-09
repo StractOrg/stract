@@ -109,6 +109,7 @@ impl Field {
             &Field::LastUpdated => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
+                    .set_stored()
                     .set_indexed(),
             ),
         }
