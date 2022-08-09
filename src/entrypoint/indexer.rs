@@ -74,7 +74,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
         let file = WarcFile::download(source, &self.warc_path).unwrap();
         debug!("finished downloading");
 
-        for record in file.records().flatten().take(200) {
+        for record in file.records().flatten().take(2000) {
             let html = Html::parse(&record.response.body, &record.request.url);
             let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
             let centrality = worker.centrality_store.get(html.host()).unwrap_or_default();

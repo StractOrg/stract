@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 // Cuely is an open source web search engine.
 // Copyright (C) 2022 Cuely ApS
@@ -101,10 +102,10 @@ impl Index {
     }
 
     pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
-        self.maybe_insert_favicon(&webpage);
-        if let Some(uuid) = self.maybe_insert_primary_image(&webpage) {
-            webpage.set_primary_image_uuid(uuid);
-        }
+        // self.maybe_insert_favicon(&webpage);
+        // if let Some(uuid) = self.maybe_insert_primary_image(&webpage) {
+        //     webpage.set_primary_image_uuid(uuid);
+        // }
         self.writer
             .add_document(webpage.into_tantivy(&self.schema)?)?;
         Ok(())
@@ -257,6 +258,7 @@ pub struct RetrievedWebpage {
     pub body: String,
     pub favicon: Option<Image>,
     pub primary_image_uuid: Option<String>,
+    pub updated_time: Option<NaiveDateTime>,
 }
 
 impl From<Document> for RetrievedWebpage {
@@ -301,6 +303,16 @@ impl From<Document> for RetrievedWebpage {
                         }
                     }
                 }
+                Field::LastUpdated => {
+                    webpage.updated_time = {
+                        let timestamp = value.value.as_u64().unwrap() as i64;
+                        if timestamp == 0 {
+                            None
+                        } else {
+                            Some(NaiveDateTime::from_timestamp(timestamp, 0))
+                        }
+                    }
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::Host
@@ -309,7 +321,6 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
-                | Field::LastUpdated
                 | Field::FetchTimeMs => {}
             }
         }

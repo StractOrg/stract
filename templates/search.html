@@ -29,6 +29,13 @@
                     <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
                 </div>
                 <div class="text-sm">
+                    {% match item.last_updated %}
+                    {% when Some with (val) %}
+                    <span class="text-gray-500">
+                        {{ val }}
+                    </span> —
+                    {% when None %}
+                    {% endmatch %}
                     {{ item.snippet }}
                 </div>
             </div>

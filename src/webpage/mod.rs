@@ -166,7 +166,6 @@ impl<'a> Webpage<'a> {
 
     pub(crate) fn download_primary_image(&self) -> Option<Image> {
         self.html.primary_image().and_then(|url| {
-            dbg!(&url);
             url.download_bytes(Duration::from_secs(5))
                 .and_then(|bytes| Image::from_bytes(bytes).ok())
         })
@@ -460,9 +459,9 @@ impl<'a> Html<'a> {
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,
-                    self.updated_time()
+                    dbg!(dbg!(self.updated_time())
                         .map(|time| time.timestamp().max(0) as u64)
-                        .unwrap_or(0),
+                        .unwrap_or(0)),
                 ),
                 Field::BacklinkText
                 | Field::Centrality
