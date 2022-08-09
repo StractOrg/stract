@@ -38,8 +38,9 @@ pub enum Field {
     FetchTimeMs,
     PrimaryImageUuid,
     LastUpdated,
+    Description,
 }
-pub static ALL_FIELDS: [Field; 14] = [
+pub static ALL_FIELDS: [Field; 15] = [
     Field::Title,
     Field::Body,
     Field::StemmedTitle,
@@ -54,6 +55,7 @@ pub static ALL_FIELDS: [Field; 14] = [
     Field::FetchTimeMs,
     Field::PrimaryImageUuid,
     Field::LastUpdated,
+    Field::Description,
 ];
 
 impl Field {
@@ -106,12 +108,13 @@ impl Field {
             Field::PrimaryImageUuid => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            &Field::LastUpdated => IndexingOption::Numeric(
+            Field::LastUpdated => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_stored()
                     .set_indexed(),
             ),
+            Field::Description => IndexingOption::Text(self.default_text_options().set_stored()),
         }
     }
 
@@ -131,6 +134,7 @@ impl Field {
             Field::FetchTimeMs => "fetch_time_ms",
             Field::PrimaryImageUuid => "primary_image_uuid",
             Field::LastUpdated => "last_updated",
+            Field::Description => "description",
         }
     }
 
@@ -148,6 +152,7 @@ impl Field {
             | Field::IsHomepage
             | Field::PrimaryImageUuid
             | Field::FetchTimeMs
+            | Field::Description
             | Field::LastUpdated => None,
         }
     }

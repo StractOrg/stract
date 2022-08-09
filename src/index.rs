@@ -134,7 +134,7 @@ impl Index {
             .collect();
 
         for page in &mut webpages {
-            page.snippet = snippet::generate(query, &page.body, &searcher)?;
+            page.snippet = snippet::generate(query, &page.body, &page.description, &searcher)?;
         }
 
         Ok(SearchResult {
@@ -256,6 +256,7 @@ pub struct RetrievedWebpage {
     pub url: String,
     pub snippet: String,
     pub body: String,
+    pub description: Option<String>,
     pub favicon: Option<Image>,
     pub primary_image_uuid: Option<String>,
     pub updated_time: Option<NaiveDateTime>,
@@ -280,6 +281,15 @@ impl From<Document> for RetrievedWebpage {
                         .as_text()
                         .expect("Body field should be text")
                         .to_string()
+                }
+                Field::Description => {
+                    let desc = value
+                        .value
+                        .as_text()
+                        .expect("Description field should be text")
+                        .to_string();
+
+                    webpage.description = if desc.is_empty() { None } else { Some(desc) }
                 }
                 Field::Url => {
                     webpage.url = value
