@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+#[non_exhaustive]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(tag = "@type")]
 pub enum SchemaOrg {
