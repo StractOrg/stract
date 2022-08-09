@@ -497,7 +497,24 @@ impl<'a> Html<'a> {
         schemas
     }
 
-    pub fn updated_time(&self) -> Option<DateTime<FixedOffset>> {
+    fn article_modified_time(&self) -> Option<DateTime<FixedOffset>> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(property) = metadata.get("property") {
+                    property == &String::from("article:modified_time")
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| {
+                metadata
+                    .get("content")
+                    .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
+            })
+    }
+
+    fn og_updated_time(&self) -> Option<DateTime<FixedOffset>> {
         self.metadata()
             .into_iter()
             .find(|metadata| {
@@ -512,6 +529,56 @@ impl<'a> Html<'a> {
                     .get("content")
                     .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
             })
+    }
+
+    fn og_image(&self) -> Option<Url> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(property) = metadata.get("property") {
+                    property == &String::from("og:image")
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| metadata.get("content").map(|link| link.clone().into()))
+    }
+
+    #[allow(unreachable_patterns)]
+    fn schema_org_images(&self) -> Vec<Url> {
+        self.schema_org()
+            .into_iter()
+            .filter(|schema| matches!(schema, SchemaOrg::ImageObject(_)))
+            .flat_map(|schema| {
+                match schema {
+                    SchemaOrg::ImageObject(image) => image.content_url.map(|url| url.into()),
+                    _ => None, // has been filtered, so only image is possible
+                }
+            })
+            .collect()
+    }
+
+    pub fn updated_time(&self) -> Option<DateTime<FixedOffset>> {
+        self.og_updated_time()
+            .or_else(|| self.article_modified_time())
+    }
+
+    pub fn primary_image(&self) -> Option<Url> {
+        self.og_image()
+            .or_else(|| self.schema_org_images().first().cloned())
+    }
+
+    pub fn description(&self) -> Option<String> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(property) = metadata.get("property") {
+                    property == &String::from("og:description")
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| metadata.get("content").cloned())
     }
 }
 
@@ -942,5 +1009,113 @@ mod tests {
         let html = Html::parse(html, "example.com");
 
         assert_eq!(html.updated_time(), None);
+    }
+
+    #[test]
+    fn primary_image() {
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:image" content="https://example.com/link_to_image.html" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.primary_image(),
+            Some("https://example.com/link_to_image.html".to_string().into())
+        );
+
+        let html = r#"
+    <html>
+        <head>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.primary_image(), None);
+
+        let html = r#"
+    <html>
+        <head>
+            <script type="application/ld+json">
+                {
+                "@context": "https://schema.org",
+                "@type": "ImageObject",
+                "author": "Jane Doe",
+                "contentLocation": "Puerto Vallarta, Mexico",
+                "contentUrl": "mexico-beach.jpg",
+                "datePublished": "2008-01-25",
+                "description": "I took this picture while on vacation last year.",
+                "name": "Beach in Mexico"
+                }
+            </script>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.primary_image(),
+            Some("mexico-beach.jpg".to_string().into())
+        );
+    }
+
+    #[test]
+    fn description() {
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:description" content="This is a page description" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.description(),
+            Some("This is a page description".to_string())
+        );
+
+        let html = r#"
+    <html>
+        <head>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.description(), None);
+    }
+
+    #[test]
+    fn article_modified_time() {
+        let html = r#"
+    <html>
+        <head>
+            <meta property="article:modified_time" content="2022-06-22T19:37:34+00:00" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.updated_time(),
+            Some(DateTime::parse_from_rfc3339("2022-06-22T19:37:34+00:00").unwrap())
+        );
     }
 }

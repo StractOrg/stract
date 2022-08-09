@@ -23,21 +23,62 @@ pub struct Tag<'a> {
     raw: &'a str,
 }
 
+fn addr_of(s: &str) -> usize {
+    s.as_ptr() as usize
+}
+
+fn split_whitespace_indices(s: &str) -> impl Iterator<Item = (usize, &str)> {
+    s.split_whitespace()
+        .map(move |sub| (addr_of(sub) - addr_of(s), sub))
+}
+
 impl<'a> Tag<'a> {
     pub fn attributes(&self) -> HashMap<&'a str, &'a str> {
         let mut attributes = HashMap::new();
 
-        for tok in self.raw.split_whitespace().skip(1) {
-            if tok.contains('=') {
-                if let Some((key, value)) = tok.split_once('=') {
-                    attributes.insert(key.trim(), trim_html_stuff(value, false));
-                }
-            } else {
-                if tok == ">" || tok.starts_with(self.name.as_ref()) || tok == "/>" {
-                    continue;
-                }
+        let mut long_attribute: Option<usize> = None;
+        let mut is_first_token = true;
+        for (start_idx, tok) in split_whitespace_indices(self.raw) {
+            let num_quotes = tok.chars().filter(|c| *c == '"').count();
+            if (tok.contains('>') && num_quotes == 0 && is_first_token)
+                || tok.contains('<')
+                || tok == "/>"
+                || tok.starts_with(self.name.as_ref())
+            {
+                is_first_token = false;
+                continue;
+            }
+            is_first_token = false;
 
-                attributes.insert(trim_html_stuff(tok, true), "");
+            if num_quotes == 0 {
+                if long_attribute.is_none() {
+                    // attribute without value (e.g. autofocus)
+                    let to_insert = trim_html_stuff(tok, true);
+                    if !to_insert.is_empty() {
+                        attributes.insert(to_insert, "");
+                    }
+                }
+            } else if num_quotes == 1 {
+                if let Some(attribute_start_idx) = long_attribute {
+                    // closing attribute
+                    let tok = &self.raw[attribute_start_idx..start_idx + tok.len()];
+                    if tok.contains('=') {
+                        if let Some((key, value)) = tok.split_once('=') {
+                            attributes.insert(key.trim(), trim_html_stuff(value, false));
+                        }
+                    }
+                    long_attribute = None;
+                } else {
+                    // opening attribute
+                    long_attribute = Some(start_idx);
+                }
+            } else if num_quotes == 2 {
+                // self-containing attribute
+                if tok.contains('=') {
+                    if let Some((key, value)) = tok.split_once('=') {
+                        attributes.insert(key.trim(), trim_html_stuff(value, false));
+                    }
+                }
             }
         }
 
@@ -66,7 +107,7 @@ fn trim_html_stuff(s: &str, break_on_dash: bool) -> &str {
             break;
         }
 
-        if c == ' ' || c == '"' || c == '>' {
+        if c == '"' || c == '>' {
             break;
         }
     }
@@ -271,6 +312,30 @@ mod tests {
             _ => panic!(),
         };
         assert_eq!(tag.name(), "a");
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn test_split_whitespace_indices() {
+        let mut iter = split_whitespace_indices(" Hello world");
+
+        assert_eq!(Some((1, "Hello")), iter.next());
+        assert_eq!(Some((7, "world")), iter.next());
+    }
+
+    #[test]
+    fn attribute_containing_spaces() {
+        let mut lex = Token::lexer("<meta description=\"this is a long attribute\">");
+
+        let tag = match lex.next().unwrap() {
+            Token::StartTag(tag) => tag,
+            _ => panic!(),
+        };
+
+        assert_eq!(
+            tag.attributes(),
+            hashmap!["description" => "this is a long attribute"]
+        );
         assert_eq!(lex.next(), None);
     }
 }
