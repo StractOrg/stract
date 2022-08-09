@@ -248,11 +248,17 @@ impl SnippetGenerator {
 
 use crate::{query::Query, schema::Field, Result};
 
-pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Result<String> {
+pub fn generate(
+    query: &Query,
+    text: &str,
+    description: &Option<String>,
+    searcher: &tantivy::Searcher,
+) -> Result<String> {
     let field = searcher
         .schema()
         .get_field(Field::StemmedBody.as_str())
         .expect("Failed to get body field");
+
     let tokenizer =
         StemmedTokenizer::with_forced_language(whatlang::detect_lang(text).unwrap_or(Lang::Eng))
             .into();
@@ -261,7 +267,20 @@ pub fn generate(query: &Query, text: &str, searcher: &tantivy::Searcher) -> Resu
     let mut snippet = generator.snippet(text);
 
     if snippet.fragment.is_empty() {
-        snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+        match description {
+            Some(desc) => {
+                let tokenizer = StemmedTokenizer::with_forced_language(
+                    whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
+                )
+                .into();
+                let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+
+                snippet = generator.snippet(desc);
+            }
+            None => {
+                snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+            }
+        }
     }
 
     let highlighted = snippet.to_html() + "...";

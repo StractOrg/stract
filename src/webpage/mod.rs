@@ -444,6 +444,9 @@ impl<'a> Html<'a> {
 
                     doc.add_text(tantivy_field, text.unwrap())
                 }
+                Field::Description => {
+                    doc.add_text(tantivy_field, self.description().unwrap_or_default())
+                }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
                 Field::Host => doc.add_text(tantivy_field, self.host()),
                 Field::Domain => doc.add_text(tantivy_field, self.domain()),
@@ -459,9 +462,9 @@ impl<'a> Html<'a> {
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,
-                    dbg!(dbg!(self.updated_time())
+                    self.updated_time()
                         .map(|time| time.timestamp().max(0) as u64)
-                        .unwrap_or(0)),
+                        .unwrap_or(0),
                 ),
                 Field::BacklinkText
                 | Field::Centrality
