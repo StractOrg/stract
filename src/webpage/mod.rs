@@ -17,6 +17,7 @@ use crate::{image_store::Image, schema_org::SchemaOrg, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use logos::{Lexer, Logos};
 use std::{collections::HashMap, time::Duration};
+use uuid::Uuid;
 
 mod just_text;
 mod lexer;
@@ -88,6 +89,7 @@ pub struct Webpage<'a> {
     pub backlinks: Vec<Link>,
     pub centrality: f64,
     pub fetch_time_ms: u64,
+    pub primary_image_uuid: Option<Uuid>,
 }
 
 impl<'a> Webpage<'a> {
@@ -105,6 +107,7 @@ impl<'a> Webpage<'a> {
             backlinks,
             centrality,
             fetch_time_ms,
+            primary_image_uuid: None,
         }
     }
 
@@ -138,28 +141,39 @@ impl<'a> Webpage<'a> {
             self.fetch_time_ms,
         );
 
+        let uuid = self
+            .primary_image_uuid
+            .map(|uuid| uuid.to_string())
+            .unwrap_or_default();
+        doc.add_text(
+            schema
+                .get_field(Field::PrimaryImageUuid.as_str())
+                .expect("Failed to get primary_image_uuid field"),
+            uuid,
+        );
+
         Ok(doc)
     }
 
     pub(crate) fn download_favicon(&self) -> Option<Image> {
         self.html.favicon().and_then(|favicon_link| {
-            let client = reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(1))
-                .build()
-                .unwrap();
-
-            match client.get(favicon_link.link.full()).send() {
-                Ok(mut res) => {
-                    let mut bytes = Vec::new();
-                    if res.copy_to(&mut bytes).is_err() {
-                        None
-                    } else {
-                        Image::from_bytes(bytes).ok()
-                    }
-                }
-                Err(_) => None,
-            }
+            favicon_link
+                .link
+                .download_bytes(Duration::from_secs(1))
+                .and_then(|bytes| Image::from_bytes(bytes).ok())
         })
+    }
+
+    pub(crate) fn download_primary_image(&self) -> Option<Image> {
+        self.html.primary_image().and_then(|url| {
+            dbg!(&url);
+            url.download_bytes(Duration::from_secs(5))
+                .and_then(|bytes| Image::from_bytes(bytes).ok())
+        })
+    }
+
+    pub(crate) fn set_primary_image_uuid(&mut self, uuid: Uuid) {
+        self.primary_image_uuid = Some(uuid);
     }
 }
 
@@ -258,7 +272,7 @@ impl<'a> Html<'a> {
                         let (width, height) = match tag.attributes().get("sizes") {
                             Some(size) => {
                                 if let Some((width, height)) = size.split_once('x') {
-                                    (Some(width.parse().unwrap()), Some(height.parse().unwrap()))
+                                    (width.parse().ok(), height.parse().ok())
                                 } else {
                                     (None, None)
                                 }
@@ -444,7 +458,16 @@ impl<'a> Html<'a> {
                 Field::IsHomepage => {
                     doc.add_u64(tantivy_field, self.is_homepage().then(|| 1).unwrap_or(0))
                 }
-                Field::BacklinkText | Field::Centrality | Field::FetchTimeMs => {}
+                Field::LastUpdated => doc.add_u64(
+                    tantivy_field,
+                    self.updated_time()
+                        .map(|time| time.timestamp().max(0) as u64)
+                        .unwrap_or(0),
+                ),
+                Field::BacklinkText
+                | Field::Centrality
+                | Field::FetchTimeMs
+                | Field::PrimaryImageUuid => {}
             }
         }
 
@@ -566,6 +589,12 @@ impl<'a> Html<'a> {
     pub fn primary_image(&self) -> Option<Url> {
         self.og_image()
             .or_else(|| self.schema_org_images().first().cloned())
+            .map(|mut url| {
+                if !url.is_full_path() {
+                    url.prefix_with(&self.url);
+                }
+                url
+            })
     }
 
     pub fn description(&self) -> Option<String> {
@@ -1061,11 +1090,11 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com");
 
         assert_eq!(
             html.primary_image(),
-            Some("mexico-beach.jpg".to_string().into())
+            Some("https://example.com/mexico-beach.jpg".to_string().into())
         );
     }
 

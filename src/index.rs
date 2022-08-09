@@ -18,9 +18,10 @@ use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
+use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
-use crate::image_store::{FaviconStore, Image};
+use crate::image_store::{FaviconStore, Image, PrimaryImageStore};
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
@@ -34,6 +35,7 @@ use std::sync::Arc;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
+const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 
 pub struct Index {
     pub path: String,
@@ -42,6 +44,7 @@ pub struct Index {
     reader: IndexReader,
     schema: Arc<Schema>,
     favicon_store: FaviconStore,
+    primary_image_store: PrimaryImageStore,
 }
 
 impl Index {
@@ -68,6 +71,8 @@ impl Index {
         };
 
         let favicon_store = FaviconStore::open(path.as_ref().join(FAVICON_STORE_SUBFOLDER_NAME));
+        let primary_image_store =
+            PrimaryImageStore::open(path.as_ref().join(PRIMARY_IMAGE_STORE_SUBFOLDER_NAME));
 
         let tokenizer = Tokenizer::default();
         tantivy_index
@@ -90,12 +95,16 @@ impl Index {
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
             favicon_store,
+            primary_image_store,
             tantivy_index,
         })
     }
 
-    pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
+    pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
         self.maybe_insert_favicon(&webpage);
+        if let Some(uuid) = self.maybe_insert_primary_image(&webpage) {
+            webpage.set_primary_image_uuid(uuid);
+        }
         self.writer
             .add_document(webpage.into_tantivy(&self.schema)?)?;
         Ok(())
@@ -205,6 +214,9 @@ impl Index {
         self.favicon_store.merge(other.favicon_store);
         drop(self.favicon_store);
 
+        self.primary_image_store.merge(other.primary_image_store);
+        drop(self.primary_image_store);
+
         Self::open(path).expect("failed to open index")
     }
 
@@ -222,8 +234,18 @@ impl Index {
         }
     }
 
+    fn maybe_insert_primary_image(&mut self, webpage: &Webpage) -> Option<Uuid> {
+        webpage
+            .download_primary_image()
+            .map(|image| self.primary_image_store.insert(image))
+    }
+
     pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
         self.favicon_store.get(url.domain())
+    }
+
+    pub fn retrieve_primary_image(&self, uuid: &Uuid) -> Option<Image> {
+        self.primary_image_store.get(uuid)
     }
 }
 
@@ -234,6 +256,7 @@ pub struct RetrievedWebpage {
     pub snippet: String,
     pub body: String,
     pub favicon: Option<Image>,
+    pub primary_image_uuid: Option<String>,
 }
 
 impl From<Document> for RetrievedWebpage {
@@ -263,6 +286,21 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
+                Field::PrimaryImageUuid => {
+                    webpage.primary_image_uuid = {
+                        let s = value
+                            .value
+                            .as_text()
+                            .expect("Primary image uuid field should be text")
+                            .to_string();
+
+                        if s.is_empty() {
+                            None
+                        } else {
+                            Some(s)
+                        }
+                    }
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::Host
@@ -271,6 +309,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
+                | Field::LastUpdated
                 | Field::FetchTimeMs => {}
             }
         }

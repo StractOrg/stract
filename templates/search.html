@@ -15,21 +15,30 @@
 
     <div class="search-result flex flex-col space-y-3 pt-8 pb-8 pl-40">
         {% for item in search_result %}
-        <div class="search-result-item bg-white max-w-2xl p-3">
-            <div class="text-sm mb-1 flex">
-                <div class="flex items-center mr-2">
-                    <img src="/favicons/{{ item.domain }}" width="13px" />
+        <div class="flex max-w-2xl p-3">
+            <div class="flex flex-col">
+                <div class="text-sm mb-1 flex">
+                    <div class="flex items-center mr-2">
+                        <img src="/favicons/{{ item.domain }}" width="13px" />
+                    </div>
+                    <div>
+                        <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+                    </div>
                 </div>
-                <div>
-                    <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+                <div class="text-lg font-medium mb-1">
+                    <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
+                </div>
+                <div class="text-sm">
+                    {{ item.snippet }}
                 </div>
             </div>
-            <div class="text-lg font-medium mb-1">
-                <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
+            {% match item.primary_image_uuid %}
+            {% when Some with (val) %}
+            <div class="aspect-square h-full ml-3">
+                <img class="w-full h-full object-cover rounded-full" src="/image/{{ val }}" />
             </div>
-            <div class="text-sm">
-                {{ item.snippet }}
-            </div>
+            {% when None %}
+            {% endmatch %}
         </div>
         {% endfor %}
     </div>
@@ -48,10 +57,6 @@
         text-rendering: optimizeLegibility;
         font-smooth: grayscale;
         -moz-osx-font-smoothing: grayscale;
-    }
-
-    .search-result-item {
-        border-color: rgb(241 245 249);
     }
 </style>
 

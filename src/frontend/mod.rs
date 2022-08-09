@@ -31,6 +31,7 @@ use axum_extra::routing::SpaRouter;
 mod autosuggest;
 mod favicons;
 mod index;
+mod primary_image;
 pub mod search;
 
 pub struct HtmlTemplate<T>(T);
@@ -71,6 +72,7 @@ pub fn router(index_path: &str, queries_csv_path: &str) -> Result<Router> {
         .route("/search", get(search::route))
         .route("/autosuggest", get(autosuggest::route))
         .route("/favicons/:site", get(favicons::route))
+        .route("/image/:uuid", get(primary_image::route))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state)))
 }

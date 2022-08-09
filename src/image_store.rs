@@ -21,6 +21,7 @@ use image::{DynamicImage, ImageOutputFormat};
 use serde::{de, ser::SerializeStruct, Serialize};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
+use uuid::Uuid;
 
 const FAVICON_SIZE: u32 = 32;
 
@@ -161,8 +162,48 @@ impl FaviconStore {
         self.0.get(key)
     }
 
-    pub fn merge(&mut self, other: FaviconStore) {
+    pub fn merge(&mut self, other: Self) {
         self.0.merge(other.0)
+    }
+}
+
+pub struct PrimaryImageStore(ImageStore);
+
+impl PrimaryImageStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let store = ImageStore::open_with_filters(
+            path,
+            vec![Box::new(ResizeFilter {
+                width: 200,
+                height: 100,
+            })],
+        );
+
+        Self(store)
+    }
+
+    pub fn insert(&mut self, image: Image) -> Uuid {
+        let uuid = self.generate_uuid();
+        self.0.insert(&uuid.to_string(), image);
+        uuid
+    }
+
+    pub fn get(&self, uuid: &Uuid) -> Option<Image> {
+        self.0.get(uuid.to_string().as_str())
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        self.0.merge(other.0)
+    }
+
+    fn generate_uuid(&self) -> Uuid {
+        let mut uuid = Uuid::new_v4();
+
+        while self.0.contains(&uuid.to_string()) {
+            uuid = Uuid::new_v4();
+        }
+
+        uuid
     }
 }
 

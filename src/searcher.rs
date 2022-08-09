@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
+use uuid::Uuid;
+
 use crate::image_store::Image;
 use crate::index::{Index, RetrievedWebpage};
 use crate::query::Query;
@@ -46,5 +50,12 @@ impl Searcher {
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {
         self.index.retrieve_favicon(site)
+    }
+
+    pub fn primary_image(&self, uuid: String) -> Option<Image> {
+        if let Ok(uuid) = Uuid::from_str(uuid.as_str()) {
+            return self.index.retrieve_primary_image(&uuid);
+        }
+        None
     }
 }

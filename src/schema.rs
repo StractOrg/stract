@@ -36,8 +36,10 @@ pub enum Field {
     BacklinkText,
     Centrality,
     FetchTimeMs,
+    PrimaryImageUuid,
+    LastUpdated,
 }
-pub static ALL_FIELDS: [Field; 12] = [
+pub static ALL_FIELDS: [Field; 14] = [
     Field::Title,
     Field::Body,
     Field::StemmedTitle,
@@ -50,6 +52,8 @@ pub static ALL_FIELDS: [Field; 12] = [
     Field::BacklinkText,
     Field::Centrality,
     Field::FetchTimeMs,
+    Field::PrimaryImageUuid,
+    Field::LastUpdated,
 ];
 
 impl Field {
@@ -99,6 +103,14 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
+            Field::PrimaryImageUuid => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            &Field::LastUpdated => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -116,6 +128,8 @@ impl Field {
             Field::DomainIfHomepage => "domain_if_homepage",
             Field::IsHomepage => "is_homepage",
             Field::FetchTimeMs => "fetch_time_ms",
+            Field::PrimaryImageUuid => "primary_image_uuid",
+            Field::LastUpdated => "last_updated",
         }
     }
 
@@ -131,14 +145,14 @@ impl Field {
             | Field::Url
             | Field::Domain
             | Field::IsHomepage
-            | Field::FetchTimeMs => None,
+            | Field::PrimaryImageUuid
+            | Field::FetchTimeMs
+            | Field::LastUpdated => None,
         }
     }
 
     pub fn is_searchable(&self) -> bool {
-        match self {
-            _ => true,
-        }
+        !matches!(self, Field::PrimaryImageUuid)
     }
 }
 

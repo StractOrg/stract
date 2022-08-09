@@ -38,6 +38,7 @@ pub struct DisplayedWebpage {
     pub pretty_url: String,
     pub snippet: String,
     pub body: String,
+    pub primary_image_uuid: Option<String>,
 }
 
 const MAX_PRETTY_URL_LEN: usize = 50;
@@ -78,6 +79,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             domain,
             snippet: webpage.snippet, // snippet has already been html-escaped.
             body: webpage.body,
+            primary_image_uuid: webpage.primary_image_uuid,
         }
     }
 }
