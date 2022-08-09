@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Url(String);
@@ -132,5 +132,24 @@ impl Url {
 
     pub fn full(&self) -> &str {
         &self.0
+    }
+
+    pub fn download_bytes(&self, timeout: Duration) -> Option<Vec<u8>> {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(timeout)
+            .build()
+            .unwrap();
+
+        match client.get(self.full()).send() {
+            Ok(mut res) => {
+                let mut bytes = Vec::new();
+                if res.copy_to(&mut bytes).is_err() {
+                    None
+                } else {
+                    Some(bytes)
+                }
+            }
+            Err(_) => None,
+        }
     }
 }
