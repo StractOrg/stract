@@ -307,8 +307,26 @@ impl<'a> Html<'a> {
         None
     }
 
-    pub fn text(&self) -> Option<String> {
+    pub fn clean_text(&self) -> Option<String> {
         let text = JustText::default().extract(self.raw);
+
+        if text.is_empty() {
+            None
+        } else {
+            Some(text)
+        }
+    }
+
+    pub fn all_text(&self) -> Option<String> {
+        let text = JustText {
+            max_link_density: 2.0,
+            length_low: 0,
+            length_high: 0,
+            stopwords_low: -1.0,
+            stopwords_high: -1.0,
+            max_heading_distance: 10000,
+        }
+        .extract(self.raw);
 
         if text.is_empty() {
             None
@@ -435,14 +453,10 @@ impl<'a> Html<'a> {
 
                     doc.add_text(tantivy_field, title.unwrap())
                 }
-                Field::Body | Field::StemmedBody => {
-                    let text = self.text();
+                Field::CleanBody | Field::StemmedCleanBody => {
+                    let text = self.clean_text();
 
-                    if text.is_none() {
-                        return Err(Error::EmptyField("body"));
-                    }
-
-                    doc.add_text(tantivy_field, text.unwrap())
+                    doc.add_text(tantivy_field, text.unwrap_or_default())
                 }
                 Field::Description => {
                     doc.add_text(tantivy_field, self.description().unwrap_or_default())
@@ -466,6 +480,15 @@ impl<'a> Html<'a> {
                         .map(|time| time.timestamp().max(0) as u64)
                         .unwrap_or(0),
                 ),
+                Field::StemmedAllBody | Field::AllBody => {
+                    let text = self.all_text();
+
+                    if text.is_none() {
+                        return Err(Error::EmptyField("all body"));
+                    }
+
+                    doc.add_text(tantivy_field, text.unwrap())
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::FetchTimeMs
@@ -661,7 +684,7 @@ mod tests {
                 text: "Link to example".to_string()
             }]
         );
-        assert_eq!(webpage.text(), Some(CONTENT.to_string()));
+        assert_eq!(webpage.clean_text(), Some(CONTENT.to_string()));
 
         let mut expected_meta = HashMap::new();
         expected_meta.insert("name".to_string(), "meta1".to_string());
@@ -690,7 +713,7 @@ mod tests {
 
         let webpage = Html::parse(&raw, "https://www.example.com/whatever");
 
-        assert_eq!(webpage.text(), Some(CONTENT.to_string()));
+        assert_eq!(webpage.clean_text(), Some(CONTENT.to_string()));
     }
 
     #[test]
@@ -718,7 +741,7 @@ mod tests {
 
         let webpage = Html::parse(&raw, "https://www.example.com");
 
-        assert!(!webpage.text().unwrap().contains("not"));
+        assert!(!webpage.clean_text().unwrap().contains("not"));
     }
 
     #[test]
@@ -746,7 +769,7 @@ mod tests {
 
         let webpage = Html::parse(&raw, "https://www.example.com");
 
-        assert!(!webpage.text().unwrap().contains("not"));
+        assert!(!webpage.clean_text().unwrap().contains("not"));
     }
 
     #[test]
@@ -789,16 +812,16 @@ mod tests {
             webpage.title(),
             Some("パチンコ大当たり情報 - Ｐジューシーハニー３ 大当たり詳細ページ - やすだひばりヶ丘店".to_string())
         );
-        assert!(webpage.text().is_some());
-        assert!(!webpage.text().unwrap().is_empty());
+        assert!(webpage.clean_text().is_some());
+        assert!(!webpage.clean_text().unwrap().is_empty());
 
         let webpage = Html::parse(include_str!("../../testcases_parsing/5390001.html"), "");
         assert_eq!(
             webpage.title(),
             Some("特效烟机系列_山东壹线文化传播有限公司".to_string())
         );
-        assert!(webpage.text().is_some());
-        assert!(!webpage.text().unwrap().is_empty());
+        assert!(webpage.clean_text().is_some());
+        assert!(!webpage.clean_text().unwrap().is_empty());
 
         let webpage = Html::parse(
             include_str!("../../testcases_parsing/77p2p-7.live-105.html"),
@@ -808,8 +831,8 @@ mod tests {
             webpage.title(),
             Some("77p2pЅu¤WЖ[¬Э - ҐDјЅ :: іnєс ".to_string())
         );
-        assert!(webpage.text().is_some());
-        assert!(!webpage.text().unwrap().is_empty());
+        assert!(webpage.clean_text().is_some());
+        assert!(!webpage.clean_text().unwrap().is_empty());
     }
 
     #[test]

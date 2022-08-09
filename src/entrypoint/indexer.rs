@@ -83,7 +83,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             trace!("inserting webpage: {:?}", html.url());
 
             trace!("title = {:?}", html.title());
-            trace!("text = {:?}", html.text());
+            trace!("text = {:?}", html.clean_text());
 
             let webpage = Webpage {
                 html,

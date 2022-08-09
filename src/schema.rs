@@ -25,9 +25,11 @@ pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 #[derive(Clone)]
 pub enum Field {
     Title,
-    Body,
+    CleanBody,
     StemmedTitle,
-    StemmedBody,
+    StemmedCleanBody,
+    AllBody,
+    StemmedAllBody,
     Url,
     Host,
     Domain,
@@ -40,11 +42,13 @@ pub enum Field {
     LastUpdated,
     Description,
 }
-pub static ALL_FIELDS: [Field; 15] = [
+pub static ALL_FIELDS: [Field; 17] = [
     Field::Title,
-    Field::Body,
+    Field::CleanBody,
     Field::StemmedTitle,
-    Field::StemmedBody,
+    Field::StemmedCleanBody,
+    Field::AllBody,
+    Field::StemmedAllBody,
     Field::Url,
     Field::Host,
     Field::Domain,
@@ -77,10 +81,15 @@ impl Field {
     pub fn options(&self) -> IndexingOption {
         match self {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Body => IndexingOption::Text(self.default_text_options()),
+            Field::CleanBody => IndexingOption::Text(self.default_text_options()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Host => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
+            Field::AllBody => IndexingOption::Text(self.default_text_options()),
+            Field::StemmedAllBody => IndexingOption::Text(
+                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str())
+                    .set_stored(),
+            ),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::IsHomepage => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -96,7 +105,7 @@ impl Field {
             Field::StemmedTitle => IndexingOption::Text(
                 self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
             ),
-            Field::StemmedBody => IndexingOption::Text(
+            Field::StemmedCleanBody => IndexingOption::Text(
                 self.default_text_options_with_tokenizer(StemmedTokenizer::as_str())
                     .set_stored(),
             ),
@@ -121,13 +130,13 @@ impl Field {
     pub fn as_str(&self) -> &str {
         match self {
             Field::Title => "title",
-            Field::Body => "body",
+            Field::CleanBody => "body",
             Field::Url => "url",
             Field::Host => "host",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
             Field::StemmedTitle => "stemmed_title",
-            Field::StemmedBody => "stemmed_body",
+            Field::StemmedCleanBody => "stemmed_body",
             Field::Domain => "domain",
             Field::DomainIfHomepage => "domain_if_homepage",
             Field::IsHomepage => "is_homepage",
@@ -135,6 +144,8 @@ impl Field {
             Field::PrimaryImageUuid => "primary_image_uuid",
             Field::LastUpdated => "last_updated",
             Field::Description => "description",
+            Field::AllBody => "all_body",
+            Field::StemmedAllBody => "stemmed_all_body",
         }
     }
 
@@ -142,9 +153,11 @@ impl Field {
         match self {
             Field::Host => Some(2.0),
             Field::DomainIfHomepage => Some(50.0),
-            Field::StemmedBody | Field::StemmedTitle => Some(0.01),
+            Field::StemmedCleanBody | Field::StemmedTitle => Some(0.01),
+            Field::AllBody => Some(0.01),
+            Field::StemmedAllBody => Some(0.001),
             Field::Title
-            | Field::Body
+            | Field::CleanBody
             | Field::BacklinkText
             | Field::Centrality
             | Field::Url
