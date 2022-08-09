@@ -137,7 +137,6 @@ impl Scorer for TermIntersection {
             .map(|(field_id, terms)| {
                 let mut weights = Vec::new();
                 for (i, (term, weight)) in terms.into_iter().enumerate() {
-                    weights.push(weight);
                     if term.doc() == TERMINATED {
                         for pos in &mut positions[i..] {
                             if !pos.is_empty() {
@@ -146,7 +145,7 @@ impl Scorer for TermIntersection {
                         }
                         break;
                     }
-
+                    weights.push(weight);
                     term.positions(positions.get_mut(i).unwrap());
                 }
 
@@ -159,6 +158,7 @@ impl Scorer for TermIntersection {
 
                 positions
                     .iter()
+                    .filter(|pos| !pos.is_empty())
                     .zip_eq(weights.iter())
                     .enumerate()
                     .map(|(term_id, (_pos, weight))| {
