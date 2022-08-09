@@ -134,7 +134,13 @@ impl Index {
             .collect();
 
         for page in &mut webpages {
-            page.snippet = snippet::generate(query, &page.body, &page.description, &searcher)?;
+            page.snippet = snippet::generate(
+                query,
+                &page.body,
+                &page.dirty_body,
+                &page.description,
+                &searcher,
+            )?;
         }
 
         Ok(SearchResult {
@@ -256,6 +262,7 @@ pub struct RetrievedWebpage {
     pub url: String,
     pub snippet: String,
     pub body: String,
+    pub dirty_body: String,
     pub description: Option<String>,
     pub favicon: Option<Image>,
     pub primary_image_uuid: Option<String>,
@@ -275,7 +282,7 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Title field should be text")
                         .to_string()
                 }
-                Field::StemmedBody => {
+                Field::StemmedCleanBody => {
                     webpage.body = value
                         .value
                         .as_text()
@@ -323,14 +330,22 @@ impl From<Document> for RetrievedWebpage {
                         }
                     }
                 }
+                Field::StemmedAllBody => {
+                    webpage.dirty_body = value
+                        .value
+                        .as_text()
+                        .expect("Stemmed all body field should be text")
+                        .to_string()
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::Host
                 | Field::StemmedTitle
-                | Field::Body
+                | Field::CleanBody
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
+                | Field::AllBody
                 | Field::FetchTimeMs => {}
             }
         }

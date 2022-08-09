@@ -26,9 +26,9 @@ use super::{lexer::Token, Preprocessor};
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py
 
 const MAX_LINK_DENSITY_DEFAULT: f64 = 0.2;
-const LENGTH_LOW_DEFAULT: usize = 50;
+const LENGTH_LOW_DEFAULT: usize = 70;
 const LENGTH_HIGH_DEFAULT: usize = 200;
-const STOPWORDS_LOW_DEFAULT: f64 = 0.28;
+const STOPWORDS_LOW_DEFAULT: f64 = 0.30;
 const STOPWORDS_HIGH_DEFAULT: f64 = 0.32;
 const MAX_HEADING_DISTANCE_DEFAULT: usize = 200;
 
@@ -124,12 +124,12 @@ lazy_static! {
 }
 
 pub struct JustText {
-    max_link_density: f64,
-    length_low: usize,
-    length_high: usize,
-    stopwords_low: f64,
-    stopwords_high: f64,
-    max_heading_distance: usize,
+    pub max_link_density: f64,
+    pub length_low: usize,
+    pub length_high: usize,
+    pub stopwords_low: f64,
+    pub stopwords_high: f64,
+    pub max_heading_distance: usize,
 }
 
 impl Default for JustText {

@@ -251,12 +251,13 @@ use crate::{query::Query, schema::Field, Result};
 pub fn generate(
     query: &Query,
     text: &str,
+    dirty_text: &str,
     description: &Option<String>,
     searcher: &tantivy::Searcher,
 ) -> Result<String> {
     let field = searcher
         .schema()
-        .get_field(Field::StemmedBody.as_str())
+        .get_field(Field::StemmedCleanBody.as_str())
         .expect("Failed to get body field");
 
     let tokenizer =
@@ -276,9 +277,26 @@ pub fn generate(
                 let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
                 snippet = generator.snippet(desc);
+                if snippet.fragment.is_empty() {
+                    snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                }
             }
             None => {
-                snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                if text.is_empty() {
+                    let tokenizer = StemmedTokenizer::with_forced_language(
+                        whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
+                    )
+                    .into();
+                    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+
+                    snippet = generator.snippet(dirty_text);
+
+                    if snippet.fragment.is_empty() {
+                        snippet.fragment = dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                    }
+                } else {
+                    snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                }
             }
         }
     }
