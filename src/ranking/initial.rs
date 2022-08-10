@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::schema::{Field, CENTRALITY_SCALING};
+use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::fastfield::{DynamicFastFieldReader, FastFieldReader};
 use tantivy::{DocId, Score, SegmentReader};
@@ -26,6 +27,8 @@ pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<u64>,
     is_homepage_reader: DynamicFastFieldReader<u64>,
     fetch_time_ms_reader: DynamicFastFieldReader<u64>,
+    update_timestamp_reader: DynamicFastFieldReader<u64>,
+    current_timestamp: f64,
 }
 
 impl ScoreTweaker<f64> for InitialScoreTweaker {
@@ -59,12 +62,29 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .u64(fetch_time_ms_field)
             .expect("Failed to get fetch_time_ms fast-field reader");
 
+        let update_timestamp_field = segment_reader
+            .schema()
+            .get_field(Field::LastUpdated.as_str())
+            .expect("Faild to load last_updated field");
+        let update_timestamp_reader = segment_reader
+            .fast_fields()
+            .u64(update_timestamp_field)
+            .expect("Failed to get last_updated fast-field reader");
+
+        let current_timestamp = Utc::now().timestamp() as f64;
+
         Ok(InitialSegmentScoreTweaker {
             centrality_reader,
             is_homepage_reader,
             fetch_time_ms_reader,
+            update_timestamp_reader,
+            current_timestamp,
         })
     }
+}
+
+fn time_to_score(time: f64) -> f64 {
+    1.0 / ((time + 1.0).log2())
 }
 
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
@@ -73,7 +93,13 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
         let is_homepage = self.is_homepage_reader.get(doc) as f64;
         let fetch_time_ms = self.fetch_time_ms_reader.get(doc) as f64;
+        let update_timestamp = self.update_timestamp_reader.get(doc) as f64;
+        let hours_since_update = (self.current_timestamp - update_timestamp).max(0.000001) / 3600.0;
 
-        (3.0 * score) + (1000.0 * centrality) + (1.0 * is_homepage) + (10.0 / (fetch_time_ms + 1.0))
+        (3.0 * score)
+            + (4000.0 * centrality)
+            + (1.0 * is_homepage)
+            + (10.0 / (fetch_time_ms + 1.0))
+            + (2000.0 * time_to_score(hours_since_update))
     }
 }

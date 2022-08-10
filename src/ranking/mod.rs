@@ -170,4 +170,58 @@ mod tests {
         assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
+
+    #[test]
+    fn freshness_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Title</title>
+                            <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.old.com",
+                vec![],
+                0.1,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Title</title>
+                            <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.new.com",
+                vec![],
+                0.09,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::from(index);
+        let result = searcher.search("title").expect("Search failed");
+
+        assert_eq!(result.documents[0].url, "https://www.new.com");
+    }
 }
