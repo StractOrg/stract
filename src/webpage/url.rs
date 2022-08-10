@@ -16,7 +16,9 @@
 
 use std::{fmt::Display, time::Duration};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+use tracing::debug;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Url(String);
 
 impl Display for Url {
@@ -134,20 +136,15 @@ impl Url {
         &self.0
     }
 
-    pub fn download_bytes(&self, timeout: Duration) -> Option<Vec<u8>> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(timeout)
-            .build()
-            .unwrap();
+    pub async fn download_bytes(&self, timeout: Duration) -> Option<Vec<u8>> {
+        let client = reqwest::Client::builder().timeout(timeout).build().unwrap();
 
-        match client.get(self.full()).send() {
-            Ok(mut res) => {
-                let mut bytes = Vec::new();
-                if res.copy_to(&mut bytes).is_err() {
-                    None
-                } else {
-                    Some(bytes)
-                }
+        debug!("downloading {:?}", self.full());
+
+        match client.get(self.full()).send().await {
+            Ok(res) => {
+                let bytes = res.bytes().await.ok()?.to_vec();
+                Some(bytes)
             }
             Err(_) => None,
         }

@@ -19,7 +19,8 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::image_store::Image;
-use crate::index::{Index, RetrievedWebpage};
+use crate::index::Index;
+use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
 use crate::ranking::Ranker;
 use crate::webpage::Url;

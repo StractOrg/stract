@@ -22,7 +22,7 @@ use tantivy::TantivyError;
 use thiserror::Error;
 
 pub mod entrypoint;
-pub mod index;
+pub mod inverted_index;
 
 pub mod mapreduce;
 
@@ -31,6 +31,7 @@ mod directory;
 mod exponential_backoff;
 mod frontend;
 mod image_store;
+mod index;
 mod kv;
 pub mod query;
 pub mod ranking;

@@ -74,7 +74,14 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
         let file = WarcFile::download(source, &self.warc_path).unwrap();
         debug!("finished downloading");
 
-        for record in file.records().flatten().take(2000) {
+        for record in
+            file.records()
+                .flatten()
+                .filter(|record| match &record.response.payload_type {
+                    Some(payload_type) => !matches!(payload_type.as_str(), "application/pdf"),
+                    None => true,
+                })
+        {
             let html = Html::parse(&record.response.body, &record.request.url);
             let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
             let centrality = worker.centrality_store.get(html.host()).unwrap_or_default();
@@ -92,34 +99,13 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                 fetch_time_ms,
                 primary_image_uuid: None,
             };
-
             if let Err(err) = index.insert(webpage) {
-                if record.response.body.is_empty() {
-                    continue;
-                }
-                if let Some(payload) = &record.response.payload_type {
-                    if payload == "application/pdf" {
-                        continue;
-                    }
-                }
-
                 debug!("{:?}", err);
-                // these url's actually have errors (no title etc)
-                // if matches!(
-                //     record.request.url.as_str(),
-                //     "http://ain.liberzic.com/agenda-date-26-5-2008.html"
-                // ) {
-                //     continue;
-                // }
-                // dbg!(&record);
-                // println!();
-                // println!();
-                // println!("{}", record.response.body);
-                // panic!();
             }
         }
         index.commit().unwrap();
-        index.merge_all_segments().unwrap();
+        info!("downloading images");
+        index.download_pending_images();
 
         info!("{} done", name);
 
