@@ -132,8 +132,12 @@ impl Url {
         };
     }
 
-    pub fn full(&self) -> &str {
-        &self.0
+    pub fn full(&self) -> String {
+        if self.find_protocol_end() == 0 {
+            "https://".to_string() + &self.0
+        } else {
+            self.0.clone()
+        }
     }
 
     pub async fn download_bytes(&self, timeout: Duration) -> Option<Vec<u8>> {

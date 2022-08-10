@@ -40,12 +40,13 @@ const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 enum ImageDownloadJob {
     Favicon(Url),
     PrimaryImage { key: Uuid, url: Url },
 }
 
+#[derive(Debug)]
 struct DownloadedImage {
     image: Image,
     key: String,
@@ -149,9 +150,8 @@ impl Index {
         }
 
         if let Some(favicon) = webpage.html.favicon() {
-            self.image_download_jobs.insert(ImageDownloadJob::Favicon(
-                favicon.link.domain().to_string().into(),
-            ));
+            self.image_download_jobs
+                .insert(ImageDownloadJob::Favicon(favicon.link));
         }
     }
 
