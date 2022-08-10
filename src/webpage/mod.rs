@@ -13,10 +13,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{image_store::Image, schema_org::SchemaOrg, Error, Result};
+use crate::{schema_org::SchemaOrg, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use logos::{Lexer, Logos};
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 mod just_text;
@@ -30,7 +30,7 @@ use self::{just_text::JustText, lexer::Token};
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct FaviconLink {
-    link: Url,
+    pub link: Url,
     width: Option<u32>,
     height: Option<u32>,
     image_type: Option<String>,
@@ -153,22 +153,6 @@ impl<'a> Webpage<'a> {
         );
 
         Ok(doc)
-    }
-
-    pub(crate) fn download_favicon(&self) -> Option<Image> {
-        self.html.favicon().and_then(|favicon_link| {
-            favicon_link
-                .link
-                .download_bytes(Duration::from_secs(1))
-                .and_then(|bytes| Image::from_bytes(bytes).ok())
-        })
-    }
-
-    pub(crate) fn download_primary_image(&self) -> Option<Image> {
-        self.html.primary_image().and_then(|url| {
-            url.download_bytes(Duration::from_secs(5))
-                .and_then(|bytes| Image::from_bytes(bytes).ok())
-        })
     }
 
     pub(crate) fn set_primary_image_uuid(&mut self, uuid: Uuid) {

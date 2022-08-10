@@ -169,7 +169,5 @@ mod tests {
 
         assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
-        assert_eq!(result.documents[1].url, "https://www.dr.dk/whatever");
-        assert_eq!(result.documents[2].url, "https://www.b.com");
     }
 }

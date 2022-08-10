@@ -151,14 +151,13 @@ impl Field {
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Host => Some(2.0),
+            Field::Host => Some(3.0),
             Field::DomainIfHomepage => Some(50.0),
-            Field::StemmedCleanBody | Field::StemmedTitle => Some(0.01),
+            Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
+            Field::Title | Field::CleanBody => Some(1.5),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
-            Field::Title
-            | Field::CleanBody
-            | Field::BacklinkText
+            Field::BacklinkText
             | Field::Centrality
             | Field::Url
             | Field::Domain

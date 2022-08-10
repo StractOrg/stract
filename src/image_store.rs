@@ -19,6 +19,7 @@ use crate::Result;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageOutputFormat};
 use serde::{de, ser::SerializeStruct, Serialize};
+use std::collections::HashSet;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
 use uuid::Uuid;
@@ -167,7 +168,10 @@ impl FaviconStore {
     }
 }
 
-pub struct PrimaryImageStore(ImageStore);
+pub struct PrimaryImageStore {
+    store: ImageStore,
+    promised_uuids: HashSet<Uuid>,
+}
 
 impl PrimaryImageStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
@@ -179,29 +183,33 @@ impl PrimaryImageStore {
             })],
         );
 
-        Self(store)
+        Self {
+            store,
+            promised_uuids: HashSet::new(),
+        }
     }
 
-    pub fn insert(&mut self, image: Image) -> Uuid {
-        let uuid = self.generate_uuid();
-        self.0.insert(&uuid.to_string(), image);
-        uuid
+    pub fn insert(&mut self, uuid: Uuid, image: Image) {
+        self.promised_uuids.remove(&uuid);
+        self.store.insert(&uuid.to_string(), image);
     }
 
     pub fn get(&self, uuid: &Uuid) -> Option<Image> {
-        self.0.get(uuid.to_string().as_str())
+        self.store.get(uuid.to_string().as_str())
     }
 
     pub fn merge(&mut self, other: Self) {
-        self.0.merge(other.0)
+        self.store.merge(other.store)
     }
 
-    fn generate_uuid(&self) -> Uuid {
+    pub fn generate_uuid(&mut self) -> Uuid {
         let mut uuid = Uuid::new_v4();
 
-        while self.0.contains(&uuid.to_string()) {
+        while self.store.contains(&uuid.to_string()) || self.promised_uuids.contains(&uuid) {
             uuid = Uuid::new_v4();
         }
+
+        self.promised_uuids.insert(uuid);
 
         uuid
     }

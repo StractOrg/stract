@@ -1,5 +1,3 @@
-use chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
 // Cuely is an open source web search engine.
 // Copyright (C) 2022 Cuely ApS
 //
@@ -15,208 +13,126 @@ use serde::{Deserialize, Serialize};
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use tantivy::collector::{Collector, Count};
-use tantivy::merge_policy::NoMergePolicy;
+
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+
+use futures::StreamExt;
+use serde::{Deserialize, Serialize};
+use tantivy::collector::Collector;
 use tantivy::schema::Schema;
-use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
 use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
 use crate::image_store::{FaviconStore, Image, PrimaryImageStore};
+use crate::inverted_index::InvertedIndex;
 use crate::query::Query;
-use crate::schema::{Field, ALL_FIELDS};
 use crate::searcher::SearchResult;
-use crate::snippet;
 use crate::webpage::{Url, Webpage};
 use crate::Result;
-use crate::{schema::create_schema, tokenizer::Tokenizer};
-use std::fs;
-use std::path::Path;
-use std::sync::Arc;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
+const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+enum ImageDownloadJob {
+    Favicon(Url),
+    PrimaryImage { key: Uuid, url: Url },
+}
+
+struct DownloadedImage {
+    image: Image,
+    key: String,
+    original_job: ImageDownloadJob,
+}
+
+impl ImageDownloadJob {
+    pub async fn download(&self) -> Option<DownloadedImage> {
+        match self {
+            ImageDownloadJob::Favicon(url) => url
+                .download_bytes(Duration::from_secs(1))
+                .await
+                .and_then(|bytes| Image::from_bytes(bytes).ok())
+                .map(|image| DownloadedImage {
+                    image,
+                    key: url.domain().to_string(),
+                    original_job: self.clone(),
+                }),
+            ImageDownloadJob::PrimaryImage { key, url } => url
+                .download_bytes(Duration::from_secs(5))
+                .await
+                .and_then(|bytes| Image::from_bytes(bytes).ok())
+                .map(|image| DownloadedImage {
+                    image,
+                    key: key.to_string(),
+                    original_job: self.clone(),
+                }),
+        }
+    }
+}
 
 pub struct Index {
-    pub path: String,
-    tantivy_index: tantivy::Index,
-    writer: IndexWriter,
-    reader: IndexReader,
-    schema: Arc<Schema>,
+    inverted_index: InvertedIndex,
     favicon_store: FaviconStore,
     primary_image_store: PrimaryImageStore,
+    image_download_jobs: HashSet<ImageDownloadJob>,
+    pub path: String,
 }
 
 impl Index {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref())?;
+        }
+
+        let favicon_store = FaviconStore::open(path.as_ref().join(FAVICON_STORE_SUBFOLDER_NAME));
+        let primary_image_store =
+            PrimaryImageStore::open(path.as_ref().join(PRIMARY_IMAGE_STORE_SUBFOLDER_NAME));
+
+        let inverted_index =
+            InvertedIndex::open(path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME))?;
+
+        Ok(Self {
+            inverted_index,
+            favicon_store,
+            primary_image_store,
+            path: path.as_ref().to_str().unwrap().to_string(),
+            image_download_jobs: HashSet::new(),
+        })
+    }
+
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = crate::gen_temp_path();
         Self::open(path)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let schema = create_schema();
-
-        if !path.as_ref().exists() {
-            fs::create_dir_all(path.as_ref())?;
-        }
-
-        let tv_path = path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME);
-
-        let tantivy_index = if tv_path.exists() {
-            tantivy::Index::open_in_dir(tv_path)?
-        } else {
-            fs::create_dir_all(&tv_path)?;
-            tantivy::Index::create_in_dir(tv_path, schema.clone())?
-        };
-
-        let favicon_store = FaviconStore::open(path.as_ref().join(FAVICON_STORE_SUBFOLDER_NAME));
-        let primary_image_store =
-            PrimaryImageStore::open(path.as_ref().join(PRIMARY_IMAGE_STORE_SUBFOLDER_NAME));
-
-        let tokenizer = Tokenizer::default();
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::new_stemmed();
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let writer = tantivy_index.writer(10_000_000_000)?;
-
-        let merge_policy = NoMergePolicy::default();
-        writer.set_merge_policy(Box::new(merge_policy));
-
-        Ok(Index {
-            writer,
-            reader: tantivy_index.reader()?,
-            schema: Arc::new(schema),
-            path: path.as_ref().to_str().unwrap().to_string(),
-            favicon_store,
-            primary_image_store,
-            tantivy_index,
-        })
-    }
-
     pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
-        // self.maybe_insert_favicon(&webpage);
-        // if let Some(uuid) = self.maybe_insert_primary_image(&webpage) {
-        //     webpage.set_primary_image_uuid(uuid);
-        // }
-        self.writer
-            .add_document(webpage.into_tantivy(&self.schema)?)?;
-        Ok(())
+        self.maybe_insert_favicon(&webpage);
+        self.maybe_insert_primary_image(&mut webpage);
+        self.inverted_index.insert(webpage)
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.writer.commit()?;
-        self.reader.reload()?;
-
-        Ok(())
+        self.inverted_index.merge_all_segments()?;
+        self.inverted_index.commit()
     }
 
     pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
     where
         C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
     {
-        let searcher = self.reader.searcher();
-
-        let (count, docs) = searcher.search(query, &(Count, collector))?;
-
-        let mut webpages: Vec<RetrievedWebpage> = docs
-            .into_iter()
-            .map(|(_score, doc_address)| self.retrieve_doc(doc_address, &searcher))
-            .filter(|page| page.is_ok())
-            .map(|page| page.unwrap())
-            .collect();
-
-        for page in &mut webpages {
-            page.snippet = snippet::generate(
-                query,
-                &page.body,
-                &page.dirty_body,
-                &page.description,
-                &searcher,
-            )?;
-        }
-
-        Ok(SearchResult {
-            num_docs: count,
-            documents: webpages,
-        })
+        self.inverted_index.search(query, collector)
     }
 
-    pub fn merge_all_segments(&mut self) -> Result<()> {
-        let segment_ids: Vec<_> = self
-            .tantivy_index
-            .load_metas()?
-            .segments
-            .into_iter()
-            .map(|segment| segment.id())
-            .collect();
-
-        self.writer.merge(&segment_ids[..]).wait()?;
-
-        Ok(())
-    }
-
-    fn retrieve_doc(
-        &self,
-        doc_address: DocAddress,
-        searcher: &LeasedItem<tantivy::Searcher>,
-    ) -> Result<RetrievedWebpage> {
-        let doc = searcher.doc(doc_address)?;
-        Ok(RetrievedWebpage::from(doc))
-    }
-
-    pub fn merge(mut self, mut other: Index) -> Self {
-        other.commit().expect("failed to commit index");
-        self.commit().expect("failed to commit index");
-
-        let other_meta = other
-            .tantivy_index
-            .load_metas()
-            .expect("failed to laod tantivy metadata for index");
-
-        let mut meta = self
-            .tantivy_index
-            .load_metas()
-            .expect("failed to laod tantivy metadata for index");
-
-        let x = other.path.clone();
-        let other_path = Path::new(x.as_str()).join(INVERTED_INDEX_SUBFOLDER_NAME);
-        other.writer.wait_merging_threads().unwrap();
-
-        let path = self.path.clone();
-        let self_path = Path::new(path.as_str()).join(INVERTED_INDEX_SUBFOLDER_NAME);
-        self.writer.wait_merging_threads().unwrap();
-
-        for segment in other_meta.segments {
-            // TODO: handle case where current index has segment with same name
-            for file in segment.list_files() {
-                let p = other_path.join(&file);
-                if p.exists() {
-                    fs::rename(p, self_path.join(&file)).unwrap();
-                }
-            }
-            meta.segments.push(segment);
-        }
-
-        meta.segments
-            .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
-
-        fs::remove_dir_all(other_path).unwrap();
-
-        let self_path = Path::new(&path).join(INVERTED_INDEX_SUBFOLDER_NAME);
-
-        std::fs::write(
-            self_path.join("meta.json"),
-            serde_json::to_string_pretty(&meta).unwrap(),
-        )
-        .unwrap();
+    pub fn merge(mut self, other: Self) -> Self {
+        self.inverted_index.merge(other.inverted_index);
 
         self.favicon_store.merge(other.favicon_store);
         drop(self.favicon_store);
@@ -224,27 +140,69 @@ impl Index {
         self.primary_image_store.merge(other.primary_image_store);
         drop(self.primary_image_store);
 
-        Self::open(path).expect("failed to open index")
-    }
-
-    pub fn schema(&self) -> Arc<Schema> {
-        Arc::clone(&self.schema)
+        Self::open(&self.path).expect("failed to open index")
     }
 
     fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
-        if !webpage.html.is_homepage() || self.favicon_store.contains(webpage.html.domain()) {
+        if self.favicon_store.contains(webpage.html.domain()) {
             return;
         }
 
-        if let Some(favicon) = webpage.download_favicon() {
-            self.favicon_store.insert(webpage.html.domain(), favicon);
+        if let Some(favicon) = webpage.html.favicon() {
+            self.image_download_jobs.insert(ImageDownloadJob::Favicon(
+                favicon.link.domain().to_string().into(),
+            ));
         }
     }
 
-    fn maybe_insert_primary_image(&mut self, webpage: &Webpage) -> Option<Uuid> {
-        webpage
-            .download_primary_image()
-            .map(|image| self.primary_image_store.insert(image))
+    fn maybe_insert_primary_image(&mut self, webpage: &mut Webpage) {
+        match webpage
+            .centrality
+            .partial_cmp(&IMAGE_WEBPAGE_CENTRALITY_THRESHOLD)
+        {
+            None | Some(Ordering::Greater) => {}
+            _ => return,
+        }
+
+        if let Some(url) = webpage.html.primary_image() {
+            let uuid = self.primary_image_store.generate_uuid();
+            webpage.set_primary_image_uuid(uuid);
+
+            self.image_download_jobs
+                .insert(ImageDownloadJob::PrimaryImage { key: uuid, url });
+        }
+    }
+
+    pub fn download_pending_images(&mut self) {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async { self.download_pending_images_async().await });
+
+        self.image_download_jobs.clear();
+    }
+
+    async fn download_pending_images_async(&mut self) {
+        let results = futures::stream::iter(
+            self.image_download_jobs
+                .iter()
+                .map(|job| async move { job.download().await }),
+        )
+        .buffer_unordered(20)
+        .collect::<Vec<Option<DownloadedImage>>>()
+        .await;
+
+        for result in results.into_iter().flatten() {
+            match result.original_job {
+                ImageDownloadJob::Favicon(_) => {
+                    self.favicon_store.insert(&result.key, result.image)
+                }
+                ImageDownloadJob::PrimaryImage { key, url: _ } => {
+                    self.primary_image_store.insert(key, result.image)
+                }
+            }
+        }
     }
 
     pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
@@ -254,103 +212,9 @@ impl Index {
     pub fn retrieve_primary_image(&self, uuid: &Uuid) -> Option<Image> {
         self.primary_image_store.get(uuid)
     }
-}
 
-#[derive(Default, Debug)]
-pub struct RetrievedWebpage {
-    pub title: String,
-    pub url: String,
-    pub snippet: String,
-    pub body: String,
-    pub dirty_body: String,
-    pub description: Option<String>,
-    pub favicon: Option<Image>,
-    pub primary_image_uuid: Option<String>,
-    pub updated_time: Option<NaiveDateTime>,
-}
-
-impl From<Document> for RetrievedWebpage {
-    fn from(doc: Document) -> Self {
-        let mut webpage = RetrievedWebpage::default();
-
-        for value in doc.field_values() {
-            match ALL_FIELDS[value.field.field_id() as usize] {
-                Field::Title => {
-                    webpage.title = value
-                        .value
-                        .as_text()
-                        .expect("Title field should be text")
-                        .to_string()
-                }
-                Field::StemmedCleanBody => {
-                    webpage.body = value
-                        .value
-                        .as_text()
-                        .expect("Body field should be text")
-                        .to_string()
-                }
-                Field::Description => {
-                    let desc = value
-                        .value
-                        .as_text()
-                        .expect("Description field should be text")
-                        .to_string();
-
-                    webpage.description = if desc.is_empty() { None } else { Some(desc) }
-                }
-                Field::Url => {
-                    webpage.url = value
-                        .value
-                        .as_text()
-                        .expect("Url field should be text")
-                        .to_string()
-                }
-                Field::PrimaryImageUuid => {
-                    webpage.primary_image_uuid = {
-                        let s = value
-                            .value
-                            .as_text()
-                            .expect("Primary image uuid field should be text")
-                            .to_string();
-
-                        if s.is_empty() {
-                            None
-                        } else {
-                            Some(s)
-                        }
-                    }
-                }
-                Field::LastUpdated => {
-                    webpage.updated_time = {
-                        let timestamp = value.value.as_u64().unwrap() as i64;
-                        if timestamp == 0 {
-                            None
-                        } else {
-                            Some(NaiveDateTime::from_timestamp(timestamp, 0))
-                        }
-                    }
-                }
-                Field::StemmedAllBody => {
-                    webpage.dirty_body = value
-                        .value
-                        .as_text()
-                        .expect("Stemmed all body field should be text")
-                        .to_string()
-                }
-                Field::BacklinkText
-                | Field::Centrality
-                | Field::Host
-                | Field::StemmedTitle
-                | Field::CleanBody
-                | Field::Domain
-                | Field::DomainIfHomepage
-                | Field::IsHomepage
-                | Field::AllBody
-                | Field::FetchTimeMs => {}
-            }
-        }
-
-        webpage
+    pub fn schema(&self) -> Arc<Schema> {
+        self.inverted_index.schema()
     }
 }
 
@@ -384,7 +248,7 @@ impl From<Index> for FrozenIndex {
     fn from(mut index: Index) -> Self {
         index.commit().expect("failed to commit index");
         let path = index.path.clone();
-        index.writer.wait_merging_threads().unwrap();
+        index.inverted_index.stop();
         let root = directory::scan_folder(path).unwrap();
 
         Self { root }
@@ -393,296 +257,11 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ranking::Ranker, webpage::Link};
+    use crate::ranking::Ranker;
 
     use super::*;
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
-
-    #[test]
-    fn simple_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn document_not_matching() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("this query should not match", index.schema())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
-    }
-
-    #[test]
-    fn english_stemming() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Website for runners</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn stemmed_query_english() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runners", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Fast runner</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn searchable_backlinks() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("great site", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Website A</title>
-                </head>
-                <a href="https://www.b.com">B site is great</a>
-                {CONTENT}
-            </html>
-            "#
-                ),
-                "https://www.a.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Website B</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.b.com",
-                vec![Link {
-                    source: "https://www.a.com".to_string().into(),
-                    destination: "https://www.b.com".to_string().into(),
-                    text: "B site is great".to_string(),
-                }],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-
-        index.commit().expect("failed to commit index");
-
-        let mut result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-
-        result
-            .documents
-            .sort_by(|a, b| a.url.partial_cmp(&b.url).unwrap());
-
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.a.com");
-        assert_eq!(result.documents[1].url, "https://www.b.com");
-    }
-
-    #[test]
-    fn limited_top_docs() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        for _ in 0..100 {
-            index
-                .insert(Webpage::new(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Website for runners</title>
-                        </head>
-                        <body>
-                            {CONTENT}
-                        </body>
-                    </html>
-                    "#
-                    ),
-                    "https://www.example.com",
-                    vec![],
-                    1.0,
-                    500,
-                ))
-                .expect("failed to parse webpage");
-        }
-
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 20);
-    }
-
-    #[test]
-    fn host_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("dr", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                    <html>
-                        <head>
-                            <title>News website</title>
-                        </head>
-                        <body>
-                            {CONTENT}
-                        </body>
-                    </html>
-                "#
-                ),
-                "https://www.dr.dk",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.dr.dk");
-    }
 
     #[test]
     fn serialize_deserialize_bincode() {
@@ -726,245 +305,5 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn merge() {
-        let mut index1 = Index::temporary().expect("Unable to open index");
-
-        index1
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-
-        let mut index2 = Index::temporary().expect("Unable to open index");
-
-        index2
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.,
-                500,
-            ))
-            .expect("failed to parse webpage");
-
-        let mut index = index1.merge(index2);
-        index.commit().unwrap();
-
-        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-        assert_eq!(result.documents[1].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn match_across_fields() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("example test", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.example.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn proximity_ranking() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("termA termB", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT} termA termB d d d d d d d d d
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.first.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT} termA d d d d d d d d d termB
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.third.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT} termA d d d d termB d d d d d
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.second.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 3);
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
-        assert_eq!(result.documents[2].url, "https://www.third.com");
-    }
-
-    #[test]
-    fn fetch_time_ranking() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let query = Query::parse("test", index.schema()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.first.com",
-                vec![],
-                1.0,
-                0,
-            ))
-            .expect("failed to parse webpage");
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.second.com",
-                vec![],
-                1.0,
-                5000,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
     }
 }

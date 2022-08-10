@@ -17,7 +17,7 @@
 use axum::Extension;
 use chrono::{NaiveDateTime, Utc};
 
-use crate::{index::RetrievedWebpage, webpage::Url};
+use crate::{inverted_index::RetrievedWebpage, webpage::Url};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -94,7 +94,7 @@ fn prettify_date(date: NaiveDateTime) -> String {
 
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
-        let last_updated = webpage.updated_time.map(|date| prettify_date(date));
+        let last_updated = webpage.updated_time.map(prettify_date);
 
         let url: Url = webpage.url.clone().into();
         let domain = url.domain().to_string();
