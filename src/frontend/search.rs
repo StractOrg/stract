@@ -17,7 +17,7 @@
 use axum::Extension;
 use chrono::{NaiveDateTime, Utc};
 
-use crate::{inverted_index::RetrievedWebpage, webpage::Url};
+use crate::{entity_index::StoredEntity, inverted_index::RetrievedWebpage, webpage::Url};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -120,11 +120,26 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
     }
 }
 
+pub struct DisplayedEntity {
+    pub title: String,
+    pub small_abstract: String,
+}
+
+impl From<StoredEntity> for DisplayedEntity {
+    fn from(entity: StoredEntity) -> Self {
+        Self {
+            title: entity.title,
+            small_abstract: entity.entity_abstract.chars().take(300).collect::<String>() + "...",
+        }
+    }
+}
+
 #[derive(Template)]
 #[template(path = "search.html", escape = "none")]
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
+    entity: Option<DisplayedEntity>,
 }
 
 pub async fn route(
@@ -133,21 +148,26 @@ pub async fn route(
 ) -> impl IntoResponse {
     let mut search_result = Vec::new();
     let mut displayed_query = String::new();
+    let mut entity = None;
 
     if let Some(query) = params.get("q") {
         displayed_query = query.clone();
         let result = state.searcher.search(query).expect("Search failed");
 
         search_result = result
+            .webpages
             .documents
             .into_iter()
             .map(DisplayedWebpage::from)
             .collect();
+
+        entity = result.entity.map(From::from);
     }
 
     let template = SearchTemplate {
         search_result,
         query: displayed_query,
+        entity,
     };
     HtmlTemplate(template)
 }

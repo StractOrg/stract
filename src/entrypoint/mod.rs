@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod centrality;
+mod entity;
 pub mod frontend;
 mod indexer;
 mod webgraph;
 
 pub use centrality::CentralityEntrypoint;
+pub use entity::EntityIndexer;
 pub use indexer::Indexer;
 pub use webgraph::WebgraphEntrypoint;

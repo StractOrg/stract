@@ -15,7 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cuely::entrypoint::{frontend, CentralityEntrypoint, Indexer, WebgraphEntrypoint};
+use cuely::entrypoint::{
+    frontend, CentralityEntrypoint, EntityIndexer, Indexer, WebgraphEntrypoint,
+};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
@@ -47,6 +49,7 @@ enum Commands {
     Frontend {
         index_path: String,
         queries_csv_path: String,
+        entity_index_path: Option<String>,
         #[clap(default_value = "0.0.0.0:3000")]
         host: String,
     },
@@ -70,6 +73,10 @@ enum IndexingOptions {
     },
     Local {
         config_path: String,
+    },
+    Entity {
+        wikipedia_dump_path: String,
+        output_path: String,
     },
 }
 
@@ -102,6 +109,10 @@ fn main() -> Result<()> {
                 let config = load_toml_config(&config_path);
                 Indexer::run_locally(&config)?;
             }
+            IndexingOptions::Entity {
+                wikipedia_dump_path,
+                output_path,
+            } => EntityIndexer::run(wikipedia_dump_path, output_path)?,
         },
         Commands::Centrality {
             webgraph_path,
@@ -124,10 +135,16 @@ fn main() -> Result<()> {
             index_path,
             queries_csv_path,
             host,
+            entity_index_path,
         } => tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
-            .block_on(frontend::run(&index_path, &queries_csv_path, &host))?,
+            .block_on(frontend::run(
+                &index_path,
+                &queries_csv_path,
+                entity_index_path,
+                &host,
+            ))?,
     }
 
     Ok(())

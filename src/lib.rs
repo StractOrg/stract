@@ -28,6 +28,7 @@ pub mod mapreduce;
 
 mod autosuggest;
 mod directory;
+mod entity_index;
 mod exponential_backoff;
 mod frontend;
 mod image_store;
@@ -173,6 +174,9 @@ pub enum Error {
 
     #[error("Image error")]
     Image(#[from] image::ImageError),
+
+    #[error("XML parser error")]
+    XML(#[from] quick_xml::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

@@ -28,10 +28,9 @@ use tantivy::schema::Schema;
 use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
-use crate::image_store::{FaviconStore, Image, PrimaryImageStore};
-use crate::inverted_index::InvertedIndex;
+use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
+use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
 use crate::query::Query;
-use crate::searcher::SearchResult;
 use crate::webpage::{Url, Webpage};
 use crate::Result;
 
@@ -125,7 +124,7 @@ impl Index {
         self.inverted_index.commit()
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
     where
         C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
     {
@@ -145,7 +144,11 @@ impl Index {
     }
 
     fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
-        if self.favicon_store.contains(webpage.html.domain()) {
+        if !webpage.html.is_homepage()
+            || self
+                .favicon_store
+                .contains(&webpage.html.domain().to_string())
+        {
             return;
         }
 
@@ -195,9 +198,7 @@ impl Index {
 
         for result in results.into_iter().flatten() {
             match result.original_job {
-                ImageDownloadJob::Favicon(_) => {
-                    self.favicon_store.insert(&result.key, result.image)
-                }
+                ImageDownloadJob::Favicon(_) => self.favicon_store.insert(result.key, result.image),
                 ImageDownloadJob::PrimaryImage { key, url: _ } => {
                     self.primary_image_store.insert(key, result.image)
                 }
@@ -206,7 +207,7 @@ impl Index {
     }
 
     pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
-        self.favicon_store.get(url.domain())
+        self.favicon_store.get(&url.domain().to_string())
     }
 
     pub fn retrieve_primary_image(&self, uuid: &Uuid) -> Option<Image> {

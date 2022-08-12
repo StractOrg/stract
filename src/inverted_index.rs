@@ -23,7 +23,6 @@ use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
 use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
-use crate::searcher::SearchResult;
 use crate::snippet;
 use crate::webpage::Webpage;
 use crate::Result;
@@ -94,7 +93,7 @@ impl InvertedIndex {
         Ok(())
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
     where
         C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
     {
@@ -119,7 +118,7 @@ impl InvertedIndex {
             )?;
         }
 
-        Ok(SearchResult {
+        Ok(InvertedIndexSearchResult {
             num_docs: count,
             documents: webpages,
         })
@@ -206,6 +205,12 @@ impl InvertedIndex {
     pub fn schema(&self) -> Arc<Schema> {
         Arc::clone(&self.schema)
     }
+}
+
+#[derive(Debug)]
+pub struct InvertedIndexSearchResult {
+    pub num_docs: usize,
+    pub documents: Vec<RetrievedWebpage>,
 }
 
 #[derive(Default, Debug)]

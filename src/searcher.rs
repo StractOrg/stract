@@ -18,9 +18,10 @@ use std::str::FromStr;
 
 use uuid::Uuid;
 
+use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::inverted_index::RetrievedWebpage;
+use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::Ranker;
 use crate::webpage::Url;
@@ -28,25 +29,43 @@ use crate::Result;
 
 #[derive(Debug)]
 pub struct SearchResult {
-    pub num_docs: usize,
-    pub documents: Vec<RetrievedWebpage>,
+    pub webpages: InvertedIndexSearchResult,
+    pub entity: Option<StoredEntity>,
 }
 
 pub struct Searcher {
     index: Index,
+    entity_index: Option<EntityIndex>,
 }
 
 impl From<Index> for Searcher {
     fn from(index: Index) -> Self {
-        Searcher { index }
+        Self::new(index, None)
+    }
+}
+
+impl Searcher {
+    pub fn new(index: Index, entity_index: Option<EntityIndex>) -> Self {
+        Searcher {
+            index,
+            entity_index,
+        }
     }
 }
 
 impl Searcher {
     pub fn search(&self, query: &str) -> Result<SearchResult> {
+        let raw_query = query.to_string();
         let query = Query::parse(query, self.index.schema())?;
         let ranker = Ranker::new(query.clone());
-        self.index.search(&query, ranker.collector())
+        let webpages = self.index.search(&query, ranker.collector())?;
+
+        let entity = self
+            .entity_index
+            .as_ref()
+            .and_then(|index| index.search(raw_query));
+
+        Ok(SearchResult { webpages, entity })
     }
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {

@@ -6,3 +6,4 @@ data
 static/**/*.css
 node_modules
 package-lock.json
+notes
