@@ -105,8 +105,7 @@ impl InvertedIndex {
         let mut webpages: Vec<RetrievedWebpage> = docs
             .into_iter()
             .map(|(_score, doc_address)| self.retrieve_doc(doc_address, &searcher))
-            .filter(|page| page.is_ok())
-            .map(|page| page.unwrap())
+            .filter_map(|page| page.ok())
             .collect();
 
         for page in &mut webpages {
