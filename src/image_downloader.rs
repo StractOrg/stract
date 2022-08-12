@@ -114,6 +114,7 @@ where
         .await;
 
         for result in results.into_iter().flatten() {
+            dbg!(&result.key);
             store.insert(result.key, result.image);
         }
     }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use tantivy::{
     collector::TopDocs,
@@ -22,8 +22,10 @@ use tantivy::{
     schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
     IndexReader, IndexWriter, Term,
 };
+use tracing::info;
 
 use crate::{
+    image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::EntityImageStore,
     tokenizer::{NormalTokenizer, Tokenizer},
     webpage::Url,
@@ -35,6 +37,7 @@ pub(crate) mod entity;
 
 pub struct EntityIndex {
     image_store: EntityImageStore,
+    image_downloader: ImageDownloader<String>,
     writer: IndexWriter,
     reader: IndexReader,
     schema: Arc<Schema>,
@@ -80,7 +83,14 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
 }
 
 fn wikipedify_url(url: Url) -> Url {
-    todo!();
+    let name = url.raw().replace(' ', "_");
+    let hex = format!("{:?}", md5::compute(&name));
+    format!(
+        "https://upload.wikimedia.org/wikipedia/commons/{:}/{:}",
+        hex[0..1].to_string() + "/" + &hex[0..2],
+        name
+    )
+    .into()
 }
 
 #[derive(Debug)]
@@ -123,6 +133,7 @@ impl EntityIndex {
             image_store,
             writer,
             reader,
+            image_downloader: ImageDownloader::new(),
             schema: Arc::new(schema),
         })
     }
@@ -130,6 +141,11 @@ impl EntityIndex {
     pub fn insert(&mut self, entity: Entity) {
         if let Some(image) = entity.image.clone() {
             let image = wikipedify_url(image);
+            self.image_downloader.schedule(ImageDownloadJob {
+                key: entity.title.clone(),
+                url: image,
+                timeout: Some(Duration::from_secs(10)),
+            })
         }
         let doc = entity_to_tantivy(entity, &self.schema);
         self.writer.add_document(doc).unwrap();
@@ -137,6 +153,8 @@ impl EntityIndex {
 
     pub fn commit(&mut self) {
         self.writer.commit().unwrap();
+        info!("downloading images");
+        self.image_downloader.download(&mut self.image_store);
     }
 
     pub fn search(&self, query: String) -> Option<StoredEntity> {
@@ -197,5 +215,19 @@ impl EntityIndex {
                     entity_abstract,
                 }
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wikipedia_image_url_aristotle() {
+        assert_eq!(
+            wikipedify_url("Aristotle Altemps Inv8575.jpg".to_string().into()).full(),
+            "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
+                .to_string()
+        );
     }
 }
