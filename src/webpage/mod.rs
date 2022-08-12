@@ -456,7 +456,7 @@ impl<'a> Html<'a> {
                     }
                 }
                 Field::IsHomepage => {
-                    doc.add_u64(tantivy_field, self.is_homepage().then(|| 1).unwrap_or(0))
+                    doc.add_u64(tantivy_field, if self.is_homepage() { 1 } else { 0 })
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,

@@ -12,6 +12,7 @@
     cargo watch -x 'run -- frontend data/index queries_us.csv data/entity'
 
 @local:
+    wget -nc -P data/warc_files https://data.commoncrawl.org/crawl-data/CC-MAIN-2022-05/segments/1642320299852.23/warc/CC-MAIN-20220116093137-20220116123137-00049.warc.gz
     rm -rf data/index/
     cargo run --release -- indexer local configs/indexer/local.toml
     mv data/index/CC-MAIN-20220116093137-20220116123137-00049.warc.gz/* data/index/
