@@ -31,6 +31,7 @@ mod directory;
 mod entity_index;
 mod exponential_backoff;
 mod frontend;
+mod image_downloader;
 mod image_store;
 mod index;
 mod kv;

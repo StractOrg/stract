@@ -26,6 +26,7 @@ use tantivy::{
 use crate::{
     image_store::EntityImageStore,
     tokenizer::{NormalTokenizer, Tokenizer},
+    webpage::Url,
     Result,
 };
 
@@ -78,6 +79,10 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
     doc
 }
 
+fn wikipedify_url(url: Url) -> Url {
+    todo!();
+}
+
 #[derive(Debug)]
 pub struct StoredEntity {
     pub title: String,
@@ -123,6 +128,9 @@ impl EntityIndex {
     }
 
     pub fn insert(&mut self, entity: Entity) {
+        if let Some(image) = entity.image.clone() {
+            let image = wikipedify_url(image);
+        }
         let doc = entity_to_tantivy(entity, &self.schema);
         self.writer.add_document(doc).unwrap();
     }
