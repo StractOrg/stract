@@ -18,9 +18,9 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use tantivy::{
     collector::TopDocs,
-    query::{BooleanQuery, Occur, QueryClone, TermQuery},
+    query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
     schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
-    IndexReader, IndexWriter, Term,
+    DocAddress, IndexReader, IndexWriter, Term,
 };
 use tracing::info;
 
@@ -98,6 +98,7 @@ pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
     pub image: Option<String>,
+    pub related_entities: Vec<StoredEntity>,
 }
 
 impl EntityIndex {
@@ -158,6 +159,61 @@ impl EntityIndex {
         self.image_downloader.download(&mut self.image_store);
     }
 
+    fn related_entities(&self, doc: DocAddress) -> Vec<StoredEntity> {
+        let searcher = self.reader.searcher();
+        let query = MoreLikeThisQuery::builder()
+            .with_min_doc_frequency(1)
+            .with_max_doc_frequency(10)
+            .with_min_term_frequency(1)
+            .with_min_word_length(2)
+            .with_max_word_length(5)
+            .with_boost_factor(1.0)
+            // .with_stop_words(vec!["for".to_string()])
+            .with_document(doc);
+
+        match searcher.search(&query, &TopDocs::with_limit(10)) {
+            Ok(result) => {
+                let title = self.schema.get_field("title").unwrap();
+                let entity_abstract = self.schema.get_field("abstract").unwrap();
+
+                result
+                    .into_iter()
+                    .filter(|(_, related_doc)| doc != *related_doc)
+                    .map(|(_, doc_address)| {
+                        let doc = searcher.doc(doc_address).unwrap();
+                        let title = doc
+                            .get_first(title)
+                            .and_then(|val| match val {
+                                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                                _ => None,
+                            })
+                            .unwrap();
+
+                        let entity_abstract = doc
+                            .get_first(entity_abstract)
+                            .and_then(|val| match val {
+                                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                                _ => None,
+                            })
+                            .unwrap();
+
+                        let image = self.retrieve_image(&title).map(|_| title.clone());
+
+                        StoredEntity {
+                            title,
+                            entity_abstract,
+                            image,
+                            related_entities: Vec::new(),
+                        }
+                    })
+                    .filter(|entity| entity.image.is_some())
+                    .take(4)
+                    .collect()
+            }
+            Err(_) => Vec::new(),
+        }
+    }
+
     pub fn search(&self, query: String) -> Option<StoredEntity> {
         let searcher = self.reader.searcher();
 
@@ -211,12 +267,15 @@ impl EntityIndex {
                     })
                     .unwrap();
 
+                let related_entities = self.related_entities(*doc_address);
+
                 let image = self.retrieve_image(&title).map(|_| title.clone());
 
                 StoredEntity {
                     title,
                     entity_abstract,
                     image,
+                    related_entities,
                 }
             })
     }

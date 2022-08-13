@@ -124,6 +124,7 @@ pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,
     pub image: Option<String>,
+    pub related_entities: Vec<DisplayedEntity>,
 }
 
 impl From<StoredEntity> for DisplayedEntity {
@@ -132,6 +133,11 @@ impl From<StoredEntity> for DisplayedEntity {
             title: entity.title,
             small_abstract: entity.entity_abstract.chars().take(300).collect::<String>() + "...",
             image: entity.image,
+            related_entities: entity
+                .related_entities
+                .into_iter()
+                .map(DisplayedEntity::from)
+                .collect(),
         }
     }
 }
