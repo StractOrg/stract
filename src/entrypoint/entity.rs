@@ -113,7 +113,7 @@ impl EntityIndexer {
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;
 
-        for entity in EntityIterator::from(reader).take(100) {
+        for entity in EntityIterator::from(reader).take(1000) {
             index.insert(entity);
         }
 

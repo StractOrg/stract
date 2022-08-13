@@ -13,8 +13,8 @@
         {% call scope::searchbar("", query) %}
     </div>
 
-    <div class="flex">
-        <div class="search-result flex flex-col space-y-3 pt-8 pb-8 pl-40">
+    <div class="flex pt-8">
+        <div class="search-result flex flex-col space-y-3 pb-8 pl-40">
             {% for item in search_result %}
             <div class="flex max-w-2xl p-3 h-36">
                 <div class="flex flex-col">
@@ -53,12 +53,27 @@
 
         {% match entity %}
         {% when Some with (entity) %}
-        <div class="max-w-lg flex flex-col items-center">
-            <div>
-                {{ entity.title }}
-            </div>
-            <div>
-                {{ entity.small_abstract }}
+        <div class="flex grow justify-center pt-3">
+            <div class="max-w-lg flex flex-col items-center">
+                {% match entity.image %}
+                {% when Some(image) %}
+                <div class="w-lg mb-3">
+                    <a href="https://en.wikipedia.org/wiki/{{ entity.title }}">
+                        <img class="h-full w-full rounded-full" src="/entity/image/{{ image }}" />
+                    </a>
+                </div>
+                {% when None %}
+                {% endmatch %}
+                <div class="text-xl mb-1">
+                    <a href="https://en.wikipedia.org/wiki/{{ entity.title }}">{{ entity.title }}</a>
+                </div>
+                <div class="text-sm">
+                    {{ entity.small_abstract }}
+                    <span class="italic">
+                        source: <a class="text-blue-600"
+                            href="https://en.wikipedia.org/wiki/{{ entity.title }}">wikipedia</a>
+                    </span>
+                </div>
             </div>
         </div>
         {% when None %}

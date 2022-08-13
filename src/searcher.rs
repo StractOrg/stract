@@ -78,4 +78,10 @@ impl Searcher {
         }
         None
     }
+
+    pub fn entity_image(&self, entity: String) -> Option<Image> {
+        self.entity_index
+            .as_ref()
+            .and_then(|index| index.retrieve_image(&entity))
+    }
 }

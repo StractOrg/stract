@@ -31,6 +31,7 @@ use axum::{
 use axum_extra::routing::SpaRouter;
 
 mod autosuggest;
+mod entity_image;
 mod favicons;
 mod index;
 mod primary_image;
@@ -80,6 +81,7 @@ pub fn router(
         .route("/autosuggest", get(autosuggest::route))
         .route("/favicons/:site", get(favicons::route))
         .route("/image/:uuid", get(primary_image::route))
+        .route("/entity/image/:entity", get(entity_image::route))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state)))
 }

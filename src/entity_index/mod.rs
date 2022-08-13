@@ -26,7 +26,7 @@ use tracing::info;
 
 use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
-    image_store::EntityImageStore,
+    image_store::{EntityImageStore, Image, ImageStore},
     tokenizer::{NormalTokenizer, Tokenizer},
     webpage::Url,
     Result,
@@ -97,6 +97,7 @@ fn wikipedify_url(url: Url) -> Url {
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
+    pub image: Option<String>,
 }
 
 impl EntityIndex {
@@ -210,11 +211,18 @@ impl EntityIndex {
                     })
                     .unwrap();
 
+                let image = self.retrieve_image(&title).map(|_| title.clone());
+
                 StoredEntity {
                     title,
                     entity_abstract,
+                    image,
                 }
             })
+    }
+
+    pub fn retrieve_image(&self, key: &String) -> Option<Image> {
+        self.image_store.get(key)
     }
 }
 

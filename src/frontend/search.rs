@@ -123,6 +123,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,
+    pub image: Option<String>,
 }
 
 impl From<StoredEntity> for DisplayedEntity {
@@ -130,6 +131,7 @@ impl From<StoredEntity> for DisplayedEntity {
         Self {
             title: entity.title,
             small_abstract: entity.entity_abstract.chars().take(300).collect::<String>() + "...",
+            image: entity.image,
         }
     }
 }
