@@ -14,25 +14,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs, path::Path, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, fs, path::Path, sync::Arc, time::Duration};
 
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
-    schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
-    DocAddress, IndexReader, IndexWriter, Term,
+    schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
+    DocAddress, IndexReader, IndexWriter, LeasedItem, Searcher, Term,
 };
 use tracing::info;
 
 use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
-    tokenizer::{NormalTokenizer, Tokenizer},
+    tokenizer::NormalTokenizer,
     webpage::Url,
     Result,
 };
 
-use self::entity::Entity;
+use self::entity::{Entity, Link, Span};
 pub(crate) mod entity;
 
 pub struct EntityIndex {
@@ -66,6 +66,8 @@ fn schema() -> Schema {
             )
             .set_stored(),
     );
+    builder.add_bytes_field("info", BytesOptions::default().set_stored());
+    builder.add_bytes_field("links", BytesOptions::default().set_stored());
 
     builder.build()
 }
@@ -77,6 +79,14 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
     doc.add_text(
         schema.get_field("abstract").unwrap(),
         entity.page_abstract.text,
+    );
+    doc.add_bytes(
+        schema.get_field("info").unwrap(),
+        bincode::serialize(&entity.info).unwrap(),
+    );
+    doc.add_bytes(
+        schema.get_field("links").unwrap(),
+        bincode::serialize(&entity.page_abstract.links).unwrap(),
     );
 
     doc
@@ -99,6 +109,8 @@ pub struct StoredEntity {
     pub entity_abstract: String,
     pub image: Option<String>,
     pub related_entities: Vec<StoredEntity>,
+    pub info: BTreeMap<String, Span>,
+    pub links: Vec<Link>,
 }
 
 impl EntityIndex {
@@ -116,15 +128,9 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
-        let tokenizer = Tokenizer::default();
         tantivy_index
             .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::new_stemmed();
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
+            .register(NormalTokenizer::as_str(), NormalTokenizer::default());
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
 
@@ -156,7 +162,7 @@ impl EntityIndex {
     pub fn commit(&mut self) {
         self.writer.commit().unwrap();
         info!("downloading images");
-        self.image_downloader.download(&mut self.image_store);
+        // self.image_downloader.download(&mut self.image_store);
     }
 
     fn related_entities(&self, doc: DocAddress) -> Vec<StoredEntity> {
@@ -168,48 +174,18 @@ impl EntityIndex {
             .with_min_word_length(2)
             .with_max_word_length(5)
             .with_boost_factor(1.0)
-            // .with_stop_words(vec!["for".to_string()])
             .with_document(doc);
 
         match searcher.search(&query, &TopDocs::with_limit(10)) {
-            Ok(result) => {
-                let title = self.schema.get_field("title").unwrap();
-                let entity_abstract = self.schema.get_field("abstract").unwrap();
-
-                result
-                    .into_iter()
-                    .filter(|(_, related_doc)| doc != *related_doc)
-                    .map(|(_, doc_address)| {
-                        let doc = searcher.doc(doc_address).unwrap();
-                        let title = doc
-                            .get_first(title)
-                            .and_then(|val| match val {
-                                tantivy::schema::Value::Str(string) => Some(string.clone()),
-                                _ => None,
-                            })
-                            .unwrap();
-
-                        let entity_abstract = doc
-                            .get_first(entity_abstract)
-                            .and_then(|val| match val {
-                                tantivy::schema::Value::Str(string) => Some(string.clone()),
-                                _ => None,
-                            })
-                            .unwrap();
-
-                        let image = self.retrieve_image(&title).map(|_| title.clone());
-
-                        StoredEntity {
-                            title,
-                            entity_abstract,
-                            image,
-                            related_entities: Vec::new(),
-                        }
-                    })
-                    .filter(|entity| entity.image.is_some())
-                    .take(4)
-                    .collect()
-            }
+            Ok(result) => result
+                .into_iter()
+                .filter(|(_, related_doc)| doc != *related_doc)
+                .map(|(_, doc_address)| {
+                    self.retrieve_stored_entity(&searcher, &doc_address, false, false, false)
+                })
+                .filter(|entity| entity.image.is_some())
+                .take(4)
+                .collect(),
             Err(_) => Vec::new(),
         }
     }
@@ -250,34 +226,84 @@ impl EntityIndex {
             .unwrap()
             .first()
             .map(|(_score, doc_address)| {
-                let doc = searcher.doc(*doc_address).unwrap();
-                let title = doc
-                    .get_first(title)
-                    .and_then(|val| match val {
-                        tantivy::schema::Value::Str(string) => Some(string.clone()),
-                        _ => None,
-                    })
-                    .unwrap();
-
-                let entity_abstract = doc
-                    .get_first(entity_abstract)
-                    .and_then(|val| match val {
-                        tantivy::schema::Value::Str(string) => Some(string.clone()),
-                        _ => None,
-                    })
-                    .unwrap();
-
-                let related_entities = self.related_entities(*doc_address);
-
-                let image = self.retrieve_image(&title).map(|_| title.clone());
-
-                StoredEntity {
-                    title,
-                    entity_abstract,
-                    image,
-                    related_entities,
-                }
+                self.retrieve_stored_entity(&searcher, doc_address, true, true, true)
             })
+    }
+
+    fn retrieve_stored_entity(
+        &self,
+        searcher: &LeasedItem<Searcher>,
+        doc_address: &DocAddress,
+        get_related: bool,
+        decode_info: bool,
+        get_links: bool,
+    ) -> StoredEntity {
+        let title = self.schema.get_field("title").unwrap();
+        let entity_abstract = self.schema.get_field("abstract").unwrap();
+        let info = self.schema.get_field("info").unwrap();
+        let links = self.schema.get_field("links").unwrap();
+
+        let doc = searcher.doc(*doc_address).unwrap();
+        let title = doc
+            .get_first(title)
+            .and_then(|val| match val {
+                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                _ => None,
+            })
+            .unwrap();
+
+        let entity_abstract = doc
+            .get_first(entity_abstract)
+            .and_then(|val| match val {
+                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                _ => None,
+            })
+            .unwrap();
+
+        let info = if decode_info {
+            bincode::deserialize(
+                doc.get_first(info)
+                    .and_then(|val| match val {
+                        tantivy::schema::Value::Bytes(bytes) => Some(bytes),
+                        _ => None,
+                    })
+                    .unwrap(),
+            )
+            .unwrap()
+        } else {
+            BTreeMap::new()
+        };
+
+        let related_entities = if get_related {
+            self.related_entities(*doc_address)
+        } else {
+            Vec::new()
+        };
+
+        let image = self.retrieve_image(&title).map(|_| title.clone());
+
+        let links: Vec<Link> = if get_links {
+            bincode::deserialize(
+                doc.get_first(links)
+                    .and_then(|val| match val {
+                        tantivy::schema::Value::Bytes(bytes) => Some(bytes),
+                        _ => None,
+                    })
+                    .unwrap(),
+            )
+            .unwrap()
+        } else {
+            Vec::new()
+        };
+
+        StoredEntity {
+            title,
+            entity_abstract,
+            image,
+            related_entities,
+            info,
+            links,
+        }
     }
 
     pub fn retrieve_image(&self, key: &String) -> Option<Image> {

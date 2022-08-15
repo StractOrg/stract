@@ -15,9 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use axum::Extension;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 
-use crate::{entity_index::StoredEntity, inverted_index::RetrievedWebpage, webpage::Url};
+use crate::{
+    entity_index::{entity::Span, StoredEntity},
+    inverted_index::RetrievedWebpage,
+    webpage::Url,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -125,21 +129,83 @@ pub struct DisplayedEntity {
     pub small_abstract: String,
     pub image: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
+    pub info: Vec<(String, String)>,
 }
 
 impl From<StoredEntity> for DisplayedEntity {
     fn from(entity: StoredEntity) -> Self {
+        let entity_abstract = Span {
+            text: entity.entity_abstract,
+            links: entity.links,
+        };
+
+        let small_abstract = entity_link_to_html(entity_abstract, 300);
+
         Self {
             title: entity.title,
-            small_abstract: entity.entity_abstract.chars().take(300).collect::<String>() + "...",
+            small_abstract,
             image: entity.image,
             related_entities: entity
                 .related_entities
                 .into_iter()
                 .map(DisplayedEntity::from)
                 .collect(),
+            info: entity
+                .info
+                .into_iter()
+                .map(|(key, value)| {
+                    let mut value = entity_link_to_html(value, 150).replace('*', "•");
+
+                    if value.starts_with('•') || value.starts_with("\n•") {
+                        if let Some(first_bullet) = value.find('•') {
+                            value = value.chars().skip(first_bullet + 1).collect();
+                        }
+                    }
+
+                    let value = maybe_prettify_entity_date(value);
+
+                    (key.replace('_', " "), value)
+                })
+                .filter(|(key, _)| {
+                    !matches!(
+                        key.as_str(),
+                        "caption" | "image size" | "label" | "landscape"
+                    )
+                })
+                .take(5)
+                .collect(),
         }
     }
+}
+
+fn maybe_prettify_entity_date(value: String) -> String {
+    if let Ok(date) = NaiveDate::parse_from_str(value.trim(), "%Y %-m %-d") {
+        return format!("{}", date.format("%d/%m/%Y"));
+    }
+
+    if value.split_whitespace().count() == 6 {
+        let first_date = NaiveDate::parse_from_str(
+            itertools::intersperse(value.split_whitespace().take(3), " ")
+                .collect::<String>()
+                .as_str(),
+            "%Y %-m %-d",
+        );
+        let second_date = NaiveDate::parse_from_str(
+            itertools::intersperse(value.split_whitespace().skip(3), " ")
+                .collect::<String>()
+                .as_str(),
+            "%Y %-m %-d",
+        );
+
+        if let (Ok(first_date), Ok(second_date)) = (first_date, second_date) {
+            // the dates are reversed from the parser, so we need to return second_date before first_date
+            return format!("{}", second_date.format("%d/%m/%Y"))
+                + " - "
+                + format!("{}", first_date.format("%d/%m/%Y")).as_str();
+        }
+    }
+
+    value
 }
 
 #[derive(Template)]
@@ -180,9 +246,69 @@ pub async fn route(
     HtmlTemplate(template)
 }
 
+fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
+    let mut s = span.text;
+
+    let truncated = s.len() > trunace_to;
+    if truncated {
+        s = s.chars().take(trunace_to).collect();
+    }
+
+    let chars = s.chars();
+    let num_chars = chars.clone().count();
+
+    let mut res = String::new();
+
+    let mut last_link_end = 0;
+    for link in span.links {
+        if link.start > num_chars {
+            break;
+        }
+
+        res += chars
+            .clone()
+            .skip(last_link_end)
+            .take(link.start - last_link_end)
+            .collect::<String>()
+            .as_str();
+
+        let link_text: String = chars
+            .clone()
+            .skip(link.start)
+            .take(link.end - link.start)
+            .collect();
+
+        res += format!(
+            "<a href=\"https://en.wikipedia.org/wiki/{}\">",
+            link.target.replace(' ', "_")
+        )
+        .as_str();
+
+        res += link_text.as_str();
+
+        res += "</a>";
+
+        last_link_end = link.end;
+    }
+
+    res += chars
+        .clone()
+        .skip(last_link_end)
+        .collect::<String>()
+        .as_str();
+
+    if truncated {
+        res += "...";
+    }
+
+    res
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Utc};
+
+    use crate::entity_index::entity::Link;
 
     use super::*;
 
@@ -210,5 +336,58 @@ mod tests {
             .unwrap()
             .naive_local();
         assert_eq!(prettify_date(date), "19. Dec. 1996".to_string());
+    }
+
+    #[test]
+    fn simple_link_to_html() {
+        assert_eq!(
+            entity_link_to_html(
+                Span {
+                    text: "some text with a link".to_string(),
+                    links: vec![Link {
+                        start: 5,
+                        end: 9,
+                        target: "text article".to_string()
+                    }]
+                },
+                10000
+            ),
+            "some <a href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
+                .to_string()
+        )
+    }
+
+    #[test]
+    fn truncated_link_to_html() {
+        assert_eq!(
+            entity_link_to_html(
+                Span {
+                    text: "some text".to_string(),
+                    links: vec![Link {
+                        start: 5,
+                        end: 9,
+                        target: "text article".to_string()
+                    }]
+                },
+                7
+            ),
+            "some <a href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
+        )
+    }
+
+    #[test]
+    fn einstein_date() {
+        assert_eq!(
+            maybe_prettify_entity_date("1879 3 14 ".to_string()),
+            "14/03/1879".to_string()
+        );
+    }
+
+    #[test]
+    fn entity_date_span_prettify() {
+        assert_eq!(
+            maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ".to_string()),
+            "14/03/1879 - 27/05/1999".to_string()
+        );
     }
 }

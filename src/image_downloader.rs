@@ -116,6 +116,8 @@ where
         for result in results.into_iter().flatten() {
             store.insert(result.key, result.image);
         }
+
+        store.flush();
     }
 
     pub fn schedule(&mut self, image_download_job: ImageDownloadJob<K>) {

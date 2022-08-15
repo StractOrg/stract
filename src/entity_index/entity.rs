@@ -17,6 +17,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use parse_wiki_text::Node;
+use serde::{Deserialize, Serialize};
 
 use crate::webpage::Url;
 
@@ -36,7 +37,7 @@ pub struct Entity {
     pub categories: HashSet<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Span {
     pub text: String,
     pub links: Vec<Link>,
@@ -57,12 +58,14 @@ impl Span {
     }
 
     pub fn add_link(&mut self, text: String, link: Link) {
+        debug_assert_eq!(self.text.chars().count() + text.chars().count(), link.end);
+        debug_assert_eq!(self.text.chars().count(), link.start);
         self.links.push(link);
         self.text.push_str(&text);
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct Link {
     pub start: usize,
     pub end: usize,
@@ -99,8 +102,8 @@ impl<'a> From<Vec<Node<'a>>> for Span {
 
                     let link = Link {
                         target: target.to_string(),
-                        start: span.text.len(),
-                        end: span.text.len() + text.len(),
+                        start: span.text.chars().count(),
+                        end: span.text.chars().count() + text.chars().count(),
                     };
                     span.add_link(text, link);
                 }
@@ -114,12 +117,6 @@ impl<'a> From<Vec<Node<'a>>> for Span {
                             span.text.push_str(". ");
                         }
                         continue;
-                    }
-
-                    if value == "\n* " {
-                        if !span.text.is_empty() {
-                            span.text.push_str(", ");
-                        }
                     } else {
                         span.text.push_str(value);
                     }

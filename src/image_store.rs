@@ -81,6 +81,7 @@ pub trait ImageStore<K: Serialize> {
     fn insert(&mut self, key: K, image: Image);
     fn get(&self, key: &K) -> Option<Image>;
     fn merge(&mut self, other: Self);
+    fn flush(&self);
 }
 
 struct BaseImageStore {
@@ -106,6 +107,10 @@ impl BaseImageStore {
         }
 
         self.store.insert(key, image)
+    }
+
+    fn flush(&self) {
+        self.store.flush();
     }
 
     fn contains(&self, key: &String) -> bool {
@@ -174,6 +179,10 @@ impl ImageStore<String> for FaviconStore {
     fn merge(&mut self, other: Self) {
         self.0.merge(other.0)
     }
+
+    fn flush(&self) {
+        self.0.flush()
+    }
 }
 
 pub struct PrimaryImageStore {
@@ -223,6 +232,10 @@ impl ImageStore<Uuid> for PrimaryImageStore {
     fn merge(&mut self, other: Self) {
         self.store.merge(other.store)
     }
+
+    fn flush(&self) {
+        self.store.flush()
+    }
 }
 
 pub struct EntityImageStore {
@@ -254,6 +267,10 @@ impl ImageStore<String> for EntityImageStore {
 
     fn merge(&mut self, other: Self) {
         self.store.merge(other.store)
+    }
+
+    fn flush(&self) {
+        self.store.flush()
     }
 }
 

@@ -113,7 +113,10 @@ impl EntityIndexer {
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;
 
-        for entity in EntityIterator::from(reader).take(1000) {
+        for entity in EntityIterator::from(reader)
+            .take(1000)
+            .filter(|entity| !entity.categories.is_empty())
+        {
             index.insert(entity);
         }
 
@@ -255,8 +258,9 @@ impl EntityBuilder {
                     match current_paragraph.as_mut() {
                         Some(current_paragraph) => {
                             let link = Link {
-                                start: current_paragraph.content.text.len(),
-                                end: current_paragraph.content.text.len() + text.len(),
+                                start: current_paragraph.content.text.chars().count(),
+                                end: current_paragraph.content.text.chars().count()
+                                    + text.chars().count(),
                                 target: target.to_string(),
                             };
                             current_paragraph.content.add_link(text, link)
@@ -264,7 +268,7 @@ impl EntityBuilder {
                         None => {
                             let link = Link {
                                 start: 0,
-                                end: text.len(),
+                                end: text.chars().count(),
                                 target: target.to_string(),
                             };
                             current_paragraph = Some(Paragraph {
@@ -282,8 +286,7 @@ impl EntityBuilder {
         }
 
         let page_abstract = if !paragraphs.is_empty() {
-            let mut page_abstract = paragraphs.remove(0).content;
-            page_abstract.text = page_abstract.text.trim().to_string();
+            let page_abstract = paragraphs.remove(0).content;
             Some(page_abstract)
         } else {
             None
@@ -389,10 +392,19 @@ mod tests {
         );
 
         assert!(
-            entity.page_abstract.text.starts_with("Aristotle (;  Aristotélēs, ; 384–322BC) was a Greek philosopher and polymath during the Classical period in Ancient Greece"));
+            entity.page_abstract.text.trim().starts_with("Aristotle (;  Aristotélēs, ; 384–322BC) was a Greek philosopher and polymath during the Classical period in Ancient Greece"));
 
         assert!(entity.categories.contains("Aristotle"));
         assert!(entity.categories.contains("Acting theorists"));
+
+        assert_eq!(
+            entity.page_abstract.links[0],
+            Link {
+                start: 58,
+                end: 69,
+                target: "philosopher".to_string()
+            }
+        )
     }
 
     #[test]
@@ -456,7 +468,7 @@ mod tests {
         );
 
         assert!(
-            entity.page_abstract.text.starts_with("Barack Hussein Obama II (   ; born August 4, 1961) is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, he was the first African-American  president of the United States."));
+            entity.page_abstract.text.trim().starts_with("Barack Hussein Obama II (   ; born August 4, 1961) is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, he was the first African-American  president of the United States."));
 
         assert!(entity.categories.contains("Nobel Peace Prize laureates"));
         assert!(entity.categories.contains("Obama family"));
@@ -475,7 +487,7 @@ mod tests {
         assert!(entity.info.is_empty());
         assert!(entity.image.is_none());
 
-        assert!(entity.page_abstract.text.starts_with("In mathematics and computer science, an algorithm () is a finite sequence of rigorous instructions, typically used to solve a class of specific problemss or to perform a computation."));
+        assert!(entity.page_abstract.text.trim().starts_with("In mathematics and computer science, an algorithm () is a finite sequence of rigorous instructions, typically used to solve a class of specific problemss or to perform a computation."));
 
         assert!(entity.categories.contains("Algorithms"));
     }
