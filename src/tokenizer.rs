@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
+use tantivy::tokenizer::{
+    Language, LowerCaser, SimpleTokenizer, Stemmer, StopWordFilter, TextAnalyzer,
+};
 use whatlang::Lang;
 
 struct MyStemmer(Stemmer);
@@ -68,11 +70,19 @@ impl Default for Tokenizer {
 }
 
 #[derive(Clone, Default)]
-pub struct NormalTokenizer {}
+pub struct NormalTokenizer {
+    stopwords: Option<Vec<String>>,
+}
 
 impl NormalTokenizer {
     pub fn as_str() -> &'static str {
         "tokenizer"
+    }
+
+    pub fn with_stopwords(stopwords: Vec<String>) -> Self {
+        Self {
+            stopwords: Some(stopwords),
+        }
     }
 }
 
@@ -103,15 +113,21 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
 
 impl tantivy::tokenizer::Tokenizer for NormalTokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        TextAnalyzer::from(SimpleTokenizer)
-            .filter(LowerCaser)
-            .token_stream(text)
+        let mut analyzer = TextAnalyzer::from(SimpleTokenizer).filter(LowerCaser);
+
+        if let Some(stopwords) = &self.stopwords {
+            analyzer = analyzer.filter(StopWordFilter::remove(stopwords.clone()));
+        }
+
+        analyzer.token_stream(text)
     }
 }
 
 impl tantivy::tokenizer::Tokenizer for StemmedTokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let analyzer = TextAnalyzer::from(SimpleTokenizer).filter(LowerCaser);
+        let analyzer = TextAnalyzer::from(SimpleTokenizer)
+            .filter(LowerCaser)
+            .filter(StopWordFilter::remove(vec![]));
 
         let lang = match self.force_language {
             Some(lang) => Some(lang),

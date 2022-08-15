@@ -103,7 +103,7 @@ fn wikipedify_url(url: Url) -> Url {
     .into()
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
@@ -128,9 +128,15 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
-        tantivy_index
-            .tokenizers()
-            .register(NormalTokenizer::as_str(), NormalTokenizer::default());
+        tantivy_index.tokenizers().register(
+            NormalTokenizer::as_str(),
+            NormalTokenizer::with_stopwords(
+                include_str!("../../stopwords/English.txt")
+                    .lines()
+                    .map(|word| word.to_ascii_lowercase())
+                    .collect(),
+            ),
+        );
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
 
@@ -161,6 +167,7 @@ impl EntityIndex {
 
     pub fn commit(&mut self) {
         self.writer.commit().unwrap();
+        self.reader.reload().unwrap();
         info!("downloading images");
         // self.image_downloader.download(&mut self.image_store);
     }
@@ -313,6 +320,8 @@ impl EntityIndex {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]
@@ -321,6 +330,31 @@ mod tests {
             wikipedify_url("Aristotle Altemps Inv8575.jpg".to_string().into()).full(),
             "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
                 .to_string()
+        );
+    }
+
+    #[test]
+    fn stopwords_title_ignored() {
+        let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+
+        index.insert(Entity {
+            title: "the ashes".to_string(),
+            page_abstract: Span {
+                text: String::new(),
+                links: Vec::new(),
+            },
+            info: BTreeMap::new(),
+            image: None,
+            paragraphs: Vec::new(),
+            categories: HashSet::new(),
+        });
+
+        index.commit();
+
+        assert_eq!(index.search("the".to_string()), None);
+        assert_eq!(
+            index.search("ashes".to_string()).unwrap().title.as_str(),
+            "the ashes"
         );
     }
 }
