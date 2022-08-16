@@ -9,3 +9,9 @@ static/**/*.css
 node_modules
 package-lock.json
 notes
+*.log
+/data/**/LOG*
+/data/**/MANIFEST*
+/data/**/OPTIONS*
+/data/**/CURRENT
+/data/**/LOG
