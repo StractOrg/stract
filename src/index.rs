@@ -158,9 +158,9 @@ impl Index {
     }
 
     pub(crate) fn download_pending_images(&mut self) {
-        // self.favicon_downloader.download(&mut self.favicon_store);
-        // self.primary_image_downloader
-        //     .download(&mut self.primary_image_store);
+        self.favicon_downloader.download(&mut self.favicon_store);
+        self.primary_image_downloader
+            .download(&mut self.primary_image_store);
     }
 }
 

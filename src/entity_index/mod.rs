@@ -14,7 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fs, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    path::Path,
+    sync::Arc,
+    time::Duration,
+};
 
 use tantivy::{
     collector::TopDocs,
@@ -41,6 +47,7 @@ pub struct EntityIndex {
     writer: IndexWriter,
     reader: IndexReader,
     schema: Arc<Schema>,
+    stopwords: HashSet<String>,
 }
 
 fn schema() -> Schema {
@@ -128,14 +135,14 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
+        let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
+            .lines()
+            .map(|word| word.to_ascii_lowercase())
+            .collect();
+
         tantivy_index.tokenizers().register(
             NormalTokenizer::as_str(),
-            NormalTokenizer::with_stopwords(
-                include_str!("../../stopwords/English.txt")
-                    .lines()
-                    .map(|word| word.to_ascii_lowercase())
-                    .collect(),
-            ),
+            NormalTokenizer::with_stopwords(stopwords.clone().into_iter().collect()),
         );
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
@@ -149,6 +156,7 @@ impl EntityIndex {
             reader,
             image_downloader: ImageDownloader::new(),
             schema: Arc::new(schema),
+            stopwords,
         })
     }
 
@@ -169,7 +177,7 @@ impl EntityIndex {
         self.writer.commit().unwrap();
         self.reader.reload().unwrap();
         info!("downloading images");
-        // self.image_downloader.download(&mut self.image_store);
+        self.image_downloader.download(&mut self.image_store);
     }
 
     fn related_entities(&self, doc: DocAddress) -> Vec<StoredEntity> {
@@ -205,12 +213,14 @@ impl EntityIndex {
 
         let term_queries: Vec<(Occur, Box<dyn tantivy::query::Query>)> = query
             .split(' ')
+            .map(|term| term.to_ascii_lowercase())
+            .filter(|term| !self.stopwords.contains(term))
             .flat_map(|term| {
                 vec![
                     (
                         Occur::Must,
                         TermQuery::new(
-                            Term::from_field_text(title, &term.to_ascii_lowercase()),
+                            Term::from_field_text(title, &term),
                             IndexRecordOption::WithFreqsAndPositions,
                         )
                         .box_clone(),
@@ -218,7 +228,7 @@ impl EntityIndex {
                     (
                         Occur::Should,
                         TermQuery::new(
-                            Term::from_field_text(entity_abstract, &term.to_ascii_lowercase()),
+                            Term::from_field_text(entity_abstract, &term),
                             IndexRecordOption::WithFreqsAndPositions,
                         )
                         .box_clone(),
@@ -354,6 +364,14 @@ mod tests {
         assert_eq!(index.search("the".to_string()), None);
         assert_eq!(
             index.search("ashes".to_string()).unwrap().title.as_str(),
+            "the ashes"
+        );
+        assert_eq!(
+            index
+                .search("the ashes".to_string())
+                .unwrap()
+                .title
+                .as_str(),
             "the ashes"
         );
     }
