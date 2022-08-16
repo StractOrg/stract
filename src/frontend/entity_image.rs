@@ -14,22 +14,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use std::sync::Arc;
 
-use crate::frontend::router;
+use axum::body::Body;
+use axum::extract::Path;
+use axum::http::Response;
+use axum::response::IntoResponse;
+use axum::Extension;
+use reqwest::StatusCode;
 
-pub async fn run(
-    index_path: &str,
-    queries_csv_path: &str,
-    entity_index_path: Option<String>,
-    host: &str,
-) -> Result<()> {
-    let app = router(index_path, queries_csv_path, entity_index_path)?;
-    let addr = host.parse()?;
-    tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+use super::State;
 
-    Ok(())
+pub async fn route(
+    Path(entity): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    let img = state.searcher.entity_image(entity);
+
+    let bytes = match img {
+        Some(img) => img.as_raw_bytes(),
+        None => Vec::new(),
+    };
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(bytes))
+        .unwrap()
 }

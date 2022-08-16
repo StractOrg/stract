@@ -1,0 +1,652 @@
+{{Short description|Sequence of instructions to perform a task}}
+{{Redirect|Algorithms|the subfield of computer science|Analysis of algorithms}}
+{{Other uses}}
+
+{{More citations needed|date=July 2022}}
+{{Use mdy dates|date=September 2017}}
+
+[[Image:Euclid flowchart.svg|thumb|right| [[Flowchart]] of an algorithm ([[Euclid's algorithm]]) for calculating the greatest common divisor (g.c.d.) of two numbers ''a'' and ''b'' in locations named A and B. The algorithm proceeds by successive subtractions in two loops: IF the test B ≥ A yields "yes" or "true" (more accurately, the ''number'' ''b'' in location B is greater than or equal to the ''number'' ''a'' in location A) THEN, the algorithm specifies B ← B − A (meaning the number ''b'' − ''a'' replaces the old ''b''). Similarly, IF A > B, THEN A ← A − B. The process terminates when (the contents of) B is 0, yielding the g.c.d. in A. (Algorithm derived from Scott 2009:13; symbols and drawing style from Tausworthe 1977).]]
+
+[[File:Diagram for the computation of Bernoulli numbers.jpg|thumb|[[Ada Lovelace]]'s diagram from "note G", the first published computer algorithm]]
+
+In [[mathematics]] and [[computer science]], an '''algorithm''' ({{IPAc-en|audio=en-us-algorithm.ogg|ˈ|æ|l|ɡ|ə|r|ɪ|ð|əm}}) is a finite sequence of [[rigorous]] instructions, typically used to solve a class of specific [[Computational problem|problem]]s or to perform a [[computation]].<ref>{{Cite web|url=https://www.merriam-webster.com/dictionary/algorithm|title=Definition of ALGORITHM|work=Merriam-Webster Online Dictionary |language=en |access-date=2019-11-14 |archive-url=https://web.archive.org/web/20200214074446/https://www.merriam-webster.com/dictionary/algorithm |archive-date=February 14, 2020|url-status=live}}</ref> Algorithms are used as specifications for performing [[calculation]]s and [[data processing]]. By making use of [[artificial intelligence]], algorithms can perform automated deductions (referred to as [[automated reasoning]]) and use mathematical and logical tests to divert the code execution through various routes (referred to as [[automated decision-making]]). Using human characteristics as descriptors of machines in metaphorical ways was already practiced by [[Alan Turing]] with terms such as "memory", "search" and "stimulus".<ref>Blair, Ann, Duguid, Paul, Goeing, Anja-Silvia and Grafton, Anthony. Information: A Historical Companion, Princeton: Princeton University Press, 2021. p. 247</ref>
+
+In contrast, a [[Heuristic (computer science)|heuristic]] is an approach to problem solving that may not be fully specified or may not guarantee correct or optimal results, especially in problem domains where there is no well-defined correct or optimal result.<ref>David A. Grossman, Ophir Frieder, ''Information Retrieval: Algorithms and Heuristics'', 2nd edition, 2004, {{isbn|1402030045}}</ref>
+
+As an [[effective method]], an algorithm can be expressed within a finite amount of space and time,<ref>"Any classical mathematical algorithm, for example, can be described in a finite number of English words" (Rogers 1987:2).</ref> and in a well-defined formal language<ref>Well defined with respect to the agent that executes the algorithm: "There is a computing agent, usually human, which can react to the instructions and carry out the computations" (Rogers 1987:2).</ref> for calculating a [[Function (mathematics)|function]].<ref>"an algorithm is a procedure for computing a ''function'' (with respect to some chosen notation for integers) ... this limitation (to numerical functions) results in no loss of generality", (Rogers 1987:1).</ref> Starting from an initial state and initial input (perhaps [[Empty string|empty]]),<ref>"An algorithm has [[zero]] or more inputs, i.e., [[Quantity|quantities]] which are given to it initially before the algorithm begins" (Knuth 1973:5).</ref> the instructions describe a [[computation]] that, when [[Execution (computing)|executed]], proceeds through a finite<ref>"A procedure which has all the characteristics of an algorithm except that it possibly lacks finiteness may be called a 'computational method{{'"}} (Knuth 1973:5).</ref> number of well-defined successive states, eventually producing "output"<ref>"An algorithm has one or more outputs, i.e. quantities which have a specified relation to the inputs" (Knuth 1973:5).</ref> and terminating at a final ending state. The transition from one state to the next is not necessarily [[deterministic]]; some algorithms, known as [[randomized algorithms]], incorporate random input.<ref>Whether or not a process with random interior processes (not including the input) is an algorithm is debatable. Rogers opines that: "a computation is carried out in a discrete stepwise fashion, without the use of continuous methods or analogue devices ... carried forward deterministically, without resort to random methods or devices, e.g., dice" (Rogers 1987:2).</ref>
+
+== History ==
+The concept of algorithm has existed since antiquity. [[Arithmetic]] algorithms, such as a [[division algorithm]], were used by ancient [[Babylonian mathematics|Babylonian mathematicians]] c. 2500 BC and [[Egyptian mathematics|Egyptian mathematicians]] c. 1550 BC.<ref name="Springer Science & Business Media" /> [[Greek mathematics|Greek mathematicians]] later used algorithms in 240 BC in the [[sieve of Eratosthenes]] for finding prime numbers, and the [[Euclidean algorithm]] for finding the [[greatest common divisor]] of two numbers.<ref name="Cooke2005">{{cite book|last=Cooke|first=Roger L.|title=The History of Mathematics: A Brief Course|date=2005|publisher=John Wiley & Sons|isbn=978-1-118-46029-0}}</ref> [[Arabic mathematics|Arabic mathematicians]] such as [[al-Kindi]] in the 9th century used [[cryptographic]] algorithms for [[code-breaking]], based on [[frequency analysis]].<ref name="Dooley" />
+
+The word ''algorithm'' is derived from the name of the 9th-century Persian mathematician [[Muhammad ibn Musa al-Khwarizmi|Muḥammad ibn Mūsā al-Khwārizmī]], whose [[Nisba (suffix)|nisba]] (identifying him as from [[Khwarazm]]) was Latinized ''as Algoritmi ([[Arabization|Arabized]] [[Persian language|Persian]] الخوارزمی c. 780–850).''<ref>{{cite web|title=Al-Khwarizmi biography|url=http://www-history.mcs.st-andrews.ac.uk/Biographies/Al-Khwarizmi.html|url-status=live|archive-url=https://web.archive.org/web/20190802091553/http://www-history.mcs.st-andrews.ac.uk/Biographies/Al-Khwarizmi.html|archive-date=August 2, 2019|access-date=May 3, 2017|website=www-history.mcs.st-andrews.ac.uk}}</ref><ref>{{cite web|title=Etymology of algorithm|url=http://chambers.co.uk/search/?query=algorithm&title=21st|url-status=live|archive-url=https://web.archive.org/web/20190331204600/https://chambers.co.uk/search/?query=algorithm&title=21st|archive-date=March 31, 2019|access-date=December 13, 2016|website=Chambers Dictionary}}</ref>
+[[Muhammad ibn Musa al-Khwarizmi|Muḥammad ibn Mūsā al-Khwārizmī]] was a mathematician, [[astronomer]], [[geographer]], and scholar in the [[House of Wisdom]] in [[Baghdad]], whose name means 'the native of [[Khwarazm]]', a region that was part of [[Greater Iran]] and is now in [[Uzbekistan]].<ref name="Hogendijk">{{cite journal|first=Jan P. |last=Hogendijk |title=al-Khwarzimi |journal=Pythagoras |volume=38 |issue=2 |year=1998 |pages=4–5 |url=http://www.kennislink.nl/web/show?id=116543 |url-status=dead |archive-url=https://web.archive.org/web/20090412193516/http://www.kennislink.nl/web/show?id=116543 |archive-date=April 12, 2009 }}</ref><ref name="Oaks">{{cite web|first=Jeffrey A.|last=Oaks|url=http://facstaff.uindy.edu/~oaks/MHMC.htm|title=Was al-Khwarizmi an applied algebraist?|publisher=[[University of Indianapolis]]|access-date=May 30, 2008|archive-url=https://web.archive.org/web/20110718094835/http://facstaff.uindy.edu/~oaks/MHMC.htm|archive-date=July 18, 2011|url-status=dead|df=mdy-all}}</ref> About 825, al-Khwarizmi wrote an [[Arabic language]] treatise on the [[Hindu–Arabic numeral system]], which was translated into [[Latin]] during the 12th century. The manuscript starts with the phrase ''Dixit Algorizmi'' ('Thus spake Al-Khwarizmi'), where "Algorizmi" was the translator's [[Latinisation of names|Latinization]] of Al-Khwarizmi's name.<ref>{{cite book| last = Brezina| first = Corona| title = Al-Khwarizmi: The Inventor Of Algebra| url = https://books.google.com/books?id=955jPgAACAAJ| year = 2006| publisher = The Rosen Publishing Group| isbn = 978-1-4042-0513-0 }}</ref> Al-Khwarizmi was the most widely read mathematician in Europe in the late Middle Ages, primarily through another of his books, the [[Al-Jabr|Algebra]].<ref>[http://www-history.mcs.st-and.ac.uk/Extras/Boyer_Foremost_Text.html Foremost mathematical texts in history] {{Webarchive|url=https://web.archive.org/web/20110609224820/http://www-history.mcs.st-and.ac.uk/Extras/Boyer_Foremost_Text.html |date=June 9, 2011 }}, according to [[Carl B. Boyer]].</ref> In late medieval Latin, ''algorismus'', English '[[algorism]]', the corruption of his name, simply meant the "decimal number system".<ref>{{Citation|title=algorismic|url=https://www.thefreedictionary.com/algorismic|work=The Free Dictionary|access-date=2019-11-14|archive-url=https://web.archive.org/web/20191221200124/https://www.thefreedictionary.com/algorismic|archive-date=December 21, 2019|url-status=live}}</ref> In the 15th century, under the influence of the Greek word ἀριθμός (''arithmos''), 'number' (''cf.'' 'arithmetic'), the Latin word was altered to ''algorithmus'', and the corresponding English term 'algorithm' is first attested in the 17th century; the modern sense was introduced in the 19th century.<ref>''[[Oxford English Dictionary]]'', Third Edition, 2012 [http://www.oed.com/view/Entry/4959 ''s.v.'']</ref>
+
+[[Indian mathematics]] was predominantly algorithmic.
+Algorithms that are representative of the Indian mathematical tradition range from the ancient ''[[Sulbasutras|Śulbasūtrās]]'' to the medieval texts of the [[Kerala school of astronomy and mathematics|Kerala School]].<ref>{{cite book |last1=Sriram |first1=M. S. |editor1-last=Emch |editor1-first=Gerard G. |editor2-last=Sridharan |editor2-first=R. |editor3-last=Srinivas |editor3-first=M. D. |title=Contributions to the History of Indian Mathematics |date=2005 |publisher=Springer |isbn=978-93-86279-25-5 |page=153 |chapter-url=https://books.google.com/books?id=qfJdDwAAQBAJ&pg=PA153 |language=en |chapter=Algorithms in Indian Mathematics}}</ref>
+
+In English, the word ''algorithm'' was first used in about 1230 and then by [[Geoffrey Chaucer|Chaucer]] in 1391. English adopted the French term, but it was not until the late 19th century that "algorithm" took on the meaning that it has in modern English.<ref>{{Cite journal|last=Mehri|first=Bahman|date=2017|title=From Al-Khwarizmi to Algorithm|journal=Olympiads in Informatics|volume=11|issue=2|pages=71–74|doi=10.15388/ioi.2017.special.11}}</ref>
+
+Another early use of the word is from 1240, in a manual titled ''Carmen de Algorismo'' composed by [[Alexander of Villedieu|Alexandre de Villedieu]]. It begins with:
+
+{{blockquote|''Haec algorismus ars praesens dicitur, in qua / Talibus Indorum fruimur bis quinque figuris.''}}
+which translates to:
+{{blockquote|Algorism is the art by which at present we use those Indian figures, which number two times five.}}
+
+The poem is a few hundred lines long and summarizes the art of calculating with the new styled Indian dice (''Tali Indorum''), or Hindu numerals.<ref>{{Cite web|url=http://members.peak.org/~jeremy/calculators/alKwarizmi.html|title=Abu Jafar Muhammad ibn Musa al-Khwarizmi|website=members.peak.org|access-date=2019-11-14|archive-url=https://web.archive.org/web/20190821232118/http://members.peak.org/~jeremy/calculators/alKwarizmi.html|archive-date=August 21, 2019|url-status=live}}</ref>
+
+A partial formalization of the modern concept of algorithm began with attempts to solve the ''[[Entscheidungsproblem]] '' (decision problem) posed by [[David Hilbert]] in 1928. Later formalizations were framed as attempts to define "[[effective calculability]]"<ref>Kleene 1943 in Davis 1965:274</ref> or "effective method".<ref>Rosser 1939 in Davis 1965:225</ref> Those formalizations included the [[Kurt Gödel|Gödel]]–[[Jacques Herbrand|Herbrand]]–[[Stephen Cole Kleene|Kleene]] [[Recursion (computer science)|recursive functions]] of 1930, 1934 and 1935, [[Alonzo Church]]'s [[lambda calculus]] of 1936, [[Emil Post]]'s [[Formulation 1]] of 1936, and [[Alan Turing]]'s [[Turing machines]] of 1936–37 and 1939.
+
+==Informal definition==
+{{for|a detailed presentation of the various points of view on the definition of "algorithm"|Algorithm characterizations}}
+An informal definition could be "a set of rules that precisely defines a sequence of operations",<ref>Stone 1973:4</ref>{{qn | reason = Stone (1972) suggests on page 4: "...any sequence of instructions that can be obeyed by a robot, is called an algorithm"|date=July 2020}} which would include all computer programs (including programs that do not perform numeric calculations), and (for example) any prescribed [[bureaucratic]] procedure<ref>
+{{cite book
+ | last1 = Simanowski
+ | first1 = Roberto
+ | author-link1 = Roberto Simanowski
+ | translator1-last = Chase
+ | translator1-first = Jefferson
+ | title = The Death Algorithm and Other Digital Dilemmas
+ | url = https://books.google.com/books?id=RJV5DwAAQBAJ
+ | series = Untimely Meditations
+ | volume = 14
+ | location = Cambridge, Massachusetts
+ | publisher = MIT Press
+ | date = 2018
+ | page = 147
+ | isbn = 9780262536370
+ | access-date = 27 May 2019
+ | quote = [...] the next level of abstraction of central bureaucracy: globally operating algorithms.
+ | archive-url = https://web.archive.org/web/20191222120705/https://books.google.com/books?id=RJV5DwAAQBAJ
+ | archive-date = December 22, 2019
+ | url-status = live
+ }}
+</ref>
+or [[Cookbook|cook-book]] [[recipe]].<ref>
+{{cite book
+ | last1 = Dietrich
+ | first1 = Eric
+ | year = 1999
+ | chapter = Algorithm
+ | editor1-last = Wilson
+ | editor1-first = Robert Andrew
+ | editor2-last = Keil
+ | editor2-first = Frank C.
+ | title = The MIT Encyclopedia of the Cognitive Sciences
+ | url = https://books.google.com/books?id=-wt1aZrGXLYC
+ | series = MIT Cognet library
+ | location = Cambridge, Massachusetts
+ | publisher = MIT Press
+ | publication-date = 2001
+ | page = 11
+ | isbn = 9780262731447
+ | access-date = 22 July 2020
+ | quote = An algorithm is a recipe, method, or technique for doing something. 
+}}
+</ref>
+
+In general, a program is only an algorithm if it stops eventually<ref>Stone simply requires that "it must terminate in a finite number of steps" (Stone 1973:7–8).</ref>—even though [[infinite loop#Intentional looping|infinite loop]]s may sometimes prove desirable.
+
+A prototypical example of an algorithm is the [[Euclidean algorithm]], which is used to determine the maximum common divisor of two integers; an example (there are others) is described by the [[flowchart]] above and as an example in a later section.
+
+{{Harvtxt|Boolos|Jeffrey|1974, 1999|ref=CITEREFBoolosJeffrey1999}} offer an informal meaning of the word "algorithm" in the following quotation:
+
+{{blockquote|No human being can write fast enough, or long enough, or small enough† ( †"smaller and smaller without limit ... you'd be trying to write on molecules, on atoms, on electrons") to list all members of an enumerably infinite set by writing out their names, one after another, in some notation. But humans can do something equally useful, in the case of certain enumerably infinite sets: They can give ''explicit instructions for determining the '''n'''th member of the set'', for arbitrary finite ''n''. Such instructions are to be given quite explicitly, in a form in which ''they could be followed by a computing machine'', or by a ''human who is capable of carrying out only very elementary operations on symbols.''<ref>Boolos and Jeffrey 1974,1999:19</ref>}}
+
+An [[recursively enumerable set|"enumerably infinite set"]] is one whose elements can be put into one-to-one correspondence with the integers. Thus Boolos and Jeffrey are saying that an algorithm implies instructions for a process that "creates" output integers from an ''arbitrary'' "input" integer or integers that, in theory, can be arbitrarily large. For example, an algorithm can be an algebraic equation such as ''y = m + n'' (i.e., two arbitrary "input variables" ''m'' and ''n'' that produce an output ''y''), but various authors' attempts to define the notion indicate that the word implies much more than this, something on the order of (for the addition example):
+:Precise instructions (in a language understood by "the computer")<ref>cf Stone 1972:5</ref> for a fast, efficient, "good"<ref>Knuth 1973:7 states: "In practice we not only want algorithms, we want ''good'' algorithms ... one criterion of goodness is the length of time taken to perform the algorithm ... other criteria are the adaptability of the algorithm to computers, its simplicity, and elegance, etc."</ref> process that specifies the "moves" of "the computer" (machine or human, equipped with the necessary internally contained information and capabilities)<ref>cf Stone 1973:6</ref> to find, decode, and then process arbitrary input integers/symbols ''m'' and ''n'', symbols ''+'' and ''='' ... and "effectively"<ref>
+Stone 1973:7–8 states that there must be, "...a procedure that a robot [i.e., computer] can follow in order to determine precisely how to obey the instruction". Stone adds finiteness of the process, and definiteness (having no ambiguity in the instructions) to this definition.
+</ref> produce, in a "reasonable" time,<ref>Knuth, loc. cit</ref> output-integer ''y'' at a specified place and in a specified format.
+
+The concept of ''algorithm'' is also used to define the notion of [[decidability (logic)|decidability]]—a notion that is central for explaining how [[formal system]]s come into being starting from a small set of [[axiom]]s and rules. In [[logic]], the time that an algorithm requires to complete cannot be measured, as it is not apparently related to the customary physical dimension. From such uncertainties, that characterize ongoing work, stems the unavailability of a definition of ''algorithm'' that suits both concrete (in some sense) and abstract usage of the term.
+
+Most algorithms are intended to be [[Implementation|implement]]ed as [[computer programs]]. However, algorithms are also implemented by other means, such as in a [[biological neural network]] (for example, the [[human brain]] implementing [[arithmetic]] or an insect looking for food), in an [[electrical circuit]], or in a mechanical device.
+
+==Formalization==
+<!-- [[Computer program]] links here. -->
+Algorithms are essential to the way computers process data. Many computer programs contain algorithms that detail the specific instructions a computer should perform—in a specific order—to carry out a specified task, such as calculating employees' paychecks or printing students' report cards. Thus, an algorithm can be considered to be any sequence of operations that can be simulated by a [[Turing reduction|Turing-complete]] system. Authors who assert this thesis include Minsky (1967), Savage (1987) and Gurevich (2000):
+{{blockquote| Minsky: "But we will also maintain, with Turing ... that any procedure which could "naturally" be called effective, can, in fact, be realized by a (simple) machine. Although this may seem extreme, the arguments ... in its favor are hard to refute".<ref name="Minsky 1967:105">{{harvnb|Minsky|1967|page=105}}</ref>
+
+ Gurevich: "… Turing's informal argument in favor of his thesis justifies a stronger thesis: every algorithm can be simulated by a Turing machine … according to Savage [1987], an algorithm is a computational process defined by a Turing machine".<ref>Gurevich 2000:1, 3</ref>}}Turing machines can define computational processes that do not terminate. The informal definitions of algorithms generally require that the algorithm always terminates. This requirement renders the task of deciding whether a formal procedure is an algorithm impossible in the general case—due to a major theorem of [[computability theory]] known as the [[halting problem]].
+
+Typically, when an algorithm is associated with processing information, data can be read from an input source, written to an output device and stored for further processing. Stored data are regarded as part of the internal state of the entity performing the algorithm. In practice, the state is stored in one or more [[data structure]]s.
+
+For some of these computational processes, the algorithm must be rigorously defined: specified in the way it applies in all possible circumstances that could arise. This means that any conditional steps must be systematically dealt with, case-by-case; the criteria for each case must be clear (and computable).
+
+Because an algorithm is a precise list of precise steps, the order of computation is always crucial to the functioning of the algorithm. Instructions are usually assumed to be listed explicitly, and are described as starting "from the top" and going "down to the bottom"—an idea that is described more formally by ''[[control flow|flow of control]]''.
+
+So far, the discussion on the formalization of an algorithm has assumed the premises of [[imperative programming]]. This is the most common conception—one which attempts to describe a task in discrete, "mechanical" means. Unique to this conception of formalized algorithms is the [[assignment operation]], which sets the value of a variable. It derives from the intuition of "[[memory]]" as a scratchpad. An example of such an assignment can be found below.
+
+For some alternate conceptions of what constitutes an algorithm, see [[functional programming]] and [[logic programming]].
+
+==Expressing algorithms==
+Algorithms can be expressed in many kinds of notation, including [[natural language]]s, [[pseudocode]], [[flowchart]]s, [[DRAKON|drakon-charts]], [[programming language]]s or [[control table]]s (processed by [[Interpreter (computing)|interpreters]]). Natural language expressions of algorithms tend to be verbose and ambiguous, and are rarely used for complex or technical algorithms. Pseudocode, flowcharts, [[DRAKON|drakon-charts]] and control tables are structured ways to express algorithms that avoid many of the ambiguities common in the statements based on natural language. Programming languages are primarily intended for expressing algorithms in a form that can be executed by a computer, but are also often used as a way to define or document algorithms.
+
+There is a wide variety of representations possible and one can express a given [[Turing machine]] program as a sequence of machine tables (see [[finite-state machine]], [[state transition table]] and [[control table]] for more), as flowcharts and [[DRAKON|drakon-charts]] (see [[state diagram]] for more), or as a form of rudimentary [[machine code]] or [[assembly code]] called "sets of quadruples" (see [[Turing machine]] for more).
+
+Representations of algorithms can be classed into three accepted levels of Turing machine description, as follows:<ref>Sipser 2006:157</ref>
+; 1 High-level description
+: "...prose to describe an algorithm, ignoring the implementation details. At this level, we do not need to mention how the machine manages its tape or head."
+; 2 Implementation description
+: "...prose used to define the way the Turing machine uses its head and the way that it stores data on its tape. At this level, we do not give details of states or transition function."
+; 3 Formal description
+: Most detailed, "lowest level", gives the Turing machine's "state table".
+
+For an example of the simple algorithm "Add m+n" described in all three levels, see [[#Examples|Examples]].
+
+==Design==
+{{See also|Algorithm#By design paradigm}}
+
+Algorithm design refers to a method or a mathematical process for problem-solving and engineering algorithms. The design of algorithms is part of many solution theories of [[operation research]], such as [[dynamic programming]] and [[divide-and-conquer algorithm|divide-and-conquer]]. Techniques for designing and implementing algorithm designs are also called algorithm design patterns,<ref>{{citation|url=http://ww3.algorithmdesign.net/ch00-front.html|title=Algorithm Design: Foundations, Analysis, and Internet Examples|last1=Goodrich|first1=Michael T.|author1-link=Michael T. Goodrich|last2=Tamassia|first2=Roberto|author2-link=Roberto Tamassia|publisher=John Wiley & Sons, Inc.|year=2002|isbn=978-0-471-38365-9|access-date=June 14, 2018|archive-url=https://web.archive.org/web/20150428201622/http://ww3.algorithmdesign.net/ch00-front.html|archive-date=April 28, 2015|url-status=live}}</ref> with examples including the template method pattern and the decorator pattern.
+
+One of the most important aspects of algorithm design is resource (run-time, memory usage) efficiency; the [[big O notation]] is used to describe e.g. an algorithm's run-time growth as the size of its input increases.
+
+Typical steps in the development of algorithms:
+# Problem definition
+# Development of a model
+# Specification of the algorithm
+# Designing an algorithm
+# Checking the [[correctness (computer science)|correctness]] of the algorithm
+# Analysis of algorithm
+# Implementation of algorithm
+# Program testing
+# Documentation preparation{{clarify|reason=These steps are typically used in every day *software* development. In contrast, coming up with a new *algorithm* requires some ingenuity, and often lead(s) to a research article in a computer science journal; it can hardly be broken down into receipt-like steps.|date=December 2020}}
+
+==Computer algorithms==
+[[Image:TTL npn nand.svg|right|thumb|[[Logical NAND]] algorithm implemented electronically in [[7400 series|7400]] chip]]
+[[File:Euclid's algorithm structured blocks 1.png|thumb|Flowchart examples of the canonical [[Structured program theorem|Böhm-Jacopini structures]]: the SEQUENCE (rectangles descending the page), the WHILE-DO and the IF-THEN-ELSE. The three structures are made of the primitive conditional GOTO ({{code|1=IF test THEN GOTO step xxx}}, shown as diamond), the unconditional GOTO (rectangle), various assignment operators (rectangle), and HALT (rectangle). Nesting of these structures inside assignment-blocks result in complex diagrams (cf. Tausworthe 1977:100, 114).]]
+
+''"Elegant" (compact) programs, "good" (fast) programs '': The notion of "simplicity and elegance" appears informally in [[Donald Knuth|Knuth]] and precisely in [[Gregory Chaitin|Chaitin]]:
+:Knuth: " ... we want ''good'' algorithms in some loosely defined aesthetic sense. One criterion ... is the length of time taken to perform the algorithm .... Other criteria are adaptability of the algorithm to computers, its simplicity and elegance, etc."<ref>Knuth 1973:7</ref>
+
+:Chaitin: " ... a program is 'elegant,' by which I mean that it's the smallest possible program for producing the output that it does"<ref>Chaitin 2005:32</ref>
+
+Chaitin prefaces his definition with: "I'll show you can't prove that a program is 'elegant{{'"}}—such a proof would solve the [[Halting problem]] (ibid).
+
+''Algorithm versus function computable by an algorithm'': For a given function multiple algorithms may exist. This is true, even without expanding the available instruction set available to the programmer. Rogers observes that "It is ... important to distinguish between the notion of ''algorithm'', i.e. procedure and the notion of ''function computable by algorithm'', i.e. mapping yielded by procedure. The same function may have several different algorithms".<ref>Rogers 1987:1–2</ref>
+
+Unfortunately, there may be a tradeoff between goodness (speed) and elegance (compactness)—an elegant program may take more steps to complete a computation than one less elegant. An example that uses Euclid's algorithm appears below.
+
+''Computers (and computors), models of computation'': A computer (or human "computor"<ref>In his essay "Calculations by Man and Machine: Conceptual Analysis" Seig 2002:390 credits this distinction to Robin Gandy, cf Wilfred Seig, et al., 2002 ''Reflections on the foundations of mathematics: Essays in honor of Solomon Feferman'', Association for Symbolic Logic, A.K. Peters Ltd, Natick, MA.</ref>) is a restricted type of machine, a "discrete deterministic mechanical device"<ref>cf Gandy 1980:126, Robin Gandy ''Church's Thesis and Principles for Mechanisms'' appearing on pp. 123–148 in [[Jon Barwise|J. Barwise]] et al. 1980 ''The Kleene Symposium'', North-Holland Publishing Company.</ref> that blindly follows its instructions.<ref>A "robot": "A computer is a robot that performs any task that can be described as a sequence of instructions." cf Stone 1972:3</ref> Melzak's and Lambek's primitive models<ref>Lambek's "abacus" is a "countably infinite number of locations (holes, wires etc.) together with an unlimited supply of counters (pebbles, beads, etc.). The locations are distinguishable, the counters are not". The holes have unlimited capacity, and standing by is an agent who understands and is able to carry out the list of instructions" (Lambek 1961:295). Lambek references Melzak who defines his Q-machine as "an indefinitely large number of locations ... an indefinitely large supply of counters distributed among these locations, a program, and an operator whose sole purpose is to carry out the program" (Melzak 1961:283). B-B-J (loc. cit.) add the stipulation that the holes are "capable of holding any number of stones" (p. 46). Both Melzak and Lambek appear in ''The [[Canadian Mathematical Bulletin]]'', vol. 4, no. 3, September 1961.</ref> reduced this notion to four elements: (i) discrete, distinguishable ''locations'', (ii) discrete, indistinguishable ''counters''<ref>If no confusion results, the word "counters" can be dropped, and a location can be said to contain a single "number".</ref> (iii) an agent, and (iv) a list of instructions that are ''effective'' relative to the capability of the agent.<ref>"We say that an instruction is ''effective'' if there is a procedure that the robot can follow in order to determine precisely how to obey the instruction." (Stone 1972:6)</ref>
+
+Minsky describes a more congenial variation of Lambek's "abacus" model in his "Very Simple Bases for [[Computability]]".<ref>cf Minsky 1967: Chapter 11 "Computer models" and Chapter 14 "Very Simple Bases for Computability" pp. 255–281, in particular,</ref> [[Minsky machine|Minsky's machine]] proceeds sequentially through its five (or six, depending on how one counts) instructions unless either a conditional IF-THEN GOTO or an unconditional GOTO changes program flow out of sequence. Besides HALT, Minsky's machine includes three ''assignment'' (replacement, substitution)<ref>cf Knuth 1973:3.</ref> operations: ZERO (e.g. the contents of location replaced by 0: L ← 0), SUCCESSOR (e.g. L ← L+1), and DECREMENT (e.g. L ← L − 1).<ref>But always preceded by IF-THEN to avoid improper subtraction.</ref> Rarely must a programmer write "code" with such a limited instruction set. But Minsky shows (as do Melzak and Lambek) that his machine is [[Turing complete]] with only four general ''types'' of instructions: conditional GOTO, unconditional GOTO, assignment/replacement/substitution, and HALT. However, a few different assignment instructions (e.g. DECREMENT, INCREMENT, and ZERO/CLEAR/EMPTY for a Minsky machine) are also required for Turing-completeness; their exact specification is somewhat up to the designer. The unconditional GOTO is a convenience; it can be constructed by initializing a dedicated location to zero e.g. the instruction " Z ← 0 "; thereafter the instruction IF Z=0 THEN GOTO xxx is unconditional.
+
+''Simulation of an algorithm: computer (computor) language'': Knuth advises the reader that "the best way to learn an algorithm is to try it . . . immediately take pen and paper and work through an example".<ref>Knuth 1973:4</ref> But what about a simulation or execution of the real thing? The programmer must translate the algorithm into a language that the simulator/computer/computor can ''effectively'' execute. Stone gives an example of this: when computing the roots of a quadratic equation the computor must know how to take a square root. If they don't, then the algorithm, to be effective, must provide a set of rules for extracting a square root.<ref>Stone 1972:5. Methods for extracting roots are not trivial: see [[Methods of computing square roots]].</ref>
+
+This means that the programmer must know a "language" that is effective relative to the target computing agent (computer/computor).
+
+But what model should be used for the simulation? Van Emde Boas observes "even if we base [[Computational complexity theory|complexity theory]] on abstract instead of concrete machines, arbitrariness of the choice of a model remains. It is at this point that the notion of ''simulation'' enters".<ref>{{cite book| last = Leeuwen| first = Jan| title = Handbook of Theoretical Computer Science: Algorithms and complexity. Volume A| url = https://books.google.com/books?id=-X39_rA3VSQC| year = 1990| publisher = Elsevier| isbn = 978-0-444-88071-0 | page = 85}}</ref> When speed is being measured, the instruction set matters. For example, the subprogram in Euclid's algorithm to compute the remainder would execute much faster if the programmer had a "[[modular arithmetic|modulus]]" instruction available rather than just subtraction (or worse: just Minsky's "decrement").
+
+''Structured programming, canonical structures'': Per the [[Church–Turing thesis]], any algorithm can be computed by a model known to be [[Turing complete]], and per Minsky's demonstrations, Turing completeness requires only four instruction types—conditional GOTO, unconditional GOTO, assignment, HALT. Kemeny and Kurtz observe that, while "undisciplined" use of unconditional GOTOs and conditional IF-THEN GOTOs can result in "[[spaghetti code]]", a programmer can write structured programs using only these instructions; on the other hand "it is also possible, and not too hard, to write badly structured programs in a structured language".<ref>[[John G. Kemeny]] and [[Thomas E. Kurtz]] 1985 ''Back to Basic: The History, Corruption, and Future of the Language'', Addison-Wesley Publishing Company, Inc. Reading, MA, {{ISBN|0-201-13433-0}}.</ref> Tausworthe augments the three [[Structured program theorem|Böhm-Jacopini canonical structures]]:<ref>Tausworthe 1977:101</ref> SEQUENCE, IF-THEN-ELSE, and WHILE-DO, with two more: DO-WHILE and CASE.<ref>Tausworthe 1977:142</ref> An additional benefit of a structured program is that it lends itself to [[proof of correctness|proofs of correctness]] using [[mathematical induction]].<ref>Knuth 1973 section 1.2.1, expanded by Tausworthe 1977 at pages 100ff and Chapter 9.1</ref>
+
+''Canonical flowchart symbols<ref>cf Tausworthe 1977</ref>'': The graphical aide called a [[flowchart]], offers a way to describe and document an algorithm (and a computer program of one). Like the program flow of a Minsky machine, a flowchart always starts at the top of a page and proceeds down. Its primary symbols are only four: the directed arrow showing program flow, the rectangle (SEQUENCE, GOTO), the diamond (IF-THEN-ELSE), and the dot (OR-tie). The Böhm–Jacopini canonical structures are made of these primitive shapes. Sub-structures can "nest" in rectangles, but only if a single exit occurs from the superstructure. The symbols, and their use to build the canonical structures are shown in the diagram.
+
+==Examples==
+{{further|List of algorithms}}
+
+===Algorithm example===
+One of the simplest algorithms is to find the largest number in a list of numbers of random order. Finding the solution requires looking at every number in the list. From this follows a simple algorithm, which can be stated in a high-level description in English prose, as:
+
+''High-level description:''
+# If there are no numbers in the set then there is no highest number.
+# Assume the first number in the set is the largest number in the set.
+# For each remaining number in the set: if this number is larger than the current largest number, consider this number to be the largest number in the set.
+# When there are no numbers left in the set to iterate over, consider the current largest number to be the largest number of the set.
+
+''(Quasi-)formal description:''
+Written in prose but much closer to the high-level language of a computer program, the following is the more formal coding of the algorithm in [[pseudocode]] or [[pidgin code]]:
+
+{{algorithm-begin|name=LargestNumber}}
+ Input: A list of numbers ''L''.
+ Output: The largest number in the list ''L''.
+
+ '''if''' ''L.size'' = 0 '''return''' null
+ ''largest'' ← ''L''[0]
+ '''for each''' ''item'' '''in''' ''L'', '''do'''
+ '''if''' ''item'' > ''largest'', '''then'''
+ ''largest'' ← ''item''
+ '''return''' ''largest''
+{{algorithm-end}}
+
+===Euclid's algorithm===
+{{further|Euclid's algorithm}}In [[mathematics]], the '''Euclidean algorithm''', or '''Euclid's algorithm''', is an efficient method for computing the [[greatest common divisor]] (GCD) of two integers (numbers), the largest number that divides them both without a [[remainder]]. It is named after the ancient Greek [[mathematician]] [[Euclid]], who first described it in [[Euclid's Elements|his ''Elements'']] ({{circa|300 BC}}).<ref>Heath 1908:300; Hawking's Dover 2005 edition derives from Heath.</ref> It is one of the oldest algorithms in common use. It can be used to reduce [[Fraction (mathematics)|fractions]] to their [[Irreducible fraction|simplest form]], and is a part of many other number-theoretic and cryptographic calculations.
+
+[[File:Euclid's algorithm Book VII Proposition 2 2.png|250px|thumb|left|The example-diagram of Euclid's algorithm from T.L. Heath (1908), with more detail added. Euclid does not go beyond a third measuring and gives no numerical examples. Nicomachus gives the example of 49 and 21: "I subtract the less from the greater; 28 is left; then again I subtract from this the same 21 (for this is possible); 7 is left; I subtract this from 21, 14 is left; from which I again subtract 7 (for this is possible); 7 is left, but 7 cannot be subtracted from 7." Heath comments that "The last phrase is curious, but the meaning of it is obvious enough, as also the meaning of the phrase about ending 'at one and the same number'."(Heath 1908:300).]]
+
+Euclid poses the problem thus: "Given two numbers not prime to one another, to find their greatest common measure". He defines "A number [to be] a multitude composed of units": a counting number, a positive integer not including zero. To "measure" is to place a shorter measuring length ''s'' successively (''q'' times) along longer length ''l'' until the remaining portion ''r'' is less than the shorter length ''s''.<ref>" 'Let CD, measuring BF, leave FA less than itself.' This is a neat abbreviation for saying, measure along BA successive lengths equal to CD until a point F is reached such that the length FA remaining is less than CD; in other words, let BF be the largest exact multiple of CD contained in BA" (Heath 1908:297)</ref> In modern words, remainder ''r'' = ''l'' − ''q''×''s'', ''q'' being the quotient, or remainder ''r'' is the "modulus", the integer-fractional part left over after the division.<ref>For modern treatments using division in the algorithm, see Hardy and Wright 1979:180, Knuth 1973:2 (Volume 1), plus more discussion of Euclid's algorithm in Knuth 1969:293–297 (Volume 2).</ref>
+
+For Euclid's method to succeed, the starting lengths must satisfy two requirements: (i) the lengths must not be zero, AND (ii) the subtraction must be "proper"; i.e., a test must guarantee that the smaller of the two numbers is subtracted from the larger (or the two can be equal so their subtraction yields zero).
+
+Euclid's original proof adds a third requirement: the two lengths must not be prime to one another. Euclid stipulated this so that he could construct a [[reductio ad absurdum]] proof that the two numbers' common measure is in fact the ''greatest''.<ref>Euclid covers this question in his Proposition 1.</ref> While Nicomachus' algorithm is the same as Euclid's, when the numbers are prime to one another, it yields the number "1" for their common measure. So, to be precise, the following is really Nicomachus' algorithm.
+
+[[File:Euclids-algorithm-example-1599-650.gif|350px|thumb|right|A graphical expression of Euclid's algorithm to find the greatest common divisor for 1599 and 650.
+<syntaxhighlight lang="text" highlight="1,5">
+ 1599 = 650×2 + 299
+ 650 = 299×2 + 52
+ 299 = 52×5 + 39
+ 52 = 39×1 + 13
+ 39 = 13×3 + 0</syntaxhighlight>]]
+
+====Computer language for Euclid's algorithm====
+Only a few instruction ''types'' are required to execute Euclid's algorithm—some logical tests (conditional GOTO), unconditional GOTO, assignment (replacement), and subtraction.
+* A ''location'' is symbolized by upper case letter(s), e.g. S, A, etc.
+* The varying quantity (number) in a location is written in lower case letter(s) and (usually) associated with the location's name. For example, location L at the start might contain the number ''l'' = 3009.
+
+====An inelegant program for Euclid's algorithm====
+[[File:Euclid's algorithm Inelegant program 1.png|thumb|163px|right|"Inelegant" is a translation of Knuth's version of the algorithm with a subtraction-based remainder-loop replacing his use of division (or a "modulus" instruction). Derived from Knuth 1973:2–4. Depending on the two numbers "Inelegant" may compute the g.c.d. in fewer steps than "Elegant".]]
+
+The following algorithm is framed as Knuth's four-step version of Euclid's and Nicomachus', but, rather than using division to find the remainder, it uses successive subtractions of the shorter length ''s'' from the remaining length ''r'' until ''r'' is less than ''s''. The high-level description, shown in boldface, is adapted from Knuth 1973:2–4:
+
+'''INPUT''':
+ {{vanchor|1|el1}} [Into two locations L and S put the numbers ''l'' and ''s'' that represent the two lengths]:
+ INPUT L, S
+ {{vanchor|2|el2}} [Initialize R: make the remaining length ''r'' equal to the starting/initial/input length ''l'']:
+ R ← L
+
+'''E0: [Ensure ''r'' ≥ ''s''.]'''
+ {{vanchor|3|el3}} [Ensure the smaller of the two numbers is in S and the larger in R]:
+ IF R > S THEN
+ the contents of L is the larger number so skip over the exchange-steps [[#4|4]], [[#5|5]] and [[#6|6]]:
+ GOTO step [[#7|7]]
+ ELSE
+ swap the contents of R and S.
+ {{vanchor|4|el4}} L ← R (this first step is redundant, but is useful for later discussion).
+ {{vanchor|5|el5}} R ← S
+ {{vanchor|6|el6}} S ← L
+
+'''E1: [Find remainder]''': Until the remaining length ''r'' in R is less than the shorter length ''s'' in S, repeatedly subtract the measuring number ''s'' in S from the remaining length ''r'' in R.
+ {{vanchor|7|el7}} IF S > R THEN
+ done measuring so
+ GOTO [[#10|10]]
+ ELSE
+ measure again,
+ {{vanchor|8|el8}} R ← R − S
+ {{vanchor|9|el9}} [Remainder-loop]:
+ GOTO [[#7|7]].
+
+'''E2: [Is the remainder zero?]''': EITHER (i) the last measure was exact, the remainder in R is zero, and the program can halt, OR (ii) the algorithm must continue: the last measure left a remainder in R less than measuring number in S.
+ {{vanchor|10|el10}} IF R = 0 THEN
+ done so
+ GOTO [[#15|step 15]]
+ ELSE
+ CONTINUE TO [[#11|step 11]],
+
+'''E3: [Interchange ''s'' and ''r'']''': The nut of Euclid's algorithm. Use remainder ''r'' to measure what was previously smaller number ''s''; L serves as a temporary location.
+ {{vanchor|11|el11}} L ← R
+ {{vanchor|12|el12}} R ← S
+ {{vanchor|13|el13}} S ← L
+ {{vanchor|14|el14}} [Repeat the measuring process]:
+ GOTO [[#7|7]]
+
+'''OUTPUT''':
+
+ {{vanchor|15|el15}} [Done. S contains the [[greatest common divisor]]]:
+ PRINT S
+
+'''DONE''':
+ {{vanchor|16|el16}} HALT, END, STOP.
+
+====An elegant program for Euclid's algorithm====
+{{clarify span|The following version of Euclid's algorithm requires only six core instructions to do what thirteen are required to do by "Inelegant"; worse, "Inelegant" requires more ''types'' of instructions.|reason=Contrary to this (unsourced) text, it is general consensus in software engineering that good programming style does not aim at minimizing the number of 'core' (whatever that means) instructions or instruction types. Software engineers during the entire recent 50 years would have ostracized the shown program, if only due to its extensive use of 'goto'. While the program should not be removed here, it could serve as an example of poor programming style, leading to hard-to-understand source code.|date=March 2019}} The flowchart of "Elegant" can be found at the top of this article. In the (unstructured) Basic language, the steps are numbered, and the instruction <syntaxhighlight lang="cbmbas" inline>LET [] = []</syntaxhighlight> is the assignment instruction symbolized by ←.
+<syntaxhighlight lang="cbmbas">
+  5 REM Euclid's algorithm for greatest common divisor
+  6 PRINT "Type two integers greater than 0"
+  10 INPUT A,B
+  20 IF B=0 THEN GOTO 80
+  30 IF A > B THEN GOTO 60
+  40 LET B=B-A
+  50 GOTO 20
+  60 LET A=A-B
+  70 GOTO 20
+  80 PRINT A
+  90 END
+</syntaxhighlight>
+''How "Elegant" works'': In place of an outer "Euclid loop", "Elegant" shifts back and forth between two "co-loops", an A > B loop that computes A ← A − B, and a B ≤ A loop that computes B ← B − A. This works because, when at last the minuend M is less than or equal to the subtrahend S (Difference = Minuend − Subtrahend), the minuend can become ''s'' (the new measuring length) and the subtrahend can become the new ''r'' (the length to be measured); in other words the "sense" of the subtraction reverses.
+
+The following version can be used with [[List of C-family programming languages|programming languages from the C-family]]:
+<syntaxhighlight lang="java">
+// Euclid's algorithm for greatest common divisor
+int euclidAlgorithm (int A, int B){
+     A=abs(A);
+     B=abs(B);
+     while (B!=0){
+          while (A>B) A=A-B;
+          B=B-A;
+     }
+     return A;
+}
+</syntaxhighlight>
+
+===Testing the Euclid algorithms===
+Does an algorithm do what its author wants it to do? A few test cases usually give some confidence in the core functionality. But tests are not enough. For test cases, one source<ref>{{cite web |url=http://aleph0.clarku.edu/~djoyce/java/elements/bookVII/propVII2.html |title=Euclid's Elements, Book VII, Proposition 2 |publisher=Aleph0.clarku.edu |access-date=May 20, 2012 |archive-url=https://web.archive.org/web/20120524074919/http://aleph0.clarku.edu/~djoyce/java/elements/bookVII/propVII2.html |archive-date=May 24, 2012 |url-status=live }}</ref> uses 3009 and 884. Knuth suggested 40902, 24140. Another interesting case is the two [[relatively prime]] numbers 14157 and 5950.
+
+But "exceptional cases"<ref>While this notion is in widespread use, it cannot be defined precisely.</ref> must be identified and tested. Will "Inelegant" perform properly when R > S, S > R, R = S? Ditto for "Elegant": B > A, A > B, A = B? (Yes to all). What happens when one number is zero, both numbers are zero? ("Inelegant" computes forever in all cases; "Elegant" computes forever when A = 0.) What happens if ''negative'' numbers are entered? Fractional numbers? If the input numbers, i.e. the [[domain of a function|domain of the function]] computed by the algorithm/program, is to include only positive integers including zero, then the failures at zero indicate that the algorithm (and the program that [[instance (computer science)|instantiates]] it) is a [[partial function]] rather than a [[total function]]. A notable failure due to exceptions is the [[Ariane 5 Flight 501]] rocket failure (June 4, 1996).
+
+''Proof of program correctness by use of mathematical induction'': Knuth demonstrates the application of [[mathematical induction]] to an "extended" version of Euclid's algorithm, and he proposes "a general method applicable to proving the validity of any algorithm".<ref>Knuth 1973:13–18. He credits "the formulation of algorithm-proving in terms of assertions and induction" to R W. Floyd, Peter Naur, C.A.R. Hoare, H.H. Goldstine and J. von Neumann. Tausworth 1977 borrows Knuth's Euclid example and extends Knuth's method in section 9.1 ''Formal Proofs'' (pp. 288–298).</ref> Tausworthe proposes that a measure of the complexity of a program be the length of its correctness proof.<ref>Tausworthe 1997:294</ref>
+
+===Measuring and improving the Euclid algorithms===
+''Elegance (compactness) versus goodness (speed)'': With only six core instructions, "Elegant" is the clear winner, compared to "Inelegant" at thirteen instructions. However, "Inelegant" is ''faster'' (it arrives at HALT in fewer steps). [[Algorithm analysis]]<ref>cf Knuth 1973:7 (Vol. I), and his more-detailed analyses on pp. 1969:294–313 (Vol II).</ref> indicates why this is the case: "Elegant" does ''two'' conditional tests in every subtraction loop, whereas "Inelegant" only does one. As the algorithm (usually) requires many loop-throughs, ''on average'' much time is wasted doing a "B = 0?" test that is needed only after the remainder is computed.
+
+''Can the algorithms be improved?'': Once the programmer judges a program "fit" and "effective"—that is, it computes the function intended by its author—then the question becomes, can it be improved?
+
+The compactness of "Inelegant" can be improved by the elimination of five steps. But Chaitin proved that compacting an algorithm cannot be automated by a generalized algorithm;<ref>Breakdown occurs when an algorithm tries to compact itself. Success would solve the [[Halting problem]].</ref> rather, it can only be done [[heuristic]]ally; i.e., by exhaustive search (examples to be found at [[Busy beaver]]), trial and error, cleverness, insight, application of [[inductive reasoning]], etc. Observe that steps 4, 5 and 6 are repeated in steps 11, 12 and 13. Comparison with "Elegant" provides a hint that these steps, together with steps 2 and 3, can be eliminated. This reduces the number of core instructions from thirteen to eight, which makes it "more elegant" than "Elegant", at nine steps.
+
+The speed of "Elegant" can be improved by moving the "B=0?" test outside of the two subtraction loops. This change calls for the addition of three instructions (B = 0?, A = 0?, GOTO). Now "Elegant" computes the example-numbers faster; whether this is always the case for any given A, B, and R, S would require a detailed analysis.
+
+==Algorithmic analysis==
+{{Main|Analysis of algorithms}}
+It is frequently important to know how much of a particular resource (such as time or storage) is theoretically required for a given algorithm. Methods have been developed for the [[analysis of algorithms]] to obtain such quantitative answers (estimates); for example, an algorithm which adds up the elements of a list of ''n'' numbers would have a time requirement of ''O(n)'', using [[big O notation]]. At all times the algorithm only needs to remember two values: the sum of all the elements so far, and its current position in the input list. Therefore, it is said to have a space requirement of ''O(1)'', if the space required to store the input numbers is not counted, or ''O(n)'' if it is counted.
+
+Different algorithms may complete the same task with a different set of instructions in less or more time, space, or '[[algorithmic efficiency|effort]]' than others. For example, a [[binary search]] algorithm (with cost ''O(log n)'') outperforms a sequential search (cost ''O(n)'' ) when used for [[lookup table|table lookups]] on sorted lists or arrays.
+
+===Formal versus empirical===
+{{Main|Empirical algorithmics|Profiling (computer programming)|Program optimization}}
+The [[analysis of algorithms|analysis, and study of algorithms]] is a discipline of [[computer science]], and is often practiced abstractly without the use of a specific [[programming language]] or implementation. In this sense, algorithm analysis resembles other mathematical disciplines in that it focuses on the underlying properties of the algorithm and not on the specifics of any particular implementation. Usually [[pseudocode]] is used for analysis as it is the simplest and most general representation. However, ultimately, most algorithms are usually implemented on particular hardware/software platforms and their [[algorithmic efficiency]] is eventually put to the test using real code. For the solution of a "one off" problem, the efficiency of a particular algorithm may not have significant consequences (unless n is extremely large) but for algorithms designed for fast interactive, commercial or long life scientific usage it may be critical. Scaling from small n to large n frequently exposes inefficient algorithms that are otherwise benign.
+
+Empirical testing is useful because it may uncover unexpected interactions that affect performance. [[Benchmark (computing)|Benchmarks]] may be used to compare before/after potential improvements to an algorithm after program optimization.
+Empirical tests cannot replace formal analysis, though, and are not trivial to perform in a fair manner.<ref name="KriegelSchubert2016">{{cite journal|last1=Kriegel|first1=Hans-Peter|author-link=Hans-Peter Kriegel|last2=Schubert|first2=Erich|last3=Zimek|first3=Arthur|author-link3=Arthur Zimek|title=The (black) art of run-time evaluation: Are we comparing algorithms or implementations?|journal=Knowledge and Information Systems|volume=52|issue=2|year=2016|pages=341–378|issn=0219-1377|doi=10.1007/s10115-016-1004-2|s2cid=40772241}}</ref>
+
+=== Execution efficiency ===
+{{Main|Algorithmic efficiency}}
+To illustrate the potential improvements possible even in well-established algorithms, a recent significant innovation, relating to [[Fast Fourier transform|FFT]] algorithms (used heavily in the field of image processing), can decrease processing time up to 1,000 times for applications like medical imaging.<ref>{{cite web| title=Better Math Makes Faster Data Networks| author=Gillian Conahan| date=January 2013| url=http://discovermagazine.com/2013/jan-feb/34-better-math-makes-faster-data-networks| publisher=discovermagazine.com| access-date=May 13, 2014| archive-url=https://web.archive.org/web/20140513212427/http://discovermagazine.com/2013/jan-feb/34-better-math-makes-faster-data-networks| archive-date=May 13, 2014| url-status=live}}</ref> In general, speed improvements depend on special properties of the problem, which are very common in practical applications.<ref name="Hassanieh12">Haitham Hassanieh, [[Piotr Indyk]], Dina Katabi, and Eric Price, "[http://siam.omnibooksonline.com/2012SODA/data/papers/500.pdf ACM-SIAM Symposium On Discrete Algorithms (SODA)] {{webarchive|url=https://web.archive.org/web/20130704180806/http://siam.omnibooksonline.com/2012SODA/data/papers/500.pdf |date=July 4, 2013 }}, Kyoto, January 2012. See also the [http://groups.csail.mit.edu/netmit/sFFT/ sFFT Web Page] {{Webarchive|url=https://web.archive.org/web/20120221145740/http://groups.csail.mit.edu/netmit/sFFT/ |date=February 21, 2012 }}.</ref> Speedups of this magnitude enable computing devices that make extensive use of image processing (like digital cameras and medical equipment) to consume less power.
+
+== Classification ==
+There are various ways to classify algorithms, each with its own merits.
+
+=== By implementation ===
+One way to classify algorithms is by implementation means.
+
+{| style="float:right; width:200pt;"
+|-
+| 
+<syntaxhighlight lang="C">
+int gcd(int A, int B) {
+    if (B == 0)
+        return A;
+    else if (A > B)
+        return gcd(A-B,B);
+    else
+        return gcd(A,B-A);
+}
+</syntaxhighlight>
+|-
+| Recursive [[C (programming language)|C]] implementation of Euclid's algorithm from the [[#lead|above]] flowchart
+|}
+
+; Recursion
+: A [[recursive algorithm]] is one that invokes (makes reference to) itself repeatedly until a certain condition (also known as termination condition) matches, which is a method common to [[functional programming]]. [[Iteration|Iterative]] algorithms use repetitive constructs like [[Program loops|loops]] and sometimes additional data structures like [[Stack (data structure)|stacks]] to solve the given problems. Some problems are naturally suited for one implementation or the other. For example, [[towers of Hanoi]] is well understood using recursive implementation. Every recursive version has an equivalent (but possibly more or less complex) iterative version, and vice versa.
+; Logical
+: An algorithm may be viewed as controlled [[Deductive reasoning|logical deduction]]. This notion may be expressed as: ''Algorithm = logic + control''.<ref>Kowalski 1979</ref> The logic component expresses the axioms that may be used in the computation and the control component determines the way in which deduction is applied to the axioms. This is the basis for the [[logic programming]] paradigm. In pure logic programming languages, the control component is fixed and algorithms are specified by supplying only the logic component. The appeal of this approach is the elegant [[Formal semantics of programming languages|semantics]]: a change in the axioms produces a well-defined change in the algorithm.
+; Serial, parallel or distributed
+: Algorithms are usually discussed with the assumption that computers execute one instruction of an algorithm at a time. Those computers are sometimes called serial computers. An [[algorithm design]]ed for such an environment is called a serial algorithm, as opposed to [[parallel algorithm]]s or [[distributed algorithms]]. Parallel algorithms take advantage of computer architectures where several processors can work on a problem at the same time, whereas distributed algorithms utilize multiple machines connected with a [[computer network]]. Parallel or distributed algorithms divide the problem into more symmetrical or asymmetrical subproblems and collect the results back together. The resource consumption in such algorithms is not only processor cycles on each processor but also the communication overhead between the processors. Some sorting algorithms can be parallelized efficiently, but their communication overhead is expensive. Iterative algorithms are generally parallelizable. Some problems have no parallel algorithms and are called inherently serial problems.
+; Deterministic or non-deterministic
+: [[Deterministic algorithm]]s solve the problem with exact decision at every step of the algorithm whereas [[non-deterministic algorithm]]s solve problems via guessing although typical guesses are made more accurate through the use of [[heuristics]].
+; Exact or approximate
+: While many algorithms reach an exact solution, [[approximation algorithm]]s seek an approximation that is closer to the true solution. The approximation can be reached by either using a deterministic or a random strategy. Such algorithms have practical value for many hard problems. One of the examples of an approximate algorithm is the [[Knapsack problem]], where there is a set of given items. Its goal is to pack the knapsack to get the maximum total value. Each item has some weight and some value. Total weight that can be carried is no more than some fixed number X. So, the solution must consider weights of items as well as their value.<ref>{{Cite book|url=https://www.springer.com/us/book/9783540402862|title=Knapsack Problems {{!}} Hans Kellerer {{!}} Springer|language=en|isbn=978-3-540-40286-2|publisher=Springer|year=2004|doi=10.1007/978-3-540-24777-7|access-date=September 19, 2017|archive-url=https://web.archive.org/web/20171018181055/https://www.springer.com/us/book/9783540402862|archive-date=October 18, 2017|url-status=live|last1=Kellerer|first1=Hans|last2=Pferschy|first2=Ulrich|last3=Pisinger|first3=David|s2cid=28836720 }}</ref>
+; [[Quantum algorithm]]
+: They run on a realistic model of [[quantum computation]]. The term is usually used for those algorithms which seem inherently quantum, or use some essential feature of [[Quantum computing]] such as [[quantum superposition]] or [[quantum entanglement]].
+
+=== By design paradigm ===
+Another way of classifying algorithms is by their design methodology or [[algorithmic paradigm|paradigm]]. There is a certain number of paradigms, each different from the other. Furthermore, each of these categories includes many different types of algorithms. Some common paradigms are:
+
+; [[Brute-force search|Brute-force]] or exhaustive search
+: This is the [[Naïve algorithm|naive method]] of trying every possible solution to see which is best.<ref>{{cite book| last1 = Carroll| first1 = Sue| last2 = Daughtrey| first2 = Taz| title = Fundamental Concepts for the Software Quality Engineer| url = https://books.google.com/books?id=bz_cl3B05IcC&pg=PA282| date = July 4, 2007| publisher = American Society for Quality| isbn = 978-0-87389-720-4| pages = 282 et seq }}</ref>
+; Divide and conquer
+: A [[divide-and-conquer algorithm]] repeatedly reduces an instance of a problem to one or more smaller instances of the same problem (usually [[recursion|recursively]]) until the instances are small enough to solve easily. One such example of divide and conquer is [[mergesort|merge sorting]]. Sorting can be done on each segment of data after dividing data into segments and sorting of entire data can be obtained in the conquer phase by merging the segments. A simpler variant of divide and conquer is called a ''decrease-and-conquer algorithm'', which solves an identical subproblem and uses the solution of this subproblem to solve the bigger problem. Divide and conquer divides the problem into multiple subproblems and so the conquer stage is more complex than decrease and conquer algorithms. An example of a decrease and conquer algorithm is the [[binary search algorithm]].
+; Search and enumeration
+: Many problems (such as playing [[chess]]) can be modeled as problems on [[graph theory|graphs]]. A [[graph exploration algorithm]] specifies rules for moving around a graph and is useful for such problems. This category also includes [[search algorithm]]s, [[branch and bound]] enumeration and [[backtracking]].
+;[[Randomized algorithm]]
+: Such algorithms make some choices randomly (or pseudo-randomly). They can be very useful in finding approximate solutions for problems where finding exact solutions can be impractical (see heuristic method below). For some of these problems, it is known that the fastest approximations must involve some [[randomness]].<ref>For instance, the [[volume]] of a [[convex polytope]] (described using a membership oracle) can be approximated to high accuracy by a randomized polynomial time algorithm, but not by a deterministic one: see {{citation
+ | last1 = Dyer | first1 = Martin
+ | last2 = Frieze | first2 = Alan
+ | last3 = Kannan | first3 = Ravi
+ | date = January 1991
+ | doi = 10.1145/102782.102783
+ | issue = 1
+ | journal = J. ACM
+ | pages = 1–17
+ | title = A Random Polynomial-time Algorithm for Approximating the Volume of Convex Bodies
+ | volume = 38| citeseerx = 10.1.1.145.4600| s2cid = 13268711
+ }}.</ref> Whether randomized algorithms with [[P (complexity)|polynomial time complexity]] can be the fastest algorithms for some problems is an open question known as the [[P versus NP problem]]. There are two large classes of such algorithms:
+# [[Monte Carlo algorithm]]s return a correct answer with high-probability. E.g. [[RP (complexity)|RP]] is the subclass of these that run in [[polynomial time]].
+# [[Las Vegas algorithm]]s always return the correct answer, but their running time is only probabilistically bound, e.g. [[Zero-error Probabilistic Polynomial time|ZPP]].
+; [[Reduction (complexity)|Reduction of complexity]]
+: This technique involves solving a difficult problem by transforming it into a better-known problem for which we have (hopefully) [[asymptotically optimal]] algorithms. The goal is to find a reducing algorithm whose [[Computational complexity theory|complexity]] is not dominated by the resulting reduced algorithm's. For example, one [[selection algorithm]] for finding the median in an unsorted list involves first sorting the list (the expensive portion) and then pulling out the middle element in the sorted list (the cheap portion). This technique is also known as ''[[Transform and conquer algorithm|transform and conquer]]''.
+; [[Back tracking]]
+: In this approach, multiple solutions are built incrementally and abandoned when it is determined that they cannot lead to a valid full solution.
+
+=== Optimization problems ===
+For [[optimization problem]]s there is a more specific classification of algorithms; an algorithm for such problems may fall into one or more of the general categories described above as well as into one of the following:
+
+; [[Linear programming]]
+: When searching for optimal solutions to a linear function bound to linear equality and inequality constraints, the constraints of the problem can be used directly in producing the optimal solutions. There are algorithms that can solve any problem in this category, such as the popular [[simplex algorithm]].<ref>
+[[George B. Dantzig]] and Mukund N. Thapa. 2003. ''Linear Programming 2: Theory and Extensions''. Springer-Verlag.</ref> Problems that can be solved with linear programming include the [[maximum flow problem]] for directed graphs. If a problem additionally requires that one or more of the unknowns must be an [[integer]] then it is classified in [[integer programming]]. A linear programming algorithm can solve such a problem if it can be proved that all restrictions for integer values are superficial, i.e., the solutions satisfy these restrictions anyway. In the general case, a specialized algorithm or an algorithm that finds approximate solutions is used, depending on the difficulty of the problem.
+; [[Dynamic programming]]
+: When a problem shows [[optimal substructure]]s—meaning the optimal solution to a problem can be constructed from optimal solutions to subproblems—and [[overlapping subproblems]], meaning the same subproblems are used to solve many different problem instances, a quicker approach called ''dynamic programming'' avoids recomputing solutions that have already been computed. For example, [[Floyd–Warshall algorithm]], the shortest path to a goal from a vertex in a weighted [[graph (discrete mathematics)|graph]] can be found by using the shortest path to the goal from all adjacent vertices. Dynamic programming and [[memoization]] go together. The main difference between dynamic programming and divide and conquer is that subproblems are more or less independent in divide and conquer, whereas subproblems overlap in dynamic programming. The difference between dynamic programming and straightforward recursion is in caching or memoization of recursive calls. When subproblems are independent and there is no repetition, memoization does not help; hence dynamic programming is not a solution for all complex problems. By using memoization or maintaining a [[Mathematical table|table]] of subproblems already solved, dynamic programming reduces the exponential nature of many problems to polynomial complexity.
+; The greedy method
+: A [[greedy algorithm]] is similar to a dynamic programming algorithm in that it works by examining substructures, in this case not of the problem but of a given solution. Such algorithms start with some solution, which may be given or have been constructed in some way, and improve it by making small modifications. For some problems they can find the optimal solution while for others they stop at [[local optimum|local optima]], that is, at solutions that cannot be improved by the algorithm but are not optimum. The most popular use of greedy algorithms is for finding the minimal spanning tree where finding the optimal solution is possible with this method. [[Huffman coding|Huffman Tree]], [[kruskal's algorithm|Kruskal]], [[Prim's algorithm|Prim]], [[Sollin's algorithm|Sollin]] are greedy algorithms that can solve this optimization problem.
+;The heuristic method
+:In [[optimization problem]]s, [[heuristic algorithm]]s can be used to find a solution close to the optimal solution in cases where finding the optimal solution is impractical. These algorithms work by getting closer and closer to the optimal solution as they progress. In principle, if run for an infinite amount of time, they will find the optimal solution. Their merit is that they can find a solution very close to the optimal solution in a relatively short time. Such algorithms include [[local search (optimization)|local search]], [[tabu search]], [[simulated annealing]], and [[genetic algorithm]]s. Some of them, like simulated annealing, are non-deterministic algorithms while others, like tabu search, are deterministic. When a bound on the error of the non-optimal solution is known, the algorithm is further categorized as an [[approximation algorithm]].
+
+=== By field of study ===
+{{See also|List of algorithms}}
+Every field of science has its own problems and needs efficient algorithms. Related problems in one field are often studied together. Some example classes are [[search algorithm]]s, [[sorting algorithm]]s, [[merge algorithm]]s, [[numerical analysis|numerical algorithms]], [[graph theory|graph algorithms]], [[string algorithms]], [[computational geometry|computational geometric algorithms]], [[combinatorial|combinatorial algorithms]], [[medical algorithm]]s, [[machine learning]], [[cryptography]], [[data compression]] algorithms and [[parsing|parsing techniques]].
+
+Fields tend to overlap with each other, and algorithm advances in one field may improve those of other, sometimes completely unrelated, fields. For example, dynamic programming was invented for optimization of resource consumption in industry but is now used in solving a broad range of problems in many fields.
+
+=== By complexity ===
+{{See also|Complexity class| Parameterized complexity}}
+Algorithms can be classified by the amount of time they need to complete compared to their input size:
+* Constant time: if the time needed by the algorithm is the same, regardless of the input size. E.g. an access to an [[Array data structure|array]] element.
+* Logarithmic time: if the time is a logarithmic function of the input size. E.g. [[binary search algorithm]].
+* Linear time: if the time is proportional to the input size. E.g. the traverse of a list.
+* Polynomial time: if the time is a power of the input size. E.g. the [[bubble sort]] algorithm has quadratic time complexity.
+* Exponential time: if the time is an exponential function of the input size. E.g. [[Brute-force search]].
+
+Some problems may have multiple algorithms of differing complexity, while other problems might have no algorithms or no known efficient algorithms. There are also mappings from some problems to other problems. Owing to this, it was found to be more suitable to classify the problems themselves instead of the algorithms into equivalence classes based on the complexity of the best possible algorithms for them.
+
+=== Continuous algorithms ===
+The adjective "continuous" when applied to the word "algorithm" can mean:
+* An algorithm operating on data that represents continuous quantities, even though this data is represented by discrete approximations—such algorithms are studied in [[numerical analysis]]; or
+* An algorithm in the form of a [[differential equation]] that operates continuously on the data, running on an [[analog computer]].<ref>{{cite book| author = Tsypkin| title = Adaptation and learning in automatic systems| url = https://books.google.com/books?id=sgDHJlafMskC&pg=PA54| year = 1971| publisher = Academic Press| isbn = 978-0-08-095582-7| page = 54 }}</ref>
+
+== Legal issues ==
+{{see also|Software patent}}
+
+Algorithms, by themselves, are not usually patentable. In the United States, a claim consisting solely of simple manipulations of abstract concepts, numbers, or signals does not constitute "processes" (USPTO 2006), and hence algorithms are not patentable (as in [[Gottschalk v. Benson]]). However practical applications of algorithms are sometimes patentable. For example, in [[Diamond v. Diehr]], the application of a simple [[feedback]] algorithm to aid in the curing of [[synthetic rubber]] was deemed patentable. The [[Software patent debate|patenting of software]] is highly controversial, and there are highly criticized patents involving algorithms, especially [[data compression]] algorithms, such as [[Unisys]]' [[Graphics Interchange Format#Unisys and LZW patent enforcement|LZW patent]].
+
+Additionally, some cryptographic algorithms have export restrictions (see [[export of cryptography]]).
+
+== History: Development of the notion of "algorithm" ==
+=== Ancient Near East ===
+The earliest evidence of algorithms is found in the [[Babylonian mathematics]] of ancient [[Mesopotamia]] (modern Iraq). A [[Sumer]]ian clay tablet found in [[Shuruppak]] near [[Baghdad]] and dated to circa 2500 BC described the earliest [[division algorithm]].<ref name="Springer Science & Business Media">{{cite book |last1=Chabert |first1=Jean-Luc |title=A History of Algorithms: From the Pebble to the Microchip |date=2012 |publisher=Springer Science & Business Media |isbn=9783642181924 |pages=7–8}}</ref> During the [[First Babylonian dynasty|Hammurabi dynasty]] circa 1800-1600 BC, [[Babylonia]]n clay tablets described algorithms for computing [[formulas]].<ref>{{cite journal |last1=Knuth |first1=Donald E. |title=Ancient Babylonian Algorithms |journal=Commun. ACM |date=1972 |volume=15 |issue=7 |pages=671–677 |doi=10.1145/361454.361514 |s2cid=7829945 |url=http://steiner.math.nthu.edu.tw/disk5/js/computer/1.pdf |archive-url=https://web.archive.org/web/20121224100137/http://steiner.math.nthu.edu.tw/disk5/js/computer/1.pdf |url-status=dead |archive-date=2012-12-24 |issn=0001-0782}}</ref> Algorithms were also used in [[Babylonian astronomy]]. Babylonian clay tablets describe and employ algorithmic procedures to compute the time and place of significant astronomical events.<ref>{{Citation | last = Aaboe | first = Asger | author-link = Asger Aaboe | date = 2001 | title = Episodes from the Early History of Astronomy | publisher = Springer | place = New York | pages = 40–62 | isbn = 978-0-387-95136-2 }}</ref>
+
+Algorithms for arithmetic are also found in ancient [[Egyptian mathematics]], dating back to the [[Rhind Mathematical Papyrus]] circa 1550 BC.<ref name="Springer Science & Business Media"/> Algorithms were later used in ancient [[Hellenistic mathematics]]. Two examples are the [[Sieve of Eratosthenes]], which was described in the ''[[Introduction to Arithmetic]]'' by [[Nicomachus]],<ref>{{cite web|url=http://www.math.wichita.edu/history/men/eratosthenes.html|title=Eratosthenes|publisher=Wichita State University: Department of Mathematics and Statistics|first=Courtney|last=Ast|access-date=February 27, 2015|archive-url=https://web.archive.org/web/20150227150653/http://www.math.wichita.edu/history/men/eratosthenes.html|archive-date=February 27, 2015|url-status=live}}</ref><ref name=Cooke2005/>{{rp|Ch 9.2}} and the [[Euclidean algorithm]], which was first described in ''[[Euclid's Elements]]'' ({{circa|300 BC}}).<ref name=Cooke2005/>{{rp|Ch 9.1}}
+
+=== Discrete and distinguishable symbols ===
+Tally-marks: To keep track of their flocks, their sacks of grain and their money the ancients used tallying: accumulating stones or marks scratched on sticks or making discrete symbols in clay. Through the Babylonian and Egyptian use of marks and symbols, eventually [[Roman numerals]] and the [[abacus]] evolved (Dilson, p.&nbsp;16–41). Tally marks appear prominently in [[unary numeral system]] arithmetic used in [[Turing machine]] and [[Post–Turing machine]] computations.
+
+=== Manipulation of symbols as "place holders" for numbers: algebra ===
+[[Muhammad ibn Mūsā al-Khwārizmī]], a [[Mathematics in medieval Islam|Persian mathematician]], wrote the ''[[Al-jabr]]'' in the 9th century. The terms "[[algorism]]" and "algorithm" are derived from the name al-Khwārizmī, while the term "[[algebra]]" is derived from the book ''Al-jabr''. In Europe, the word "algorithm" was originally used to refer to the sets of rules and techniques used by Al-Khwarizmi to solve algebraic equations, before later being generalized to refer to any set of rules or techniques.<ref>{{cite book |last1=Chabert |first1=Jean-Luc |title=A History of Algorithms: From the Pebble to the Microchip |date=2012 |publisher=Springer Science & Business Media |isbn=9783642181924 |page=2}}</ref> This eventually culminated in [[Gottfried Leibniz|Leibniz]]'s notion of the [[calculus ratiocinator]] ({{circa|1680}}):
+
+{{blockquote|A good century and a half ahead of his time, Leibniz proposed an algebra of logic, an algebra that would specify the rules for manipulating logical concepts in the manner that ordinary algebra specifies the rules for manipulating numbers.<ref>Davis 2000:18</ref>}}
+
+=== Cryptographic algorithms ===
+The first [[cryptographic]] algorithm for deciphering encrypted code was developed by [[Al-Kindi]], a 9th-century [[Mathematics in medieval Islam|Arab mathematician]], in ''A Manuscript On Deciphering Cryptographic Messages''. He gave the first description of [[cryptanalysis]] by [[frequency analysis]], the earliest [[codebreaking]] algorithm.<ref name="Dooley">{{cite book |last1=Dooley |first1=John F. |title=A Brief History of Cryptology and Cryptographic Algorithms |date=2013 |publisher=Springer Science & Business Media |isbn=9783319016283 |pages=12–3}}</ref>
+
+=== Mechanical contrivances with discrete states ===
+''The clock'': Bolter credits the invention of the weight-driven [[clock]] as "The key invention [of Europe in the Middle Ages]", in particular, the [[verge escapement]]<ref>Bolter 1984:24</ref> that provides us with the tick and tock of a mechanical clock. "The accurate automatic machine"<ref>Bolter 1984:26</ref> led immediately to "mechanical [[automata theory|automata]]" beginning in the 13th century and finally to "computational machines"—the [[difference engine]] and [[analytical engine]]s of [[Charles Babbage]] and Countess [[Ada Lovelace]], mid-19th century.<ref>Bolter 1984:33–34, 204–206.</ref> Lovelace is credited with the first creation of an algorithm intended for processing on a computer—Babbage's analytical engine, the first device considered a real [[Turing-complete]] computer instead of just a [[calculator]]—and is sometimes called "history's first programmer" as a result, though a full implementation of Babbage's second device would not be realized until decades after her lifetime.
+
+''Logical machines 1870 – [[Stanley Jevons]]' "logical abacus" and "logical machine"'': The technical problem was to reduce [[Boolean equation]]s when presented in a form similar to what is now known as [[Karnaugh map]]s. Jevons (1880) describes first a simple "abacus" of "slips of wood furnished with pins, contrived so that any part or class of the [logical] combinations can be picked out mechanically ... More recently, however, I have reduced the system to a completely mechanical form, and have thus embodied the whole of the indirect process of inference in what may be called a ''Logical Machine''" His machine came equipped with "certain moveable wooden rods" and "at the foot are 21 keys like those of a piano [etc.] ...". With this machine he could analyze a "[[syllogism]] or any other simple logical argument".<ref>All quotes from W. Stanley Jevons 1880 ''Elementary Lessons in Logic: Deductive and Inductive'', Macmillan and Co., London and New York. Republished as a googlebook; cf Jevons 1880:199–201. Louis Couturat 1914 ''the Algebra of Logic'', The Open Court Publishing Company, Chicago and London. Republished as a googlebook; cf Couturat 1914:75–76 gives a few more details; he compares this to a typewriter as well as a piano. Jevons states that the account is to be found at January 20, 1870 ''The Proceedings of the Royal Society''.</ref>
+
+This machine he displayed in 1870 before the Fellows of the Royal Society.<ref>Jevons 1880:199–200</ref> Another logician [[John Venn]], however, in his 1881 ''Symbolic Logic'', turned a jaundiced eye to this effort: "I have no high estimate myself of the interest or importance of what are sometimes called logical machines ... it does not seem to me that any contrivances at present known or likely to be discovered really deserve the name of logical machines"; see more at [[Algorithm characterizations]]. But not to be outdone he too presented "a plan somewhat analogous, I apprehend, to Prof. Jevon's ''abacus'' ... [And] [a]gain, corresponding to Prof. Jevons's logical machine, the following contrivance may be described. I prefer to call it merely a logical-diagram machine ... but I suppose that it could do very completely all that can be rationally expected of any logical machine".<ref>All quotes from John Venn 1881 ''Symbolic Logic'', Macmillan and Co., London. Republished as a googlebook. cf Venn 1881:120–125. The interested reader can find a deeper explanation in those pages.</ref>
+
+''Jacquard loom, Hollerith punch cards, telegraphy and telephony – the electromechanical relay'': Bell and Newell (1971) indicate that the [[Jacquard loom]] (1801), precursor to [[Hollerith cards]] (punch cards, 1887), and "telephone switching technologies" were the roots of a tree leading to the development of the first computers.<ref>Bell and Newell diagram 1971:39, cf. Davis 2000</ref> By the mid-19th century the [[telegraph]], the precursor of the telephone, was in use throughout the world, its discrete and distinguishable encoding of letters as "dots and dashes" a common sound. By the late 19th century the [[ticker tape]] ({{circa|1870s}}) was in use, as was the use of Hollerith cards in the 1890 U.S. census. Then came the [[teleprinter]] ({{circa|1910}}) with its punched-paper use of [[Baudot code]] on tape.
+
+''Telephone-switching networks'' of electromechanical [[relay]]s (invented 1835) was behind the work of [[George Stibitz]] (1937), the inventor of the digital adding device. As he worked in Bell Laboratories, he observed the "burdensome' use of mechanical calculators with gears. "He went home one evening in 1937 intending to test his idea... When the tinkering was over, Stibitz had constructed a binary adding device".<ref>* Melina Hill, Valley News Correspondent, ''A Tinkerer Gets a Place in History'', Valley News West Lebanon NH, Thursday, March 31, 1983, p. 13.</ref>
+
+The mathematician [[Martin Davis (mathematician)|Martin Davis]] observes the particular importance of the electromechanical relay (with its two "binary states" ''open'' and ''closed''):
+: It was only with the development, beginning in the 1930s, of electromechanical calculators using electrical relays, that machines were built having the scope Babbage had envisioned."<ref>Davis 2000:14</ref>
+
+=== Mathematics during the 19th century up to the mid-20th century ===
+''Symbols and rules'': In rapid succession, the mathematics of [[George Boole]] (1847, 1854), [[Gottlob Frege]] (1879), and [[Giuseppe Peano]] (1888–1889) reduced arithmetic to a sequence of symbols manipulated by rules. Peano's ''The principles of arithmetic, presented by a new method'' (1888) was "the first attempt at an axiomatization of mathematics in a [[Symbolic language (programming)|symbolic language]]".<ref>van Heijenoort 1967:81ff</ref>
+
+But Heijenoort gives Frege (1879) this kudos: Frege's is "perhaps the most important single work ever written in logic. ... in which we see a " 'formula language', that is a ''lingua characterica'', a language written with special symbols, "for pure thought", that is, free from rhetorical embellishments ... constructed from specific symbols that are manipulated according to definite rules".<ref>van Heijenoort's commentary on Frege's ''Begriffsschrift, a formula language, modeled upon that of arithmetic, for pure thought'' in van Heijenoort 1967:1</ref> The work of Frege was further simplified and amplified by [[Alfred North Whitehead]] and [[Bertrand Russell]] in their [[Principia Mathematica]] (1910–1913).
+
+''The paradoxes'': At the same time a number of disturbing paradoxes appeared in the literature, in particular, the [[Burali-Forti paradox]] (1897), the [[Russell paradox]] (1902–03), and the [[Richard Paradox]].<ref>Dixon 1906, cf. Kleene 1952:36–40</ref> The resultant considerations led to [[Kurt Gödel]]'s paper (1931)—he specifically cites the paradox of the liar—that completely reduces rules of [[recursion]] to numbers.
+
+''Effective calculability'': In an effort to solve the [[Entscheidungsproblem]] defined precisely by Hilbert in 1928, mathematicians first set about to define what was meant by an "effective method" or "effective calculation" or "effective calculability" (i.e., a calculation that would succeed). In rapid succession the following appeared: [[Alonzo Church]], [[Stephen Kleene]] and [[J.B. Rosser]]'s [[λ-calculus]]<ref>cf. footnote in Alonzo Church 1936a in Davis 1965:90 and 1936b in Davis 1965:110</ref> a finely honed definition of "general recursion" from the work of Gödel acting on suggestions of [[Jacques Herbrand]] (cf. Gödel's Princeton lectures of 1934) and subsequent simplifications by Kleene.<ref>Kleene 1935–6 in Davis 1965:237ff, Kleene 1943 in Davis 1965:255ff</ref> Church's proof<ref>Church 1936 in Davis 1965:88ff</ref> that the Entscheidungsproblem was unsolvable, [[Emil Post]]'s definition of effective calculability as a worker mindlessly following a list of instructions to move left or right through a sequence of rooms and while there either mark or erase a paper or observe the paper and make a yes-no decision about the next instruction.<ref>cf. "Finite Combinatory Processes – formulation 1", Post 1936 in Davis 1965:289–290</ref> Alan Turing's proof of that the Entscheidungsproblem was unsolvable by use of his "a- [automatic-] machine"<ref>Turing 1936–37 in Davis 1965:116ff</ref>—in effect almost identical to Post's "formulation", [[J. Barkley Rosser]]'s definition of "effective method" in terms of "a machine".<ref>Rosser 1939 in Davis 1965:226</ref> Kleene's proposal of a precursor to "[[Church thesis]]" that he called "Thesis I",<ref>Kleene 1943 in Davis 1965:273–274</ref> and a few years later Kleene's renaming his Thesis "Church's Thesis"<ref>Kleene 1952:300, 317</ref> and proposing "Turing's Thesis".<ref>Kleene 1952:376</ref>
+
+=== Emil Post (1936) and Alan Turing (1936–37, 1939) ===
+[[Emil Post]] (1936) described the actions of a "computer" (human being) as follows:
+:"...two concepts are involved: that of a ''symbol space'' in which the work leading from problem to answer is to be carried out, and a fixed unalterable ''set of directions''.
+
+His symbol space would be
+:"a two-way infinite sequence of spaces or boxes... The problem solver or worker is to move and work in this symbol space, being capable of being in, and operating in but one box at a time.... a box is to admit of but two possible conditions, i.e., being empty or unmarked, and having a single mark in it, say a vertical stroke.
+
+:"One box is to be singled out and called the starting point. ...a specific problem is to be given in symbolic form by a finite number of boxes [i.e., INPUT] being marked with a stroke. Likewise, the answer [i.e., OUTPUT] is to be given in symbolic form by such a configuration of marked boxes...
+
+:"A set of directions applicable to a general problem sets up a deterministic process when applied to each specific problem. This process terminates only when it comes to the direction of type (C ) [i.e., STOP]".<ref>Turing 1936–37 in Davis 1965:289–290</ref> See more at [[Post–Turing machine]]
+[[File:Alan Turing.jpg|thumb|200px|Alan Turing's statue at [[Bletchley Park]]]]
+[[Alan Turing]]'s work<ref>Turing 1936 in Davis 1965, Turing 1939 in Davis 1965:160</ref> preceded that of Stibitz (1937); it is unknown whether Stibitz knew of the work of Turing. Turing's biographer believed that Turing's use of a typewriter-like model derived from a youthful interest: "Alan had dreamt of inventing typewriters as a boy; Mrs. Turing had a typewriter, and he could well have begun by asking himself what was meant by calling a typewriter 'mechanical'".<ref>Hodges, p.&nbsp;96</ref> Given the prevalence at the time of Morse code, telegraphy, ticker tape machines, and teletypewriters, it is quite possible that all were influences on Turing during his youth.
+
+Turing—his model of computation is now called a [[Turing machine]]—begins, as did Post, with an analysis of a human computer that he whittles down to a simple set of basic motions and "states of mind". But he continues a step further and creates a machine as a model of computation of numbers.<ref>Turing 1936–37:116</ref>
+
+:"Computing is normally done by writing certain symbols on paper. We may suppose this paper is divided into squares like a child's arithmetic book...I assume then that the computation is carried out on one-dimensional paper, i.e., on a tape divided into squares. I shall also suppose that the number of symbols which may be printed is finite...
+
+:"The behavior of the computer at any moment is determined by the symbols which he is observing, and his "state of mind" at that moment. We may suppose that there is a bound B to the number of symbols or squares that the computer can observe at one moment. If he wishes to observe more, he must use successive observations. We will also suppose that the number of states of mind which need be taken into account is finite...
+
+:"Let us imagine that the operations performed by the computer to be split up into 'simple operations' which are so elementary that it is not easy to imagine them further divided."<ref name="Turing 1936–37 in Davis 1965:136">Turing 1936–37 in Davis 1965:136</ref>
+
+Turing's reduction yields the following:
+:"The simple operations must therefore include:
+::"(a) Changes of the symbol on one of the observed squares
+::"(b) Changes of one of the squares observed to another square within L squares of one of the previously observed squares.
+"It may be that some of these change necessarily invoke a change of state of mind. The most general single operation must, therefore, be taken to be one of the following:
+::"(A) A possible change (a) of symbol together with a possible change of state of mind.
+::"(B) A possible change (b) of observed squares, together with a possible change of state of mind"
+
+:"We may now construct a machine to do the work of this computer."<ref name="Turing 1936–37 in Davis 1965:136"/>
+
+A few years later, Turing expanded his analysis (thesis, definition) with this forceful expression of it:
+:"A function is said to be "effectively calculable" if its values can be found by some purely mechanical process. Though it is fairly easy to get an intuitive grasp of this idea, it is nevertheless desirable to have some more definite, mathematical expressible definition ... [he discusses the history of the definition pretty much as presented above with respect to Gödel, Herbrand, Kleene, Church, Turing, and Post] ... We may take this statement literally, understanding by a purely mechanical process one which could be carried out by a machine. It is possible to give a mathematical description, in a certain normal form, of the structures of these machines. The development of these ideas leads to the author's definition of a computable function, and to an identification of computability † with effective calculability...
+::"† We shall use the expression "computable function" to mean a function calculable by a machine, and we let "effectively calculable" refer to the intuitive idea without particular identification with any one of these definitions".<ref>Turing 1939 in Davis 1965:160</ref>
+
+=== J.B. Rosser (1939) and S.C. Kleene (1943) ===
+[[J. Barkley Rosser]] defined an 'effective [mathematical] method' in the following manner (italicization added):
+:"'Effective method' is used here in the rather special sense of a method each step of which is precisely determined and which is certain to produce the answer in a finite number of steps. With this special meaning, three different precise definitions have been given to date. [his footnote #5; see discussion immediately below]. The simplest of these to state (due to Post and Turing) says essentially that ''an effective method of solving certain sets of problems exists if one can build a machine which will then solve any problem of the set with no human intervention beyond inserting the question and (later) reading the answer''. All three definitions are equivalent, so it doesn't matter which one is used. Moreover, the fact that all three are equivalent is a very strong argument for the correctness of any one." (Rosser 1939:225–226)
+
+Rosser's footnote No. 5 references the work of (1) Church and Kleene and their definition of λ-definability, in particular, Church's use of it in his ''An Unsolvable Problem of Elementary Number Theory'' (1936); (2) Herbrand and Gödel and their use of recursion, in particular, Gödel's use in his famous paper ''On Formally Undecidable Propositions of Principia Mathematica and Related Systems I'' (1931); and (3) Post (1936) and Turing (1936–37) in their mechanism-models of computation.
+
+[[Stephen C. Kleene]] defined as his now-famous "Thesis I" known as the [[Church–Turing thesis]]. But he did this in the following context (boldface in original):
+:"12. ''Algorithmic theories''... In setting up a complete algorithmic theory, what we do is to describe a procedure, performable for each set of values of the independent variables, which procedure necessarily terminates and in such manner that from the outcome we can read a definite answer, "yes" or "no," to the question, "is the predicate value true?"" (Kleene 1943:273)
+
+=== History after 1950 ===
+A number of efforts have been directed toward further refinement of the definition of "algorithm", and activity is on-going because of issues surrounding, in particular, [[foundations of mathematics]] (especially the [[Church–Turing thesis]]) and [[philosophy of mind]] (especially arguments about [[artificial intelligence]]). For more, see [[Algorithm characterizations]].
+
+== See also ==
+{{div col|colwidth=22em}}
+* [[Abstract machine]]
+* [[Algorithm engineering]]
+* [[Algorithm characterizations]]
+* [[Algorithmic bias]]
+* [[Algorithmic composition]]
+* [[Algorithmic entities]]
+* [[Algorithmic synthesis]]
+* [[Algorithmic technique]]
+* [[Algorithmic topology]]
+* [[Garbage in, garbage out]]
+* ''[[Introduction to Algorithms]]'' (textbook)
+* [[Government by algorithm]]
+* [[List of algorithms]]
+* [[List of algorithm general topics]]
+* [[List of important publications in theoretical computer science#Algorithms|List of important publications in theoretical computer science – Algorithms]]
+* [[Regulation of algorithms]]
+* [[Theory of computation]]
+** [[Computability theory]]
+** [[Computational complexity theory]]
+* [[Computational mathematics]]
+{{div col end}}
+
+==Notes==
+{{Reflist}}
+
+==Bibliography==
+{{refbegin|30em}}
+* {{cite journal | last1 = Axt | first1 = P | year = 1959 | title = On a Subrecursive Hierarchy and Primitive Recursive Degrees | journal = Transactions of the American Mathematical Society | volume = 92 | issue = 1| pages = 85–105 | doi=10.2307/1993169| jstor = 1993169 | doi-access = free}}
+* Bell, C. Gordon and Newell, Allen (1971), ''Computer Structures: Readings and Examples'', McGraw–Hill Book Company, New York. {{ISBN|0-07-004357-4}}.
+* {{Cite journal|author1-link=Andreas Blass|first1=Andreas|last1=Blass|author2-link=Yuri Gurevich|first2=Yuri|last2=Gurevich|year=2003|url=http://research.microsoft.com/~gurevich/Opera/164.pdf|title=Algorithms: A Quest for Absolute Definitions|journal= Bulletin of European Association for Theoretical Computer Science|volume= 81}} Includes an excellent bibliography of 56 references.
+* {{cite book| last = Bolter| first = David J.| title = Turing's Man: Western Culture in the Computer Age| edition = 1984| year = 1984| publisher = The University of North Carolina Press|location= Chapel Hill, NC| isbn = 978-0-8078-1564-9 }}, {{ISBN|0-8078-4108-0}}
+* {{cite book| last1 = Boolos| first1 = George| last2 = Jeffrey| first2 = Richard| title = Computability and Logic| url = https://archive.org/details/computabilitylog0000bool_r8y9| url-access = registration| edition = 4th| orig-year = 1974| year = 1999| publisher = Cambridge University Press, London| isbn = 978-0-521-20402-6| author1-link = George Boolos| author2-link = Richard Jeffrey }}: cf. Chapter 3 ''Turing machines'' where they discuss "certain enumerable sets not effectively (mechanically) enumerable".
+* {{cite book| last = Burgin| first = Mark| title = Super-Recursive Algorithms| year = 2004| publisher = Springer| isbn = 978-0-387-95569-8 }}
+* Campagnolo, M.L., [[Cris Moore|Moore, C.]], and Costa, J.F. (2000) An analog characterization of the subrecursive functions. In ''Proc. of the 4th Conference on Real Numbers and Computers'', Odense University, pp.&nbsp;91–109
+* {{Cite journal|last=Church|first=Alonzo|author-link=Alonzo Church|title=An Unsolvable Problem of Elementary Number Theory|journal=The American Journal of Mathematics|volume=58|pages= 345–363|year=1936|doi=10.2307/2371045|issue=2|jstor=2371045}} Reprinted in ''The Undecidable'', p.&nbsp;89ff. The first expression of "Church's Thesis". See in particular page 100 (''The Undecidable'') where he defines the notion of "effective calculability" in terms of "an algorithm", and he uses the word "terminates", etc.
+* {{Cite journal|last=Church|first=Alonzo|author-link=Alonzo Church|title=A Note on the Entscheidungsproblem|journal=The Journal of Symbolic Logic|volume=1|year=1936|pages=40–41|doi=10.2307/2269326|issue=1|jstor=2269326}} {{cite journal|last=Church|first=Alonzo|title=Correction to a Note on the Entscheidungsproblem|journal=The Journal of Symbolic Logic|volume=1|year=1936|pages=101–102|doi=10.2307/2269030|issue=3|jstor=2269030}} Reprinted in ''The Undecidable'', p.&nbsp;110ff. Church shows that the Entscheidungsproblem is unsolvable in about 3 pages of text and 3 pages of footnotes.
+* {{cite book| last = Daffa'| first = Ali Abdullah al-| title = The Muslim contribution to mathematics| year = 1977| publisher = Croom Helm| location = London| isbn = 978-0-85664-464-1 }}
+* {{cite book| last = Davis| first = Martin| author-link = Martin Davis (mathematician)| title = The Undecidable: Basic Papers On Undecidable Propositions, Unsolvable Problems and Computable Functions| url = https://archive.org/details/undecidablebasic0000davi| url-access = registration| year = 1965| publisher = Raven Press| location = New York| isbn = 978-0-486-43228-1 }} Davis gives commentary before each article. Papers of [[Gödel]], [[Alonzo Church]], [[Alan Turing|Turing]], [[J. Barkley Rosser|Rosser]], [[Kleene]], and [[Emil Post]] are included; those cited in the article are listed here by author's name.
+* {{cite book| last = Davis| first = Martin| author-link = Martin Davis (mathematician)| title = Engines of Logic: Mathematicians and the Origin of the Computer| year = 2000| publisher = W.W. Nortion| location = New York| isbn = 978-0-393-32229-3 }} Davis offers concise biographies of [[Gottfried Leibniz|Leibniz]], [[George Boole|Boole]], [[Gottlob Frege|Frege]], [[Georg Cantor|Cantor]], [[David Hilbert|Hilbert]], Gödel and Turing with [[John von Neumann|von Neumann]] as the show-stealing villain. Very brief bios of [[Joseph-Marie Jacquard]], [[Babbage]], [[Ada Lovelace]], [[Claude Shannon]], [[Howard Aiken]], etc.
+* {{DADS|algorithm|algorithm}}
+* {{cite journal|title= Evolution and moral diversity |author=Dean, Tim |journal=Baltic International Yearbook of Cognition, Logic and Communication|year=2012|volume=7|doi=10.4148/biyclc.v7i0.1775 |doi-access=free}}
+* {{cite book| last = Dennett| first = Daniel| author-link = Daniel Dennett| title = Darwin's Dangerous Idea| journal = Complexity| volume = 2| issue = 1| pages = [https://archive.org/details/darwinsdangerous0000denn/page/32 32]–36| year = 1995| publisher = Touchstone/Simon & Schuster| location = New York| isbn = 978-0-684-80290-9| bibcode = 1996Cmplx...2a..32M| doi = 10.1002/(SICI)1099-0526(199609/10)2:1<32::AID-CPLX8>3.0.CO;2-H| url = https://archive.org/details/darwinsdangerous0000denn| url-access = registration}}
+* {{cite book| last = Dilson| first = Jesse| title = The Abacus| edition = (1968, 1994)| year = 2007| publisher = St. Martin's Press, NY| isbn = 978-0-312-10409-2| url = https://archive.org/details/abacusworldsfirs0000dils}}, {{ISBN|0-312-10409-X}}
+* [[Yuri Gurevich]], [http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.146.3017&rep=rep1&type=pdf ''Sequential Abstract State Machines Capture Sequential Algorithms''], ACM Transactions on Computational Logic, Vol 1, no 1 (July 2000), pp.&nbsp;77–111. Includes bibliography of 33 sources.
+* {{cite book| last = van Heijenoort| first = Jean| author-link = Jean van Heijenoort| title = From Frege to Gödel, A Source Book in Mathematical Logic, 1879–1931| edition = (1967)| year = 2001| publisher = Harvard University Press, Cambridge| isbn = 978-0-674-32449-7 }}, 3rd edition 1976[?], {{ISBN|0-674-32449-8}} (pbk.)
+* {{cite book| last = Hodges| first = Andrew| author-link = Andrew Hodges| title = Alan Turing: The Enigma| journal = Physics Today| volume = 37| issue = 11| pages = 107–108| year = 1983| publisher = [[Simon and Schuster]]| location = New York| isbn = 978-0-671-49207-6| title-link = Alan Turing: The Enigma| bibcode = 1984PhT....37k.107H| doi = 10.1063/1.2915935}}, {{ISBN|0-671-49207-1}}. Cf. Chapter "The Spirit of Truth" for a history leading to, and a discussion of, his proof.
+* {{Cite journal|last=Kleene|first=Stephen C.|author-link=Stephen Kleene|title=General Recursive Functions of Natural Numbers|journal=Mathematische Annalen|volume=112|pages=727–742|url=http://gdz.sub.uni-goettingen.de/index.php?id=11&PPN=GDZPPN002278499&L=1|year=1936|doi=10.1007/BF01565439|issue=5|s2cid=120517999|access-date=September 30, 2013|archive-url=https://web.archive.org/web/20140903092121/http://gdz.sub.uni-goettingen.de/index.php?id=11&PPN=GDZPPN002278499&L=1|archive-date=September 3, 2014|url-status=dead}} Presented to the American Mathematical Society, September 1935. Reprinted in ''The Undecidable'', p.&nbsp;237ff. Kleene's definition of "general recursion" (known now as mu-recursion) was used by Church in his 1935 paper ''An Unsolvable Problem of Elementary Number Theory'' that proved the "decision problem" to be "undecidable" (i.e., a negative result).
+* {{Cite journal|last=Kleene|first=Stephen C.|author-link=Stephen Kleene |title= Recursive Predicates and Quantifiers|journal= Transactions of the American Mathematical Society|volume=53|pages=41–73|year=1943 |doi= 10.2307/1990131|issue=1|jstor=1990131|doi-access=free}} Reprinted in ''The Undecidable'', p.&nbsp;255ff. Kleene refined his definition of "general recursion" and proceeded in his chapter "12. Algorithmic theories" to posit "Thesis I" (p.&nbsp;274); he would later repeat this thesis (in Kleene 1952:300) and name it "Church's Thesis"(Kleene 1952:317) (i.e., the [[Church thesis]]).
+* {{cite book| last = Kleene| first = Stephen C.| author-link = Kleene| title = Introduction to Metamathematics| edition = Tenth|year= 1991| orig-year = 1952| publisher = North-Holland Publishing Company| isbn = 978-0-7204-2103-3 }}
+* {{cite book| last = Knuth| first = Donald| author-link = Donald Knuth| title = Fundamental Algorithms, Third Edition| year = 1997| publisher = Addison–Wesley| location = Reading, Massachusetts| isbn = 978-0-201-89683-1 }}
+* {{Cite book|last=Knuth|first=Donald|author-link=Donald Knuth|title=Volume 2/Seminumerical Algorithms, The Art of Computer Programming First Edition|publisher=Addison–Wesley|location=Reading, Massachusetts|year=1969}}
+* Kosovsky, N.K. ''Elements of Mathematical Logic and its Application to the theory of Subrecursive Algorithms'', LSU Publ., Leningrad, 1981
+* {{Cite journal|last=Kowalski|first=Robert|author-link=Robert Kowalski|title=Algorithm=Logic+Control|journal=[[Communications of the ACM]]|volume=22|issue=7|pages=424–436|year=1979|doi=10.1145/359131.359136|s2cid=2509896}}
+* [[A.A. Markov]] (1954) ''Theory of algorithms''. [Translated by Jacques J. Schorr-Kon and PST staff] Imprint Moscow, Academy of Sciences of the USSR, 1954 [i.e., Jerusalem, Israel Program for Scientific Translations, 1961; available from the Office of Technical Services, U.S. Dept. of Commerce, Washington] Description 444 p.&nbsp;28&nbsp;cm. Added t.p. in Russian Translation of Works of the Mathematical Institute, Academy of Sciences of the USSR, v.&nbsp;42. Original title: Teoriya algerifmov. [QA248.M2943 Dartmouth College library. U.S. Dept. of Commerce, Office of Technical Services, number OTS {{not a typo|60-51085}}.]
+* {{cite book| last = Minsky| first = Marvin| author-link = Marvin Minsky| title = Computation: Finite and Infinite Machines| url = https://archive.org/details/computationfinit0000mins| url-access = registration| edition = First| year = 1967| publisher = Prentice-Hall, Englewood Cliffs, NJ| isbn = 978-0-13-165449-5 }} Minsky expands his "...idea of an algorithm – an effective procedure..." in chapter 5.1 ''Computability, Effective Procedures and Algorithms. Infinite machines.''
+* {{Cite journal|last=Post|first=Emil|author-link=Emil Post|title=Finite Combinatory Processes, Formulation I |journal=The Journal of Symbolic Logic |volume=1 |year=1936 |pages=103–105 |doi=10.2307/2269031 |issue=3 |jstor=2269031}} Reprinted in ''The Undecidable'', pp.&nbsp;289ff. Post defines a simple algorithmic-like process of a man writing marks or erasing marks and going from box to box and eventually halting, as he follows a list of simple instructions. This is cited by Kleene as one source of his "Thesis I", the so-called [[Church–Turing thesis]].
+* {{Cite book|last=Rogers, Jr|first=Hartley|title=Theory of Recursive Functions and Effective Computability|publisher=The MIT Press|year=1987|isbn=978-0-262-68052-3}}
+* {{Cite journal|last=Rosser|first=J.B.|author-link=J. B. Rosser|title=An Informal Exposition of Proofs of Godel's Theorem and Church's Theorem|journal=Journal of Symbolic Logic|volume= 4 |issue=2|year=1939|doi=10.2307/2269059|pages=53–60|jstor=2269059}} Reprinted in ''The Undecidable'', p.&nbsp;223ff. Herein is Rosser's famous definition of "effective method": "...a method each step of which is precisely predetermined and which is certain to produce the answer in a finite number of steps... a machine which will then solve any problem of the set with no human intervention beyond inserting the question and (later) reading the answer" (p.&nbsp;225–226, ''The Undecidable'')
+* {{cite book |last=Santos-Lang |first=Christopher | year=2014 |editor1-first=Simon |editor1-last=van Rysewyk |editor2-first=Matthijs |editor2-last=Pontier |title=Machine Medical Ethics |volume=74 |publisher=Springer | location=Switzerland | pages=111–127 | chapter=Moral Ecology Approaches to Machine Ethics| chapter-url=http://grinfree.com/MoralEcology.pdf | doi=10.1007/978-3-319-08108-3_8|series=Intelligent Systems, Control and Automation: Science and Engineering |isbn=978-3-319-08107-6 }}
+* {{Cite book|last=Scott|first=Michael L.|title=Programming Language Pragmatics |edition=3rd |publisher=Morgan Kaufmann Publishers/Elsevier|year=2009|isbn=978-0-12-374514-9}}
+* {{cite book| last = Sipser| first = Michael| title = Introduction to the Theory of Computation| year = 2006| publisher = PWS Publishing Company| isbn = 978-0-534-94728-6| url = https://archive.org/details/introductiontoth00sips}}
+* {{cite book |last1=Sober |first1=Elliott |last2=Wilson |first2=David Sloan |year=1998 |title=Unto Others: The Evolution and Psychology of Unselfish Behavior |url=https://archive.org/details/untoothersevolut00sobe |url-access=registration |location=Cambridge |publisher=Harvard University Press|isbn=9780674930469 }}
+* {{Cite book|last=Stone|first=Harold S.|title=Introduction to Computer Organization and Data Structures|edition=1972|publisher=McGraw-Hill, New York|isbn=978-0-07-061726-1|year=1972}} Cf. in particular the first chapter titled: ''Algorithms, Turing Machines, and Programs''. His succinct informal definition: "...any sequence of instructions that can be obeyed by a robot, is called an ''algorithm''" (p.&nbsp;4).
+* {{cite book| last = Tausworthe| first = Robert C| title = Standardized Development of Computer Software Part 1 Methods| year = 1977| publisher = Prentice–Hall, Inc.| location = Englewood Cliffs NJ| isbn = 978-0-13-842195-3 }}
+* {{Cite journal|last=Turing|first=Alan M.|author-link=A. M. Turing|title=On Computable Numbers, With An Application to the Entscheidungsproblem|journal=[[Proceedings of the London Mathematical Society]]|series=Series 2|volume=42|pages= 230–265 |year=1936–37|doi=10.1112/plms/s2-42.1.230 |s2cid=73712 }}. Corrections, ibid, vol. 43(1937) pp.&nbsp;544–546. Reprinted in ''The Undecidable'', p.&nbsp;116ff. Turing's famous paper completed as a Master's dissertation while at King's College Cambridge UK.
+* {{Cite journal|last=Turing|first=Alan M.|author-link=A. M. Turing|title=Systems of Logic Based on Ordinals|journal=Proceedings of the London Mathematical Society|volume=45|pages=161–228|year=1939|doi=10.1112/plms/s2-45.1.161|hdl=21.11116/0000-0001-91CE-3|hdl-access=free}} Reprinted in ''The Undecidable'', pp.&nbsp;155ff. Turing's paper that defined "the oracle" was his PhD thesis while at Princeton.
+* [[United States Patent and Trademark Office]] (2006), [http://www.uspto.gov/web/offices/pac/mpep/documents/2100_2106_02.htm ''2106.02 **>Mathematical Algorithms: 2100 Patentability''], Manual of Patent Examining Procedure (MPEP). Latest revision August 2006
+{{refend|30em}}
+
+==Further reading==
+{{refbegin}}
+* {{cite book |last=Bellah |first=Robert Neelly |year=1985 |author-link=Robert N. Bellah |title=Habits of the Heart: Individualism and Commitment in American Life |location=Berkeley |isbn=978-0-520-25419-0 |publisher=University of California Press |url=https://books.google.com/books?id=XsUojihVZQcC }}
+* {{cite book |last=Berlinski |first=David |title=The Advent of the Algorithm: The 300-Year Journey from an Idea to the Computer |year=2001 |publisher=Harvest Books |isbn=978-0-15-601391-8 |url=https://archive.org/details/adventofalgorith0000berl }}
+* {{cite book |last=Chabert |first=Jean-Luc |title=A History of Algorithms: From the Pebble to the Microchip |year=1999 |publisher=Springer Verlag |isbn=978-3-540-63369-3}}
+* {{cite book |author1=Thomas H. Cormen |author2=Charles E. Leiserson |author3=Ronald L. Rivest |author4=Clifford Stein |title=Introduction To Algorithms |edition=3rd |year=2009 |publisher=MIT Press |isbn=978-0-262-03384-8}}
+* {{cite book |author=Harel, David |author2=Feldman, Yishai |title=Algorithmics: The Spirit of Computing |year=2004 |publisher=Addison-Wesley |isbn=978-0-321-11784-7}}
+* {{cite book |last1=Hertzke |first1=Allen D. |last2=McRorie |first2=Chris |year=1998 |editor1-last=Lawler |editor1-first=Peter Augustine |editor2-last=McConkey |editor2-first=Dale |chapter=The Concept of Moral Ecology |title=Community and Political Thought Today |location=Westport, CT |publisher=[[Praeger Publishers|Praeger]] }}
+* [[Donald Knuth|Knuth, Donald E.]] (2000). ''[http://www-cs-faculty.stanford.edu/~uno/aa.html Selected Papers on Analysis of Algorithms]''. Stanford, California: Center for the Study of Language and Information.
+* Knuth, Donald E. (2010). ''[http://www-cs-faculty.stanford.edu/~uno/da.html Selected Papers on Design of Algorithms]''. Stanford, California: Center for the Study of Language and Information.
+* {{Cite book |first1=Wendell |last1=Wallach |first2=Colin |last2=Allen |date=November 2008 |title=Moral Machines: Teaching Robots Right from Wrong |isbn=978-0-19-537404-9 |publisher=Oxford University Press |location=US }}
+* {{cite book |author=Bleakley, Chris |title=Poems that Solve Puzzles: The History and Science of Algorithms |year=2020 |publisher=Oxford University Press |isbn=978-0-19-885373-2 |url=https://books.google.com/books?id=3pr5DwAAQBAJ}}
+{{refend}}
+
+==External links==
+{{wiktionary}}
+{{wikibooks|Algorithms}}
+{{WVD}}
+{{Commons category|Algorithms}}
+* {{springer|title=Algorithm|id=p/a011780}}
+* {{curlie|Computers/Algorithms/|Algorithms}}
+* {{MathWorld | urlname=Algorithm | title=Algorithm}}
+* [https://www.nist.gov/dads/ Dictionary of Algorithms and Data Structures] – [[National Institute of Standards and Technology]]
+; Algorithm repositories
+* [http://www.cs.sunysb.edu/~algorith/ The Stony Brook Algorithm Repository] – [[State University of New York at Stony Brook]]
+* [http://calgo.acm.org/ Collected Algorithms of the ACM] – [[Association for Computing Machinery]]
+* [http://www-cs-staff.stanford.edu/~knuth/sgb.html The Stanford GraphBase] – [[Stanford University]]
+
+{{Industrial and applied mathematics}}
+{{Authority control}}
+
+[[Category:Algorithms| ]]
+[[Category:Articles with example pseudocode]]
+[[Category:Mathematical logic]]
+[[Category:Theoretical computer science]]
+[[Category:Disambiguation]]

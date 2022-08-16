@@ -77,12 +77,19 @@ impl<'de> de::Deserialize<'de> for Image {
     }
 }
 
-struct ImageStore {
+pub trait ImageStore<K: Serialize> {
+    fn insert(&mut self, key: K, image: Image);
+    fn get(&self, key: &K) -> Option<Image>;
+    fn merge(&mut self, other: Self);
+    fn flush(&self);
+}
+
+struct BaseImageStore {
     store: Box<dyn Kv<String, Image>>,
     filters: Vec<Box<dyn ImageFilter>>,
 }
 
-impl ImageStore {
+impl BaseImageStore {
     #[cfg(test)]
     fn open<P: AsRef<Path>>(path: P) -> Self {
         Self::open_with_filters(path, Vec::new())
@@ -94,25 +101,29 @@ impl ImageStore {
         Self { store, filters }
     }
 
-    fn insert(&mut self, key: &str, mut image: Image) {
+    fn insert(&mut self, key: String, mut image: Image) {
         for filter in &self.filters {
             image = filter.transform(image);
         }
 
-        self.store.insert(key.to_string(), image)
+        self.store.insert(key, image)
     }
 
-    fn contains(&self, key: &str) -> bool {
-        self.store.get(&key.to_string()).is_some()
+    fn flush(&self) {
+        self.store.flush();
     }
 
-    fn get(&self, key: &str) -> Option<Image> {
-        self.store.get(&key.to_string())
+    fn contains(&self, key: &String) -> bool {
+        self.store.get(key).is_some()
     }
 
-    fn merge(&mut self, other: ImageStore) {
+    fn get(&self, key: &String) -> Option<Image> {
+        self.store.get(key)
+    }
+
+    fn merge(&mut self, other: BaseImageStore) {
         for (key, image) in other.store.iter() {
-            self.insert(&key, image);
+            self.insert(key, image);
         }
     }
 }
@@ -136,11 +147,11 @@ impl ImageFilter for ResizeFilter {
     }
 }
 
-pub struct FaviconStore(ImageStore);
+pub struct FaviconStore(BaseImageStore);
 
 impl FaviconStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let store = ImageStore::open_with_filters(
+        let store = BaseImageStore::open_with_filters(
             path,
             vec![Box::new(ResizeFilter {
                 width: FAVICON_SIZE,
@@ -151,31 +162,37 @@ impl FaviconStore {
         Self(store)
     }
 
-    pub fn insert(&mut self, key: &str, image: Image) {
+    pub fn contains(&self, key: &String) -> bool {
+        self.0.contains(key)
+    }
+}
+
+impl ImageStore<String> for FaviconStore {
+    fn insert(&mut self, key: String, image: Image) {
         self.0.insert(key, image)
     }
 
-    pub fn contains(&self, key: &str) -> bool {
-        self.0.contains(key)
-    }
-
-    pub fn get(&self, key: &str) -> Option<Image> {
+    fn get(&self, key: &String) -> Option<Image> {
         self.0.get(key)
     }
 
-    pub fn merge(&mut self, other: Self) {
+    fn merge(&mut self, other: Self) {
         self.0.merge(other.0)
+    }
+
+    fn flush(&self) {
+        self.0.flush()
     }
 }
 
 pub struct PrimaryImageStore {
-    store: ImageStore,
+    store: BaseImageStore,
     promised_uuids: HashSet<Uuid>,
 }
 
 impl PrimaryImageStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let store = ImageStore::open_with_filters(
+        let store = BaseImageStore::open_with_filters(
             path,
             vec![Box::new(ResizeFilter {
                 width: 200,
@@ -187,19 +204,6 @@ impl PrimaryImageStore {
             store,
             promised_uuids: HashSet::new(),
         }
-    }
-
-    pub fn insert(&mut self, uuid: Uuid, image: Image) {
-        self.promised_uuids.remove(&uuid);
-        self.store.insert(&uuid.to_string(), image);
-    }
-
-    pub fn get(&self, uuid: &Uuid) -> Option<Image> {
-        self.store.get(uuid.to_string().as_str())
-    }
-
-    pub fn merge(&mut self, other: Self) {
-        self.store.merge(other.store)
     }
 
     pub fn generate_uuid(&mut self) -> Uuid {
@@ -215,9 +219,75 @@ impl PrimaryImageStore {
     }
 }
 
+impl ImageStore<Uuid> for PrimaryImageStore {
+    fn insert(&mut self, uuid: Uuid, image: Image) {
+        self.promised_uuids.remove(&uuid);
+        self.store.insert(uuid.to_string(), image);
+    }
+
+    fn get(&self, uuid: &Uuid) -> Option<Image> {
+        self.store.get(&uuid.to_string())
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.store.merge(other.store)
+    }
+
+    fn flush(&self) {
+        self.store.flush()
+    }
+}
+
+pub struct EntityImageStore {
+    store: BaseImageStore,
+}
+
+impl EntityImageStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let store = BaseImageStore::open_with_filters(
+            path,
+            vec![Box::new(ResizeFilter {
+                width: 200,
+                height: 200,
+            })],
+        );
+
+        Self { store }
+    }
+}
+
+impl ImageStore<String> for EntityImageStore {
+    fn insert(&mut self, entity_name: String, image: Image) {
+        self.store.insert(entity_name, image);
+    }
+
+    fn get(&self, entity_name: &String) -> Option<Image> {
+        self.store.get(entity_name)
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.store.merge(other.store)
+    }
+
+    fn flush(&self) {
+        self.store.flush()
+    }
+}
+
 impl Image {
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Image> {
-        Ok(Self(image::load_from_memory(&bytes)?))
+        if let Ok(img) = image::load_from_memory(&bytes) {
+            Ok(Self(img))
+        } else if let Ok(img) =
+            image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        {
+            Ok(Self(img))
+        } else {
+            Ok(Self(image::load_from_memory_with_format(
+                &bytes,
+                image::ImageFormat::Png,
+            )?))
+        }
     }
 
     pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {
@@ -257,14 +327,14 @@ mod tests {
         let image = Image(
             ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
         );
-        let key = "test";
-        let mut store = ImageStore::open(crate::gen_temp_path());
+        let key = "test".to_string();
+        let mut store = BaseImageStore::open(crate::gen_temp_path());
 
-        assert!(!store.contains(key));
-        assert_eq!(store.get(key), None);
-        store.insert(key, image.clone());
-        assert!(store.contains(key));
-        assert_eq!(store.get(key), Some(image));
+        assert!(!store.contains(&key));
+        assert_eq!(store.get(&key), None);
+        store.insert(key.clone(), image.clone());
+        assert!(store.contains(&key));
+        assert_eq!(store.get(&key), Some(image));
     }
 
     #[test]
@@ -301,14 +371,14 @@ mod tests {
 
         let mut store = FaviconStore::open(crate::gen_temp_path());
 
-        let key = "test";
+        let key = "test".to_string();
 
-        assert!(!store.contains(key));
-        assert_eq!(store.get(key), None);
-        store.insert(key, image);
-        assert!(store.contains(key));
+        assert!(!store.contains(&key));
+        assert_eq!(store.get(&key), None);
+        store.insert(key.clone(), image);
+        assert!(store.contains(&key));
 
-        let retrieved_image = store.get(key).unwrap();
+        let retrieved_image = store.get(&key).unwrap();
         assert_eq!(retrieved_image.0.width(), FAVICON_SIZE);
         assert_eq!(retrieved_image.0.height(), FAVICON_SIZE);
     }

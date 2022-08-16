@@ -356,9 +356,9 @@ Survey in 2016, 2017, and 2018."#;
 
         let result = searcher.search("rust language").expect("Search failed");
 
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is...".to_string());
+        assert_eq!(result.webpages.num_docs, 1);
+        assert_eq!(result.webpages.documents.len(), 1);
+        assert_eq!(result.webpages.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is...".to_string());
     }
 
     #[test]
@@ -392,9 +392,9 @@ Survey in 2016, 2017, and 2018."#;
 
         let result = searcher.search("describe").expect("Search failed");
 
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is...".to_string());
+        assert_eq!(result.webpages.num_docs, 1);
+        assert_eq!(result.webpages.documents.len(), 1);
+        assert_eq!(result.webpages.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is...".to_string());
     }
 
     #[test]

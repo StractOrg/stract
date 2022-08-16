@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "searchbar.html" as scope %}
+{% import "entity.html" as entity_scope %}
 
 {% block content %}
 
@@ -13,41 +14,53 @@
         {% call scope::searchbar("", query) %}
     </div>
 
-    <div class="search-result flex flex-col space-y-3 pt-8 pb-8 pl-40">
-        {% for item in search_result %}
-        <div class="flex max-w-2xl p-3 h-36">
-            <div class="flex flex-col">
-                <div class="text-sm mb-1 flex">
-                    <div class="flex items-center mr-2">
-                        <img src="/favicons/{{ item.domain }}" width="13px" />
+    <div class="flex pt-8">
+        <div class="search-result flex flex-col space-y-3 pb-8 pl-40">
+            {% for item in search_result %}
+            <div class="flex max-w-3xl w-full p-3 h-36">
+                <div class="flex flex-col w-full">
+                    <div class="text-sm mb-1 flex">
+                        <div class="flex items-center mr-2">
+                            <img src="/favicons/{{ item.domain }}" width="13px" />
+                        </div>
+                        <div>
+                            <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+                        </div>
                     </div>
-                    <div>
-                        <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url }}</a>
+                    <div class="text-lg font-medium mb-1">
+                        <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
+                    </div>
+                    <div class="text-sm">
+                        {% match item.last_updated %}
+                        {% when Some with (val) %}
+                        <span class="text-gray-500">
+                            {{ val }}
+                        </span> —
+                        {% when None %}
+                        {% endmatch %}
+                        {{ item.snippet }}
                     </div>
                 </div>
-                <div class="text-lg font-medium mb-1">
-                    <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
-                </div>
-                <div class="text-sm">
-                    {% match item.last_updated %}
-                    {% when Some with (val) %}
-                    <span class="text-gray-500">
-                        {{ val }}
-                    </span> —
-                    {% when None %}
-                    {% endmatch %}
-                    {{ item.snippet }}
+                <div class="flex h-full items-center">
+                    <div class="h-20 w-20 pl-2 pt-1 pb-1">
+                        {% match item.primary_image_uuid %}
+                        {% when Some with (val) %}
+                        <a href="{{ item.url }}">
+                            <img class="h-full w-full object-cover rounded-full" src="/image/{{ val }}" />
+                        </a>
+                        {% when None %}
+                        {% endmatch %}
+                    </div>
                 </div>
             </div>
-            {% match item.primary_image_uuid %}
-            {% when Some with (val) %}
-            <div class="aspect-square pl-3 h-full max-h-full">
-                <img class="max-h-full h-full w-full object-cover rounded-full" src="/image/{{ val }}" />
-            </div>
-            {% when None %}
-            {% endmatch %}
+            {% endfor %}
         </div>
-        {% endfor %}
+
+        {% match entity %}
+        {% when Some with (entity) %}
+        {% call entity_scope::show_entity(entity) %}
+        {% when None %}
+        {% endmatch %}
     </div>
 </div>
 

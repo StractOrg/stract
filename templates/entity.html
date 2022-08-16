@@ -1,0 +1,67 @@
+{% macro show_entity(entity) %}
+<div class="flex grow justify-center pt-3">
+    <div class="max-w-md flex flex-col items-center">
+        {% match entity.image %}
+        {% when Some(image) %}
+        <div class="w-lg mb-3">
+            <a href="https://en.wikipedia.org/wiki/{{ entity.title }}">
+                <img class="h-full w-full rounded-full" src="/entity/image/{{ image }}" />
+            </a>
+        </div>
+        {% when None %}
+        {% endmatch %}
+        <div class="text-xl mb-1">
+            <a href="https://en.wikipedia.org/wiki/{{ entity.title }}">{{ entity.title }}</a>
+        </div>
+        <div class="text-sm">
+            {{ entity.small_abstract }}
+            <span class="italic">
+                source: <a class="text-blue-600" href="https://en.wikipedia.org/wiki/{{ entity.title }}">wikipedia</a>
+            </span>
+        </div>
+        {% if !entity.info.is_empty() %}
+        <div class="flex flex-col text-sm mt-5 w-full">
+            <table class="border-separate border-spacing-x-4 border-spacing-y-1.5">
+                {% for (key, value) in entity.info %}
+                <tr class="align-top">
+                    <td class="text-gray-400">
+                        {{ key }}
+                    </td>
+                    <td>
+                        {{ value }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+        {% if !entity.related_entities.is_empty() %}
+        <div class="flex flex-col mt-5 text-gray-500 w-full">
+            <div class="font-light">
+                Related Searches
+            </div>
+            <div class="flex">
+                {% for entity in entity.related_entities %}
+                <div class="flex flex-col items-center p-4">
+                    {% match entity.image %}
+                    {% when Some(image) %}
+                    <div class="h-20 w-20 mb-3">
+                        <a href="/search?q={{ entity.title }}">
+                            <img class="h-full object-cover w-full rounded-full" src="/entity/image/{{ image }}" />
+                        </a>
+                    </div>
+                    {% when None %}
+                    {% endmatch %}
+                    <div class="text-center">
+                        <a href="/search?q={{ entity.title }}">
+                            {{ entity.title }}
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

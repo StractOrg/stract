@@ -95,9 +95,9 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher.search("great site").expect("Search failed");
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.b.com");
-        assert_eq!(result.documents[1].url, "https://www.a.com");
+        assert_eq!(result.webpages.documents.len(), 2);
+        assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
+        assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
     }
 
     #[test]
@@ -167,8 +167,8 @@ mod tests {
         let searcher = Searcher::from(index);
         let result = searcher.search("dr dk").expect("Search failed");
 
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.documents[0].url, "https://www.dr.dk");
+        assert_eq!(result.webpages.documents.len(), 3);
+        assert_eq!(result.webpages.documents[0].url, "https://www.dr.dk");
     }
 
     #[test]
@@ -222,6 +222,6 @@ mod tests {
         let searcher = Searcher::from(index);
         let result = searcher.search("title").expect("Search failed");
 
-        assert_eq!(result.documents[0].url, "https://www.new.com");
+        assert_eq!(result.webpages.documents[0].url, "https://www.new.com");
     }
 }

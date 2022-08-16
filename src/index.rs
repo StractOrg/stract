@@ -15,23 +15,21 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
 use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
-use crate::image_store::{FaviconStore, Image, PrimaryImageStore};
-use crate::inverted_index::InvertedIndex;
+use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
+use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
+use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
 use crate::query::Query;
-use crate::searcher::SearchResult;
 use crate::webpage::{Url, Webpage};
 use crate::Result;
 
@@ -40,49 +38,12 @@ const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-enum ImageDownloadJob {
-    Favicon(Url),
-    PrimaryImage { key: Uuid, url: Url },
-}
-
-#[derive(Debug)]
-struct DownloadedImage {
-    image: Image,
-    key: String,
-    original_job: ImageDownloadJob,
-}
-
-impl ImageDownloadJob {
-    pub async fn download(&self) -> Option<DownloadedImage> {
-        match self {
-            ImageDownloadJob::Favicon(url) => url
-                .download_bytes(Duration::from_secs(1))
-                .await
-                .and_then(|bytes| Image::from_bytes(bytes).ok())
-                .map(|image| DownloadedImage {
-                    image,
-                    key: url.domain().to_string(),
-                    original_job: self.clone(),
-                }),
-            ImageDownloadJob::PrimaryImage { key, url } => url
-                .download_bytes(Duration::from_secs(5))
-                .await
-                .and_then(|bytes| Image::from_bytes(bytes).ok())
-                .map(|image| DownloadedImage {
-                    image,
-                    key: key.to_string(),
-                    original_job: self.clone(),
-                }),
-        }
-    }
-}
-
 pub struct Index {
     inverted_index: InvertedIndex,
     favicon_store: FaviconStore,
     primary_image_store: PrimaryImageStore,
-    image_download_jobs: HashSet<ImageDownloadJob>,
+    favicon_downloader: ImageDownloader<String>,
+    primary_image_downloader: ImageDownloader<Uuid>,
     pub path: String,
 }
 
@@ -103,8 +64,9 @@ impl Index {
             inverted_index,
             favicon_store,
             primary_image_store,
+            primary_image_downloader: ImageDownloader::new(),
+            favicon_downloader: ImageDownloader::new(),
             path: path.as_ref().to_str().unwrap().to_string(),
-            image_download_jobs: HashSet::new(),
         })
     }
 
@@ -125,7 +87,7 @@ impl Index {
         self.inverted_index.commit()
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
     where
         C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
     {
@@ -145,13 +107,20 @@ impl Index {
     }
 
     fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
-        if self.favicon_store.contains(webpage.html.domain()) {
+        if !webpage.html.is_homepage()
+            || self
+                .favicon_store
+                .contains(&webpage.html.domain().to_string())
+        {
             return;
         }
 
         if let Some(favicon) = webpage.html.favicon() {
-            self.image_download_jobs
-                .insert(ImageDownloadJob::Favicon(favicon.link));
+            self.favicon_downloader.schedule(ImageDownloadJob {
+                key: favicon.link.domain().to_string(),
+                urls: vec![favicon.link],
+                timeout: Some(Duration::from_secs(1)),
+            });
         }
     }
 
@@ -168,45 +137,16 @@ impl Index {
             let uuid = self.primary_image_store.generate_uuid();
             webpage.set_primary_image_uuid(uuid);
 
-            self.image_download_jobs
-                .insert(ImageDownloadJob::PrimaryImage { key: uuid, url });
-        }
-    }
-
-    pub fn download_pending_images(&mut self) {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async { self.download_pending_images_async().await });
-
-        self.image_download_jobs.clear();
-    }
-
-    async fn download_pending_images_async(&mut self) {
-        let results = futures::stream::iter(
-            self.image_download_jobs
-                .iter()
-                .map(|job| async move { job.download().await }),
-        )
-        .buffer_unordered(20)
-        .collect::<Vec<Option<DownloadedImage>>>()
-        .await;
-
-        for result in results.into_iter().flatten() {
-            match result.original_job {
-                ImageDownloadJob::Favicon(_) => {
-                    self.favicon_store.insert(&result.key, result.image)
-                }
-                ImageDownloadJob::PrimaryImage { key, url: _ } => {
-                    self.primary_image_store.insert(key, result.image)
-                }
-            }
+            self.primary_image_downloader.schedule(ImageDownloadJob {
+                key: uuid,
+                urls: vec![url],
+                timeout: Some(Duration::from_secs(5)),
+            });
         }
     }
 
     pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
-        self.favicon_store.get(url.domain())
+        self.favicon_store.get(&url.domain().to_string())
     }
 
     pub fn retrieve_primary_image(&self, uuid: &Uuid) -> Option<Image> {
@@ -215,6 +155,12 @@ impl Index {
 
     pub fn schema(&self) -> Arc<Schema> {
         self.inverted_index.schema()
+    }
+
+    pub(crate) fn download_pending_images(&mut self) {
+        self.favicon_downloader.download(&mut self.favicon_store);
+        self.primary_image_downloader
+            .download(&mut self.primary_image_store);
     }
 }
 

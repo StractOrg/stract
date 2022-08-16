@@ -791,7 +791,7 @@ mod tests {
     #[test]
     #[ignore = "JustText doesn't find any content on the sites. How should we split into words for Japanese, Chinese etc.?"]
     fn hard_parsing() {
-        let webpage = Html::parse(include_str!("../../testcases_parsing/yasudaya.html"), "");
+        let webpage = Html::parse(include_str!("../../testcases/parsing/yasudaya.html"), "");
         assert_eq!(
             webpage.title(),
             Some("パチンコ大当たり情報 - Ｐジューシーハニー３ 大当たり詳細ページ - やすだひばりヶ丘店".to_string())
@@ -799,7 +799,7 @@ mod tests {
         assert!(webpage.clean_text().is_some());
         assert!(!webpage.clean_text().unwrap().is_empty());
 
-        let webpage = Html::parse(include_str!("../../testcases_parsing/5390001.html"), "");
+        let webpage = Html::parse(include_str!("../../testcases/parsing/5390001.html"), "");
         assert_eq!(
             webpage.title(),
             Some("特效烟机系列_山东壹线文化传播有限公司".to_string())
@@ -808,7 +808,7 @@ mod tests {
         assert!(!webpage.clean_text().unwrap().is_empty());
 
         let webpage = Html::parse(
-            include_str!("../../testcases_parsing/77p2p-7.live-105.html"),
+            include_str!("../../testcases/parsing/77p2p-7.live-105.html"),
             "",
         );
         assert_eq!(

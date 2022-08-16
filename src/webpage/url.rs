@@ -153,4 +153,8 @@ impl Url {
             Err(_) => None,
         }
     }
+
+    pub fn raw(&self) -> &str {
+        &self.0
+    }
 }
