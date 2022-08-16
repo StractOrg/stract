@@ -115,7 +115,7 @@ impl EntityIndexer {
         EntityIterator::from(reader)
             .into_iter()
             .filter(|entity| !entity.categories.is_empty())
-            .take(100_000)
+            .take(200_000)
             .for_each(|entity| {
                 index.insert(entity);
             });

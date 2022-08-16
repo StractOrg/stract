@@ -160,7 +160,15 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &Searcher) -> Vec<(Strin
         .filter(|(key, _)| {
             !matches!(
                 key.as_str(),
-                "caption" | "image size" | "label" | "landscape" | "signature"
+                "caption"
+                    | "image size"
+                    | "label"
+                    | "landscape"
+                    | "signature"
+                    | "name"
+                    | "website"
+                    | "logo"
+                    | "image caption"
             )
         })
         .take(5)
@@ -244,6 +252,17 @@ pub async fn route(
             .webpages
             .documents
             .into_iter()
+            .map(|mut webpage| {
+                webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
+                    if state.searcher.primary_image(uuid.clone()).is_some() {
+                        Some(uuid)
+                    } else {
+                        None
+                    }
+                });
+
+                webpage
+            })
             .map(DisplayedWebpage::from)
             .collect();
 

@@ -17,8 +17,8 @@
     <div class="flex pt-8">
         <div class="search-result flex flex-col space-y-3 pb-8 pl-40">
             {% for item in search_result %}
-            <div class="flex max-w-2xl p-3 h-36">
-                <div class="flex flex-col">
+            <div class="flex max-w-3xl w-full p-3 h-36">
+                <div class="flex flex-col w-full">
                     <div class="text-sm mb-1 flex">
                         <div class="flex items-center mr-2">
                             <img src="/favicons/{{ item.domain }}" width="13px" />
@@ -41,13 +41,17 @@
                         {{ item.snippet }}
                     </div>
                 </div>
-                {% match item.primary_image_uuid %}
-                {% when Some with (val) %}
-                <div class="aspect-square pl-3 h-full max-h-full">
-                    <img class="max-h-full h-full w-full object-cover rounded-full" src="/image/{{ val }}" />
+                <div class="flex h-full items-center">
+                    <div class="h-20 w-20 pl-2 pt-1 pb-1">
+                        {% match item.primary_image_uuid %}
+                        {% when Some with (val) %}
+                        <a href="{{ item.url }}">
+                            <img class="h-full w-full object-cover rounded-full" src="/image/{{ val }}" />
+                        </a>
+                        {% when None %}
+                        {% endmatch %}
+                    </div>
                 </div>
-                {% when None %}
-                {% endmatch %}
             </div>
             {% endfor %}
         </div>
