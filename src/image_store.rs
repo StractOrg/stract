@@ -276,7 +276,18 @@ impl ImageStore<String> for EntityImageStore {
 
 impl Image {
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Image> {
-        Ok(Self(image::load_from_memory(&bytes)?))
+        if let Ok(img) = image::load_from_memory(&bytes) {
+            Ok(Self(img))
+        } else if let Ok(img) =
+            image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        {
+            Ok(Self(img))
+        } else {
+            Ok(Self(image::load_from_memory_with_format(
+                &bytes,
+                image::ImageFormat::Png,
+            )?))
+        }
     }
 
     pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {

@@ -26,32 +26,39 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct ImageDownloadJob<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     pub key: K,
-    pub url: Url,
+    pub urls: Vec<Url>,
     pub timeout: Option<Duration>,
 }
 
 impl<K> ImageDownloadJob<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     async fn download(self) -> Option<DownloadedImage<K>> {
-        self.url
-            .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
-            .await
-            .and_then(|bytes| Image::from_bytes(bytes).ok())
-            .map(|image| DownloadedImage {
-                image,
-                key: self.key,
-            })
+        for url in &self.urls {
+            if let Some(image) = url
+                .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
+                .await
+                .and_then(|bytes| Image::from_bytes(bytes).ok())
+                .map(|image| DownloadedImage {
+                    image,
+                    key: self.key.clone(),
+                })
+            {
+                return Some(image);
+            }
+        }
+
+        None
     }
 }
 
 impl<K> Hash for ImageDownloadJob<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.key.hash(state);
@@ -60,14 +67,17 @@ where
 
 impl<K> PartialEq for ImageDownloadJob<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
     }
 }
 
-impl<K> Eq for ImageDownloadJob<K> where K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq {}
+impl<K> Eq for ImageDownloadJob<K> where
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone
+{
+}
 
 #[derive(Debug)]
 struct DownloadedImage<K>
@@ -79,14 +89,14 @@ where
 }
 pub struct ImageDownloader<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     image_download_jobs: HashSet<ImageDownloadJob<K>>,
 }
 
 impl<K> ImageDownloader<K>
 where
-    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq,
+    K: std::fmt::Debug + Serialize + Hash + PartialEq + Eq + Clone,
 {
     pub fn new() -> Self {
         Self {

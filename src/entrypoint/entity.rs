@@ -112,13 +112,13 @@ impl EntityIndexer {
         let reader = BufReader::new(File::open(wikipedia_dump_path)?);
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;
-
-        for entity in EntityIterator::from(reader)
-            .take(1000)
+        EntityIterator::from(reader)
+            .into_iter()
             .filter(|entity| !entity.categories.is_empty())
-        {
-            index.insert(entity);
-        }
+            .take(100_000)
+            .for_each(|entity| {
+                index.insert(entity);
+            });
 
         index.commit();
 

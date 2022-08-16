@@ -84,4 +84,10 @@ impl Searcher {
             .as_ref()
             .and_then(|index| index.retrieve_image(&entity))
     }
+
+    pub fn attribute_occurrence(&self, attribute: &String) -> Option<u32> {
+        self.entity_index
+            .as_ref()
+            .and_then(|index| index.get_attribute_occurrence(attribute))
+    }
 }

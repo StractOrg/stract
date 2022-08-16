@@ -33,6 +33,7 @@ use tracing::info;
 use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
+    kv::{rocksdb_store::RocksDbStore, Kv},
     tokenizer::NormalTokenizer,
     webpage::Url,
     Result,
@@ -48,6 +49,7 @@ pub struct EntityIndex {
     reader: IndexReader,
     schema: Arc<Schema>,
     stopwords: HashSet<String>,
+    attribute_occurrences: Box<dyn Kv<String, u32>>,
 }
 
 fn schema() -> Schema {
@@ -75,6 +77,15 @@ fn schema() -> Schema {
     );
     builder.add_bytes_field("info", BytesOptions::default().set_stored());
     builder.add_bytes_field("links", BytesOptions::default().set_stored());
+    builder.add_text_field(
+        "has_image",
+        TextOptions::default()
+            .set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+            )
+            .set_stored(),
+    );
 
     builder.build()
 }
@@ -95,19 +106,41 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
         schema.get_field("links").unwrap(),
         bincode::serialize(&entity.page_abstract.links).unwrap(),
     );
+    let has_image = if entity.image.is_some() {
+        "true"
+    } else {
+        "false"
+    };
+
+    doc.add_text(schema.get_field("has_image").unwrap(), has_image);
 
     doc
 }
 
-fn wikipedify_url(url: Url) -> Url {
-    let name = url.raw().replace(' ', "_");
+fn wikipedify_url(url: Url) -> Vec<Url> {
+    let mut name = url.raw().replace(' ', "_");
+
+    if name.starts_with("File:") {
+        if let Some(index) = name.find("File:") {
+            name = name[index + "File:".len()..].to_string();
+        }
+    }
+
     let hex = format!("{:?}", md5::compute(&name));
-    format!(
-        "https://upload.wikimedia.org/wikipedia/commons/{:}/{:}",
-        hex[0..1].to_string() + "/" + &hex[0..2],
-        name
-    )
-    .into()
+    vec![
+        format!(
+            "https://upload.wikimedia.org/wikipedia/commons/{:}/{:}",
+            hex[0..1].to_string() + "/" + &hex[0..2],
+            name
+        )
+        .into(),
+        format!(
+            "https://upload.wikimedia.org/wikipedia/en/{:}/{:}",
+            hex[0..1].to_string() + "/" + &hex[0..2],
+            name
+        )
+        .into(),
+    ]
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -135,8 +168,11 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
+        let attribute_occurrences = RocksDbStore::open(path.as_ref().join("attribute_occurrences"));
+
         let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
             .lines()
+            .take(50)
             .map(|word| word.to_ascii_lowercase())
             .collect();
 
@@ -157,15 +193,22 @@ impl EntityIndex {
             image_downloader: ImageDownloader::new(),
             schema: Arc::new(schema),
             stopwords,
+            attribute_occurrences,
         })
     }
 
     pub fn insert(&mut self, entity: Entity) {
+        for attribute in entity.info.keys() {
+            let current = self.attribute_occurrences.get(attribute).unwrap_or(0);
+            self.attribute_occurrences
+                .insert(attribute.to_string(), current + 1);
+        }
+
         if let Some(image) = entity.image.clone() {
             let image = wikipedify_url(image);
             self.image_downloader.schedule(ImageDownloadJob {
                 key: entity.title.clone(),
-                url: image,
+                urls: image,
                 timeout: Some(Duration::from_secs(10)),
             })
         }
@@ -176,22 +219,31 @@ impl EntityIndex {
     pub fn commit(&mut self) {
         self.writer.commit().unwrap();
         self.reader.reload().unwrap();
+        self.attribute_occurrences.flush();
         info!("downloading images");
         self.image_downloader.download(&mut self.image_store);
     }
 
     fn related_entities(&self, doc: DocAddress) -> Vec<StoredEntity> {
         let searcher = self.reader.searcher();
-        let query = MoreLikeThisQuery::builder()
+        let more_like_this_query = MoreLikeThisQuery::builder()
             .with_min_doc_frequency(1)
-            .with_max_doc_frequency(10)
             .with_min_term_frequency(1)
             .with_min_word_length(2)
-            .with_max_word_length(5)
             .with_boost_factor(1.0)
             .with_document(doc);
 
-        match searcher.search(&query, &TopDocs::with_limit(10)) {
+        let image_query = TermQuery::new(
+            Term::from_field_text(self.schema.get_field("has_image").unwrap(), "true"),
+            IndexRecordOption::WithFreqsAndPositions,
+        );
+
+        let query = BooleanQuery::from(vec![
+            (Occur::Must, more_like_this_query.box_clone()),
+            (Occur::Must, image_query.box_clone()),
+        ]);
+
+        match searcher.search(&query, &TopDocs::with_limit(1_000)) {
             Ok(result) => result
                 .into_iter()
                 .filter(|(_, related_doc)| doc != *related_doc)
@@ -236,6 +288,7 @@ impl EntityIndex {
                 ]
             })
             .collect();
+
         let query = BooleanQuery::from(term_queries);
 
         searcher
@@ -326,6 +379,10 @@ impl EntityIndex {
     pub fn retrieve_image(&self, key: &String) -> Option<Image> {
         self.image_store.get(key)
     }
+
+    pub fn get_attribute_occurrence(&self, attribute: &String) -> Option<u32> {
+        self.attribute_occurrences.get(attribute)
+    }
 }
 
 #[cfg(test)]
@@ -337,7 +394,22 @@ mod tests {
     #[test]
     fn wikipedia_image_url_aristotle() {
         assert_eq!(
-            wikipedify_url("Aristotle Altemps Inv8575.jpg".to_string().into()).full(),
+            wikipedify_url("Aristotle Altemps Inv8575.jpg".to_string().into())
+                .first()
+                .unwrap()
+                .full(),
+            "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn wikipedia_image_url_with_file() {
+        assert_eq!(
+            wikipedify_url("File:Aristotle Altemps Inv8575.jpg".to_string().into())
+                .first()
+                .unwrap()
+                .full(),
             "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
                 .to_string()
         );

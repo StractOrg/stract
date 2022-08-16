@@ -118,7 +118,7 @@ impl Index {
         if let Some(favicon) = webpage.html.favicon() {
             self.favicon_downloader.schedule(ImageDownloadJob {
                 key: favicon.link.domain().to_string(),
-                url: favicon.link,
+                urls: vec![favicon.link],
                 timeout: Some(Duration::from_secs(1)),
             });
         }
@@ -139,7 +139,7 @@ impl Index {
 
             self.primary_image_downloader.schedule(ImageDownloadJob {
                 key: uuid,
-                url,
+                urls: vec![url],
                 timeout: Some(Duration::from_secs(5)),
             });
         }

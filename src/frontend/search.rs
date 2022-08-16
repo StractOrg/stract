@@ -20,9 +20,10 @@ use chrono::{NaiveDate, NaiveDateTime, Utc};
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
+    searcher::Searcher,
     webpage::Url,
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use super::{HtmlTemplate, State};
@@ -132,8 +133,42 @@ pub struct DisplayedEntity {
     pub info: Vec<(String, String)>,
 }
 
-impl From<StoredEntity> for DisplayedEntity {
-    fn from(entity: StoredEntity) -> Self {
+fn prepare_info(info: BTreeMap<String, Span>, searcher: &Searcher) -> Vec<(String, String)> {
+    let mut info: Vec<_> = info.into_iter().collect();
+
+    info.sort_by(|(a, _), (b, _)| {
+        searcher
+            .attribute_occurrence(b)
+            .unwrap_or(0)
+            .cmp(&searcher.attribute_occurrence(a).unwrap_or(0))
+    });
+
+    info.into_iter()
+        .map(|(key, value)| {
+            let mut value = entity_link_to_html(value, 150).replace('*', "•");
+
+            if value.starts_with('•') || value.starts_with("\n•") {
+                if let Some(first_bullet) = value.find('•') {
+                    value = value.chars().skip(first_bullet + 1).collect();
+                }
+            }
+
+            let value = maybe_prettify_entity_date(value);
+
+            (key.replace('_', " "), value)
+        })
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "caption" | "image size" | "label" | "landscape" | "signature"
+            )
+        })
+        .take(5)
+        .collect()
+}
+
+impl DisplayedEntity {
+    fn from(entity: StoredEntity, searcher: &Searcher) -> Self {
         let entity_abstract = Span {
             text: entity.entity_abstract,
             links: entity.links,
@@ -148,32 +183,9 @@ impl From<StoredEntity> for DisplayedEntity {
             related_entities: entity
                 .related_entities
                 .into_iter()
-                .map(DisplayedEntity::from)
+                .map(|entity| DisplayedEntity::from(entity, searcher))
                 .collect(),
-            info: entity
-                .info
-                .into_iter()
-                .map(|(key, value)| {
-                    let mut value = entity_link_to_html(value, 150).replace('*', "•");
-
-                    if value.starts_with('•') || value.starts_with("\n•") {
-                        if let Some(first_bullet) = value.find('•') {
-                            value = value.chars().skip(first_bullet + 1).collect();
-                        }
-                    }
-
-                    let value = maybe_prettify_entity_date(value);
-
-                    (key.replace('_', " "), value)
-                })
-                .filter(|(key, _)| {
-                    !matches!(
-                        key.as_str(),
-                        "caption" | "image size" | "label" | "landscape"
-                    )
-                })
-                .take(5)
-                .collect(),
+            info: prepare_info(entity.info, searcher),
         }
     }
 }
@@ -235,7 +247,9 @@ pub async fn route(
             .map(DisplayedWebpage::from)
             .collect();
 
-        entity = result.entity.map(From::from);
+        entity = result
+            .entity
+            .map(|entity| DisplayedEntity::from(entity, &state.searcher));
     }
 
     let template = SearchTemplate {
