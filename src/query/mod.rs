@@ -37,6 +37,7 @@ mod term_intersection;
 mod term_scorer;
 mod vec_docset;
 mod weight;
+use itertools::Itertools;
 
 /// A combinator that takes a parser `inner` and produces a parser that also consumes leading
 /// whitespace, returning the output of `inner`.
@@ -84,6 +85,7 @@ impl Query {
                     .into_iter()
                     .filter(|term| !term.is_empty())
                     .map(|term| term.to_string())
+                    .unique()
                     .collect();
                 Ok(Query { terms, schema })
             }
@@ -169,7 +171,7 @@ mod tests {
     fn simple_parse() {
         let schema = Arc::new(create_schema());
 
-        let query = Query::parse("This is a simple query", Arc::clone(&schema))
+        let query = Query::parse("This is a simple query the the query the the", Arc::clone(&schema))
             .expect("Failed to parse query");
 
         assert_eq!(
@@ -180,6 +182,7 @@ mod tests {
                 "a".to_string(),
                 "simple".to_string(),
                 "query".to_string(),
+                "the".to_string(),
             ]
         );
     }
