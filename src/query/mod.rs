@@ -90,6 +90,10 @@ impl Query {
             Err(error) => Err(Error::ParsingError(error.to_string())),
         }
     }
+
+    pub fn simple_terms(&self) -> &[String] {
+        &self.terms
+    }
 }
 
 impl tantivy::query::Query for Query {

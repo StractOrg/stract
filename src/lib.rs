@@ -13,6 +13,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// #![warn(clippy::pedantic)]
+
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -41,6 +44,7 @@ mod schema;
 mod schema_org;
 pub mod searcher;
 mod snippet;
+mod spell;
 mod tokenizer;
 mod warc;
 pub mod webgraph;
@@ -178,6 +182,9 @@ pub enum Error {
 
     #[error("XML parser error")]
     XML(#[from] quick_xml::Error),
+
+    #[error("Spell dictionary error")]
+    Spell(#[from] crate::spell::dictionary::DictionaryError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

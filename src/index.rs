@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
@@ -30,12 +31,14 @@ use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
 use crate::query::Query;
+use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker};
 use crate::webpage::{Url, Webpage};
 use crate::Result;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
+const SPELL_SUBFOLDER_NAME: &str = "primary_image_store";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
 pub struct Index {
@@ -44,6 +47,7 @@ pub struct Index {
     primary_image_store: PrimaryImageStore,
     favicon_downloader: ImageDownloader<String>,
     primary_image_downloader: ImageDownloader<Uuid>,
+    spell_dictionary: Dictionary,
     pub path: String,
 }
 
@@ -66,6 +70,7 @@ impl Index {
             primary_image_store,
             primary_image_downloader: ImageDownloader::new(),
             favicon_downloader: ImageDownloader::new(),
+            spell_dictionary: Dictionary::open(Some(path.as_ref().join(SPELL_SUBFOLDER_NAME)))?,
             path: path.as_ref().to_str().unwrap().to_string(),
         })
     }
@@ -79,11 +84,13 @@ impl Index {
     pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
         self.maybe_insert_favicon(&webpage);
         self.maybe_insert_primary_image(&mut webpage);
+        self.spell_dictionary.insert_page(&webpage);
         self.inverted_index.insert(webpage)
     }
 
     pub fn commit(&mut self) -> Result<()> {
         self.inverted_index.merge_all_segments()?;
+        self.spell_dictionary.commit()?;
         self.inverted_index.commit()
     }
 
@@ -102,6 +109,8 @@ impl Index {
 
         self.primary_image_store.merge(other.primary_image_store);
         drop(self.primary_image_store);
+
+        self.spell_dictionary.merge(other.spell_dictionary);
 
         Self::open(&self.path).expect("failed to open index")
     }
@@ -161,6 +170,29 @@ impl Index {
         self.favicon_downloader.download(&mut self.favicon_store);
         self.primary_image_downloader
             .download(&mut self.primary_image_store);
+    }
+
+    pub fn spell_correction(&self, terms: &[String]) -> Option<String> {
+        let spellchecker = SpellChecker::new(&self.spell_dictionary, LogarithmicEdit::new(4));
+        let mut corrections: Vec<String> = Vec::new();
+
+        for term in terms {
+            match spellchecker.correct(term.to_ascii_lowercase().as_str()) {
+                Some(correction) => corrections.push(correction.to_ascii_lowercase()),
+                None => corrections.push(term.to_ascii_lowercase()),
+            }
+        }
+
+        if corrections
+            .iter()
+            .cloned()
+            .zip(terms.iter().map(|term| term.to_ascii_lowercase()))
+            .all(|(correction, term)| correction == term)
+        {
+            None
+        } else {
+            Some(intersperse(corrections.into_iter(), " ".to_string()).collect())
+        }
     }
 }
 
@@ -234,6 +266,8 @@ mod tests {
             ))
             .expect("failed to parse webpage");
 
+        index.commit().unwrap();
+
         let path = index.path.clone();
         let frozen: FrozenIndex = index.into();
         let bytes = bincode::serialize(&frozen).unwrap();
@@ -251,5 +285,47 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
+
+        assert_eq!(
+            index.spell_correction(&["thiss".to_string()]),
+            Some("this".to_string())
+        );
+    }
+
+    #[test]
+    fn sentence_spell_correction() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    {CONTENT}
+                </body>
+            </html>
+            "#
+                ),
+                "https://www.example.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().unwrap();
+
+        assert_eq!(
+            index.spell_correction(&["th".to_string(), "best".to_string()]),
+            Some("the best".to_string())
+        );
+        assert_eq!(
+            index.spell_correction(&["the".to_string(), "best".to_string()]),
+            None
+        );
     }
 }
