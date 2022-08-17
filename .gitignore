@@ -11,5 +11,9 @@ package-lock.json
 notes
 *.log
 /data/**/LOG.old*
+/data/entity/attribute_occurrences/CURRENT
+/data/**/**/LOG
 /data/webgraph
 /data/warc_files
+/data/**/MANIFEST*
+/data/**/OPTIONS*
