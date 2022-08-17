@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::spell::distance::{EditDistance, LevenshteinDistance};
+use crate::spell::distance::LevenshteinDistance;
 use crate::webpage::Webpage;
 use fst::map::Union;
 use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
@@ -27,10 +27,6 @@ use std::{cmp, io, mem};
 use thiserror::Error;
 
 pub trait EditStrategy: Send + Sync {
-    fn removes(&self, string: &str) -> HashSet<EditDistance> {
-        LevenshteinDistance::new(self.distance_for_string(string)).removes(string)
-    }
-
     fn max_distance(&self) -> usize;
     fn distance_for_string(&self, string: &str) -> usize;
     fn dist(&self) -> LevenshteinDistance;
@@ -339,6 +335,7 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
             .map(|(_key, frequency)| frequency as f64 / self.total_freq as f64)
     }
 
+    #[cfg(test)]
     pub fn contains(&self, term: &str) -> bool {
         self.probability(term).is_some()
     }

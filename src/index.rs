@@ -31,7 +31,7 @@ use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
 use crate::query::Query;
-use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker};
+use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker, TermSplitter};
 use crate::webpage::{Url, Webpage};
 use crate::Result;
 
@@ -172,7 +172,7 @@ impl Index {
             .download(&mut self.primary_image_store);
     }
 
-    pub fn spell_correction(&self, terms: &[String]) -> Option<String> {
+    fn spell_check(&self, terms: &[String]) -> Option<String> {
         let spellchecker = SpellChecker::new(&self.spell_dictionary, LogarithmicEdit::new(4));
         let mut corrections: Vec<String> = Vec::new();
 
@@ -193,6 +193,38 @@ impl Index {
         } else {
             Some(intersperse(corrections.into_iter(), " ".to_string()).collect())
         }
+    }
+
+    fn split_words(&self, terms: &[String]) -> Option<String> {
+        let splitter = TermSplitter::new(&self.spell_dictionary);
+        let mut corrections: Vec<String> = Vec::new();
+
+        for term in terms {
+            let t = term.to_ascii_lowercase();
+            let split = splitter.split(t.as_str());
+            if split.is_empty() {
+                corrections.push(term.clone());
+            } else {
+                for s in split {
+                    corrections.push(s.to_string())
+                }
+            }
+        }
+
+        if corrections
+            .iter()
+            .cloned()
+            .zip(terms.iter().map(|term| term.to_ascii_lowercase()))
+            .all(|(correction, term)| correction == term)
+        {
+            None
+        } else {
+            Some(intersperse(corrections.into_iter(), " ".to_string()).collect())
+        }
+    }
+
+    pub fn spell_correction(&self, terms: &[String]) -> Option<String> {
+        self.spell_check(terms).or_else(|| self.split_words(terms))
     }
 }
 
