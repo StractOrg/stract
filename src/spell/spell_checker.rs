@@ -17,13 +17,13 @@ use crate::spell::dictionary::EditStrategy;
 use crate::spell::{Dictionary, DictionaryResult};
 use std::iter::FromIterator;
 
-pub struct SpellChecker<'a, T: EditStrategy> {
-    dict: &'a Dictionary,
+pub struct SpellChecker<'a, T: EditStrategy, const DICT_N: usize> {
+    dict: &'a Dictionary<DICT_N>,
     edit_strategy: T,
 }
 
-impl<'a, T: EditStrategy> SpellChecker<'a, T> {
-    pub fn new(dict: &'a Dictionary, edit_strategy: T) -> Self {
+impl<'a, T: EditStrategy, const DICT_N: usize> SpellChecker<'a, T, DICT_N> {
+    pub fn new(dict: &'a Dictionary<DICT_N>, edit_strategy: T) -> Self {
         SpellChecker {
             dict,
             edit_strategy,
@@ -73,7 +73,7 @@ impl<'a, T: EditStrategy> SpellChecker<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spell::{LogarithmicEdit, MaxEdit};
+    use crate::spell::{dictionary::MaxEdit, LogarithmicEdit};
 
     #[test]
     fn simple_corrections() {

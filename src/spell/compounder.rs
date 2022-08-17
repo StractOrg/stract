@@ -15,12 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::Dictionary;
 
-pub struct Compounder<'a> {
-    dict: &'a Dictionary,
+pub struct Compounder<'a, const DICT_N: usize> {
+    dict: &'a Dictionary<DICT_N>,
 }
 
-impl<'a> Compounder<'a> {
-    pub fn new(dict: &'a Dictionary) -> Self {
+impl<'a, const DICT_N: usize> Compounder<'a, DICT_N> {
+    pub fn new(dict: &'a Dictionary<DICT_N>) -> Self {
         Compounder { dict }
     }
 

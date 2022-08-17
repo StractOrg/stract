@@ -20,7 +20,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use itertools::{intersperse, Itertools};
+use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
@@ -47,7 +47,7 @@ pub struct Index {
     primary_image_store: PrimaryImageStore,
     favicon_downloader: ImageDownloader<String>,
     primary_image_downloader: ImageDownloader<Uuid>,
-    spell_dictionary: Dictionary,
+    spell_dictionary: Dictionary<1_000_000>,
     pub path: String,
 }
 

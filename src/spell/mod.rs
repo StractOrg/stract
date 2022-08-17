@@ -20,6 +20,6 @@ pub mod spell_checker;
 pub mod splitter;
 
 pub use self::compounder::Compounder;
-pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit, MaxEdit};
+pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit};
 pub use self::spell_checker::SpellChecker;
 pub use self::splitter::TermSplitter;

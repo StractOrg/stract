@@ -18,7 +18,7 @@ use crate::webpage::Webpage;
 use fst::map::Union;
 use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
 use memmap::Mmap;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::ops::AddAssign;
@@ -61,16 +61,19 @@ impl EditStrategy for LogarithmicEdit {
     }
 }
 
+#[cfg(test)]
 pub struct MaxEdit {
     max_edit_distance: usize,
 }
 
+#[cfg(test)]
 impl MaxEdit {
     pub fn new(max_edit_distance: usize) -> Self {
         Self { max_edit_distance }
     }
 }
 
+#[cfg(test)]
 impl EditStrategy for MaxEdit {
     fn distance_for_string(&self, _: &str) -> usize {
         self.max_distance()
@@ -140,20 +143,21 @@ impl InnerMap {
 }
 
 /// Dictionary that contains term frequency information
-pub struct Dictionary {
+pub struct Dictionary<const TOP_N: usize> {
     cache: BTreeMap<String, u64>,
     map: InnerMap,
     folder_path: Option<String>,
     total_freq: u64,
 }
 
-impl Default for Dictionary {
+#[cfg(test)]
+impl Default for Dictionary<1_000> {
     fn default() -> Self {
         Dictionary::open::<&str>(None).unwrap()
     }
 }
 
-impl Dictionary {
+impl<const TOP_N: usize> Dictionary<TOP_N> {
     pub fn open<P: AsRef<Path>>(folder_path: Option<P>) -> Result<Self> {
         if let Some(path) = folder_path.as_ref() {
             fs::create_dir_all(path)?;
@@ -174,15 +178,9 @@ impl Dictionary {
                 let dictionary_file = OpenOptions::new().read(true).open(dictionary_path)?;
 
                 let mmap = unsafe { Mmap::map(&dictionary_file)? };
-                let map = InnerMap::File(Map::new(mmap)?);
-
-                map
+                InnerMap::File(Map::new(mmap)?)
             }
-            None => {
-                let map = InnerMap::Memory(Map::default());
-
-                map
-            }
+            None => InnerMap::Memory(Map::default()),
         };
 
         Ok(Dictionary {
@@ -200,9 +198,26 @@ impl Dictionary {
                 let wrt = io::BufWriter::new(File::create(path.join("new_dictionary"))?);
                 let mut builder = MapBuilder::new(wrt)?;
 
+                let mut heap = BinaryHeap::with_capacity(TOP_N + 1);
+
                 while let Some((key, values)) = union.next() {
                     let val: u64 = values.iter().map(|idx_val| idx_val.value).sum();
-                    builder.insert(key, val)?;
+
+                    heap.push((
+                        std::cmp::Reverse(val),
+                        String::from_utf8_lossy(key).to_string(),
+                    ));
+
+                    if heap.len() > TOP_N {
+                        heap.pop();
+                    }
+                }
+
+                let top_values: BTreeMap<_, _> =
+                    heap.into_iter().map(|(val, key)| (key, val.0)).collect();
+
+                for (key, value) in top_values {
+                    builder.insert(key, value)?;
                 }
 
                 let path = Path::new(path);
@@ -214,9 +229,26 @@ impl Dictionary {
             None => {
                 let mut builder = MapBuilder::memory();
 
+                let mut heap = BinaryHeap::with_capacity(TOP_N + 1);
+
                 while let Some((key, values)) = union.next() {
                     let val: u64 = values.iter().map(|idx_val| idx_val.value).sum();
-                    builder.insert(key, val)?;
+
+                    heap.push((
+                        std::cmp::Reverse(val),
+                        String::from_utf8_lossy(key).to_string(),
+                    ));
+
+                    if heap.len() > TOP_N {
+                        heap.pop();
+                    }
+                }
+
+                let top_values: BTreeMap<_, _> =
+                    heap.into_iter().map(|(val, key)| (key, val.0)).collect();
+
+                for (key, value) in top_values {
+                    builder.insert(key, value)?;
                 }
 
                 let bytes = builder.into_inner().unwrap();
@@ -244,7 +276,10 @@ impl Dictionary {
     }
 
     pub fn insert(&mut self, term: &str) {
-        self.cache.entry(term.to_owned()).or_insert(0).add_assign(1);
+        self.cache
+            .entry(term.to_ascii_lowercase())
+            .or_insert(0)
+            .add_assign(1);
     }
 
     #[inline]
@@ -308,7 +343,7 @@ impl Dictionary {
         }
     }
 
-    pub fn merge(mut self, mut other: Dictionary) -> Self {
+    pub fn merge(mut self, mut other: Dictionary<TOP_N>) -> Self {
         self.commit().unwrap();
         other.commit().unwrap();
 
@@ -413,5 +448,22 @@ mod tests {
         assert_eq!(res.probability("kage"), Some(1.0 / 4.0));
         assert_eq!(res.probability("yay"), Some(1.0 / 4.0));
         assert_eq!(res.probability("ay"), Some(1.0 / 4.0));
+    }
+
+    #[test]
+    fn only_stop_top_n() {
+        let mut dict: Dictionary<2> = Dictionary::open::<&str>(None).unwrap();
+
+        dict.insert("test");
+        dict.insert("test");
+        dict.insert("hej");
+        dict.insert("kage");
+        dict.insert("kage");
+
+        dict.commit().unwrap();
+
+        assert!(dict.contains("test"));
+        assert!(dict.contains("kage"));
+        assert!(!dict.contains("hej"));
     }
 }

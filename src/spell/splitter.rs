@@ -15,12 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::Dictionary;
 
-pub struct TermSplitter<'a> {
-    dict: &'a Dictionary,
+pub struct TermSplitter<'a, const DICT_N: usize> {
+    dict: &'a Dictionary<DICT_N>,
 }
 
-impl<'a> TermSplitter<'a> {
-    pub fn new(dict: &'a Dictionary) -> Self {
+impl<'a, const DICT_N: usize> TermSplitter<'a, DICT_N> {
+    pub fn new(dict: &'a Dictionary<DICT_N>) -> Self {
         TermSplitter { dict }
     }
     pub fn split(&self, text: &'a str) -> Vec<&'a str> {
