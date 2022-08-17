@@ -1,0 +1,6 @@
+workers = ["0.0.0.0:1338"]
+
+[warc_source]
+type = "local"
+folder = "./warc_files"
+names = ["small1.warc.gz", "small2.warc.gz"]

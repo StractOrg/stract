@@ -15,3 +15,5 @@ notes
 /data/**/OPTIONS*
 /data/**/CURRENT
 /data/**/LOG
+/data/webgraph
+/data/warc_files
