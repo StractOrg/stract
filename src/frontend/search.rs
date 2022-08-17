@@ -234,6 +234,7 @@ struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
     entity: Option<DisplayedEntity>,
+    spell_correction: Option<String>,
 }
 
 pub async fn route(
@@ -243,6 +244,7 @@ pub async fn route(
     let mut search_result = Vec::new();
     let mut displayed_query = String::new();
     let mut entity = None;
+    let mut spell_correction = None;
 
     if let Some(query) = params.get("q") {
         displayed_query = query.clone();
@@ -269,12 +271,14 @@ pub async fn route(
         entity = result
             .entity
             .map(|entity| DisplayedEntity::from(entity, &state.searcher));
+        spell_correction = result.spell_corrected_query;
     }
 
     let template = SearchTemplate {
         search_result,
         query: displayed_query,
         entity,
+        spell_correction,
     };
     HtmlTemplate(template)
 }

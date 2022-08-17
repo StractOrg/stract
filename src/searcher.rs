@@ -29,6 +29,7 @@ use crate::Result;
 
 #[derive(Debug)]
 pub struct SearchResult {
+    pub spell_corrected_query: Option<String>,
     pub webpages: InvertedIndexSearchResult,
     pub entity: Option<StoredEntity>,
 }
@@ -59,13 +60,18 @@ impl Searcher {
         let query = Query::parse(query, self.index.schema())?;
         let ranker = Ranker::new(query.clone());
         let webpages = self.index.search(&query, ranker.collector())?;
+        let correction = self.index.spell_correction(query.simple_terms());
 
         let entity = self
             .entity_index
             .as_ref()
             .and_then(|index| index.search(raw_query));
 
-        Ok(SearchResult { webpages, entity })
+        Ok(SearchResult {
+            webpages,
+            entity,
+            spell_corrected_query: correction,
+        })
     }
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {

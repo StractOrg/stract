@@ -41,7 +41,7 @@ axum-extra = { version = "0.3.4", features = ["spa"] }
 html-escape = "0.2.11"
 logos = "0.12.1"
 csv = "1.1.6"
-fst = "0.4.7"
+fst = { version = "0.4.7", features = ["levenshtein"] }
 lazy_static = "1.4.0"
 rocksdb = "0.18.0"
 image = "0.24.3"
@@ -52,6 +52,7 @@ quick-xml = "0.23.0"
 bzip2 = "0.4.3"
 parse_wiki_text = "0.1.5"
 md5 = "0.7.0"
+memmap = "0.7.0"
 
 [dev-dependencies]
 maplit = "1.0.2"
