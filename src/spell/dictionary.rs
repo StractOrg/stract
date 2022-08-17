@@ -277,7 +277,13 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
 
     pub fn insert(&mut self, term: &str) {
         self.cache
-            .entry(term.to_ascii_lowercase())
+            .entry(
+                term.chars()
+                    .into_iter()
+                    .map(|c| c.to_ascii_lowercase())
+                    .filter(|c| !matches!(c, ',' | '.' | '\\' | '=' | '*' | '(' | ')'))
+                    .collect(),
+            )
             .or_insert(0)
             .add_assign(1);
     }
@@ -465,5 +471,17 @@ mod tests {
         assert!(dict.contains("test"));
         assert!(dict.contains("kage"));
         assert!(!dict.contains("hej"));
+    }
+
+    #[test]
+    fn weird_characters_ignored() {
+        let mut dict = Dictionary::default();
+
+        dict.insert("lennon,");
+
+        dict.commit().unwrap();
+
+        assert!(dict.contains("lennon"));
+        assert!(!dict.contains("lennon,"));
     }
 }
