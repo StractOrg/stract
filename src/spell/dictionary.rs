@@ -27,7 +27,6 @@ use std::{cmp, io, mem};
 use thiserror::Error;
 
 pub trait EditStrategy: Send + Sync {
-    fn max_distance(&self) -> usize;
     fn distance_for_string(&self, string: &str) -> usize;
     fn dist(&self) -> LevenshteinDistance;
 }
@@ -46,10 +45,6 @@ impl EditStrategy for LogarithmicEdit {
     fn distance_for_string(&self, string: &str) -> usize {
         let log_value: usize = (string.len() as f32).log2() as usize;
         cmp::max(1, cmp::min(log_value, self.max_edit_distance))
-    }
-
-    fn max_distance(&self) -> usize {
-        self.max_edit_distance
     }
 
     fn dist(&self) -> LevenshteinDistance {
@@ -72,10 +67,6 @@ impl MaxEdit {
 #[cfg(test)]
 impl EditStrategy for MaxEdit {
     fn distance_for_string(&self, _: &str) -> usize {
-        self.max_distance()
-    }
-
-    fn max_distance(&self) -> usize {
         self.max_edit_distance
     }
 
