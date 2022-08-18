@@ -1,0 +1,12 @@
+use crate::query::Term;
+
+grammar;
+
+
+pub Terms: Vec<Term<'input>> = <Term*> => <>;
+
+Term: Term<'input> = {
+    <BasicTerm> => Term::Simple(<>),
+}
+
+BasicTerm: &'input str = r"[\S]*" => <>;

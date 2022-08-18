@@ -16,7 +16,6 @@
 
 use std::marker::PhantomData;
 
-use nom::AsBytes;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::kv::Kv;
@@ -31,7 +30,7 @@ where
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.get(key)
             .expect("failed to retrieve key")
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.to_vec())
     }
 
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>) {

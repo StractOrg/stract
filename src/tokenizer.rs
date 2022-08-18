@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use logos::{Lexer, Logos};
 use tantivy::tokenizer::{
-    Language, LowerCaser, SimpleTokenizer, Stemmer, StopWordFilter, TextAnalyzer,
+    BoxTokenStream, Language, LowerCaser, Stemmer, StopWordFilter, TextAnalyzer,
 };
+
 use whatlang::Lang;
 
 struct MyStemmer(Stemmer);
@@ -138,5 +140,193 @@ impl tantivy::tokenizer::Tokenizer for StemmedTokenizer {
             Some(lang) => analyzer.filter(MyStemmer::from(lang).0).token_stream(text),
             None => analyzer.token_stream(text),
         }
+    }
+}
+
+#[derive(Logos, Debug, PartialEq)]
+enum Token {
+    #[regex("[\\w|\\p{Han}|\\p{Hiragana}|\\p{Katakana}|\\p{Cyrillic}|\\p{Arabic}]+")]
+    Text,
+
+    #[error]
+    #[regex(r"[ \t\n\f]+", logos::skip)]
+    Error,
+}
+
+#[derive(Clone)]
+pub struct SimpleTokenizer;
+
+pub struct SimpleTokenStream<'a> {
+    lexer: Lexer<'a, Token>,
+    token: Option<tantivy::tokenizer::Token>,
+    next_position: usize,
+}
+
+impl tantivy::tokenizer::Tokenizer for SimpleTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+        let lexer = Token::lexer(text);
+        BoxTokenStream::from(SimpleTokenStream {
+            lexer,
+            token: None,
+            next_position: 0,
+        })
+    }
+}
+
+impl<'a> tantivy::tokenizer::TokenStream for SimpleTokenStream<'a> {
+    fn advance(&mut self) -> bool {
+        self.token = self.lexer.next().map(|_| {
+            let span = self.lexer.span();
+            let pos = self.next_position;
+            self.next_position += 1;
+            tantivy::tokenizer::Token {
+                offset_from: span.start,
+                offset_to: span.end,
+                position: pos,
+                text: self.lexer.slice().to_string(),
+                ..Default::default()
+            }
+        });
+
+        self.token.is_some()
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        self.token.as_ref().unwrap()
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        self.token.as_mut().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tantivy::tokenizer::Tokenizer;
+
+    use super::*;
+
+    fn tokenize(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut stream = NormalTokenizer::default().token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
+    #[test]
+    fn simple_tokenization() {
+        assert_eq!(
+            tokenize("this is a relatively simple123 test    string"),
+            vec![
+                "this".to_string(),
+                "is".to_string(),
+                "a".to_string(),
+                "relatively".to_string(),
+                "simple123".to_string(),
+                "test".to_string(),
+                "string".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn special_character_tokenization() {
+        assert_eq!(
+            tokenize("example.com"),
+            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
+        );
+        assert_eq!(
+            tokenize("example. com"),
+            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
+        );
+        assert_eq!(
+            tokenize("example . com"),
+            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
+        );
+
+        assert_eq!(
+            tokenize("a c++ blog post"),
+            vec![
+                "a".to_string(),
+                "c".to_string(),
+                "+".to_string(),
+                "+".to_string(),
+                "blog".to_string(),
+                "post".to_string()
+            ]
+        );
+        assert_eq!(
+            tokenize("path/test"),
+            vec!["path".to_string(), "/".to_string(), "test".to_string(),]
+        );
+    }
+
+    #[test]
+    fn han() {
+        assert_eq!(
+            tokenize("test 漢.com"),
+            vec![
+                "test".to_string(),
+                "漢".to_string(),
+                ".".to_string(),
+                "com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn hiragana() {
+        assert_eq!(
+            tokenize("test あ.com"),
+            vec![
+                "test".to_string(),
+                "あ".to_string(),
+                ".".to_string(),
+                "com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn katakana() {
+        assert_eq!(
+            tokenize("test ダ.com"),
+            vec![
+                "test".to_string(),
+                "ダ".to_string(),
+                ".".to_string(),
+                "com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn cyrillic() {
+        assert_eq!(
+            tokenize("test б.com"),
+            vec![
+                "test".to_string(),
+                "б".to_string(),
+                ".".to_string(),
+                "com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn arabic() {
+        assert_eq!(
+            tokenize("test ب.com"),
+            vec![
+                "test".to_string(),
+                "ب".to_string(),
+                ".".to_string(),
+                "com".to_string()
+            ]
+        );
     }
 }

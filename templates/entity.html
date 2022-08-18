@@ -4,8 +4,8 @@
         {% match entity.image %}
         {% when Some(image) %}
         <div class="w-lg mb-3">
-            <a href="https://en.wikipedia.org/wiki/{{ entity.title }}">
-                <img class="h-full w-full rounded-full" src="/entity/image/{{ image }}" />
+            <a href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">
+                <img class="h-full w-full rounded-full" src="/entity/image/{{ image|urlencode }}" />
             </a>
         </div>
         {% when None %}
@@ -16,7 +16,8 @@
         <div class="text-sm">
             {{ entity.small_abstract }}
             <span class="italic">
-                source: <a class="text-blue-600" href="https://en.wikipedia.org/wiki/{{ entity.title }}">wikipedia</a>
+                source: <a class="text-blue-600"
+                    href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">wikipedia</a>
             </span>
         </div>
         {% if !entity.info.is_empty() %}
@@ -46,14 +47,15 @@
                     {% match entity.image %}
                     {% when Some(image) %}
                     <div class="h-20 w-20 mb-3">
-                        <a href="/search?q={{ entity.title }}">
-                            <img class="h-full object-cover w-full rounded-full" src="/entity/image/{{ image }}" />
+                        <a href="/search?q={{ entity.title|urlencode }}">
+                            <img class="h-full object-cover w-full rounded-full"
+                                src="/entity/image/{{ image|urlencode }}" />
                         </a>
                     </div>
                     {% when None %}
                     {% endmatch %}
                     <div class="text-center">
-                        <a href="/search?q={{ entity.title }}">
+                        <a href="/search?q={{ entity.title|urlencode }}">
                             {{ entity.title }}
                         </a>
                     </div>

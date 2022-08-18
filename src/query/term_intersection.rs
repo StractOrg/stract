@@ -20,8 +20,8 @@ use tantivy::{DocId, DocSet, Postings, Score, TERMINATED};
 
 use super::field_union::FieldUnion;
 
-const MAX_WIDTH: u32 = 45;
-const LAMBDA: f32 = 0.55;
+const MAX_WIDTH: u32 = 25;
+const LAMBDA: f32 = 0.75;
 const GAMMA: f32 = 0.25;
 
 pub fn intersect_terms(mut scorers: Vec<FieldUnion>) -> Box<dyn Scorer> {

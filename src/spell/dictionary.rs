@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::distance::LevenshteinDistance;
+use crate::tokenizer::NormalTokenizer;
 use crate::webpage::Webpage;
 use fst::map::Union;
 use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
@@ -24,6 +25,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::AddAssign;
 use std::path::Path;
 use std::{cmp, io, mem};
+use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 
 pub trait EditStrategy: Send + Sync {
@@ -332,8 +334,12 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
     }
 
     pub fn insert_page(&mut self, webpage: &Webpage) {
-        for text in webpage.html.clean_text().unwrap_or_default().split(' ') {
-            self.insert(text);
+        let text = webpage.html.clean_text().unwrap_or_default();
+
+        let mut stream = NormalTokenizer::default().token_stream(text.as_str());
+
+        while let Some(token) = stream.next() {
+            self.insert(&token.text);
         }
     }
 
@@ -445,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn only_stop_top_n() {
+    fn only_store_top_n() {
         let mut dict: Dictionary<2> = Dictionary::open::<&str>(None).unwrap();
 
         dict.insert("test");

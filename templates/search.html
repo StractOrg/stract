@@ -19,7 +19,8 @@
             {% match spell_correction %}
             {% when Some with (correction) %}
             <div class="pl-3 pb-3 ">
-                Did you mean: <a class="italic title-link font-bold" href="/search?q={{ correction }}">{{ correction
+                Did you mean: <a class="italic title-link font-bold" href="/search?q={{ correction|urlencode }}">{{
+                    correction
                     }}</a>
             </div>
             {% when None %}
@@ -31,10 +32,11 @@
                     <div class="flex flex-col w-full">
                         <div class="text-sm mb-1 flex">
                             <div class="flex items-center mr-2">
-                                <img src="/favicons/{{ item.domain }}" width="13px" />
+                                <img src="/favicons/{{ item.domain|urlencode }}" width="13px" />
                             </div>
                             <div>
-                                <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{ item.pretty_url
+                                <a class="hover:no-underline text-gray-600" href="{{ item.url|urlencode }}">{{
+                                    item.pretty_url
                                     }}</a>
                             </div>
                         </div>
@@ -56,8 +58,8 @@
                         <div class="h-20 w-20 pl-2 pt-1 pb-1">
                             {% match item.primary_image_uuid %}
                             {% when Some with (val) %}
-                            <a href="{{ item.url }}">
-                                <img class="h-full w-full object-cover rounded-full" src="/image/{{ val }}" />
+                            <a href="{{ item.url|urlencode }}">
+                                <img class="h-full w-full object-cover rounded-full" src="/image/{{ val|urlencode }}" />
                             </a>
                             {% when None %}
                             {% endmatch %}

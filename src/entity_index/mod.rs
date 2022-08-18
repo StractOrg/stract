@@ -26,6 +26,7 @@ use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
     schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
+    tokenizer::Tokenizer,
     DocAddress, IndexReader, IndexWriter, LeasedItem, Searcher, Term,
 };
 use tracing::info;
@@ -263,31 +264,31 @@ impl EntityIndex {
         let title = self.schema.get_field("title").unwrap();
         let entity_abstract = self.schema.get_field("abstract").unwrap();
 
-        let term_queries: Vec<(Occur, Box<dyn tantivy::query::Query>)> = query
-            .split(' ')
-            .map(|term| term.to_ascii_lowercase())
-            .filter(|term| !self.stopwords.contains(term))
-            .flat_map(|term| {
-                vec![
-                    (
-                        Occur::Must,
-                        TermQuery::new(
-                            Term::from_field_text(title, &term),
-                            IndexRecordOption::WithFreqsAndPositions,
-                        )
-                        .box_clone(),
-                    ),
-                    (
-                        Occur::Should,
-                        TermQuery::new(
-                            Term::from_field_text(entity_abstract, &term),
-                            IndexRecordOption::WithFreqsAndPositions,
-                        )
-                        .box_clone(),
-                    ),
-                ]
-            })
-            .collect();
+        let mut term_queries = Vec::new();
+        let mut stream = NormalTokenizer::default().token_stream(query.as_str());
+        while let Some(token) = stream.next() {
+            if self.stopwords.contains(&token.text) {
+                continue;
+            }
+
+            term_queries.push((
+                Occur::Must,
+                TermQuery::new(
+                    Term::from_field_text(title, &token.text),
+                    IndexRecordOption::WithFreqsAndPositions,
+                )
+                .box_clone(),
+            ));
+
+            term_queries.push((
+                Occur::Should,
+                TermQuery::new(
+                    Term::from_field_text(entity_abstract, &token.text),
+                    IndexRecordOption::WithFreqsAndPositions,
+                )
+                .box_clone(),
+            ));
+        }
 
         let query = BooleanQuery::from(term_queries);
 

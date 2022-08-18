@@ -1,4 +1,5 @@
 @unpack-data:
+    rm -rf data
     tar -zxvf data.tar.gz
 
 @flamegraph:
