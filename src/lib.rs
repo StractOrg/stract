@@ -185,6 +185,15 @@ pub enum Error {
 
     #[error("Spell dictionary error")]
     Spell(#[from] crate::spell::dictionary::DictionaryError),
+
+    #[error("Parser error")]
+    Parse,
+}
+
+impl<L, T, E> From<lalrpop_util::ParseError<L, T, E>> for Error {
+    fn from(_: lalrpop_util::ParseError<L, T, E>) -> Self {
+        Error::Parse
+    }
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

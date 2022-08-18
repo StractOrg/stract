@@ -14,22 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{query::weight::Weight, schema::ALL_FIELDS, Error, Result};
-use nom::{
-    bytes::complete::{tag, take_while},
-    character::complete::multispace0,
-    error::ParseError,
-    multi::separated_list0,
-    sequence::preceded,
-    IResult,
+use crate::{query::weight::Weight, schema::ALL_FIELDS, tokenizer::NormalTokenizer, Result};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
 };
-use std::{collections::BTreeMap, sync::Arc};
 use tantivy::{
     schema::{FieldType, IndexRecordOption, Schema},
-    tokenizer::TextAnalyzer,
+    tokenizer::{TextAnalyzer, Tokenizer},
 };
 
 use self::bm25::Bm25Weight;
+use lalrpop_util::lalrpop_mod;
+lalrpop_mod!(pub parser, "/query/parser.rs"); // synthesized by LALRPOP
 
 mod bm25;
 mod field_union;
@@ -37,22 +34,11 @@ mod term_intersection;
 mod term_scorer;
 mod vec_docset;
 mod weight;
-use itertools::Itertools;
 
-/// A combinator that takes a parser `inner` and produces a parser that also consumes leading
-/// whitespace, returning the output of `inner`.
-fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-where
-    F: Fn(&'a str) -> IResult<&'a str, O, E>,
-{
-    preceded(multispace0, inner)
-}
+static PARSER: once_cell::sync::Lazy<parser::TermsParser> =
+    once_cell::sync::Lazy::new(parser::TermsParser::new);
 
-fn term(term: &str) -> IResult<&str, &str> {
-    ws(take_while(|c: char| !c.is_whitespace()))(term)
-}
+const MAX_SIMILAR_TERMS: usize = 10;
 
 pub struct FieldData {
     tantivy: tantivy::schema::Field,
@@ -69,6 +55,11 @@ impl std::fmt::Debug for FieldData {
     }
 }
 
+#[derive(Debug)]
+pub enum Term<'a> {
+    Simple(&'a str),
+}
+
 #[derive(Clone, Debug)]
 pub struct Query {
     terms: Vec<String>,
@@ -77,20 +68,34 @@ pub struct Query {
 
 impl Query {
     pub fn parse(query: &str, schema: Arc<Schema>) -> Result<Query> {
-        match separated_list0(tag(" "), term)(query) {
-            Ok((remaining, terms)) => {
-                debug_assert!(remaining.is_empty());
+        let mut raw_terms = Vec::new();
 
-                let terms = terms
-                    .into_iter()
-                    .filter(|term| !term.is_empty())
-                    .map(|term| term.to_string())
-                    .unique()
-                    .collect();
-                Ok(Query { terms, schema })
+        let terms = PARSER.parse(query)?;
+        for term in terms {
+            match term {
+                Term::Simple(term) => {
+                    let mut stream = NormalTokenizer::default().token_stream(term);
+
+                    while let Some(token) = stream.next() {
+                        raw_terms.push(token.text.to_string());
+                    }
+                }
             }
-            Err(error) => Err(Error::ParsingError(error.to_string())),
         }
+
+        let mut term_count = HashMap::new();
+        let mut terms = Vec::new();
+        for term in raw_terms {
+            let count = term_count.entry(term.clone()).or_insert(0);
+
+            if *count < MAX_SIMILAR_TERMS {
+                terms.push(term);
+            }
+
+            *count += 1;
+        }
+
+        Ok(Query { terms, schema })
     }
 
     pub fn simple_terms(&self) -> &[String] {
@@ -175,17 +180,29 @@ mod tests {
     fn simple_parse() {
         let schema = Arc::new(create_schema());
 
-        let query = Query::parse("This is a simple query the the query the the", Arc::clone(&schema))
-            .expect("Failed to parse query");
+        let query = Query::parse(
+            "This is a simple query the the the the the the the the the the the the the",
+            Arc::clone(&schema),
+        )
+        .expect("Failed to parse query");
 
         assert_eq!(
             query.terms,
             vec![
-                "This".to_string(),
+                "this".to_string(),
                 "is".to_string(),
                 "a".to_string(),
                 "simple".to_string(),
                 "query".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
+                "the".to_string(),
                 "the".to_string(),
             ]
         );
@@ -201,7 +218,7 @@ mod tests {
         assert_eq!(
             query.terms,
             vec![
-                "This".to_string(),
+                "this".to_string(),
                 "is".to_string(),
                 "a".to_string(),
                 "simple".to_string(),
@@ -229,7 +246,13 @@ mod tests {
             .terms;
         assert_eq!(
             terms,
-            vec!["term!".to_string(), "term#".to_string(), "$".to_string()]
+            vec![
+                "term".to_string(),
+                "!".to_string(),
+                "term".to_string(),
+                "#".to_string(),
+                "$".to_string()
+            ]
         );
     }
 }
