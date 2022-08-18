@@ -203,7 +203,7 @@ impl Index {
             let t = term.to_ascii_lowercase();
             let split = splitter.split(t.as_str());
             if split.is_empty() {
-                corrections.push(term.clone());
+                corrections.push(t);
             } else {
                 for s in split {
                     corrections.push(s.to_string())
@@ -213,7 +213,7 @@ impl Index {
 
         if corrections
             .iter()
-            .cloned()
+            .map(|s| s.to_ascii_lowercase())
             .zip(terms.iter().map(|term| term.to_ascii_lowercase()))
             .all(|(correction, term)| correction == term)
         {
