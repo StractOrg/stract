@@ -1,3 +1,6 @@
+@unpack-data:
+    tar -zxvf data.tar.gz
+
 @flamegraph:
     sudo rm -rf data/index
     cargo flamegraph --root -- indexer local configs/indexer/local.toml
@@ -21,3 +24,7 @@
 @entity:
     rm -rf data/entity
     cargo run --release -- indexer entity data/enwiki-20220801-pages-articles-multistream.xml.bz2 data/entity
+
+@pack-data:
+    rm -f data.tar.gz
+    tar --exclude="data/enwiki*" --exclude="data/warc_files" --exclude="data/webgraph" -zcvf  data.tar.gz data
