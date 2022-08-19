@@ -14,46 +14,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{query::weight::Weight, schema::ALL_FIELDS, tokenizer::NormalTokenizer, Result};
+use crate::{schema::ALL_FIELDS, tokenizer::NormalTokenizer, Result};
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
 use tantivy::{
+    query::{BooleanQuery, BoostQuery, Occur, TermQuery},
     schema::{FieldType, IndexRecordOption, Schema},
     tokenizer::{TextAnalyzer, Tokenizer},
 };
 
-use self::bm25::Bm25Weight;
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(pub parser, "/query/parser.rs"); // synthesized by LALRPOP
-
-mod bm25;
-mod field_union;
-mod term_intersection;
-mod term_scorer;
-mod vec_docset;
-mod weight;
 
 static PARSER: once_cell::sync::Lazy<parser::TermsParser> =
     once_cell::sync::Lazy::new(parser::TermsParser::new);
 
 const MAX_SIMILAR_TERMS: usize = 10;
-
-pub struct FieldData {
-    tantivy: tantivy::schema::Field,
-    scoring: Bm25Weight,
-    index_record_option: Option<IndexRecordOption>,
-    boost: Option<f32>,
-    analyzer: Option<TextAnalyzer>,
-}
-impl std::fmt::Debug for FieldData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldData")
-            .field("tanitvy", &self.tantivy)
-            .finish()
-    }
-}
 
 #[derive(Debug)]
 pub enum Term<'a> {
@@ -101,6 +79,43 @@ impl Query {
     pub fn simple_terms(&self) -> &[String] {
         &self.terms
     }
+
+    fn get_tantivy_analyzer(
+        entry: &tantivy::schema::FieldEntry,
+        tokenizer_manager: &tantivy::tokenizer::TokenizerManager,
+    ) -> Option<TextAnalyzer> {
+        match entry.field_type() {
+            tantivy::schema::FieldType::Str(options) => {
+                options.get_indexing_options().map(|indexing_options| {
+                    let tokenizer_name = indexing_options.tokenizer();
+                    tokenizer_manager
+                        .get(tokenizer_name)
+                        .expect("Unknown tokenizer")
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn process_tantivy_term(
+        term: &str,
+        analyzer: Option<TextAnalyzer>,
+        tantivy_field: tantivy::schema::Field,
+    ) -> impl Iterator<Item = tantivy::Term> {
+        match analyzer {
+            None => vec![tantivy::Term::from_field_text(tantivy_field, term)].into_iter(),
+            Some(tokenizer) => {
+                let mut terms: Vec<tantivy::Term> = Vec::new();
+                let mut token_stream = tokenizer.token_stream(term);
+                token_stream.process(&mut |token| {
+                    let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
+                    terms.push(term);
+                });
+
+                terms.into_iter()
+            }
+        }
+    }
 }
 
 impl tantivy::query::Query for Query {
@@ -109,54 +124,53 @@ impl tantivy::query::Query for Query {
         searcher: &tantivy::Searcher,
         scoring_enabled: bool,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
-        let terms = self.terms.clone();
+        let schema = searcher.schema();
+        let tokenizer_manager = searcher.index().tokenizers();
 
-        let fields: Vec<_> = ALL_FIELDS
+        let queries = self
+            .terms
             .iter()
-            .filter(|field| field.is_searchable())
-            .map(|field| {
-                let tantivy_field = searcher.schema().get_field(field.as_str()).unwrap();
-                let analyzer = searcher.index().tokenizer_for_field(tantivy_field).ok();
+            .map(|term| {
+                let one_term = schema
+                    .fields()
+                    .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
+                    .into_iter()
+                    .map(|(field, entry)| {
+                        let analyzer = Query::get_tantivy_analyzer(entry, tokenizer_manager);
+                        let processed_terms = Query::process_tantivy_term(term, analyzer, field);
 
-                let tantivy_terms: Vec<_> = terms
-                    .iter()
-                    .flat_map(|term_text| {
-                        let terms = analyzer
-                            .as_ref()
-                            .map(|analyzer| {
-                                let mut terms = Vec::new();
-
-                                let mut stream = analyzer.token_stream(term_text);
-
-                                while let Some(token) = stream.next() {
-                                    terms.push(token.text.clone());
-                                }
-
-                                terms
+                        let processed_queries = processed_terms
+                            .map(|term| {
+                                (
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(
+                                        term,
+                                        IndexRecordOption::WithFreqsAndPositions,
+                                    ))
+                                        as Box<dyn tantivy::query::Query>,
+                                )
                             })
-                            .unwrap_or_else(|| vec![term_text.clone()]);
+                            .collect();
+                        let boost = ALL_FIELDS[field.field_id() as usize].boost().unwrap_or(1.0);
 
-                        terms
-                            .into_iter()
-                            .map(|term| tantivy::Term::from_field_text(tantivy_field, &term))
+                        (
+                            Occur::Should,
+                            Box::new(BoostQuery::new(
+                                Box::new(BooleanQuery::new(processed_queries)),
+                                boost,
+                            )) as Box<dyn tantivy::query::Query>,
+                        )
                     })
                     .collect();
 
-                FieldData {
-                    tantivy: tantivy_field,
-                    index_record_option: searcher
-                        .schema()
-                        .get_field_entry(tantivy_field)
-                        .field_type()
-                        .get_index_record_option(),
-                    boost: field.boost(),
-                    scoring: Bm25Weight::for_terms(searcher, &tantivy_terms).unwrap(),
-                    analyzer,
-                }
+                Box::new(BooleanQuery::new(one_term)) as Box<dyn tantivy::query::Query>
             })
+            .map(|term_query| (Occur::Must, term_query))
             .collect();
 
-        Ok(Box::new(Weight::new(terms, fields, scoring_enabled)))
+        let query = Box::new(BooleanQuery::new(queries));
+
+        query.weight(searcher, scoring_enabled)
     }
 
     fn query_terms(&self, terms: &mut BTreeMap<tantivy::Term, bool>) {

@@ -192,7 +192,7 @@ mod tests {
                 ),
                 "https://www.old.com",
                 vec![],
-                0.1,
+                0.092,
                 500,
             ))
             .expect("failed to parse webpage");
