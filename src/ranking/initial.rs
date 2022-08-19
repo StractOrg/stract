@@ -97,9 +97,9 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let hours_since_update = (self.current_timestamp - update_timestamp).max(0.000001) / 3600.0;
 
         (3.0 * score)
-            + (4000.0 * centrality)
+            + (6000.0 * centrality)
             + (1.0 * is_homepage)
-            + (10.0 / (fetch_time_ms + 1.0))
-            + (2000.0 * time_to_score(hours_since_update))
+            + (0.5 / (fetch_time_ms + 1.0))
+            + (1500.0 * time_to_score(hours_since_update))
     }
 }

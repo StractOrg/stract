@@ -60,6 +60,7 @@ pub struct IndexingMasterConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
+    limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     centrality_store_path: String,
 }

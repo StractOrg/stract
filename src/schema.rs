@@ -154,7 +154,8 @@ impl Field {
             Field::Host => Some(3.0),
             Field::DomainIfHomepage => Some(50.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
-            Field::Title | Field::CleanBody => Some(1.5),
+            Field::CleanBody => Some(2.5),
+            Field::Title => Some(10.0),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText
