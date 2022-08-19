@@ -20,9 +20,9 @@ use tantivy::{DocId, DocSet, Postings, Score, TERMINATED};
 
 use super::field_union::FieldUnion;
 
-const MAX_WIDTH: u32 = 25;
-const LAMBDA: f32 = 0.75;
-const GAMMA: f32 = 0.25;
+const MAX_WIDTH: u32 = 45;
+const LAMBDA: f32 = 0.65;
+const GAMMA: f32 = 0.45;
 
 pub fn intersect_terms(mut scorers: Vec<FieldUnion>) -> Box<dyn Scorer> {
     if scorers.is_empty() {
@@ -98,6 +98,8 @@ impl Scorer for TermIntersection {
             return 0.0;
         }
 
+        return self.docsets.iter_mut().map(|docset| docset.score()).sum();
+
         let num_docsets = self.docsets.len();
 
         let postings = self
@@ -166,7 +168,8 @@ impl Scorer for TermIntersection {
                             .iter()
                             .filter(|span| span.has_term(term_id as u32))
                             .map(|span| span.relevance_contribution())
-                            .sum::<f32>();
+                            .sum::<f32>()
+                            / spans.len() as f32;
 
                         weight.score(field_id.try_into().unwrap(), rc)
                     })

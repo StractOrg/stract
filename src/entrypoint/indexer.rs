@@ -190,6 +190,7 @@ impl Indexer {
 
         warc_paths
             .into_iter()
+            .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .map(|path| Job {
                 config: job_config.clone(),
                 warc_path: path,
