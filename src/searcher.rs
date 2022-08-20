@@ -25,7 +25,7 @@ use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::Ranker;
 use crate::webpage::Url;
-use crate::Result;
+use crate::{Error, Result};
 
 #[derive(Debug)]
 pub struct SearchResult {
@@ -58,6 +58,11 @@ impl Searcher {
     pub fn search(&self, query: &str) -> Result<SearchResult> {
         let raw_query = query.to_string();
         let query = Query::parse(query, self.index.schema())?;
+
+        if query.is_empty() {
+            return Err(Error::EmptyQuery);
+        }
+
         let ranker = Ranker::new(query.clone());
         let webpages = self.index.search(&query, ranker.collector())?;
         let correction = self.index.spell_correction(query.simple_terms());

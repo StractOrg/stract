@@ -80,6 +80,10 @@ impl Query {
         &self.terms
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.terms.is_empty()
+    }
+
     fn get_tantivy_analyzer(
         entry: &tantivy::schema::FieldEntry,
         tokenizer_manager: &tantivy::tokenizer::TokenizerManager,
@@ -268,5 +272,14 @@ mod tests {
                 "$".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn empty_query() {
+        let schema = Arc::new(create_schema());
+
+        let query = Query::parse("", Arc::clone(&schema)).expect("Failed to parse query");
+
+        assert!(query.is_empty())
     }
 }
