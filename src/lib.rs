@@ -189,6 +189,9 @@ pub enum Error {
 
     #[error("Parser error")]
     Parse,
+
+    #[error("Query cannot be completely empty")]
+    EmptyQuery,
 }
 
 impl<L, T, E> From<lalrpop_util::ParseError<L, T, E>> for Error {
