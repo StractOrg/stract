@@ -201,6 +201,8 @@ impl<S: Store> GraphStore<S> {
         self.assign_id(node, id);
         id
     }
+
+    #[allow(unused)]
     pub fn outgoing_edges(&self, node: NodeID) -> Vec<Edge> {
         self.adjacency
             .borrow_mut()

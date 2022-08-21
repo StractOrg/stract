@@ -25,7 +25,7 @@ use tantivy::TantivyError;
 use thiserror::Error;
 
 pub mod entrypoint;
-pub mod inverted_index;
+mod inverted_index;
 
 pub mod mapreduce;
 
@@ -38,17 +38,17 @@ mod image_downloader;
 mod image_store;
 mod index;
 mod kv;
-pub mod query;
-pub mod ranking;
+mod query;
+mod ranking;
 mod schema;
 mod schema_org;
-pub mod searcher;
+mod searcher;
 mod snippet;
 mod spell;
 mod tokenizer;
 mod warc;
-pub mod webgraph;
-pub mod webpage;
+mod webgraph;
+mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
@@ -188,12 +188,27 @@ pub enum Error {
     Spell(#[from] crate::spell::dictionary::DictionaryError),
 
     #[error("Parser error")]
-    Parse,
+    Parse(&'static str),
+
+    #[error("Query cannot be completely empty")]
+    EmptyQuery,
 }
 
-impl<L, T, E> From<lalrpop_util::ParseError<L, T, E>> for Error {
-    fn from(_: lalrpop_util::ParseError<L, T, E>) -> Self {
-        Error::Parse
+impl<L, T> From<lalrpop_util::ParseError<L, T, &'static str>> for Error {
+    fn from(err: lalrpop_util::ParseError<L, T, &'static str>) -> Self {
+        match err {
+            lalrpop_util::ParseError::InvalidToken { location: _ } => Error::Parse("Invalid token"),
+            lalrpop_util::ParseError::UnrecognizedEOF {
+                location: _,
+                expected: _,
+            } => Error::Parse("Unrecognized EOF"),
+            lalrpop_util::ParseError::UnrecognizedToken {
+                token: _,
+                expected: _,
+            } => Error::Parse("Unrecognized Token"),
+            lalrpop_util::ParseError::ExtraToken { token: _ } => Error::Parse("Extra Token"),
+            lalrpop_util::ParseError::User { error } => Error::Parse(error),
+        }
     }
 }
 

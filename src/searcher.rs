@@ -57,10 +57,10 @@ impl Searcher {
 impl Searcher {
     pub fn search(&self, query: &str) -> Result<SearchResult> {
         let raw_query = query.to_string();
-        let query = Query::parse(query, self.index.schema())?;
+        let query = Query::parse(query, self.index.schema(), self.index.tokenizers())?;
         let ranker = Ranker::new(query.clone());
         let webpages = self.index.search(&query, ranker.collector())?;
-        let correction = self.index.spell_correction(query.simple_terms());
+        let correction = self.index.spell_correction(&query.simple_terms());
 
         let entity = self
             .entity_index

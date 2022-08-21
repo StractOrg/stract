@@ -18,6 +18,7 @@ use chrono::NaiveDateTime;
 use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
+use tantivy::tokenizer::TokenizerManager;
 use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
 
 use crate::image_store::Image;
@@ -72,6 +73,10 @@ impl InvertedIndex {
             path: path.as_ref().to_str().unwrap().to_string(),
             tantivy_index,
         })
+    }
+
+    pub fn tokenizers(&self) -> &TokenizerManager {
+        self.tantivy_index.tokenizers()
     }
 
     #[cfg(test)]
@@ -321,7 +326,8 @@ mod tests {
     #[test]
     fn simple_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("website", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
@@ -363,8 +369,12 @@ mod tests {
     #[test]
     fn document_not_matching() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("this query should not match", index.schema())
-            .expect("Failed to parse query");
+        let query = Query::parse(
+            "this query should not match",
+            index.schema(),
+            index.tokenizers(),
+        )
+        .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -399,7 +409,8 @@ mod tests {
     #[test]
     fn english_stemming() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("runner", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -434,7 +445,8 @@ mod tests {
     #[test]
     fn stemmed_query_english() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runners", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("runners", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -469,7 +481,8 @@ mod tests {
     #[test]
     fn searchable_backlinks() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("great site", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("great site", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -534,7 +547,8 @@ mod tests {
     #[test]
     fn limited_top_docs() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("runner", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         for _ in 0..100 {
@@ -571,7 +585,8 @@ mod tests {
     #[test]
     fn host_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("dr", index.schema()).expect("Failed to parse query");
+        let query =
+            Query::parse("dr", index.schema(), index.tokenizers()).expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
@@ -654,7 +669,8 @@ mod tests {
         let mut index = index1.merge(index2);
         index.commit().unwrap();
 
-        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("website", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
@@ -669,7 +685,8 @@ mod tests {
     #[test]
     fn match_across_fields() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("example test", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("example test", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
@@ -711,7 +728,8 @@ mod tests {
     #[test]
     fn fetch_time_ranking() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("test", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("test", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         index
