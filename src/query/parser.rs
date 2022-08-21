@@ -20,12 +20,13 @@ use tantivy::{
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
 
-use crate::schema::ALL_FIELDS;
+use crate::schema::{Field, ALL_FIELDS};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Simple(String),
     Not(Box<Term>),
+    Site(String),
 }
 
 impl Term {
@@ -49,6 +50,14 @@ impl Term {
                     subterm.as_tantivy_query(fields, tokenizer_manager)
                 ])),
             ),
+            Term::Site(site) => (
+                Occur::Must,
+                Box::new(BooleanQuery::new(Term::into_tantivy_site(
+                    site,
+                    fields,
+                    tokenizer_manager,
+                ))),
+            ),
         }
     }
 
@@ -62,31 +71,63 @@ impl Term {
             .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
             .into_iter()
             .map(|(field, entry)| {
-                let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
-                let processed_terms = Term::process_tantivy_term(term, analyzer, *field);
-
-                let processed_queries = processed_terms
-                    .map(|term| {
-                        (
-                            Occur::Should,
-                            Box::new(TermQuery::new(
-                                term,
-                                IndexRecordOption::WithFreqsAndPositions,
-                            )) as Box<dyn tantivy::query::Query>,
-                        )
-                    })
-                    .collect();
-                let boost = ALL_FIELDS[field.field_id() as usize].boost().unwrap_or(1.0);
-
                 (
                     Occur::Should,
-                    Box::new(BoostQuery::new(
-                        Box::new(BooleanQuery::new(processed_queries)),
-                        boost,
-                    )) as Box<dyn tantivy::query::Query>,
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, term),
                 )
             })
             .collect()
+    }
+
+    fn into_tantivy_site(
+        term: &str,
+        fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
+        tokenizer_manager: &TokenizerManager,
+    ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
+        fields
+            .iter()
+            .filter(|(field, _)| {
+                matches!(
+                    ALL_FIELDS[field.field_id() as usize],
+                    Field::Domain | Field::Host
+                )
+            })
+            .into_iter()
+            .map(|(field, entry)| {
+                (
+                    Occur::Should,
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, term),
+                )
+            })
+            .collect()
+    }
+
+    fn tantivy_term_query(
+        field: &tantivy::schema::Field,
+        entry: &tantivy::schema::FieldEntry,
+        tokenizer_manager: &TokenizerManager,
+        term: &str,
+    ) -> Box<dyn tantivy::query::Query + 'static> {
+        let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
+        let processed_terms = Term::process_tantivy_term(term, analyzer, *field);
+
+        let processed_queries = processed_terms
+            .map(|term| {
+                (
+                    Occur::Must,
+                    Box::new(TermQuery::new(
+                        term,
+                        IndexRecordOption::WithFreqsAndPositions,
+                    )) as Box<dyn tantivy::query::Query>,
+                )
+            })
+            .collect();
+        let boost = ALL_FIELDS[field.field_id() as usize].boost().unwrap_or(1.0);
+
+        Box::new(BoostQuery::new(
+            Box::new(BooleanQuery::new(processed_queries)),
+            boost,
+        ))
     }
 
     fn get_tantivy_analyzer(
@@ -133,6 +174,12 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string()))
         }
+    } else if let Some(site) = term.strip_prefix("site:") {
+        if !site.is_empty() {
+            Box::new(Term::Site(site.to_string()))
+        } else {
+            Box::new(Term::Simple(term.to_string()))
+        }
     } else {
         Box::new(Term::Simple(term.to_string()))
     }
@@ -173,6 +220,17 @@ mod tests {
             vec![
                 Box::new(Term::Simple("this".to_string())),
                 Box::new(Term::Simple("--that".to_string()))
+            ]
+        );
+    }
+
+    #[test]
+    fn site() {
+        assert_eq!(
+            parse("this site:test.com"),
+            vec![
+                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Site("test.com".to_string()))
             ]
         );
     }
