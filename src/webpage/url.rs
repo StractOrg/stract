@@ -37,7 +37,7 @@ impl Url {
     pub fn strip_protocol(&self) -> &str {
         let mut start_host = 0;
         let url = &self.0;
-        if url.starts_with("http://") || url.starts_with("https://") {
+        if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("//") {
             start_host = url
                 .find('/')
                 .expect("It was checked that url starts with protocol");
@@ -76,7 +76,7 @@ impl Url {
             let mut start_index = host[..domain_index].rfind('.').unwrap();
 
             if &host[start_index + 1..] == "co.uk" {
-                start_index = host[start_index..].rfind('.').unwrap();
+                start_index = host[..start_index].rfind('.').unwrap();
             }
 
             &host[start_index + 1..]
@@ -100,6 +100,11 @@ impl Url {
             start_host = url
                 .find(':')
                 .expect("It was checked that url starts with protocol");
+        } else if url.starts_with("//") {
+            start_host = url
+                .find('/')
+                .expect("It was checked that url starts with protocol")
+                + 1;
         }
         start_host
     }
@@ -156,5 +161,18 @@ impl Url {
 
     pub fn raw(&self) -> &str {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn double_slash_start() {
+        let url: Url = "//scripts.dailymail.co.uk".to_string().into();
+
+        assert_eq!(url.domain(), "dailymail.co.uk");
+        assert_eq!(url.host(), "scripts.dailymail.co.uk");
     }
 }
