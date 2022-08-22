@@ -274,6 +274,7 @@ impl<S: Store> Webgraph<S> {
         distances
     }
 
+    #[allow(unused)]
     pub fn distances(&self, source: Node) -> HashMap<Node, usize> {
         self.full_graph
             .as_ref()
@@ -293,6 +294,7 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
         self.full_graph
             .as_ref()
@@ -307,6 +309,7 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     pub fn reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.full_graph
             .as_ref()
@@ -319,6 +322,7 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host_graph
             .as_ref()
@@ -352,6 +356,7 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     pub fn host_reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host_graph
             .as_ref()
@@ -401,6 +406,7 @@ impl<S: Store> Webgraph<S> {
             .collect()
     }
 
+    #[allow(unused)]
     pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
         self.full_graph
             .as_ref()

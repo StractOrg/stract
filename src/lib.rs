@@ -25,7 +25,7 @@ use tantivy::TantivyError;
 use thiserror::Error;
 
 pub mod entrypoint;
-pub mod inverted_index;
+mod inverted_index;
 
 pub mod mapreduce;
 
@@ -38,17 +38,17 @@ mod image_downloader;
 mod image_store;
 mod index;
 mod kv;
-pub mod query;
-pub mod ranking;
+mod query;
+mod ranking;
 mod schema;
 mod schema_org;
-pub mod searcher;
+mod searcher;
 mod snippet;
 mod spell;
 mod tokenizer;
 mod warc;
-pub mod webgraph;
-pub mod webpage;
+mod webgraph;
+mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
@@ -192,12 +192,6 @@ pub enum Error {
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,
-}
-
-impl<L, T, E> From<lalrpop_util::ParseError<L, T, E>> for Error {
-    fn from(_: lalrpop_util::ParseError<L, T, E>) -> Self {
-        Error::Parse
-    }
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

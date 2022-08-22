@@ -93,6 +93,7 @@ pub struct Webpage<'a> {
 }
 
 impl<'a> Webpage<'a> {
+    #[cfg(test)]
     pub fn new(
         html: &'a str,
         url: &str,
@@ -435,7 +436,7 @@ impl<'a> Html<'a> {
                         return Err(Error::EmptyField("title"));
                     }
 
-                    doc.add_text(tantivy_field, title.unwrap())
+                    doc.add_text(tantivy_field, title.unwrap());
                 }
                 Field::CleanBody | Field::StemmedCleanBody => {
                     let text = self.clean_text();

@@ -24,6 +24,7 @@ use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
+use tantivy::tokenizer::TokenizerManager;
 use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
@@ -73,6 +74,10 @@ impl Index {
             spell_dictionary: Dictionary::open(Some(path.as_ref().join(SPELL_SUBFOLDER_NAME)))?,
             path: path.as_ref().to_str().unwrap().to_string(),
         })
+    }
+
+    pub fn tokenizers(&self) -> &TokenizerManager {
+        self.inverted_index.tokenizers()
     }
 
     #[cfg(test)]
@@ -308,7 +313,8 @@ mod tests {
 
         let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
         let index: Index = deserialized_frozen.into();
-        let query = Query::parse("website", index.schema()).expect("Failed to parse query");
+        let query = Query::parse("website", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
         let ranker = Ranker::new(query.clone());
 
         let result = index
