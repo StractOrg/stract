@@ -188,28 +188,10 @@ pub enum Error {
     Spell(#[from] crate::spell::dictionary::DictionaryError),
 
     #[error("Parser error")]
-    Parse(&'static str),
+    Parse,
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,
-}
-
-impl<L, T> From<lalrpop_util::ParseError<L, T, &'static str>> for Error {
-    fn from(err: lalrpop_util::ParseError<L, T, &'static str>) -> Self {
-        match err {
-            lalrpop_util::ParseError::InvalidToken { location: _ } => Error::Parse("Invalid token"),
-            lalrpop_util::ParseError::UnrecognizedEOF {
-                location: _,
-                expected: _,
-            } => Error::Parse("Unrecognized EOF"),
-            lalrpop_util::ParseError::UnrecognizedToken {
-                token: _,
-                expected: _,
-            } => Error::Parse("Unrecognized Token"),
-            lalrpop_util::ParseError::ExtraToken { token: _ } => Error::Parse("Extra Token"),
-            lalrpop_util::ParseError::User { error } => Error::Parse(error),
-        }
-    }
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

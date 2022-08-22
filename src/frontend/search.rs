@@ -22,13 +22,17 @@ use crate::{
     inverted_index::RetrievedWebpage,
     searcher::Searcher,
     webpage::Url,
+    Error,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use super::{HtmlTemplate, State};
 use askama::Template;
-use axum::{extract, response::IntoResponse};
+use axum::{
+    extract,
+    response::{IntoResponse, Redirect},
+};
 
 pub fn html_escape(s: &str) -> String {
     html_escape::decode_html_entities(s)
@@ -241,46 +245,44 @@ pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    let mut search_result = Vec::new();
-    let mut displayed_query = String::new();
-    let mut entity = None;
-    let mut spell_correction = None;
+    let query = params.get("q").cloned().unwrap_or_default();
 
-    if let Some(query) = params.get("q") {
-        displayed_query = query.clone();
-        let result = state.searcher.search(query).expect("Search failed");
+    match state.searcher.search(query.as_str()) {
+        Ok(result) => {
+            let search_result = result
+                .webpages
+                .documents
+                .into_iter()
+                .map(|mut webpage| {
+                    webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
+                        if state.searcher.primary_image(uuid.clone()).is_some() {
+                            Some(uuid)
+                        } else {
+                            None
+                        }
+                    });
+                    webpage
+                })
+                .map(DisplayedWebpage::from)
+                .collect();
 
-        search_result = result
-            .webpages
-            .documents
-            .into_iter()
-            .map(|mut webpage| {
-                webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
-                    if state.searcher.primary_image(uuid.clone()).is_some() {
-                        Some(uuid)
-                    } else {
-                        None
-                    }
-                });
+            let entity = result
+                .entity
+                .map(|entity| DisplayedEntity::from(entity, &state.searcher));
+            let spell_correction = result.spell_corrected_query;
 
-                webpage
-            })
-            .map(DisplayedWebpage::from)
-            .collect();
+            let template = SearchTemplate {
+                search_result,
+                query,
+                entity,
+                spell_correction,
+            };
 
-        entity = result
-            .entity
-            .map(|entity| DisplayedEntity::from(entity, &state.searcher));
-        spell_correction = result.spell_corrected_query;
+            HtmlTemplate(template).into_response()
+        }
+        Err(Error::EmptyQuery) => Redirect::to("/").into_response(),
+        Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
     }
-
-    let template = SearchTemplate {
-        search_result,
-        query: displayed_query,
-        entity,
-        spell_correction,
-    };
-    HtmlTemplate(template)
 }
 
 fn entity_link_to_html(span: Span, trunace_to: usize) -> String {

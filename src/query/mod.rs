@@ -89,6 +89,10 @@ impl Query {
             })
             .collect()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.terms.is_empty()
+    }
 }
 
 impl tantivy::query::Query for Query {
@@ -430,5 +434,15 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com/forum");
+    }
+
+    #[test]
+    fn empty_query() {
+        let schema = Arc::new(create_schema());
+
+        let query = Query::parse("", Arc::clone(&schema), &TokenizerManager::new())
+            .expect("Failed to parse query");
+
+        assert!(query.is_empty())
     }
 }
