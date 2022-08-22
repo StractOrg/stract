@@ -378,4 +378,57 @@ mod tests {
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com");
     }
+
+    #[test]
+    fn url_query() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website
+                            </body>
+                        </html>
+                    "#,
+                "https://www.first.com/forum",
+                vec![],
+                1.0,
+                0,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website
+                            </body>
+                        </html>
+                    "#,
+                "https://www.second.com",
+                vec![],
+                1.0,
+                0,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let query = Query::parse("test inurl:forum", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
+        let ranker = Ranker::new(query.clone());
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.first.com/forum");
+    }
 }

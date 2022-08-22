@@ -29,6 +29,7 @@ pub enum Term {
     Site(String),
     Title(String),
     Body(String),
+    Url(String),
 }
 
 impl Term {
@@ -82,6 +83,16 @@ impl Term {
                 (
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, body),
+                )
+            }
+            Term::Url(url) => {
+                let (field, entry) = fields
+                    .iter()
+                    .find(|(field, _)| matches!(ALL_FIELDS[field.field_id() as usize], Field::Url))
+                    .unwrap();
+                (
+                    Occur::Must,
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, url),
                 )
             }
         }
@@ -218,6 +229,12 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string()))
         }
+    } else if let Some(url) = term.strip_prefix("inurl:") {
+        if !url.is_empty() {
+            Box::new(Term::Url(url.to_string()))
+        } else {
+            Box::new(Term::Simple(term.to_string()))
+        }
     } else {
         Box::new(Term::Simple(term.to_string()))
     }
@@ -291,6 +308,17 @@ mod tests {
             vec![
                 Box::new(Term::Simple("this".to_string())),
                 Box::new(Term::Body("test".to_string()))
+            ]
+        );
+    }
+
+    #[test]
+    fn url() {
+        assert_eq!(
+            parse("this inurl:test"),
+            vec![
+                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Url("test".to_string()))
             ]
         );
     }
