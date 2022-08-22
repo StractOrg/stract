@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::{
-    query::{BooleanQuery, BoostQuery, Occur, TermQuery},
+    query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, TermQuery},
     schema::IndexRecordOption,
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
@@ -146,25 +146,20 @@ impl Term {
         term: &str,
     ) -> Box<dyn tantivy::query::Query + 'static> {
         let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
-        let processed_terms = Term::process_tantivy_term(term, analyzer, *field);
+        let mut processed_terms = Term::process_tantivy_term(term, analyzer, *field);
 
-        let processed_queries = processed_terms
-            .map(|term| {
-                (
-                    Occur::Must,
-                    Box::new(TermQuery::new(
-                        term,
-                        IndexRecordOption::WithFreqsAndPositions,
-                    )) as Box<dyn tantivy::query::Query>,
-                )
-            })
-            .collect();
+        let processed_query = if processed_terms.len() > 1 {
+            Box::new(PhraseQuery::new(processed_terms)) as Box<dyn tantivy::query::Query>
+        } else {
+            let term = processed_terms.pop().unwrap();
+            Box::new(TermQuery::new(
+                term,
+                IndexRecordOption::WithFreqsAndPositions,
+            ))
+        };
         let boost = ALL_FIELDS[field.field_id() as usize].boost().unwrap_or(1.0);
 
-        Box::new(BoostQuery::new(
-            Box::new(BooleanQuery::new(processed_queries)),
-            boost,
-        ))
+        Box::new(BoostQuery::new(processed_query, boost))
     }
 
     fn get_tantivy_analyzer(
@@ -186,9 +181,9 @@ impl Term {
         term: &str,
         analyzer: Option<TextAnalyzer>,
         tantivy_field: tantivy::schema::Field,
-    ) -> impl Iterator<Item = tantivy::Term> {
+    ) -> Vec<tantivy::Term> {
         match analyzer {
-            None => vec![tantivy::Term::from_field_text(tantivy_field, term)].into_iter(),
+            None => vec![tantivy::Term::from_field_text(tantivy_field, term)],
             Some(tokenizer) => {
                 let mut terms: Vec<tantivy::Term> = Vec::new();
                 let mut token_stream = tokenizer.token_stream(term);
@@ -197,7 +192,7 @@ impl Term {
                     terms.push(term);
                 });
 
-                terms.into_iter()
+                terms
             }
         }
     }

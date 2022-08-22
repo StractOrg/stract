@@ -69,7 +69,7 @@ impl Query {
 
         queries.push((Occur::Should, Box::new(AllQuery)));
 
-        let tantivy_query = dbg!(Box::new(BooleanQuery::new(queries)));
+        let tantivy_query = Box::new(BooleanQuery::new(queries));
 
         Ok(Query {
             terms,
