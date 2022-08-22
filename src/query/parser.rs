@@ -28,6 +28,7 @@ pub enum Term {
     Not(Box<Term>),
     Site(String),
     Title(String),
+    Body(String),
 }
 
 impl Term {
@@ -69,6 +70,18 @@ impl Term {
                 (
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, title),
+                )
+            }
+            Term::Body(body) => {
+                let (field, entry) = fields
+                    .iter()
+                    .find(|(field, _)| {
+                        matches!(ALL_FIELDS[field.field_id() as usize], Field::AllBody)
+                    })
+                    .unwrap();
+                (
+                    Occur::Must,
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, body),
                 )
             }
         }
@@ -199,6 +212,12 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string()))
         }
+    } else if let Some(body) = term.strip_prefix("inbody:") {
+        if !body.is_empty() {
+            Box::new(Term::Body(body.to_string()))
+        } else {
+            Box::new(Term::Simple(term.to_string()))
+        }
     } else {
         Box::new(Term::Simple(term.to_string()))
     }
@@ -261,6 +280,17 @@ mod tests {
             vec![
                 Box::new(Term::Simple("this".to_string())),
                 Box::new(Term::Title("test".to_string()))
+            ]
+        );
+    }
+
+    #[test]
+    fn body() {
+        assert_eq!(
+            parse("this inbody:test"),
+            vec![
+                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Body("test".to_string()))
             ]
         );
     }
