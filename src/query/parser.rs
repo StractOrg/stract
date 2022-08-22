@@ -27,6 +27,7 @@ pub enum Term {
     Simple(String),
     Not(Box<Term>),
     Site(String),
+    Title(String),
 }
 
 impl Term {
@@ -58,6 +59,18 @@ impl Term {
                     tokenizer_manager,
                 ))),
             ),
+            Term::Title(title) => {
+                let (field, entry) = fields
+                    .iter()
+                    .find(|(field, _)| {
+                        matches!(ALL_FIELDS[field.field_id() as usize], Field::Title)
+                    })
+                    .unwrap();
+                (
+                    Occur::Must,
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, title),
+                )
+            }
         }
     }
 
@@ -180,6 +193,12 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string()))
         }
+    } else if let Some(title) = term.strip_prefix("intitle:") {
+        if !title.is_empty() {
+            Box::new(Term::Title(title.to_string()))
+        } else {
+            Box::new(Term::Simple(term.to_string()))
+        }
     } else {
         Box::new(Term::Simple(term.to_string()))
     }
@@ -231,6 +250,17 @@ mod tests {
             vec![
                 Box::new(Term::Simple("this".to_string())),
                 Box::new(Term::Site("test.com".to_string()))
+            ]
+        );
+    }
+
+    #[test]
+    fn title() {
+        assert_eq!(
+            parse("this intitle:test"),
+            vec![
+                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Title("test".to_string()))
             ]
         );
     }
