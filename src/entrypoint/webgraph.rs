@@ -20,6 +20,8 @@ use crate::{
     webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
+use rayon::prelude::ParallelBridge;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
 use tracing::{debug, info, trace};
@@ -171,19 +173,16 @@ impl WebgraphEntrypoint {
 
         warc_paths
             .into_iter()
+            .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .map(|path| Job {
                 config: job_config.clone(),
                 warc_path: path,
                 graph_base_path: "data/webgraph".to_string(),
             })
+            .par_bridge()
             .map(|job| job.map(&worker))
-            .fold(
-                None,
-                |acc: Option<Webgraph>, elem: FrozenWebgraph| match acc {
-                    Some(acc) => Some(acc.reduce(elem)),
-                    None => Some(elem.into()),
-                },
-            );
+            .map(Webgraph::from)
+            .reduce_with(|a, b| a.reduce(b));
 
         Ok(())
     }

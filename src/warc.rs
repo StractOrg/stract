@@ -20,7 +20,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::thread::sleep;
-use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
 use tracing::debug;
@@ -112,12 +111,10 @@ impl WarcFile {
         url += path;
 
         let client = reqwest::blocking::ClientBuilder::new()
-            .tcp_keepalive(Duration::from_secs(120))
-            .connect_timeout(Duration::from_secs(20))
-            .timeout(Duration::from_secs(300))
-            .pool_idle_timeout(Duration::from_secs(0))
-            .pool_max_idle_per_host(0)
-            .connection_verbose(true)
+            .tcp_keepalive(None)
+            .connect_timeout(None)
+            .timeout(None)
+            .pool_idle_timeout(None)
             .build()?;
         let res = client.get(url).send()?;
 

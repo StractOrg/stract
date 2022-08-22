@@ -16,6 +16,7 @@
 use std::net::SocketAddr;
 use std::path::Path;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, trace};
 
@@ -115,15 +116,28 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
 
 impl Reduce<FrozenIndex> for Index {
     fn reduce(self, element: FrozenIndex) -> Self {
-        let other = element.into();
+        let other: Index = element.into();
 
-        self.merge(other)
+        let other_path = other.path.clone();
+
+        let res = self.merge(other);
+
+        std::fs::remove_dir_all(other_path).unwrap();
+
+        res
     }
 }
 
 impl Reduce<Index> for Index {
     fn reduce(self, element: Index) -> Self {
-        self.merge(element)
+        let other = element;
+        let other_path = other.path.clone();
+
+        let res = self.merge(other);
+
+        std::fs::remove_dir_all(other_path).unwrap();
+
+        res
     }
 }
 
@@ -196,11 +210,11 @@ impl Indexer {
                 warc_path: path,
                 base_path: "data/index".to_string(),
             })
+            .par_bridge()
+            .panic_fuse()
             .map(|job| job.map(&worker))
-            .fold(None, |acc: Option<Index>, elem: FrozenIndex| match acc {
-                Some(acc) => Some(acc.reduce(elem)),
-                None => Some(elem.into()),
-            });
+            .map(Index::from)
+            .reduce_with(|a, b| a.reduce(b));
 
         Ok(())
     }
