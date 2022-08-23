@@ -130,11 +130,13 @@ impl Index {
         }
 
         if let Some(favicon) = webpage.html.favicon() {
-            self.favicon_downloader.schedule(ImageDownloadJob {
-                key: favicon.link.domain().to_string(),
-                urls: vec![favicon.link],
-                timeout: Some(Duration::from_secs(1)),
-            });
+            if favicon.link.is_valid_uri() {
+                self.favicon_downloader.schedule(ImageDownloadJob {
+                    key: favicon.link.domain().to_string(),
+                    urls: vec![favicon.link],
+                    timeout: Some(Duration::from_secs(1)),
+                });
+            }
         }
     }
 
@@ -148,14 +150,16 @@ impl Index {
         }
 
         if let Some(url) = webpage.html.primary_image() {
-            let uuid = self.primary_image_store.generate_uuid();
-            webpage.set_primary_image_uuid(uuid);
+            if url.is_valid_uri() {
+                let uuid = self.primary_image_store.generate_uuid();
+                webpage.set_primary_image_uuid(uuid);
 
-            self.primary_image_downloader.schedule(ImageDownloadJob {
-                key: uuid,
-                urls: vec![url],
-                timeout: Some(Duration::from_secs(5)),
-            });
+                self.primary_image_downloader.schedule(ImageDownloadJob {
+                    key: uuid,
+                    urls: vec![url],
+                    timeout: Some(Duration::from_secs(5)),
+                });
+            }
         }
     }
 

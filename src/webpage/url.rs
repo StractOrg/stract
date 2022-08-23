@@ -37,7 +37,7 @@ impl Url {
     pub fn strip_protocol(&self) -> &str {
         let mut start_host = 0;
         let url = &self.0;
-        if url.starts_with("http://") || url.starts_with("https://") {
+        if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("//") {
             start_host = url
                 .find('/')
                 .expect("It was checked that url starts with protocol");
@@ -73,13 +73,17 @@ impl Url {
         let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
         if num_punctuations > 1 {
             let domain_index = host.rfind('.').unwrap();
-            let mut start_index = host[..domain_index].rfind('.').unwrap();
+            let mut start_index = host[..domain_index].rfind('.').unwrap() + 1;
 
-            if &host[start_index + 1..] == "co.uk" {
-                start_index = host[start_index..].rfind('.').unwrap();
+            if &host[start_index..] == "co.uk" {
+                if let Some(new_start_index) = host[..start_index - 1].rfind('.') {
+                    start_index = new_start_index + 1;
+                } else {
+                    start_index = 0;
+                }
             }
 
-            &host[start_index + 1..]
+            &host[start_index..]
         } else {
             host
         }
@@ -100,6 +104,11 @@ impl Url {
             start_host = url
                 .find(':')
                 .expect("It was checked that url starts with protocol");
+        } else if url.starts_with("//") {
+            start_host = url
+                .find('/')
+                .expect("It was checked that url starts with protocol")
+                + 1;
         }
         start_host
     }
@@ -156,5 +165,78 @@ impl Url {
 
     pub fn raw(&self) -> &str {
         &self.0
+    }
+
+    pub fn is_valid_uri(&self) -> bool {
+        self.full().as_str().parse::<http::Uri>().is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn double_slash_start() {
+        let url: Url = "//scripts.dailymail.co.uk".to_string().into();
+
+        assert_eq!(url.domain(), "dailymail.co.uk");
+        assert_eq!(url.host(), "scripts.dailymail.co.uk");
+    }
+
+    #[test]
+    fn co_uk_edgecase() {
+        let url: Url = "dailymail.co.uk".to_string().into();
+
+        assert_eq!(url.domain(), "dailymail.co.uk");
+        assert_eq!(url.host(), "dailymail.co.uk");
+        assert_eq!(url.full().as_str(), "https://dailymail.co.uk");
+    }
+
+    #[test]
+    fn full() {
+        let url: Url = "https://example.com".to_string().into();
+        assert_eq!(url.full().as_str(), "https://example.com");
+
+        let url: Url = "http://example.com".to_string().into();
+        assert_eq!(url.full().as_str(), "http://example.com");
+    }
+
+    #[test]
+    fn prefix_with() {
+        let mut a: Url = "/test".to_string().into();
+        let b: Url = "https://example.com".to_string().into();
+        a.prefix_with(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "test".to_string().into();
+        let b: Url = "https://example.com".to_string().into();
+        a.prefix_with(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "test".to_string().into();
+        let b: Url = "https://example.com/".to_string().into();
+        a.prefix_with(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "/test".to_string().into();
+        let b: Url = "https://example.com/".to_string().into();
+        a.prefix_with(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+    }
+
+    #[test]
+    fn is_full_path() {
+        let url: Url = "https://dailymail.co.uk".to_string().into();
+        assert!(url.is_full_path());
+    }
+
+    #[test]
+    fn is_valid() {
+        let url: Url = "https://dailymail.co.uk".to_string().into();
+        assert!(url.is_valid_uri());
+
+        let url: Url = "da<>ilymail.co.uk".to_string().into();
+        assert!(!url.is_valid_uri());
     }
 }

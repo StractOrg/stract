@@ -39,7 +39,7 @@ impl<'a> Tag<'a> {
         let mut long_attribute: Option<usize> = None;
         let mut is_first_token = true;
         for (start_idx, tok) in split_whitespace_indices(self.raw) {
-            let num_quotes = tok.chars().filter(|c| *c == '"').count();
+            let num_quotes = tok.chars().filter(|c| matches!(*c, '"' | '\'')).count();
             if (tok.contains('>') && num_quotes == 0 && is_first_token)
                 || tok.contains('<')
                 || tok == "/>"
@@ -88,6 +88,10 @@ impl<'a> Tag<'a> {
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
+
+    pub fn raw(&self) -> &str {
+        self.raw
+    }
 }
 
 fn trim_html_stuff(s: &str, break_on_dash: bool) -> &str {
@@ -96,7 +100,7 @@ fn trim_html_stuff(s: &str, break_on_dash: bool) -> &str {
 
     for (idx, c) in s.char_indices() {
         start_val = idx;
-        if c != ' ' && c != '"' {
+        if !matches!(c, ' ' | '"' | '\'') {
             break;
         }
     }
@@ -107,7 +111,7 @@ fn trim_html_stuff(s: &str, break_on_dash: bool) -> &str {
             break;
         }
 
-        if c == '"' || c == '>' {
+        if matches!(c, '>' | '"' | '\'') {
             break;
         }
     }
@@ -119,34 +123,26 @@ fn start_tag<'a>(lex: &mut Lexer<'a, Token<'a>>) -> Option<Tag<'a>> {
     let slice = lex.slice();
     let name = name(slice);
 
-    if name.chars().any(|c| c.is_uppercase()) {
-        Some(Tag {
-            name: Cow::Owned(name.to_ascii_lowercase()),
-            raw: slice,
-        })
+    let name = if name.chars().any(|c| c.is_uppercase()) {
+        Cow::Owned(name.to_ascii_lowercase())
     } else {
-        Some(Tag {
-            name: Cow::Borrowed(name),
-            raw: slice,
-        })
-    }
+        Cow::Borrowed(name)
+    };
+
+    Some(Tag { name, raw: slice })
 }
 
 fn end_tag<'a>(lex: &mut Lexer<'a, Token<'a>>) -> Option<Tag<'a>> {
     let slice = lex.slice();
     let name = name(slice);
 
-    if name.chars().any(|c| c.is_uppercase()) {
-        Some(Tag {
-            name: Cow::Owned(name.to_ascii_lowercase()),
-            raw: slice,
-        })
+    let name = if name.chars().any(|c| c.is_uppercase()) {
+        Cow::Owned(name.to_ascii_lowercase())
     } else {
-        Some(Tag {
-            name: Cow::Borrowed(name),
-            raw: slice,
-        })
-    }
+        Cow::Borrowed(name)
+    };
+
+    Some(Tag { name, raw: slice })
 }
 
 fn name(s: &str) -> &str {
@@ -173,12 +169,13 @@ fn name(s: &str) -> &str {
 
 #[derive(Clone, Logos, Debug, PartialEq, Eq)]
 pub enum Token<'a> {
-    #[regex(r"<[^>]+>", start_tag)]
+    #[regex(r"<[^><]+[^/]?>", start_tag, priority = 0)]
     StartTag(Tag<'a>),
 
-    #[regex(r"<\\?/[a-zA-Z]+>", end_tag)]
+    #[regex(r"<?\\?/[a-zA-Z]+>", end_tag, priority = 1)]
     EndTag(Tag<'a>),
 
+    // #[regex(r"<[^[/>]]+/>", start_tag)]
     #[regex(r"<[^[/>]]+/>", start_tag)]
     SelfTerminatingTag(Tag<'a>),
 
@@ -203,7 +200,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
 
         assert_eq!(tag.name(), "a");
@@ -217,7 +214,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap![]);
@@ -227,7 +224,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap![]);
@@ -237,7 +234,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap![]);
@@ -247,7 +244,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap![]);
@@ -260,7 +257,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "input");
         assert_eq!(tag.attributes(), hashmap!["autofocus" => ""]);
@@ -270,7 +267,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::SelfTerminatingTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "input");
         assert_eq!(tag.attributes(), hashmap!["autofocus" => ""]);
@@ -283,7 +280,7 @@ mod tests {
 
         let tag = match lex.next().unwrap() {
             Token::SelfTerminatingTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap!["href" => "test"]);
@@ -292,11 +289,14 @@ mod tests {
 
     #[test]
     fn end_tag() {
-        let mut lex = Token::lexer("<a href=\"test\">this is some text</a>");
+        let raw = r#"<a href="test">this is some text</a>"#;
+        let mut lex = Token::lexer(raw);
 
         let tag = match lex.next().unwrap() {
             Token::StartTag(tag) => tag,
-            _ => panic!(),
+            whut => {
+                panic!("{:?}", whut)
+            }
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(tag.attributes(), hashmap!["href" => "test"]);
@@ -309,7 +309,7 @@ mod tests {
 
         let tag = match tok.unwrap() {
             Token::EndTag(tag) => tag,
-            _ => panic!(),
+            whut => panic!("{:?}", whut),
         };
         assert_eq!(tag.name(), "a");
         assert_eq!(lex.next(), None);
@@ -337,5 +337,48 @@ mod tests {
             hashmap!["description" => "this is a long attribute"]
         );
         assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn script_with_lt() {
+        let raw = "<script>if d < a</script>";
+        let mut lex = Token::lexer(raw);
+
+        let tag = match lex.next().unwrap() {
+            Token::StartTag(tag) => tag,
+            whut => panic!("{:?}", whut),
+        };
+
+        assert_eq!(tag.name(), "script");
+
+        let mut text = String::new();
+
+        let mut tok = lex.next();
+        while let Some(Token::Error) = tok {
+            text.push_str(&raw[lex.span()]);
+            tok = lex.next();
+        }
+
+        assert_eq!(text.as_str(), "if d < a");
+
+        assert!(matches!(tok.unwrap(), Token::EndTag(_)));
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn link_attributes() {
+        let raw = "<link href='//securepubads.g.doubleclick.net' rel='preconnect'>";
+
+        let mut lex = Token::lexer(raw);
+
+        let tag = match lex.next().unwrap() {
+            Token::StartTag(tag) => tag,
+            whut => panic!("{:?}", whut),
+        };
+
+        assert_eq!(
+            tag.attributes().get("href"),
+            Some(&"//securepubads.g.doubleclick.net")
+        );
     }
 }

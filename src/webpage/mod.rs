@@ -15,7 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{schema_org::SchemaOrg, Error, Result};
 use chrono::{DateTime, FixedOffset};
+use itertools::Itertools;
 use logos::{Lexer, Logos};
+use regex::Regex;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -27,6 +29,10 @@ use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 pub use self::url::Url;
 use self::{just_text::JustText, lexer::Token};
+
+static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
+    Regex::new(r#"(((http|ftp|https):/{2})+(([0-9a-z_-]+\.)+(aero|asia|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|cz|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mn|mn|mo|mp|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|nom|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ra|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|arpa)(:[0-9]+)?((/([~0-9a-zA-Z\#\+%@\./_-]+))?(\?[0-9a-zA-Z\+%@/&\[\];=_-]+)?)?))\b"#).unwrap()
+});
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct FaviconLink {
@@ -53,7 +59,7 @@ impl<const N: usize> Preprocessor<N> {
 
     pub fn update(&mut self, tok: &Token) {
         match tok {
-            Token::StartTag(tag) => {
+            Token::StartTag(tag) if !tag.raw().contains("/>") => {
                 if let Some((_, n)) = self
                     .removed_tags
                     .iter()
@@ -73,9 +79,9 @@ impl<const N: usize> Preprocessor<N> {
                     *n -= 1;
                 }
             }
-            Token::SelfTerminatingTag(_) | Token::Error => {}
             Token::BeginComment => self.open_comments += 1,
             Token::EndComment => self.open_comments -= 1,
+            _ => {}
         }
     }
 
@@ -474,6 +480,7 @@ impl<'a> Html<'a> {
 
                     doc.add_text(tantivy_field, text.unwrap())
                 }
+                Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::FetchTimeMs
@@ -618,6 +625,77 @@ impl<'a> Html<'a> {
                 }
             })
             .and_then(|metadata| metadata.get("content").cloned())
+    }
+
+    pub fn trackers(&self) -> Vec<Url> {
+        let mut tokens = self.tokens.clone();
+
+        let mut links: Vec<Url> = Vec::new();
+        let mut open_scripts = 0;
+        let mut script_text = String::new();
+        let mut preprocessor = Preprocessor::new([]);
+
+        while let Some(tok) = tokens.next() {
+            preprocessor.update(&tok);
+            if preprocessor.is_inside_removed() {
+                continue;
+            }
+
+            match tok {
+                Token::StartTag(tag) if tag.name() == "script" => {
+                    if !tag.raw().contains("/>") {
+                        open_scripts += 1;
+                    }
+                    if let Some(link) = tag.attributes().get("src") {
+                        links.push(link.to_string().into());
+                    }
+                }
+                Token::EndTag(tag) if tag.name() == "script" => {
+                    if open_scripts > 0 {
+                        open_scripts -= 1;
+
+                        if open_scripts == 0 {
+                            for res in URL_REGEX.find_iter(script_text.as_str()) {
+                                links.push(res.as_str().to_string().into());
+                            }
+                            script_text.clear();
+                        }
+                    }
+                }
+                _ if open_scripts > 0 => {
+                    let span = tokens.span();
+                    script_text.push_str(&self.raw[span]);
+                }
+                Token::Error => {
+                    if open_scripts > 0 {
+                        let span = tokens.span();
+                        script_text.push_str(&self.raw[span]);
+                    }
+                }
+                Token::SelfTerminatingTag(tag) if tag.name() == "script" => {
+                    if let Some(link) = tag.attributes().get("src") {
+                        links.push(link.to_string().into());
+                    }
+                }
+                Token::StartTag(tag) | Token::SelfTerminatingTag(tag) if tag.name() == "link" => {
+                    if let Some(link) = tag.attributes().get("href") {
+                        links.push(link.to_string().into());
+                    }
+                }
+                Token::StartTag(_)
+                | Token::EndTag(_)
+                | Token::SelfTerminatingTag(_)
+                | Token::BeginComment
+                | Token::EndComment => {}
+            }
+        }
+
+        links
+            .into_iter()
+            .filter(|link| !link.host().is_empty())
+            .filter(|link| link.host() != self.host())
+            .unique_by(|link| link.host().to_string())
+            .collect()
     }
 }
 
@@ -1156,5 +1234,83 @@ mod tests {
             html.updated_time(),
             Some(DateTime::parse_from_rfc3339("2022-06-22T19:37:34+00:00").unwrap())
         );
+    }
+
+    #[test]
+    fn trackers() {
+        let html = r#"
+            <html>
+                <head>
+                    <script>
+                        !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://cdn.segment.com/analytics.js/v1/" + key + "/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey="";analytics.SNIPPET_VERSION="4.13.2";
+                        analytics.load("");
+                        analytics.page();
+                        }}();
+                    </script>
+                    <script>
+                        (function(h,o,t,j,a,r){
+                            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+                            a.appendChild(r);
+                        })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+                    </script>
+                    <script src="https://thirdparty.com/js" />
+                    <script src="https://example.com/js" />
+                    <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
+                    <script src="https://thirdparty.com/js" />
+                    <script src="/js/file" />
+                    <meta property="article:modified_time" content="2022-06-22T19:37:34+00:00" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(
+            html.trackers()
+                .into_iter()
+                .map(|url| url.host().to_string())
+                .collect::<Vec<_>>(),
+            vec![
+                "cdn.segment.com".to_string(),
+                "static.hotjar.com".to_string(),
+                "thirdparty.com".to_string(),
+                "securepubads.g.doubleclick.net".to_string()
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_title_with_scripts() {
+        let html = Html::parse(
+            r#"
+                    <html>
+                        <head>
+                            <script>
+                                !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://cdn.segment.com/analytics.js/v1/" + key + "/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey="";analytics.SNIPPET_VERSION="4.13.2";
+                                analytics.load("");
+                                analytics.page();
+                                }}();
+                            </script>
+                            <script>
+                                (function(h,o,t,j,a,r){
+                                    h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+                                    a.appendChild(r);
+                                })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+                            </script>
+                            <script src="https://thirdparty.com/js" />
+                            <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+            "example.com",
+        );
+
+        assert_eq!(html.title(), Some("Test site".to_string()));
+        assert_eq!(html.all_text(), Some("test".to_string()))
     }
 }

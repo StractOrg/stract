@@ -13,7 +13,7 @@
     cargo run --release -- configs/webgraph/master.toml
 
 @frontend:
-    cargo watch -x 'run -- frontend data/index queries_us.csv data/entity'
+    cargo watch -x 'run -- frontend data/index data/queries_us.csv data/entity'
 
 @local:
     wget -nc -P data/warc_files https://data.commoncrawl.org/crawl-data/CC-MAIN-2022-05/segments/1642320299852.23/warc/CC-MAIN-20220116093137-20220116123137-00049.warc.gz

@@ -28,6 +28,7 @@ pub(crate) struct InitialSegmentScoreTweaker {
     is_homepage_reader: DynamicFastFieldReader<u64>,
     fetch_time_ms_reader: DynamicFastFieldReader<u64>,
     update_timestamp_reader: DynamicFastFieldReader<u64>,
+    num_trackers_reader: DynamicFastFieldReader<u64>,
     current_timestamp: f64,
 }
 
@@ -71,6 +72,15 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .u64(update_timestamp_field)
             .expect("Failed to get last_updated fast-field reader");
 
+        let num_trackers_field = segment_reader
+            .schema()
+            .get_field(Field::NumTrackers.as_str())
+            .expect("Faild to load num_trackers field");
+        let num_trackers_reader = segment_reader
+            .fast_fields()
+            .u64(num_trackers_field)
+            .expect("Failed to get num_trackers fast-field reader");
+
         let current_timestamp = Utc::now().timestamp() as f64;
 
         Ok(InitialSegmentScoreTweaker {
@@ -78,6 +88,7 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             is_homepage_reader,
             fetch_time_ms_reader,
             update_timestamp_reader,
+            num_trackers_reader,
             current_timestamp,
         })
     }
@@ -95,11 +106,13 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let fetch_time_ms = self.fetch_time_ms_reader.get(doc) as f64;
         let update_timestamp = self.update_timestamp_reader.get(doc) as f64;
         let hours_since_update = (self.current_timestamp - update_timestamp).max(0.000001) / 3600.0;
+        let num_trackers = self.num_trackers_reader.get(doc) as f64;
 
         (3.0 * score)
-            + (6000.0 * centrality)
+            + (3000.0 * centrality)
             + (1.0 * is_homepage)
-            + (0.5 / (fetch_time_ms + 1.0))
+            + (1.0 / (fetch_time_ms + 1.0))
             + (1500.0 * time_to_score(hours_since_update))
+            + (200.0 * (1.0 / (num_trackers + 1.0)))
     }
 }
