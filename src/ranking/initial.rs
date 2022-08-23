@@ -113,6 +113,6 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
             + (1.0 * is_homepage)
             + (1.0 / (fetch_time_ms + 1.0))
             + (1500.0 * time_to_score(hours_since_update))
-            + (100.0 * (1.0 / (num_trackers + 1.0)))
+            + (200.0 * (1.0 / (num_trackers + 1.0)))
     }
 }
