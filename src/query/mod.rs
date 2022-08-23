@@ -112,7 +112,10 @@ impl tantivy::query::Query for Query {
 #[cfg(test)]
 mod tests {
     use crate::{
-        inverted_index::InvertedIndex, ranking::Ranker, schema::create_schema, webpage::Webpage,
+        inverted_index::InvertedIndex,
+        ranking::Ranker,
+        schema::create_schema,
+        webpage::{region::RegionCount, Webpage},
     };
 
     use super::*;
@@ -205,7 +208,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("test -website", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -297,7 +300,7 @@ mod tests {
 
         let query = Query::parse("test site:first.com", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -311,7 +314,7 @@ mod tests {
             index.tokenizers(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -321,7 +324,7 @@ mod tests {
 
         let query = Query::parse("test -site:first.com", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -374,7 +377,7 @@ mod tests {
 
         let query = Query::parse("intitle:website", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -427,7 +430,7 @@ mod tests {
 
         let query = Query::parse("test inurl:forum", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");

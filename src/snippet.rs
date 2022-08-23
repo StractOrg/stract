@@ -354,7 +354,9 @@ Survey in 2016, 2017, and 2018."#;
 
         let searcher = Searcher::from(index);
 
-        let result = searcher.search("rust language").expect("Search failed");
+        let result = searcher
+            .search("rust language", None)
+            .expect("Search failed");
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
@@ -390,7 +392,7 @@ Survey in 2016, 2017, and 2018."#;
 
         let searcher = Searcher::from(index);
 
-        let result = searcher.search("describe").expect("Search failed");
+        let result = searcher.search("describe", None).expect("Search failed");
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);

@@ -42,8 +42,9 @@ pub enum Field {
     LastUpdated,
     Description,
     NumTrackers,
+    Region,
 }
-pub static ALL_FIELDS: [Field; 18] = [
+pub static ALL_FIELDS: [Field; 19] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -62,6 +63,7 @@ pub static ALL_FIELDS: [Field; 18] = [
     Field::LastUpdated,
     Field::Description,
     Field::NumTrackers,
+    Field::Region,
 ];
 
 impl Field {
@@ -131,6 +133,11 @@ impl Field {
                     .set_indexed(),
             ),
             Field::Description => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Region => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -154,6 +161,7 @@ impl Field {
             Field::AllBody => "all_body",
             Field::StemmedAllBody => "stemmed_all_body",
             Field::NumTrackers => "num_trackers",
+            Field::Region => "region",
         }
     }
 
@@ -175,6 +183,7 @@ impl Field {
             | Field::FetchTimeMs
             | Field::Description
             | Field::NumTrackers
+            | Field::Region
             | Field::LastUpdated => None,
         }
     }

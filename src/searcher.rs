@@ -25,6 +25,7 @@ use crate::index::Index;
 use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::Ranker;
+use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{Error, Result};
 
@@ -57,7 +58,7 @@ impl Searcher {
 }
 
 impl Searcher {
-    pub fn search(&self, query: &str) -> Result<SearchResult> {
+    pub fn search(&self, query: &str, selected_region: Option<Region>) -> Result<SearchResult> {
         let start = Instant::now();
 
         let raw_query = query.to_string();
@@ -67,7 +68,14 @@ impl Searcher {
             return Err(Error::EmptyQuery);
         }
 
-        let ranker = Ranker::new(query.clone());
+        let mut ranker = Ranker::new(self.index.region_count.clone());
+
+        if let Some(region) = selected_region {
+            if region != Region::All {
+                ranker = ranker.with_region(region);
+            }
+        }
+
         let webpages = self.index.search(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 

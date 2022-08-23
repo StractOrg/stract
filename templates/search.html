@@ -21,7 +21,7 @@
                     <p class="h-fit">Found {{ num_matches }} results in {{ search_duration_sec }} seconds</p>
                 </div>
                 <div class="select-region h-full flex flex-col justify-center p-0 m-0">
-                    <select form="searchbar-form" name="gl" class="p-0 m-0">
+                    <select form="searchbar-form" name="gl" class="p-0 m-0 hover:cursor-pointer">
                         {% for region_selection in all_regions %}
                         {% match region_selection %}
                         {% when RegionSelection::Selected with (region) %}

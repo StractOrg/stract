@@ -259,13 +259,15 @@ pub async fn route(
 ) -> impl IntoResponse {
     let query = params.get("q").cloned().unwrap_or_default();
 
-    let gl = params
-        .get("gl")
-        .cloned()
-        .unwrap_or_else(|| Region::All.gl());
-    let selected_region = Region::from_gl(&gl).unwrap();
+    let selected_region = params.get("gl").and_then(|gl| {
+        if let Ok(region) = Region::from_gl(gl) {
+            Some(region)
+        } else {
+            None
+        }
+    });
 
-    match state.searcher.search(query.as_str()) {
+    match state.searcher.search(query.as_str(), selected_region) {
         Ok(result) => {
             let search_result = result
                 .webpages
@@ -296,8 +298,12 @@ pub async fn route(
             let all_regions = ALL_REGIONS
                 .into_iter()
                 .map(|region| {
-                    if region == selected_region {
-                        RegionSelection::Selected(region)
+                    if let Some(selected_region) = selected_region {
+                        if region == selected_region {
+                            RegionSelection::Selected(region)
+                        } else {
+                            RegionSelection::Unselected(region)
+                        }
                     } else {
                         RegionSelection::Unselected(region)
                     }

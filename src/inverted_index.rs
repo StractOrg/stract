@@ -307,6 +307,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::NumTrackers
+                | Field::Region
                 | Field::AllBody
                 | Field::FetchTimeMs => {}
             }
@@ -318,7 +319,10 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ranking::Ranker, webpage::Link};
+    use crate::{
+        ranking::Ranker,
+        webpage::{region::RegionCount, Link},
+    };
 
     use super::*;
 
@@ -329,7 +333,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("website", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -376,7 +380,7 @@ mod tests {
             index.tokenizers(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -412,7 +416,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("runner", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -448,7 +452,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("runners", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -484,7 +488,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("great site", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -550,7 +554,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("runner", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         for _ in 0..100 {
             index
@@ -588,7 +592,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query =
             Query::parse("dr", index.schema(), index.tokenizers()).expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
@@ -672,7 +676,7 @@ mod tests {
 
         let query = Query::parse("website", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -688,7 +692,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("example test", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -731,7 +735,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("test", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         index
             .insert(Webpage::new(
