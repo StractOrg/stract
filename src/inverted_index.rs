@@ -306,6 +306,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
+                | Field::NumTrackers
                 | Field::AllBody
                 | Field::FetchTimeMs => {}
             }

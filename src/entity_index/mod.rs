@@ -206,7 +206,10 @@ impl EntityIndex {
         }
 
         if let Some(image) = entity.image.clone() {
-            let image = wikipedify_url(image);
+            let image = wikipedify_url(image)
+                .into_iter()
+                .filter(|url| url.is_valid_uri())
+                .collect();
             self.image_downloader.schedule(ImageDownloadJob {
                 key: entity.title.clone(),
                 urls: image,

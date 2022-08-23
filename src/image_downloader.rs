@@ -39,6 +39,10 @@ where
 {
     async fn download(self) -> Option<DownloadedImage<K>> {
         for url in &self.urls {
+            if !url.is_valid_uri() {
+                continue;
+            }
+
             if let Some(image) = url
                 .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
                 .await

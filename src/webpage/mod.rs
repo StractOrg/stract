@@ -59,7 +59,7 @@ impl<const N: usize> Preprocessor<N> {
 
     pub fn update(&mut self, tok: &Token) {
         match tok {
-            Token::StartTag(tag) => {
+            Token::StartTag(tag) if !tag.raw().contains("/>") => {
                 if let Some((_, n)) = self
                     .removed_tags
                     .iter()
@@ -79,9 +79,9 @@ impl<const N: usize> Preprocessor<N> {
                     *n -= 1;
                 }
             }
-            Token::SelfTerminatingTag(_) | Token::Error => {}
             Token::BeginComment => self.open_comments += 1,
             Token::EndComment => self.open_comments -= 1,
+            _ => {}
         }
     }
 
@@ -480,6 +480,7 @@ impl<'a> Html<'a> {
 
                     doc.add_text(tantivy_field, text.unwrap())
                 }
+                Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::FetchTimeMs
@@ -691,6 +692,7 @@ impl<'a> Html<'a> {
 
         links
             .into_iter()
+            .filter(|link| !link.host().is_empty())
             .filter(|link| link.host() != self.host())
             .unique_by(|link| link.host().to_string())
             .collect()
@@ -1255,6 +1257,7 @@ mod tests {
                     <script src="https://example.com/js" />
                     <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
                     <script src="https://thirdparty.com/js" />
+                    <script src="/js/file" />
                     <meta property="article:modified_time" content="2022-06-22T19:37:34+00:00" />
                 </head>
                 <body>
@@ -1275,5 +1278,39 @@ mod tests {
                 "securepubads.g.doubleclick.net".to_string()
             ]
         )
+    }
+
+    #[test]
+    fn parse_title_with_scripts() {
+        let html = Html::parse(
+            r#"
+                    <html>
+                        <head>
+                            <script>
+                                !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://cdn.segment.com/analytics.js/v1/" + key + "/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey="";analytics.SNIPPET_VERSION="4.13.2";
+                                analytics.load("");
+                                analytics.page();
+                                }}();
+                            </script>
+                            <script>
+                                (function(h,o,t,j,a,r){
+                                    h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+                                    a.appendChild(r);
+                                })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+                            </script>
+                            <script src="https://thirdparty.com/js" />
+                            <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+            "example.com",
+        );
+
+        assert_eq!(html.title(), Some("Test site".to_string()));
+        assert_eq!(html.all_text(), Some("test".to_string()))
     }
 }

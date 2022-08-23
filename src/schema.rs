@@ -41,8 +41,9 @@ pub enum Field {
     PrimaryImageUuid,
     LastUpdated,
     Description,
+    NumTrackers,
 }
-pub static ALL_FIELDS: [Field; 17] = [
+pub static ALL_FIELDS: [Field; 18] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -60,6 +61,7 @@ pub static ALL_FIELDS: [Field; 17] = [
     Field::PrimaryImageUuid,
     Field::LastUpdated,
     Field::Description,
+    Field::NumTrackers,
 ];
 
 impl Field {
@@ -114,6 +116,11 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
+            Field::NumTrackers => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
             Field::PrimaryImageUuid => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
@@ -146,6 +153,7 @@ impl Field {
             Field::Description => "description",
             Field::AllBody => "all_body",
             Field::StemmedAllBody => "stemmed_all_body",
+            Field::NumTrackers => "num_trackers",
         }
     }
 
@@ -166,6 +174,7 @@ impl Field {
             | Field::PrimaryImageUuid
             | Field::FetchTimeMs
             | Field::Description
+            | Field::NumTrackers
             | Field::LastUpdated => None,
         }
     }
