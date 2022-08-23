@@ -14,60 +14,67 @@
         {% call scope::searchbar("", query) %}
     </div>
 
-    <div class="flex pt-8">
-        <div class="flex flex-col pb-8 pl-40">
-            {% match spell_correction %}
-            {% when Some with (correction) %}
-            <div class="pl-3 pb-3 ">
-                Did you mean: <a class="italic title-link font-bold" href="/search?q={{ correction|urlencode }}">{{
-                    correction
-                    }}</a>
+    <div class="flex">
+        <div class="flex pl-40 flex-col">
+            <div class="pl-3 pt-3 text-sm text-gray-600">
+                Found {{ num_matches }} results in {{ search_duration_sec }} seconds
             </div>
-            {% when None %}
-            {% endmatch %}
-
-            <div class="search-result flex flex-col space-y-3">
-                {% for item in search_result %}
-                <div class="flex max-w-3xl w-full p-3">
-                    <div class="flex flex-col w-full">
-                        <div class="text-sm mb-1 flex">
-                            <div class="flex items-center mr-2">
-                                <img src="/favicons/{{ item.domain|urlencode }}" width="13px" />
-                            </div>
-                            <div>
-                                <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{
-                                    item.pretty_url
-                                    }}</a>
-                            </div>
-                        </div>
-                        <div class="text-lg font-medium mb-1">
-                            <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
-                        </div>
-                        <div class="text-sm">
-                            {% match item.last_updated %}
-                            {% when Some with (val) %}
-                            <span class="text-gray-500">
-                                {{ val }}
-                            </span> —
-                            {% when None %}
-                            {% endmatch %}
-                            {{ item.snippet }}
-                        </div>
-                    </div>
-                    <div class="flex h-full items-center">
-                        <div class="h-20 w-20 pl-2 pt-1 pb-1">
-                            {% match item.primary_image_uuid %}
-                            {% when Some with (val) %}
-                            <a href="{{ item.url|urlencode }}">
-                                <img class="h-full w-full object-cover rounded-full" src="/image/{{ val|urlencode }}" />
-                            </a>
-                            {% when None %}
-                            {% endmatch %}
-                        </div>
-                    </div>
+            <div class="flex flex-col pt-5 pb-8">
+                {% match spell_correction %}
+                {% when Some with (correction) %}
+                <div class="pl-3 pb-3 ">
+                    Did you mean: <a class="italic title-link font-bold" href="/search?q={{ correction|urlencode }}">{{
+                        correction
+                        }}</a>
                 </div>
-                {% endfor %}
+                {% when None %}
+                {% endmatch %}
+
+                <div class="search-result flex flex-col space-y-3">
+                    {% for item in search_result %}
+                    <div class="flex max-w-3xl w-full p-3">
+                        <div class="flex flex-col w-full">
+                            <div class="text-sm mb-1 flex">
+                                <div class="flex items-center mr-2">
+                                    <img src="/favicons/{{ item.domain|urlencode }}" width="13px" />
+                                </div>
+                                <div>
+                                    <a class="hover:no-underline text-gray-600" href="{{ item.url }}">{{
+                                        item.pretty_url
+                                        }}</a>
+                                </div>
+                            </div>
+                            <div class="text-lg font-medium mb-1">
+                                <a class="title-link" href="{{ item.url }}">{{ item.title }}</a>
+                            </div>
+                            <div class="text-sm">
+                                {% match item.last_updated %}
+                                {% when Some with (val) %}
+                                <span class="text-gray-500">
+                                    {{ val }}
+                                </span> —
+                                {% when None %}
+                                {% endmatch %}
+                                {{ item.snippet }}
+                            </div>
+                        </div>
+                        <div class="flex h-full items-center">
+                            <div class="h-20 w-20 pl-2 pt-1 pb-1">
+                                {% match item.primary_image_uuid %}
+                                {% when Some with (val) %}
+                                <a href="{{ item.url|urlencode }}">
+                                    <img class="h-full w-full object-cover rounded-full"
+                                        src="/image/{{ val|urlencode }}" />
+                                </a>
+                                {% when None %}
+                                {% endmatch %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
+
         </div>
 
         {% match entity %}

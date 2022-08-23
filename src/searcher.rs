@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::str::FromStr;
+use std::time::Instant;
 
 use uuid::Uuid;
 
@@ -32,6 +33,7 @@ pub struct SearchResult {
     pub spell_corrected_query: Option<String>,
     pub webpages: InvertedIndexSearchResult,
     pub entity: Option<StoredEntity>,
+    pub search_duration_ms: u128,
 }
 
 pub struct Searcher {
@@ -56,6 +58,8 @@ impl Searcher {
 
 impl Searcher {
     pub fn search(&self, query: &str) -> Result<SearchResult> {
+        let start = Instant::now();
+
         let raw_query = query.to_string();
         let query = Query::parse(query, self.index.schema(), self.index.tokenizers())?;
 
@@ -72,10 +76,13 @@ impl Searcher {
             .as_ref()
             .and_then(|index| index.search(raw_query));
 
+        let search_duration_ms = start.elapsed().as_millis();
+
         Ok(SearchResult {
             webpages,
             entity,
             spell_corrected_query: correction,
+            search_duration_ms,
         })
     }
 
