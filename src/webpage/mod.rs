@@ -23,6 +23,7 @@ use uuid::Uuid;
 
 mod just_text;
 mod lexer;
+pub mod region;
 mod url;
 
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};

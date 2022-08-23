@@ -193,6 +193,9 @@ pub enum Error {
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,
+
+    #[error("Unknown region")]
+    UnknownRegion,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

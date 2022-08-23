@@ -109,7 +109,7 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let num_trackers = self.num_trackers_reader.get(doc) as f64;
 
         (3.0 * score)
-            + (3000.0 * centrality)
+            + (3200.0 * centrality)
             + (1.0 * is_homepage)
             + (1.0 / (fetch_time_ms + 1.0))
             + (1500.0 * time_to_score(hours_since_update))

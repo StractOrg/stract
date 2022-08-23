@@ -164,12 +164,12 @@ impl Field {
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
+            Field::Url => Some(1.0),
+            Field::Domain => Some(4.0),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText
             | Field::Centrality
-            | Field::Url
-            | Field::Domain
             | Field::IsHomepage
             | Field::PrimaryImageUuid
             | Field::FetchTimeMs

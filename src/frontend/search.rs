@@ -22,7 +22,10 @@ use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
     searcher::Searcher,
-    webpage::Url,
+    webpage::{
+        region::{Region, ALL_REGIONS},
+        Url,
+    },
     Error,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -242,6 +245,12 @@ struct SearchTemplate {
     spell_correction: Option<String>,
     num_matches: String,
     search_duration_sec: String,
+    all_regions: Vec<RegionSelection>,
+}
+
+enum RegionSelection {
+    Selected(Region),
+    Unselected(Region),
 }
 
 pub async fn route(
@@ -249,6 +258,12 @@ pub async fn route(
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let query = params.get("q").cloned().unwrap_or_default();
+
+    let gl = params
+        .get("gl")
+        .cloned()
+        .unwrap_or_else(|| Region::All.gl());
+    let selected_region = Region::from_gl(&gl).unwrap();
 
     match state.searcher.search(query.as_str()) {
         Ok(result) => {
@@ -278,6 +293,17 @@ pub async fn route(
 
             let search_duration_sec = format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
 
+            let all_regions = ALL_REGIONS
+                .into_iter()
+                .map(|region| {
+                    if region == selected_region {
+                        RegionSelection::Selected(region)
+                    } else {
+                        RegionSelection::Unselected(region)
+                    }
+                })
+                .collect();
+
             let template = SearchTemplate {
                 search_result,
                 query,
@@ -285,6 +311,7 @@ pub async fn route(
                 spell_correction,
                 num_matches,
                 search_duration_sec,
+                all_regions,
             };
 
             HtmlTemplate(template).into_response()
