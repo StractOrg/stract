@@ -42,8 +42,9 @@ pub enum Field {
     LastUpdated,
     Description,
     NumTrackers,
+    Region,
 }
-pub static ALL_FIELDS: [Field; 18] = [
+pub static ALL_FIELDS: [Field; 19] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -62,6 +63,7 @@ pub static ALL_FIELDS: [Field; 18] = [
     Field::LastUpdated,
     Field::Description,
     Field::NumTrackers,
+    Field::Region,
 ];
 
 impl Field {
@@ -131,6 +133,11 @@ impl Field {
                     .set_indexed(),
             ),
             Field::Description => IndexingOption::Text(self.default_text_options().set_stored()),
+            Field::Region => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -154,27 +161,29 @@ impl Field {
             Field::AllBody => "all_body",
             Field::StemmedAllBody => "stemmed_all_body",
             Field::NumTrackers => "num_trackers",
+            Field::Region => "region",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Host => Some(3.0),
+            Field::Host => Some(6.0),
             Field::DomainIfHomepage => Some(50.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
-            Field::CleanBody => Some(2.5),
+            Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
+            Field::Url => Some(1.0),
+            Field::Domain => Some(4.0),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText
             | Field::Centrality
-            | Field::Url
-            | Field::Domain
             | Field::IsHomepage
             | Field::PrimaryImageUuid
             | Field::FetchTimeMs
             | Field::Description
             | Field::NumTrackers
+            | Field::Region
             | Field::LastUpdated => None,
         }
     }

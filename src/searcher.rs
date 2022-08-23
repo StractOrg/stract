@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::str::FromStr;
+use std::time::Instant;
 
 use uuid::Uuid;
 
@@ -24,6 +25,7 @@ use crate::index::Index;
 use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::Ranker;
+use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{Error, Result};
 
@@ -32,6 +34,7 @@ pub struct SearchResult {
     pub spell_corrected_query: Option<String>,
     pub webpages: InvertedIndexSearchResult,
     pub entity: Option<StoredEntity>,
+    pub search_duration_ms: u128,
 }
 
 pub struct Searcher {
@@ -55,7 +58,9 @@ impl Searcher {
 }
 
 impl Searcher {
-    pub fn search(&self, query: &str) -> Result<SearchResult> {
+    pub fn search(&self, query: &str, selected_region: Option<Region>) -> Result<SearchResult> {
+        let start = Instant::now();
+
         let raw_query = query.to_string();
         let query = Query::parse(query, self.index.schema(), self.index.tokenizers())?;
 
@@ -63,7 +68,14 @@ impl Searcher {
             return Err(Error::EmptyQuery);
         }
 
-        let ranker = Ranker::new(query.clone());
+        let mut ranker = Ranker::new(self.index.region_count.clone());
+
+        if let Some(region) = selected_region {
+            if region != Region::All {
+                ranker = ranker.with_region(region);
+            }
+        }
+
         let webpages = self.index.search(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 
@@ -72,10 +84,13 @@ impl Searcher {
             .as_ref()
             .and_then(|index| index.search(raw_query));
 
+        let search_duration_ms = start.elapsed().as_millis();
+
         Ok(SearchResult {
             webpages,
             entity,
             spell_corrected_query: correction,
+            search_duration_ms,
         })
     }
 

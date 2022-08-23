@@ -14,14 +14,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use crate::schema::{Field, CENTRALITY_SCALING};
+use crate::webpage::region::{Region, RegionCount};
 use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::fastfield::{DynamicFastFieldReader, FastFieldReader};
 use tantivy::{DocId, Score, SegmentReader};
 
-#[derive(Default)]
-pub(crate) struct InitialScoreTweaker {}
+pub(crate) struct InitialScoreTweaker {
+    region_count: Arc<RegionCount>,
+    selected_region: Option<Region>,
+}
+
+impl InitialScoreTweaker {
+    pub fn new(region_count: Arc<RegionCount>, selected_region: Option<Region>) -> Self {
+        Self {
+            region_count,
+            selected_region,
+        }
+    }
+}
 
 pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<u64>,
@@ -29,7 +43,10 @@ pub(crate) struct InitialSegmentScoreTweaker {
     fetch_time_ms_reader: DynamicFastFieldReader<u64>,
     update_timestamp_reader: DynamicFastFieldReader<u64>,
     num_trackers_reader: DynamicFastFieldReader<u64>,
+    region_reader: DynamicFastFieldReader<u64>,
+    region_count: Arc<RegionCount>,
     current_timestamp: f64,
+    selected_region: Option<Region>,
 }
 
 impl ScoreTweaker<f64> for InitialScoreTweaker {
@@ -81,6 +98,15 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             .u64(num_trackers_field)
             .expect("Failed to get num_trackers fast-field reader");
 
+        let region_field = segment_reader
+            .schema()
+            .get_field(Field::Region.as_str())
+            .expect("Faild to load region field");
+        let region_reader = segment_reader
+            .fast_fields()
+            .u64(region_field)
+            .expect("Failed to get region fast-field reader");
+
         let current_timestamp = Utc::now().timestamp() as f64;
 
         Ok(InitialSegmentScoreTweaker {
@@ -90,12 +116,27 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
             update_timestamp_reader,
             num_trackers_reader,
             current_timestamp,
+            region_reader,
+            selected_region: self.selected_region,
+            region_count: Arc::clone(&self.region_count),
         })
     }
 }
 
 fn time_to_score(time: f64) -> f64 {
     1.0 / ((time + 1.0).log2())
+}
+
+fn region_score(
+    region_count: &RegionCount,
+    selected_region: Option<Region>,
+    webpage_region: Region,
+) -> f64 {
+    let boost = selected_region
+        .map(|region| if region == webpage_region { 15.0 } else { 0.0 })
+        .unwrap_or(0.0);
+
+    boost + region_count.score(&webpage_region)
 }
 
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
@@ -107,12 +148,14 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let update_timestamp = self.update_timestamp_reader.get(doc) as f64;
         let hours_since_update = (self.current_timestamp - update_timestamp).max(0.000001) / 3600.0;
         let num_trackers = self.num_trackers_reader.get(doc) as f64;
+        let region = Region::from_id(self.region_reader.get(doc));
 
         (3.0 * score)
-            + (3000.0 * centrality)
+            + (3200.0 * centrality)
             + (1.0 * is_homepage)
             + (1.0 / (fetch_time_ms + 1.0))
             + (1500.0 * time_to_score(hours_since_update))
             + (200.0 * (1.0 / (num_trackers + 1.0)))
+            + (25.0 * region_score(&self.region_count, self.selected_region, region))
     }
 }

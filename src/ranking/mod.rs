@@ -17,19 +17,34 @@
 pub mod centrality_store;
 mod initial;
 
-use crate::query::Query;
+use std::sync::Arc;
+
 use initial::InitialScoreTweaker;
 use tantivy::collector::{Collector, TopDocs};
 
-pub struct Ranker {}
+use crate::webpage::region::{Region, RegionCount};
+
+pub struct Ranker {
+    region_count: Arc<RegionCount>,
+    selected_region: Option<Region>,
+}
 
 impl Ranker {
-    pub fn new(_query: Query) -> Self {
-        Ranker {}
+    pub fn new(region_count: RegionCount) -> Self {
+        Ranker {
+            region_count: Arc::new(region_count),
+            selected_region: None,
+        }
+    }
+
+    pub fn with_region(mut self, region: Region) -> Self {
+        self.selected_region = Some(region);
+        self
     }
 
     pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
-        let score_tweaker = InitialScoreTweaker::default();
+        let score_tweaker =
+            InitialScoreTweaker::new(Arc::clone(&self.region_count), self.selected_region);
         TopDocs::with_limit(20).tweak_score(score_tweaker)
     }
 }
@@ -94,7 +109,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("great site").expect("Search failed");
+        let result = searcher.search("great site", None).expect("Search failed");
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
         assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
@@ -165,7 +180,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("dr dk").expect("Search failed");
+        let result = searcher.search("dr dk", None).expect("Search failed");
 
         assert_eq!(result.webpages.documents.len(), 3);
         assert_eq!(result.webpages.documents[0].url, "https://www.dr.dk");
@@ -220,7 +235,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("title").expect("Search failed");
+        let result = searcher.search("title", None).expect("Search failed");
 
         assert_eq!(result.webpages.documents[0].url, "https://www.new.com");
     }
@@ -282,7 +297,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("test").expect("Search failed");
+        let result = searcher.search("test", None).expect("Search failed");
 
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.first.com");

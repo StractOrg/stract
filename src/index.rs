@@ -33,6 +33,7 @@ use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
 use crate::query::Query;
 use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker, TermSplitter};
+use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::{Url, Webpage};
 use crate::Result;
 
@@ -40,6 +41,7 @@ const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 const SPELL_SUBFOLDER_NAME: &str = "primary_image_store";
+const REGION_COUNT_FILE_NAME: &str = "region_count.json";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
 pub struct Index {
@@ -49,6 +51,7 @@ pub struct Index {
     favicon_downloader: ImageDownloader<String>,
     primary_image_downloader: ImageDownloader<Uuid>,
     spell_dictionary: Dictionary<1_000_000>,
+    pub region_count: RegionCount,
     pub path: String,
 }
 
@@ -65,10 +68,13 @@ impl Index {
         let inverted_index =
             InvertedIndex::open(path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME))?;
 
+        let region_count = RegionCount::open(path.as_ref().join(REGION_COUNT_FILE_NAME));
+
         Ok(Self {
             inverted_index,
             favicon_store,
             primary_image_store,
+            region_count,
             primary_image_downloader: ImageDownloader::new(),
             favicon_downloader: ImageDownloader::new(),
             spell_dictionary: Dictionary::open(Some(path.as_ref().join(SPELL_SUBFOLDER_NAME)))?,
@@ -90,13 +96,20 @@ impl Index {
         self.maybe_insert_favicon(&webpage);
         self.maybe_insert_primary_image(&mut webpage);
         self.spell_dictionary.insert_page(&webpage);
+
+        if let Ok(region) = Region::guess_from(&webpage) {
+            self.region_count.increment(&region);
+        }
+
         self.inverted_index.insert(webpage)
     }
 
     pub fn commit(&mut self) -> Result<()> {
         self.inverted_index.merge_all_segments()?;
         self.spell_dictionary.commit()?;
-        self.inverted_index.commit()
+        self.inverted_index.commit()?;
+        self.region_count.commit();
+        Ok(())
     }
 
     pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
@@ -116,6 +129,8 @@ impl Index {
         drop(self.primary_image_store);
 
         self.spell_dictionary.merge(other.spell_dictionary);
+
+        self.region_count.merge(other.region_count);
 
         Self::open(&self.path).expect("failed to open index")
     }
@@ -319,7 +334,7 @@ mod tests {
         let index: Index = deserialized_frozen.into();
         let query = Query::parse("website", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
-        let ranker = Ranker::new(query.clone());
+        let ranker = Ranker::new(RegionCount::default());
 
         let result = index
             .search(&query, ranker.collector())

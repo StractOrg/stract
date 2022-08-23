@@ -16,12 +16,16 @@
 
 use axum::Extension;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
+use itertools::{intersperse, Itertools};
 
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
     searcher::Searcher,
-    webpage::Url,
+    webpage::{
+        region::{Region, ALL_REGIONS},
+        Url,
+    },
     Error,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -239,6 +243,14 @@ struct SearchTemplate {
     query: String,
     entity: Option<DisplayedEntity>,
     spell_correction: Option<String>,
+    num_matches: String,
+    search_duration_sec: String,
+    all_regions: Vec<RegionSelection>,
+}
+
+enum RegionSelection {
+    Selected(Region),
+    Unselected(Region),
 }
 
 pub async fn route(
@@ -247,7 +259,15 @@ pub async fn route(
 ) -> impl IntoResponse {
     let query = params.get("q").cloned().unwrap_or_default();
 
-    match state.searcher.search(query.as_str()) {
+    let selected_region = params.get("gl").and_then(|gl| {
+        if let Ok(region) = Region::from_gl(gl) {
+            Some(region)
+        } else {
+            None
+        }
+    });
+
+    match state.searcher.search(query.as_str(), selected_region) {
         Ok(result) => {
             let search_result = result
                 .webpages
@@ -271,11 +291,33 @@ pub async fn route(
                 .map(|entity| DisplayedEntity::from(entity, &state.searcher));
             let spell_correction = result.spell_corrected_query;
 
+            let num_matches = thousand_sep_number(result.webpages.num_docs);
+
+            let search_duration_sec = format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
+
+            let all_regions = ALL_REGIONS
+                .into_iter()
+                .map(|region| {
+                    if let Some(selected_region) = selected_region {
+                        if region == selected_region {
+                            RegionSelection::Selected(region)
+                        } else {
+                            RegionSelection::Unselected(region)
+                        }
+                    } else {
+                        RegionSelection::Unselected(region)
+                    }
+                })
+                .collect();
+
             let template = SearchTemplate {
                 search_result,
                 query,
                 entity,
                 spell_correction,
+                num_matches,
+                search_duration_sec,
+                all_regions,
             };
 
             HtmlTemplate(template).into_response()
@@ -283,6 +325,25 @@ pub async fn route(
         Err(Error::EmptyQuery) => Redirect::to("/").into_response(),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
     }
+}
+
+fn thousand_sep_number(num: usize) -> String {
+    let s = num.to_string();
+    let c = s.chars().rev().chunks(3);
+    let chunks = c.into_iter().map(|chunk| {
+        chunk
+            .into_iter()
+            .collect::<Vec<char>>()
+            .into_iter()
+            .rev()
+            .collect::<String>()
+    });
+
+    intersperse(
+        chunks.collect::<Vec<_>>().into_iter().rev(),
+        ".".to_string(),
+    )
+    .collect()
 }
 
 fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
@@ -428,5 +489,17 @@ mod tests {
             maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ".to_string()),
             "14/03/1879 - 27/05/1999".to_string()
         );
+    }
+
+    #[test]
+    fn sep_number() {
+        assert_eq!(thousand_sep_number(0), "0".to_string());
+        assert_eq!(thousand_sep_number(10), "10".to_string());
+        assert_eq!(thousand_sep_number(100), "100".to_string());
+        assert_eq!(thousand_sep_number(1000), "1.000".to_string());
+        assert_eq!(thousand_sep_number(10000), "10.000".to_string());
+        assert_eq!(thousand_sep_number(100000), "100.000".to_string());
+        assert_eq!(thousand_sep_number(512854), "512.854".to_string());
+        assert_eq!(thousand_sep_number(9512854), "9.512.854".to_string());
     }
 }
