@@ -71,12 +71,6 @@ impl WarcFile {
     pub(crate) fn download(source: WarcSource, path: &str) -> Result<Self> {
         for dur in ExponentialBackoff::from_millis(10).take(5) {
             let res = match source.clone() {
-                WarcSource::S3(config) => WarcFile::download_from_s3(
-                    path,
-                    config.name.clone(),
-                    config.endpoint.clone(),
-                    config.bucket,
-                ),
                 WarcSource::HTTP(config) => WarcFile::download_from_http(path, config.base_url),
                 WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
             };
@@ -121,39 +115,6 @@ impl WarcFile {
         let bytes = Vec::from(&res.bytes()?[..]);
 
         Ok(WarcFile::new(bytes))
-    }
-
-    fn download_from_s3(
-        _path: &str,
-        _region_name: String,
-        _region_endpoint: String,
-        _bucket: String,
-    ) -> Result<Self> {
-        todo!();
-        // let path = path.to_string();
-        // let region = Region::Custom {
-        //     name: region_name,
-        //     endpoint: region_endpoint,
-        // };
-
-        // let client = S3Client::new(region);
-
-        // let obj = client
-        //     .get_object(GetObjectRequest {
-        //         bucket,
-        //         key: path,
-        //         ..Default::default()
-        //     })
-        //     .await?;
-
-        // let mut bytes = Vec::new();
-        // obj.body
-        //     .ok_or(Error::S3DownloadError)?
-        //     .into_async_read()
-        //     .read_to_end(&mut bytes)
-        //     .await?;
-
-        // Ok(WarcFile::new(bytes))
     }
 }
 

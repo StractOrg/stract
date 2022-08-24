@@ -82,7 +82,6 @@ pub struct WebgraphLocalConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum WarcSource {
-    S3(S3Config),
     HTTP(HttpConfig),
     Local(LocalConfig),
 }
@@ -91,12 +90,6 @@ impl WarcSource {
     pub fn paths(&self) -> Result<Vec<String>> {
         let mut warc_paths = Vec::new();
         match &self {
-            WarcSource::S3(config) => {
-                let file = File::open(&config.warc_paths_file)?;
-                for line in io::BufReader::new(file).lines() {
-                    warc_paths.push(line?);
-                }
-            }
             WarcSource::HTTP(config) => {
                 let file = File::open(&config.warc_paths_file)?;
                 for line in io::BufReader::new(file).lines() {
@@ -119,14 +112,6 @@ pub struct LocalConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct S3Config {
-    name: String,
-    endpoint: String,
-    warc_paths_file: String,
-    bucket: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HttpConfig {
     base_url: String,
     warc_paths_file: String,
@@ -134,14 +119,8 @@ pub struct HttpConfig {
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Failed to download object from S3")]
-    S3DownloadError,
-
     #[error("Failed to download object from HTTP")]
     HTTPDownloadError(#[from] reqwest::Error),
-
-    #[error("Failed to get the object from S3")]
-    GetObjectError(#[from] rusoto_core::RusotoError<rusoto_s3::GetObjectError>),
 
     #[error("Got an IO error")]
     IOError(#[from] io::Error),

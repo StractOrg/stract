@@ -16,7 +16,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use lazy_static::lazy_static;
 use logos::{Lexer, Logos};
 use whatlang::Lang;
 
@@ -70,8 +69,8 @@ macro_rules! include_stopwords {
     }};
 }
 
-lazy_static! {
-    static ref STOPWORDS: HashMap<Lang, HashSet<String>> = {
+static STOPWORDS: once_cell::sync::Lazy<HashMap<Lang, HashSet<String>>> =
+    once_cell::sync::Lazy::new(|| {
         include_stopwords!(
                 "../../stopwords/Afrikaans.txt" => Lang::Afr,
                 "../../stopwords/Arabic.txt" => Lang::Ara,
@@ -120,8 +119,7 @@ lazy_static! {
                 "../../stopwords/Spanish.txt" => Lang::Spa,
                 "../../stopwords/Japanese.txt" => Lang::Jpn
         )
-    };
-}
+    });
 
 pub struct JustText {
     pub max_link_density: f64,

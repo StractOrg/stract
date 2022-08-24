@@ -154,7 +154,6 @@ impl Indexer {
             .collect();
 
         let job_config = match config.warc_source.clone() {
-            WarcSource::S3(_) => todo!("s3 not supported yet"),
             WarcSource::HTTP(config) => JobConfig::Http(config),
             WarcSource::Local(config) => JobConfig::Local(config),
         };
@@ -195,7 +194,6 @@ impl Indexer {
         let warc_paths = config.warc_source.paths()?;
 
         let job_config = match config.warc_source.clone() {
-            WarcSource::S3(_) => todo!("s3 not supported yet"),
             WarcSource::HTTP(config) => JobConfig::Http(config),
             WarcSource::Local(config) => JobConfig::Local(config),
         };

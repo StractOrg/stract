@@ -16,42 +16,25 @@
 
 use std::path::Path;
 
+use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+
 pub struct CentralityStore {
-    inner: sled::Tree,
+    inner: Box<dyn Kv<String, f64>>,
 }
 
 impl CentralityStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
-        let db = sled::Config::default()
-            .path(path)
-            .use_compression(true)
-            .mode(sled::Mode::LowSpace)
-            .open()
-            .expect("Failed to open database");
-
         Self {
-            inner: db
-                .open_tree("centrality_store")
-                .expect("Failed to open tree"),
+            inner: RocksDbStore::open(path),
         }
     }
 
     pub fn insert(&mut self, key: String, centrality: f64) {
-        let key_bytes = bincode::serialize(&key).expect("Failed to serialize key");
-        let centrality_bytes =
-            bincode::serialize(&centrality).expect("Failed to serialize centrality");
-
-        self.inner
-            .insert(key_bytes, centrality_bytes)
-            .expect("Failed to insert into tree");
+        self.inner.insert(key, centrality);
     }
 
     pub fn get(&self, key: &str) -> Option<f64> {
-        let key_bytes = bincode::serialize(key).expect("Failed to serialize key");
-        self.inner
-            .get(key_bytes)
-            .expect("Failed to retrieve value from key")
-            .map(|bytes| bincode::deserialize(&bytes).expect("Failed to deserialize value"))
+        self.inner.get(&key.to_string())
     }
 
     pub fn append(&mut self, it: impl Iterator<Item = (String, f64)>) {
@@ -59,6 +42,7 @@ impl CentralityStore {
             .for_each(|(key, value)| {
                 self.insert(key, value);
             });
-        self.inner.flush().unwrap();
+
+        self.inner.flush();
     }
 }
