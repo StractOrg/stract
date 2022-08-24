@@ -41,12 +41,12 @@ fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
             res.push(DirEntry::Folder {
                 name: entry.path().as_os_str().to_str().unwrap().to_string(),
                 entries: iterate_children(entry.path().as_os_str().to_str().unwrap())?,
-            })
+            });
         } else if metadata.is_file() {
             res.push(DirEntry::File {
                 name: entry.path().as_os_str().to_str().unwrap().to_string(),
                 content: fs::read(entry.path())?,
-            })
+            });
         }
     }
 

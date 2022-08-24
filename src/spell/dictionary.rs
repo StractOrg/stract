@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::distance::LevenshteinDistance;
-use crate::tokenizer::NormalTokenizer;
+use crate::tokenizer::Normal;
 use crate::webpage::Webpage;
 use fst::map::Union;
 use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
@@ -336,7 +336,7 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
     pub fn insert_page(&mut self, webpage: &Webpage) {
         let text = webpage.html.clean_text().unwrap_or_default();
 
-        let mut stream = NormalTokenizer::default().token_stream(text.as_str());
+        let mut stream = Normal::default().token_stream(text.as_str());
 
         while let Some(token) = stream.next() {
             self.insert(&token.text);

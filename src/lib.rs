@@ -16,6 +16,9 @@
 
 // #![warn(clippy::pedantic)]
 
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::missing_errors_doc)]
+
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};

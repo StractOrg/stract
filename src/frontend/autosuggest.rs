@@ -41,6 +41,7 @@ struct Suggestion {
     raw: String,
 }
 
+#[allow(clippy::unused_async)]
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,

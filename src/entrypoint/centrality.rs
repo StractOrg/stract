@@ -18,9 +18,9 @@ use std::path::Path;
 
 use crate::{ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilder};
 
-pub struct CentralityEntrypoint {}
+pub struct Centrality {}
 
-impl CentralityEntrypoint {
+impl Centrality {
     pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
         let graph = WebgraphBuilder::new(webgraph_path).with_host_graph().open();
 

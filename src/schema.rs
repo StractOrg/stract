@@ -18,7 +18,7 @@ use tantivy::schema::{
     Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{NormalTokenizer, StemmedTokenizer};
+use crate::tokenizer::{Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
@@ -79,7 +79,7 @@ impl Field {
     }
 
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
-        self.default_text_options_with_tokenizer(NormalTokenizer::as_str())
+        self.default_text_options_with_tokenizer(Normal::as_str())
     }
 
     pub fn options(&self) -> IndexingOption {
@@ -91,7 +91,7 @@ impl Field {
             Field::Domain => IndexingOption::Text(self.default_text_options()),
             Field::AllBody => IndexingOption::Text(self.default_text_options()),
             Field::StemmedAllBody => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str())
+                self.default_text_options_with_tokenizer(Stemmed::as_str())
                     .set_stored(),
             ),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
@@ -106,11 +106,11 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::StemmedTitle => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str()),
-            ),
+            Field::StemmedTitle => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Stemmed::as_str()))
+            }
             Field::StemmedCleanBody => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(StemmedTokenizer::as_str())
+                self.default_text_options_with_tokenizer(Stemmed::as_str())
                     .set_stored(),
             ),
             Field::FetchTimeMs => IndexingOption::Numeric(

@@ -18,6 +18,7 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
+#[allow(clippy::unused_async)]
 pub async fn route() -> impl IntoResponse {
     let template = IndexTemplate {};
     HtmlTemplate(template)

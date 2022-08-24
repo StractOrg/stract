@@ -35,7 +35,7 @@ use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
     kv::{rocksdb_store::RocksDbStore, Kv},
-    tokenizer::NormalTokenizer,
+    tokenizer::Normal,
     webpage::Url,
     Result,
 };
@@ -61,7 +61,7 @@ fn schema() -> Schema {
         TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
-                    .set_tokenizer(NormalTokenizer::as_str())
+                    .set_tokenizer(Normal::as_str())
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored(),
@@ -71,7 +71,7 @@ fn schema() -> Schema {
         TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
-                    .set_tokenizer(NormalTokenizer::as_str())
+                    .set_tokenizer(Normal::as_str())
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored(),
@@ -118,7 +118,7 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
     doc
 }
 
-fn wikipedify_url(url: Url) -> Vec<Url> {
+fn wikipedify_url(url: &Url) -> Vec<Url> {
     let mut name = url.raw().replace(' ', "_");
 
     if name.starts_with("File:") {
@@ -174,12 +174,12 @@ impl EntityIndex {
         let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
             .lines()
             .take(50)
-            .map(|word| word.to_ascii_lowercase())
+            .map(str::to_ascii_lowercase)
             .collect();
 
         tantivy_index.tokenizers().register(
-            NormalTokenizer::as_str(),
-            NormalTokenizer::with_stopwords(stopwords.clone().into_iter().collect()),
+            Normal::as_str(),
+            Normal::with_stopwords(stopwords.clone().into_iter().collect()),
         );
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
@@ -206,15 +206,16 @@ impl EntityIndex {
         }
 
         if let Some(image) = entity.image.clone() {
-            let image = wikipedify_url(image)
+            let image = wikipedify_url(&image)
                 .into_iter()
-                .filter(|url| url.is_valid_uri())
+                .filter(Url::is_valid_uri)
                 .collect();
+
             self.image_downloader.schedule(ImageDownloadJob {
                 key: entity.title.clone(),
                 urls: image,
                 timeout: Some(Duration::from_secs(10)),
-            })
+            });
         }
         let doc = entity_to_tantivy(entity, &self.schema);
         self.writer.add_document(doc).unwrap();
@@ -252,7 +253,7 @@ impl EntityIndex {
                 .into_iter()
                 .filter(|(_, related_doc)| doc != *related_doc)
                 .map(|(_, doc_address)| {
-                    self.retrieve_stored_entity(&searcher, &doc_address, false, false, false)
+                    self.retrieve_stored_entity(&searcher, doc_address, false, false, false)
                 })
                 .filter(|entity| entity.image.is_some())
                 .take(4)
@@ -261,14 +262,14 @@ impl EntityIndex {
         }
     }
 
-    pub fn search(&self, query: String) -> Option<StoredEntity> {
+    pub fn search(&self, query: &str) -> Option<StoredEntity> {
         let searcher = self.reader.searcher();
 
         let title = self.schema.get_field("title").unwrap();
         let entity_abstract = self.schema.get_field("abstract").unwrap();
 
         let mut term_queries = Vec::new();
-        let mut stream = NormalTokenizer::default().token_stream(query.as_str());
+        let mut stream = Normal::default().token_stream(query);
         while let Some(token) = stream.next() {
             if self.stopwords.contains(&token.text) {
                 continue;
@@ -300,14 +301,14 @@ impl EntityIndex {
             .unwrap()
             .first()
             .map(|(_score, doc_address)| {
-                self.retrieve_stored_entity(&searcher, doc_address, true, true, true)
+                self.retrieve_stored_entity(&searcher, *doc_address, true, true, true)
             })
     }
 
     fn retrieve_stored_entity(
         &self,
         searcher: &LeasedItem<Searcher>,
-        doc_address: &DocAddress,
+        doc_address: DocAddress,
         get_related: bool,
         decode_info: bool,
         get_links: bool,
@@ -317,7 +318,7 @@ impl EntityIndex {
         let info = self.schema.get_field("info").unwrap();
         let links = self.schema.get_field("links").unwrap();
 
-        let doc = searcher.doc(*doc_address).unwrap();
+        let doc = searcher.doc(doc_address).unwrap();
         let title = doc
             .get_first(title)
             .and_then(|val| match val {
@@ -349,7 +350,7 @@ impl EntityIndex {
         };
 
         let related_entities = if get_related {
-            self.related_entities(*doc_address)
+            self.related_entities(doc_address)
         } else {
             Vec::new()
         };
@@ -398,7 +399,7 @@ mod tests {
     #[test]
     fn wikipedia_image_url_aristotle() {
         assert_eq!(
-            wikipedify_url("Aristotle Altemps Inv8575.jpg".to_string().into())
+            wikipedify_url(&"Aristotle Altemps Inv8575.jpg".to_string().into())
                 .first()
                 .unwrap()
                 .full(),
@@ -410,7 +411,7 @@ mod tests {
     #[test]
     fn wikipedia_image_url_with_file() {
         assert_eq!(
-            wikipedify_url("File:Aristotle Altemps Inv8575.jpg".to_string().into())
+            wikipedify_url(&"File:Aristotle Altemps Inv8575.jpg".to_string().into())
                 .first()
                 .unwrap()
                 .full(),
@@ -437,17 +438,10 @@ mod tests {
 
         index.commit();
 
-        assert_eq!(index.search("the".to_string()), None);
+        assert_eq!(index.search("the"), None);
+        assert_eq!(index.search("ashes").unwrap().title.as_str(), "the ashes");
         assert_eq!(
-            index.search("ashes".to_string()).unwrap().title.as_str(),
-            "the ashes"
-        );
-        assert_eq!(
-            index
-                .search("the ashes".to_string())
-                .unwrap()
-                .title
-                .as_str(),
+            index.search("the ashes").unwrap().title.as_str(),
             "the ashes"
         );
     }

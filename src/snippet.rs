@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::frontend::search::html_escape;
-use crate::tokenizer::StemmedTokenizer;
+use crate::tokenizer::Stemmed;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -24,8 +24,8 @@ use tantivy::tokenizer::{TextAnalyzer, Token};
 use tantivy::{Score, Searcher};
 use whatlang::Lang;
 
-/// For now we use the snippet generator from tantivy with a minor modification to support our TokenStreamMerger.
-/// In the future we want to implement something closer to the method described in https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf.
+/// For now we use the snippet generator from tantivy with a minor modifications.
+/// In the future we want to implement something closer to the method described in <https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf>.
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
 
@@ -44,7 +44,7 @@ impl FragmentCandidate {
     ///
     /// `score`, `num_chars` are set to 0
     /// and `highlighted` is set to empty vec
-    /// stop_offset is set to start_offset, which is taken as a param.
+    /// `stop_offset` is set to `start_offset`, which is taken as a param.
     fn new(start_offset: usize) -> FragmentCandidate {
         FragmentCandidate {
             score: 0.0,
@@ -261,8 +261,7 @@ pub fn generate(
         .expect("Failed to get body field");
 
     let tokenizer =
-        StemmedTokenizer::with_forced_language(whatlang::detect_lang(text).unwrap_or(Lang::Eng))
-            .into();
+        Stemmed::with_forced_language(whatlang::detect_lang(text).unwrap_or(Lang::Eng)).into();
     let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
     let mut snippet = generator.snippet(text);
@@ -270,10 +269,9 @@ pub fn generate(
     if snippet.fragment.is_empty() {
         match description {
             Some(desc) => {
-                let tokenizer = StemmedTokenizer::with_forced_language(
-                    whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
-                )
-                .into();
+                let tokenizer =
+                    Stemmed::with_forced_language(whatlang::detect_lang(desc).unwrap_or(Lang::Eng))
+                        .into();
                 let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
                 snippet = generator.snippet(desc);
@@ -283,7 +281,7 @@ pub fn generate(
             }
             None => {
                 if text.is_empty() {
-                    let tokenizer = StemmedTokenizer::with_forced_language(
+                    let tokenizer = Stemmed::with_forced_language(
                         whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
                     )
                     .into();

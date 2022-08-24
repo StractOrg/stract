@@ -59,7 +59,7 @@ pub struct DisplayedWebpage {
 const MAX_PRETTY_URL_LEN: usize = 50;
 const MAX_TITLE_LEN: usize = 50;
 
-fn prettify_url(url: Url) -> String {
+fn prettify_url(url: &Url) -> String {
     let mut pretty_url = url.strip_query().to_string();
 
     if pretty_url.ends_with('/') {
@@ -88,18 +88,18 @@ fn prettify_date(date: NaiveDateTime) -> String {
     if num_hours < 24 {
         if num_hours <= 1 {
             return "1 hour ago".to_string();
-        } else {
-            return format!("{num_hours} hours ago");
         }
+
+        return format!("{num_hours} hours ago");
     }
 
     let num_days = diff.num_days();
     if num_days < 30 {
         if num_days <= 1 {
             return "1 day ago".to_string();
-        } else {
-            return format!("{num_days} days ago");
         }
+
+        return format!("{num_days} days ago");
     }
 
     format!("{}", date.format("%d. %b. %Y"))
@@ -111,7 +111,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
         let url: Url = webpage.url.clone().into();
         let domain = url.domain().to_string();
-        let pretty_url = prettify_url(url);
+        let pretty_url = prettify_url(&url);
 
         let mut title = html_escape(&webpage.title);
 
@@ -253,6 +253,8 @@ enum RegionSelection {
     Unselected(Region),
 }
 
+#[allow(clippy::unused_async)]
+#[allow(clippy::match_wild_err_arm)]
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
@@ -454,7 +456,7 @@ mod tests {
             ),
             "some <a href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
                 .to_string()
-        )
+        );
     }
 
     #[test]
@@ -472,7 +474,7 @@ mod tests {
                 7
             ),
             "some <a href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
-        )
+        );
     }
 
     #[test]
@@ -497,9 +499,9 @@ mod tests {
         assert_eq!(thousand_sep_number(10), "10".to_string());
         assert_eq!(thousand_sep_number(100), "100".to_string());
         assert_eq!(thousand_sep_number(1000), "1.000".to_string());
-        assert_eq!(thousand_sep_number(10000), "10.000".to_string());
-        assert_eq!(thousand_sep_number(100000), "100.000".to_string());
-        assert_eq!(thousand_sep_number(512854), "512.854".to_string());
-        assert_eq!(thousand_sep_number(9512854), "9.512.854".to_string());
+        assert_eq!(thousand_sep_number(10_000), "10.000".to_string());
+        assert_eq!(thousand_sep_number(100_000), "100.000".to_string());
+        assert_eq!(thousand_sep_number(512_854), "512.854".to_string());
+        assert_eq!(thousand_sep_number(9_512_854), "9.512.854".to_string());
     }
 }

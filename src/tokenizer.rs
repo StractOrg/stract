@@ -29,7 +29,6 @@ impl From<Lang> for MyStemmer {
             Lang::Dan => MyStemmer(Stemmer::new(Language::Danish)),
             Lang::Ara => MyStemmer(Stemmer::new(Language::Arabic)),
             Lang::Nld => MyStemmer(Stemmer::new(Language::Dutch)),
-            Lang::Eng => MyStemmer(Stemmer::new(Language::English)),
             Lang::Fin => MyStemmer(Stemmer::new(Language::Finnish)),
             Lang::Fra => MyStemmer(Stemmer::new(Language::French)),
             Lang::Deu => MyStemmer(Stemmer::new(Language::German)),
@@ -49,34 +48,34 @@ impl From<Lang> for MyStemmer {
 
 #[derive(Clone)]
 pub enum Tokenizer {
-    NormalTokenizer(NormalTokenizer),
-    StemmedTokenizer(StemmedTokenizer),
+    NormalTokenizer(Normal),
+    StemmedTokenizer(Stemmed),
 }
 
 impl Tokenizer {
     pub fn new_stemmed() -> Self {
-        Self::StemmedTokenizer(Default::default())
+        Self::StemmedTokenizer(Stemmed::default())
     }
     pub fn as_str(&self) -> &'static str {
         match self {
-            Tokenizer::NormalTokenizer(_) => NormalTokenizer::as_str(),
-            Tokenizer::StemmedTokenizer(_) => StemmedTokenizer::as_str(),
+            Tokenizer::NormalTokenizer(_) => Normal::as_str(),
+            Tokenizer::StemmedTokenizer(_) => Stemmed::as_str(),
         }
     }
 }
 
 impl Default for Tokenizer {
     fn default() -> Self {
-        Self::NormalTokenizer(Default::default())
+        Self::NormalTokenizer(Normal::default())
     }
 }
 
 #[derive(Clone, Default)]
-pub struct NormalTokenizer {
+pub struct Normal {
     stopwords: Option<Vec<String>>,
 }
 
-impl NormalTokenizer {
+impl Normal {
     pub fn as_str() -> &'static str {
         "tokenizer"
     }
@@ -89,11 +88,11 @@ impl NormalTokenizer {
 }
 
 #[derive(Clone, Default)]
-pub struct StemmedTokenizer {
+pub struct Stemmed {
     force_language: Option<Lang>,
 }
 
-impl StemmedTokenizer {
+impl Stemmed {
     pub fn as_str() -> &'static str {
         "stemmed_tokenizer"
     }
@@ -113,9 +112,9 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
     }
 }
 
-impl tantivy::tokenizer::Tokenizer for NormalTokenizer {
+impl tantivy::tokenizer::Tokenizer for Normal {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let mut analyzer = TextAnalyzer::from(SimpleTokenizer).filter(LowerCaser);
+        let mut analyzer = TextAnalyzer::from(Simple).filter(LowerCaser);
 
         if let Some(stopwords) = &self.stopwords {
             analyzer = analyzer.filter(StopWordFilter::remove(stopwords.clone()));
@@ -125,9 +124,9 @@ impl tantivy::tokenizer::Tokenizer for NormalTokenizer {
     }
 }
 
-impl tantivy::tokenizer::Tokenizer for StemmedTokenizer {
+impl tantivy::tokenizer::Tokenizer for Stemmed {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let analyzer = TextAnalyzer::from(SimpleTokenizer)
+        let analyzer = TextAnalyzer::from(Simple)
             .filter(LowerCaser)
             .filter(StopWordFilter::remove(vec![]));
 
@@ -154,7 +153,7 @@ enum Token {
 }
 
 #[derive(Clone)]
-pub struct SimpleTokenizer;
+pub struct Simple;
 
 pub struct SimpleTokenStream<'a> {
     lexer: Lexer<'a, Token>,
@@ -162,7 +161,7 @@ pub struct SimpleTokenStream<'a> {
     next_position: usize,
 }
 
-impl tantivy::tokenizer::Tokenizer for SimpleTokenizer {
+impl tantivy::tokenizer::Tokenizer for Simple {
     fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
         let lexer = Token::lexer(text);
         BoxTokenStream::from(SimpleTokenStream {
@@ -208,7 +207,7 @@ mod tests {
 
     fn tokenize(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = NormalTokenizer::default().token_stream(s);
+        let mut stream = Normal::default().token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());

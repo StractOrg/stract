@@ -57,11 +57,11 @@ impl Span {
         }
     }
 
-    pub fn add_link(&mut self, text: String, link: Link) {
+    pub fn add_link(&mut self, text: &str, link: Link) {
         debug_assert_eq!(self.text.chars().count() + text.chars().count(), link.end);
         debug_assert_eq!(self.text.chars().count(), link.start);
         self.links.push(link);
-        self.text.push_str(&text);
+        self.text.push_str(text);
     }
 }
 
@@ -105,7 +105,7 @@ impl<'a> From<Vec<Node<'a>>> for Span {
                         start: span.text.chars().count(),
                         end: span.text.chars().count() + text.chars().count(),
                     };
-                    span.add_link(text, link);
+                    span.add_link(&text, link);
                 }
                 Node::Text {
                     end: _,
@@ -117,9 +117,9 @@ impl<'a> From<Vec<Node<'a>>> for Span {
                             span.text.push_str(". ");
                         }
                         continue;
-                    } else {
-                        span.text.push_str(value);
                     }
+
+                    span.text.push_str(value);
                 }
                 Node::Template {
                     end: _,

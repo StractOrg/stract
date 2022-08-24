@@ -182,6 +182,7 @@ impl Paragraph {
         text.len()
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn link_density(&self) -> f64 {
         self.chars_count_in_links as f64 / self.text.len() as f64
     }
@@ -332,11 +333,8 @@ impl JustText {
         res
     }
 
-    fn calculate_stopword_density(
-        &self,
-        paragraph: &Paragraph,
-        stopwords: &HashSet<String>,
-    ) -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    fn calculate_stopword_density(paragraph: &Paragraph, stopwords: &HashSet<String>) -> f64 {
         paragraph
             .text
             .split_whitespace()
@@ -359,7 +357,7 @@ impl JustText {
 
         for paragraph in paragraphs {
             let classification = {
-                let stopword_density: f64 = self.calculate_stopword_density(&paragraph, stopwords);
+                let stopword_density: f64 = Self::calculate_stopword_density(&paragraph, stopwords);
 
                 if paragraph.link_density() > self.max_link_density
                     || paragraph.text.contains("\\xa9")
@@ -508,16 +506,10 @@ impl JustText {
             paragraph.classification = match &paragraph.classification {
                 Classification::Final(_) => paragraph.classification.clone(),
                 Classification::Intermediate(intermediate) => match intermediate {
-                    IntermediateClassification::Good => {
+                    IntermediateClassification::Good | IntermediateClassification::NearGood => {
                         Classification::Final(FinalClassification::Good)
                     }
-                    IntermediateClassification::NearGood => {
-                        Classification::Final(FinalClassification::Good)
-                    }
-                    IntermediateClassification::Short => {
-                        Classification::Final(FinalClassification::Bad)
-                    }
-                    IntermediateClassification::Bad => {
+                    IntermediateClassification::Short | IntermediateClassification::Bad => {
                         Classification::Final(FinalClassification::Bad)
                     }
                 },
@@ -571,7 +563,7 @@ impl JustText {
         Classification::Intermediate(IntermediateClassification::Bad)
     }
 
-    fn extract_text(&self, paragraphs: Vec<ClassifiedParagraph>) -> String {
+    fn extract_text(paragraphs: Vec<ClassifiedParagraph>) -> String {
         paragraphs
             .into_iter()
             .filter(|paragraph| {
@@ -595,7 +587,7 @@ impl JustText {
 
         self.contextual_classification(&mut classified);
 
-        self.extract_text(classified)
+        Self::extract_text(classified)
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ")

@@ -82,7 +82,7 @@ impl Searcher {
         let entity = self
             .entity_index
             .as_ref()
-            .and_then(|index| index.search(raw_query));
+            .and_then(|index| index.search(&raw_query));
 
         let search_duration_ms = start.elapsed().as_millis();
 

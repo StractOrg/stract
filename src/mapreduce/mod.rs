@@ -52,9 +52,11 @@ where
 }
 
 pub trait Reduce<T> {
+    #[must_use]
     fn reduce(self, element: T) -> Self;
 }
 
+#[allow(clippy::trait_duplication_in_bounds)]
 pub trait MapReduce<W, I, O1, O2>
 where
     Self: Sized + Iterator<Item = I> + Send,
@@ -68,6 +70,8 @@ where
         manager.run(self)
     }
 }
+
+#[allow(clippy::trait_duplication_in_bounds)]
 impl<W, I, O1, O2, T> MapReduce<W, I, O1, O2> for T
 where
     W: Worker,

@@ -32,27 +32,26 @@ fn rtrim(s: &mut String) {
     s.truncate(s.trim_end().len());
 }
 
-fn decode(raw: Vec<u8>) -> String {
-    match String::from_utf8(raw.clone()) {
-        Ok(res) => res,
-        Err(_) => {
-            let encodings = [
-                encoding_rs::WINDOWS_1251,
-                encoding_rs::GBK,
-                encoding_rs::SHIFT_JIS,
-                encoding_rs::EUC_JP,
-                encoding_rs::EUC_KR,
-            ];
+fn decode(raw: &[u8]) -> String {
+    if let Ok(res) = String::from_utf8(raw.to_owned()) {
+        res
+    } else {
+        let encodings = [
+            encoding_rs::WINDOWS_1251,
+            encoding_rs::GBK,
+            encoding_rs::SHIFT_JIS,
+            encoding_rs::EUC_JP,
+            encoding_rs::EUC_KR,
+        ];
 
-            for enc in encodings {
-                let (cow, _, had_errors) = enc.decode(&raw[..]);
-                if !had_errors {
-                    return cow.to_string();
-                }
+        for enc in encodings {
+            let (cow, _, had_errors) = enc.decode(raw);
+            if !had_errors {
+                return cow.to_string();
             }
-
-            return String::from_utf8_lossy(&raw).to_string();
         }
+
+        String::from_utf8_lossy(raw).to_string()
     }
 }
 
@@ -157,7 +156,7 @@ pub(crate) struct Response {
 
 impl Response {
     fn from_raw(record: RawWarcRecord) -> Result<Self> {
-        let content = decode(record.content);
+        let content = decode(&record.content[..]);
 
         let (_header, content) = content
             .split_once("\r\n\r\n")

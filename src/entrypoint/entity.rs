@@ -263,7 +263,7 @@ impl EntityBuilder {
                                     + text.chars().count(),
                                 target: target.to_string(),
                             };
-                            current_paragraph.content.add_link(text, link)
+                            current_paragraph.content.add_link(&text, link)
                         }
                         None => {
                             let link = Link {

@@ -19,7 +19,7 @@ pub mod frontend;
 mod indexer;
 mod webgraph;
 
-pub use centrality::CentralityEntrypoint;
+pub use centrality::Centrality;
 pub use entity::EntityIndexer;
 pub use indexer::Indexer;
-pub use webgraph::WebgraphEntrypoint;
+pub use webgraph::Webgraph;

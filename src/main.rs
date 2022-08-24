@@ -15,9 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cuely::entrypoint::{
-    frontend, CentralityEntrypoint, EntityIndexer, Indexer, WebgraphEntrypoint,
-};
+use cuely::entrypoint::{self, frontend};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
@@ -97,38 +95,38 @@ fn main() -> Result<()> {
         Commands::Indexer { options } => match options {
             IndexingOptions::Master { config_path } => {
                 let config = load_toml_config(&config_path);
-                Indexer::run_master(&config)?;
+                entrypoint::Indexer::run_master(&config)?;
             }
             IndexingOptions::Worker {
                 address,
                 centrality_store_path,
             } => {
-                Indexer::run_worker(address, centrality_store_path)?;
+                entrypoint::Indexer::run_worker(address, centrality_store_path)?;
             }
             IndexingOptions::Local { config_path } => {
                 let config = load_toml_config(&config_path);
-                Indexer::run_locally(&config)?;
+                entrypoint::Indexer::run_locally(&config)?;
             }
             IndexingOptions::Entity {
                 wikipedia_dump_path,
                 output_path,
-            } => EntityIndexer::run(wikipedia_dump_path, output_path)?,
+            } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
         },
         Commands::Centrality {
             webgraph_path,
             output_path,
-        } => CentralityEntrypoint::run(webgraph_path, output_path),
+        } => entrypoint::Centrality::run(webgraph_path, output_path),
         Commands::Webgraph { options } => match options {
             WebgraphOptions::Master { config_path } => {
                 let config = load_toml_config(config_path);
-                WebgraphEntrypoint::run_master(&config)?;
+                entrypoint::Webgraph::run_master(&config)?;
             }
             WebgraphOptions::Worker { address } => {
-                WebgraphEntrypoint::run_worker(address)?;
+                entrypoint::Webgraph::run_worker(address)?;
             }
             WebgraphOptions::Local { config_path } => {
                 let config = load_toml_config(config_path);
-                WebgraphEntrypoint::run_locally(&config)?;
+                entrypoint::Webgraph::run_locally(&config)?;
             }
         },
         Commands::Frontend {

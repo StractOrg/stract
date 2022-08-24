@@ -27,6 +27,7 @@ use crate::webpage::Url;
 
 use super::State;
 
+#[allow(clippy::unused_async)]
 pub async fn route(
     Path(site): Path<String>,
     Extension(state): Extension<Arc<State>>,

@@ -60,8 +60,8 @@ where
 
         Box::new(IntoIter {
             inner: iter,
-            key: Default::default(),
-            value: Default::default(),
+            key: PhantomData::default(),
+            value: PhantomData::default(),
         })
     }
 }

@@ -40,6 +40,6 @@ where
         let key_bytes = bincode::serialize(&key).expect("failed to serialize key");
         let val_bytes = bincode::serialize(&value).expect("failed to serialize value");
 
-        self.insert_raw(key_bytes, val_bytes)
+        self.insert_raw(key_bytes, val_bytes);
     }
 }

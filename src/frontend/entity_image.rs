@@ -25,6 +25,7 @@ use reqwest::StatusCode;
 
 use super::State;
 
+#[allow(clippy::unused_async)]
 pub async fn route(
     Path(entity): Path<String>,
     Extension(state): Extension<Arc<State>>,

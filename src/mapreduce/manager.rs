@@ -108,7 +108,7 @@ impl<'a> WorkerGuard<'a> {
     }
 
     fn success(self) {
-        self.from_pool.insert(Arc::clone(&self.worker))
+        self.from_pool.insert(Arc::clone(&self.worker));
     }
 }
 
@@ -122,7 +122,7 @@ impl<'a> Deref for WorkerGuard<'a> {
 
 impl<'a> Drop for WorkerGuard<'a> {
     fn drop(&mut self) {
-        self.from_pool.put_back()
+        self.from_pool.put_back();
     }
 }
 
@@ -185,7 +185,7 @@ impl WorkerPool {
         let mut failing_workers = Vec::new();
         for worker in &self.all_workers {
             if worker.stop::<W, I, O>().is_err() {
-                failing_workers.push(worker)
+                failing_workers.push(worker);
             }
         }
 
@@ -272,6 +272,7 @@ impl Manager {
         }
     }
 
+    #[allow(clippy::trait_duplication_in_bounds)]
     fn get_results<W, I, O1, O2>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
         W: Worker,
@@ -327,6 +328,7 @@ impl Manager {
         x
     }
 
+    #[allow(clippy::trait_duplication_in_bounds)]
     pub fn run<W, I, O1, O2>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
         W: Worker,

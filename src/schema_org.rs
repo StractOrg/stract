@@ -61,6 +61,6 @@ mod tests {
                 author: Some("Jane Doe".to_string()),
                 content_url: Some("mexico-beach.jpg".to_string()),
             }),
-        )
+        );
     }
 }

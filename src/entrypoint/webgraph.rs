@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
+    directory::DirEntry,
     mapreduce::{Map, MapReduce, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
-    webgraph::{FrozenWebgraph, Node, Webgraph, WebgraphBuilder},
+    webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
@@ -81,11 +82,12 @@ impl Map<StatelessWorker, FrozenWebgraph> for Job {
     }
 }
 
-impl Reduce<FrozenWebgraph> for Webgraph {
-    fn reduce(mut self, other: FrozenWebgraph) -> Webgraph {
+impl Reduce<FrozenWebgraph> for webgraph::Webgraph {
+    fn reduce(mut self, other: FrozenWebgraph) -> webgraph::Webgraph {
         let other_path = match &other.root {
-            crate::directory::DirEntry::Folder { name, entries: _ } => name.clone(),
-            crate::directory::DirEntry::File { name, content: _ } => name.clone(),
+            DirEntry::Folder { name, entries: _ } | DirEntry::File { name, content: _ } => {
+                name.clone()
+            }
         };
 
         let other = other.into();
@@ -98,8 +100,8 @@ impl Reduce<FrozenWebgraph> for Webgraph {
     }
 }
 
-impl Reduce<Webgraph> for Webgraph {
-    fn reduce(mut self, element: Webgraph) -> Self {
+impl Reduce<webgraph::Webgraph> for webgraph::Webgraph {
+    fn reduce(mut self, element: webgraph::Webgraph) -> Self {
         let other_path = element.path.clone();
 
         self.merge(element);
@@ -109,9 +111,9 @@ impl Reduce<Webgraph> for Webgraph {
     }
 }
 
-pub struct WebgraphEntrypoint {}
+pub struct Webgraph {}
 
-impl WebgraphEntrypoint {
+impl Webgraph {
     pub fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
         info!("Running master for webgraph construction");
 
@@ -144,7 +146,7 @@ impl WebgraphEntrypoint {
             warc_paths = Box::new(warc_paths.take(limit));
         }
 
-        let _graph: Webgraph = warc_paths
+        let _graph: webgraph::Webgraph = warc_paths
             .map_reduce(&workers)
             .expect("failed to build webgraph");
 
@@ -179,7 +181,7 @@ impl WebgraphEntrypoint {
             })
             .par_bridge()
             .map(|job| job.map(&worker))
-            .map(Webgraph::from)
+            .map(webgraph::Webgraph::from)
             .reduce_with(|a, b| a.reduce(b));
 
         Ok(())

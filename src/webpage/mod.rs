@@ -16,7 +16,7 @@
 use crate::{schema_org::SchemaOrg, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use itertools::Itertools;
-use kuchiki::{iter::NodeEdge, traits::*, NodeRef};
+use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use std::{borrow::Borrow, collections::HashMap};
 use uuid::Uuid;
@@ -242,7 +242,7 @@ impl Html {
                                         source: self.url.clone(),
                                         destination: dest.to_string().into(),
                                         text: text.trim().to_string(),
-                                    })
+                                    });
                                 }
                             }
                         }
@@ -293,9 +293,9 @@ impl Html {
 
                 let favicon = FaviconLink {
                     link,
-                    image_type,
                     width,
                     height,
+                    image_type,
                 };
 
                 return Some(favicon);
@@ -344,10 +344,10 @@ impl Html {
     pub fn title(&self) -> Option<String> {
         if let Ok(title) = self.root.select_first("title") {
             let title = title.text_contents().trim().to_string();
-            if !title.is_empty() {
-                Some(title)
-            } else {
+            if title.is_empty() {
                 None
+            } else {
+                Some(title)
             }
         } else {
             None
@@ -416,29 +416,28 @@ impl Html {
                 Field::CleanBody | Field::StemmedCleanBody => {
                     let text = self.clean_text();
 
-                    doc.add_text(tantivy_field, text.unwrap_or_default())
+                    doc.add_text(tantivy_field, text.unwrap_or_default());
                 }
                 Field::Description => {
-                    doc.add_text(tantivy_field, self.description().unwrap_or_default())
+                    doc.add_text(tantivy_field, self.description().unwrap_or_default());
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
                 Field::Host => doc.add_text(tantivy_field, self.host()),
                 Field::Domain => doc.add_text(tantivy_field, self.domain()),
                 Field::DomainIfHomepage => {
                     if self.is_homepage() {
-                        doc.add_text(tantivy_field, self.domain())
+                        doc.add_text(tantivy_field, self.domain());
                     } else {
-                        doc.add_text(tantivy_field, "")
+                        doc.add_text(tantivy_field, "");
                     }
                 }
                 Field::IsHomepage => {
-                    doc.add_u64(tantivy_field, if self.is_homepage() { 1 } else { 0 })
+                    doc.add_u64(tantivy_field, if self.is_homepage() { 1 } else { 0 });
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,
                     self.updated_time()
-                        .map(|time| time.timestamp().max(0) as u64)
-                        .unwrap_or(0),
+                        .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
                 Field::StemmedAllBody | Field::AllBody => {
                     let text = self.all_text();
@@ -447,7 +446,7 @@ impl Html {
                         return Err(Error::EmptyField("all body"));
                     }
 
-                    doc.add_text(tantivy_field, text.unwrap())
+                    doc.add_text(tantivy_field, text.unwrap());
                 }
                 Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
                 Field::BacklinkText
@@ -482,7 +481,7 @@ impl Html {
             scripts.push(Script {
                 attributes,
                 content,
-            })
+            });
         }
 
         scripts
@@ -493,7 +492,7 @@ impl Html {
 
         for schema in self.scripts().into_iter().filter(|script| {
             matches!(
-                script.attributes.get("type").map(|s| s.as_str()),
+                script.attributes.get("type").map(String::as_str),
                 Some("application/ld+json")
             )
         }) {
@@ -520,7 +519,7 @@ impl Html {
 
         for node in self.root.select("link").unwrap() {
             if let Some(link) = node.attributes.borrow().get("href") {
-                links.push(link.to_string().into())
+                links.push(link.to_string().into());
             }
         }
 
@@ -584,9 +583,9 @@ impl Html {
         self.schema_org()
             .into_iter()
             .filter(|schema| matches!(schema, SchemaOrg::ImageObject(_)))
-            .flat_map(|schema| {
+            .filter_map(|schema| {
                 match schema {
-                    SchemaOrg::ImageObject(image) => image.content_url.map(|url| url.into()),
+                    SchemaOrg::ImageObject(image) => image.content_url.map(Url::from),
                     _ => None, // has been filtered, so only image is possible
                 }
             })
@@ -874,7 +873,7 @@ mod tests {
                 height: Some(192),
                 image_type: None
             })
-        )
+        );
     }
 
     fn full_link_favicon(href: &str, site_url: &str, expected: &str) {
@@ -973,7 +972,7 @@ mod tests {
                 author: Some("Jane Doe".to_string()),
                 content_url: Some("mexico-beach.jpg".to_string()),
             })]
-        )
+        );
     }
 
     #[test]
@@ -1012,7 +1011,7 @@ mod tests {
 
         let html = Html::parse(html, "example.com");
 
-        assert!(html.schema_org().is_empty())
+        assert!(html.schema_org().is_empty());
     }
 
     #[test]
@@ -1220,7 +1219,7 @@ mod tests {
                 "thirdparty.com".to_string(),
                 "securepubads.g.doubleclick.net".to_string()
             ]
-        )
+        );
     }
 
     #[test]
@@ -1254,6 +1253,6 @@ mod tests {
         );
 
         assert_eq!(html.title(), Some("Test site".to_string()));
-        assert_eq!(html.all_text(), Some("test".to_string()))
+        assert_eq!(html.all_text(), Some("test".to_string()));
     }
 }
