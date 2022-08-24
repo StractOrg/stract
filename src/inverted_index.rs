@@ -484,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn searchable_backlinks() {
+    fn not_searchable_backlinks() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
         let query = Query::parse("great site", index.schema(), index.tokenizers())
             .expect("Failed to parse query");
@@ -544,9 +544,8 @@ mod tests {
             .documents
             .sort_by(|a, b| a.url.partial_cmp(&b.url).unwrap());
 
-        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.a.com");
-        assert_eq!(result.documents[1].url, "https://www.b.com");
     }
 
     #[test]

@@ -37,30 +37,50 @@ impl Term {
         &self,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
         tokenizer_manager: &TokenizerManager,
-    ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
+    ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         match self {
-            Term::Simple(term) => (
-                Occur::Must,
-                Box::new(BooleanQuery::new(Term::into_tantivy_simple(
-                    term,
-                    fields,
-                    tokenizer_manager,
-                ))),
-            ),
-            Term::Not(subterm) => (
+            Term::Simple(term) => {
+                let (backlink_field, backlink_field_entry) = fields
+                    .iter()
+                    .find(|(field, _)| {
+                        matches!(ALL_FIELDS[field.field_id() as usize], Field::BacklinkText)
+                    })
+                    .unwrap();
+
+                vec![
+                    (
+                        Occur::Must,
+                        Box::new(BooleanQuery::new(Term::into_tantivy_simple(
+                            term,
+                            fields,
+                            tokenizer_manager,
+                        ))),
+                    ),
+                    (
+                        Occur::Should,
+                        Box::new(Term::tantivy_term_query(
+                            backlink_field,
+                            backlink_field_entry,
+                            tokenizer_manager,
+                            term,
+                        )),
+                    ),
+                ]
+            }
+            Term::Not(subterm) => vec![(
                 Occur::MustNot,
-                Box::new(BooleanQuery::new(vec![
-                    subterm.as_tantivy_query(fields, tokenizer_manager)
-                ])),
-            ),
-            Term::Site(site) => (
+                Box::new(BooleanQuery::new(
+                    subterm.as_tantivy_query(fields, tokenizer_manager),
+                )),
+            )],
+            Term::Site(site) => vec![(
                 Occur::Must,
                 Box::new(BooleanQuery::new(Term::into_tantivy_site(
                     site,
                     fields,
                     tokenizer_manager,
                 ))),
-            ),
+            )],
             Term::Title(title) => {
                 let (field, entry) = fields
                     .iter()
@@ -68,10 +88,10 @@ impl Term {
                         matches!(ALL_FIELDS[field.field_id() as usize], Field::Title)
                     })
                     .unwrap();
-                (
+                vec![(
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, title),
-                )
+                )]
             }
             Term::Body(body) => {
                 let (field, entry) = fields
@@ -80,20 +100,20 @@ impl Term {
                         matches!(ALL_FIELDS[field.field_id() as usize], Field::AllBody)
                     })
                     .unwrap();
-                (
+                vec![(
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, body),
-                )
+                )]
             }
             Term::Url(url) => {
                 let (field, entry) = fields
                     .iter()
                     .find(|(field, _)| matches!(ALL_FIELDS[field.field_id() as usize], Field::Url))
                     .unwrap();
-                (
+                vec![(
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, url),
-                )
+                )]
             }
         }
     }

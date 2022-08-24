@@ -176,8 +176,8 @@ impl Field {
             Field::Domain => Some(4.0),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
-            Field::BacklinkText
-            | Field::Centrality
+            Field::BacklinkText => Some(4.0),
+            Field::Centrality
             | Field::IsHomepage
             | Field::PrimaryImageUuid
             | Field::FetchTimeMs
@@ -189,7 +189,7 @@ impl Field {
     }
 
     pub fn is_searchable(&self) -> bool {
-        !matches!(self, Field::PrimaryImageUuid)
+        !matches!(self, Field::PrimaryImageUuid | Field::BacklinkText)
     }
 }
 

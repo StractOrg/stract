@@ -71,8 +71,10 @@ mod tests {
                         <head>
                             <title>Website A</title>
                         </head>
-                        {CONTENT}
-                        <a href="https://www.b.com">B site is great</a>
+                        <body>
+                            {CONTENT}
+                            example example example
+                        </body>
                     </html>
                 "#
                 ),
@@ -97,11 +99,7 @@ mod tests {
                 "#
                 ),
                 "https://www.b.com",
-                vec![Link {
-                    source: "https://www.a.com".to_string().into(),
-                    destination: "https://www.b.com".to_string().into(),
-                    text: "B site is great".to_string(),
-                }],
+                vec![],
                 5.0,
                 500,
             ))
@@ -109,7 +107,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("great site", None).expect("Search failed");
+        let result = searcher.search("example", None).expect("Search failed");
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
         assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
@@ -285,6 +283,59 @@ mod tests {
                         </head>
                         <body>
                             test
+                        </body>
+                    </html>
+                "#,
+                "https://www.second.com",
+                vec![],
+                0.003,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::from(index);
+        let result = searcher.search("test", None).expect("Search failed");
+
+        assert_eq!(result.webpages.documents.len(), 2);
+        assert_eq!(result.webpages.documents[0].url, "https://www.first.com");
+    }
+
+    #[test]
+    fn backlink_text() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+                    <html>
+                        <head>
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+                "https://www.first.com",
+                vec![Link {
+                    source: "https://www.second.com".to_string().into(),
+                    destination: "https://www.first.com".to_string().into(),
+                    text: "test this is the best test site".to_string(),
+                }],
+                0.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                r#"
+                    <html>
+                        <head>
+                            <title>Second test site</title>
+                        </head>
+                        <body>
+                            test test test test test test test
                         </body>
                     </html>
                 "#,

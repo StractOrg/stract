@@ -63,8 +63,7 @@ impl Query {
 
         let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
-            .map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
-            // .map(|term_query| (Occur::Must, term_query))
+            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
             .collect();
 
         queries.push((Occur::Should, Box::new(AllQuery)));
