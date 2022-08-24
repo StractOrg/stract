@@ -173,7 +173,7 @@ impl Field {
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
             Field::Url => Some(1.0),
-            Field::Domain => Some(4.0),
+            Field::Domain => Some(2.0),
             Field::AllBody => Some(0.01),
             Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText => Some(4.0),

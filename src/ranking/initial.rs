@@ -133,7 +133,7 @@ fn region_score(
     webpage_region: Region,
 ) -> f64 {
     let boost = selected_region
-        .map(|region| if region == webpage_region { 15.0 } else { 0.0 })
+        .map(|region| if region == webpage_region { 50.0 } else { 0.0 })
         .unwrap_or(0.0);
 
     boost + region_count.score(&webpage_region)

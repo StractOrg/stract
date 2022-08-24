@@ -195,14 +195,21 @@ struct Script {
 pub struct Html {
     url: Url,
     root: NodeRef, // this is reference counted (cheap to clone)
+    all_text: Option<String>,
+    clean_text: Option<String>,
 }
 
 impl Html {
     pub fn parse(html: &str, url: &str) -> Self {
         let root = kuchiki::parse_html().one(html);
 
+        let all_text = Html::calculate_all_text(root.clone());
+        let clean_text = Html::calculate_clean_text(root.clone());
+
         Self {
             root,
+            all_text,
+            clean_text,
             url: url.to_string().into(),
         }
     }
@@ -298,8 +305,8 @@ impl Html {
         None
     }
 
-    pub fn clean_text(&self) -> Option<String> {
-        let text = JustText::default().extract(self.root.clone());
+    fn calculate_clean_text(node: NodeRef) -> Option<String> {
+        let text = JustText::default().extract(node);
 
         if text.is_empty() {
             None
@@ -308,7 +315,11 @@ impl Html {
         }
     }
 
-    pub fn all_text(&self) -> Option<String> {
+    pub fn clean_text(&self) -> Option<String> {
+        self.clean_text.clone()
+    }
+
+    fn calculate_all_text(node: NodeRef) -> Option<String> {
         let text = JustText {
             max_link_density: 2.0,
             length_low: 0,
@@ -317,7 +328,7 @@ impl Html {
             stopwords_high: -1.0,
             max_heading_distance: 10000,
         }
-        .extract(self.root.clone());
+        .extract(node);
 
         if text.is_empty() {
             None
@@ -326,9 +337,18 @@ impl Html {
         }
     }
 
+    fn all_text(&self) -> Option<String> {
+        self.all_text.clone()
+    }
+
     pub fn title(&self) -> Option<String> {
         if let Ok(title) = self.root.select_first("title") {
-            Some(title.text_contents().trim().to_string())
+            let title = title.text_contents().trim().to_string();
+            if !title.is_empty() {
+                Some(title)
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -664,6 +684,26 @@ mod tests {
         );
         assert_eq!(webpage.host(), "www.example.com");
         assert_eq!(webpage.domain(), "example.com");
+    }
+
+    #[test]
+    fn empty_title() {
+        let raw = format!(
+            r#"
+            <html>
+                <head>
+                    <title></title>
+                </head>
+                <body>
+                    <p>{CONTENT}</p>
+                </body>
+            </html>
+        "#
+        );
+
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+
+        assert_eq!(webpage.title(), None);
     }
 
     #[test]
