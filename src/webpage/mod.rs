@@ -16,20 +16,19 @@
 use crate::{schema_org::SchemaOrg, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use itertools::Itertools;
-use logos::{Lexer, Logos};
+use kuchiki::{iter::NodeEdge, traits::*, NodeRef};
 use regex::Regex;
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap};
 use uuid::Uuid;
 
 mod just_text;
-mod lexer;
 pub mod region;
 mod url;
 
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 pub use self::url::Url;
-use self::{just_text::JustText, lexer::Token, region::Region};
+use self::{just_text::JustText, region::Region};
 
 static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
     Regex::new(r#"(((http|ftp|https):/{2})+(([0-9a-z_-]+\.)+(aero|asia|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|cz|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mn|mn|mo|mp|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|nom|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ra|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|arpa)(:[0-9]+)?((/([~0-9a-zA-Z\#\+%@\./_-]+))?(\?[0-9a-zA-Z\+%@/&\[\];=_-]+)?)?))\b"#).unwrap()
@@ -46,7 +45,6 @@ pub struct FaviconLink {
 pub struct Preprocessor<const N: usize> {
     removed_tags: [&'static str; N],
     num_open_tags: [i64; N],
-    open_comments: i64,
 }
 
 impl<const N: usize> Preprocessor<N> {
@@ -54,55 +52,57 @@ impl<const N: usize> Preprocessor<N> {
         Self {
             removed_tags,
             num_open_tags: [0; N],
-            open_comments: 0,
         }
     }
 
-    pub fn update(&mut self, tok: &Token) {
-        match tok {
-            Token::StartTag(tag) if !tag.raw().contains("/>") => {
-                if let Some((_, n)) = self
-                    .removed_tags
-                    .iter()
-                    .zip(self.num_open_tags.iter_mut())
-                    .find(|(name, _)| **name == tag.name())
-                {
-                    *n += 1;
+    pub fn update(&mut self, edge: &NodeEdge<NodeRef>) {
+        match edge {
+            NodeEdge::Start(node) => {
+                if let Some(element) = node.as_element() {
+                    let element_name: &str = element.name.local.borrow();
+                    if let Some((_, n)) = self
+                        .removed_tags
+                        .iter()
+                        .zip(self.num_open_tags.iter_mut())
+                        .find(|(name, _)| **name == element_name)
+                    {
+                        *n += 1;
+                    }
                 }
             }
-            Token::EndTag(tag) => {
-                if let Some((_, n)) = self
-                    .removed_tags
-                    .iter()
-                    .zip(self.num_open_tags.iter_mut())
-                    .find(|(name, _)| **name == tag.name())
-                {
-                    *n -= 1;
+            NodeEdge::End(node) => {
+                if let Some(element) = node.as_element() {
+                    let element_name: &str = element.name.local.borrow();
+                    if let Some((_, n)) = self
+                        .removed_tags
+                        .iter()
+                        .zip(self.num_open_tags.iter_mut())
+                        .find(|(name, _)| **name == element_name)
+                    {
+                        *n -= 1;
+                    }
                 }
             }
-            Token::BeginComment => self.open_comments += 1,
-            Token::EndComment => self.open_comments -= 1,
-            _ => {}
         }
     }
 
     pub fn is_inside_removed(&self) -> bool {
-        self.num_open_tags.iter().any(|n| *n > 0) || self.open_comments > 0
+        self.num_open_tags.iter().any(|n| *n > 0)
     }
 }
 
-pub struct Webpage<'a> {
-    pub html: Html<'a>,
+pub struct Webpage {
+    pub html: Html,
     pub backlinks: Vec<Link>,
     pub centrality: f64,
     pub fetch_time_ms: u64,
     pub primary_image_uuid: Option<Uuid>,
 }
 
-impl<'a> Webpage<'a> {
+impl Webpage {
     #[cfg(test)]
     pub fn new(
-        html: &'a str,
+        html: &str,
         url: &str,
         backlinks: Vec<Link>,
         centrality: f64,
@@ -186,71 +186,73 @@ impl<'a> Webpage<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct Html<'a> {
-    raw: &'a str,
-    tokens: Lexer<'a, Token<'a>>,
-    url: Url,
+struct Script {
+    attributes: HashMap<String, String>,
+    content: String,
 }
 
-impl<'a> Html<'a> {
-    pub fn parse(html: &'a str, url: &str) -> Self {
-        let tokens = Token::lexer(html);
+#[derive(Debug)]
+pub struct Html {
+    url: Url,
+    root: NodeRef, // this is reference counted (cheap to clone)
+}
+
+impl Html {
+    pub fn parse(html: &str, url: &str) -> Self {
+        let root = kuchiki::parse_html().one(html);
 
         Self {
-            raw: html,
-            tokens,
+            root,
             url: url.to_string().into(),
         }
     }
 
     pub fn links(&self) -> Vec<Link> {
-        let mut tokens = self.tokens.clone();
         let mut links = Vec::new();
         let mut open_links = Vec::new();
         let mut preprocessor = Preprocessor::new(["script", "style", "head"]);
 
-        while let Some(tok) = tokens.next() {
-            preprocessor.update(&tok);
+        for edge in self.root.traverse() {
+            preprocessor.update(&edge);
             if preprocessor.is_inside_removed() {
                 continue;
             }
 
-            match tok {
-                Token::StartTag(tag) if tag.name() == "a" => {
-                    open_links.push((String::new(), tag.attributes()));
-                }
-                Token::EndTag(tag) if tag.name() == "a" => {
-                    if let Some((text, attributes)) = open_links.pop() {
-                        if let Some(dest) = attributes.get("href") {
-                            links.push(Link {
-                                source: self.url.clone(),
-                                destination: dest.to_string().into(),
-                                text,
-                            })
+            match edge {
+                NodeEdge::Start(node) => {
+                    if let Some(element) = node.as_element() {
+                        if &element.name.local == "a" {
+                            open_links.push((String::new(), element.attributes.clone()));
                         }
                     }
                 }
-                Token::Error => {
-                    for (text, _) in &mut open_links {
-                        let span = tokens.span();
-                        text.push_str(&self.raw[span]);
+                NodeEdge::End(node) => {
+                    if let Some(element) = node.as_element() {
+                        if &element.name.local == "a" {
+                            if let Some((text, attributes)) = open_links.pop() {
+                                if let Some(dest) = attributes.borrow().get("href") {
+                                    links.push(Link {
+                                        source: self.url.clone(),
+                                        destination: dest.to_string().into(),
+                                        text: text.trim().to_string(),
+                                    })
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(text) = node.as_text() {
+                        let raw_text = text.borrow();
+                        let text = raw_text.trim();
+
+                        if !text.is_empty() {
+                            for (link_text, _) in &mut open_links {
+                                link_text.push('\n');
+                                link_text.push_str(text);
+                            }
+                        }
                     }
                 }
-                Token::SelfTerminatingTag(tag) if tag.name() == "a" => {
-                    if let Some(dest) = tag.attributes().get("href") {
-                        links.push(Link {
-                            source: self.url.clone(),
-                            destination: dest.to_string().into(),
-                            text: String::new(),
-                        })
-                    }
-                }
-                Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::SelfTerminatingTag(_)
-                | Token::BeginComment
-                | Token::EndComment => {}
             }
         }
 
@@ -258,59 +260,38 @@ impl<'a> Html<'a> {
     }
 
     pub fn favicon(&self) -> Option<FaviconLink> {
-        let mut preprocessor = Preprocessor::new(["script", "style", "body"]);
-
-        let tokens = self.tokens.clone();
-        for tok in tokens {
-            preprocessor.update(&tok);
-            if preprocessor.is_inside_removed() {
+        for node in self.root.select("link").unwrap() {
+            if !matches!(node.attributes.borrow().get("rel"), Some("icon")) {
                 continue;
             }
 
-            match tok {
-                Token::StartTag(tag) | Token::SelfTerminatingTag(tag) if tag.name() == "link" => {
-                    let rel = tag.attributes().get("rel").cloned();
-                    if rel.is_none() {
-                        continue;
-                    }
-                    if rel.unwrap() != "icon" {
-                        continue;
-                    }
-
-                    if let Some(link) = tag.attributes().get("href") {
-                        let (width, height) = match tag.attributes().get("sizes") {
-                            Some(size) => {
-                                if let Some((width, height)) = size.split_once('x') {
-                                    (width.parse().ok(), height.parse().ok())
-                                } else {
-                                    (None, None)
-                                }
-                            }
-                            _ => (None, None),
-                        };
-
-                        let image_type = tag.attributes().get("type").map(|t| t.to_string());
-                        let mut link: Url = link.to_string().into();
-
-                        if !link.is_full_path() {
-                            link.prefix_with(&self.url);
+            if let Some(link) = node.attributes.borrow().get("href") {
+                let (width, height) = match node.attributes.borrow().get("sizes") {
+                    Some(size) => {
+                        if let Some((width, height)) = size.split_once('x') {
+                            (width.parse().ok(), height.parse().ok())
+                        } else {
+                            (None, None)
                         }
-
-                        let favicon = FaviconLink {
-                            link,
-                            image_type,
-                            width,
-                            height,
-                        };
-                        return Some(favicon);
                     }
+                    _ => (None, None),
+                };
+
+                let image_type = node.attributes.borrow().get("type").map(|t| t.to_string());
+                let mut link: Url = link.to_string().into();
+
+                if !link.is_full_path() {
+                    link.prefix_with(&self.url);
                 }
-                Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::SelfTerminatingTag(_)
-                | Token::BeginComment
-                | Token::Error
-                | Token::EndComment => {}
+
+                let favicon = FaviconLink {
+                    link,
+                    image_type,
+                    width,
+                    height,
+                };
+
+                return Some(favicon);
             }
         }
 
@@ -318,7 +299,7 @@ impl<'a> Html<'a> {
     }
 
     pub fn clean_text(&self) -> Option<String> {
-        let text = JustText::default().extract(self.raw);
+        let text = JustText::default().extract(self.root.clone());
 
         if text.is_empty() {
             None
@@ -336,7 +317,7 @@ impl<'a> Html<'a> {
             stopwords_high: -1.0,
             max_heading_distance: 10000,
         }
-        .extract(self.raw);
+        .extract(self.root.clone());
 
         if text.is_empty() {
             None
@@ -346,47 +327,11 @@ impl<'a> Html<'a> {
     }
 
     pub fn title(&self) -> Option<String> {
-        let mut tokens = self.tokens.clone();
-        let mut title = None;
-        let mut open_tags = 0;
-        let mut preprocessor = Preprocessor::new(["script", "style"]);
-
-        while let Some(tok) = tokens.next() {
-            preprocessor.update(&tok);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
-            match tok {
-                Token::StartTag(tag) if tag.name() == "title" => {
-                    open_tags += 1;
-                }
-                Token::EndTag(tag) if tag.name() == "title" => {
-                    open_tags -= 1;
-
-                    if open_tags == 0 {
-                        break;
-                    }
-                }
-                Token::Error => {
-                    if open_tags > 0 {
-                        let span = tokens.span();
-                        if let Some(cur_title) = title {
-                            title = Some(cur_title + &self.raw[span]);
-                        } else {
-                            title = Some(self.raw[span].to_string());
-                        }
-                    }
-                }
-                Token::SelfTerminatingTag(_)
-                | Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::BeginComment
-                | Token::EndComment => {}
-            }
+        if let Ok(title) = self.root.select_first("title") {
+            Some(title.text_contents().trim().to_string())
+        } else {
+            None
         }
-
-        title
     }
 
     pub fn url(&self) -> &Url {
@@ -406,39 +351,24 @@ impl<'a> Html<'a> {
     }
 
     pub fn metadata(&self) -> Vec<Meta> {
-        let tokens = self.tokens.clone();
         let mut metas = Vec::new();
-        let mut preprocessor = Preprocessor::new(["script", "style"]);
 
-        for tok in tokens {
-            preprocessor.update(&tok);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
-            match tok {
-                Token::StartTag(tag) if tag.name() == "meta" => {
-                    metas.push(
-                        tag.attributes()
-                            .into_iter()
-                            .map(|(key, value)| (key.to_string(), value.to_string()))
-                            .collect(),
-                    );
-                }
-                Token::SelfTerminatingTag(tag) if tag.name() == "meta" => {
-                    metas.push(
-                        tag.attributes()
-                            .into_iter()
-                            .map(|(key, value)| (key.to_string(), value.to_string()))
-                            .collect(),
-                    );
-                }
-                Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::SelfTerminatingTag(_)
-                | Token::Error
-                | Token::BeginComment
-                | Token::EndComment => {}
+        for node in self.root.select("meta").unwrap() {
+            if let Some(element) = node.as_node().as_element() {
+                metas.push(
+                    element
+                        .attributes
+                        .borrow()
+                        .map
+                        .iter()
+                        .map(|(name, attr)| {
+                            (
+                                name.local.borrow().to_string(),
+                                attr.borrow().value.to_string(),
+                            )
+                        })
+                        .collect(),
+                );
             }
         }
 
@@ -511,50 +441,75 @@ impl<'a> Html<'a> {
         Ok(doc)
     }
 
+    fn scripts(&self) -> Vec<Script> {
+        let mut scripts = Vec::new();
+
+        for node in self.root.select("script").unwrap() {
+            let content = node.text_contents().trim().to_string();
+            let attributes = node
+                .attributes
+                .borrow()
+                .map
+                .iter()
+                .map(|(name, attr)| {
+                    (
+                        name.local.borrow().to_string(),
+                        attr.borrow().value.to_string(),
+                    )
+                })
+                .collect();
+
+            scripts.push(Script {
+                attributes,
+                content,
+            })
+        }
+
+        scripts
+    }
+
     pub fn schema_org(&self) -> Vec<SchemaOrg> {
-        let mut tokens = self.tokens.clone();
         let mut schemas = Vec::new();
-        let mut preprocessor = Preprocessor::new([]);
-        let mut open_schemas = 0;
-        let mut json = String::new();
 
-        while let Some(tok) = tokens.next() {
-            preprocessor.update(&tok);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
-            match tok {
-                Token::StartTag(tag) if tag.name() == "script" => {
-                    if let Some(&"application/ld+json") = tag.attributes().get("type") {
-                        open_schemas += 1;
-                    }
-                }
-                Token::EndTag(tag) if tag.name() == "script" => {
-                    if open_schemas > 0 {
-                        open_schemas -= 1;
-
-                        if open_schemas == 0 {
-                            if let Ok(schema) = serde_json::from_str(&json) {
-                                schemas.push(schema);
-                            }
-                            json = String::new();
-                        }
-                    }
-                }
-                Token::Error => {
-                    let span = tokens.span();
-                    json.push_str(&self.raw[span]);
-                }
-                Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::SelfTerminatingTag(_)
-                | Token::BeginComment
-                | Token::EndComment => {}
+        for schema in self.scripts().into_iter().filter(|script| {
+            matches!(
+                script.attributes.get("type").map(|s| s.as_str()),
+                Some("application/ld+json")
+            )
+        }) {
+            if let Ok(schema) = serde_json::from_str(&schema.content) {
+                schemas.push(schema);
             }
         }
 
         schemas
+    }
+
+    pub fn trackers(&self) -> Vec<Url> {
+        let mut links: Vec<Url> = Vec::new();
+
+        for script in self.scripts() {
+            if let Some(link) = script.attributes.get("src") {
+                links.push(link.to_string().into());
+            }
+
+            for res in URL_REGEX.find_iter(&script.content) {
+                links.push(res.as_str().to_string().into());
+            }
+        }
+
+        for node in self.root.select("link").unwrap() {
+            if let Some(link) = node.attributes.borrow().get("href") {
+                links.push(link.to_string().into())
+            }
+        }
+
+        links
+            .into_iter()
+            .filter(|link| !link.host().is_empty())
+            .filter(|link| link.host() != self.host())
+            .unique_by(|link| link.host().to_string())
+            .collect()
     }
 
     fn article_modified_time(&self) -> Option<DateTime<FixedOffset>> {
@@ -645,77 +600,6 @@ impl<'a> Html<'a> {
                 }
             })
             .and_then(|metadata| metadata.get("content").cloned())
-    }
-
-    pub fn trackers(&self) -> Vec<Url> {
-        let mut tokens = self.tokens.clone();
-
-        let mut links: Vec<Url> = Vec::new();
-        let mut open_scripts = 0;
-        let mut script_text = String::new();
-        let mut preprocessor = Preprocessor::new([]);
-
-        while let Some(tok) = tokens.next() {
-            preprocessor.update(&tok);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
-            match tok {
-                Token::StartTag(tag) if tag.name() == "script" => {
-                    if !tag.raw().contains("/>") {
-                        open_scripts += 1;
-                    }
-                    if let Some(link) = tag.attributes().get("src") {
-                        links.push(link.to_string().into());
-                    }
-                }
-                Token::EndTag(tag) if tag.name() == "script" => {
-                    if open_scripts > 0 {
-                        open_scripts -= 1;
-
-                        if open_scripts == 0 {
-                            for res in URL_REGEX.find_iter(script_text.as_str()) {
-                                links.push(res.as_str().to_string().into());
-                            }
-                            script_text.clear();
-                        }
-                    }
-                }
-                _ if open_scripts > 0 => {
-                    let span = tokens.span();
-                    script_text.push_str(&self.raw[span]);
-                }
-                Token::Error => {
-                    if open_scripts > 0 {
-                        let span = tokens.span();
-                        script_text.push_str(&self.raw[span]);
-                    }
-                }
-                Token::SelfTerminatingTag(tag) if tag.name() == "script" => {
-                    if let Some(link) = tag.attributes().get("src") {
-                        links.push(link.to_string().into());
-                    }
-                }
-                Token::StartTag(tag) | Token::SelfTerminatingTag(tag) if tag.name() == "link" => {
-                    if let Some(link) = tag.attributes().get("href") {
-                        links.push(link.to_string().into());
-                    }
-                }
-                Token::StartTag(_)
-                | Token::EndTag(_)
-                | Token::SelfTerminatingTag(_)
-                | Token::BeginComment
-                | Token::EndComment => {}
-            }
-        }
-
-        links
-            .into_iter()
-            .filter(|link| !link.host().is_empty())
-            .filter(|link| link.host() != self.host())
-            .unique_by(|link| link.host().to_string())
-            .collect()
     }
 }
 
@@ -1273,12 +1157,11 @@ mod tests {
                             a.appendChild(r);
                         })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
                     </script>
-                    <script src="https://thirdparty.com/js" />
-                    <script src="https://example.com/js" />
+                    <script src="https://thirdparty.com/js"></script>
+                    <script src="https://example.com/js"></script>
                     <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
-                    <script src="https://thirdparty.com/js" />
-                    <script src="/js/file" />
-                    <meta property="article:modified_time" content="2022-06-22T19:37:34+00:00" />
+                    <script src="https://thirdparty.com/js"></script>
+                    <script src="/js/file"></script>
                 </head>
                 <body>
                 </body>
@@ -1318,7 +1201,7 @@ mod tests {
                                     a.appendChild(r);
                                 })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
                             </script>
-                            <script src="https://thirdparty.com/js" />
+                            <script src="https://thirdparty.com/js"></script>
                             <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
                             <title>Test site</title>
                         </head>

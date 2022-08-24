@@ -277,7 +277,7 @@ mod tests {
                                     a.appendChild(r);
                                 })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
                             </script>
-                            <script src="https://thirdparty.com/js" />
+                            <script src="https://thirdparty.com/js"></script>
                             <link href='//securepubads.g.doubleclick.net' rel='preconnect'>
                             <title>Test site</title>
                         </head>

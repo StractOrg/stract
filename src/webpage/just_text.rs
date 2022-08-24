@@ -16,10 +16,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use logos::{Lexer, Logos};
+use kuchiki::{iter::NodeEdge, NodeRef};
 use whatlang::Lang;
 
-use super::{lexer::Token, Preprocessor};
+use super::Preprocessor;
 
 // implementation of the JustText algorithm described in this thesis: https://is.muni.cz/th/45523/fi_d/phdthesis.pdf
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py
@@ -194,7 +194,7 @@ struct ClassifiedParagraph {
 }
 
 impl JustText {
-    fn paragraphs<'a>(&self, mut tokens: Lexer<'a, Token<'a>>, raw: &str) -> Vec<Paragraph> {
+    fn paragraphs(&self, root: NodeRef) -> Vec<Paragraph> {
         let mut res = Vec::new();
 
         let mut preprocessor = Preprocessor::new(["script", "style", "embed", "form", "head"]);
@@ -205,116 +205,123 @@ impl JustText {
 
         let mut heading_count = 0;
 
-        while let Some(tok) = tokens.next() {
-            preprocessor.update(&tok);
-
+        for edge in root.traverse() {
+            preprocessor.update(&edge);
             if preprocessor.is_inside_removed() {
                 continue;
             }
 
-            match tok {
-                Token::StartTag(tag) => {
-                    if matches!(tag.name(), "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
-                        heading_count += 1;
-                    }
+            match edge {
+                NodeEdge::Start(node) => {
+                    if let Some(element) = node.as_element() {
+                        let name: &str = &element.name.local;
 
-                    if matches!(
-                        tag.name(),
-                        "body"
-                            | "blockquote"
-                            | "caption"
-                            | "center"
-                            | "col"
-                            | "colgroup"
-                            | "dd"
-                            | "div"
-                            | "dl"
-                            | "dt"
-                            | "fieldset"
-                            | "form"
-                            | "legend"
-                            | "optgroup"
-                            | "option"
-                            | "p"
-                            | "pre"
-                            | "table"
-                            | "td"
-                            | "textarea"
-                            | "tfoot"
-                            | "th"
-                            | "thead"
-                            | "tr"
-                            | "ul"
-                            | "li"
-                            | "h1"
-                            | "h2"
-                            | "h3"
-                            | "h4"
-                            | "h5"
-                            | "h6"
-                    ) || (tag.name() == "br" && br)
-                    {
-                        if tag.name() == "br" {
-                            // the <br><br> is a paragraph separator and should
-                            // not be included in the number of tags within the
-                            // paragraph
-                            paragraph.tags_count -= 1;
+                        if matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
+                            heading_count += 1;
                         }
 
-                        paragraph.is_heading = heading_count > 0;
+                        if matches!(
+                            name,
+                            "body"
+                                | "blockquote"
+                                | "caption"
+                                | "center"
+                                | "col"
+                                | "colgroup"
+                                | "dd"
+                                | "div"
+                                | "dl"
+                                | "dt"
+                                | "fieldset"
+                                | "form"
+                                | "legend"
+                                | "optgroup"
+                                | "option"
+                                | "p"
+                                | "pre"
+                                | "table"
+                                | "td"
+                                | "textarea"
+                                | "tfoot"
+                                | "th"
+                                | "thead"
+                                | "tr"
+                                | "ul"
+                                | "li"
+                                | "h1"
+                                | "h2"
+                                | "h3"
+                                | "h4"
+                                | "h5"
+                                | "h6"
+                        ) || (name == "br" && br)
+                        {
+                            if name == "br" {
+                                // the <br><br> is a paragraph separator and should
+                                // not be included in the number of tags within the
+                                // paragraph
+                                paragraph.tags_count -= 1;
+                            }
 
-                        if paragraph.contains_text() {
-                            res.push(paragraph);
-                        }
+                            paragraph.is_heading = heading_count > 0;
 
-                        paragraph = Paragraph::new();
-                    } else {
-                        br = tag.name() == "br";
-                        if br {
-                            paragraph.append_text(" ");
-                        } else if tag.name() == "a" {
-                            link = true;
-                        }
-                        paragraph.tags_count += 1;
-                    }
-                }
-                Token::EndTag(tag) => {
-                    if matches!(tag.name(), "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
-                        heading_count -= 1;
-                    }
-
-                    paragraph.append_text(" ");
-
-                    match tag.name() {
-                        "body" | "blockquote" | "caption" | "center" | "col" | "colgroup"
-                        | "dd" | "div" | "dl" | "dt" | "fieldset" | "form" | "legend"
-                        | "optgroup" | "option" | "p" | "pre" | "table" | "td" | "textarea"
-                        | "tfoot" | "th" | "thead" | "tr" | "ul" | "li" | "h1" | "h2" | "h3"
-                        | "h4" | "h5" | "h6" => {
                             if paragraph.contains_text() {
                                 res.push(paragraph);
                             }
 
                             paragraph = Paragraph::new();
+                        } else {
+                            br = name == "br";
+                            if br {
+                                paragraph.append_text(" ");
+                            } else if name == "a" {
+                                link = true;
+                            }
+                            paragraph.tags_count += 1;
                         }
-                        _ => {}
                     }
 
-                    if tag.name() == "a" {
-                        link = false;
+                    if let Some(text) = node.as_text() {
+                        let raw_text = text.borrow();
+                        let text = raw_text.as_str();
+                        let chars_added = paragraph.append_text(text);
+
+                        if link {
+                            paragraph.chars_count_in_links += chars_added;
+                        }
+
+                        br = false;
                     }
                 }
-                Token::Error => {
-                    let span = tokens.span();
-                    let chars_added = paragraph.append_text(&raw[span]);
+                NodeEdge::End(node) => {
+                    if let Some(element) = node.as_element() {
+                        let name: &str = &element.name.local;
+                        if matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
+                            heading_count -= 1;
+                        }
 
-                    if link {
-                        paragraph.chars_count_in_links += chars_added;
+                        paragraph.append_text(" ");
+
+                        match name {
+                            "body" | "blockquote" | "caption" | "center" | "col" | "colgroup"
+                            | "dd" | "div" | "dl" | "dt" | "fieldset" | "form" | "legend"
+                            | "optgroup" | "option" | "p" | "pre" | "table" | "td" | "textarea"
+                            | "tfoot" | "th" | "thead" | "tr" | "ul" | "li" | "h1" | "h2"
+                            | "h3" | "h4" | "h5" | "h6" => {
+                                if paragraph.contains_text() {
+                                    res.push(paragraph);
+                                }
+
+                                paragraph = Paragraph::new();
+                            }
+                            _ => {}
+                        }
+
+                        if name == "a" {
+                            link = false;
+                        }
                     }
-
-                    br = false;
                 }
-                Token::SelfTerminatingTag(_) | Token::BeginComment | Token::EndComment => {}
             }
         }
 
@@ -578,10 +585,8 @@ impl JustText {
             .join(" ")
     }
 
-    pub fn extract(&self, html: &str) -> String {
-        let lex = Token::lexer(html);
-
-        let paragraphs = self.paragraphs(lex, html);
+    pub fn extract(&self, root: NodeRef) -> String {
+        let paragraphs = self.paragraphs(root);
         let mut classified = self
             .initial_classification(paragraphs)
             .into_iter()
