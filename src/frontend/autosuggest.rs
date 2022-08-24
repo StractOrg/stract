@@ -17,10 +17,11 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{extract, response::IntoResponse, Extension, Json};
+use serde::Serialize;
 
 use super::State;
 
-fn highlight(query: &str, suggestion: String) -> String {
+fn highlight(query: &str, suggestion: &str) -> String {
     let idx = suggestion
         .chars()
         .zip(query.chars())
@@ -34,6 +35,12 @@ fn highlight(query: &str, suggestion: String) -> String {
     new_suggestion
 }
 
+#[derive(Serialize)]
+struct Suggestion {
+    highlighted: String,
+    raw: String,
+}
+
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
@@ -42,7 +49,11 @@ pub async fn route(
         let mut suggestions = Vec::new();
 
         for suggestion in state.autosuggest.suggestions(query).unwrap() {
-            suggestions.push(highlight(query, suggestion));
+            let highlighted = highlight(query, &suggestion);
+            suggestions.push(Suggestion {
+                highlighted,
+                raw: suggestion,
+            });
         }
 
         Json(suggestions)
@@ -57,10 +68,10 @@ mod tests {
 
     #[test]
     fn suffix_highlight() {
-        assert_eq!(&highlight("", "test".to_string()), "<b>test</b>");
-        assert_eq!(&highlight("t", "test".to_string()), "t<b>est</b>");
-        assert_eq!(&highlight("te", "test".to_string()), "te<b>st</b>");
-        assert_eq!(&highlight("tes", "test".to_string()), "tes<b>t</b>");
-        assert_eq!(&highlight("test", "test".to_string()), "test<b></b>");
+        assert_eq!(&highlight("", "test"), "<b>test</b>");
+        assert_eq!(&highlight("t", "test"), "t<b>est</b>");
+        assert_eq!(&highlight("te", "test"), "te<b>st</b>");
+        assert_eq!(&highlight("tes", "test"), "tes<b>t</b>");
+        assert_eq!(&highlight("test", "test"), "test<b></b>");
     }
 }

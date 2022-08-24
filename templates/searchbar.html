@@ -107,7 +107,7 @@
 
     let currentHighlighted = -1;
     let currentSuggestions = [];
-    let originalQuery = "{{ query|escape}}";
+    let originalQuery = "{{ query|escape }}";
 
 
     function updateSuggestions(suggestionsData) {
@@ -127,17 +127,18 @@
         suggestionsData.forEach(item => {
             const node = document.createElement("div");
 
+            console.log(item);
             node.classList.add("flex");
             node.classList.add("suggestion-item");
-            node.setAttribute("data-suggestion", item)
-
+            node.setAttribute("data-suggestion", item.raw)
+            console.log(node);
 
             node.innerHTML = `
                 <div class="flex w-4 mr-3 items-center">
                     <img class="h-5" loading="lazy" src="/static/images/search.svg" />
                 </div>
                 <div>
-                    ${item}
+                    ${item.highlighted}
                 </div>
             `.trim();
 
@@ -147,16 +148,31 @@
         suggestionItems = document.querySelectorAll('.suggestion-item')
 
         suggestionItems.forEach(item => item.addEventListener("mousedown", (event) => {
-            var suggestion = event.target.dataset.suggestion;
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set("q", suggestion);
-            window.location = "/search?" + searchParams.toString();
+            handleSuggestionClick(event.target);
         }));
 
         suggestionItems.forEach((item, idx) => item.addEventListener("mouseenter", (event) => {
             currentHighlighted = idx;
             updateHighlighted(false);
         }));
+    }
+
+    function handleSuggestionClick(element) {
+        if (element == null) {
+            return;
+        }
+
+        var suggestion = element.dataset.suggestion;
+
+        if (suggestion == undefined) {
+            return handleSuggestionClick(element.parentElement);
+        }
+
+        var searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("q", suggestion);
+        window.location = "/search?" + searchParams.toString();
+
+        return;
     }
 
     function fetchAndUpdateSuggestions() {
