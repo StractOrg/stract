@@ -80,6 +80,7 @@ pub struct WebgraphMasterConfig {
 pub struct WebgraphLocalConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
+    graph_base_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -215,7 +215,15 @@ impl Indexer {
             .panic_fuse()
             .map(|job| job.map(&worker))
             .map(Index::from)
-            .reduce_with(|a, b| a.reduce(b));
+            .map(Some)
+            .reduce(
+                || None,
+                |a, b| match (a, b) {
+                    (Some(a), Some(b)) => Some(a.reduce(b)),
+                    (Some(graph), None) | (None, Some(graph)) => Some(graph),
+                    (None, None) => None,
+                },
+            );
 
         Ok(())
     }
