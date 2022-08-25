@@ -48,6 +48,7 @@ impl Map<StatelessWorker, FrozenWebgraph> for Job {
 
         let mut graph = WebgraphBuilder::new(Path::new(&self.graph_base_path).join(name))
             .with_host_graph()
+            .with_full_graph()
             .open();
 
         let source = match self.config {

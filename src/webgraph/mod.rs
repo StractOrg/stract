@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
 use std::{cmp, fs};
+use tracing::info;
 
 use graph_store::GraphStore;
 
@@ -45,8 +46,12 @@ pub struct Node {
 
 impl Node {
     fn into_host(self) -> Node {
+        let url = Url::from(self.name);
+
+        let host = url.host_without_specific_subdomains();
+
         Node {
-            name: Url::from(self.name).host().to_string(),
+            name: host.to_string(),
         }
     }
 }
@@ -374,7 +379,7 @@ impl<S: Store> Webgraph<S> {
         F: Fn(Node) -> HashMap<NodeID, usize>,
     {
         let nodes: Vec<_> = graph.nodes().collect();
-        dbg!(&nodes);
+        info!("Found {} nodes in the graph", nodes.len());
         let pb = ProgressBar::new(nodes.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -403,6 +408,7 @@ impl<S: Store> Webgraph<S> {
 
                 (node, centrality)
             })
+            .filter(|(_, centrality)| *centrality > 0.0)
             .collect()
     }
 
@@ -567,7 +573,7 @@ mod test {
         let centrality = graph.harmonic_centrality();
 
         assert_eq!(centrality.get(&Node::from("C")).unwrap(), &1.0);
-        assert_eq!(centrality.get(&Node::from("D")).unwrap(), &0.0);
+        assert_eq!(centrality.get(&Node::from("D")), None);
         assert_eq!(
             (*centrality.get(&Node::from("A")).unwrap() * 100.0).round() / 100.0,
             0.67
@@ -611,8 +617,25 @@ mod test {
         let host_centrality = graph.host_harmonic_centrality();
         assert!(
             host_centrality.get(&Node::from("B.com")).unwrap()
-                > host_centrality.get(&Node::from("A.com")).unwrap()
+                > host_centrality.get(&Node::from("A.com")).unwrap_or(&0.0)
         );
+    }
+
+    #[test]
+    fn www_subdomain_ignored() {
+        let mut graph = WebgraphBuilder::new_memory()
+            .with_full_graph()
+            .with_host_graph()
+            .open();
+
+        graph.insert(Node::from("B.com"), Node::from("A.com"), String::new());
+        graph.insert(Node::from("B.com"), Node::from("www.A.com"), String::new());
+
+        graph.flush();
+
+        let centrality = graph.host_harmonic_centrality();
+        assert_eq!(centrality.get(&Node::from("A.com")), Some(&1.0));
+        assert_eq!(centrality.get(&Node::from("www.A.com")), None);
     }
 
     #[test]

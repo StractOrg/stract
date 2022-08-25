@@ -358,18 +358,6 @@ impl Html {
         &self.url
     }
 
-    pub fn host(&self) -> &str {
-        self.url.host()
-    }
-
-    pub fn domain(&self) -> &str {
-        self.url.domain()
-    }
-
-    pub fn is_homepage(&self) -> bool {
-        self.url.is_homepage()
-    }
-
     pub fn metadata(&self) -> Vec<Meta> {
         let mut metas = Vec::new();
 
@@ -422,17 +410,17 @@ impl Html {
                     doc.add_text(tantivy_field, self.description().unwrap_or_default());
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
-                Field::Host => doc.add_text(tantivy_field, self.host()),
-                Field::Domain => doc.add_text(tantivy_field, self.domain()),
+                Field::Host => doc.add_text(tantivy_field, self.url().host()),
+                Field::Domain => doc.add_text(tantivy_field, self.url().domain()),
                 Field::DomainIfHomepage => {
-                    if self.is_homepage() {
-                        doc.add_text(tantivy_field, self.domain());
+                    if self.url().is_homepage() {
+                        doc.add_text(tantivy_field, self.url().domain());
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
                 }
                 Field::IsHomepage => {
-                    doc.add_u64(tantivy_field, if self.is_homepage() { 1 } else { 0 });
+                    doc.add_u64(tantivy_field, if self.url().is_homepage() { 1 } else { 0 });
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,
@@ -526,7 +514,7 @@ impl Html {
         links
             .into_iter()
             .filter(|link| !link.host().is_empty())
-            .filter(|link| link.host() != self.host())
+            .filter(|link| link.host() != self.url().host())
             .unique_by(|link| link.host().to_string())
             .collect()
     }
@@ -681,8 +669,8 @@ mod tests {
             webpage.url().to_string().as_str(),
             "https://www.example.com/whatever"
         );
-        assert_eq!(webpage.host(), "www.example.com");
-        assert_eq!(webpage.domain(), "example.com");
+        assert_eq!(webpage.url().host(), "www.example.com");
+        assert_eq!(webpage.url().domain(), "example.com");
     }
 
     #[test]
@@ -783,31 +771,31 @@ mod tests {
         let raw = "";
 
         let webpage = Html::parse(raw, "https://www.domain.co.uk");
-        assert_eq!(webpage.domain(), "domain.co.uk");
+        assert_eq!(webpage.url().domain(), "domain.co.uk");
     }
 
     #[test]
     fn is_homepage() {
         let webpage = Html::parse("", "https://www.example.com");
-        assert!(webpage.is_homepage());
+        assert!(webpage.url().is_homepage());
 
         let webpage = Html::parse("", "https://www.example.com/");
-        assert!(webpage.is_homepage());
+        assert!(webpage.url().is_homepage());
 
         let webpage = Html::parse("", "https://www.example.com/test");
-        assert!(!webpage.is_homepage());
+        assert!(!webpage.url().is_homepage());
 
         let webpage = Html::parse("", "https://example.com/test");
-        assert!(!webpage.is_homepage());
+        assert!(!webpage.url().is_homepage());
 
         let webpage = Html::parse("", "https://example.com/");
-        assert!(webpage.is_homepage());
+        assert!(webpage.url().is_homepage());
 
         let webpage = Html::parse("", "https://example.com");
-        assert!(webpage.is_homepage());
+        assert!(webpage.url().is_homepage());
 
         let webpage = Html::parse("", "http://example.com");
-        assert!(webpage.is_homepage());
+        assert!(webpage.url().is_homepage());
     }
 
     #[test]

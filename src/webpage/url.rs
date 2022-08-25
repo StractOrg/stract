@@ -89,6 +89,18 @@ impl Url {
         }
     }
 
+    pub fn subdomain(&self) -> Option<&str> {
+        if let Some(subdomain) = self.host().strip_suffix(self.domain()) {
+            if subdomain.is_empty() || subdomain == "." {
+                None
+            } else {
+                Some(&subdomain[..subdomain.len() - 1])
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn is_homepage(&self) -> bool {
         let url = self.strip_protocol();
         match url.find('/') {
@@ -170,6 +182,18 @@ impl Url {
     pub fn is_valid_uri(&self) -> bool {
         self.full().as_str().parse::<http::Uri>().is_ok()
     }
+
+    pub(crate) fn host_without_specific_subdomains(&self) -> &str {
+        if let Some(subdomain) = self.subdomain() {
+            if subdomain == "www" {
+                self.domain()
+            } else {
+                self.host()
+            }
+        } else {
+            self.host()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -238,5 +262,17 @@ mod tests {
 
         let url: Url = "da<>ilymail.co.uk".to_string().into();
         assert!(!url.is_valid_uri());
+    }
+
+    #[test]
+    fn subdomain() {
+        let url: Url = "https://test.example.com".to_string().into();
+        assert_eq!(url.subdomain(), Some("test"));
+
+        let url: Url = "https://test1.test2.example.com".to_string().into();
+        assert_eq!(url.subdomain(), Some("test1.test2"));
+
+        let url: Url = "https://example.com".to_string().into();
+        assert_eq!(url.subdomain(), None);
     }
 }

@@ -136,10 +136,10 @@ impl Index {
     }
 
     fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
-        if !webpage.html.is_homepage()
+        if !webpage.html.url().is_homepage()
             || self
                 .favicon_store
-                .contains(&webpage.html.domain().to_string())
+                .contains(&webpage.html.url().domain().to_string())
         {
             return;
         }

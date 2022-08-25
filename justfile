@@ -7,10 +7,14 @@
     cargo flamegraph --root -- indexer local configs/indexer/local.toml
 
 @worker:
-    cargo run --release -- configs/webgraph/worker.toml
+    cargo run --release -- webgraph worker configs/webgraph/worker.toml
 
 @master:
-    cargo run --release -- configs/webgraph/master.toml
+    cargo run --release -- webgraph master configs/webgraph/master.toml
+
+@webgraph:
+    rm -rf data/webgraph
+    cargo run --release -- webgraph local configs/webgraph/local.toml
 
 @frontend:
     cargo watch -x 'run -- frontend data/index data/queries_us.csv data/entity'
