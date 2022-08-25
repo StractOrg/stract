@@ -283,7 +283,7 @@ impl<R: Read> Iterator for RecordIterator<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.num_reads == 0 {
-            self.next_raw().unwrap().unwrap(); // skip warc_info
+            self.next_raw()?.ok()?; // skip warc_info
         }
         self.num_reads += 1;
 
