@@ -16,7 +16,9 @@
 
 use std::{fs, marker::PhantomData};
 
-use rocksdb::{DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, SingleThreaded, DB};
+use rocksdb::{
+    DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, Options, SingleThreaded, DB,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::kv::Kv;
@@ -35,6 +37,22 @@ impl RocksDbStore {
         }
 
         Box::new(DB::open_default(path).expect("unable to open rocks db"))
+    }
+
+    pub fn open_read_only<K, V, P>(path: P) -> Box<dyn Kv<K, V> + Send + Sync>
+    where
+        P: AsRef<std::path::Path>,
+        K: Serialize + DeserializeOwned + 'static,
+        V: Serialize + DeserializeOwned + 'static,
+    {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref()).expect("faild to create dir");
+        }
+
+        let mut options = Options::default();
+        options.create_if_missing(true);
+
+        Box::new(DB::open_for_read_only(&options, path, false).expect("unable to open rocks db"))
     }
 }
 

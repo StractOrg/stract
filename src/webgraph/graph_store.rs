@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    cell::RefCell, collections::HashMap, hash::Hash, marker::PhantomData, ops::Div, path::Path,
+    collections::HashMap, hash::Hash, marker::PhantomData, ops::Div, path::Path, sync::Mutex,
 };
 
 use lru::LruCache;
@@ -146,11 +146,11 @@ where
 }
 
 pub struct GraphStore<S> {
-    pub(crate) adjacency: RefCell<Adjacency>,
-    pub(crate) reversed_adjacency: RefCell<Adjacency>,
-    pub(crate) node2id: RefCell<CachedTree<Node, NodeID>>,
-    pub(crate) id2node: RefCell<BlockedCachedTree<NodeID, Node>>,
-    pub(crate) meta: RefCell<CachedTree<String, u64>>,
+    pub(crate) adjacency: Mutex<Adjacency>,
+    pub(crate) reversed_adjacency: Mutex<Adjacency>,
+    pub(crate) node2id: Mutex<CachedTree<Node, NodeID>>,
+    pub(crate) id2node: Mutex<BlockedCachedTree<NodeID, Node>>,
+    pub(crate) meta: Mutex<CachedTree<String, u64>>,
     pub(crate) store: PhantomData<S>,
 }
 
@@ -164,9 +164,14 @@ impl<S: Store> GraphStore<S> {
         S::open(path)
     }
 
+    pub fn open_read_only<P: AsRef<Path>>(path: P) -> Self {
+        S::open_read_only(path)
+    }
+
     fn next_id(&self) -> NodeID {
         self.meta
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .get(&"next_id".to_string())
             .cloned()
             .unwrap_or(0)
@@ -176,7 +181,8 @@ impl<S: Store> GraphStore<S> {
         let current_id = self.next_id();
         let next_id = current_id + 1;
         self.meta
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert("next_id".to_string(), next_id);
     }
 
@@ -187,14 +193,14 @@ impl<S: Store> GraphStore<S> {
     }
 
     fn assign_id(&self, node: Node, id: NodeID) {
-        self.node2id.borrow_mut().insert(node.clone(), id);
-        self.id2node.borrow_mut().insert(id, &mut |block| {
+        self.node2id.lock().unwrap().insert(node.clone(), id);
+        self.id2node.lock().unwrap().insert(id, &mut |block| {
             block.insert(id, node.clone());
         });
     }
 
     fn id_or_assign(&self, node: Node) -> NodeID {
-        if let Some(id) = self.node2id.borrow_mut().get(&node) {
+        if let Some(id) = self.node2id.lock().unwrap().get(&node) {
             return *id;
         }
         let id = self.id_and_increment();
@@ -205,7 +211,8 @@ impl<S: Store> GraphStore<S> {
     #[allow(unused)]
     pub fn outgoing_edges(&self, node: NodeID) -> Vec<Edge> {
         self.adjacency
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .edges(node)
             .into_iter()
             .map(|edge| Edge {
@@ -218,7 +225,8 @@ impl<S: Store> GraphStore<S> {
 
     pub fn ingoing_edges(&self, node: NodeID) -> Vec<Edge> {
         self.reversed_adjacency
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .edges(node)
             .into_iter()
             .map(|edge| Edge {
@@ -231,7 +239,8 @@ impl<S: Store> GraphStore<S> {
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> {
         self.node2id
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .iter()
             .map(|(_, id)| id)
             .collect::<Vec<u64>>()
@@ -243,27 +252,29 @@ impl<S: Store> GraphStore<S> {
         let to_id = self.id_or_assign(to);
 
         self.adjacency
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert(from_id, to_id, label.clone());
         self.reversed_adjacency
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert(to_id, from_id, label);
     }
 
     pub fn node2id(&self, node: &Node) -> Option<NodeID> {
-        self.node2id.borrow_mut().get(node).cloned()
+        self.node2id.lock().unwrap().get(node).cloned()
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node.borrow_mut().get(id).cloned()
+        self.id2node.lock().unwrap().get(id).cloned()
     }
 
     pub fn flush(&self) {
-        self.adjacency.borrow_mut().tree.inner.flush();
-        self.reversed_adjacency.borrow_mut().tree.inner.flush();
-        self.node2id.borrow_mut().flush();
-        self.id2node.borrow_mut().inner.flush();
-        self.meta.borrow_mut().flush();
+        self.adjacency.lock().unwrap().tree.inner.flush();
+        self.reversed_adjacency.lock().unwrap().tree.inner.flush();
+        self.node2id.lock().unwrap().flush();
+        self.id2node.lock().unwrap().inner.flush();
+        self.meta.lock().unwrap().flush();
     }
 
     pub fn edges(&self) -> EdgeIterator<'_> {
@@ -291,24 +302,55 @@ impl Store for RocksDbStore {
         let meta = RocksDbStore::open(path.as_ref().join("meta"));
 
         GraphStore {
-            adjacency: RefCell::new(Adjacency {
+            adjacency: Mutex::new(Adjacency {
                 tree: BlockedCachedTree {
                     inner: CachedTree::new(adjacency, 10_000),
                     block_size: 1_024,
                 },
             }),
-            reversed_adjacency: RefCell::new(Adjacency {
+            reversed_adjacency: Mutex::new(Adjacency {
                 tree: BlockedCachedTree {
                     inner: CachedTree::new(reversed_adjacency, 10_000),
                     block_size: 1_024,
                 },
             }),
-            node2id: RefCell::new(CachedTree::new(node2id, 100_000)),
-            id2node: RefCell::new(BlockedCachedTree {
+            node2id: Mutex::new(CachedTree::new(node2id, 100_000)),
+            id2node: Mutex::new(BlockedCachedTree {
                 inner: CachedTree::new(id2node, 100_000),
                 block_size: 1_024,
             }),
-            meta: RefCell::new(CachedTree::new(meta, 1_000)),
+            meta: Mutex::new(CachedTree::new(meta, 1_000)),
+            store: Default::default(),
+        }
+    }
+
+    fn open_read_only<P: AsRef<Path>>(path: P) -> GraphStore<Self> {
+        let adjacency = RocksDbStore::open_read_only(path.as_ref().join("adjacency"));
+        let reversed_adjacency =
+            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency"));
+        let node2id = RocksDbStore::open_read_only(path.as_ref().join("node2id"));
+        let id2node = RocksDbStore::open_read_only(path.as_ref().join("id2node"));
+        let meta = RocksDbStore::open_read_only(path.as_ref().join("meta"));
+
+        GraphStore {
+            adjacency: Mutex::new(Adjacency {
+                tree: BlockedCachedTree {
+                    inner: CachedTree::new(adjacency, 10_000),
+                    block_size: 1_024,
+                },
+            }),
+            reversed_adjacency: Mutex::new(Adjacency {
+                tree: BlockedCachedTree {
+                    inner: CachedTree::new(reversed_adjacency, 10_000),
+                    block_size: 1_024,
+                },
+            }),
+            node2id: Mutex::new(CachedTree::new(node2id, 100_000)),
+            id2node: Mutex::new(BlockedCachedTree {
+                inner: CachedTree::new(id2node, 100_000),
+                block_size: 1_024,
+            }),
+            meta: Mutex::new(CachedTree::new(meta, 1_000)),
             store: Default::default(),
         }
     }
@@ -348,7 +390,7 @@ mod test {
 
         let nodes: Vec<Node> = store
             .nodes()
-            .map(|id| store.id2node.borrow_mut().get(&id).unwrap().clone())
+            .map(|id| store.id2node.lock().unwrap().get(&id).unwrap().clone())
             .collect();
         assert_eq!(nodes, vec![a.clone(), b.clone(), c.clone()]);
 

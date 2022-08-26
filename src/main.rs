@@ -68,6 +68,7 @@ enum IndexingOptions {
     Worker {
         address: String,
         centrality_store_path: String,
+        webgraph_path: Option<String>,
     },
     Local {
         config_path: String,
@@ -100,8 +101,9 @@ fn main() -> Result<()> {
             IndexingOptions::Worker {
                 address,
                 centrality_store_path,
+                webgraph_path,
             } => {
-                entrypoint::Indexer::run_worker(address, centrality_store_path)?;
+                entrypoint::Indexer::run_worker(address, centrality_store_path, webgraph_path)?;
             }
             IndexingOptions::Local { config_path } => {
                 let config = load_toml_config(&config_path);

@@ -17,9 +17,9 @@ mod graph_store;
 
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
+use std::sync::Mutex;
 use std::{cmp, fs};
 use tracing::info;
 
@@ -62,6 +62,14 @@ impl From<String> for Node {
     }
 }
 
+impl From<&Url> for Node {
+    fn from(url: &Url) -> Self {
+        Self {
+            name: url.raw().to_string(),
+        }
+    }
+}
+
 impl From<&str> for Node {
     fn from(name: &str) -> Self {
         Self::from(name.to_string())
@@ -79,14 +87,15 @@ impl From<Url> for Node {
 pub struct EdgeIterator<'a> {
     current_block_idx: usize,
     blocks: Vec<u64>,
-    adjacency: &'a RefCell<Adjacency>,
+    adjacency: &'a Mutex<Adjacency>,
     current_block: Option<Box<dyn Iterator<Item = Edge>>>,
 }
 
 impl<'a> EdgeIterator<'a> {
-    fn new(adjacency: &'a RefCell<Adjacency>) -> EdgeIterator<'a> {
+    fn new(adjacency: &'a Mutex<Adjacency>) -> EdgeIterator<'a> {
         let blocks: Vec<_> = adjacency
-            .borrow()
+            .lock()
+            .unwrap()
             .tree
             .inner
             .store
@@ -107,7 +116,8 @@ impl<'a> EdgeIterator<'a> {
             let block_id = self.blocks[self.current_block_idx];
             let block = self
                 .adjacency
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .tree
                 .inner
                 .get(&block_id)
@@ -150,10 +160,18 @@ pub struct Edge {
     label: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FullEdge {
+    pub from: Node,
+    pub to: Node,
+    pub label: String,
+}
+
 pub struct WebgraphBuilder {
     path: Box<Path>,
     full_graph_path: Option<Box<Path>>,
     host_graph_path: Option<Box<Path>>,
+    read_only: bool,
 }
 
 impl WebgraphBuilder {
@@ -170,6 +188,7 @@ impl WebgraphBuilder {
             path: path.as_ref().into(),
             full_graph_path: None,
             host_graph_path: None,
+            read_only: false,
         }
     }
 
@@ -183,11 +202,25 @@ impl WebgraphBuilder {
         self
     }
 
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+
+        self
+    }
+
     pub fn open(self) -> Webgraph {
-        Webgraph {
-            full_graph: self.full_graph_path.map(GraphStore::open),
-            host_graph: self.host_graph_path.map(GraphStore::open),
-            path: self.path.to_str().unwrap().to_string(),
+        if self.read_only {
+            Webgraph {
+                full_graph: self.full_graph_path.map(GraphStore::open_read_only),
+                host_graph: self.host_graph_path.map(GraphStore::open_read_only),
+                path: self.path.to_str().unwrap().to_string(),
+            }
+        } else {
+            Webgraph {
+                full_graph: self.full_graph_path.map(GraphStore::open),
+                host_graph: self.host_graph_path.map(GraphStore::open),
+                path: self.path.to_str().unwrap().to_string(),
+            }
         }
     }
 }
@@ -197,6 +230,7 @@ where
     Self: Sized,
 {
     fn open<P: AsRef<Path>>(path: P) -> GraphStore<Self>;
+    fn open_read_only<P: AsRef<Path>>(path: P) -> GraphStore<Self>;
 
     fn temporary() -> GraphStore<Self> {
         Self::open(crate::gen_temp_path())
@@ -439,6 +473,26 @@ impl<S: Store> Webgraph<S> {
         }
         if let Some(host_graph) = &self.host_graph {
             host_graph.flush();
+        }
+    }
+
+    pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
+        if let Some(graph) = &self.full_graph {
+            if let Some(node_id) = graph.node2id(&node) {
+                graph
+                    .ingoing_edges(node_id)
+                    .into_iter()
+                    .map(|edge| FullEdge {
+                        from: graph.id2node(&edge.from).unwrap(),
+                        to: graph.id2node(&edge.to).unwrap(),
+                        label: edge.label,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
         }
     }
 }

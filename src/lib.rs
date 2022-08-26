@@ -67,6 +67,7 @@ pub struct IndexingLocalConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     batch_size: Option<usize>,
+    webgraph_path: Option<String>,
     centrality_store_path: String,
 }
 

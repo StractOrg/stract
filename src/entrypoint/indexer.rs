@@ -26,6 +26,7 @@ use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Map, MapReduce, Reduce, Worker};
 use crate::ranking::centrality_store::CentralityStore;
 use crate::warc::WarcFile;
+use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
 use crate::{
     HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig, Result, WarcSource,
@@ -48,12 +49,20 @@ struct Job {
 
 struct IndexingWorker {
     centrality_store: CentralityStore,
+    webgraph: Option<Webgraph>,
 }
 
 impl IndexingWorker {
-    fn new(centrality_store_path: String) -> Self {
+    fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
         Self {
             centrality_store: CentralityStore::new(centrality_store_path),
+            webgraph: webgraph_path.map(|path| {
+                WebgraphBuilder::new(path)
+                    .with_full_graph()
+                    .with_host_graph()
+                    .read_only(true)
+                    .open()
+            }),
         }
     }
 }
@@ -88,7 +97,21 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                         })
                 {
                     let html = Html::parse(&record.response.body, &record.request.url);
-                    let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
+                    let backlinks: Vec<Link> = worker
+                        .webgraph
+                        .as_ref()
+                        .map(|webgraph| {
+                            webgraph
+                                .ingoing_edges(Node::from(html.url()))
+                                .into_iter()
+                                .map(|edge| Link {
+                                    source: edge.from.name.into(),
+                                    destination: edge.to.name.into(),
+                                    text: edge.label,
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_else(Vec::new);
                     let centrality = worker
                         .centrality_store
                         .get(html.url().host_without_specific_subdomains())
@@ -197,8 +220,12 @@ impl Indexer {
         Ok(())
     }
 
-    pub fn run_worker(worker_addr: String, centrality_store_path: String) -> Result<()> {
-        IndexingWorker::new(centrality_store_path).run::<Job, FrozenIndex>(
+    pub fn run_worker(
+        worker_addr: String,
+        centrality_store_path: String,
+        webgraph_path: Option<String>,
+    ) -> Result<()> {
+        IndexingWorker::new(centrality_store_path, webgraph_path).run::<Job, FrozenIndex>(
             worker_addr
                 .parse::<SocketAddr>()
                 .expect("Could not parse worker address"),
@@ -214,7 +241,10 @@ impl Indexer {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
-        let worker = IndexingWorker::new(config.centrality_store_path.clone());
+        let worker = IndexingWorker::new(
+            config.centrality_store_path.clone(),
+            config.webgraph_path.clone(),
+        );
 
         warc_paths
             .into_iter()
