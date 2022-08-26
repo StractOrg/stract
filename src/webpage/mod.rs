@@ -201,10 +201,22 @@ pub struct Html {
 
 impl Html {
     pub fn parse(html: &str, url: &str) -> Self {
+        Self::parse_including_text(html, url, true)
+    }
+
+    pub fn parse_including_text(html: &str, url: &str, include_text: bool) -> Self {
         let root = kuchiki::parse_html().one(html);
 
-        let all_text = Html::calculate_all_text(root.clone());
-        let clean_text = Html::calculate_clean_text(root.clone());
+        let all_text = if include_text {
+            Html::calculate_all_text(root.clone())
+        } else {
+            None
+        };
+        let clean_text = if include_text {
+            Html::calculate_clean_text(root.clone())
+        } else {
+            None
+        };
 
         Self {
             root,
