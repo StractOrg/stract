@@ -108,7 +108,7 @@ where
         }
     }
     pub fn download(&mut self, store: &mut impl ImageStore<K>) {
-        tokio::runtime::Builder::new_multi_thread()
+        tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap()

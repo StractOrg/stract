@@ -15,17 +15,18 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     directory::DirEntry,
+    entrypoint::download_all_warc_files,
     mapreduce::{Map, MapReduce, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
-use rayon::prelude::ParallelBridge;
+use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GraphPath(String);
@@ -39,7 +40,7 @@ enum JobConfig {
 #[derive(Debug, Serialize, Deserialize)]
 struct Job {
     config: JobConfig,
-    warc_path: String,
+    warc_paths: Vec<String>,
     graph_base_path: String,
 }
 
@@ -51,7 +52,7 @@ fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
 }
 
 fn process_job(job: &Job) -> webgraph::Webgraph {
-    let name = job.warc_path.split('/').last().unwrap();
+    let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
     info!("processing {}", name);
 
@@ -62,25 +63,29 @@ fn process_job(job: &Job) -> webgraph::Webgraph {
         JobConfig::Local(config) => WarcSource::Local(config),
     };
 
-    debug!("downlooading warc file");
-    let file = WarcFile::download(source, &job.warc_path).unwrap();
-    debug!("finished downloading");
+    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
 
-    for record in file.records().flatten() {
-        let webpage = Html::parse(&record.response.body, &record.request.url);
-        for link in webpage
-            .links()
-            .into_iter()
-            .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
-            .filter(|link| link.source.domain() != link.destination.domain())
-        {
-            trace!("inserting link {:?}", link);
-            graph.insert(
-                Node::from(link.source),
-                Node::from(link.destination),
-                link.text,
-            );
+    for warc_path in &warc_files {
+        if let Ok(file) = WarcFile::open(warc_path) {
+            for record in file.records().flatten() {
+                let webpage = Html::parse(&record.response.body, &record.request.url);
+                for link in webpage
+                    .links()
+                    .into_iter()
+                    .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
+                    .filter(|link| link.source.domain() != link.destination.domain())
+                {
+                    trace!("inserting link {:?}", link);
+                    graph.insert(
+                        Node::from(link.source),
+                        Node::from(link.destination),
+                        link.text,
+                    );
+                }
+            }
         }
+
+        std::fs::remove_file(warc_path).ok();
     }
 
     graph.flush();
@@ -170,17 +175,22 @@ impl Webgraph {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
-        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> =
-            Box::new(warc_paths.into_iter().map(|warc_path| {
-                Job {
+        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
+            warc_paths
+                .into_iter()
+                .chunks(config.batch_size.unwrap_or(1))
+                .into_iter()
+                .map(|warc_paths| Job {
                     config: job_config.clone(),
-                    warc_path,
+                    warc_paths: warc_paths.into_iter().collect(),
                     graph_base_path: config
                         .graph_base_path
                         .clone()
                         .unwrap_or_else(|| "data/webgraph".to_string()),
-                }
-            }));
+                })
+                .collect::<Vec<_>>()
+                .into_iter(),
+        );
 
         if let Some(limit) = config.limit_warc_files {
             warc_paths = Box::new(warc_paths.take(limit));
@@ -219,15 +229,18 @@ impl Webgraph {
         warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
-            .map(|path| Job {
+            .chunks(config.batch_size.unwrap_or(1))
+            .into_iter()
+            .map(|warc_paths| Job {
                 config: job_config.clone(),
-                warc_path: path,
+                warc_paths: warc_paths.collect_vec(),
                 graph_base_path: config
                     .graph_base_path
                     .clone()
                     .unwrap_or_else(|| "data/webgraph".to_string()),
             })
-            .par_bridge()
+            .collect_vec()
+            .into_par_iter()
             .map(|job| -> GraphPath { job.map(&worker) })
             .map(Some)
             .reduce(

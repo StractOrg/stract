@@ -17,11 +17,12 @@ use crate::exponential_backoff::ExponentialBackoff;
 use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
-use std::thread::sleep;
 
 use flate2::read::MultiGzDecoder;
+use futures::StreamExt;
+use tokio::time::sleep;
 use tracing::debug;
 
 pub(crate) struct WarcFile {
@@ -56,8 +57,18 @@ fn decode(raw: &[u8]) -> String {
 }
 
 impl WarcFile {
-    pub(crate) fn new(bytes: Vec<u8>) -> Self {
+    pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
+    }
+
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
+
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes)?;
+
+        Ok(Self::new(bytes))
     }
 
     pub fn records(&self) -> RecordIterator<&[u8]> {
@@ -67,53 +78,78 @@ impl WarcFile {
         }
     }
 
-    pub(crate) fn download(source: WarcSource, path: &str) -> Result<Self> {
+    #[allow(unused)]
+    pub(crate) async fn download(source: &WarcSource, warc_path: &str) -> Result<Self> {
+        let mut cursor = Cursor::new(Vec::new());
+        Self::download_into_buf(source, warc_path, &mut cursor).await?;
+
+        let mut buf = Vec::new();
+        cursor.read_to_end(&mut buf)?;
+
+        Ok(Self::new(buf))
+    }
+
+    pub(crate) async fn download_into_buf<W: Write + Seek>(
+        source: &WarcSource,
+        warc_path: &str,
+        buf: &mut W,
+    ) -> Result<()> {
         for dur in ExponentialBackoff::from_millis(10).take(5) {
             let res = match source.clone() {
-                WarcSource::HTTP(config) => WarcFile::download_from_http(path, config.base_url),
-                WarcSource::Local(config) => WarcFile::load_from_folder(path, &config.folder),
+                WarcSource::HTTP(config) => {
+                    WarcFile::download_from_http(warc_path, config.base_url, buf).await
+                }
+                WarcSource::Local(config) => {
+                    WarcFile::load_from_folder(warc_path, &config.folder, buf)
+                }
             };
 
             if res.is_ok() {
-                return res;
+                return Ok(());
             }
 
             debug!("warc download failed, retrying in {} ms", dur.as_millis());
 
-            sleep(dur);
+            sleep(dur).await;
         }
 
         Err(Error::DownloadFailed)
     }
 
-    fn load_from_folder(name: &str, folder: &str) -> Result<Self> {
-        let mut bytes = Vec::new();
+    fn load_from_folder<W: Write + Seek>(name: &str, folder: &str, buf: &mut W) -> Result<()> {
         let f = File::open(Path::new(folder).join(name))?;
-
         let mut reader = BufReader::new(f);
-        reader.read_to_end(&mut bytes)?;
 
-        Ok(WarcFile::new(bytes))
+        buf.seek(SeekFrom::Start(0))?;
+        std::io::copy(&mut reader, buf)?;
+        Ok(())
     }
 
-    fn download_from_http(path: &str, base_url: String) -> Result<Self> {
+    async fn download_from_http<W: Write + Seek>(
+        warc_path: &str,
+        base_url: String,
+        buf: &mut W,
+    ) -> Result<()> {
         let mut url = base_url;
         if !url.ends_with('/') {
             url += "/";
         }
-        url += path;
+        url += warc_path;
 
-        let client = reqwest::blocking::ClientBuilder::new()
+        let client = reqwest::ClientBuilder::new()
             .tcp_keepalive(None)
-            .connect_timeout(None)
-            .timeout(None)
             .pool_idle_timeout(None)
             .build()?;
-        let res = client.get(url).send()?;
+        let res = client.get(url).send().await?;
 
-        let bytes = Vec::from(&res.bytes()?[..]);
+        let mut stream = res.bytes_stream();
 
-        Ok(WarcFile::new(bytes))
+        buf.seek(SeekFrom::Start(0))?;
+        while let Some(chunk) = stream.next().await {
+            std::io::copy(&mut &chunk?[..], buf)?;
+        }
+
+        Ok(())
     }
 }
 

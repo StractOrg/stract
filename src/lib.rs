@@ -58,6 +58,7 @@ pub struct IndexingMasterConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     workers: Vec<String>,
+    batch_size: Option<usize>,
     index_base_path: Option<String>,
 }
 
@@ -65,6 +66,7 @@ pub struct IndexingMasterConfig {
 pub struct IndexingLocalConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
+    batch_size: Option<usize>,
     centrality_store_path: String,
 }
 
@@ -74,6 +76,7 @@ pub struct WebgraphMasterConfig {
     warc_source: WarcSource,
     workers: Vec<String>,
     graph_base_path: Option<String>,
+    batch_size: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -81,6 +84,7 @@ pub struct WebgraphLocalConfig {
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     graph_base_path: Option<String>,
+    batch_size: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

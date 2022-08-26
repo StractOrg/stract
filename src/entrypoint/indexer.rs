@@ -16,10 +16,12 @@
 use std::net::SocketAddr;
 use std::path::Path;
 
+use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, trace};
 
+use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Map, MapReduce, Reduce, Worker};
 use crate::ranking::centrality_store::CentralityStore;
@@ -40,7 +42,7 @@ enum JobConfig {
 #[derive(Debug, Serialize, Deserialize)]
 struct Job {
     config: JobConfig,
-    warc_path: String,
+    warc_paths: Vec<String>,
     base_path: String,
 }
 
@@ -60,7 +62,7 @@ impl Worker for IndexingWorker {}
 
 impl Map<IndexingWorker, FrozenIndex> for Job {
     fn map(self, worker: &IndexingWorker) -> FrozenIndex {
-        let name = self.warc_path.split('/').last().unwrap();
+        let name = self.warc_paths.first().unwrap().split('/').last().unwrap();
 
         info!("processing {}", name);
 
@@ -71,45 +73,51 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             JobConfig::Local(config) => WarcSource::Local(config),
         };
 
-        debug!("downlooading warc file");
-        let file = WarcFile::download(source, &self.warc_path).unwrap();
-        debug!("finished downloading");
+        let warc_files = download_all_warc_files(&self.warc_paths, &source, &self.base_path);
 
-        for record in
-            file.records()
-                .flatten()
-                .filter(|record| match &record.response.payload_type {
-                    Some(payload_type) => !matches!(payload_type.as_str(), "application/pdf"),
-                    None => true,
-                })
-        {
-            let html = Html::parse(&record.response.body, &record.request.url);
-            let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
-            let centrality = worker
-                .centrality_store
-                .get(html.url().host_without_specific_subdomains())
-                .unwrap_or_default();
-            let fetch_time_ms = record.metadata.fetch_time_ms as u64;
+        for file in warc_files {
+            if let Ok(file) = WarcFile::open(&file) {
+                for record in
+                    file.records()
+                        .flatten()
+                        .filter(|record| match &record.response.payload_type {
+                            Some(payload_type) => {
+                                !matches!(payload_type.as_str(), "application/pdf")
+                            }
+                            None => true,
+                        })
+                {
+                    let html = Html::parse(&record.response.body, &record.request.url);
+                    let backlinks: Vec<Link> = Vec::new(); // TODO: lookup backlinks in full webgraph
+                    let centrality = worker
+                        .centrality_store
+                        .get(html.url().host_without_specific_subdomains())
+                        .unwrap_or_default();
+                    let fetch_time_ms = record.metadata.fetch_time_ms as u64;
 
-            trace!("inserting webpage: {:?}", html.url());
+                    trace!("inserting webpage: {:?}", html.url());
 
-            trace!("title = {:?}", html.title());
-            trace!("text = {:?}", html.clean_text());
+                    trace!("title = {:?}", html.title());
+                    trace!("text = {:?}", html.clean_text());
 
-            let webpage = Webpage {
-                html,
-                backlinks,
-                centrality,
-                fetch_time_ms,
-                primary_image_uuid: None,
-            };
-            if let Err(err) = index.insert(webpage) {
-                debug!("{:?}", err);
+                    let webpage = Webpage {
+                        html,
+                        backlinks,
+                        centrality,
+                        fetch_time_ms,
+                        primary_image_uuid: None,
+                    };
+                    if let Err(err) = index.insert(webpage) {
+                        debug!("{:?}", err);
+                    }
+                }
+                index.commit().unwrap();
+                info!("downloading images");
+                index.download_pending_images();
             }
+
+            std::fs::remove_file(file).ok();
         }
-        index.commit().unwrap();
-        info!("downloading images");
-        index.download_pending_images();
 
         info!("{} done", name);
 
@@ -161,17 +169,22 @@ impl Indexer {
             WarcSource::Local(config) => JobConfig::Local(config),
         };
 
-        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> =
-            Box::new(warc_paths.into_iter().map(|warc_path| {
-                Job {
+        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
+            warc_paths
+                .into_iter()
+                .chunks(config.batch_size.unwrap_or(1))
+                .into_iter()
+                .map(|warc_paths| Job {
                     config: job_config.clone(),
-                    warc_path,
+                    warc_paths: warc_paths.collect_vec(),
                     base_path: config
                         .index_base_path
                         .clone()
                         .unwrap_or_else(|| "data/index".to_string()),
-                }
-            }));
+                })
+                .collect_vec()
+                .into_iter(),
+        );
 
         if let Some(limit) = config.limit_warc_files {
             warc_paths = Box::new(warc_paths.take(limit));
@@ -206,12 +219,15 @@ impl Indexer {
         warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
-            .map(|path| Job {
+            .chunks(config.batch_size.unwrap_or(1))
+            .into_iter()
+            .map(|warc_paths| Job {
                 config: job_config.clone(),
-                warc_path: path,
+                warc_paths: warc_paths.collect_vec(),
                 base_path: "data/index".to_string(),
             })
-            .par_bridge()
+            .collect_vec()
+            .into_par_iter()
             .panic_fuse()
             .map(|job| job.map(&worker))
             .map(Index::from)
