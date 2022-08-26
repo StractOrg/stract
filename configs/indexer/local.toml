@@ -1,6 +1,6 @@
 warc_paths_file = "warc.paths"
 centrality_store_path = "./data/centrality"
-limit_warc_files = 10
+limit_warc_files = 1
 
 [warc_source]
 # type = "Local"
