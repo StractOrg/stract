@@ -13,12 +13,17 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{schema_org::SchemaOrg, Error, Result};
+use crate::{schema_org::SchemaOrg, tokenizer, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
-use std::{borrow::Borrow, collections::HashMap};
+use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+};
+use tantivy::tokenizer::Tokenizer;
 use uuid::Uuid;
 
 mod just_text;
@@ -40,6 +45,13 @@ pub struct FaviconLink {
     width: Option<u32>,
     height: Option<u32>,
     image_type: Option<String>,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct ImageLink {
+    pub url: Url,
+    pub title: Option<String>,
+    pub description: Option<String>,
 }
 
 pub struct Preprocessor<const N: usize> {
@@ -91,12 +103,19 @@ impl<const N: usize> Preprocessor<N> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredPrimaryImage {
+    pub uuid: Uuid,
+    pub title_terms: HashSet<String>,
+    pub description_terms: HashSet<String>,
+}
+
 pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
     pub centrality: f64,
     pub fetch_time_ms: u64,
-    pub primary_image_uuid: Option<Uuid>,
+    pub primary_image: Option<StoredPrimaryImage>,
 }
 
 impl Webpage {
@@ -115,7 +134,7 @@ impl Webpage {
             backlinks,
             centrality,
             fetch_time_ms,
-            primary_image_uuid: None,
+            primary_image: None,
         }
     }
 
@@ -167,22 +186,41 @@ impl Webpage {
             self.fetch_time_ms,
         );
 
-        let uuid = self
-            .primary_image_uuid
-            .map(|uuid| uuid.to_string())
-            .unwrap_or_default();
-        doc.add_text(
+        let image = bincode::serialize(&self.primary_image).unwrap();
+        doc.add_bytes(
             schema
-                .get_field(Field::PrimaryImageUuid.as_str())
-                .expect("Failed to get primary_image_uuid field"),
-            uuid,
+                .get_field(Field::PrimaryImage.as_str())
+                .expect("Failed to get primary_image field"),
+            image,
         );
 
         Ok(doc)
     }
 
-    pub(crate) fn set_primary_image_uuid(&mut self, uuid: Uuid) {
-        self.primary_image_uuid = Some(uuid);
+    pub(crate) fn set_primary_image(&mut self, uuid: Uuid, image: ImageLink) {
+        let mut title_terms = HashSet::new();
+
+        if let Some(title) = image.title {
+            let mut tokenizer = tokenizer::Normal::default().token_stream(title.as_str());
+            while let Some(token) = tokenizer.next() {
+                title_terms.insert(token.text.clone());
+            }
+        }
+
+        let mut description_terms = HashSet::new();
+
+        if let Some(description) = image.description {
+            let mut tokenizer = tokenizer::Normal::default().token_stream(description.as_str());
+            while let Some(token) = tokenizer.next() {
+                description_terms.insert(token.text.clone());
+            }
+        }
+
+        self.primary_image = Some(StoredPrimaryImage {
+            uuid,
+            title_terms,
+            description_terms,
+        });
     }
 }
 
@@ -453,7 +491,7 @@ impl Html {
                 | Field::Centrality
                 | Field::FetchTimeMs
                 | Field::Region
-                | Field::PrimaryImageUuid => {}
+                | Field::PrimaryImage => {}
             }
         }
 
@@ -565,7 +603,7 @@ impl Html {
             })
     }
 
-    fn og_image(&self) -> Option<Url> {
+    fn og_image(&self) -> Option<ImageLink> {
         self.metadata()
             .into_iter()
             .find(|metadata| {
@@ -576,6 +614,11 @@ impl Html {
                 }
             })
             .and_then(|metadata| metadata.get("content").map(|link| link.clone().into()))
+            .map(|url| ImageLink {
+                url,
+                title: self.og_title(),
+                description: self.description(),
+            })
     }
 
     #[allow(unreachable_patterns)]
@@ -597,14 +640,24 @@ impl Html {
             .or_else(|| self.article_modified_time())
     }
 
-    pub fn primary_image(&self) -> Option<Url> {
+    pub fn primary_image(&self) -> Option<ImageLink> {
         self.og_image()
-            .or_else(|| self.schema_org_images().first().cloned())
-            .map(|mut url| {
-                if !url.is_full_path() {
-                    url.prefix_with(&self.url);
+            .or_else(|| {
+                self.schema_org_images()
+                    .first()
+                    .cloned()
+                    .map(|url| ImageLink {
+                        url,
+                        title: self.og_title(),
+                        description: self.description(),
+                    })
+            })
+            .map(|mut image| {
+                if !image.url.is_full_path() {
+                    image.url.prefix_with(&self.url);
                 }
-                url
+
+                image
             })
     }
 
@@ -614,6 +667,19 @@ impl Html {
             .find(|metadata| {
                 if let Some(property) = metadata.get("property") {
                     property == &String::from("og:description")
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| metadata.get("content").cloned())
+    }
+
+    pub fn og_title(&self) -> Option<String> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(property) = metadata.get("property") {
+                    property == &String::from("og:title")
                 } else {
                     false
                 }
@@ -1077,6 +1143,8 @@ mod tests {
     <html>
         <head>
             <meta property="og:image" content="https://example.com/link_to_image.html" />
+            <meta property="og:description" content="desc" />
+            <meta property="og:title" content="title" />
         </head>
         <body>
         </body>
@@ -1086,7 +1154,11 @@ mod tests {
 
         assert_eq!(
             html.primary_image(),
-            Some("https://example.com/link_to_image.html".to_string().into())
+            Some(ImageLink {
+                url: "https://example.com/link_to_image.html".to_string().into(),
+                title: Some("title".to_string()),
+                description: Some("desc".to_string())
+            })
         );
 
         let html = r#"
@@ -1125,7 +1197,11 @@ mod tests {
 
         assert_eq!(
             html.primary_image(),
-            Some("https://example.com/mexico-beach.jpg".to_string().into())
+            Some(ImageLink {
+                url: "https://example.com/mexico-beach.jpg".to_string().into(),
+                title: None,
+                description: None
+            })
         );
     }
 

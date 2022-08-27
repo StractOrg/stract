@@ -164,10 +164,11 @@ impl Index {
             _ => return,
         }
 
-        if let Some(url) = webpage.html.primary_image() {
+        if let Some(image) = webpage.html.primary_image() {
+            let url = image.url.clone();
             if url.is_valid_uri() {
                 let uuid = self.primary_image_store.generate_uuid();
-                webpage.set_primary_image_uuid(uuid);
+                webpage.set_primary_image(uuid, image);
 
                 self.primary_image_downloader.schedule(ImageDownloadJob {
                     key: uuid,

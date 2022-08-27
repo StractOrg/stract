@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::schema::{
-    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+    BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
 use crate::tokenizer::{Normal, Stemmed};
@@ -38,7 +38,7 @@ pub enum Field {
     BacklinkText,
     Centrality,
     FetchTimeMs,
-    PrimaryImageUuid,
+    PrimaryImage,
     LastUpdated,
     Description,
     NumTrackers,
@@ -59,7 +59,7 @@ pub static ALL_FIELDS: [Field; 19] = [
     Field::BacklinkText,
     Field::Centrality,
     Field::FetchTimeMs,
-    Field::PrimaryImageUuid,
+    Field::PrimaryImage,
     Field::LastUpdated,
     Field::Description,
     Field::NumTrackers,
@@ -123,9 +123,7 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::PrimaryImageUuid => {
-                IndexingOption::Text(self.default_text_options().set_stored())
-            }
+            Field::PrimaryImage => IndexingOption::Bytes(BytesOptions::default().set_stored()),
             Field::LastUpdated => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -155,7 +153,7 @@ impl Field {
             Field::DomainIfHomepage => "domain_if_homepage",
             Field::IsHomepage => "is_homepage",
             Field::FetchTimeMs => "fetch_time_ms",
-            Field::PrimaryImageUuid => "primary_image_uuid",
+            Field::PrimaryImage => "primary_image_uuid",
             Field::LastUpdated => "last_updated",
             Field::Description => "description",
             Field::AllBody => "all_body",
@@ -179,7 +177,7 @@ impl Field {
             Field::BacklinkText => Some(4.0),
             Field::Centrality
             | Field::IsHomepage
-            | Field::PrimaryImageUuid
+            | Field::PrimaryImage
             | Field::FetchTimeMs
             | Field::Description
             | Field::NumTrackers
@@ -189,7 +187,7 @@ impl Field {
     }
 
     pub fn is_searchable(&self) -> bool {
-        !matches!(self, Field::PrimaryImageUuid | Field::BacklinkText)
+        !matches!(self, Field::PrimaryImage | Field::BacklinkText)
     }
 }
 
@@ -200,6 +198,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
             IndexingOption::Numeric(options) => builder.add_u64_field(field.as_str(), options),
+            IndexingOption::Bytes(options) => builder.add_bytes_field(field.as_str(), options),
         };
     }
 
@@ -209,4 +208,5 @@ pub fn create_schema() -> tantivy::schema::Schema {
 pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Numeric(tantivy::schema::NumericOptions),
+    Bytes(tantivy::schema::BytesOptions),
 }

@@ -25,7 +25,7 @@ use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
-use crate::webpage::Webpage;
+use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
@@ -110,6 +110,22 @@ impl InvertedIndex {
             .into_iter()
             .map(|(_score, doc_address)| self.retrieve_doc(doc_address, &searcher))
             .filter_map(|page| page.ok())
+            .map(|mut doc| {
+                if let Some(image) = doc.primary_image.as_ref() {
+                    if !query.simple_terms().into_iter().all(|term| {
+                        image
+                            .title_terms
+                            .contains(term.to_ascii_lowercase().as_str())
+                            || image
+                                .description_terms
+                                .contains(term.to_ascii_lowercase().as_str())
+                    }) {
+                        doc.primary_image = None;
+                    }
+                }
+
+                doc
+            })
             .collect();
 
         for page in &mut webpages {
@@ -226,7 +242,7 @@ pub struct RetrievedWebpage {
     pub dirty_body: String,
     pub description: Option<String>,
     pub favicon: Option<Image>,
-    pub primary_image_uuid: Option<String>,
+    pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
 }
 
@@ -266,19 +282,14 @@ impl From<Document> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::PrimaryImageUuid => {
-                    webpage.primary_image_uuid = {
-                        let s = value
+                Field::PrimaryImage => {
+                    webpage.primary_image = {
+                        let bytes = value
                             .value
-                            .as_text()
-                            .expect("Primary image uuid field should be text")
-                            .to_string();
+                            .as_bytes()
+                            .expect("Primary image field should be bytes");
 
-                        if s.is_empty() {
-                            None
-                        } else {
-                            Some(s)
-                        }
+                        bincode::deserialize(bytes).unwrap()
                     }
                 }
                 Field::LastUpdated => {
@@ -319,6 +330,8 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
+    use maplit::hashset;
+
     use crate::{
         ranking::Ranker,
         webpage::{region::RegionCount, Link},
@@ -785,5 +798,69 @@ mod tests {
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.first.com");
         assert_eq!(result.documents[1].url, "https://www.second.com");
+    }
+
+    #[test]
+    fn only_show_primary_images_when_relevant() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ranker = Ranker::new(RegionCount::default());
+
+        let mut webpage = Webpage::new(
+            &format!(
+                r#"
+                    <html>
+                        <head>
+                            <meta property="og:image" content="https://example.com/link_to_image.html" />
+                            <meta property="og:description" content="This is an image for the test website" />
+                            <meta property="og:title" content="title" />
+                            <title>Test website</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                    "#
+            ),
+            "https://www.example.com",
+            vec![],
+            1.0,
+            500,
+        );
+        let uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
+        webpage.set_primary_image(uuid, webpage.html.primary_image().unwrap());
+
+        index.insert(webpage).expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let query = Query::parse("website", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(
+            result.documents[0].primary_image,
+            Some(StoredPrimaryImage {
+                uuid,
+                title_terms: hashset! {"title".to_string()},
+                description_terms: hashset! {"this".to_string(), "is".to_string(), "an".to_string(), "image".to_string(), "for".to_string(), "the".to_string(), "test".to_string(), "website".to_string()}
+            })
+        );
+
+        let query = Query::parse("best website", index.schema(), index.tokenizers())
+            .expect("Failed to parse query");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].primary_image, None);
     }
 }

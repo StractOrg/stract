@@ -127,7 +127,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             domain,
             snippet: webpage.snippet, // snippet has already been html-escaped.
             body: webpage.body,
-            primary_image_uuid: webpage.primary_image_uuid,
+            primary_image_uuid: webpage.primary_image.map(|image| image.uuid.to_string()),
             last_updated,
         }
     }
@@ -277,9 +277,13 @@ pub async fn route(
                     .documents
                     .into_iter()
                     .map(|mut webpage| {
-                        webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
-                            if state.searcher.primary_image(uuid.clone()).is_some() {
-                                Some(uuid)
+                        webpage.primary_image = webpage.primary_image.and_then(|image| {
+                            if state
+                                .searcher
+                                .primary_image(image.uuid.clone().to_string())
+                                .is_some()
+                            {
+                                Some(image)
                             } else {
                                 None
                             }

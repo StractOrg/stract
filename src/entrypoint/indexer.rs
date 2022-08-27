@@ -128,7 +128,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                         backlinks,
                         centrality,
                         fetch_time_ms,
-                        primary_image_uuid: None,
+                        primary_image: None,
                     };
                     if let Err(err) = index.insert(webpage) {
                         debug!("{:?}", err);
