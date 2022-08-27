@@ -17,7 +17,8 @@
 use axum::{Extension, Router};
 
 use crate::{
-    autosuggest::Autosuggest, entity_index::EntityIndex, index::Index, searcher::Searcher,
+    autosuggest::Autosuggest, bangs::Bangs, entity_index::EntityIndex, index::Index,
+    searcher::Searcher,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -64,11 +65,13 @@ pub fn router(
     index_path: &str,
     queries_csv_path: &str,
     entity_index_path: Option<String>,
+    bangs_path: Option<String>,
 ) -> Result<Router> {
     let entity_index = entity_index_path.map(|path| EntityIndex::open(path).unwrap());
+    let bangs = bangs_path.map(Bangs::from_path);
     let search_index = Index::open(index_path)?;
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
-    let searcher = Searcher::new(search_index, entity_index);
+    let searcher = Searcher::new(search_index, entity_index, bangs);
 
     let state = Arc::new(State {
         searcher,

@@ -107,7 +107,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("example", None).expect("Search failed");
+        let result = searcher
+            .search("example", None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
         assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
@@ -178,7 +182,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("dr dk", None).expect("Search failed");
+        let result = searcher
+            .search("dr dk", None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
 
         assert_eq!(result.webpages.documents.len(), 3);
         assert_eq!(result.webpages.documents[0].url, "https://www.dr.dk");
@@ -233,7 +241,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("title", None).expect("Search failed");
+        let result = searcher
+            .search("title", None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
 
         assert_eq!(result.webpages.documents[0].url, "https://www.new.com");
     }
@@ -295,7 +307,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("test", None).expect("Search failed");
+        let result = searcher
+            .search("test", None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
 
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.first.com");
@@ -348,7 +364,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
-        let result = searcher.search("test", None).expect("Search failed");
+        let result = searcher
+            .search("test", None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
 
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.first.com");

@@ -21,7 +21,7 @@ use itertools::{intersperse, Itertools};
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
-    searcher::Searcher,
+    searcher::{SearchResult, Searcher},
     webpage::{
         region::{Region, ALL_REGIONS},
         Url,
@@ -270,60 +270,64 @@ pub async fn route(
     });
 
     match state.searcher.search(query.as_str(), selected_region) {
-        Ok(result) => {
-            let search_result = result
-                .webpages
-                .documents
-                .into_iter()
-                .map(|mut webpage| {
-                    webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
-                        if state.searcher.primary_image(uuid.clone()).is_some() {
-                            Some(uuid)
-                        } else {
-                            None
-                        }
-                    });
-                    webpage
-                })
-                .map(DisplayedWebpage::from)
-                .collect();
+        Ok(result) => match result {
+            SearchResult::Websites(result) => {
+                let search_result = result
+                    .webpages
+                    .documents
+                    .into_iter()
+                    .map(|mut webpage| {
+                        webpage.primary_image_uuid = webpage.primary_image_uuid.and_then(|uuid| {
+                            if state.searcher.primary_image(uuid.clone()).is_some() {
+                                Some(uuid)
+                            } else {
+                                None
+                            }
+                        });
+                        webpage
+                    })
+                    .map(DisplayedWebpage::from)
+                    .collect();
 
-            let entity = result
-                .entity
-                .map(|entity| DisplayedEntity::from(entity, &state.searcher));
-            let spell_correction = result.spell_corrected_query;
+                let entity = result
+                    .entity
+                    .map(|entity| DisplayedEntity::from(entity, &state.searcher));
+                let spell_correction = result.spell_corrected_query;
 
-            let num_matches = thousand_sep_number(result.webpages.num_docs);
+                let num_matches = thousand_sep_number(result.webpages.num_docs);
 
-            let search_duration_sec = format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
+                let search_duration_sec =
+                    format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
 
-            let all_regions = ALL_REGIONS
-                .into_iter()
-                .map(|region| {
-                    if let Some(selected_region) = selected_region {
-                        if region == selected_region {
-                            RegionSelection::Selected(region)
+                let all_regions = ALL_REGIONS
+                    .into_iter()
+                    .map(|region| {
+                        if let Some(selected_region) = selected_region {
+                            if region == selected_region {
+                                RegionSelection::Selected(region)
+                            } else {
+                                RegionSelection::Unselected(region)
+                            }
                         } else {
                             RegionSelection::Unselected(region)
                         }
-                    } else {
-                        RegionSelection::Unselected(region)
-                    }
-                })
-                .collect();
+                    })
+                    .collect();
 
-            let template = SearchTemplate {
-                search_result,
-                query,
-                entity,
-                spell_correction,
-                num_matches,
-                search_duration_sec,
-                all_regions,
-            };
+                let template = SearchTemplate {
+                    search_result,
+                    query,
+                    entity,
+                    spell_correction,
+                    num_matches,
+                    search_duration_sec,
+                    all_regions,
+                };
 
-            HtmlTemplate(template).into_response()
-        }
+                HtmlTemplate(template).into_response()
+            }
+            SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
+        },
         Err(Error::EmptyQuery) => Redirect::to("/").into_response(),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
     }

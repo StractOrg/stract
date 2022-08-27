@@ -22,9 +22,10 @@ pub async fn run(
     index_path: &str,
     queries_csv_path: &str,
     entity_index_path: Option<String>,
+    bangs_path: Option<String>,
     host: &str,
 ) -> Result<()> {
-    let app = router(index_path, queries_csv_path, entity_index_path)?;
+    let app = router(index_path, queries_csv_path, entity_index_path, bangs_path)?;
     let addr = host.parse()?;
     tracing::info!("listening on {}", addr);
     axum::Server::bind(&addr)

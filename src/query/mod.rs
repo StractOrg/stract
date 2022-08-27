@@ -25,7 +25,7 @@ use tantivy::{
     tokenizer::TokenizerManager,
 };
 
-mod parser;
+pub mod parser;
 use parser::Term;
 
 const MAX_SIMILAR_TERMS: usize = 10;
@@ -87,6 +87,10 @@ impl Query {
                 }
             })
             .collect()
+    }
+
+    pub fn terms(&self) -> &[Box<Term>] {
+        &self.terms
     }
 
     pub fn is_empty(&self) -> bool {

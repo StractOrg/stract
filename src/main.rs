@@ -48,6 +48,7 @@ enum Commands {
         index_path: String,
         queries_csv_path: String,
         entity_index_path: Option<String>,
+        bangs_path: Option<String>,
         #[clap(default_value = "0.0.0.0:3000")]
         host: String,
     },
@@ -136,6 +137,7 @@ fn main() -> Result<()> {
             queries_csv_path,
             host,
             entity_index_path,
+            bangs_path,
         } => tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
@@ -143,6 +145,7 @@ fn main() -> Result<()> {
                 &index_path,
                 &queries_csv_path,
                 entity_index_path,
+                bangs_path,
                 &host,
             ))?,
     }

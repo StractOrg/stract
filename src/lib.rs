@@ -33,6 +33,7 @@ mod inverted_index;
 pub mod mapreduce;
 
 mod autosuggest;
+mod bangs;
 mod directory;
 mod entity_index;
 mod exponential_backoff;

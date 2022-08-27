@@ -20,7 +20,10 @@ use tantivy::{
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
 
-use crate::schema::{Field, ALL_FIELDS};
+use crate::{
+    bangs::BANG_PREFIX,
+    schema::{Field, ALL_FIELDS},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
@@ -30,6 +33,52 @@ pub enum Term {
     Title(String),
     Body(String),
     Url(String),
+    PossibleBang(String),
+}
+
+impl ToString for Term {
+    fn to_string(&self) -> String {
+        match self {
+            Term::Simple(term) => term.clone(),
+            Term::Not(term) => "-".to_string() + term.to_string().as_str(),
+            Term::Site(site) => "site:".to_string() + site.as_str(),
+            Term::Title(title) => "intitle:".to_string() + title.as_str(),
+            Term::Body(body) => "inbody:".to_string() + body.as_str(),
+            Term::Url(url) => "inurl:".to_string() + url.as_str(),
+            Term::PossibleBang(bang) => "!".to_string() + bang.as_str(),
+        }
+    }
+}
+
+fn simple_into_tantivy(
+    term: &str,
+    fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
+    tokenizer_manager: &TokenizerManager,
+) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
+    let (backlink_field, backlink_field_entry) = fields
+        .iter()
+        .find(|(field, _)| matches!(ALL_FIELDS[field.field_id() as usize], Field::BacklinkText))
+        .unwrap();
+
+    vec![
+        (
+            Occur::Must,
+            Box::new(BooleanQuery::new(Term::into_tantivy_simple(
+                term,
+                fields,
+                tokenizer_manager,
+            ))),
+        ),
+        (
+            Occur::Should,
+            Box::new(Term::tantivy_term_query(
+                backlink_field,
+                backlink_field_entry,
+                tokenizer_manager,
+                term,
+            )),
+        ),
+    ]
 }
 
 impl Term {
@@ -39,34 +88,7 @@ impl Term {
         tokenizer_manager: &TokenizerManager,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         match self {
-            Term::Simple(term) => {
-                let (backlink_field, backlink_field_entry) = fields
-                    .iter()
-                    .find(|(field, _)| {
-                        matches!(ALL_FIELDS[field.field_id() as usize], Field::BacklinkText)
-                    })
-                    .unwrap();
-
-                vec![
-                    (
-                        Occur::Must,
-                        Box::new(BooleanQuery::new(Term::into_tantivy_simple(
-                            term,
-                            fields,
-                            tokenizer_manager,
-                        ))),
-                    ),
-                    (
-                        Occur::Should,
-                        Box::new(Term::tantivy_term_query(
-                            backlink_field,
-                            backlink_field_entry,
-                            tokenizer_manager,
-                            term,
-                        )),
-                    ),
-                ]
-            }
+            Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager),
             Term::Not(subterm) => vec![(
                 Occur::MustNot,
                 Box::new(BooleanQuery::new(
@@ -114,6 +136,13 @@ impl Term {
                     Occur::Must,
                     Term::tantivy_term_query(field, entry, tokenizer_manager, url),
                 )]
+            }
+            Term::PossibleBang(text) => {
+                let mut term = String::new();
+                term.push(BANG_PREFIX);
+                term.push_str(text);
+
+                simple_into_tantivy(&term, fields, tokenizer_manager)
             }
         }
     }
@@ -250,6 +279,8 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string()))
         }
+    } else if let Some(bang) = term.strip_prefix(BANG_PREFIX) {
+        Box::new(Term::PossibleBang(bang.to_string()))
     } else {
         Box::new(Term::Simple(term.to_string()))
     }
