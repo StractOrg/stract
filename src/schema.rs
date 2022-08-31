@@ -44,6 +44,7 @@ pub enum Field {
     NumTrackers,
     Region,
 }
+
 pub static ALL_FIELDS: [Field; 19] = [
     Field::Title,
     Field::CleanBody,

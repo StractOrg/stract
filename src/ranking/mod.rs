@@ -16,6 +16,7 @@
 
 pub mod centrality_store;
 mod initial;
+mod signal_aggregator;
 
 use std::sync::Arc;
 

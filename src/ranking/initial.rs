@@ -37,6 +37,18 @@ impl InitialScoreTweaker {
     }
 }
 
+fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFastFieldReader<u64> {
+    let tv_field = segment_reader
+        .schema()
+        .get_field(field.as_str())
+        .unwrap_or_else(|| panic!("Faild to load {} field", field.as_str()));
+
+    segment_reader
+        .fast_fields()
+        .u64(tv_field)
+        .unwrap_or_else(|_| panic!("Failed to get {} fast-field reader", field.as_str()))
+}
+
 pub(crate) struct InitialSegmentScoreTweaker {
     centrality_reader: DynamicFastFieldReader<u64>,
     is_homepage_reader: DynamicFastFieldReader<u64>,
@@ -53,59 +65,12 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let centrality_field = segment_reader
-            .schema()
-            .get_field(Field::Centrality.as_str())
-            .expect("Faild to load centrality field");
-        let centrality_reader = segment_reader
-            .fast_fields()
-            .u64(centrality_field)
-            .expect("Failed to get centrality fast-field reader");
-
-        let is_homepage_field = segment_reader
-            .schema()
-            .get_field(Field::IsHomepage.as_str())
-            .expect("Faild to load is_homepage field");
-        let is_homepage_reader = segment_reader
-            .fast_fields()
-            .u64(is_homepage_field)
-            .expect("Failed to get is_homepage fast-field reader");
-
-        let fetch_time_ms_field = segment_reader
-            .schema()
-            .get_field(Field::FetchTimeMs.as_str())
-            .expect("Faild to load fetch_time_ms field");
-        let fetch_time_ms_reader = segment_reader
-            .fast_fields()
-            .u64(fetch_time_ms_field)
-            .expect("Failed to get fetch_time_ms fast-field reader");
-
-        let update_timestamp_field = segment_reader
-            .schema()
-            .get_field(Field::LastUpdated.as_str())
-            .expect("Faild to load last_updated field");
-        let update_timestamp_reader = segment_reader
-            .fast_fields()
-            .u64(update_timestamp_field)
-            .expect("Failed to get last_updated fast-field reader");
-
-        let num_trackers_field = segment_reader
-            .schema()
-            .get_field(Field::NumTrackers.as_str())
-            .expect("Faild to load num_trackers field");
-        let num_trackers_reader = segment_reader
-            .fast_fields()
-            .u64(num_trackers_field)
-            .expect("Failed to get num_trackers fast-field reader");
-
-        let region_field = segment_reader
-            .schema()
-            .get_field(Field::Region.as_str())
-            .expect("Faild to load region field");
-        let region_reader = segment_reader
-            .fast_fields()
-            .u64(region_field)
-            .expect("Failed to get region fast-field reader");
+        let centrality_reader = fastfield_reader(segment_reader, &Field::Centrality);
+        let is_homepage_reader = fastfield_reader(segment_reader, &Field::IsHomepage);
+        let fetch_time_ms_reader = fastfield_reader(segment_reader, &Field::FetchTimeMs);
+        let update_timestamp_reader = fastfield_reader(segment_reader, &Field::LastUpdated);
+        let num_trackers_reader = fastfield_reader(segment_reader, &Field::NumTrackers);
+        let region_reader = fastfield_reader(segment_reader, &Field::Region);
 
         let current_timestamp = Utc::now().timestamp() as f64;
 
@@ -142,7 +107,7 @@ fn region_score(
 
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: Score) -> f64 {
-        let score = score as f64;
+        let bm25 = score as f64;
         let centrality: f64 =
             self.centrality_reader.get_val(doc as u64) as f64 / CENTRALITY_SCALING as f64;
         let is_homepage = self.is_homepage_reader.get_val(doc as u64) as f64;
@@ -152,7 +117,7 @@ impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
         let num_trackers = self.num_trackers_reader.get_val(doc as u64) as f64;
         let region = Region::from_id(self.region_reader.get_val(doc as u64));
 
-        (3.0 * score)
+        (3.0 * bm25)
             + (3200.0 * centrality)
             + (1.0 * is_homepage)
             + (1.0 / (fetch_time_ms + 1.0))
