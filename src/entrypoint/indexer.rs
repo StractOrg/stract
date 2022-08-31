@@ -254,7 +254,10 @@ impl Indexer {
             .map(|warc_paths| Job {
                 config: job_config.clone(),
                 warc_paths: warc_paths.collect_vec(),
-                base_path: "data/index".to_string(),
+                base_path: config
+                    .output_path
+                    .clone()
+                    .unwrap_or_else(|| "data/index".to_string()),
             })
             .collect_vec()
             .into_par_iter()

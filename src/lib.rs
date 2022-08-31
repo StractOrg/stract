@@ -69,6 +69,7 @@ pub struct IndexingLocalConfig {
     warc_source: WarcSource,
     batch_size: Option<usize>,
     webgraph_path: Option<String>,
+    output_path: Option<String>,
     centrality_store_path: String,
 }
 
