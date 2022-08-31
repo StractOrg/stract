@@ -22,7 +22,7 @@ rayon = "1.5.3"
 reqwest = { version = "0.11.10", features = ["blocking", "stream"] }
 serde = "1.0.137"
 serde_json = "1.0.81"
-tantivy = "0.18.0"
+tantivy = { git = "https://github.com/quickwit-oss/tantivy.git", rev = "a451f6d60dc4cb751457d11a3cc9d038d9b63713" }
 thiserror = "1.0.31"
 toml = "0.5.9"
 tracing = "0.1.34"

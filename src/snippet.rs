@@ -17,7 +17,7 @@
 use crate::frontend::search::html_escape;
 use crate::tokenizer::Stemmed;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use tantivy::tokenizer::{TextAnalyzer, Token};
@@ -201,29 +201,23 @@ impl SnippetGenerator {
         field: tantivy::schema::Field,
         tokenizer: tantivy::tokenizer::TextAnalyzer,
     ) -> crate::Result<SnippetGenerator> {
-        let mut terms = BTreeMap::new();
-        query.query_terms(&mut terms);
-        let mut terms_text: BTreeMap<String, Score> = Default::default();
-
-        for (mut term, _) in terms {
-            if term.field() != field {
-                continue;
+        let mut terms: BTreeSet<&tantivy::Term> = BTreeSet::new();
+        query.query_terms(&mut |term, _| {
+            if term.field() == field {
+                terms.insert(term);
             }
+        });
+        let mut terms_text: BTreeMap<String, Score> = Default::default();
+        for term in terms {
             let term_str = if let Some(term_str) = term.as_str() {
-                tokenizer
-                    .token_stream(term_str)
-                    .next()
-                    .unwrap()
-                    .text
-                    .clone()
+                term_str
             } else {
                 continue;
             };
-            term.set_text(&term_str);
-            let doc_freq = searcher.doc_freq(&term)?;
+            let doc_freq = searcher.doc_freq(term)?;
             if doc_freq > 0 {
                 let score = 1.0 / (1.0 + doc_freq as Score);
-                terms_text.insert(term_str, score);
+                terms_text.insert(term_str.to_string(), score);
             }
         }
         Ok(SnippetGenerator {

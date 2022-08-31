@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{Extension, Router};
+use axum::{body::Body, Extension, Router};
 
 use crate::{
     autosuggest::Autosuggest, bangs::Bangs, entity_index::EntityIndex, index::Index,
@@ -31,11 +31,13 @@ use axum::{
 };
 use axum_extra::routing::SpaRouter;
 
+mod about;
 mod autosuggest;
 mod entity_image;
 mod favicons;
 mod index;
 mod primary_image;
+mod privacy;
 pub mod search;
 
 pub struct HtmlTemplate<T>(T);
@@ -59,6 +61,16 @@ where
                 .into_response(),
         }
     }
+}
+
+#[allow(clippy::unused_async)]
+pub async fn favicon() -> impl IntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(
+            include_bytes!("../../static/images/favicon.ico").to_vec(),
+        ))
+        .unwrap()
 }
 
 pub fn router(
@@ -85,6 +97,9 @@ pub fn router(
         .route("/favicons/:site", get(favicons::route))
         .route("/image/:uuid", get(primary_image::route))
         .route("/entity/image/:entity", get(entity_image::route))
+        .route("/favicon.ico", get(favicon))
+        .route("/about", get(about::route))
+        .route("/privacy-and-happy-lawyers", get(privacy::route))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state)))
 }

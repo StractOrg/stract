@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% import "searchbar.html" as scope %}
 {% import "entity.html" as entity_scope %}
+{% import "navbar.html" as navbar %}
+{% import "footer.html" as footer %}
 
 {% block content %}
 
 <div class="flex flex-col w-full">
     <div class="flex items-center h-24 border bg-neutral-50">
-        <div class="ml-14 mr-14">
+        <div class="ml-14 mr-14 w-12 h-12">
             <a href="/">
-                <img src="/static/images/logo.svg" />
+                <img src="/static/images/logo.svg" class="w-full h-full" />
             </a>
         </div>
         {% call scope::searchbar("", query) %}
+        {% call navbar::navbar() %}
     </div>
 
     <div class="flex">
@@ -98,6 +101,8 @@
         {% endmatch %}
     </div>
 </div>
+
+{% call footer::footer() %}
 
 <style>
     .title-link {

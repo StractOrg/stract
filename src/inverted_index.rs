@@ -19,7 +19,7 @@ use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{DocAddress, Document, IndexReader, IndexWriter, LeasedItem};
+use tantivy::{DocAddress, Document, IndexReader, IndexWriter};
 
 use crate::image_store::Image;
 use crate::query::Query;
@@ -163,7 +163,7 @@ impl InvertedIndex {
     fn retrieve_doc(
         &self,
         doc_address: DocAddress,
-        searcher: &LeasedItem<tantivy::Searcher>,
+        searcher: &tantivy::Searcher,
     ) -> Result<RetrievedWebpage> {
         let doc = searcher.doc(doc_address)?;
         Ok(RetrievedWebpage::from(doc))

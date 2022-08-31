@@ -27,7 +27,7 @@ use tantivy::{
     query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
     schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
     tokenizer::Tokenizer,
-    DocAddress, IndexReader, IndexWriter, LeasedItem, Searcher, Term,
+    DocAddress, IndexReader, IndexWriter, Searcher, Term,
 };
 use tracing::info;
 
@@ -307,7 +307,7 @@ impl EntityIndex {
 
     fn retrieve_stored_entity(
         &self,
-        searcher: &LeasedItem<Searcher>,
+        searcher: &Searcher,
         doc_address: DocAddress,
         get_related: bool,
         decode_info: bool,

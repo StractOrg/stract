@@ -1,0 +1,39 @@
+{% macro navbar() %}
+<navbar class="flex-grow flex justify-end pr-10 space-x-10">
+    <a href="/about">About</a>
+    <a href="https://discord.gg/BmzKHffWJM">
+        <div class="discord-logo"></div>
+    </a>
+    <a href="https://github.com/cuely/cuely">
+        <div class="github-logo"></div>
+    </a>
+</navbar>
+
+<style>
+    .github-logo {
+        background-color: gray;
+        width: 22px;
+        height: 22px;
+        -webkit-mask: url(/static/images/github.svg) no-repeat center;
+        mask: url(/static/images/github.svg) no-repeat center;
+        mask-size: contain;
+    }
+
+    .github-logo:hover {
+        background-color: black;
+    }
+
+    .discord-logo {
+        background-color: gray;
+        width: 22px;
+        height: 22px;
+        -webkit-mask: url(/static/images/discord.svg) no-repeat center;
+        mask: url(/static/images/discord.svg) no-repeat center;
+        mask-size: contain;
+    }
+
+    .discord-logo:hover {
+        background-color: black;
+    }
+</style>
+{% endmacro %}

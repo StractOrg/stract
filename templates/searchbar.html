@@ -121,7 +121,7 @@
             sepBar.classList.remove("sep-bar-margin-bottom");
         }
 
-        currentSuggestions = suggestionsData;
+        currentSuggestions = suggestionsData.map(item => item.raw);
         currentHighlighted = -1;
 
         suggestionsData.forEach(item => {

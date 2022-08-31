@@ -20,7 +20,7 @@ use crate::schema::{Field, CENTRALITY_SCALING};
 use crate::webpage::region::{Region, RegionCount};
 use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
-use tantivy::fastfield::{DynamicFastFieldReader, FastFieldReader};
+use tantivy::fastfield::{Column, DynamicFastFieldReader};
 use tantivy::{DocId, Score, SegmentReader};
 
 pub(crate) struct InitialScoreTweaker {
@@ -143,13 +143,14 @@ fn region_score(
 impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: Score) -> f64 {
         let score = score as f64;
-        let centrality: f64 = self.centrality_reader.get(doc) as f64 / CENTRALITY_SCALING as f64;
-        let is_homepage = self.is_homepage_reader.get(doc) as f64;
-        let fetch_time_ms = self.fetch_time_ms_reader.get(doc) as f64;
-        let update_timestamp = self.update_timestamp_reader.get(doc) as f64;
+        let centrality: f64 =
+            self.centrality_reader.get_val(doc as u64) as f64 / CENTRALITY_SCALING as f64;
+        let is_homepage = self.is_homepage_reader.get_val(doc as u64) as f64;
+        let fetch_time_ms = self.fetch_time_ms_reader.get_val(doc as u64) as f64;
+        let update_timestamp = self.update_timestamp_reader.get_val(doc as u64) as f64;
         let hours_since_update = (self.current_timestamp - update_timestamp).max(0.000001) / 3600.0;
-        let num_trackers = self.num_trackers_reader.get(doc) as f64;
-        let region = Region::from_id(self.region_reader.get(doc));
+        let num_trackers = self.num_trackers_reader.get_val(doc as u64) as f64;
+        let region = Region::from_id(self.region_reader.get_val(doc as u64));
 
         (3.0 * score)
             + (3200.0 * centrality)

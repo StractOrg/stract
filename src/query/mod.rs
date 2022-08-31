@@ -15,10 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Result;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{AllQuery, BooleanQuery, Occur},
     schema::Schema,
@@ -107,8 +104,8 @@ impl tantivy::query::Query for Query {
         self.tantivy_query.weight(searcher, scoring_enabled)
     }
 
-    fn query_terms(&self, terms: &mut BTreeMap<tantivy::Term, bool>) {
-        self.tantivy_query.query_terms(terms)
+    fn query_terms<'a>(&'a self, visitor: &mut dyn FnMut(&'a tantivy::Term, bool)) {
+        self.tantivy_query.query_terms(visitor)
     }
 }
 
