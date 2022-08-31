@@ -42,7 +42,8 @@ enum JobConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Job {
-    config: JobConfig,
+    source_config: JobConfig,
+    download_images: bool,
     warc_paths: Vec<String>,
     base_path: String,
 }
@@ -77,7 +78,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
 
         let mut index = Index::open(Path::new(&self.base_path).join(name)).unwrap();
 
-        let source = match self.config {
+        let source = match self.source_config {
             JobConfig::Http(config) => WarcSource::HTTP(config),
             JobConfig::Local(config) => WarcSource::Local(config),
         };
@@ -135,8 +136,10 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                     }
                 }
                 index.commit().unwrap();
-                info!("downloading images");
-                index.download_pending_images();
+                if self.download_images {
+                    info!("downloading images");
+                    index.download_pending_images();
+                }
             }
 
             std::fs::remove_file(file).ok();
@@ -198,8 +201,9 @@ impl Indexer {
                 .chunks(config.batch_size.unwrap_or(1))
                 .into_iter()
                 .map(|warc_paths| Job {
-                    config: job_config.clone(),
+                    source_config: job_config.clone(),
                     warc_paths: warc_paths.collect_vec(),
+                    download_images: config.download_images.unwrap_or(true),
                     base_path: config
                         .index_base_path
                         .clone()
@@ -252,8 +256,9 @@ impl Indexer {
             .chunks(config.batch_size.unwrap_or(1))
             .into_iter()
             .map(|warc_paths| Job {
-                config: job_config.clone(),
+                source_config: job_config.clone(),
                 warc_paths: warc_paths.collect_vec(),
+                download_images: config.download_images.unwrap_or(true),
                 base_path: config
                     .output_path
                     .clone()

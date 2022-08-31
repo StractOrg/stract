@@ -60,6 +60,7 @@ pub struct IndexingMasterConfig {
     warc_source: WarcSource,
     workers: Vec<String>,
     batch_size: Option<usize>,
+    download_images: Option<bool>,
     index_base_path: Option<String>,
 }
 
@@ -70,6 +71,7 @@ pub struct IndexingLocalConfig {
     batch_size: Option<usize>,
     webgraph_path: Option<String>,
     output_path: Option<String>,
+    download_images: Option<bool>,
     centrality_store_path: String,
 }
 

@@ -16,7 +16,7 @@ Cuely is an open source web search engine hosted at [cuely.io](https://cuely.io/
 * Keyword search that respects your search query.
 * Advanced query syntax (`site:`, `intitle:` etc.).
 * Rank webpages based on their [harmonic centrality](https://en.wikipedia.org/wiki/Centrality#Harmonic_centrality)
-* DDG-like [!bang syntax](https://duckduckgo.com/bang)
+* DDG-style [!bang syntax](https://duckduckgo.com/bang)
 * Entity sidebar
 * De-rank websites with third-party trackers
 * Prioritize fresh content
