@@ -3,7 +3,7 @@
 <br/>
 <br/>
 <p align="center">
-  <img src="git-assets/big-logo.svg" height="60" />
+  <img src="git-assets/big-logo.svg" height="120" />
 </p>
 <br />
 
