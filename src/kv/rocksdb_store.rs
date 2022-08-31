@@ -102,11 +102,14 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(key_bytes, value_bytes)| {
-            (
-                bincode::deserialize(&key_bytes).expect("Failed to deserialize key"),
-                bincode::deserialize(&value_bytes).expect("Failed to deserialize value"),
-            )
-        })
+        self.inner
+            .next()
+            .and_then(|r| r.ok())
+            .map(|(key_bytes, value_bytes)| {
+                (
+                    bincode::deserialize(&key_bytes).expect("Failed to deserialize key"),
+                    bincode::deserialize(&value_bytes).expect("Failed to deserialize value"),
+                )
+            })
     }
 }
