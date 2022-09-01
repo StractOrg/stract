@@ -33,6 +33,7 @@ use axum::{
 use axum_extra::routing::SpaRouter;
 
 mod about;
+mod api;
 mod autosuggest;
 mod entity_image;
 mod favicons;
@@ -101,6 +102,7 @@ pub fn router(
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
+        .route("/api/beta/search", get(api::search))
         .merge(SpaRouter::new("/static", "static"))
         .layer(Extension(state))
         .layer(CompressionLayer::new()))

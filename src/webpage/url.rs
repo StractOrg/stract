@@ -16,9 +16,10 @@
 
 use std::{fmt::Display, time::Duration};
 
+use serde::Serialize;
 use tracing::debug;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, Serialize, PartialEq, Eq, Clone, Hash)]
 pub struct Url(String);
 
 impl Display for Url {

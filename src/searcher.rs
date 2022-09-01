@@ -17,6 +17,7 @@
 use std::str::FromStr;
 use std::time::Instant;
 
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::bangs::{BangHit, Bangs};
@@ -33,7 +34,7 @@ use crate::{Error, Result};
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<String>,
     pub webpages: InvertedIndexSearchResult,
@@ -41,7 +42,7 @@ pub struct WebsitesResult {
     pub search_duration_ms: u128,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(BangHit),

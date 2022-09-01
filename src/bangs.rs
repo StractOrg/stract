@@ -50,7 +50,7 @@ pub struct Bang {
     url: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct BangHit {
     bang: Bang,
     pub redirect_to: Url,

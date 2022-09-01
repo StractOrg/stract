@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::NaiveDateTime;
+use serde::Serialize;
 use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
@@ -44,12 +45,14 @@ impl InvertedIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = create_schema();
 
-        let tantivy_index = if path.as_ref().exists() {
+        let mut tantivy_index = if path.as_ref().exists() {
             tantivy::Index::open_in_dir(&path)?
         } else {
             fs::create_dir_all(&path)?;
             tantivy::Index::create_in_dir(&path, schema.clone())?
         };
+
+        tantivy_index.set_default_multithread_executor()?;
 
         let tokenizer = Tokenizer::default();
         tantivy_index
@@ -227,13 +230,13 @@ impl InvertedIndex {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct InvertedIndexSearchResult {
     pub num_docs: usize,
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,
