@@ -26,13 +26,19 @@ use super::signal_aggregator::SignalAggregator;
 pub(crate) struct InitialScoreTweaker {
     region_count: Arc<RegionCount>,
     selected_region: Option<Region>,
+    aggregator: SignalAggregator,
 }
 
 impl InitialScoreTweaker {
-    pub fn new(region_count: Arc<RegionCount>, selected_region: Option<Region>) -> Self {
+    pub fn new(
+        region_count: Arc<RegionCount>,
+        selected_region: Option<Region>,
+        aggregator: SignalAggregator,
+    ) -> Self {
         Self {
             region_count,
             selected_region,
+            aggregator,
         }
     }
 }
@@ -48,7 +54,7 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let mut aggregator = SignalAggregator::default();
+        let mut aggregator = SignalAggregator::new_like(&self.aggregator);
         aggregator.register_readers(segment_reader);
 
         let current_timestamp = Utc::now().timestamp() as f64;

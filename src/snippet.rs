@@ -347,7 +347,7 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = Searcher::from(index);
 
         let result = searcher
-            .search("rust language", None)
+            .search("rust language", None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -387,7 +387,7 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = Searcher::from(index);
 
         let result = searcher
-            .search("describe", None)
+            .search("describe", None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();

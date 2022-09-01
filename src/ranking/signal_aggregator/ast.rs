@@ -21,7 +21,7 @@ lalrpop_mod!(pub parser, "/ranking/signal_aggregator/parser.rs");
 pub static PARSER: once_cell::sync::Lazy<parser::AlterationsParser> =
     once_cell::sync::Lazy::new(parser::AlterationsParser::new);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Target {
     Signal(String),
     Field(String),
@@ -29,8 +29,8 @@ pub enum Target {
 
 #[derive(Debug, PartialEq)]
 pub struct Alteration {
-    target: Target,
-    score: f64,
+    pub target: Target,
+    pub score: f64,
 }
 
 #[cfg(test)]

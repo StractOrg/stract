@@ -16,7 +16,7 @@
 
 mod ast;
 
-use crate::Result;
+use crate::{Error, Result};
 use std::{collections::HashMap, sync::Arc};
 
 use strum::{EnumIter, IntoEnumIterator};
@@ -30,9 +30,9 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::ast::{Alteration, PARSER};
+use self::ast::{Alteration, Target, PARSER};
 
-#[derive(Debug, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter)]
 pub enum Signal {
     Bm25,
     HostCentrality,
@@ -102,6 +102,26 @@ impl Signal {
             }
         }
     }
+
+    fn default_coefficient(&self) -> f64 {
+        match self {
+            Signal::Bm25 => 3.0,
+            Signal::HostCentrality => 3200.0,
+            Signal::IsHomepage => 1.0,
+            Signal::FetchTimeMs => 1.0,
+            Signal::UpdateTimestamp => 1500.0,
+            Signal::NumTrackers => 200.0,
+            Signal::Region => 25.0,
+        }
+    }
+
+    fn from_string(name: String) -> Option<Signal> {
+        match name.as_str() {
+            "bm25" => Some(Signal::Bm25),
+            "host_centrality" => Some(Signal::HostCentrality),
+            _ => None,
+        }
+    }
 }
 
 fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFastFieldReader<u64> {
@@ -116,13 +136,18 @@ fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFas
         .unwrap_or_else(|_| panic!("Failed to get {} fast-field reader", field.as_str()))
 }
 
+#[derive(Debug, Clone)]
 pub struct FieldBoost(HashMap<Field, f64>);
 
+#[derive(Debug, Clone)]
 pub struct SignalCoefficient(HashMap<Signal, f64>);
 
 impl SignalCoefficient {
     pub fn get(&self, signal: &Signal) -> f64 {
-        self.0.get(signal).copied().unwrap_or(0.0)
+        self.0
+            .get(signal)
+            .copied()
+            .unwrap_or_else(|| signal.default_coefficient())
     }
 }
 
@@ -142,30 +167,38 @@ pub struct SignalAggregator {
     field_boost: FieldBoost,
 }
 
+impl std::fmt::Debug for SignalAggregator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SignalAggregator")
+            .field("signal_coefficients", &self.signal_coefficients)
+            .field("field_boost", &self.field_boost)
+            .finish()
+    }
+}
+
 impl Default for SignalAggregator {
     fn default() -> Self {
-        let mut coeffs = HashMap::new();
-
-        coeffs.insert(Signal::Bm25, 3.0);
-        coeffs.insert(Signal::HostCentrality, 3200.0);
-        coeffs.insert(Signal::FetchTimeMs, 1.0);
-        coeffs.insert(Signal::UpdateTimestamp, 1500.0);
-        coeffs.insert(Signal::NumTrackers, 200.0);
-        coeffs.insert(Signal::Region, 25.0);
-
-        Self::new(coeffs, HashMap::new())
+        Self::new(HashMap::new(), HashMap::new())
     }
 }
 
 impl SignalAggregator {
     pub fn new(coefficients: HashMap<Signal, f64>, boosts: HashMap<Field, f64>) -> Self {
         let signal_coefficients = SignalCoefficient(coefficients);
-        let field_boost = FieldBoost(HashMap::new());
+        let field_boost = FieldBoost(boosts);
 
         Self {
             readers: HashMap::new(),
             signal_coefficients,
             field_boost,
+        }
+    }
+
+    pub fn new_like(other: &SignalAggregator) -> Self {
+        Self {
+            readers: HashMap::new(),
+            signal_coefficients: other.signal_coefficients.clone(),
+            field_boost: other.field_boost.clone(),
         }
     }
 
@@ -220,8 +253,33 @@ impl SignalAggregator {
     }
 }
 
-// pub fn parse(program: &str) -> Result<SignalAggregator> {
-//     let res: Vec<Alteration> = PARSER.parse(program)?;
-//
-//     todo!();
-// }
+impl From<Vec<Alteration>> for SignalAggregator {
+    fn from(alterations: Vec<Alteration>) -> Self {
+        let mut coefficients = HashMap::new();
+        let mut boosts = HashMap::new();
+
+        for alteration in alterations {
+            match alteration.target {
+                Target::Signal(name) => {
+                    if let Some(signal) = Signal::from_string(name) {
+                        coefficients.insert(signal, alteration.score);
+                    }
+                }
+                Target::Field(name) => {
+                    if let Some(field) = Field::from_string(name) {
+                        boosts.insert(field, alteration.score);
+                    }
+                }
+            }
+        }
+
+        Self::new(coefficients, boosts)
+    }
+}
+
+pub fn parse(program: &str) -> Result<SignalAggregator> {
+    match PARSER.parse(program) {
+        Ok(alterations) => Ok(SignalAggregator::from(alterations)),
+        Err(_) => Err(Error::Parse),
+    }
+}

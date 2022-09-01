@@ -125,7 +125,7 @@ mod tests {
 
     use tantivy::tokenizer::TokenizerManager;
 
-    use crate::schema::create_schema;
+    use crate::{ranking::signal_aggregator::SignalAggregator, schema::create_schema};
 
     use super::*;
 
@@ -146,13 +146,31 @@ mod tests {
         }]"#,
         );
 
-        let query = Query::parse("no bangs", schema.clone(), &tokenizer_manager).unwrap();
+        let query = Query::parse(
+            "no bangs",
+            schema.clone(),
+            &tokenizer_manager,
+            &SignalAggregator::default(),
+        )
+        .unwrap();
         assert_eq!(bangs.get(&query), None);
 
-        let query = Query::parse("!no bangs", schema.clone(), &tokenizer_manager).unwrap();
+        let query = Query::parse(
+            "!no bangs",
+            schema.clone(),
+            &tokenizer_manager,
+            &SignalAggregator::default(),
+        )
+        .unwrap();
         assert_eq!(bangs.get(&query), None);
 
-        let query = Query::parse("!ty bangs", schema, &tokenizer_manager).unwrap();
+        let query = Query::parse(
+            "!ty bangs",
+            schema,
+            &tokenizer_manager,
+            &SignalAggregator::default(),
+        )
+        .unwrap();
         assert_eq!(
             bangs.get(&query),
             Some(BangHit {

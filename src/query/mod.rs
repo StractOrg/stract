@@ -39,6 +39,7 @@ impl Query {
         query: &str,
         schema: Arc<Schema>,
         tokenizer_manager: &TokenizerManager,
+        aggregator: &SignalAggregator,
     ) -> Result<Query> {
         let parsed_terms = parser::parse(query);
 
@@ -58,7 +59,6 @@ impl Query {
         let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
             schema.fields().collect();
 
-        let aggregator = SignalAggregator::default();
         let field_boost = aggregator.field_boosts();
 
         let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
@@ -131,6 +131,7 @@ mod tests {
             "this is a simple query the the the the the the the the the the the the the",
             Arc::clone(&schema),
             &TokenizerManager::new(),
+            &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
 
@@ -164,6 +165,7 @@ mod tests {
             "   this is a simple query   ",
             Arc::clone(&schema),
             &TokenizerManager::new(),
+            &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
 
@@ -183,20 +185,31 @@ mod tests {
     fn parse_weird_characters() {
         let schema = Arc::new(create_schema());
 
-        let terms = Query::parse("123", Arc::clone(&schema), &TokenizerManager::new())
-            .expect("Failed to parse query")
-            .simple_terms();
+        let terms = Query::parse(
+            "123",
+            Arc::clone(&schema),
+            &TokenizerManager::new(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query")
+        .simple_terms();
         assert_eq!(terms, vec!["123".to_string()]);
 
-        let terms = Query::parse("123 33", Arc::clone(&schema), &TokenizerManager::new())
-            .expect("Failed to parse query")
-            .simple_terms();
+        let terms = Query::parse(
+            "123 33",
+            Arc::clone(&schema),
+            &TokenizerManager::new(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query")
+        .simple_terms();
         assert_eq!(terms, vec!["123".to_string(), "33".to_string()]);
 
         let terms = Query::parse(
             "term! term# $",
             Arc::clone(&schema),
             &TokenizerManager::new(),
+            &SignalAggregator::default(),
         )
         .expect("Failed to parse query")
         .simple_terms();
@@ -209,9 +222,14 @@ mod tests {
     #[test]
     fn not_query() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("test -website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "test -website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -301,9 +319,14 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let query = Query::parse("test site:first.com", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "test site:first.com",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -315,9 +338,10 @@ mod tests {
             "test site:www.first.com",
             index.schema(),
             index.tokenizers(),
+            &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -325,9 +349,14 @@ mod tests {
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com");
 
-        let query = Query::parse("test -site:first.com", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "test -site:first.com",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -378,9 +407,14 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let query = Query::parse("intitle:website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "intitle:website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -431,9 +465,14 @@ mod tests {
             .expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let query = Query::parse("test inurl:forum", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "test inurl:forum",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -446,8 +485,13 @@ mod tests {
     fn empty_query() {
         let schema = Arc::new(create_schema());
 
-        let query = Query::parse("", Arc::clone(&schema), &TokenizerManager::new())
-            .expect("Failed to parse query");
+        let query = Query::parse(
+            "",
+            Arc::clone(&schema),
+            &TokenizerManager::new(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
 
         assert!(query.is_empty())
     }

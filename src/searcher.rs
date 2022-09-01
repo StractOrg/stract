@@ -25,6 +25,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
+use crate::ranking::signal_aggregator;
 use crate::ranking::Ranker;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
@@ -67,11 +68,27 @@ impl Searcher {
 }
 
 impl Searcher {
-    pub fn search(&self, query: &str, selected_region: Option<Region>) -> Result<SearchResult> {
+    pub fn search(
+        &self,
+        query: &str,
+        selected_region: Option<Region>,
+        goggle_program: Option<&str>,
+    ) -> Result<SearchResult> {
         let start = Instant::now();
 
         let raw_query = query.to_string();
-        let query = Query::parse(query, self.index.schema(), self.index.tokenizers())?;
+        let aggregator = goggle_program
+            .and_then(|program| signal_aggregator::parse(program).ok())
+            .unwrap_or_default();
+
+        dbg!(&aggregator);
+
+        let query = Query::parse(
+            query,
+            self.index.schema(),
+            self.index.tokenizers(),
+            &aggregator,
+        )?;
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
@@ -83,7 +100,7 @@ impl Searcher {
             }
         }
 
-        let mut ranker = Ranker::new(self.index.region_count.clone());
+        let mut ranker = Ranker::new(self.index.region_count.clone(), aggregator);
 
         if let Some(region) = selected_region {
             if region != Region::All {
@@ -140,5 +157,123 @@ impl SearchResult {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::webpage::Webpage;
+
+    use super::*;
+
+    #[test]
+    fn custom_signal_aggregation() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    example
+                </body>
+            </html>
+            "#,
+                "https://www.body.com",
+                vec![],
+                1.0,
+                20,
+            ))
+            .expect("failed to parse webpage");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Example website</title>
+                </head>
+                <body>
+                    test
+                </body>
+            </html>
+            "#,
+                "https://www.title.com",
+                vec![],
+                1.0,
+                20,
+            ))
+            .expect("failed to parse webpage");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Example website</title>
+                </head>
+                <body>
+                    test
+                </body>
+            </html>
+            "#,
+                "https://www.centrality.com",
+                vec![],
+                1.0002,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().unwrap();
+
+        let searcher = Searcher::new(index, None, None);
+
+        let res = searcher
+            .search(
+                "example",
+                None,
+                Some(
+                    r#"
+                        @field_title = 20000000
+                        @host_centrality = 0
+                    "#,
+                ),
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.title.com");
+
+        let res = searcher
+            .search(
+                "example",
+                None,
+                Some(
+                    r#"
+                        @field_all_body= 20000000
+                        @host_centrality = 0
+                    "#,
+                ),
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
+
+        let res = searcher
+            .search("example", None, Some("@host_centrality= 2000000"))
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
     }
 }

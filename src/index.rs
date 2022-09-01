@@ -292,7 +292,7 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::ranking::Ranker;
+    use crate::ranking::{signal_aggregator::SignalAggregator, Ranker};
 
     use super::*;
 
@@ -333,9 +333,14 @@ mod tests {
 
         let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
         let index: Index = deserialized_frozen.into();
-        let query = Query::parse("website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         let result = index
             .search(&query, ranker.collector())
