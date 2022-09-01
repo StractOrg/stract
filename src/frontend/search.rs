@@ -269,7 +269,7 @@ pub async fn route(
         }
     });
 
-    match state.searcher.search(query.as_str(), selected_region) {
+    match state.searcher.search(query.as_str(), selected_region, None) {
         Ok(result) => match result {
             SearchResult::Websites(result) => {
                 let search_result = result

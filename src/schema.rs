@@ -22,7 +22,7 @@ use crate::tokenizer::{Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Field {
     Title,
     CleanBody,
@@ -44,6 +44,7 @@ pub enum Field {
     NumTrackers,
     Region,
 }
+
 pub static ALL_FIELDS: [Field; 19] = [
     Field::Title,
     Field::CleanBody,
@@ -188,6 +189,31 @@ impl Field {
 
     pub fn is_searchable(&self) -> bool {
         !matches!(self, Field::PrimaryImage | Field::BacklinkText)
+    }
+
+    pub fn from_string(name: String) -> Option<Field> {
+        match name.as_str() {
+            "title" => Some(Field::Title),
+            "body" => Some(Field::CleanBody),
+            "url" => Some(Field::Url),
+            "host" => Some(Field::Host),
+            "backlink_text" => Some(Field::BacklinkText),
+            "centrality" => Some(Field::Centrality),
+            "stemmed_title" => Some(Field::StemmedTitle),
+            "stemmed_body" => Some(Field::StemmedCleanBody),
+            "domain" => Some(Field::Domain),
+            "domain_if_homepage" => Some(Field::DomainIfHomepage),
+            "is_homepage" => Some(Field::IsHomepage),
+            "fetch_time_ms" => Some(Field::FetchTimeMs),
+            "primary_image_uuid" => Some(Field::PrimaryImage),
+            "last_updated" => Some(Field::LastUpdated),
+            "description" => Some(Field::Description),
+            "all_body" => Some(Field::AllBody),
+            "stemmed_all_body" => Some(Field::StemmedAllBody),
+            "num_trackers" => Some(Field::NumTrackers),
+            "region" => Some(Field::Region),
+            _ => None,
+        }
     }
 }
 

@@ -333,7 +333,7 @@ mod tests {
     use maplit::hashset;
 
     use crate::{
-        ranking::Ranker,
+        ranking::{signal_aggregator::SignalAggregator, Ranker},
         webpage::{region::RegionCount, Link},
     };
 
@@ -344,9 +344,14 @@ mod tests {
     #[test]
     fn simple_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -391,9 +396,10 @@ mod tests {
             "this query should not match",
             index.schema(),
             index.tokenizers(),
+            &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -427,9 +433,14 @@ mod tests {
     #[test]
     fn english_stemming() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "runner",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -463,9 +474,14 @@ mod tests {
     #[test]
     fn stemmed_query_english() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runners", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "runners",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -499,9 +515,14 @@ mod tests {
     #[test]
     fn not_searchable_backlinks() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("great site", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "great site",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -564,9 +585,14 @@ mod tests {
     #[test]
     fn limited_top_docs() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("runner", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "runner",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         for _ in 0..100 {
             index
@@ -602,9 +628,14 @@ mod tests {
     #[test]
     fn host_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query =
-            Query::parse("dr", index.schema(), index.tokenizers()).expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "dr",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -686,9 +717,14 @@ mod tests {
         let mut index = index1.merge(index2);
         index.commit().unwrap();
 
-        let query = Query::parse("website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -702,9 +738,14 @@ mod tests {
     #[test]
     fn match_across_fields() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("example test", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "example test",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         let result = index
             .search(&query, ranker.collector())
@@ -745,9 +786,14 @@ mod tests {
     #[test]
     fn fetch_time_ranking() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse("test", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default());
+        let query = Query::parse(
+            "test",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         index
             .insert(Webpage::new(
@@ -803,7 +849,7 @@ mod tests {
     #[test]
     fn only_show_primary_images_when_relevant() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let ranker = Ranker::new(RegionCount::default());
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
 
         let mut webpage = Webpage::new(
             &format!(
@@ -832,8 +878,13 @@ mod tests {
         index.insert(webpage).expect("failed to parse webpage");
         index.commit().expect("failed to commit index");
 
-        let query = Query::parse("website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
+        let query = Query::parse(
+            "website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
 
         let result = index
             .search(&query, ranker.collector())
@@ -851,8 +902,13 @@ mod tests {
             })
         );
 
-        let query = Query::parse("best website", index.schema(), index.tokenizers())
-            .expect("Failed to parse query");
+        let query = Query::parse(
+            "best website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
 
         let result = index
             .search(&query, ranker.collector())

@@ -1,0 +1,25 @@
+use std::str::FromStr;
+use crate::ranking::signal_aggregator::ast::*;
+
+grammar;
+
+pub Alterations: Vec<Alteration> = <Alteration*> => <>;
+
+Alteration: Alteration = {
+    "@" <target:Target> "=" <score:Num> => Alteration {<>}
+}
+
+Target: Target = {
+    <Name> => {
+        if let Some(name) = <>.strip_prefix("field_") {
+            Target::Field(name.to_string())
+        } else {
+            Target::Signal(<>)
+        }
+    },
+}
+
+Name: String = r"[a-zA-Z_]+[0-9]*" => <>.to_string();
+
+
+Num: f64 = r"[0-9]+" => f64::from_str(<>).unwrap();
