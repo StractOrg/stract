@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use axum::{body::Body, Extension, Router};
+use tower_http::compression::CompressionLayer;
 
 use crate::{
     autosuggest::Autosuggest, bangs::Bangs, entity_index::EntityIndex, index::Index,
@@ -101,5 +102,6 @@ pub fn router(
         .route("/about", get(about::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .merge(SpaRouter::new("/static", "static"))
-        .layer(Extension(state)))
+        .layer(Extension(state))
+        .layer(CompressionLayer::new()))
 }

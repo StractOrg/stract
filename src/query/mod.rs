@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Result;
+use crate::{
+    ranking::signal_aggregator::{DefaultSignalAggregator, SignalAggregator},
+    Result,
+};
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{AllQuery, BooleanQuery, Occur},
@@ -58,9 +61,12 @@ impl Query {
         let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
             schema.fields().collect();
 
+        let aggregator = DefaultSignalAggregator::new();
+        let field_boost = aggregator.field_boosts();
+
         let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
-            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
+            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager, field_boost))
             .collect();
 
         queries.push((Occur::Should, Box::new(AllQuery)));

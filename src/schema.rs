@@ -22,7 +22,7 @@ use crate::tokenizer::{Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Field {
     Title,
     CleanBody,

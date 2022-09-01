@@ -22,6 +22,7 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIX,
+    ranking::signal_aggregator::FieldBoost,
     schema::{Field, ALL_FIELDS},
 };
 
@@ -54,6 +55,7 @@ fn simple_into_tantivy(
     term: &str,
     fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
     tokenizer_manager: &TokenizerManager,
+    field_boost: &FieldBoost,
 ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
     let (backlink_field, backlink_field_entry) = fields
         .iter()
@@ -67,6 +69,7 @@ fn simple_into_tantivy(
                 term,
                 fields,
                 tokenizer_manager,
+                field_boost,
             ))),
         ),
         (
@@ -75,6 +78,7 @@ fn simple_into_tantivy(
                 backlink_field,
                 backlink_field_entry,
                 tokenizer_manager,
+                field_boost,
                 term,
             )),
         ),
@@ -86,14 +90,17 @@ impl Term {
         &self,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
         tokenizer_manager: &TokenizerManager,
+        field_boost: &FieldBoost,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         match self {
-            Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager),
+            Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager, field_boost),
             Term::Not(subterm) => vec![(
                 Occur::MustNot,
-                Box::new(BooleanQuery::new(
-                    subterm.as_tantivy_query(fields, tokenizer_manager),
-                )),
+                Box::new(BooleanQuery::new(subterm.as_tantivy_query(
+                    fields,
+                    tokenizer_manager,
+                    field_boost,
+                ))),
             )],
             Term::Site(site) => vec![(
                 Occur::Must,
@@ -101,6 +108,7 @@ impl Term {
                     site,
                     fields,
                     tokenizer_manager,
+                    field_boost,
                 ))),
             )],
             Term::Title(title) => {
@@ -112,7 +120,7 @@ impl Term {
                     .unwrap();
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, title),
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, title),
                 )]
             }
             Term::Body(body) => {
@@ -124,7 +132,7 @@ impl Term {
                     .unwrap();
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, body),
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, body),
                 )]
             }
             Term::Url(url) => {
@@ -134,7 +142,7 @@ impl Term {
                     .unwrap();
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, url),
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, url),
                 )]
             }
             Term::PossibleBang(text) => {
@@ -142,7 +150,7 @@ impl Term {
                 term.push(BANG_PREFIX);
                 term.push_str(text);
 
-                simple_into_tantivy(&term, fields, tokenizer_manager)
+                simple_into_tantivy(&term, fields, tokenizer_manager, field_boost)
             }
         }
     }
@@ -151,6 +159,7 @@ impl Term {
         term: &str,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
         tokenizer_manager: &TokenizerManager,
+        field_boost: &FieldBoost,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
@@ -159,7 +168,7 @@ impl Term {
             .map(|(field, entry)| {
                 (
                     Occur::Should,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, term),
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, term),
                 )
             })
             .collect()
@@ -169,6 +178,7 @@ impl Term {
         term: &str,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
         tokenizer_manager: &TokenizerManager,
+        field_boost: &FieldBoost,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
@@ -182,7 +192,7 @@ impl Term {
             .map(|(field, entry)| {
                 (
                     Occur::Should,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, term),
+                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, term),
                 )
             })
             .collect()
@@ -192,6 +202,7 @@ impl Term {
         field: &tantivy::schema::Field,
         entry: &tantivy::schema::FieldEntry,
         tokenizer_manager: &TokenizerManager,
+        field_boost: &FieldBoost,
         term: &str,
     ) -> Box<dyn tantivy::query::Query + 'static> {
         let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
@@ -206,7 +217,8 @@ impl Term {
                 IndexRecordOption::WithFreqsAndPositions,
             ))
         };
-        let boost = ALL_FIELDS[field.field_id() as usize].boost().unwrap_or(1.0);
+
+        let boost = field_boost.get(&ALL_FIELDS[field.field_id() as usize]) as f32;
 
         Box::new(BoostQuery::new(processed_query, boost))
     }
