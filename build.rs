@@ -10,4 +10,6 @@ fn main() {
     println!("cargo:rerun-if-changed=yarn.lock");
     println!("cargo:rerun-if-changed=tailwind.config.js");
     println!("cargo:rerun-if-changed=postcss.config.js");
+
+    lalrpop::process_root().unwrap();
 }

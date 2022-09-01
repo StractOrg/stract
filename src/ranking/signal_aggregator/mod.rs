@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod ast;
+
+use crate::Result;
 use std::{collections::HashMap, sync::Arc};
 
 use strum::{EnumIter, IntoEnumIterator};
@@ -26,6 +29,8 @@ use crate::{
     schema::{Field, ALL_FIELDS, CENTRALITY_SCALING},
     webpage::region::{Region, RegionCount},
 };
+
+use self::ast::{Alteration, PARSER};
 
 #[derive(Debug, PartialEq, Eq, Hash, EnumIter)]
 pub enum Signal {
@@ -111,14 +116,60 @@ fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFas
         .unwrap_or_else(|_| panic!("Failed to get {} fast-field reader", field.as_str()))
 }
 
-pub trait SignalAggregator {
-    fn coefficients(&self) -> &SignalCoefficient;
-    fn field_boosts(&self) -> &FieldBoost;
+pub struct FieldBoost(HashMap<Field, f64>);
 
-    fn mut_readers(&mut self) -> &mut HashMap<Signal, DynamicFastFieldReader<u64>>;
-    fn readers(&self) -> &HashMap<Signal, DynamicFastFieldReader<u64>>;
+pub struct SignalCoefficient(HashMap<Signal, f64>);
 
-    fn register_readers(&mut self, segment_reader: &SegmentReader) {
+impl SignalCoefficient {
+    pub fn get(&self, signal: &Signal) -> f64 {
+        self.0.get(signal).copied().unwrap_or(0.0)
+    }
+}
+
+impl FieldBoost {
+    pub fn get(&self, field: &Field) -> f64 {
+        self.0
+            .get(field)
+            .copied()
+            .or_else(|| field.boost().map(|s| s as f64))
+            .unwrap_or(1.0)
+    }
+}
+
+pub struct SignalAggregator {
+    readers: HashMap<Signal, DynamicFastFieldReader<u64>>,
+    signal_coefficients: SignalCoefficient,
+    field_boost: FieldBoost,
+}
+
+impl Default for SignalAggregator {
+    fn default() -> Self {
+        let mut coeffs = HashMap::new();
+
+        coeffs.insert(Signal::Bm25, 3.0);
+        coeffs.insert(Signal::HostCentrality, 3200.0);
+        coeffs.insert(Signal::FetchTimeMs, 1.0);
+        coeffs.insert(Signal::UpdateTimestamp, 1500.0);
+        coeffs.insert(Signal::NumTrackers, 200.0);
+        coeffs.insert(Signal::Region, 25.0);
+
+        Self::new(coeffs, HashMap::new())
+    }
+}
+
+impl SignalAggregator {
+    pub fn new(coefficients: HashMap<Signal, f64>, boosts: HashMap<Field, f64>) -> Self {
+        let signal_coefficients = SignalCoefficient(coefficients);
+        let field_boost = FieldBoost(HashMap::new());
+
+        Self {
+            readers: HashMap::new(),
+            signal_coefficients,
+            field_boost,
+        }
+    }
+
+    pub fn register_readers(&mut self, segment_reader: &SegmentReader) {
         for field in &ALL_FIELDS {
             if let Some(signal) = Signal::from_field(field) {
                 if signal.has_fast_reader() {
@@ -129,7 +180,7 @@ pub trait SignalAggregator {
         }
     }
 
-    fn score(
+    pub fn score(
         &self,
         doc: DocId,
         bm25: Score,
@@ -151,70 +202,26 @@ pub trait SignalAggregator {
             })
             .sum()
     }
-}
 
-pub struct FieldBoost(HashMap<Field, f64>);
-
-pub struct SignalCoefficient(HashMap<Signal, f64>);
-
-impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> f64 {
-        self.0.get(signal).copied().unwrap_or(0.0)
-    }
-}
-
-impl FieldBoost {
-    pub fn get(&self, field: &Field) -> f64 {
-        self.0
-            .get(field)
-            .copied()
-            .or_else(|| field.boost().map(|s| s as f64))
-            .unwrap_or(1.0)
-    }
-}
-
-pub struct DefaultSignalAggregator {
-    readers: HashMap<Signal, DynamicFastFieldReader<u64>>,
-    signal_coefficients: SignalCoefficient,
-    field_boost: FieldBoost,
-}
-
-impl DefaultSignalAggregator {
-    pub fn new() -> Self {
-        let mut map = HashMap::new();
-
-        map.insert(Signal::Bm25, 3.0);
-        map.insert(Signal::HostCentrality, 3200.0);
-        map.insert(Signal::FetchTimeMs, 1.0);
-        map.insert(Signal::UpdateTimestamp, 1500.0);
-        map.insert(Signal::NumTrackers, 200.0);
-        map.insert(Signal::Region, 25.0);
-
-        let signal_coefficients = SignalCoefficient(map);
-        let field_boost = FieldBoost(HashMap::new());
-
-        Self {
-            readers: HashMap::new(),
-            signal_coefficients,
-            field_boost,
-        }
-    }
-}
-
-impl SignalAggregator for DefaultSignalAggregator {
-    fn coefficients(&self) -> &SignalCoefficient {
+    pub fn coefficients(&self) -> &SignalCoefficient {
         &self.signal_coefficients
     }
 
-    fn field_boosts(&self) -> &FieldBoost {
+    pub fn field_boosts(&self) -> &FieldBoost {
         &self.field_boost
     }
 
-    fn mut_readers(&mut self) -> &mut HashMap<Signal, DynamicFastFieldReader<u64>> {
+    pub fn mut_readers(&mut self) -> &mut HashMap<Signal, DynamicFastFieldReader<u64>> {
         &mut self.readers
     }
 
-    fn readers(&self) -> &HashMap<Signal, DynamicFastFieldReader<u64>> {
+    pub fn readers(&self) -> &HashMap<Signal, DynamicFastFieldReader<u64>> {
         &self.readers
     }
 }
+
+// pub fn parse(program: &str) -> Result<SignalAggregator> {
+//     let res: Vec<Alteration> = PARSER.parse(program)?;
+//
+//     todo!();
+// }

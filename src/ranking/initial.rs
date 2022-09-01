@@ -21,7 +21,7 @@ use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, Score, SegmentReader};
 
-use super::signal_aggregator::{DefaultSignalAggregator, SignalAggregator};
+use super::signal_aggregator::SignalAggregator;
 
 pub(crate) struct InitialScoreTweaker {
     region_count: Arc<RegionCount>,
@@ -38,7 +38,7 @@ impl InitialScoreTweaker {
 }
 
 pub(crate) struct InitialSegmentScoreTweaker {
-    aggregator: DefaultSignalAggregator,
+    aggregator: SignalAggregator,
     region_count: Arc<RegionCount>,
     current_timestamp: f64,
     selected_region: Option<Region>,
@@ -48,7 +48,7 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let mut aggregator = DefaultSignalAggregator::new();
+        let mut aggregator = SignalAggregator::default();
         aggregator.register_readers(segment_reader);
 
         let current_timestamp = Utc::now().timestamp() as f64;
