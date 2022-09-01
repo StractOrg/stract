@@ -21,7 +21,7 @@ Cuely is an open source web search engine hosted at [cuely.io](https://cuely.io/
 * De-rank websites with third-party trackers
 * Prioritize fresh content
 * Regional search
-* (Coming soon) Customize how signals are combined during search for the final search result
+* Customize how signals are combined during search for the final search result
 * (Coming soon) Use [goggles](https://brave.com/static-assets/files/goggles.pdf) to almost endlessly customize your search results.
 * (Coming soon) Prioritize links (centrality) from the sites you trust.
 
