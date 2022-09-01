@@ -90,6 +90,30 @@
                     </div>
                     {% endfor %}
                 </div>
+                <div class="flex w-full justify-center items-center pr-24 mt-5">
+                    {% if current_page == 1 %}
+                    <div class="prev-page gray-arrow">
+                    </div>
+                    {% else %}
+                    {% match prev_page_url %}
+                    {% when Some with (url) %}
+                    <a href="{{ url }}">
+                        <div class="prev-page cuely-color-arrow">
+                        </div>
+                    </a>
+                    {% when None %}
+                    <div class="prev-page gray-arrow">
+                    </div>
+                    {% endmatch %}
+                    {% endif %}
+                    <div class="mr-2 ml-2">
+                        Page {{ current_page }}
+                    </div>
+                    <a href="{{ next_page_url }}">
+                        <div class="next-page cuely-color-arrow">
+                        </div>
+                    </a>
+                </div>
             </div>
 
         </div>
@@ -105,6 +129,31 @@
 {% call footer::footer() %}
 
 <style>
+    .prev-page {
+        width: 16px;
+        height: 16px;
+        -webkit-mask: url(/static/images/arrow.svg) no-repeat center;
+        mask: url(/static/images/arrow.svg) no-repeat center;
+        mask-size: contain;
+        transform: rotate(180deg);
+    }
+
+    .next-page {
+        width: 16px;
+        height: 16px;
+        -webkit-mask: url(/static/images/arrow.svg) no-repeat center;
+        mask: url(/static/images/arrow.svg) no-repeat center;
+        mask-size: contain;
+    }
+
+    .gray-arrow {
+        background-color: gray;
+    }
+
+    .cuely-color-arrow {
+        background-color: #0b7bff;
+    }
+
     .title-link {
         color: #1a0dab;
     }

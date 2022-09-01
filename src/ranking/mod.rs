@@ -23,13 +23,17 @@ use std::sync::Arc;
 use initial::InitialScoreTweaker;
 use tantivy::collector::{Collector, TopDocs};
 
-use crate::webpage::region::{Region, RegionCount};
+use crate::{
+    searcher::NUM_RESULTS_PER_PAGE,
+    webpage::region::{Region, RegionCount},
+};
 
 use self::signal_aggregator::SignalAggregator;
 
 pub struct Ranker {
     region_count: Arc<RegionCount>,
     selected_region: Option<Region>,
+    offset: Option<usize>,
     aggregator: SignalAggregator,
 }
 
@@ -38,6 +42,7 @@ impl Ranker {
         Ranker {
             region_count: Arc::new(region_count),
             selected_region: None,
+            offset: None,
             aggregator,
         }
     }
@@ -47,13 +52,25 @@ impl Ranker {
         self
     }
 
+    pub fn with_offset(mut self, offset: usize) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
     pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
             self.selected_region,
             SignalAggregator::new_like(&self.aggregator),
         );
-        TopDocs::with_limit(20).tweak_score(score_tweaker)
+
+        let mut collector = TopDocs::with_limit(NUM_RESULTS_PER_PAGE);
+
+        if let Some(offset) = self.offset {
+            collector = collector.and_offset(offset);
+        }
+
+        collector.tweak_score(score_tweaker)
     }
 }
 
@@ -116,7 +133,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher
-            .search("example", None, None)
+            .search("example", None, None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -191,7 +208,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher
-            .search("dr dk", None, None)
+            .search("dr dk", None, None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -250,7 +267,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher
-            .search("title", None, None)
+            .search("title", None, None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -316,7 +333,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher
-            .search("test", None, None)
+            .search("test", None, None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -373,7 +390,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
         let result = searcher
-            .search("test", None, None)
+            .search("test", None, None, None)
             .expect("Search failed")
             .into_websites()
             .unwrap();

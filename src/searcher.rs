@@ -31,6 +31,8 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{Error, Result};
 
+pub const NUM_RESULTS_PER_PAGE: usize = 20;
+
 #[derive(Debug)]
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<String>,
@@ -65,14 +67,13 @@ impl Searcher {
             bangs,
         }
     }
-}
 
-impl Searcher {
     pub fn search(
         &self,
         query: &str,
         selected_region: Option<Region>,
         goggle_program: Option<&str>,
+        skip_pages: Option<usize>,
     ) -> Result<SearchResult> {
         let start = Instant::now();
 
@@ -80,8 +81,6 @@ impl Searcher {
         let aggregator = goggle_program
             .and_then(|program| signal_aggregator::parse(program).ok())
             .unwrap_or_default();
-
-        dbg!(&aggregator);
 
         let query = Query::parse(
             query,
@@ -101,6 +100,10 @@ impl Searcher {
         }
 
         let mut ranker = Ranker::new(self.index.region_count.clone(), aggregator);
+
+        if let Some(skip_pages) = skip_pages {
+            ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
+        }
 
         if let Some(region) = selected_region {
             if region != Region::All {
@@ -241,6 +244,7 @@ mod tests {
                         @host_centrality = 0
                     "#,
                 ),
+                None,
             )
             .unwrap()
             .into_websites()
@@ -259,6 +263,7 @@ mod tests {
                         @host_centrality = 0
                     "#,
                 ),
+                None,
             )
             .unwrap()
             .into_websites()
@@ -268,12 +273,64 @@ mod tests {
         assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
 
         let res = searcher
-            .search("example", None, Some("@host_centrality= 2000000"))
+            .search("example", None, Some("@host_centrality= 2000000"), None)
             .unwrap()
             .into_websites()
             .unwrap();
 
         assert_eq!(res.webpages.num_docs, 3);
         assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
+    }
+
+    #[test]
+    fn offset_page() {
+        const NUM_PAGES: usize = 10;
+        const NUM_WEBSITES: usize = NUM_PAGES * NUM_RESULTS_PER_PAGE;
+
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        for i in 0..NUM_WEBSITES {
+            index
+                .insert(Webpage::new(
+                    r#"
+            <html>
+                <head>
+                    <title>Example website</title>
+                </head>
+                <body>
+                    test
+                </body>
+            </html>
+            "#,
+                    &format!("https://www.{i}.com"),
+                    vec![],
+                    (NUM_WEBSITES - i) as f64,
+                    500,
+                ))
+                .expect("failed to parse webpage");
+        }
+
+        index.commit().unwrap();
+
+        let searcher = Searcher::new(index, None, None);
+
+        for p in 0..NUM_PAGES {
+            let urls = searcher
+                .search("test", None, None, Some(p))
+                .unwrap()
+                .into_websites()
+                .unwrap()
+                .webpages
+                .documents
+                .into_iter()
+                .map(|page| page.url);
+
+            for (i, url) in urls.enumerate() {
+                assert_eq!(
+                    url,
+                    format!("https://www.{}.com", i + (p * NUM_RESULTS_PER_PAGE))
+                )
+            }
+        }
     }
 }

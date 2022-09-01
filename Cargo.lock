@@ -651,6 +651,7 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "strum",
  "tantivy",
  "thiserror",

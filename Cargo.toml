@@ -54,6 +54,7 @@ kuchiki = "0.8.1"
 strum = { version = "0.24.1", features = ["derive", "strum_macros"] }
 tower-http = { version = "0.3.4", features = ["compression-gzip"] }
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
+serde_urlencoded = "0.7.1"
 
 [dev-dependencies]
 maplit = "1.0.2"

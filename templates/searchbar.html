@@ -170,6 +170,7 @@
 
         var searchParams = new URLSearchParams(window.location.search);
         searchParams.set("q", suggestion);
+        searchParams.set("p", "0");
         window.location = "/search?" + searchParams.toString();
 
         return;

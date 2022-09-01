@@ -246,6 +246,9 @@ struct SearchTemplate {
     num_matches: String,
     search_duration_sec: String,
     all_regions: Vec<RegionSelection>,
+    current_page: usize,
+    next_page_url: String,
+    prev_page_url: Option<String>,
 }
 
 enum RegionSelection {
@@ -258,8 +261,11 @@ enum RegionSelection {
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
+    extract::OriginalUri(uri): extract::OriginalUri,
 ) -> impl IntoResponse {
     let query = params.get("q").cloned().unwrap_or_default();
+
+    let skip_pages = params.get("p").and_then(|p| p.parse().ok());
 
     let selected_region = params.get("gl").and_then(|gl| {
         if let Ok(region) = Region::from_gl(gl) {
@@ -269,7 +275,10 @@ pub async fn route(
         }
     });
 
-    match state.searcher.search(query.as_str(), selected_region, None) {
+    match state
+        .searcher
+        .search(query.as_str(), selected_region, None, skip_pages)
+    {
         Ok(result) => match result {
             SearchResult::Websites(result) => {
                 let search_result = result
@@ -318,6 +327,31 @@ pub async fn route(
                     })
                     .collect();
 
+                let current_page = skip_pages.unwrap_or(0) + 1;
+
+                let mut next_page_params = params.clone();
+                next_page_params.insert("p".to_string(), (skip_pages.unwrap_or(0) + 1).to_string());
+                let next_page_url = uri.path().to_string()
+                    + "?"
+                    + serde_urlencoded::to_string(&next_page_params)
+                        .unwrap()
+                        .as_str();
+
+                let prev_page_url = if current_page > 1 {
+                    let mut prev_page_params = params;
+                    prev_page_params
+                        .insert("p".to_string(), (skip_pages.unwrap_or(0) - 1).to_string());
+                    Some(
+                        uri.path().to_string()
+                            + "?"
+                            + serde_urlencoded::to_string(&prev_page_params)
+                                .unwrap()
+                                .as_str(),
+                    )
+                } else {
+                    None
+                };
+
                 let template = SearchTemplate {
                     search_result,
                     query,
@@ -326,6 +360,9 @@ pub async fn route(
                     num_matches,
                     search_duration_sec,
                     all_regions,
+                    current_page,
+                    next_page_url,
+                    prev_page_url,
                 };
 
                 HtmlTemplate(template).into_response()
