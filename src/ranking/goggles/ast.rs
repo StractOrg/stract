@@ -116,7 +116,10 @@ pub fn parse(goggle: &str) -> CrateResult<RawGoggle> {
 
     match PARSER.parse(clean.as_str()) {
         Ok(blocks) => Ok(RawGoggle::from(blocks)),
-        Err(_) => Err(Error::Parse),
+        Err(err) => {
+            dbg!(err);
+            Err(Error::Parse)
+        }
     }
 }
 
@@ -187,6 +190,39 @@ mod tests {
                 },
             ]
         )
+    }
+
+    #[test]
+    fn advanced_urls() {
+        let goggle = parse(
+            r#"
+            https://www.example.com?@hej
+        "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            goggle.instructions,
+            vec![Instruction {
+                patterns: vec![PatternPart::Raw("https://www.example.com?@hej".to_string()),],
+                options: vec![]
+            },]
+        );
+
+        let goggle = parse(
+            r#"
+            https://www.example.com?@hej$site=https://www.example.com
+        "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            goggle.instructions,
+            vec![Instruction {
+                patterns: vec![PatternPart::Raw("https://www.example.com?@hej".to_string()),],
+                options: vec![PatternOption::Site("https://www.example.com".to_string())]
+            },]
+        );
     }
 
     #[test]

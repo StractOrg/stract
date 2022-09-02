@@ -30,7 +30,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::ast::{Alteration, RawGoggle, Target};
+use self::ast::{Alteration, Instruction, RawGoggle, Target};
 
 pub fn parse(goggle: &str) -> Result<Goggle> {
     let raw_goggle = ast::parse(goggle)?;
@@ -42,12 +42,29 @@ impl From<RawGoggle> for Goggle {
     fn from(raw: RawGoggle) -> Self {
         Self {
             aggregator: SignalAggregator::from(raw.alterations),
+            instructions: raw.instructions,
         }
     }
 }
 
 pub struct Goggle {
     pub aggregator: SignalAggregator,
+    instructions: Vec<Instruction>,
+}
+
+impl Goggle {
+    pub fn as_tantivy(&self) -> Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> {
+        self.instructions
+            .iter()
+            .map(|instruction| instruction.as_tantivy())
+            .collect()
+    }
+}
+
+impl Instruction {
+    pub fn as_tantivy(&self) -> (tantivy::query::Occur, Box<dyn tantivy::query::Query>) {
+        todo!();
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter)]
