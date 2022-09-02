@@ -125,7 +125,7 @@ mod tests {
 
     use tantivy::tokenizer::TokenizerManager;
 
-    use crate::{ranking::signal_aggregator::SignalAggregator, schema::create_schema};
+    use crate::{ranking::goggles::SignalAggregator, schema::create_schema};
 
     use super::*;
 

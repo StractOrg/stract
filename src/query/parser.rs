@@ -22,7 +22,7 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIX,
-    ranking::signal_aggregator::FieldBoost,
+    ranking::goggles::FieldBoost,
     schema::{Field, ALL_FIELDS},
 };
 

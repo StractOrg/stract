@@ -1,0 +1,87 @@
+use std::str::FromStr;
+use crate::ranking::goggles::ast::*;
+
+grammar;
+
+Sep<S, T>: Vec<T> = {
+    <mut xs:(<T> S)*> <x:T> => {
+        xs.push(x);
+        xs
+    }
+};
+
+pub Blocks: Vec<GoggleBlock> = <Sep<";", Block>>;
+
+Block: GoggleBlock = {
+    <Alteration> => GoggleBlock::Alteration(<>),
+    <Comment> => GoggleBlock::Comment(<>),
+    <Instruction> => GoggleBlock::Instruction(<>),
+}
+
+
+Alteration: Alteration = {
+    "@" <target:Target> "=" <score:Num> => Alteration {<>}
+}
+
+Target: Target = {
+    <Name> => {
+        if let Some(name) = <>.strip_prefix("field_") {
+            Target::Field(name.to_string())
+        } else {
+            Target::Signal(<>)
+        }
+    },
+}
+
+Name: String = Ident;
+Num: f64 = r"[0-9]+" => f64::from_str(<>).unwrap();
+
+Comment: Comment = r"![^;]*" => {
+    if let Some((key, value)) = <>.split_once(':') {
+        let key = key.strip_prefix("!").unwrap_or(key).trim();
+        let value = value.trim();
+
+        if matches!(key, "name" | "description" | "public" | "author" | "homepage" | "issues" | "transferred_to" | "avatar" | "license") {
+            Comment::Header { key: key.to_string(), value: value.to_string() }
+        } else {
+            Comment::Basic(<>.to_string())
+        }
+    } else {
+            Comment::Basic(<>.to_string())
+    }
+};
+
+Instruction: Instruction = {
+    <patterns:Patterns> "$" <options:PatternOptions> => Instruction { <> },
+    <patterns:Patterns> => Instruction { <>, options: Vec::new() },
+}
+
+Patterns: Vec<PatternPart> = <PatternPart*> => <>;
+
+PatternPart: PatternPart = {
+    "*" => PatternPart::Wildcard,
+    "^" => PatternPart::Delimeter,
+    "|" => PatternPart::Anchor,
+    Ident => PatternPart::Raw(<>.to_string()),
+}
+
+PatternOptions: Vec<PatternOption> = <Sep<",", PatternOption>> => <>;
+
+PatternOption: PatternOption = {
+    "site=" <site:Ident> => PatternOption::Site(site.to_string()),
+    "inurl" => PatternOption::InUrl,
+    "intitle" => PatternOption::InTitle,
+    "indescription" => PatternOption::InDescription,
+    "incontent" => PatternOption::InContent,
+    <Action> => PatternOption::Action(<>),
+}
+
+Action: Action = {
+    "boost=" <Num> => Action::Boost(<> as usize),
+    "boost" => Action::Boost(1),
+    "downrank=" <Num> => Action::Downrank(<> as usize),
+    "downrank" => Action::Downrank(1),
+    "discard" => Action::Discard,
+}
+
+Ident: String = <r"[a-zA-Z_/:\.][a-zA-Z_/:\.0-9]*"> => <>.to_string();

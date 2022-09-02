@@ -15,8 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod centrality_store;
+pub mod goggles;
 mod initial;
-pub mod signal_aggregator;
 
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::signal_aggregator::SignalAggregator;
+use self::goggles::SignalAggregator;
 
 pub struct Ranker {
     region_count: Arc<RegionCount>,

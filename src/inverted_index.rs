@@ -336,7 +336,7 @@ mod tests {
     use maplit::hashset;
 
     use crate::{
-        ranking::{signal_aggregator::SignalAggregator, Ranker},
+        ranking::{goggles::SignalAggregator, Ranker},
         webpage::{region::RegionCount, Link},
     };
 

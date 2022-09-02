@@ -26,7 +26,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
-use crate::ranking::signal_aggregator;
+use crate::ranking::goggles;
 use crate::ranking::Ranker;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
@@ -80,7 +80,8 @@ impl Searcher {
 
         let raw_query = query.to_string();
         let aggregator = goggle_program
-            .and_then(|program| signal_aggregator::parse(program).ok())
+            .and_then(|program| goggles::parse(program).ok())
+            .map(|goggle| goggle.aggregator)
             .unwrap_or_default();
 
         let query = Query::parse(

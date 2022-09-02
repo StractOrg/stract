@@ -16,9 +16,9 @@
 
 mod ast;
 
-use crate::{Error, Result};
 use std::{collections::HashMap, sync::Arc};
 
+use crate::Result;
 use strum::{EnumIter, IntoEnumIterator};
 use tantivy::{
     fastfield::{Column, DynamicFastFieldReader},
@@ -30,7 +30,25 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::ast::{Alteration, Target, PARSER};
+use self::ast::{Alteration, RawGoggle, Target};
+
+pub fn parse(goggle: &str) -> Result<Goggle> {
+    let raw_goggle = ast::parse(goggle)?;
+
+    Ok(Goggle::from(raw_goggle))
+}
+
+impl From<RawGoggle> for Goggle {
+    fn from(raw: RawGoggle) -> Self {
+        Self {
+            aggregator: SignalAggregator::from(raw.alterations),
+        }
+    }
+}
+
+pub struct Goggle {
+    pub aggregator: SignalAggregator,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter)]
 pub enum Signal {
@@ -274,12 +292,5 @@ impl From<Vec<Alteration>> for SignalAggregator {
         }
 
         Self::new(coefficients, boosts)
-    }
-}
-
-pub fn parse(program: &str) -> Result<SignalAggregator> {
-    match PARSER.parse(program) {
-        Ok(alterations) => Ok(SignalAggregator::from(alterations)),
-        Err(_) => Err(Error::Parse),
     }
 }

@@ -292,7 +292,7 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::ranking::{signal_aggregator::SignalAggregator, Ranker};
+    use crate::ranking::{goggles::SignalAggregator, Ranker};
 
     use super::*;
 
