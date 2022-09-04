@@ -64,7 +64,7 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
-        let writer = tantivy_index.writer(10_000_000_000)?;
+        let writer = tantivy_index.writer_with_num_threads(1, 4_000_000_000)?;
 
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
@@ -156,7 +156,7 @@ impl InvertedIndex {
             .map(|segment| segment.id())
             .collect();
 
-        if !segment_ids.is_empty() {
+        if segment_ids.len() > 1 {
             self.writer.merge(&segment_ids[..]).wait()?;
         }
 
@@ -305,11 +305,11 @@ impl From<Document> for RetrievedWebpage {
                         }
                     }
                 }
-                Field::StemmedAllBody => {
+                Field::AllBody => {
                     webpage.dirty_body = value
                         .value
                         .as_text()
-                        .expect("Stemmed all body field should be text")
+                        .expect("All body field should be text")
                         .to_string()
                 }
                 Field::BacklinkText
@@ -322,7 +322,6 @@ impl From<Document> for RetrievedWebpage {
                 | Field::IsHomepage
                 | Field::NumTrackers
                 | Field::Region
-                | Field::AllBody
                 | Field::FetchTimeMs => {}
             }
         }

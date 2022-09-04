@@ -650,6 +650,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rocksdb",
+ "rust-stemmers",
  "serde",
  "serde_json",
  "serde_urlencoded",

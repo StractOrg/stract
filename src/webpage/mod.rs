@@ -22,9 +22,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
+    panic,
 };
-use tantivy::tokenizer::Tokenizer;
+use tantivy::tokenizer::{PreTokenizedString, Tokenizer};
 use uuid::Uuid;
+use whatlang::Lang;
 
 mod just_text;
 pub mod region;
@@ -33,7 +35,10 @@ mod url;
 use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
 
 pub use self::url::Url;
-use self::{just_text::JustText, region::Region};
+use self::{
+    just_text::{JustText, Paragraph},
+    region::Region,
+};
 
 static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
     Regex::new(r#"(((http|ftp|https):/{2})+(([0-9a-z_-]+\.)+(aero|asia|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|cz|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mn|mn|mo|mp|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|nom|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ra|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|arpa)(:[0-9]+)?((/([~0-9a-zA-Z\#\+%@\./_-]+))?(\?[0-9a-zA-Z\+%@/&\[\];=_-]+)?)?))\b"#).unwrap()
@@ -235,6 +240,7 @@ pub struct Html {
     root: NodeRef, // this is reference counted (cheap to clone)
     all_text: Option<String>,
     clean_text: Option<String>,
+    lang: Option<Lang>,
 }
 
 impl Html {
@@ -245,21 +251,35 @@ impl Html {
     pub fn parse_including_text(html: &str, url: &str, include_text: bool) -> Self {
         let root = kuchiki::parse_html().one(html);
 
-        let all_text = if include_text {
-            Html::calculate_all_text(root.clone())
-        } else {
-            None
-        };
-        let clean_text = if include_text {
-            Html::calculate_clean_text(root.clone())
-        } else {
-            None
-        };
+        let mut all_text = None;
+        let mut clean_text = None;
+        let mut lang = None;
+
+        if include_text {
+            let paragraphs = JustText::paragraphs(root.clone());
+
+            lang = paragraphs
+                .iter()
+                .max_by_key(|paragraph| paragraph.text.len())
+                .and_then(|paragraph| {
+                    whatlang::detect(&paragraph.text).and_then(|info| {
+                        if info.is_reliable() && info.confidence() > 0.95 {
+                            Some(info.lang())
+                        } else {
+                            None
+                        }
+                    })
+                });
+
+            all_text = Html::calculate_all_text(&paragraphs, &lang.unwrap_or(Lang::Eng));
+            clean_text = Html::calculate_clean_text(&paragraphs, &lang.unwrap_or(Lang::Eng));
+        }
 
         Self {
             root,
             all_text,
             clean_text,
+            lang,
             url: url.to_string().into(),
         }
     }
@@ -355,8 +375,8 @@ impl Html {
         None
     }
 
-    fn calculate_clean_text(node: NodeRef) -> Option<String> {
-        let text = JustText::default().extract(node);
+    fn calculate_clean_text(paragraphs: &[Paragraph], lang: &Lang) -> Option<String> {
+        let text = JustText::default().extract_from_paragraphs(paragraphs, lang);
 
         if text.is_empty() {
             None
@@ -369,7 +389,7 @@ impl Html {
         self.clean_text.clone()
     }
 
-    fn calculate_all_text(node: NodeRef) -> Option<String> {
+    fn calculate_all_text(paragraphs: &[Paragraph], lang: &Lang) -> Option<String> {
         let text = JustText {
             max_link_density: 2.0,
             length_low: 0,
@@ -378,7 +398,7 @@ impl Html {
             stopwords_high: -1.0,
             max_heading_distance: 10000,
         }
-        .extract(node);
+        .extract_from_paragraphs(paragraphs, lang);
 
         if text.is_empty() {
             None
@@ -436,25 +456,83 @@ impl Html {
     pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
         let mut doc = tantivy::Document::new();
 
+        let title = self.title();
+
+        if title.is_none() {
+            return Err(Error::EmptyField("title"));
+        }
+        let title = title.unwrap();
+
+        let mut title_tokens = Vec::new();
+        let mut title_stream = tokenizer::Normal::default().token_stream(&title);
+        while let Some(token) = title_stream.next() {
+            title_tokens.push(token.clone());
+        }
+
+        let all_text = self.all_text();
+
+        if all_text.is_none() {
+            return Err(Error::EmptyField("all body"));
+        }
+        let all_text = all_text.unwrap();
+
+        let mut all_text_tokens = Vec::new();
+        let mut all_text_stream = tokenizer::Normal::default().token_stream(&all_text);
+        while let Some(token) = all_text_stream.next() {
+            all_text_tokens.push(token.clone());
+        }
+
+        let clean_text = self.clean_text().unwrap_or_default();
+
+        let mut clean_text_tokens = Vec::new();
+        let mut clean_text_stream = tokenizer::Normal::default().token_stream(&clean_text);
+        while let Some(token) = clean_text_stream.next() {
+            clean_text_tokens.push(token.clone());
+        }
+
         for field in &ALL_FIELDS {
             let tantivy_field = schema
                 .get_field(field.as_str())
                 .unwrap_or_else(|| panic!("Unknown field: {}", field.as_str()));
 
             match field {
-                Field::Title | Field::StemmedTitle => {
-                    let title = self.title();
+                Field::Title => doc.add_pre_tokenized_text(
+                    tantivy_field,
+                    PreTokenizedString {
+                        text: title.clone(),
+                        tokens: title_tokens.clone(),
+                    },
+                ),
+                Field::StemmedTitle => {
+                    let mut tokens = title_tokens.clone();
+                    stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
-                    if title.is_none() {
-                        return Err(Error::EmptyField("title"));
-                    }
-
-                    doc.add_text(tantivy_field, title.unwrap());
+                    doc.add_pre_tokenized_text(
+                        tantivy_field,
+                        PreTokenizedString {
+                            text: title.clone(),
+                            tokens,
+                        },
+                    );
                 }
-                Field::CleanBody | Field::StemmedCleanBody => {
-                    let text = self.clean_text();
+                Field::CleanBody => doc.add_pre_tokenized_text(
+                    tantivy_field,
+                    PreTokenizedString {
+                        text: clean_text.clone(),
+                        tokens: clean_text_tokens.clone(),
+                    },
+                ),
+                Field::StemmedCleanBody => {
+                    let mut tokens = clean_text_tokens.clone();
+                    stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
-                    doc.add_text(tantivy_field, text.unwrap_or_default());
+                    doc.add_pre_tokenized_text(
+                        tantivy_field,
+                        PreTokenizedString {
+                            text: clean_text.clone(),
+                            tokens,
+                        },
+                    );
                 }
                 Field::Description => {
                     doc.add_text(tantivy_field, self.description().unwrap_or_default());
@@ -477,15 +555,13 @@ impl Html {
                     self.updated_time()
                         .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
-                Field::StemmedAllBody | Field::AllBody => {
-                    let text = self.all_text();
-
-                    if text.is_none() {
-                        return Err(Error::EmptyField("all body"));
-                    }
-
-                    doc.add_text(tantivy_field, text.unwrap());
-                }
+                Field::AllBody => doc.add_pre_tokenized_text(
+                    tantivy_field,
+                    PreTokenizedString {
+                        text: all_text.clone(),
+                        tokens: all_text_tokens.clone(),
+                    },
+                ),
                 Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
                 Field::BacklinkText
                 | Field::Centrality
@@ -688,6 +764,39 @@ impl Html {
     }
 }
 
+fn stemmer_from_lang(lang: &Lang) -> rust_stemmers::Stemmer {
+    match lang {
+        Lang::Ara => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Arabic),
+        Lang::Dan => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Danish),
+        Lang::Nld => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Dutch),
+        Lang::Fin => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Finnish),
+        Lang::Fra => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::French),
+        Lang::Deu => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::German),
+        Lang::Ell => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Greek),
+        Lang::Hun => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Hungarian),
+        Lang::Ita => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Italian),
+        Lang::Por => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Portuguese),
+        Lang::Ron => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Romanian),
+        Lang::Rus => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Russian),
+        Lang::Spa => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Spanish),
+        Lang::Swe => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Swedish),
+        Lang::Tam => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Tamil),
+        Lang::Tur => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Turkish),
+        _ => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English),
+    }
+}
+
+fn stem_tokens(tokens: &mut [tantivy::tokenizer::Token], lang: Lang) {
+    let stemmer = stemmer_from_lang(&lang);
+    for token in tokens {
+        // TODO remove allocation
+        if let Ok(stemmed_str) = panic::catch_unwind(|| stemmer.stem(&token.text).into_owned()) {
+            token.text.clear();
+            token.text.push_str(&stemmed_str);
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Link {
     pub source: Url,
@@ -701,7 +810,7 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::schema_org::ImageObject;
+    use crate::{schema::create_schema, schema_org::ImageObject};
 
     use super::*;
 
@@ -877,23 +986,22 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "JustText doesn't find any content on the sites. How should we split into words for Japanese, Chinese etc.?"]
     fn hard_parsing() {
         let webpage = Html::parse(include_str!("../../testcases/parsing/yasudaya.html"), "");
         assert_eq!(
             webpage.title(),
             Some("パチンコ大当たり情報 - Ｐジューシーハニー３ 大当たり詳細ページ - やすだひばりヶ丘店".to_string())
         );
-        assert!(webpage.clean_text().is_some());
-        assert!(!webpage.clean_text().unwrap().is_empty());
+        assert!(webpage.all_text().is_some());
+        assert!(!webpage.all_text().unwrap().is_empty());
 
         let webpage = Html::parse(include_str!("../../testcases/parsing/5390001.html"), "");
         assert_eq!(
             webpage.title(),
             Some("特效烟机系列_山东壹线文化传播有限公司".to_string())
         );
-        assert!(webpage.clean_text().is_some());
-        assert!(!webpage.clean_text().unwrap().is_empty());
+        assert!(webpage.all_text().is_some());
+        assert!(!webpage.all_text().unwrap().is_empty());
 
         let webpage = Html::parse(
             include_str!("../../testcases/parsing/77p2p-7.live-105.html"),
@@ -901,10 +1009,24 @@ mod tests {
         );
         assert_eq!(
             webpage.title(),
-            Some("77p2pЅu¤WЖ[¬Э - ҐDјЅ :: іnєс ".to_string())
+            Some("77p2pЅu¤WЖ[¬Э - ҐDјЅ :: іnєс".to_string())
         );
-        assert!(webpage.clean_text().is_some());
-        assert!(!webpage.clean_text().unwrap().is_empty());
+        assert!(webpage.all_text().is_some());
+        assert!(!webpage.all_text().unwrap().is_empty());
+    }
+
+    #[test]
+    fn out_of_bounds_str() {
+        let webpage = Html::parse(
+            include_str!("../../testcases/parsing/byte_index_out_of_bounds.html"),
+            "",
+        );
+        assert_eq!(webpage.title(), Some("Test".to_string()));
+        assert!(webpage.all_text().is_some());
+        assert!(!webpage.all_text().unwrap().is_empty());
+
+        let schema = create_schema();
+        webpage.into_tantivy(&schema).unwrap();
     }
 
     #[test]

@@ -86,28 +86,15 @@ impl Region {
     }
 
     pub fn guess_from(webpage: &Webpage) -> Result<Self> {
-        match webpage
-            .html
-            .clean_text()
-            .or_else(|| webpage.html.all_text())
-            .or_else(|| webpage.html.title())
-        {
-            Some(text) => whatlang::detect(&text)
-                .and_then(|info| {
-                    if info.is_reliable() && info.confidence() > 0.95 {
-                        match info.lang() {
-                            whatlang::Lang::Eng => Some(Ok(Region::US)),
-                            whatlang::Lang::Spa => Some(Ok(Region::Spain)),
-                            whatlang::Lang::Fra => Some(Ok(Region::France)),
-                            whatlang::Lang::Deu => Some(Ok(Region::Germany)),
-                            whatlang::Lang::Dan => Some(Ok(Region::Denmark)),
-                            _ => Some(Err(Error::UnknownRegion)),
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(Err(Error::UnknownRegion)),
+        match webpage.html.lang {
+            Some(lang) => match lang {
+                whatlang::Lang::Eng => Ok(Region::US),
+                whatlang::Lang::Spa => Ok(Region::Spain),
+                whatlang::Lang::Fra => Ok(Region::France),
+                whatlang::Lang::Deu => Ok(Region::Germany),
+                whatlang::Lang::Dan => Ok(Region::Denmark),
+                _ => Err(Error::UnknownRegion),
+            },
             None => Err(Error::UnknownRegion),
         }
     }

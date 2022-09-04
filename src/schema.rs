@@ -29,7 +29,6 @@ pub enum Field {
     StemmedTitle,
     StemmedCleanBody,
     AllBody,
-    StemmedAllBody,
     Url,
     Host,
     Domain,
@@ -45,13 +44,12 @@ pub enum Field {
     Region,
 }
 
-pub static ALL_FIELDS: [Field; 19] = [
+pub static ALL_FIELDS: [Field; 18] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
     Field::StemmedCleanBody,
     Field::AllBody,
-    Field::StemmedAllBody,
     Field::Url,
     Field::Host,
     Field::Domain,
@@ -90,11 +88,7 @@ impl Field {
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Host => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
-            Field::AllBody => IndexingOption::Text(self.default_text_options()),
-            Field::StemmedAllBody => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(Stemmed::as_str())
-                    .set_stored(),
-            ),
+            Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::IsHomepage => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -158,7 +152,6 @@ impl Field {
             Field::LastUpdated => "last_updated",
             Field::Description => "description",
             Field::AllBody => "all_body",
-            Field::StemmedAllBody => "stemmed_all_body",
             Field::NumTrackers => "num_trackers",
             Field::Region => "region",
         }
@@ -174,7 +167,6 @@ impl Field {
             Field::Url => Some(1.0),
             Field::Domain => Some(2.0),
             Field::AllBody => Some(0.01),
-            Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText => Some(4.0),
             Field::Centrality
             | Field::IsHomepage
@@ -209,7 +201,6 @@ impl Field {
             "last_updated" => Some(Field::LastUpdated),
             "description" => Some(Field::Description),
             "all_body" => Some(Field::AllBody),
-            "stemmed_all_body" => Some(Field::StemmedAllBody),
             "num_trackers" => Some(Field::NumTrackers),
             "region" => Some(Field::Region),
             _ => None,
