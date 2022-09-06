@@ -26,6 +26,7 @@ use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
+use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
@@ -137,6 +138,7 @@ impl InvertedIndex {
                 &page.body,
                 &page.dirty_body,
                 &page.description,
+                &page.region,
                 &searcher,
             )?;
         }
@@ -254,6 +256,7 @@ pub struct RetrievedWebpage {
     pub favicon: Option<Image>,
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
+    pub region: Region,
 }
 
 impl From<Document> for RetrievedWebpage {
@@ -319,6 +322,12 @@ impl From<Document> for RetrievedWebpage {
                         .expect("All body field should be text")
                         .to_string()
                 }
+                Field::Region => {
+                    webpage.region = {
+                        let id = value.value.as_u64().unwrap();
+                        Region::from_id(id)
+                    }
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::Host
@@ -328,7 +337,6 @@ impl From<Document> for RetrievedWebpage {
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::NumTrackers
-                | Field::Region
                 | Field::FetchTimeMs => {}
             }
         }

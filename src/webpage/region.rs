@@ -22,7 +22,7 @@ use crate::{Error, Result};
 
 use super::Webpage;
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub enum Region {
     All,
     Denmark,
@@ -30,6 +30,12 @@ pub enum Region {
     Germany,
     Spain,
     US,
+}
+
+impl Default for Region {
+    fn default() -> Self {
+        Region::All
+    }
 }
 
 pub const ALL_REGIONS: [Region; 6] = [
@@ -102,18 +108,30 @@ impl Region {
     pub fn from_id(doc: u64) -> Self {
         ALL_REGIONS[doc as usize]
     }
+
+    pub fn lang(&self) -> Option<whatlang::Lang> {
+        match self {
+            Region::Denmark => Some(whatlang::Lang::Dan),
+            Region::France => Some(whatlang::Lang::Fra),
+            Region::Germany => Some(whatlang::Lang::Deu),
+            Region::Spain => Some(whatlang::Lang::Spa),
+            Region::US => Some(whatlang::Lang::Eng),
+            Region::All => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct RegionCount {
     map: HashMap<Region, u64>,
+    fast_count: Vec<Option<u64>>,
     total_counts: u64,
     path: String,
 }
 
 impl RegionCount {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let map = if !path.as_ref().exists() {
+        let map: HashMap<Region, u64> = if !path.as_ref().exists() {
             if let Some(parent) = path.as_ref().parent() {
                 std::fs::create_dir_all(parent).unwrap();
             }
@@ -124,9 +142,22 @@ impl RegionCount {
             serde_json::from_str(&json).unwrap()
         };
 
+        let mut fast_count = Vec::new();
+
+        for (region, count) in &map {
+            let idx = region.id() as usize;
+
+            while idx >= fast_count.len() {
+                fast_count.push(None);
+            }
+
+            fast_count[idx] = Some(*count);
+        }
+
         RegionCount {
             total_counts: map.iter().map(|(_, count)| count).sum(),
             map,
+            fast_count,
             path: path.as_ref().to_str().unwrap().to_string(),
         }
     }
@@ -142,6 +173,20 @@ impl RegionCount {
         let mut file = File::options().write(true).open(&self.path).unwrap();
         file.write_all(json.as_bytes()).unwrap();
         self.total_counts = self.map.iter().map(|(_, count)| count).sum();
+
+        let mut fast_count = Vec::new();
+
+        for (region, count) in &self.map {
+            let idx = region.id() as usize;
+
+            while idx >= fast_count.len() {
+                fast_count.push(None);
+            }
+
+            fast_count[idx] = Some(*count);
+        }
+
+        self.fast_count = fast_count;
     }
 
     pub fn merge(&mut self, other: Self) {
@@ -155,9 +200,12 @@ impl RegionCount {
     }
 
     pub fn score(&self, region: &Region) -> f64 {
-        self.map
-            .get(region)
-            .map(|count| *count as f64 / self.total_counts as f64)
+        self.fast_count
+            .get(region.id() as usize)
+            .map(|count| match count {
+                Some(count) => *count as f64 / self.total_counts as f64,
+                None => 0.0,
+            })
             .unwrap_or(0.0)
     }
 }

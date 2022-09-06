@@ -16,6 +16,7 @@
 
 use crate::frontend::search::html_escape;
 use crate::tokenizer::Stemmed;
+use crate::webpage::region::Region;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
@@ -247,6 +248,7 @@ pub fn generate(
     text: &str,
     dirty_text: &str,
     description: &Option<String>,
+    region: &Region,
     searcher: &tantivy::Searcher,
 ) -> Result<String> {
     let field = searcher
@@ -254,8 +256,12 @@ pub fn generate(
         .get_field(Field::StemmedCleanBody.as_str())
         .expect("Failed to get body field");
 
-    let tokenizer =
-        Stemmed::with_forced_language(whatlang::detect_lang(text).unwrap_or(Lang::Eng)).into();
+    let lang = match region.lang() {
+        Some(lang) => lang,
+        None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
+    };
+
+    let tokenizer = Stemmed::with_forced_language(lang).into();
     let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
     let mut snippet = generator.snippet(text);
@@ -263,9 +269,12 @@ pub fn generate(
     if snippet.fragment.is_empty() {
         match description {
             Some(desc) => {
-                let tokenizer =
-                    Stemmed::with_forced_language(whatlang::detect_lang(desc).unwrap_or(Lang::Eng))
-                        .into();
+                let lang = match region.lang() {
+                    Some(lang) => lang,
+                    None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
+                };
+
+                let tokenizer = Stemmed::with_forced_language(lang).into();
                 let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
                 snippet = generator.snippet(desc);
@@ -275,10 +284,12 @@ pub fn generate(
             }
             None => {
                 if text.is_empty() {
-                    let tokenizer = Stemmed::with_forced_language(
-                        whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
-                    )
-                    .into();
+                    let lang = match region.lang() {
+                        Some(lang) => lang,
+                        None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
+                    };
+
+                    let tokenizer = Stemmed::with_forced_language(lang).into();
                     let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
                     snippet = generator.snippet(dirty_text);

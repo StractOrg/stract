@@ -46,7 +46,7 @@ impl InitialScoreTweaker {
 pub(crate) struct InitialSegmentScoreTweaker {
     aggregator: SignalAggregator,
     region_count: Arc<RegionCount>,
-    current_timestamp: f64,
+    current_timestamp: usize,
     selected_region: Option<Region>,
 }
 
@@ -57,7 +57,7 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
         let mut aggregator = SignalAggregator::new_like(&self.aggregator);
         aggregator.register_readers(segment_reader);
 
-        let current_timestamp = Utc::now().timestamp() as f64;
+        let current_timestamp = Utc::now().timestamp() as usize;
 
         Ok(InitialSegmentScoreTweaker {
             aggregator,
