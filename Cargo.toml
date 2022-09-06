@@ -58,6 +58,7 @@ serde_urlencoded = "0.7.1"
 rust-stemmers = "1.2.0"
 
 [dev-dependencies]
+criterion = "0.3.6"
 maplit = "1.0.2"
 
 [build-dependencies]
@@ -65,3 +66,7 @@ lalrpop = { version = "0.19.8", features = ["lexer"] }
 
 [profile.release]
 debug = true
+
+[[bench]]
+name = "search-preindexed"
+harness = false
