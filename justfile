@@ -21,7 +21,7 @@
 
 @local:
     rm -rf data/index/
-    RUSTFLAGS="-C target-cpu=native" cargo run --release -- indexer local configs/indexer/local.toml
+    cargo run --release -- indexer local configs/indexer/local.toml
     mv data/index/CC-MAIN-*/* data/index/
     just frontend
 

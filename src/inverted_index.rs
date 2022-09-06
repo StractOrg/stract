@@ -148,16 +148,23 @@ impl InvertedIndex {
     }
 
     pub fn merge_all_segments(&mut self) -> Result<()> {
-        let segment_ids: Vec<_> = self
+        let segments: Vec<_> = self
             .tantivy_index
             .load_metas()?
             .segments
             .into_iter()
-            .map(|segment| segment.id())
             .collect();
 
-        if segment_ids.len() > 1 {
+        if segments.len() > 1 {
+            let segment_ids: Vec<_> = segments.iter().map(|segment| segment.id()).collect();
             self.writer.merge(&segment_ids[..]).wait()?;
+
+            let path = Path::new(&self.path);
+            for segment in segments {
+                for file in segment.list_files() {
+                    std::fs::remove_file(path.join(file)).ok();
+                }
+            }
         }
 
         Ok(())

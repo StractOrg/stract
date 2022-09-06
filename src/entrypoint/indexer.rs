@@ -144,6 +144,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             std::fs::remove_file(file).ok();
         }
         index.commit().unwrap();
+        index.inverted_index.merge_all_segments().unwrap();
 
         info!("{} done", name);
 
@@ -250,7 +251,7 @@ impl Indexer {
             config.webgraph_path.clone(),
         );
 
-        warc_paths
+        let mut index = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -284,6 +285,12 @@ impl Indexer {
                     (None, None) => None,
                 },
             );
+
+        if let Some(index) = index.as_mut() {
+            dbg!("Big merge!");
+            index.inverted_index.merge_all_segments().unwrap();
+        }
+
         Ok(())
     }
 }
