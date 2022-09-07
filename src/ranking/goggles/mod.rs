@@ -138,12 +138,15 @@ impl Instruction {
 
         if !self.patterns.is_empty() {
             if let Ok(regex) = self.pattern_regex() {
-                subqueries.push((
-                    Occur::Must,
-                    RegexQuery::from_pattern(&regex, field).unwrap().box_clone(),
-                ))
+                if let Ok(query) = RegexQuery::from_pattern(&regex, field) {
+                    subqueries.push((Occur::Must, query.box_clone()))
+                } else {
+                    // TODO: show usefull error to user (pattern was likely too large)
+                }
             }
         }
+
+        // TODO: empty discard term should enforce that remaining instructions are must...
 
         match action {
             Action::Boost(boost) => (

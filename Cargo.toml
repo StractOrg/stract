@@ -69,3 +69,7 @@ debug = true
 [[bench]]
 name = "search-preindexed"
 harness = false
+
+[[bench]]
+name = "search-preindexed-goggle"
+harness = false

@@ -116,10 +116,7 @@ pub fn parse(goggle: &str) -> CrateResult<RawGoggle> {
 
     match PARSER.parse(clean.as_str()) {
         Ok(blocks) => Ok(RawGoggle::from(blocks)),
-        Err(err) => {
-            dbg!(err);
-            Err(Error::Parse)
-        }
+        Err(_) => Err(Error::Parse),
     }
 }
 
@@ -263,5 +260,13 @@ mod tests {
     #[test]
     fn quickstart_parse() {
         assert!(parse(include_str!("../../../testcases/goggles/quickstart.goggle")).is_ok());
+    }
+
+    #[test]
+    fn hacker_news_parse() {
+        assert!(parse(include_str!(
+            "../../../testcases/goggles/hacker_news.goggle"
+        ))
+        .is_ok());
     }
 }
