@@ -15,21 +15,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod ast;
+mod signal;
 
-use std::{array, sync::Arc};
-
-use crate::Result;
+use crate::{schema::Field, tokenizer, Error, Result};
 use tantivy::{
-    fastfield::{Column, DynamicFastFieldReader},
-    DocId, Score, SegmentReader,
+    query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone, RegexQuery, TermQuery},
+    schema::{IndexRecordOption, Schema},
+    tokenizer::TextAnalyzer,
 };
 
-use crate::{
-    schema::{Field, ALL_FIELDS, CENTRALITY_SCALING},
-    webpage::region::{Region, RegionCount},
-};
-
-use self::ast::{Alteration, Instruction, RawGoggle, Target};
+use self::ast::{Action, Instruction, PatternOption, PatternPart, RawGoggle};
+pub use self::signal::*;
 
 pub fn parse(goggle: &str) -> Result<Goggle> {
     let raw_goggle = ast::parse(goggle)?;
@@ -46,342 +42,348 @@ impl From<RawGoggle> for Goggle {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct Goggle {
     pub aggregator: SignalAggregator,
     instructions: Vec<Instruction>,
 }
 
 impl Goggle {
-    pub fn as_tantivy(&self) -> Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> {
+    pub fn as_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         self.instructions
             .iter()
-            .map(|instruction| instruction.as_tantivy())
+            .map(|instruction| instruction.as_tantivy(schema))
             .collect()
     }
 }
 
+fn process_tantivy_term(
+    term: &str,
+    analyzer: TextAnalyzer,
+    tantivy_field: tantivy::schema::Field,
+) -> Vec<tantivy::Term> {
+    let mut terms: Vec<tantivy::Term> = Vec::new();
+    let mut token_stream = analyzer.token_stream(term);
+    token_stream.process(&mut |token| {
+        let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
+        terms.push(term);
+    });
+
+    terms
+}
+
+fn process_site(site: &str, field: tantivy::schema::Field) -> Box<dyn tantivy::query::Query> {
+    let mut terms = process_tantivy_term(
+        site,
+        TextAnalyzer::new(tokenizer::Normal::default(), vec![]),
+        field,
+    );
+
+    if terms.len() > 1 {
+        Box::new(PhraseQuery::new(terms)) as Box<dyn tantivy::query::Query>
+    } else {
+        let term = terms.pop().unwrap();
+        Box::new(TermQuery::new(
+            term,
+            IndexRecordOption::WithFreqsAndPositions,
+        ))
+    }
+}
+
 impl Instruction {
-    pub fn as_tantivy(&self) -> (tantivy::query::Occur, Box<dyn tantivy::query::Query>) {
-        todo!();
-    }
-}
+    pub fn as_tantivy(&self, schema: &Schema) -> (Occur, Box<dyn tantivy::query::Query>) {
+        let mut subqueries = Vec::new();
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Signal {
-    Bm25,
-    HostCentrality,
-    IsHomepage,
-    FetchTimeMs,
-    UpdateTimestamp,
-    NumTrackers,
-    Region,
-}
+        let mut field = None;
+        let mut action = None;
 
-const ALL_SIGNALS: [Signal; 7] = [
-    Signal::Bm25,
-    Signal::HostCentrality,
-    Signal::IsHomepage,
-    Signal::FetchTimeMs,
-    Signal::UpdateTimestamp,
-    Signal::NumTrackers,
-    Signal::Region,
-];
+        for option in &self.options {
+            match option {
+                PatternOption::Site(site) if field.is_none() => {
+                    field = Some(schema.get_field(Field::Site.as_str()).unwrap());
 
-impl Signal {
-    fn from_field(field: &Field) -> Option<Self> {
-        match field {
-            Field::IsHomepage => Some(Signal::IsHomepage),
-            Field::Centrality => Some(Signal::HostCentrality),
-            Field::FetchTimeMs => Some(Signal::FetchTimeMs),
-            Field::LastUpdated => Some(Signal::UpdateTimestamp),
-            Field::NumTrackers => Some(Signal::NumTrackers),
-            Field::Region => Some(Signal::Region),
-            _ => None,
-        }
-    }
+                    let domain_field = schema.get_field(Field::Domain.as_str()).unwrap();
+                    let site_field = schema.get_field(Field::Site.as_str()).unwrap();
 
-    fn has_fast_reader(&self) -> bool {
-        !matches!(self, Signal::Bm25)
-    }
-
-    fn value(
-        &self,
-        doc: DocId,
-        bm25: Score,
-        fastfield: Option<&DynamicFastFieldReader<u64>>,
-        region_count: &Arc<RegionCount>,
-        current_timestamp: usize,
-        selected_region: Option<Region>,
-        aggregator: &SignalAggregator,
-    ) -> f64 {
-        match self {
-            Signal::Bm25 => bm25 as f64,
-            Signal::HostCentrality => {
-                fastfield.unwrap().get_val(doc as u64) as f64 / CENTRALITY_SCALING as f64
-            }
-            Signal::IsHomepage => fastfield.unwrap().get_val(doc as u64) as f64,
-            Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield.unwrap().get_val(doc as u64) as usize;
-
-                if fetch_time_ms >= aggregator.fetch_time_ms_cache.len() {
-                    0.0
-                } else {
-                    aggregator.fetch_time_ms_cache[fetch_time_ms]
+                    subqueries.push((
+                        Occur::Must,
+                        BooleanQuery::new(vec![
+                            (Occur::Should, process_site(site, domain_field)),
+                            (Occur::Should, process_site(site, site_field)),
+                        ])
+                        .box_clone(),
+                    ));
                 }
-            }
-            Signal::UpdateTimestamp => {
-                let update_timestamp = fastfield.unwrap().get_val(doc as u64) as usize;
-                let hours_since_update = (current_timestamp - update_timestamp).max(1) / 3600;
-
-                if hours_since_update < aggregator.update_time_cache.len() {
-                    aggregator.update_time_cache[hours_since_update]
-                } else {
-                    0.0
+                PatternOption::InUrl if field.is_none() => {
+                    field = Some(schema.get_field(Field::Url.as_str()).unwrap())
                 }
-            }
-            Signal::NumTrackers => {
-                let num_trackers = fastfield.unwrap().get_val(doc as u64) as f64;
-                1.0 / (num_trackers + 1.0)
-            }
-            Signal::Region => {
-                let webpage_region = Region::from_id(fastfield.unwrap().get_val(doc as u64));
-
-                let boost =
-                    selected_region.map_or(
-                        0.0,
-                        |region| if region == webpage_region { 50.0 } else { 0.0 },
-                    );
-
-                boost + region_count.score(&webpage_region)
-            }
-        }
-    }
-
-    fn default_coefficient(&self) -> f64 {
-        match self {
-            Signal::Bm25 => 3.0,
-            Signal::HostCentrality => 3200.0,
-            Signal::IsHomepage => 1.0,
-            Signal::FetchTimeMs => 1.0,
-            Signal::UpdateTimestamp => 1500.0,
-            Signal::NumTrackers => 200.0,
-            Signal::Region => 25.0,
-        }
-    }
-
-    fn from_string(name: String) -> Option<Signal> {
-        match name.as_str() {
-            "bm25" => Some(Signal::Bm25),
-            "host_centrality" => Some(Signal::HostCentrality),
-            _ => None,
-        }
-    }
-}
-
-fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFastFieldReader<u64> {
-    let tv_field = segment_reader
-        .schema()
-        .get_field(field.as_str())
-        .unwrap_or_else(|| panic!("Faild to load {} field", field.as_str()));
-
-    segment_reader
-        .fast_fields()
-        .u64(tv_field)
-        .unwrap_or_else(|_| panic!("Failed to get {} fast-field reader", field.as_str()))
-}
-
-#[derive(Debug, Clone)]
-pub struct FieldBoost(Vec<Option<f64>>);
-
-#[derive(Debug, Clone)]
-pub struct SignalCoefficient(Vec<Option<f64>>);
-
-impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> f64 {
-        self.0
-            .get((*signal) as usize)
-            .copied()
-            .flatten()
-            .unwrap_or_else(|| signal.default_coefficient())
-    }
-
-    pub fn new(scores: impl Iterator<Item = (Signal, f64)>) -> Self {
-        let mut fast_scores = Vec::new();
-
-        for (signal, score) in scores {
-            let idx = signal as usize;
-
-            while idx >= fast_scores.len() {
-                fast_scores.push(None);
-            }
-
-            fast_scores[idx] = Some(score);
-        }
-
-        Self(fast_scores)
-    }
-}
-
-impl FieldBoost {
-    pub fn get(&self, field: &Field) -> f64 {
-        self.0
-            .get((*field) as usize)
-            .copied()
-            .flatten()
-            .or_else(|| field.boost().map(|s| s as f64))
-            .unwrap_or(1.0)
-    }
-
-    pub fn new(scores: impl Iterator<Item = (Field, f64)>) -> Self {
-        let mut fast_scores = Vec::new();
-
-        for (field, score) in scores {
-            let idx = field as usize;
-
-            while idx >= fast_scores.len() {
-                fast_scores.push(None);
-            }
-
-            fast_scores[idx] = Some(score);
-        }
-
-        Self(fast_scores)
-    }
-}
-
-pub struct SignalAggregator {
-    readers: Vec<Option<DynamicFastFieldReader<u64>>>,
-    signal_coefficients: SignalCoefficient,
-    field_boost: FieldBoost,
-    fetch_time_ms_cache: [f64; 1000],
-    update_time_cache: Vec<f64>,
-}
-
-impl std::fmt::Debug for SignalAggregator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SignalAggregator")
-            .field("signal_coefficients", &self.signal_coefficients)
-            .field("field_boost", &self.field_boost)
-            .finish()
-    }
-}
-
-impl Default for SignalAggregator {
-    fn default() -> Self {
-        Self::new(Vec::new().into_iter(), Vec::new().into_iter())
-    }
-}
-
-impl SignalAggregator {
-    pub fn new(
-        coefficients: impl Iterator<Item = (Signal, f64)>,
-        boosts: impl Iterator<Item = (Field, f64)>,
-    ) -> Self {
-        let signal_coefficients = SignalCoefficient::new(coefficients);
-        let field_boost = FieldBoost::new(boosts);
-
-        let fetch_time_ms_cache = array::from_fn(|fetch_time| 1.0 / (fetch_time as f64 + 1.0));
-
-        let update_time_cache = (0..(3 * 365 * 24))
-            .map(|hours_since_update| 1.0 / ((hours_since_update as f64 + 1.0).log2()))
-            .collect();
-
-        Self {
-            readers: Vec::new(),
-            signal_coefficients,
-            field_boost,
-            fetch_time_ms_cache,
-            update_time_cache,
-        }
-    }
-
-    pub fn new_like(other: &SignalAggregator) -> Self {
-        Self {
-            readers: Vec::new(),
-            signal_coefficients: other.signal_coefficients.clone(),
-            field_boost: other.field_boost.clone(),
-            fetch_time_ms_cache: other.fetch_time_ms_cache,
-            update_time_cache: other.update_time_cache.clone(),
-        }
-    }
-
-    pub fn register_readers(&mut self, segment_reader: &SegmentReader) {
-        self.readers.clear();
-
-        for field in &ALL_FIELDS {
-            if let Some(signal) = Signal::from_field(field) {
-                if signal.has_fast_reader() {
-                    let idx = signal as usize;
-
-                    while idx >= self.readers.len() {
-                        self.readers.push(None);
-                    }
-
-                    self.readers[idx] = Some(fastfield_reader(segment_reader, field))
+                PatternOption::InTitle if field.is_none() => {
+                    field = Some(schema.get_field(Field::Title.as_str()).unwrap())
                 }
+                PatternOption::InDescription if field.is_none() => {
+                    field = Some(schema.get_field(Field::Description.as_str()).unwrap())
+                }
+                PatternOption::InContent if field.is_none() => {
+                    field = Some(schema.get_field(Field::CleanBody.as_str()).unwrap())
+                }
+                PatternOption::Action(pattern_action) if action.is_none() => {
+                    action = Some(*pattern_action)
+                }
+                _ => {}
             }
+        }
+
+        let action = action.unwrap_or(Action::Boost(1));
+        let field = field.unwrap_or_else(|| schema.get_field(Field::Url.as_str()).unwrap());
+
+        if !self.patterns.is_empty() {
+            if let Ok(regex) = self.pattern_regex() {
+                subqueries.push((
+                    Occur::Must,
+                    RegexQuery::from_pattern(&regex, field).unwrap().box_clone(),
+                ))
+            }
+        }
+
+        match action {
+            Action::Boost(boost) => (
+                Occur::Should,
+                BoostQuery::new(
+                    BooleanQuery::from(subqueries).box_clone(),
+                    boost as f32 + 1.0,
+                )
+                .box_clone(),
+            ),
+            Action::Downrank(boost) => (
+                Occur::Should,
+                BoostQuery::new(
+                    BooleanQuery::from(subqueries).box_clone(),
+                    1.0 / (boost as f32 + 1.0),
+                )
+                .box_clone(),
+            ),
+            Action::Discard => (Occur::MustNot, BooleanQuery::from(subqueries).box_clone()),
         }
     }
 
-    pub fn score(
-        &self,
-        doc: DocId,
-        bm25: Score,
-        region_count: &Arc<RegionCount>,
-        current_timestamp: usize,
-        selected_region: Option<Region>,
-    ) -> f64 {
-        ALL_SIGNALS
-            .into_iter()
-            .map(|signal| {
-                let reader = match self.readers.get(signal as usize) {
-                    Some(Some(reader)) => Some(reader),
-                    _ => None,
-                };
+    fn pattern_regex(&self) -> Result<String> {
+        let mut regex = String::new();
 
-                self.coefficients().get(&signal)
-                    * signal.value(
-                        doc,
-                        bm25,
-                        reader,
-                        region_count,
-                        current_timestamp,
-                        selected_region,
-                        self,
-                    )
-            })
-            .sum()
-    }
+        if !matches!(self.patterns.first(), Some(PatternPart::Anchor)) {
+            regex.push_str(".*");
+        }
 
-    pub fn coefficients(&self) -> &SignalCoefficient {
-        &self.signal_coefficients
-    }
+        for (i, pattern) in self.patterns.iter().enumerate() {
+            match pattern {
+                PatternPart::Raw(string) => regex.push_str(&regex::escape(string)),
+                PatternPart::Wildcard => regex.push_str(".*"),
+                PatternPart::Delimeter => regex.push_str("([^\\w\\d._%-]|$)"),
+                PatternPart::Anchor if i == 0 => regex.push('^'),
+                PatternPart::Anchor if i == self.patterns.len() - 1 => regex.push('$'),
+                PatternPart::Anchor => return Err(Error::Parse), // TODO: make this less generic error
+            }
+        }
 
-    pub fn field_boosts(&self) -> &FieldBoost {
-        &self.field_boost
+        if !matches!(self.patterns.last(), Some(PatternPart::Anchor)) {
+            regex.push_str(".*");
+        }
+
+        Ok(regex)
     }
 }
 
-impl From<Vec<Alteration>> for SignalAggregator {
-    fn from(alterations: Vec<Alteration>) -> Self {
-        let mut coefficients = Vec::new();
-        let mut boosts = Vec::new();
+#[cfg(test)]
+mod tests {
+    use crate::{index::Index, searcher::Searcher, webpage::Webpage};
 
-        for alteration in alterations {
-            match alteration.target {
-                Target::Signal(name) => {
-                    if let Some(signal) = Signal::from_string(name) {
-                        coefficients.push((signal, alteration.score));
-                    }
-                }
-                Target::Field(name) => {
-                    if let Some(field) = Field::from_string(name) {
-                        boosts.push((field, alteration.score));
-                    }
-                }
-            }
-        }
+    use super::*;
+    const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-        Self::new(coefficients.into_iter(), boosts.into_iter())
+    #[test]
+    fn simple_pattern_regex() {
+        let instr = Instruction {
+            patterns: vec![PatternPart::Raw("test/url".to_string())],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), ".*test/url.*");
+    }
+
+    #[test]
+    fn wildcard_pattern_regex() {
+        let instr = Instruction {
+            patterns: vec![
+                PatternPart::Raw("test".to_string()),
+                PatternPart::Wildcard,
+                PatternPart::Raw("url".to_string()),
+            ],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), ".*test.*url.*");
+    }
+
+    #[test]
+    fn delimeter_pattern_regex() {
+        let instr = Instruction {
+            patterns: vec![
+                PatternPart::Raw("test".to_string()),
+                PatternPart::Delimeter,
+                PatternPart::Raw("url".to_string()),
+            ],
+            options: vec![],
+        };
+
+        assert_eq!(
+            &instr.pattern_regex().unwrap(),
+            ".*test([^\\w\\d._%-]|$)url.*"
+        );
+    }
+
+    #[test]
+    fn anchor_regex() {
+        let instr = Instruction {
+            patterns: vec![
+                PatternPart::Anchor,
+                PatternPart::Raw("test/url".to_string()),
+            ],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), "^test/url.*");
+
+        let instr = Instruction {
+            patterns: vec![
+                PatternPart::Raw("test/url".to_string()),
+                PatternPart::Anchor,
+            ],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), ".*test/url$");
+
+        let instr = Instruction {
+            patterns: vec![
+                PatternPart::Anchor,
+                PatternPart::Raw("test/url".to_string()),
+                PatternPart::Anchor,
+            ],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), "^test/url$");
+    }
+
+    #[test]
+    fn escape_pattern() {
+        let instr = Instruction {
+            patterns: vec![PatternPart::Raw("test\\d+".to_string())],
+            options: vec![],
+        };
+
+        assert_eq!(&instr.pattern_regex().unwrap(), ".*test\\\\d\\+.*");
+    }
+
+    #[test]
+    fn discard_and_boost_sites() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                            example example example
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.a.com",
+                vec![],
+                0.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.b.com",
+                vec![],
+                0.0001,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::from(index);
+
+        let res = searcher
+            .search("website", None, None, None)
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].url, "https://www.b.com");
+        assert_eq!(res[1].url, "https://www.a.com");
+
+        let res = searcher
+            .search(
+                "website",
+                None,
+                Some(
+                    r#"
+                $discard,site=b.com
+            "#,
+                ),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://www.a.com");
+
+        let res = searcher
+            .search(
+                "website",
+                None,
+                Some(
+                    r#"
+                $boost=10,site=a.com
+            "#,
+                ),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].url, "https://www.a.com");
+        assert_eq!(res[1].url, "https://www.b.com");
     }
 }

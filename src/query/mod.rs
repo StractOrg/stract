@@ -14,10 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ranking::goggles::SignalAggregator, Result};
+use crate::{
+    ranking::goggles::{Goggle, SignalAggregator},
+    Result,
+};
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
-    query::{AllQuery, BooleanQuery, Occur},
+    query::{AllQuery, BooleanQuery, Occur, QueryClone},
     schema::Schema,
     tokenizer::TokenizerManager,
 };
@@ -74,6 +77,14 @@ impl Query {
             terms,
             tantivy_query,
         })
+    }
+
+    pub fn set_goggle(&mut self, goggle: &Goggle, schema: &Schema) {
+        let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
+
+        subqueries.append(&mut goggle.as_tantivy(schema));
+
+        self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
     }
 
     pub fn simple_terms(&self) -> Vec<String> {

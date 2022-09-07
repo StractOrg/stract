@@ -80,8 +80,8 @@ pub enum Comment {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Instruction {
-    patterns: Vec<PatternPart>,
-    options: Vec<PatternOption>,
+    pub patterns: Vec<PatternPart>,
+    pub options: Vec<PatternOption>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -102,7 +102,7 @@ pub enum PatternOption {
     Action(Action),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Action {
     Boost(usize),
     Downrank(usize),

@@ -287,7 +287,7 @@ impl Html {
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         let mut open_links = Vec::new();
-        let mut preprocessor = Preprocessor::new(["script", "style", "head"]);
+        let mut preprocessor = Preprocessor::new(["script", "style", "head", "noscript"]);
 
         for edge in self.root.traverse() {
             preprocessor.update(&edge);
@@ -360,6 +360,8 @@ impl Html {
                 if !link.is_full_path() {
                     link.prefix_with(&self.url);
                 }
+
+                dbg!(&self.url);
 
                 let favicon = FaviconLink {
                     link,
@@ -538,7 +540,7 @@ impl Html {
                     doc.add_text(tantivy_field, self.description().unwrap_or_default());
                 }
                 Field::Url => doc.add_text(tantivy_field, self.url()),
-                Field::Host => doc.add_text(tantivy_field, self.url().host()),
+                Field::Site => doc.add_text(tantivy_field, self.url().site()),
                 Field::Domain => doc.add_text(tantivy_field, self.url().domain()),
                 Field::DomainIfHomepage => {
                     if self.url().is_homepage() {
@@ -639,9 +641,9 @@ impl Html {
 
         links
             .into_iter()
-            .filter(|link| !link.host().is_empty())
-            .filter(|link| link.host() != self.url().host())
-            .unique_by(|link| link.host().to_string())
+            .filter(|link| !link.site().is_empty())
+            .filter(|link| link.site() != self.url().site())
+            .unique_by(|link| link.site().to_string())
             .collect()
     }
 
@@ -856,7 +858,7 @@ mod tests {
             webpage.url().to_string().as_str(),
             "https://www.example.com/whatever"
         );
-        assert_eq!(webpage.url().host(), "www.example.com");
+        assert_eq!(webpage.url().site(), "www.example.com");
         assert_eq!(webpage.url().domain(), "example.com");
     }
 
@@ -1409,7 +1411,7 @@ mod tests {
         assert_eq!(
             html.trackers()
                 .into_iter()
-                .map(|url| url.host().to_string())
+                .map(|url| url.site().to_string())
                 .collect::<Vec<_>>(),
             vec![
                 "cdn.segment.com".to_string(),

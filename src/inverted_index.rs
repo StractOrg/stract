@@ -330,7 +330,7 @@ impl From<Document> for RetrievedWebpage {
                 }
                 Field::BacklinkText
                 | Field::Centrality
-                | Field::Host
+                | Field::Site
                 | Field::StemmedTitle
                 | Field::CleanBody
                 | Field::Domain

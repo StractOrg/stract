@@ -185,7 +185,7 @@ impl Term {
             .filter(|(field, _)| {
                 matches!(
                     ALL_FIELDS[field.field_id() as usize],
-                    Field::Domain | Field::Host
+                    Field::Domain | Field::Site
                 )
             })
             .into_iter()

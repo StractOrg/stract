@@ -79,21 +79,21 @@ impl Searcher {
         let start = Instant::now();
 
         let raw_query = query.to_string();
-        let aggregator = goggle_program
+        let goggle = goggle_program
             .and_then(|program| goggles::parse(program).ok())
-            .map(|goggle| goggle.aggregator)
             .unwrap_or_default();
 
-        let query = Query::parse(
+        let mut query = Query::parse(
             query,
             self.index.schema(),
             self.index.tokenizers(),
-            &aggregator,
+            &goggle.aggregator,
         )?;
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
+        query.set_goggle(&goggle, &self.index.schema());
 
         if let Some(bangs) = self.bangs.as_ref() {
             if let Some(bang) = bangs.get(&query) {
@@ -101,7 +101,7 @@ impl Searcher {
             }
         }
 
-        let mut ranker = Ranker::new(self.index.region_count.clone(), aggregator);
+        let mut ranker = Ranker::new(self.index.region_count.clone(), goggle.aggregator);
 
         if let Some(skip_pages) = skip_pages {
             ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);

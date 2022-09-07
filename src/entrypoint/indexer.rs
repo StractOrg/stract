@@ -287,7 +287,6 @@ impl Indexer {
             );
 
         if let Some(index) = index.as_mut() {
-            dbg!("Big merge!");
             index.inverted_index.merge_all_segments().unwrap();
         }
 
