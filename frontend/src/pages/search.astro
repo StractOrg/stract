@@ -1,0 +1,219 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Searchbar from "../components/Searchbar.astro";
+import AskamaFor from "../components/AskamaFor.astro";
+import AskamaMatch from "../components/AskamaMatch.astro";
+import AskamaWhen from "../components/AskamaWhen.astro";
+import AskamaIf from "../components/AskamaIf.astro";
+import AskamaElse from "../components/AskamaElse.astro";
+import Navbar from "../components/Navbar.astro";
+import Footer from "../components/Footer.astro";
+import Entity from "../components/Entity.astro";
+import { askama } from "../askama";
+---
+
+<Layout title="Cuely - {{ query }}">
+  <main class="flex flex-col w-full">
+    <div class="flex items-center h-24 border bg-neutral-50">
+      <div class="ml-14 mr-14 w-12 h-12">
+        <a href="/">
+          <img src="/assets/images/logo.svg" class="w-full h-full" />
+        </a>
+      </div>
+      <Searchbar query={askama`query`} />
+      <Navbar />
+    </div>
+
+    <div class="flex">
+      <div class="flex pl-40 flex-col">
+        <div class="flex mt-1 pl-3 pt-2 max-w-3xl pr-24 w-full justify-between">
+          <div
+            class="flex flex-col h-full justify-center text-sm text-gray-600"
+          >
+            <p class="h-fit">
+              Found {askama`num_matches`} results in {
+                askama`search_duration_sec`
+              } seconds
+            </p>
+          </div>
+          <div
+            class="select-region h-full flex flex-col justify-center p-0 m-0"
+          >
+            <select
+              form="searchbar-form"
+              name="gl"
+              class="p-0 m-0 hover:cursor-pointer"
+            >
+              <AskamaFor elem="region_selection" in="all_regions">
+                <AskamaMatch expr="region_selection">
+                  <AskamaWhen pat="RegionSelection::Selected" with="(region)">
+                    <option value="{{ region.gl() }}" selected>
+                      {askama`region.name()`}
+                    </option>
+                  </AskamaWhen>
+                  <AskamaWhen pat="RegionSelection::Unselected" with="(region)">
+                    <option value="{{ region.gl() }}">
+                      {askama`region.name()`}
+                    </option>
+                  </AskamaWhen>
+                </AskamaMatch>
+              </AskamaFor>
+            </select>
+          </div>
+        </div>
+        <div class="flex flex-col pt-4 pb-8">
+          <AskamaMatch expr="spell_correction">
+            <AskamaWhen pat="Some" with="(correction)">
+              <div class="pl-3 pb-3">
+                Did you mean: <a
+                  class="italic title-link font-bold"
+                  href="/search?q={{ correction|urlencode }}"
+                >
+                  {askama`correction`}
+                </a>
+              </div>
+            </AskamaWhen>
+            <AskamaWhen pat="None" />
+          </AskamaMatch>
+
+          <div class="search-result flex flex-col space-y-3">
+            <AskamaFor elem="item" in="search_result">
+              <div class="flex max-w-3xl w-full p-3">
+                <div class="flex flex-col w-full">
+                  <div class="text-sm mb-1 flex">
+                    <div class="flex items-center mr-2">
+                      <img
+                        src="/favicons/{{ item.domain|urlencode }}"
+                        width="13px"
+                      />
+                    </div>
+                    <div>
+                      <a
+                        class="hover:no-underline text-gray-600"
+                        href="{{ item.url }}"
+                        >{askama`item.pretty_url`}
+                      </a>
+                    </div>
+                  </div>
+                  <div class="text-lg font-medium mb-1">
+                    <a class="title-link" href="{{ item.url }}"
+                      >{askama`item.title`}
+                    </a>
+                  </div>
+                  <div class="text-sm">
+                    <AskamaMatch expr="item.last_updated">
+                      <AskamaWhen pat="Some" with="(val)">
+                        <span class="text-gray-500">
+                          {askama`val`}
+                        </span> —
+                      </AskamaWhen>
+                      <AskamaWhen pat="None" />
+                    </AskamaMatch>
+                    {askama`item.snippet`}
+                  </div>
+                </div>
+                <div class="flex h-full items-center">
+                  <div class="h-20 w-20 pl-2 pt-1 pb-1">
+                    <AskamaMatch expr="item.primary_image_uuid">
+                      <AskamaWhen pat="Some" with="(val)">
+                        <a href="{{ item.url|urlencode }}">
+                          <img
+                            class="h-full w-full object-cover rounded-full"
+                            src="/image/{{ val|urlencode }}"
+                          />
+                        </a>
+                      </AskamaWhen>
+                      <AskamaWhen pat="None" />
+                    </AskamaMatch>
+                  </div>
+                </div>
+              </div>
+            </AskamaFor>
+          </div>
+
+          <div class="flex w-full justify-center items-center pr-24 mt-5">
+            <AskamaIf expr="current_page == 1">
+              <div class="prev-page gray-arrow"></div>
+
+              <AskamaElse>
+                <AskamaMatch expr="prev_page_url">
+                  <AskamaWhen pat="Some" with="(url)">
+                    <a href="{{ url }}">
+                      <div class="prev-page cuely-color-arrow"></div>
+                    </a>
+                  </AskamaWhen>
+                  <AskamaWhen pat="None">
+                    <div class="prev-page gray-arrow"></div>
+                  </AskamaWhen>
+                </AskamaMatch>
+              </AskamaElse>
+            </AskamaIf>
+            <div class="mr-2 ml-2">
+              Page {askama`current_page`}
+            </div>
+            <a href="{{ next_page_url }}">
+              <div class="next-page cuely-color-arrow"></div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <AskamaMatch expr="entity">
+        <AskamaWhen pat="Some" with="(entity)">
+          <Entity entity="entity" />
+        </AskamaWhen>
+        <AskamaWhen pat="None" />
+      </AskamaMatch>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  .prev-page {
+    width: 16px;
+    height: 16px;
+    -webkit-mask: url(/static/images/arrow.svg) no-repeat center;
+    mask: url(/static/images/arrow.svg) no-repeat center;
+    mask-size: contain;
+    transform: rotate(180deg);
+  }
+
+  .next-page {
+    width: 16px;
+    height: 16px;
+    -webkit-mask: url(/static/images/arrow.svg) no-repeat center;
+    mask: url(/static/images/arrow.svg) no-repeat center;
+    mask-size: contain;
+  }
+
+  .gray-arrow {
+    background-color: gray;
+  }
+
+  .cuely-color-arrow {
+    background-color: #0b7bff;
+  }
+
+  .title-link {
+    color: #1a0dab;
+  }
+
+  .title-link:visited {
+    color: #609;
+  }
+
+  .search-result {
+    text-rendering: optimizeLegibility;
+    font-smooth: grayscale;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .select-region > select {
+    background-color: transparent;
+    border: 0px;
+    font-size: small;
+    width: 105px;
+  }
+</style>

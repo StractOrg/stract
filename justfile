@@ -19,6 +19,9 @@
 @frontend:
     cargo watch -x 'run -- frontend data/index data/queries_us.csv data/entity data/bangs.json'
 
+@astro:
+    cd frontend; npm run dev
+
 @local:
     rm -rf data/index/
     RUSTFLAGS="-C target-cpu=native" cargo run --release -- indexer local configs/indexer/local.toml
