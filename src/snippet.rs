@@ -267,23 +267,23 @@ pub fn generate(
     let mut snippet = generator.snippet(text);
 
     if snippet.fragment.is_empty() {
-        match description {
-            Some(desc) => {
-                let lang = match region.lang() {
-                    Some(lang) => lang,
-                    None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
-                };
+        if text.is_empty() {
+            match description {
+                Some(desc) => {
+                    let lang = match region.lang() {
+                        Some(lang) => lang,
+                        None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
+                    };
 
-                let tokenizer = Stemmed::with_forced_language(lang).into();
-                let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+                    let tokenizer = Stemmed::with_forced_language(lang).into();
+                    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
 
-                snippet = generator.snippet(desc);
-                if snippet.fragment.is_empty() {
-                    snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                    snippet = generator.snippet(desc);
+                    if snippet.fragment.is_empty() {
+                        snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                    }
                 }
-            }
-            None => {
-                if text.is_empty() {
+                None => {
                     let lang = match region.lang() {
                         Some(lang) => lang,
                         None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
@@ -297,10 +297,10 @@ pub fn generate(
                     if snippet.fragment.is_empty() {
                         snippet.fragment = dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
                     }
-                } else {
-                    snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
                 }
             }
+        } else {
+            snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
         }
     }
 

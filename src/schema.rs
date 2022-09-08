@@ -42,9 +42,13 @@ pub enum Field {
     Description,
     NumTrackers,
     Region,
+    NumUrlTokens,
+    NumTitleTokens,
+    NumCleanBodyTokens,
+    NumDescriptionTokens,
 }
 
-pub static ALL_FIELDS: [Field; 18] = [
+pub static ALL_FIELDS: [Field; 22] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -63,6 +67,10 @@ pub static ALL_FIELDS: [Field; 18] = [
     Field::Description,
     Field::NumTrackers,
     Field::Region,
+    Field::NumUrlTokens,
+    Field::NumTitleTokens,
+    Field::NumCleanBodyTokens,
+    Field::NumDescriptionTokens,
 ];
 
 impl Field {
@@ -132,6 +140,26 @@ impl Field {
                     .set_stored()
                     .set_indexed(),
             ),
+            Field::NumCleanBodyTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumDescriptionTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumTitleTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumUrlTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
         }
     }
 
@@ -155,6 +183,10 @@ impl Field {
             Field::AllBody => "all_body",
             Field::NumTrackers => "num_trackers",
             Field::Region => "region",
+            Field::NumUrlTokens => "num_url_tokens",
+            Field::NumTitleTokens => "num_title_tokens",
+            Field::NumCleanBodyTokens => "num_clean_body_tokens",
+            Field::NumDescriptionTokens => "num_description_tokens",
         }
     }
 
@@ -175,13 +207,33 @@ impl Field {
             | Field::FetchTimeMs
             | Field::Description
             | Field::NumTrackers
+            | Field::NumUrlTokens
+            | Field::NumTitleTokens
+            | Field::NumCleanBodyTokens
+            | Field::NumDescriptionTokens
             | Field::Region
             | Field::LastUpdated => None,
         }
     }
 
     pub fn is_searchable(&self) -> bool {
-        !matches!(self, Field::PrimaryImage | Field::BacklinkText)
+        !matches!(self, Field::PrimaryImage | Field::BacklinkText) && !self.is_fast()
+    }
+
+    pub fn is_fast(&self) -> bool {
+        matches!(
+            self,
+            Field::IsHomepage
+                | Field::Centrality
+                | Field::FetchTimeMs
+                | Field::LastUpdated
+                | Field::NumTrackers
+                | Field::Region
+                | Field::NumUrlTokens
+                | Field::NumTitleTokens
+                | Field::NumCleanBodyTokens
+                | Field::NumDescriptionTokens
+        )
     }
 
     pub fn from_string(name: String) -> Option<Field> {

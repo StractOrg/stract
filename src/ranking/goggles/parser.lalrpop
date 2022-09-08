@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use crate::ranking::goggles::ast::*;
 
 grammar;
@@ -13,14 +12,14 @@ Sep<S, T>: Vec<T> = {
 pub Blocks: Vec<GoggleBlock> = <Sep<";", Block>>;
 
 Block: GoggleBlock = {
-    <Alteration> => GoggleBlock::Alteration(<>),
+    <RawAlteration> => GoggleBlock::Alteration(<>),
     <Comment> => GoggleBlock::Comment(<>),
-    <Instruction> => GoggleBlock::Instruction(<>),
+    <RawInstruction> => GoggleBlock::Instruction(<>),
 }
 
 
-Alteration: Alteration = {
-    "@" <target:Target> "=" <score:Num> => Alteration {<>}
+RawAlteration: RawAlteration = {
+    "@" <target:Target> "=" <score:Ident> => RawAlteration {<>}
 }
 
 Target: Target = {
@@ -34,7 +33,6 @@ Target: Target = {
 }
 
 Name: String = Ident;
-Num: f64 = r"[0-9]+" => f64::from_str(<>).unwrap();
 
 Comment: Comment = r"![^;]*" => {
     if let Some((key, value)) = <>.split_once(':') {
@@ -51,37 +49,37 @@ Comment: Comment = r"![^;]*" => {
     }
 };
 
-Instruction: Instruction = {
-    <patterns:Patterns> "$" <options:PatternOptions> => Instruction { <> },
-    <patterns:Patterns> => Instruction { <>, options: Vec::new() },
+RawInstruction: RawInstruction = {
+    <patterns:RawPatterns> "$" <options:RawPatternOptions> => RawInstruction { <> },
+    <patterns:RawPatterns> => RawInstruction { <>, options: Vec::new() },
 }
 
-Patterns: Vec<PatternPart> = <PatternPart*> => <>;
+RawPatterns: Vec<RawPatternPart> = <RawPatternPart*> => <>;
 
-PatternPart: PatternPart = {
-    "*" => PatternPart::Wildcard,
-    "^" => PatternPart::Delimeter,
-    "|" => PatternPart::Anchor,
-    Ident => PatternPart::Raw(<>.to_string()),
+RawPatternPart: RawPatternPart = {
+    "*" => RawPatternPart::Wildcard,
+    "^" => RawPatternPart::Delimeter,
+    "|" => RawPatternPart::Anchor,
+    Ident => RawPatternPart::Raw(<>.to_string()),
 }
 
-PatternOptions: Vec<PatternOption> = <Sep<",", PatternOption>> => <>;
+RawPatternOptions: Vec<RawPatternOption> = <Sep<",", RawPatternOption>> => <>;
 
-PatternOption: PatternOption = {
-    "site=" <site:Ident> => PatternOption::Site(site.to_string()),
-    "inurl" => PatternOption::InUrl,
-    "intitle" => PatternOption::InTitle,
-    "indescription" => PatternOption::InDescription,
-    "incontent" => PatternOption::InContent,
-    <Action> => PatternOption::Action(<>),
+RawPatternOption: RawPatternOption = {
+    "site=" <site:Ident> => RawPatternOption::Site(site.to_string()),
+    "inurl" => RawPatternOption::InUrl,
+    "intitle" => RawPatternOption::InTitle,
+    "indescription" => RawPatternOption::InDescription,
+    "incontent" => RawPatternOption::InContent,
+    <RawAction> => RawPatternOption::Action(<>),
 }
 
-Action: Action = {
-    "boost=" <Num> => Action::Boost(<> as usize),
-    "boost" => Action::Boost(1),
-    "downrank=" <Num> => Action::Downrank(<> as usize),
-    "downrank" => Action::Downrank(1),
-    "discard" => Action::Discard,
+RawAction: RawAction = {
+    "boost=" <Ident> => RawAction::Boost(<>),
+    "boost" => RawAction::Boost("1".to_string()),
+    "downrank=" <Ident> => RawAction::Downrank(<>),
+    "downrank" => RawAction::Downrank("1".to_string()),
+    "discard" => RawAction::Discard,
 }
 
-Ident: String = <r"[a-zA-Z_/:\.][a-zA-Z_/:\.\?@0-9&\-]*"> => <>.to_string();
+Ident: String = <r"[a-zA-Z0-9_/][a-zA-Z_/:\.\?@0-9&\-]*"> => <>.to_string();

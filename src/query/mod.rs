@@ -25,6 +25,7 @@ use tantivy::{
     tokenizer::TokenizerManager,
 };
 
+pub mod intersection;
 pub mod parser;
 use parser::Term;
 

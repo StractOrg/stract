@@ -188,6 +188,9 @@ pub enum Error {
 
     #[error("Unknown region")]
     UnknownRegion,
+
+    #[error("String is not float")]
+    ParseFloat(#[from] std::num::ParseFloatError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

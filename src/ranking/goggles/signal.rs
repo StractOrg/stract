@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{array, sync::Arc};
+use crate::Result;
+use std::{array, convert::TryFrom, sync::Arc};
 
 use tantivy::{
     fastfield::{Column, DynamicFastFieldReader},
@@ -26,7 +27,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use super::ast::{Alteration, Target};
+use super::ast::{RawAlteration, Target};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Signal {
@@ -94,6 +95,11 @@ impl Signal {
             }
             Signal::UpdateTimestamp => {
                 let update_timestamp = fastfield.unwrap().get_val(doc as u64) as i64;
+
+                if current_timestamp as i64 - update_timestamp <= 0 {
+                    return 0.0;
+                }
+
                 let hours_since_update =
                     ((current_timestamp as i64 - update_timestamp).max(1) / 3600) as usize;
 
@@ -127,7 +133,7 @@ impl Signal {
             Signal::HostCentrality => 640.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.1,
-            Signal::UpdateTimestamp => 110.0,
+            Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
         }
@@ -325,13 +331,32 @@ impl SignalAggregator {
         &self.field_boost
     }
 }
+#[derive(Debug, PartialEq)]
+pub struct Alteration {
+    pub target: Target,
+    pub score: f64,
+}
 
-impl From<Vec<Alteration>> for SignalAggregator {
-    fn from(alterations: Vec<Alteration>) -> Self {
+impl TryFrom<RawAlteration> for Alteration {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawAlteration) -> Result<Self> {
+        Ok(Alteration {
+            target: raw.target,
+            score: raw.score.parse()?,
+        })
+    }
+}
+
+impl TryFrom<Vec<RawAlteration>> for SignalAggregator {
+    type Error = crate::Error;
+
+    fn try_from(alterations: Vec<RawAlteration>) -> Result<Self> {
         let mut coefficients = Vec::new();
         let mut boosts = Vec::new();
 
         for alteration in alterations {
+            let alteration = Alteration::try_from(alteration)?;
             match alteration.target {
                 Target::Signal(name) => {
                     if let Some(signal) = Signal::from_string(name) {
@@ -346,6 +371,6 @@ impl From<Vec<Alteration>> for SignalAggregator {
             }
         }
 
-        Self::new(coefficients.into_iter(), boosts.into_iter())
+        Ok(Self::new(coefficients.into_iter(), boosts.into_iter()))
     }
 }

@@ -337,6 +337,10 @@ impl From<Document> for RetrievedWebpage {
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::NumTrackers
+                | Field::NumCleanBodyTokens
+                | Field::NumDescriptionTokens
+                | Field::NumTitleTokens
+                | Field::NumUrlTokens
                 | Field::FetchTimeMs => {}
             }
         }

@@ -30,17 +30,17 @@ pub enum Target {
     Field(String),
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Alteration {
+#[derive(Debug, PartialEq, Eq)]
+pub struct RawAlteration {
     pub target: Target,
-    pub score: f64,
+    pub score: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RawGoggle {
     pub comments: Vec<Comment>,
-    pub instructions: Vec<Instruction>,
-    pub alterations: Vec<Alteration>,
+    pub instructions: Vec<RawInstruction>,
+    pub alterations: Vec<RawAlteration>,
 }
 
 impl From<Vec<GoggleBlock>> for RawGoggle {
@@ -65,11 +65,11 @@ impl From<Vec<GoggleBlock>> for RawGoggle {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum GoggleBlock {
     Comment(Comment),
-    Instruction(Instruction),
-    Alteration(Alteration),
+    Instruction(RawInstruction),
+    Alteration(RawAlteration),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -79,13 +79,13 @@ pub enum Comment {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Instruction {
-    pub patterns: Vec<PatternPart>,
-    pub options: Vec<PatternOption>,
+pub struct RawInstruction {
+    pub patterns: Vec<RawPatternPart>,
+    pub options: Vec<RawPatternOption>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum PatternPart {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RawPatternPart {
     Raw(String),
     Wildcard,
     Delimeter,
@@ -93,19 +93,19 @@ pub enum PatternPart {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum PatternOption {
+pub enum RawPatternOption {
     Site(String),
     InUrl,
     InTitle,
     InDescription,
     InContent,
-    Action(Action),
+    Action(RawAction),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Action {
-    Boost(usize),
-    Downrank(usize),
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RawAction {
+    Boost(String),
+    Downrank(String),
     Discard,
 }
 
@@ -143,17 +143,17 @@ mod tests {
         assert_eq!(
             goggle.alterations,
             vec![
-                Alteration {
+                RawAlteration {
                     target: Target::Signal("host_centrality".to_string()),
-                    score: 3.0,
+                    score: "3".to_string(),
                 },
-                Alteration {
+                RawAlteration {
                     target: Target::Signal("bm25".to_string()),
-                    score: 100.0
+                    score: "100".to_string()
                 },
-                Alteration {
+                RawAlteration {
                     target: Target::Field("url".to_string()),
-                    score: 2.0
+                    score: "2".to_string()
                 }
             ]
         );
@@ -173,17 +173,17 @@ mod tests {
         assert_eq!(
             goggle.instructions,
             vec![
-                Instruction {
+                RawInstruction {
                     patterns: vec![
-                        PatternPart::Raw("/this/is/".to_string()),
-                        PatternPart::Wildcard,
-                        PatternPart::Raw("/pattern".to_string())
+                        RawPatternPart::Raw("/this/is/".to_string()),
+                        RawPatternPart::Wildcard,
+                        RawPatternPart::Raw("/pattern".to_string())
                     ],
                     options: vec![]
                 },
-                Instruction {
-                    patterns: vec![PatternPart::Raw("/blog/".to_string()),],
-                    options: vec![PatternOption::Site("example.com".to_string())]
+                RawInstruction {
+                    patterns: vec![RawPatternPart::Raw("/blog/".to_string()),],
+                    options: vec![RawPatternOption::Site("example.com".to_string())]
                 },
             ]
         )
@@ -200,8 +200,10 @@ mod tests {
 
         assert_eq!(
             goggle.instructions,
-            vec![Instruction {
-                patterns: vec![PatternPart::Raw("https://www.example.com?@hej".to_string()),],
+            vec![RawInstruction {
+                patterns: vec![RawPatternPart::Raw(
+                    "https://www.example.com?@hej".to_string()
+                ),],
                 options: vec![]
             },]
         );
@@ -215,9 +217,13 @@ mod tests {
 
         assert_eq!(
             goggle.instructions,
-            vec![Instruction {
-                patterns: vec![PatternPart::Raw("https://www.example.com?@hej".to_string()),],
-                options: vec![PatternOption::Site("https://www.example.com".to_string())]
+            vec![RawInstruction {
+                patterns: vec![RawPatternPart::Raw(
+                    "https://www.example.com?@hej".to_string()
+                ),],
+                options: vec![RawPatternOption::Site(
+                    "https://www.example.com".to_string()
+                )]
             },]
         );
     }
@@ -238,18 +244,18 @@ mod tests {
         assert_eq!(
             goggle.instructions,
             vec![
-                Instruction {
+                RawInstruction {
                     patterns: vec![
-                        PatternPart::Anchor,
-                        PatternPart::Raw("pattern1".to_string()),
-                        PatternPart::Anchor,
+                        RawPatternPart::Anchor,
+                        RawPatternPart::Raw("pattern1".to_string()),
+                        RawPatternPart::Anchor,
                     ],
                     options: vec![]
                 },
-                Instruction {
+                RawInstruction {
                     patterns: vec![
-                        PatternPart::Raw("pattern2".to_string()),
-                        PatternPart::Delimeter,
+                        RawPatternPart::Raw("pattern2".to_string()),
+                        RawPatternPart::Delimeter,
                     ],
                     options: vec![]
                 },

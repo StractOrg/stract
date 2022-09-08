@@ -361,8 +361,6 @@ impl Html {
                     link.prefix_with(&self.url);
                 }
 
-                dbg!(&self.url);
-
                 let favicon = FaviconLink {
                     link,
                     width,
@@ -455,9 +453,7 @@ impl Html {
         metas
     }
 
-    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
-        let mut doc = tantivy::Document::new();
-
+    fn pretokenize_title(&self) -> Result<PreTokenizedString> {
         let title = self.title();
 
         if title.is_none() {
@@ -465,12 +461,10 @@ impl Html {
         }
         let title = title.unwrap();
 
-        let mut title_tokens = Vec::new();
-        let mut title_stream = tokenizer::Normal::default().token_stream(&title);
-        while let Some(token) = title_stream.next() {
-            title_tokens.push(token.clone());
-        }
+        Ok(self.pretokenize_string(title))
+    }
 
+    fn pretokenize_all_text(&self) -> Result<PreTokenizedString> {
         let all_text = self.all_text();
 
         if all_text.is_none() {
@@ -478,19 +472,46 @@ impl Html {
         }
         let all_text = all_text.unwrap();
 
-        let mut all_text_tokens = Vec::new();
-        let mut all_text_stream = tokenizer::Normal::default().token_stream(&all_text);
-        while let Some(token) = all_text_stream.next() {
-            all_text_tokens.push(token.clone());
-        }
+        Ok(self.pretokenize_string(all_text))
+    }
 
+    fn pretokenize_clean_text(&self) -> PreTokenizedString {
         let clean_text = self.clean_text().unwrap_or_default();
+        self.pretokenize_string(clean_text)
+    }
 
-        let mut clean_text_tokens = Vec::new();
-        let mut clean_text_stream = tokenizer::Normal::default().token_stream(&clean_text);
-        while let Some(token) = clean_text_stream.next() {
-            clean_text_tokens.push(token.clone());
+    fn pretokenize_url(&self) -> PreTokenizedString {
+        let url = self.url().full();
+        self.pretokenize_string(url)
+    }
+
+    fn pretokenize_description(&self) -> PreTokenizedString {
+        let text = self.description().unwrap_or_default();
+
+        self.pretokenize_string(text)
+    }
+
+    fn pretokenize_string(&self, text: String) -> PreTokenizedString {
+        let mut tokens = Vec::new();
+
+        {
+            let mut stream = tokenizer::Normal::default().token_stream(&text);
+            while let Some(token) = stream.next() {
+                tokens.push(token.clone());
+            }
         }
+
+        PreTokenizedString { text, tokens }
+    }
+
+    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
+        let mut doc = tantivy::Document::new();
+
+        let title = self.pretokenize_title()?;
+        let all_text = self.pretokenize_all_text()?;
+        let clean_text = self.pretokenize_clean_text();
+        let url = self.pretokenize_url();
+        let description = self.pretokenize_description();
 
         for field in &ALL_FIELDS {
             let tantivy_field = schema
@@ -498,48 +519,36 @@ impl Html {
                 .unwrap_or_else(|| panic!("Unknown field: {}", field.as_str()));
 
             match field {
-                Field::Title => doc.add_pre_tokenized_text(
-                    tantivy_field,
-                    PreTokenizedString {
-                        text: title.clone(),
-                        tokens: title_tokens.clone(),
-                    },
-                ),
+                Field::Title => doc.add_pre_tokenized_text(tantivy_field, title.clone()),
                 Field::StemmedTitle => {
-                    let mut tokens = title_tokens.clone();
+                    let mut tokens = title.tokens.clone();
                     stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
                     doc.add_pre_tokenized_text(
                         tantivy_field,
                         PreTokenizedString {
-                            text: title.clone(),
+                            text: title.text.clone(),
                             tokens,
                         },
                     );
                 }
-                Field::CleanBody => doc.add_pre_tokenized_text(
-                    tantivy_field,
-                    PreTokenizedString {
-                        text: clean_text.clone(),
-                        tokens: clean_text_tokens.clone(),
-                    },
-                ),
+                Field::CleanBody => doc.add_pre_tokenized_text(tantivy_field, clean_text.clone()),
                 Field::StemmedCleanBody => {
-                    let mut tokens = clean_text_tokens.clone();
+                    let mut tokens = clean_text.tokens.clone();
                     stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
                     doc.add_pre_tokenized_text(
                         tantivy_field,
                         PreTokenizedString {
-                            text: clean_text.clone(),
+                            text: clean_text.text.clone(),
                             tokens,
                         },
                     );
                 }
                 Field::Description => {
-                    doc.add_text(tantivy_field, self.description().unwrap_or_default());
+                    doc.add_pre_tokenized_text(tantivy_field, description.clone());
                 }
-                Field::Url => doc.add_text(tantivy_field, self.url()),
+                Field::Url => doc.add_pre_tokenized_text(tantivy_field, url.clone()),
                 Field::Site => doc.add_text(tantivy_field, self.url().site()),
                 Field::Domain => doc.add_text(tantivy_field, self.url().domain()),
                 Field::DomainIfHomepage => {
@@ -557,14 +566,16 @@ impl Html {
                     self.updated_time()
                         .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
-                Field::AllBody => doc.add_pre_tokenized_text(
-                    tantivy_field,
-                    PreTokenizedString {
-                        text: all_text.clone(),
-                        tokens: all_text_tokens.clone(),
-                    },
-                ),
+                Field::AllBody => doc.add_pre_tokenized_text(tantivy_field, all_text.clone()),
                 Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
+                Field::NumUrlTokens => doc.add_u64(tantivy_field, url.tokens.len() as u64),
+                Field::NumTitleTokens => doc.add_u64(tantivy_field, title.tokens.len() as u64),
+                Field::NumCleanBodyTokens => {
+                    doc.add_u64(tantivy_field, clean_text.tokens.len() as u64)
+                }
+                Field::NumDescriptionTokens => {
+                    doc.add_u64(tantivy_field, description.tokens.len() as u64)
+                }
                 Field::BacklinkText
                 | Field::Centrality
                 | Field::FetchTimeMs
