@@ -25,5 +25,5 @@ pub async fn route() -> impl IntoResponse {
 }
 
 #[derive(Template)]
-#[template(path = "privacy.html")]
+#[template(path = "privacy-and-happy-lawyers/index.html")]
 struct PrivacyTemplate {}

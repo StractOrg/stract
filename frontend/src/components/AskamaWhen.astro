@@ -1,0 +1,17 @@
+---
+export interface Props {
+  pat: string;
+  with?: string;
+}
+
+const { props } = Astro;
+---
+
+<Fragment>
+  <Fragment
+    set:html={`{% when ${props.pat}${
+      props.with ? ` with ${props.with}` : ""
+    } %}`}
+  />
+  <slot />
+</Fragment>

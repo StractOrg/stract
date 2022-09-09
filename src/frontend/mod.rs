@@ -70,7 +70,7 @@ pub async fn favicon() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(
-            include_bytes!("../../static/images/favicon.ico").to_vec(),
+            include_bytes!("../../frontend/dist/assets/favicon.ico").to_vec(),
         ))
         .unwrap()
 }
@@ -103,7 +103,7 @@ pub fn router(
         .route("/about", get(about::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/api/beta/search", get(api::search))
-        .merge(SpaRouter::new("/static", "static"))
+        .merge(SpaRouter::new("/assets", "frontend/dist/assets"))
         .layer(Extension(state))
         .layer(CompressionLayer::new()))
 }

@@ -1,0 +1,17 @@
+---
+export interface Props {
+  elem: string;
+  in: string;
+}
+
+const { props } = Astro;
+
+const header = `{% for ${props.elem} in ${props.in} %} `;
+const footer = `{% endfor %} `;
+---
+
+<Fragment>
+  <Fragment set:html={header} />
+  <slot />
+  <Fragment set:html={footer} />
+</Fragment>

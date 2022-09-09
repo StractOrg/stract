@@ -36,7 +36,7 @@ pub async fn route(
 
     let bytes = match img {
         Some(img) => img.as_raw_bytes(),
-        None => include_bytes!("../../static/images/globe.png").to_vec(),
+        None => include_bytes!("../../frontend/dist/assets/images/globe.png").to_vec(),
     };
 
     Response::builder()
