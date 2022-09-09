@@ -89,9 +89,17 @@ $site=example.com
 /r/google/$downrank=2
 /r/google/$downrank=3
 
-! Last but not least, you can discard results completely:
+! Tou can also discard results completely:
 $discard,site=idontwanttobepartoftheresults.com
 /this/is/spam/$discard
+
+! Last but not least, you can control exactly how the signals gets prioritized for
+! the final ranking. We countinously add more signals used during ranking,
+! but you can e.g. heavily prioritize webpages with a high centrality by specifying
+@host_centrality = 2048
+
+! Or you can boost matches with a specific field with the 'field' prefix e.g
+@field_title = 50
 
 ! Individually, each instruction can either target a very narrow set of pages (or
 ! even a single page), or a wider range of them, to apply reranking to a bigger
@@ -101,9 +109,3 @@ $discard,site=idontwanttobepartoftheresults.com
 ! Although the Goggles language could express instructions to search through a
 ! small set of websites or act as a blocklist, Goggles really shine when used to
 ! express boosting and downranking across many domains and pages.
-
-! Goggles also impacts the behavior of features such as Discussions and News or
-! Videos clusters, giving you full control on your search experience.
-!
-! We are already using Goggles internally, and we can't wait to see what you will
-! do with them!
