@@ -26,7 +26,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
-use crate::ranking::signal_aggregator;
+use crate::ranking::goggles::{self, SignalAggregator};
 use crate::ranking::Ranker;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
@@ -73,25 +73,29 @@ impl Searcher {
         &self,
         query: &str,
         selected_region: Option<Region>,
-        goggle_program: Option<&str>,
+        goggle_program: Option<String>,
         skip_pages: Option<usize>,
     ) -> Result<SearchResult> {
         let start = Instant::now();
 
         let raw_query = query.to_string();
-        let aggregator = goggle_program
-            .and_then(|program| signal_aggregator::parse(program).ok())
-            .unwrap_or_default();
+        let goggle = goggle_program.and_then(|program| goggles::parse(&program).ok());
 
-        let query = Query::parse(
+        let mut query = Query::parse(
             query,
             self.index.schema(),
             self.index.tokenizers(),
-            &aggregator,
+            goggle
+                .as_ref()
+                .map(|goggle| &goggle.aggregator)
+                .unwrap_or(&SignalAggregator::default()),
         )?;
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
+        }
+        if let Some(goggle) = &goggle {
+            query.set_goggle(goggle, &self.index.schema());
         }
 
         if let Some(bangs) = self.bangs.as_ref() {
@@ -100,7 +104,10 @@ impl Searcher {
             }
         }
 
-        let mut ranker = Ranker::new(self.index.region_count.clone(), aggregator);
+        let mut ranker = Ranker::new(
+            self.index.region_count.clone(),
+            goggle.map(|goggle| goggle.aggregator).unwrap_or_default(),
+        );
 
         if let Some(skip_pages) = skip_pages {
             ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
@@ -169,119 +176,6 @@ mod tests {
     use crate::webpage::Webpage;
 
     use super::*;
-
-    #[test]
-    fn custom_signal_aggregation() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    example
-                </body>
-            </html>
-            "#,
-                "https://www.body.com",
-                vec![],
-                1.0,
-                20,
-            ))
-            .expect("failed to parse webpage");
-
-        index
-            .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>Example website</title>
-                </head>
-                <body>
-                    test
-                </body>
-            </html>
-            "#,
-                "https://www.title.com",
-                vec![],
-                1.0,
-                20,
-            ))
-            .expect("failed to parse webpage");
-
-        index
-            .insert(Webpage::new(
-                r#"
-            <html>
-                <head>
-                    <title>Example website</title>
-                </head>
-                <body>
-                    test
-                </body>
-            </html>
-            "#,
-                "https://www.centrality.com",
-                vec![],
-                1.0002,
-                500,
-            ))
-            .expect("failed to parse webpage");
-
-        index.commit().unwrap();
-
-        let searcher = Searcher::new(index, None, None);
-
-        let res = searcher
-            .search(
-                "example",
-                None,
-                Some(
-                    r#"
-                        @field_title = 20000000
-                        @host_centrality = 0
-                    "#,
-                ),
-                None,
-            )
-            .unwrap()
-            .into_websites()
-            .unwrap();
-
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.title.com");
-
-        let res = searcher
-            .search(
-                "example",
-                None,
-                Some(
-                    r#"
-                        @field_all_body= 20000000
-                        @host_centrality = 0
-                    "#,
-                ),
-                None,
-            )
-            .unwrap()
-            .into_websites()
-            .unwrap();
-
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
-
-        let res = searcher
-            .search("example", None, Some("@host_centrality= 2000000"), None)
-            .unwrap()
-            .into_websites()
-            .unwrap();
-
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
-    }
 
     #[test]
     fn offset_page() {

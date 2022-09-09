@@ -29,9 +29,8 @@ pub enum Field {
     StemmedTitle,
     StemmedCleanBody,
     AllBody,
-    StemmedAllBody,
     Url,
-    Host,
+    Site,
     Domain,
     DomainIfHomepage, // this field is only set if the webpage is the homepage for the site. Allows us to boost
     IsHomepage,
@@ -43,17 +42,20 @@ pub enum Field {
     Description,
     NumTrackers,
     Region,
+    NumUrlTokens,
+    NumTitleTokens,
+    NumCleanBodyTokens,
+    NumDescriptionTokens,
 }
 
-pub static ALL_FIELDS: [Field; 19] = [
+pub static ALL_FIELDS: [Field; 22] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
     Field::StemmedCleanBody,
     Field::AllBody,
-    Field::StemmedAllBody,
     Field::Url,
-    Field::Host,
+    Field::Site,
     Field::Domain,
     Field::DomainIfHomepage,
     Field::IsHomepage,
@@ -65,6 +67,10 @@ pub static ALL_FIELDS: [Field; 19] = [
     Field::Description,
     Field::NumTrackers,
     Field::Region,
+    Field::NumUrlTokens,
+    Field::NumTitleTokens,
+    Field::NumCleanBodyTokens,
+    Field::NumDescriptionTokens,
 ];
 
 impl Field {
@@ -88,13 +94,9 @@ impl Field {
             Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::CleanBody => IndexingOption::Text(self.default_text_options()),
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Host => IndexingOption::Text(self.default_text_options()),
+            Field::Site => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
-            Field::AllBody => IndexingOption::Text(self.default_text_options()),
-            Field::StemmedAllBody => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(Stemmed::as_str())
-                    .set_stored(),
-            ),
+            Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::IsHomepage => IndexingOption::Numeric(
                 NumericOptions::default()
@@ -135,6 +137,27 @@ impl Field {
             Field::Region => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
+                    .set_stored()
+                    .set_indexed(),
+            ),
+            Field::NumCleanBodyTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumDescriptionTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumTitleTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::NumUrlTokens => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
         }
@@ -145,7 +168,7 @@ impl Field {
             Field::Title => "title",
             Field::CleanBody => "body",
             Field::Url => "url",
-            Field::Host => "host",
+            Field::Site => "site",
             Field::BacklinkText => "backlink_text",
             Field::Centrality => "centrality",
             Field::StemmedTitle => "stemmed_title",
@@ -158,23 +181,25 @@ impl Field {
             Field::LastUpdated => "last_updated",
             Field::Description => "description",
             Field::AllBody => "all_body",
-            Field::StemmedAllBody => "stemmed_all_body",
             Field::NumTrackers => "num_trackers",
             Field::Region => "region",
+            Field::NumUrlTokens => "num_url_tokens",
+            Field::NumTitleTokens => "num_title_tokens",
+            Field::NumCleanBodyTokens => "num_clean_body_tokens",
+            Field::NumDescriptionTokens => "num_description_tokens",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Host => Some(6.0),
-            Field::DomainIfHomepage => Some(50.0),
+            Field::Site => Some(6.0),
+            Field::DomainIfHomepage => Some(250.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
             Field::Url => Some(1.0),
-            Field::Domain => Some(2.0),
+            Field::Domain => Some(1.0),
             Field::AllBody => Some(0.01),
-            Field::StemmedAllBody => Some(0.001),
             Field::BacklinkText => Some(4.0),
             Field::Centrality
             | Field::IsHomepage
@@ -182,13 +207,33 @@ impl Field {
             | Field::FetchTimeMs
             | Field::Description
             | Field::NumTrackers
+            | Field::NumUrlTokens
+            | Field::NumTitleTokens
+            | Field::NumCleanBodyTokens
+            | Field::NumDescriptionTokens
             | Field::Region
             | Field::LastUpdated => None,
         }
     }
 
     pub fn is_searchable(&self) -> bool {
-        !matches!(self, Field::PrimaryImage | Field::BacklinkText)
+        !matches!(self, Field::PrimaryImage | Field::BacklinkText) && !self.is_fast()
+    }
+
+    pub fn is_fast(&self) -> bool {
+        matches!(
+            self,
+            Field::IsHomepage
+                | Field::Centrality
+                | Field::FetchTimeMs
+                | Field::LastUpdated
+                | Field::NumTrackers
+                | Field::Region
+                | Field::NumUrlTokens
+                | Field::NumTitleTokens
+                | Field::NumCleanBodyTokens
+                | Field::NumDescriptionTokens
+        )
     }
 
     pub fn from_string(name: String) -> Option<Field> {
@@ -196,7 +241,7 @@ impl Field {
             "title" => Some(Field::Title),
             "body" => Some(Field::CleanBody),
             "url" => Some(Field::Url),
-            "host" => Some(Field::Host),
+            "site" => Some(Field::Site),
             "backlink_text" => Some(Field::BacklinkText),
             "centrality" => Some(Field::Centrality),
             "stemmed_title" => Some(Field::StemmedTitle),
@@ -209,7 +254,6 @@ impl Field {
             "last_updated" => Some(Field::LastUpdated),
             "description" => Some(Field::Description),
             "all_body" => Some(Field::AllBody),
-            "stemmed_all_body" => Some(Field::StemmedAllBody),
             "num_trackers" => Some(Field::NumTrackers),
             "region" => Some(Field::Region),
             _ => None,

@@ -43,6 +43,10 @@ impl CentralityStore {
                 self.insert(key, value);
             });
 
+        self.flush();
+    }
+
+    pub fn flush(&self) {
         self.inner.flush();
     }
 }

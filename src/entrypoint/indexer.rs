@@ -135,7 +135,6 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                         debug!("{:?}", err);
                     }
                 }
-                index.commit().unwrap();
                 if self.download_images {
                     info!("downloading images");
                     index.download_pending_images();
@@ -144,6 +143,8 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
 
             std::fs::remove_file(file).ok();
         }
+        index.commit().unwrap();
+        index.inverted_index.merge_all_segments().unwrap();
 
         info!("{} done", name);
 
@@ -250,7 +251,7 @@ impl Indexer {
             config.webgraph_path.clone(),
         );
 
-        warc_paths
+        let mut index = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -265,6 +266,12 @@ impl Indexer {
                     .unwrap_or_else(|| "data/index".to_string()),
             })
             .collect_vec()
+            // .into_iter()
+            // .map(|job| job.map(&worker))
+            // .fold(None, |acc: Option<Index>, elem: FrozenIndex| match acc {
+            //     Some(acc) => Some(acc.reduce(elem)),
+            //     None => Some(elem.into()),
+            // });
             .into_par_iter()
             .panic_fuse()
             .map(|job| job.map(&worker))
@@ -278,6 +285,10 @@ impl Indexer {
                     (None, None) => None,
                 },
             );
+
+        if let Some(index) = index.as_mut() {
+            index.inverted_index.merge_all_segments().unwrap();
+        }
 
         Ok(())
     }

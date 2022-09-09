@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod ast;
+use crate::Result;
+use std::{array, convert::TryFrom, sync::Arc};
 
-use crate::{Error, Result};
-use std::{collections::HashMap, sync::Arc};
-
-use strum::{EnumIter, IntoEnumIterator};
 use tantivy::{
     fastfield::{Column, DynamicFastFieldReader},
     DocId, Score, SegmentReader,
@@ -30,9 +27,9 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::ast::{Alteration, Target, PARSER};
+use super::ast::{RawAlteration, Target};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Signal {
     Bm25,
     HostCentrality,
@@ -42,6 +39,16 @@ pub enum Signal {
     NumTrackers,
     Region,
 }
+
+const ALL_SIGNALS: [Signal; 7] = [
+    Signal::Bm25,
+    Signal::HostCentrality,
+    Signal::IsHomepage,
+    Signal::FetchTimeMs,
+    Signal::UpdateTimestamp,
+    Signal::NumTrackers,
+    Signal::Region,
+];
 
 impl Signal {
     fn from_field(field: &Field) -> Option<Self> {
@@ -60,14 +67,16 @@ impl Signal {
         !matches!(self, Signal::Bm25)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn value(
         &self,
         doc: DocId,
         bm25: Score,
         fastfield: Option<&DynamicFastFieldReader<u64>>,
         region_count: &Arc<RegionCount>,
-        current_timestamp: f64,
+        current_timestamp: usize,
         selected_region: Option<Region>,
+        aggregator: &SignalAggregator,
     ) -> f64 {
         match self {
             Signal::Bm25 => bm25 as f64,
@@ -76,14 +85,29 @@ impl Signal {
             }
             Signal::IsHomepage => fastfield.unwrap().get_val(doc as u64) as f64,
             Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield.unwrap().get_val(doc as u64) as f64;
-                1.0 / (fetch_time_ms + 1.0)
+                let fetch_time_ms = fastfield.unwrap().get_val(doc as u64) as usize;
+
+                if fetch_time_ms >= aggregator.fetch_time_ms_cache.len() {
+                    0.0
+                } else {
+                    aggregator.fetch_time_ms_cache[fetch_time_ms]
+                }
             }
             Signal::UpdateTimestamp => {
-                let update_timestamp = fastfield.unwrap().get_val(doc as u64) as f64;
+                let update_timestamp = fastfield.unwrap().get_val(doc as u64) as i64;
+
+                if current_timestamp as i64 - update_timestamp <= 0 {
+                    return 0.0;
+                }
+
                 let hours_since_update =
-                    (current_timestamp - update_timestamp).max(0.000001) / 3600.0;
-                1.0 / ((hours_since_update + 1.0).log2())
+                    ((current_timestamp as i64 - update_timestamp).max(1) / 3600) as usize;
+
+                if hours_since_update < aggregator.update_time_cache.len() {
+                    aggregator.update_time_cache[hours_since_update]
+                } else {
+                    0.0
+                }
             }
             Signal::NumTrackers => {
                 let num_trackers = fastfield.unwrap().get_val(doc as u64) as f64;
@@ -105,13 +129,13 @@ impl Signal {
 
     fn default_coefficient(&self) -> f64 {
         match self {
-            Signal::Bm25 => 3.0,
-            Signal::HostCentrality => 3200.0,
-            Signal::IsHomepage => 1.0,
-            Signal::FetchTimeMs => 1.0,
-            Signal::UpdateTimestamp => 1500.0,
-            Signal::NumTrackers => 200.0,
-            Signal::Region => 25.0,
+            Signal::Bm25 => 1.0,
+            Signal::HostCentrality => 1024.0,
+            Signal::IsHomepage => 0.1,
+            Signal::FetchTimeMs => 0.1,
+            Signal::UpdateTimestamp => 80.0,
+            Signal::NumTrackers => 20.0,
+            Signal::Region => 60.0,
         }
     }
 
@@ -137,34 +161,70 @@ fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFas
 }
 
 #[derive(Debug, Clone)]
-pub struct FieldBoost(HashMap<Field, f64>);
+pub struct FieldBoost(Vec<Option<f64>>);
 
 #[derive(Debug, Clone)]
-pub struct SignalCoefficient(HashMap<Signal, f64>);
+pub struct SignalCoefficient(Vec<Option<f64>>);
 
 impl SignalCoefficient {
     pub fn get(&self, signal: &Signal) -> f64 {
         self.0
-            .get(signal)
+            .get((*signal) as usize)
             .copied()
+            .flatten()
             .unwrap_or_else(|| signal.default_coefficient())
+    }
+
+    pub fn new(scores: impl Iterator<Item = (Signal, f64)>) -> Self {
+        let mut fast_scores = Vec::new();
+
+        for (signal, score) in scores {
+            let idx = signal as usize;
+
+            while idx >= fast_scores.len() {
+                fast_scores.push(None);
+            }
+
+            fast_scores[idx] = Some(score);
+        }
+
+        Self(fast_scores)
     }
 }
 
 impl FieldBoost {
     pub fn get(&self, field: &Field) -> f64 {
         self.0
-            .get(field)
+            .get((*field) as usize)
             .copied()
+            .flatten()
             .or_else(|| field.boost().map(|s| s as f64))
             .unwrap_or(1.0)
+    }
+
+    pub fn new(scores: impl Iterator<Item = (Field, f64)>) -> Self {
+        let mut fast_scores = Vec::new();
+
+        for (field, score) in scores {
+            let idx = field as usize;
+
+            while idx >= fast_scores.len() {
+                fast_scores.push(None);
+            }
+
+            fast_scores[idx] = Some(score);
+        }
+
+        Self(fast_scores)
     }
 }
 
 pub struct SignalAggregator {
-    readers: HashMap<Signal, DynamicFastFieldReader<u64>>,
+    readers: Vec<Option<DynamicFastFieldReader<u64>>>,
     signal_coefficients: SignalCoefficient,
     field_boost: FieldBoost,
+    fetch_time_ms_cache: [f64; 1000],
+    update_time_cache: Vec<f64>,
 }
 
 impl std::fmt::Debug for SignalAggregator {
@@ -178,36 +238,56 @@ impl std::fmt::Debug for SignalAggregator {
 
 impl Default for SignalAggregator {
     fn default() -> Self {
-        Self::new(HashMap::new(), HashMap::new())
+        Self::new(Vec::new().into_iter(), Vec::new().into_iter())
     }
 }
 
 impl SignalAggregator {
-    pub fn new(coefficients: HashMap<Signal, f64>, boosts: HashMap<Field, f64>) -> Self {
-        let signal_coefficients = SignalCoefficient(coefficients);
-        let field_boost = FieldBoost(boosts);
+    pub fn new(
+        coefficients: impl Iterator<Item = (Signal, f64)>,
+        boosts: impl Iterator<Item = (Field, f64)>,
+    ) -> Self {
+        let signal_coefficients = SignalCoefficient::new(coefficients);
+        let field_boost = FieldBoost::new(boosts);
+
+        let fetch_time_ms_cache = array::from_fn(|fetch_time| 1.0 / (fetch_time as f64 + 1.0));
+
+        let update_time_cache = (0..(3 * 365 * 24))
+            .map(|hours_since_update| 1.0 / ((hours_since_update as f64 + 1.0).log2()))
+            .collect();
 
         Self {
-            readers: HashMap::new(),
+            readers: Vec::new(),
             signal_coefficients,
             field_boost,
+            fetch_time_ms_cache,
+            update_time_cache,
         }
     }
 
     pub fn new_like(other: &SignalAggregator) -> Self {
         Self {
-            readers: HashMap::new(),
+            readers: Vec::new(),
             signal_coefficients: other.signal_coefficients.clone(),
             field_boost: other.field_boost.clone(),
+            fetch_time_ms_cache: other.fetch_time_ms_cache,
+            update_time_cache: other.update_time_cache.clone(),
         }
     }
 
     pub fn register_readers(&mut self, segment_reader: &SegmentReader) {
+        self.readers.clear();
+
         for field in &ALL_FIELDS {
             if let Some(signal) = Signal::from_field(field) {
                 if signal.has_fast_reader() {
-                    self.mut_readers()
-                        .insert(signal, fastfield_reader(segment_reader, field));
+                    let idx = signal as usize;
+
+                    while idx >= self.readers.len() {
+                        self.readers.push(None);
+                    }
+
+                    self.readers[idx] = Some(fastfield_reader(segment_reader, field))
                 }
             }
         }
@@ -218,19 +298,26 @@ impl SignalAggregator {
         doc: DocId,
         bm25: Score,
         region_count: &Arc<RegionCount>,
-        current_timestamp: f64,
+        current_timestamp: usize,
         selected_region: Option<Region>,
     ) -> f64 {
-        Signal::iter()
+        ALL_SIGNALS
+            .into_iter()
             .map(|signal| {
+                let reader = match self.readers.get(signal as usize) {
+                    Some(Some(reader)) => Some(reader),
+                    _ => None,
+                };
+
                 self.coefficients().get(&signal)
                     * signal.value(
                         doc,
                         bm25,
-                        self.readers().get(&signal),
+                        reader,
                         region_count,
                         current_timestamp,
                         selected_region,
+                        self,
                     )
             })
             .sum()
@@ -243,43 +330,47 @@ impl SignalAggregator {
     pub fn field_boosts(&self) -> &FieldBoost {
         &self.field_boost
     }
+}
+#[derive(Debug, PartialEq)]
+pub struct Alteration {
+    pub target: Target,
+    pub score: f64,
+}
 
-    pub fn mut_readers(&mut self) -> &mut HashMap<Signal, DynamicFastFieldReader<u64>> {
-        &mut self.readers
-    }
+impl TryFrom<RawAlteration> for Alteration {
+    type Error = crate::Error;
 
-    pub fn readers(&self) -> &HashMap<Signal, DynamicFastFieldReader<u64>> {
-        &self.readers
+    fn try_from(raw: RawAlteration) -> Result<Self> {
+        Ok(Alteration {
+            target: raw.target,
+            score: raw.score.parse()?,
+        })
     }
 }
 
-impl From<Vec<Alteration>> for SignalAggregator {
-    fn from(alterations: Vec<Alteration>) -> Self {
-        let mut coefficients = HashMap::new();
-        let mut boosts = HashMap::new();
+impl TryFrom<Vec<RawAlteration>> for SignalAggregator {
+    type Error = crate::Error;
+
+    fn try_from(alterations: Vec<RawAlteration>) -> Result<Self> {
+        let mut coefficients = Vec::new();
+        let mut boosts = Vec::new();
 
         for alteration in alterations {
+            let alteration = Alteration::try_from(alteration)?;
             match alteration.target {
                 Target::Signal(name) => {
                     if let Some(signal) = Signal::from_string(name) {
-                        coefficients.insert(signal, alteration.score);
+                        coefficients.push((signal, alteration.score));
                     }
                 }
                 Target::Field(name) => {
                     if let Some(field) = Field::from_string(name) {
-                        boosts.insert(field, alteration.score);
+                        boosts.push((field, alteration.score));
                     }
                 }
             }
         }
 
-        Self::new(coefficients, boosts)
-    }
-}
-
-pub fn parse(program: &str) -> Result<SignalAggregator> {
-    match PARSER.parse(program) {
-        Ok(alterations) => Ok(SignalAggregator::from(alterations)),
-        Err(_) => Err(Error::Parse),
+        Ok(Self::new(coefficients.into_iter(), boosts.into_iter()))
     }
 }

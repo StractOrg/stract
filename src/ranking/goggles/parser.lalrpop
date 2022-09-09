@@ -1,0 +1,85 @@
+use crate::ranking::goggles::ast::*;
+
+grammar;
+
+Sep<S, T>: Vec<T> = {
+    <mut xs:(<T> S)*> <x:T> => {
+        xs.push(x);
+        xs
+    }
+};
+
+pub Blocks: Vec<GoggleBlock> = <Sep<";", Block>>;
+
+Block: GoggleBlock = {
+    <RawAlteration> => GoggleBlock::Alteration(<>),
+    <Comment> => GoggleBlock::Comment(<>),
+    <RawInstruction> => GoggleBlock::Instruction(<>),
+}
+
+
+RawAlteration: RawAlteration = {
+    "@" <target:Target> "=" <score:Ident> => RawAlteration {<>}
+}
+
+Target: Target = {
+    <Name> => {
+        if let Some(name) = <>.strip_prefix("field_") {
+            Target::Field(name.to_string())
+        } else {
+            Target::Signal(<>)
+        }
+    },
+}
+
+Name: String = Ident;
+
+Comment: Comment = r"![^;]*" => {
+    if let Some((key, value)) = <>.split_once(':') {
+        let key = key.strip_prefix("!").unwrap_or(key).trim();
+        let value = value.trim();
+
+        if matches!(key, "name" | "description" | "public" | "author" | "homepage" | "issues" | "transferred_to" | "avatar" | "license") {
+            Comment::Header { key: key.to_string(), value: value.to_string() }
+        } else {
+            Comment::Basic(<>.to_string())
+        }
+    } else {
+            Comment::Basic(<>.to_string())
+    }
+};
+
+RawInstruction: RawInstruction = {
+    <patterns:RawPatterns> "$" <options:RawPatternOptions> => RawInstruction { <> },
+    <patterns:RawPatterns> => RawInstruction { <>, options: Vec::new() },
+}
+
+RawPatterns: Vec<RawPatternPart> = <RawPatternPart*> => <>;
+
+RawPatternPart: RawPatternPart = {
+    "*" => RawPatternPart::Wildcard,
+    "^" => RawPatternPart::Delimeter,
+    "|" => RawPatternPart::Anchor,
+    Ident => RawPatternPart::Raw(<>.to_string()),
+}
+
+RawPatternOptions: Vec<RawPatternOption> = <Sep<",", RawPatternOption>> => <>;
+
+RawPatternOption: RawPatternOption = {
+    "site=" <site:Ident> => RawPatternOption::Site(site.to_string()),
+    "inurl" => RawPatternOption::InUrl,
+    "intitle" => RawPatternOption::InTitle,
+    "indescription" => RawPatternOption::InDescription,
+    "incontent" => RawPatternOption::InContent,
+    <RawAction> => RawPatternOption::Action(<>),
+}
+
+RawAction: RawAction = {
+    "boost=" <Ident> => RawAction::Boost(<>),
+    "boost" => RawAction::Boost("1".to_string()),
+    "downrank=" <Ident> => RawAction::Downrank(<>),
+    "downrank" => RawAction::Downrank("1".to_string()),
+    "discard" => RawAction::Discard,
+}
+
+Ident: String = <r"[a-zA-Z0-9_/][a-zA-Z_/:\.\?@0-9&\-]*"> => <>.to_string();

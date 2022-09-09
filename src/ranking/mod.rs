@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod bm25;
 pub mod centrality_store;
+pub mod goggles;
 mod initial;
-pub mod signal_aggregator;
 
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::signal_aggregator::SignalAggregator;
+use self::goggles::SignalAggregator;
 
 pub struct Ranker {
     region_count: Arc<RegionCount>,
@@ -397,5 +398,125 @@ mod tests {
 
         assert_eq!(result.webpages.documents.len(), 2);
         assert_eq!(result.webpages.documents[0].url, "https://www.first.com");
+    }
+
+    #[test]
+    fn custom_signal_aggregation() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    example
+                </body>
+            </html>
+            "#,
+                "https://www.body.com",
+                vec![],
+                1.0,
+                20,
+            ))
+            .expect("failed to parse webpage");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Example website</title>
+                </head>
+                <body>
+                    test
+                </body>
+            </html>
+            "#,
+                "https://www.title.com",
+                vec![],
+                1.0,
+                20,
+            ))
+            .expect("failed to parse webpage");
+
+        index
+            .insert(Webpage::new(
+                r#"
+            <html>
+                <head>
+                    <title>Example website</title>
+                </head>
+                <body>
+                    test
+                </body>
+            </html>
+            "#,
+                "https://www.centrality.com",
+                vec![],
+                1.0002,
+                500,
+            ))
+            .expect("failed to parse webpage");
+
+        index.commit().unwrap();
+
+        let searcher = Searcher::new(index, None, None);
+
+        let res = searcher
+            .search(
+                "example",
+                None,
+                Some(
+                    r#"
+                        @field_title = 20000000
+                        @host_centrality = 0
+                    "#
+                    .to_string(),
+                ),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.title.com");
+
+        let res = searcher
+            .search(
+                "example",
+                None,
+                Some(
+                    r#"
+                        @field_all_body= 20000000
+                        @host_centrality = 0
+                    "#
+                    .to_string(),
+                ),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
+
+        let res = searcher
+            .search(
+                "example",
+                None,
+                Some("@host_centrality= 2000000".to_string()),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(res.webpages.num_docs, 3);
+        assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
     }
 }

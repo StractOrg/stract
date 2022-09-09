@@ -58,40 +58,40 @@ impl Url {
         &url[..start_query]
     }
 
-    pub fn host(&self) -> &str {
+    pub fn site(&self) -> &str {
         let url = self.strip_protocol();
 
-        let mut end_host = url.len();
+        let mut end_site = url.len();
         if url.contains('/') {
-            end_host = url.find('/').expect("The url contains atleast 1 '/'");
+            end_site = url.find('/').expect("The url contains atleast 1 '/'");
         }
 
-        &url[..end_host]
+        &url[..end_site]
     }
 
     pub fn domain(&self) -> &str {
-        let host = self.host();
-        let num_punctuations: usize = host.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
+        let site = self.site();
+        let num_punctuations: usize = site.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
         if num_punctuations > 1 {
-            let domain_index = host.rfind('.').unwrap();
-            let mut start_index = host[..domain_index].rfind('.').unwrap() + 1;
+            let domain_index = site.rfind('.').unwrap();
+            let mut start_index = site[..domain_index].rfind('.').unwrap() + 1;
 
-            if &host[start_index..] == "co.uk" {
-                if let Some(new_start_index) = host[..start_index - 1].rfind('.') {
+            if &site[start_index..] == "co.uk" {
+                if let Some(new_start_index) = site[..start_index - 1].rfind('.') {
                     start_index = new_start_index + 1;
                 } else {
                     start_index = 0;
                 }
             }
 
-            &host[start_index..]
+            &site[start_index..]
         } else {
-            host
+            site
         }
     }
 
     pub fn subdomain(&self) -> Option<&str> {
-        if let Some(subdomain) = self.host().strip_suffix(self.domain()) {
+        if let Some(subdomain) = self.site().strip_suffix(self.domain()) {
             if subdomain.is_empty() || subdomain == "." {
                 None
             } else {
@@ -129,28 +129,16 @@ impl Url {
         &self.0[..self.find_protocol_end()]
     }
 
-    pub fn site(&self) -> &str {
-        let start = self.find_protocol_end() + 3;
-        let url = &self.0[start..];
-
-        let mut end_host = url.len();
-        if url.contains('/') {
-            end_host = url.find('/').expect("The url contains atleast 1 '/'");
-        }
-
-        &self.0[..end_host + start]
-    }
-
     pub fn is_full_path(&self) -> bool {
         matches!(self.protocol(), "http" | "https" | "pdf")
     }
 
     pub fn prefix_with(&mut self, url: &Url) {
         self.0 = match (url.0.ends_with('/'), self.0.starts_with('/')) {
-            (true, true) => url.site().to_string() + &self.0,
-            (true, false) => url.0.clone() + &self.0,
-            (false, true) => url.site().to_string() + &self.0,
-            (false, false) => url.0.clone() + "/" + &self.0,
+            (true, true) => url.protocol().to_string() + "://" + url.site() + &self.0,
+            (true, false) => url.full() + &self.0,
+            (false, true) => url.protocol().to_string() + "://" + url.site() + &self.0,
+            (false, false) => url.full() + "/" + &self.0,
         };
     }
 
@@ -189,10 +177,10 @@ impl Url {
             if subdomain == "www" {
                 self.domain()
             } else {
-                self.host()
+                self.site()
             }
         } else {
-            self.host()
+            self.site()
         }
     }
 }
@@ -206,7 +194,7 @@ mod tests {
         let url: Url = "//scripts.dailymail.co.uk".to_string().into();
 
         assert_eq!(url.domain(), "dailymail.co.uk");
-        assert_eq!(url.host(), "scripts.dailymail.co.uk");
+        assert_eq!(url.site(), "scripts.dailymail.co.uk");
     }
 
     #[test]
@@ -214,7 +202,7 @@ mod tests {
         let url: Url = "dailymail.co.uk".to_string().into();
 
         assert_eq!(url.domain(), "dailymail.co.uk");
-        assert_eq!(url.host(), "dailymail.co.uk");
+        assert_eq!(url.site(), "dailymail.co.uk");
         assert_eq!(url.full().as_str(), "https://dailymail.co.uk");
     }
 

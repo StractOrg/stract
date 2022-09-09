@@ -26,6 +26,7 @@ use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
+use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
@@ -64,7 +65,7 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
-        let writer = tantivy_index.writer(10_000_000_000)?;
+        let writer = tantivy_index.writer_with_num_threads(1, 4_000_000_000)?;
 
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
@@ -137,6 +138,7 @@ impl InvertedIndex {
                 &page.body,
                 &page.dirty_body,
                 &page.description,
+                &page.region,
                 &searcher,
             )?;
         }
@@ -148,16 +150,23 @@ impl InvertedIndex {
     }
 
     pub fn merge_all_segments(&mut self) -> Result<()> {
-        let segment_ids: Vec<_> = self
+        let segments: Vec<_> = self
             .tantivy_index
             .load_metas()?
             .segments
             .into_iter()
-            .map(|segment| segment.id())
             .collect();
 
-        if !segment_ids.is_empty() {
+        if segments.len() > 1 {
+            let segment_ids: Vec<_> = segments.iter().map(|segment| segment.id()).collect();
             self.writer.merge(&segment_ids[..]).wait()?;
+
+            let path = Path::new(&self.path);
+            for segment in segments {
+                for file in segment.list_files() {
+                    std::fs::remove_file(path.join(file)).ok();
+                }
+            }
         }
 
         Ok(())
@@ -247,6 +256,7 @@ pub struct RetrievedWebpage {
     pub favicon: Option<Image>,
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
+    pub region: Region,
 }
 
 impl From<Document> for RetrievedWebpage {
@@ -305,24 +315,32 @@ impl From<Document> for RetrievedWebpage {
                         }
                     }
                 }
-                Field::StemmedAllBody => {
+                Field::AllBody => {
                     webpage.dirty_body = value
                         .value
                         .as_text()
-                        .expect("Stemmed all body field should be text")
+                        .expect("All body field should be text")
                         .to_string()
+                }
+                Field::Region => {
+                    webpage.region = {
+                        let id = value.value.as_u64().unwrap();
+                        Region::from_id(id)
+                    }
                 }
                 Field::BacklinkText
                 | Field::Centrality
-                | Field::Host
+                | Field::Site
                 | Field::StemmedTitle
                 | Field::CleanBody
                 | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::NumTrackers
-                | Field::Region
-                | Field::AllBody
+                | Field::NumCleanBodyTokens
+                | Field::NumDescriptionTokens
+                | Field::NumTitleTokens
+                | Field::NumUrlTokens
                 | Field::FetchTimeMs => {}
             }
         }
@@ -336,7 +354,7 @@ mod tests {
     use maplit::hashset;
 
     use crate::{
-        ranking::{signal_aggregator::SignalAggregator, Ranker},
+        ranking::{goggles::SignalAggregator, Ranker},
         webpage::{region::RegionCount, Link},
     };
 

@@ -45,7 +45,7 @@ const REGION_COUNT_FILE_NAME: &str = "region_count.json";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
 pub struct Index {
-    inverted_index: InvertedIndex,
+    pub inverted_index: InvertedIndex,
     favicon_store: FaviconStore,
     primary_image_store: PrimaryImageStore,
     favicon_downloader: ImageDownloader<String>,
@@ -105,7 +105,6 @@ impl Index {
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.inverted_index.merge_all_segments()?;
         self.spell_dictionary.commit()?;
         self.inverted_index.commit()?;
         self.region_count.commit();
@@ -292,7 +291,7 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::ranking::{signal_aggregator::SignalAggregator, Ranker};
+    use crate::ranking::{goggles::SignalAggregator, Ranker};
 
     use super::*;
 

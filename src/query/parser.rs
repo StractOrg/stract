@@ -22,7 +22,7 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIX,
-    ranking::signal_aggregator::FieldBoost,
+    ranking::goggles::FieldBoost,
     schema::{Field, ALL_FIELDS},
 };
 
@@ -185,7 +185,7 @@ impl Term {
             .filter(|(field, _)| {
                 matches!(
                     ALL_FIELDS[field.field_id() as usize],
-                    Field::Domain | Field::Host
+                    Field::Domain | Field::Site
                 )
             })
             .into_iter()

@@ -40,13 +40,13 @@ mod exponential_backoff;
 mod frontend;
 mod image_downloader;
 mod image_store;
-mod index;
+pub mod index;
 mod kv;
 mod query;
 mod ranking;
 mod schema;
 mod schema_org;
-mod searcher;
+pub mod searcher;
 mod snippet;
 mod spell;
 mod tokenizer;
@@ -188,6 +188,9 @@ pub enum Error {
 
     #[error("Unknown region")]
     UnknownRegion,
+
+    #[error("String is not float")]
+    ParseFloat(#[from] std::num::ParseFloatError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

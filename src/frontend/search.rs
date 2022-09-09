@@ -269,6 +269,16 @@ pub async fn route(
 
     let skip_pages = params.get("p").and_then(|p| p.parse().ok());
 
+    let mut goggle = None;
+
+    if let Some(url) = params.get("goggle") {
+        if let Ok(res) = reqwest::get(url).await {
+            if let Ok(text) = res.text().await {
+                goggle = Some(text);
+            }
+        }
+    }
+
     let selected_region = params.get("gl").and_then(|gl| {
         if let Ok(region) = Region::from_gl(gl) {
             Some(region)
@@ -279,7 +289,7 @@ pub async fn route(
 
     match state
         .searcher
-        .search(query.as_str(), selected_region, None, skip_pages)
+        .search(query.as_str(), selected_region, goggle, skip_pages)
     {
         Ok(result) => match result {
             SearchResult::Websites(result) => {

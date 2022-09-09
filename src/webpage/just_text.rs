@@ -60,7 +60,7 @@ macro_rules! include_stopwords {
                 $lang,
                 include_str!($file)
                     .lines()
-                    .map(|s| s.to_lowercase())
+                    .map(|s| s.to_string())
                     .collect(),
             );
         )*
@@ -144,11 +144,11 @@ impl Default for JustText {
 }
 
 #[derive(Clone, Debug)]
-struct Paragraph {
+pub struct Paragraph {
     is_heading: bool,
     tags_count: usize,
     chars_count_in_links: usize,
-    text: String,
+    pub text: String,
     last_was_whitespace: bool,
 }
 
@@ -195,10 +195,12 @@ struct ClassifiedParagraph {
 }
 
 impl JustText {
-    fn paragraphs(&self, root: NodeRef) -> Vec<Paragraph> {
+    pub fn paragraphs(root: NodeRef) -> Vec<Paragraph> {
         let mut res = Vec::new();
 
-        let mut preprocessor = Preprocessor::new(["script", "style", "embed", "form", "head"]);
+        let mut preprocessor = Preprocessor::new([
+            "script", "style", "embed", "form", "head", "noscript", "iframe",
+        ]);
 
         let mut br = false;
         let mut link = false;
@@ -261,7 +263,9 @@ impl JustText {
                                 // the <br><br> is a paragraph separator and should
                                 // not be included in the number of tags within the
                                 // paragraph
-                                paragraph.tags_count -= 1;
+                                if paragraph.tags_count > 0 {
+                                    paragraph.tags_count -= 1;
+                                }
                             }
 
                             paragraph.is_heading = heading_count > 0;
@@ -338,26 +342,25 @@ impl JustText {
         paragraph
             .text
             .split_whitespace()
-            .filter(|word| stopwords.contains(&word.to_lowercase()))
+            .filter(|word| stopwords.contains(*word))
             .count() as f64
             / paragraph.text.split_whitespace().count() as f64
     }
 
-    fn initial_classification(&self, paragraphs: Vec<Paragraph>) -> Vec<ClassifiedParagraph> {
+    fn initial_classification(
+        &self,
+        paragraphs: &[Paragraph],
+        lang: &Lang,
+    ) -> Vec<ClassifiedParagraph> {
         let mut res = Vec::new();
 
-        let stopwords = paragraphs
-            .iter()
-            .max_by_key(|p| p.text.len())
-            .and_then(|paragraph| {
-                let lang = whatlang::detect_lang(&paragraph.text).unwrap_or(Lang::Eng);
-                STOPWORDS.get(&lang)
-            })
+        let stopwords = STOPWORDS
+            .get(lang)
             .unwrap_or_else(|| STOPWORDS.get(&Lang::Eng).unwrap());
 
         for paragraph in paragraphs {
             let classification = {
-                let stopword_density: f64 = Self::calculate_stopword_density(&paragraph, stopwords);
+                let stopword_density: f64 = Self::calculate_stopword_density(paragraph, stopwords);
 
                 if paragraph.link_density() > self.max_link_density
                     || paragraph.text.contains("\\xa9")
@@ -384,7 +387,7 @@ impl JustText {
             };
 
             res.push(ClassifiedParagraph {
-                paragraph,
+                paragraph: paragraph.clone(),
                 classification: Classification::Intermediate(classification),
             });
         }
@@ -577,10 +580,9 @@ impl JustText {
             .join(" ")
     }
 
-    pub fn extract(&self, root: NodeRef) -> String {
-        let paragraphs = self.paragraphs(root);
+    pub fn extract_from_paragraphs(&self, paragraphs: &[Paragraph], lang: &Lang) -> String {
         let mut classified = self
-            .initial_classification(paragraphs)
+            .initial_classification(paragraphs, lang)
             .into_iter()
             .filter(|par| par.paragraph.text.chars().any(|c| !c.is_whitespace()))
             .collect();
@@ -647,7 +649,7 @@ mod tests {
         ];
 
         let just_text = JustText::default();
-        let mut classifications = just_text.initial_classification(paragraphs);
+        let mut classifications = just_text.initial_classification(&paragraphs, &Lang::Eng);
 
         assert!(classifications[0].classification.is_short());
         assert!(matches!(
