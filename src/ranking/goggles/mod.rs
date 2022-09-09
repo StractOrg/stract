@@ -21,6 +21,7 @@ mod signal;
 use std::convert::TryFrom;
 
 use crate::{schema::Field, tokenizer, Result};
+use itertools::Itertools;
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone, TermQuery},
     schema::{IndexRecordOption, Schema},
@@ -156,19 +157,27 @@ pub struct Goggle {
 
 impl Goggle {
     pub fn as_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
-        let mut res = Vec::new();
-
-        let mut occur = Occur::Should;
-
-        for instruction in &self.instructions {
-            if instruction.is_empty_discard() {
-                occur = Occur::Must;
-            } else {
-                res.push(instruction.as_tantivy(schema, occur));
-            }
+        if self
+            .instructions
+            .iter()
+            .any(|instruction| instruction.is_empty_discard())
+        {
+            vec![(
+                Occur::Must,
+                BooleanQuery::from(
+                    self.instructions
+                        .iter()
+                        .map(|instruction| instruction.as_tantivy(schema))
+                        .collect_vec(),
+                )
+                .box_clone(),
+            )]
+        } else {
+            self.instructions
+                .iter()
+                .map(|instruction| instruction.as_tantivy(schema))
+                .collect()
         }
-
-        res
     }
 }
 
@@ -206,11 +215,7 @@ fn process_site(site: &str, field: tantivy::schema::Field) -> Box<dyn tantivy::q
 }
 
 impl Instruction {
-    pub fn as_tantivy(
-        &self,
-        schema: &Schema,
-        occur: Occur,
-    ) -> (Occur, Box<dyn tantivy::query::Query>) {
+    pub fn as_tantivy(&self, schema: &Schema) -> (Occur, Box<dyn tantivy::query::Query>) {
         let mut subqueries = Vec::new();
 
         let mut field = None;
@@ -262,7 +267,7 @@ impl Instruction {
 
         match action {
             Action::Boost(boost) => (
-                occur,
+                Occur::Should,
                 BoostQuery::new(
                     BooleanQuery::from(subqueries).box_clone(),
                     boost as f32 + 1.0,
@@ -270,7 +275,7 @@ impl Instruction {
                 .box_clone(),
             ),
             Action::Downrank(boost) => (
-                occur,
+                Occur::Should,
                 BoostQuery::new(
                     BooleanQuery::from(subqueries).box_clone(),
                     1.0 / (boost as f32 + 1.0),
@@ -370,7 +375,8 @@ mod tests {
                 Some(
                     r#"
                 $discard,site=b.com
-            "#,
+            "#
+                    .to_string(),
                 ),
                 None,
             )
@@ -390,7 +396,8 @@ mod tests {
                 Some(
                     r#"
                 $boost=10,site=a.com
-            "#,
+            "#
+                    .to_string(),
                 ),
                 None,
             )
@@ -465,7 +472,7 @@ mod tests {
             .search(
                 "website",
                 None,
-                Some(include_str!("../../../testcases/goggles/quickstart.goggle")),
+                Some(include_str!("../../../testcases/goggles/quickstart.goggle").to_string()),
                 None,
             )
             .unwrap()
@@ -478,9 +485,7 @@ mod tests {
             .search(
                 "website",
                 None,
-                Some(include_str!(
-                    "../../../testcases/goggles/hacker_news.goggle"
-                )),
+                Some(include_str!("../../../testcases/goggles/hacker_news.goggle").to_string()),
                 None,
             )
             .unwrap()
@@ -535,6 +540,26 @@ mod tests {
                 500,
             ))
             .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.c.com/this/is/c/pattern",
+                vec![],
+                0.0001,
+                500,
+            ))
+            .expect("failed to parse webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -546,8 +571,10 @@ mod tests {
                 Some(
                     r#"
                 $discard
-                $site=b.com,boost=2
-                "#,
+                $site=a.com,boost=6
+                $site=b.com,boost=1
+                "#
+                    .to_string(),
                 ),
                 None,
             )
@@ -557,7 +584,7 @@ mod tests {
             .webpages
             .documents;
 
-        assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com/this/is/b/pattern");
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].url, "https://www.a.com/this/is/a/pattern");
     }
 }

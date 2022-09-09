@@ -10,7 +10,11 @@ macro_rules! bench {
         desc.push('\'');
         desc.push_str(" with goggle");
         $c.bench_function(desc.as_str(), |b| {
-            b.iter(|| $searcher.search($query, None, Some($goggle), None).unwrap())
+            b.iter(|| {
+                $searcher
+                    .search($query, None, Some($goggle.to_string()), None)
+                    .unwrap()
+            })
         });
     };
 }
