@@ -1,0 +1,13 @@
+---
+export interface Props {
+  expr: string;
+}
+
+const { expr } = Astro.props;
+---
+
+<Fragment>
+  <Fragment set:html={`{% match ${expr} %}`} />
+  <slot />
+  <Fragment set:html={"{% endmatch %}"} />
+</Fragment>

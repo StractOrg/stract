@@ -1,9 +1,0 @@
-{
-    "license": "ISC",
-    "scripts": {
-        "build": "npx tailwindcss build -i tailwind.css -o ./static/css/main.css"
-    },
-    "devDependencies": {
-        "tailwindcss": "*"
-    }
-}

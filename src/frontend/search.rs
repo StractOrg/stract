@@ -17,6 +17,7 @@
 use axum::Extension;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use itertools::{intersperse, Itertools};
+use serde::Serialize;
 
 use crate::{
     entity_index::{entity::Span, StoredEntity},
@@ -133,6 +134,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
     }
 }
 
+#[derive(Serialize)]
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,
@@ -237,7 +239,7 @@ fn maybe_prettify_entity_date(value: String) -> String {
 }
 
 #[derive(Template)]
-#[template(path = "search.html", escape = "none")]
+#[template(path = "search/index.html", escape = "none")]
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,

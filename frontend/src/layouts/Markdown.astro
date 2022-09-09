@@ -1,0 +1,36 @@
+---
+import Footer from "../components/Footer.astro";
+import Navbar from "../components/Navbar.astro";
+import Layout from "../layouts/Layout.astro";
+
+export interface Props {
+  frontmatter: { title: string };
+}
+
+const { frontmatter } = Astro.props;
+---
+
+<Layout title={frontmatter.title}>
+  <div class="flex flex-col h-full w-full">
+    <div class="min-h-max w-full">
+      <header class="flex items-center w-full h-24">
+        <div class="ml-14 mr-14 w-12 h-12">
+          <a href="/">
+            <img src="/assets/images/logo.svg" class="w-full h-full" />
+          </a>
+        </div>
+        <Navbar />
+      </header>
+    </div>
+
+    <div class="flex flex-col w-full h-fit items-center pt-10">
+      <div
+        class="prose prose-headings:text-center prose-headings:font-medium prose-h4:float-left prose-h4:mr-3 prose-h4:my-0 prose-h4:leading-7"
+      >
+        <slot />
+      </div>
+    </div>
+    <div class="flex flex-grow"></div>
+    <Footer />
+  </div>
+</Layout>
