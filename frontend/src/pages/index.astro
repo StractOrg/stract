@@ -6,27 +6,24 @@ import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Cuely">
-  <div class="flex flex-col h-full w-full">
-    <header class="flex items-center h-24">
+  <div class="grid grid-rows-[auto_2fr_1fr_auto] h-full">
+    <header class="py-9">
       <Navbar />
     </header>
 
-    <div
-      class="flex justify-center items-center flex-col"
-      style="flex-grow: 3;"
-    >
+    <div class="flex flex-col justify-center items-center">
       <div class="flex">
-        <h1 class="text-5xl uppercase mb-1" style="color: #0b7bff">cuely</h1>
-        <span style="color: #828282">BETA</span>
+        <h1 class="text-5xl uppercase mb-1 text-brand">cuely</h1>
+        <span class="text-gray-500">BETA</span>
       </div>
 
-      <h3 class="mb-8" style="color: #828282">Completely Open Search Engine</h3>
+      <h2 class="mb-8 text-gray-500">Completely Open Search Engine</h2>
 
       <Searchbar autofocus />
     </div>
 
-    <div class="flex grow flex-col" style="flex-grow: 2;"></div>
-
-    <Footer />
+    <div class="row-start-4">
+      <Footer />
+    </div>
   </div>
 </Layout>
