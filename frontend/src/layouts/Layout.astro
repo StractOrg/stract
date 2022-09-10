@@ -1,4 +1,14 @@
 ---
+import "@fontsource/montserrat";
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/500.css";
+import "@fontsource/montserrat/600.css";
+import "@fontsource/montserrat/700.css";
+import "@fontsource/montserrat/400-italic.css";
+import "@fontsource/montserrat/500-italic.css";
+import "@fontsource/montserrat/600-italic.css";
+import "@fontsource/montserrat/700-italic.css";
+
 export interface Props {
   title: string;
 }
@@ -19,119 +29,6 @@ const { title } = Astro.props;
     <slot />
 
     <style is:global>
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Light.ttf") format("truetype");
-        font-style: normal;
-        font-weight: 400;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Medium.ttf") format("truetype");
-        font-style: normal;
-        font-weight: 500;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-SemiBold.ttf") format("truetype");
-        font-style: normal;
-        font-weight: 600;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Bold.ttf") format("truetype");
-        font-style: normal;
-        font-weight: 700;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-LightItalic.ttf") format("truetype");
-        font-style: italic;
-        font-weight: 400;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-MediumItalic.ttf") format("truetype");
-        font-style: italic;
-        font-weight: 500;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-SemiBoldItalic.ttf")
-          format("truetype");
-        font-style: italic;
-        font-weight: 600;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-BoldItalic.ttf") format("truetype");
-        font-style: italic;
-        font-weight: 700;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Light.woff") format("woff");
-        font-style: normal;
-        font-weight: 400;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Medium.woff") format("woff");
-        font-style: normal;
-        font-weight: 500;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-SemiBold.woff") format("woff");
-        font-style: normal;
-        font-weight: 600;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-Bold.woff") format("woff");
-        font-style: normal;
-        font-weight: 700;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-LightItalic.woff") format("woff");
-        font-style: italic;
-        font-weight: 400;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-MediumItalic.woff") format("woff");
-        font-style: italic;
-        font-weight: 500;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-SemiBoldItalic.woff") format("woff");
-        font-style: italic;
-        font-weight: 600;
-      }
-
-      @font-face {
-        font-family: Montserrat;
-        src: url("/assets/fonts/Montserrat-BoldItalic.woff") format("woff");
-        font-style: italic;
-        font-weight: 700;
-      }
-
       html,
       body {
         position: relative;
