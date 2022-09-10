@@ -20,7 +20,7 @@ use crate::{
 };
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
-    query::{AllQuery, BooleanQuery, Occur, QueryClone},
+    query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
     tokenizer::TokenizerManager,
 };
@@ -65,12 +65,10 @@ impl Query {
 
         let field_boost = aggregator.field_boosts();
 
-        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
+        let queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
             .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager, field_boost))
             .collect();
-
-        queries.push((Occur::Should, Box::new(AllQuery)));
 
         let tantivy_query = Box::new(BooleanQuery::new(queries));
 
