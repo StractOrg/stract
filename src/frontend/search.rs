@@ -32,7 +32,10 @@ use crate::{
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use super::{HtmlTemplate, State};
+use super::{
+    goggles::{GoggleLink, DEFAULT_GOGGLES},
+    HtmlTemplate, State,
+};
 use askama::Template;
 use axum::{
     extract,
@@ -251,6 +254,8 @@ struct SearchTemplate {
     current_page: usize,
     next_page_url: String,
     prev_page_url: Option<String>,
+    default_goggles: Vec<GoggleLink>,
+    current_goggle_url: Option<String>,
 }
 
 enum RegionSelection {
@@ -270,11 +275,15 @@ pub async fn route(
     let skip_pages = params.get("p").and_then(|p| p.parse().ok());
 
     let mut goggle = None;
+    let mut current_goggle_url = None;
 
     if let Some(url) = params.get("goggle") {
-        if let Ok(res) = reqwest::get(url).await {
-            if let Ok(text) = res.text().await {
-                goggle = Some(text);
+        if !url.is_empty() {
+            if let Ok(res) = reqwest::get(url).await {
+                if let Ok(text) = res.text().await {
+                    goggle = Some(text);
+                    current_goggle_url = Some(url.to_string());
+                }
             }
         }
     }
@@ -375,6 +384,8 @@ pub async fn route(
                     current_page,
                     next_page_url,
                     prev_page_url,
+                    default_goggles: DEFAULT_GOGGLES.to_vec(),
+                    current_goggle_url,
                 };
 
                 HtmlTemplate(template).into_response()

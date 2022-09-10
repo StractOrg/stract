@@ -37,6 +37,7 @@ mod api;
 mod autosuggest;
 mod entity_image;
 mod favicons;
+mod goggles;
 mod index;
 mod primary_image;
 mod privacy;
@@ -101,6 +102,7 @@ pub fn router(
         .route("/entity/image/:entity", get(entity_image::route))
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
+        .route("/goggles", get(goggles::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/api/beta/search", get(api::search))
         .merge(SpaRouter::new("/assets", "frontend/dist/assets"))

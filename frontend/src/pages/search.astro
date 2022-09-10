@@ -4,6 +4,7 @@ import Searchbar from "../components/Searchbar.astro";
 import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
+import GoggleSelector from "../components/GoggleSelector.astro";
 import { askama } from "../askama";
 ---
 
@@ -31,32 +32,39 @@ import { askama } from "../askama";
               } seconds
             </p>
           </div>
-          <div
-            class="select-region h-full flex flex-col justify-center p-0 m-0"
-          >
-            <select
-              form="searchbar-form"
-              name="gl"
-              class="p-0 m-0 hover:cursor-pointer"
+          <div class="flex">
+            <GoggleSelector
+              current_goggle_url="current_goggle_url"
+              default_goggles="default_goggles"
+            />
+            <div
+              class="select-region h-full flex flex-col justify-center p-0 m-0"
             >
-              {
-                askama.for_(
-                  "region_selection in all_regions",
-                  askama.match("region_selection", {
-                    "RegionSelection::Selected(region)": (
-                      <option value="{{ region.gl() }}" selected>
-                        {askama`region.name()`}
-                      </option>
-                    ),
-                    "RegionSelection::Unselected(region)": (
-                      <option value="{{ region.gl() }}">
-                        {askama`region.name()`}
-                      </option>
-                    ),
-                  })
-                )
-              }
-            </select>
+              <select
+                form="searchbar-form"
+                name="gl"
+                onchange="document.getElementById('searchbar-form').submit()"
+                class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+              >
+                {
+                  askama.for_(
+                    "region_selection in all_regions",
+                    askama.match("region_selection", {
+                      "RegionSelection::Selected(region)": (
+                        <option value="{{ region.gl() }}" selected>
+                          {askama`region.name()`}
+                        </option>
+                      ),
+                      "RegionSelection::Unselected(region)": (
+                        <option value="{{ region.gl() }}">
+                          {askama`region.name()`}
+                        </option>
+                      ),
+                    })
+                  )
+                }
+              </select>
+            </div>
           </div>
         </div>
         <div class="flex flex-col pt-4 pb-8">
@@ -196,12 +204,5 @@ import { askama } from "../askama";
     text-rendering: optimizeLegibility;
     font-smooth: grayscale;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  .select-region > select {
-    background-color: transparent;
-    border: 0px;
-    font-size: small;
-    width: 105px;
   }
 </style>

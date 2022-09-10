@@ -1,0 +1,168 @@
+---
+import Footer from "../components/Footer.astro";
+import Navbar from "../components/Navbar.astro";
+import Layout from "../layouts/Layout.astro";
+import { askama } from "../askama";
+---
+
+<Layout title="Cuely">
+    <div class="flex flex-col h-full w-full">
+        <div class="min-h-max w-full">
+            <header class="flex items-center w-full h-24">
+                <div class="ml-14 mr-14 w-12 h-12">
+                    <a href="/">
+                        <img
+                            src="/assets/images/logo.svg"
+                            class="w-full h-full"
+                        />
+                    </a>
+                </div>
+                <Navbar />
+            </header>
+        </div>
+
+        <div class="flex flex-col w-full h-fit items-center pt-10">
+            <div class="flex flex-col max-w-2xl">
+                <h1 class="font-medium text-2xl">Manage Goggles</h1>
+                <div class="text-sm mt-5">
+                    Goggles lets you control almost everything about which
+                    search results that gets returned to you. You can discard
+                    results from specific sites, boost results from other sites
+                    and much more.
+                </div>
+                <div class="text-sm mt-3">
+                    See our <a
+                        href="https://github.com/Cuely/sample-goggles/blob/main/quickstart.goggle"
+                        >quickstart</a
+                    > for how to get started. Once you have developed your goggle,
+                    you can add it here to be used during your search.
+                </div>
+                <div class="text-sm mt-3">
+                    Simply host the goggle on a url that returns a plain-text
+                    HTTP response with the goggle. We use
+                    raw.githubusercontent.com, but you are free to host them
+                    elsewhere.
+                </div>
+                <div class="mt-16">
+                    <div class="w-full flex justify-between pl-5 pr-5">
+                        <input id="name" type="text" placeholder="Name" />
+                        <input id="url" type="text" placeholder="Url" />
+                        <button
+                            id="add-btn"
+                            class="bg-brand text-white rounded-full w-20 h-10 border-0 text-sm"
+                            >Add</button
+                        >
+                    </div>
+                    <div class="mt-5">
+                        <div
+                            class="grid grid-cols-[auto_1fr_1fr] w-full space-y-5"
+                            id="goggles-list"
+                        >
+                            <div class="w-10"></div>
+                            <div class="font-medium">Name</div>
+                            <div class="font-medium">Url</div>
+                            {
+                                askama.for_("goggle in default_goggles", () => (
+                                    <>
+                                        <div class="w-5">
+                                            <img
+                                                src="/assets/images/disabled-delete.svg"
+                                                class="h-5 w-5"
+                                            />
+                                        </div>
+                                        <div class="text-sm">{askama`goggle.name`}</div>
+                                        <div class="text-sm">{askama`goggle.url`}</div>
+                                    </>
+                                ))
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-grow"></div>
+        <Footer />
+    </div>
+</Layout>
+
+<script is:inline>
+    const addBtn = document.querySelector("#add-btn");
+    const nameInput = document.querySelector("#name");
+    const gogglesList = document.querySelector("#goggles-list");
+    const urlInput = document.querySelector("#url");
+
+    nameInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addBtn.click();
+        }
+    });
+
+    urlInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addBtn.click();
+        }
+    });
+
+    let goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+
+    function updateList() {
+        goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+
+        document
+            .querySelectorAll(".user-goggle")
+            .forEach((goggle) => goggle.remove());
+
+        goggles.forEach((goggle, i) => {
+            let img = document.createElement("div");
+            img.classList.add("user-goggle");
+
+            img.innerHTML =
+                '<img src="/assets/images/delete.svg" class="w-5 h-5 hover:cursor-pointer" id="' +
+                i +
+                '" onclick="deleteRow(this)"/>';
+
+            let name = document.createElement("div");
+            name.innerHTML = goggle.name;
+            name.classList.add("user-goggle");
+            name.classList.add("text-sm");
+
+            let url = document.createElement("div");
+            url.innerHTML = goggle.url;
+            url.classList.add("user-goggle");
+            url.classList.add("text-sm");
+
+            gogglesList.appendChild(img);
+            gogglesList.appendChild(name);
+            gogglesList.appendChild(url);
+        });
+    }
+
+    function deleteRow(deleteBtn) {
+        let row = deleteBtn.id;
+
+        goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+        goggles.splice(row, 1);
+        window.localStorage.setItem("goggles", JSON.stringify(goggles));
+
+        updateList();
+    }
+
+    updateList();
+
+    function add() {
+        if (nameInput.value == "" || urlInput.value == "") {
+            return; // TODO: give some kind of feedback to the user
+        }
+
+        goggles.push({ name: nameInput.value, url: urlInput.value });
+        window.localStorage.setItem("goggles", JSON.stringify(goggles));
+        updateList();
+
+        nameInput.value = "";
+        urlInput.value = "";
+    }
+
+    addBtn.addEventListener("click", add);
+</script>

@@ -6,11 +6,11 @@ export interface Props {
 }
 ---
 
-<div class="flex grow justify-center pt-3">
+<div class="flex grow justify-center pt-10">
   <div class="max-w-md flex flex-col items-center">
     {
       askama.if_("let Some(image) = entity.image", () => (
-        <div class="w-lg mb-3">
+        <div class="w-lg mb-5">
           <a href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">
             <img
               class="h-full w-full rounded-full"
@@ -20,7 +20,7 @@ export interface Props {
         </div>
       ))
     }
-    <div class="text-xl mb-1">
+    <div class="text-xl mb-2">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
         >{askama`entity.title`}
       </a>
@@ -38,7 +38,7 @@ export interface Props {
     {
       askama.if_("!entity.info.is_empty()", () => (
         <div class="mt-5 flex w-full flex-col px-4 text-sm">
-          <div class="border-spacing-x-4 border-spacing-y-1.5 grid border-separate grid-cols-[auto_1fr] gap-x-4">
+          <div class="grid border-separate border-spacing-x-4 border-spacing-y-1.5 grid-cols-[auto_1fr] gap-x-4">
             {askama.for_("(key, value) in entity.info", () => (
               <>
                 <div class="text-gray-400">{askama`key`}</div>

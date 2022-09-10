@@ -1,0 +1,61 @@
+---
+export interface Props {
+  current_goggle_url: string;
+  default_goggles: string;
+}
+
+import { askama } from "../askama";
+---
+
+<div class="h-full flex flex-col justify-center p-0 m-0">
+  <select
+    form="searchbar-form"
+    id="goggles-selector"
+    name="goggle"
+    onchange="document.getElementById('searchbar-form').submit()"
+    class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+  >
+    <option value="">Goggle</option>
+    {
+      askama.for_(
+        "goggle in default_goggles",
+        askama.match("current_goggle_url", {
+          "Some(current_goggle)": askama.if_(
+            "current_goggle == goggle.url",
+            () => (
+              <option selected value="{{ goggle.url }}">
+                {askama`goggle.name`}
+              </option>
+            ),
+            () => (
+              <option value="{{ goggle.url }}">{askama`goggle.name`}</option>
+            )
+          ),
+          None: <option value="{{ goggle.url }}">{askama`goggle.name`}</option>,
+        })
+      )
+    }
+  </select>
+</div>
+
+<script is:inline>
+  const gogglesSelector = document.querySelector("#goggles-selector");
+  let goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+
+  const params = new Proxy(new URLSearchParams(window.location.search), {
+    get: (searchParams, prop) => searchParams.get(prop),
+  });
+
+  goggles.forEach((goggle) => {
+    let node = document.createElement("option");
+
+    if (goggle.url == params.goggle) {
+      node.setAttribute("selected", "");
+    }
+
+    node.value = goggle.url;
+    node.text = goggle.name;
+
+    gogglesSelector.appendChild(node);
+  });
+</script>
