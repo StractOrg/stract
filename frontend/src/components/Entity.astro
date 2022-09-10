@@ -1,8 +1,4 @@
 ---
-import AskamaFor from "./AskamaFor.astro";
-import AskamaIf from "./AskamaIf.astro";
-import AskamaMatch from "./AskamaMatch.astro";
-import AskamaWhen from "./AskamaWhen.astro";
 import { askama } from "../askama";
 
 export interface Props {
@@ -12,8 +8,8 @@ export interface Props {
 
 <div class="flex grow justify-center pt-10">
   <div class="max-w-md flex flex-col items-center">
-    <AskamaMatch expr="entity.image">
-      <AskamaWhen pat="Some(image)">
+    {
+      askama.if_("let Some(image) = entity.image", () => (
         <div class="w-lg mb-5">
           <a href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">
             <img
@@ -22,9 +18,8 @@ export interface Props {
             />
           </a>
         </div>
-      </AskamaWhen>
-      <AskamaWhen pat="None" />
-    </AskamaMatch>
+      ))
+    }
     <div class="text-xl mb-2">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
         >{askama`entity.title`}
@@ -40,51 +35,48 @@ export interface Props {
         >
       </span>
     </div>
-    <AskamaIf expr="!entity.info.is_empty()">
-      <div class="flex flex-col text-sm mt-5 w-full px-4">
-        <div
-          class="border-separate border-spacing-x-4 gap-x-4 grid grid-cols-[auto_1fr] border-spacing-y-1.5"
-        >
-          <AskamaFor elem="(key, value)" in="entity.info">
-            <div class="text-gray-400">
-              {askama`key`}
-            </div>
-            <div>
-              {askama`value`}
-            </div>
-          </AskamaFor>
+    {
+      askama.if_("!entity.info.is_empty()", () => (
+        <div class="mt-5 flex w-full flex-col px-4 text-sm">
+          <div class="grid border-separate border-spacing-x-4 border-spacing-y-1.5 grid-cols-[auto_1fr] gap-x-4">
+            {askama.for_("(key, value) in entity.info", () => (
+              <>
+                <div class="text-gray-400">{askama`key`}</div>
+                <div>{askama`value`}</div>
+              </>
+            ))}
+          </div>
         </div>
-      </div>
-    </AskamaIf>
-    <AskamaIf expr="!entity.related_entities.is_empty()">
-      <div class="flex flex-col mt-5 text-gray-500 w-full">
-        <div class="font-light">Related Searches</div>
-        <div class="flex">
-          <AskamaFor elem="entity" in="entity.related_entities">
-            <div class="flex flex-col items-center p-4">
-              <AskamaMatch expr="entity.image">
-                <AskamaWhen pat="Some(image)">
-                  <div class="h-20 w-20 mb-3">
+      ))
+    }
+    {
+      askama.if_("!entity.related_entities.is_empty()", () => (
+        <div class="mt-5 flex w-full flex-col text-gray-500">
+          <div class="font-light">Related Searches</div>
+          <div class="flex">
+            {askama.for_("entity in entity.related_entities", () => (
+              <div class="flex flex-col items-center p-4">
+                {askama.if_("let Some(image) = entity.image", () => (
+                  <div class="mb-3 h-20 w-20">
                     <a href="/search?q={{ entity.title|urlencode }}">
                       <img
-                        class="h-full object-cover w-full rounded-full"
+                        class="h-full w-full rounded-full object-cover"
                         src="/entity/image/{{ image|urlencode }}"
                       />
                     </a>
                   </div>
-                </AskamaWhen>
-                <AskamaWhen pat="None" />
-              </AskamaMatch>
+                ))}
 
-              <div class="text-center">
-                <a href="/search?q={{ entity.title|urlencode }}">
-                  {askama`entity.title`}
-                </a>
+                <div class="text-center">
+                  <a href="/search?q={{ entity.title|urlencode }}">
+                    {askama`entity.title`}
+                  </a>
+                </div>
               </div>
-            </div>
-          </AskamaFor>
+            ))}
+          </div>
         </div>
-      </div>
-    </AskamaIf>
+      ))
+    }
   </div>
 </div>

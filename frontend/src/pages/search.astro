@@ -1,11 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Searchbar from "../components/Searchbar.astro";
-import AskamaFor from "../components/AskamaFor.astro";
-import AskamaMatch from "../components/AskamaMatch.astro";
-import AskamaWhen from "../components/AskamaWhen.astro";
-import AskamaIf from "../components/AskamaIf.astro";
-import AskamaElse from "../components/AskamaElse.astro";
 import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
@@ -36,7 +31,7 @@ import { askama } from "../askama";
               } seconds
             </p>
           </div>
-          <div class="flex h-full space-x-3">
+          <div class="flex">
             <div class="h-full flex flex-col justify-center p-0 m-0">
               <select
                 form="searchbar-form"
@@ -45,145 +40,145 @@ import { askama } from "../askama";
                 class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
               >
                 <option value="">Goggle</option>
-                <AskamaFor elem="goggle" in="default_goggles">
-                  <AskamaMatch expr="current_goggle_url">
-                    <AskamaWhen pat="Some" with="(current_goggle_url)">
-                      <AskamaIf expr="current_goggle_url == goggle.url">
-                        <option selected value="{{ goggle.url }}"
-                          >{askama`goggle.name`}
-                        </option>
-                        <AskamaElse>
-                          <option value="{{ goggle.url }}"
-                            >{askama`goggle.name`}
+                {
+                  askama.for_(
+                    "goggle in default_goggles",
+                    askama.match("current_goggle_url", {
+                      "Some(current_goggle)": askama.if_(
+                        "current_goggle == goggle.url",
+                        () => (
+                          <option selected value="{{ goggle.url }}">
+                            {askama`goggle.name`}
                           </option>
-                        </AskamaElse>
-                      </AskamaIf>
-                    </AskamaWhen>
-
-                    <AskamaWhen pat="None">
-                      <option value="{{ goggle.url }}"
-                        >{askama`goggle.name`}
-                      </option>
-                    </AskamaWhen>
-                  </AskamaMatch>
-                </AskamaFor>
+                        ),
+                        () => (
+                          <option value="{{ goggle.url }}">
+                            {askama`goggle.name`}
+                          </option>
+                        )
+                      ),
+                      None: (
+                        <option value="{{ goggle.url }}">
+                          {askama`goggle.name`}
+                        </option>
+                      ),
+                    })
+                  )
+                }
               </select>
             </div>
-            <div class="h-full flex flex-col justify-center p-0 m-0">
+            <div
+              class="select-region h-full flex flex-col justify-center p-0 m-0"
+            >
               <select
                 form="searchbar-form"
                 name="gl"
                 onchange="document.getElementById('searchbar-form').submit()"
                 class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
               >
-                <AskamaFor elem="region_selection" in="all_regions">
-                  <AskamaMatch expr="region_selection">
-                    <AskamaWhen pat="RegionSelection::Selected" with="(region)">
-                      <option value="{{ region.gl() }}" selected>
-                        {askama`region.name()`}
-                      </option>
-                    </AskamaWhen>
-                    <AskamaWhen
-                      pat="RegionSelection::Unselected"
-                      with="(region)"
-                    >
-                      <option value="{{ region.gl() }}">
-                        {askama`region.name()`}
-                      </option>
-                    </AskamaWhen>
-                  </AskamaMatch>
-                </AskamaFor>
+                {
+                  askama.for_(
+                    "region_selection in all_regions",
+                    askama.match("region_selection", {
+                      "RegionSelection::Selected(region)": (
+                        <option value="{{ region.gl() }}" selected>
+                          {askama`region.name()`}
+                        </option>
+                      ),
+                      "RegionSelection::Unselected(region)": (
+                        <option value="{{ region.gl() }}">
+                          {askama`region.name()`}
+                        </option>
+                      ),
+                    })
+                  )
+                }
               </select>
             </div>
           </div>
         </div>
         <div class="flex flex-col pt-4 pb-8">
-          <AskamaMatch expr="spell_correction">
-            <AskamaWhen pat="Some" with="(correction)">
+          {
+            askama.if_("let Some(correction) = spell_correction", () => (
               <div class="pl-3 pb-3">
-                Did you mean: <a
-                  class="italic title-link font-bold"
+                Did you mean:{" "}
+                <a
+                  class="title-link font-bold italic"
                   href="/search?q={{ correction|urlencode }}"
                 >
                   {askama`correction`}
                 </a>
               </div>
-            </AskamaWhen>
-            <AskamaWhen pat="None" />
-          </AskamaMatch>
+            ))
+          }
 
           <div class="search-result flex flex-col space-y-3">
-            <AskamaFor elem="item" in="search_result">
-              <div class="flex max-w-3xl w-full p-3">
-                <div class="flex flex-col w-full">
-                  <div class="text-sm mb-1 flex">
-                    <div class="flex items-center mr-2">
-                      <img
-                        src="/favicons/{{ item.domain|urlencode }}"
-                        width="13px"
-                      />
+            {
+              askama.for_("item in search_result", () => (
+                <div class="flex w-full max-w-3xl p-3">
+                  <div class="flex w-full flex-col">
+                    <div class="mb-1 flex text-sm">
+                      <div class="mr-2 flex items-center">
+                        <img
+                          src="/favicons/{{ item.domain|urlencode }}"
+                          width="13px"
+                        />
+                      </div>
+                      <div>
+                        <a
+                          class="text-gray-600 hover:no-underline"
+                          href="{{ item.url }}"
+                        >
+                          {askama`item.pretty_url`}
+                        </a>
+                      </div>
                     </div>
-                    <div>
-                      <a
-                        class="hover:no-underline text-gray-600"
-                        href="{{ item.url }}"
-                        >{askama`item.pretty_url`}
+                    <div class="mb-1 text-lg font-medium">
+                      <a class="title-link" href="{{ item.url }}">
+                        {askama`item.title`}
                       </a>
                     </div>
+                    <div class="text-sm">
+                      {askama.if_("let Some(val) = item.last_updated", () => (
+                        <>
+                          <span class="text-gray-500">{askama`val`}</span> —
+                        </>
+                      ))}
+                      {askama`item.snippet`}
+                    </div>
                   </div>
-                  <div class="text-lg font-medium mb-1">
-                    <a class="title-link" href="{{ item.url }}"
-                      >{askama`item.title`}
-                    </a>
-                  </div>
-                  <div class="text-sm">
-                    <AskamaMatch expr="item.last_updated">
-                      <AskamaWhen pat="Some" with="(val)">
-                        <span class="text-gray-500">
-                          {askama`val`}
-                        </span> —
-                      </AskamaWhen>
-                      <AskamaWhen pat="None" />
-                    </AskamaMatch>
-                    {askama`item.snippet`}
-                  </div>
-                </div>
-                <div class="flex h-full items-center">
-                  <div class="h-20 w-20 pl-2 pt-1 pb-1">
-                    <AskamaMatch expr="item.primary_image_uuid">
-                      <AskamaWhen pat="Some" with="(val)">
+                  <div class="flex h-full items-center">
+                    <div class="h-20 w-20 pl-2 pt-1 pb-1">
+                      {askama.if_(
+                        "let Some(val) = item.primary_image_uuid",
                         <a href="{{ item.url|urlencode }}">
                           <img
-                            class="h-full w-full object-cover rounded-full"
+                            class="h-full w-full rounded-full object-cover"
                             src="/image/{{ val|urlencode }}"
                           />
                         </a>
-                      </AskamaWhen>
-                      <AskamaWhen pat="None" />
-                    </AskamaMatch>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </AskamaFor>
+              ))
+            }
           </div>
 
           <div class="flex w-full justify-center items-center pr-24 mt-5">
-            <AskamaIf expr="current_page == 1">
-              <div class="prev-page gray-arrow"></div>
-
-              <AskamaElse>
-                <AskamaMatch expr="prev_page_url">
-                  <AskamaWhen pat="Some" with="(url)">
-                    <a href="{{ url }}">
-                      <div class="prev-page cuely-color-arrow"></div>
-                    </a>
-                  </AskamaWhen>
-                  <AskamaWhen pat="None">
-                    <div class="prev-page gray-arrow"></div>
-                  </AskamaWhen>
-                </AskamaMatch>
-              </AskamaElse>
-            </AskamaIf>
+            {
+              askama.if_(
+                "current_page == 1",
+                <div class="prev-page gray-arrow" />,
+                askama.if_(
+                  "let Some(url) = prev_page_url",
+                  <a href="{{ url }}">
+                    <div class="prev-page cuely-color-arrow" />
+                  </a>,
+                  <div class="prev-page gray-arrow" />
+                )
+              )
+            }
             <div class="mr-2 ml-2">
               Page {askama`current_page`}
             </div>
@@ -194,12 +189,7 @@ import { askama } from "../askama";
         </div>
       </div>
 
-      <AskamaMatch expr="entity">
-        <AskamaWhen pat="Some" with="(entity)">
-          <Entity entity="entity" />
-        </AskamaWhen>
-        <AskamaWhen pat="None" />
-      </AskamaMatch>
+      {askama.if_("let Some(entity) = entity", <Entity entity="entity" />)}
     </div>
   </main>
 
