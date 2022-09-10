@@ -27,8 +27,8 @@ import { askama } from "../askama";
             class="flex flex-col h-full justify-center text-sm text-gray-600"
           >
             <p class="h-fit">
-              Found {askama`num_matches`} results in {
-                askama`search_duration_sec`
+              Found {askama`num_matches $ 24`} results in {
+                askama`search_duration_sec $ 0.42s`
               } seconds
             </p>
           </div>
@@ -47,17 +47,16 @@ import { askama } from "../askama";
                 class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
               >
                 {
-                  askama.for_(
-                    "region_selection in all_regions",
+                  askama.for_("region_selection in all_regions", () =>
                     askama.match("region_selection", {
                       "RegionSelection::Selected(region)": (
                         <option value="{{ region.gl() }}" selected>
-                          {askama`region.name()`}
+                          {askama`region.name() $ {{address.country}}`}
                         </option>
                       ),
                       "RegionSelection::Unselected(region)": (
                         <option value="{{ region.gl() }}">
-                          {askama`region.name()`}
+                          {askama`region.name() $ {{address.country}}`}
                         </option>
                       ),
                     })
@@ -76,7 +75,7 @@ import { askama } from "../askama";
                   class="title-link font-bold italic"
                   href="/search?q={{ correction|urlencode }}"
                 >
-                  {askama`correction`}
+                  {askama`correction $ {{lorem.sentence}}`}
                 </a>
               </div>
             ))
@@ -90,7 +89,10 @@ import { askama } from "../askama";
                     <div class="mb-1 flex text-sm">
                       <div class="mr-2 flex items-center">
                         <img
-                          src="/favicons/{{ item.domain|urlencode }}"
+                          src={askama.fake(
+                            "/favicons/{{ item.domain|urlencode }}",
+                            "{{image.avatar}}"
+                          )}
                           width="13px"
                         />
                       </div>
@@ -99,22 +101,23 @@ import { askama } from "../askama";
                           class="text-gray-600 hover:no-underline"
                           href="{{ item.url }}"
                         >
-                          {askama`item.pretty_url`}
+                          {askama`item.pretty_url $ {{internet.url}}`}
                         </a>
                       </div>
                     </div>
                     <div class="mb-1 text-lg font-medium">
                       <a class="title-link" href="{{ item.url }}">
-                        {askama`item.title`}
+                        {askama`item.title $ {{lorem.sentence}}`}
                       </a>
                     </div>
                     <div class="text-sm">
                       {askama.if_("let Some(val) = item.last_updated", () => (
                         <>
-                          <span class="text-gray-500">{askama`val`}</span> —
+                          <span class="text-gray-500">{askama`val $ 2. May 2022`}</span>{" "}
+                          —
                         </>
                       ))}
-                      {askama`item.snippet`}
+                      {askama`item.snippet $ {{lorem.lines}}`}
                     </div>
                   </div>
                   <div class="flex h-full items-center">
@@ -124,7 +127,10 @@ import { askama } from "../askama";
                         <a href="{{ item.url|urlencode }}">
                           <img
                             class="h-full w-full rounded-full object-cover"
-                            src="/image/{{ val|urlencode }}"
+                            src={askama.fake(
+                              "/image/{{ val|urlencode }}",
+                              "{{image.avatar}}"
+                            )}
                           />
                         </a>
                       )}
@@ -150,7 +156,7 @@ import { askama } from "../askama";
               )
             }
             <div class="mr-2 ml-2">
-              Page {askama`current_page`}
+              Page {askama`current_page $ 5`}
             </div>
             <a href="{{ next_page_url }}">
               <div class="next-page cuely-color-arrow"></div>
