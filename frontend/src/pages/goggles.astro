@@ -2,6 +2,7 @@
 import Footer from "../components/Footer.astro";
 import Navbar from "../components/Navbar.astro";
 import Layout from "../layouts/Layout.astro";
+import { askama } from "../askama";
 ---
 
 <Layout title="Cuely">
@@ -30,9 +31,11 @@ import Layout from "../layouts/Layout.astro";
                     and much more.
                 </div>
                 <div class="text-sm mt-3">
-                    See our quickstart for how to get started. Once you have
-                    developed your goggle, you can add it here to be used during
-                    your search.
+                    See our <a
+                        href="https://github.com/Cuely/sample-goggles/blob/main/quickstart.goggle"
+                        >quickstart</a
+                    > for how to get started. Once you have developed your goggle,
+                    you can add it here to be used during your search.
                 </div>
                 <div class="text-sm mt-3">
                     Simply host the goggle on a url that returns a plain-text
@@ -51,16 +54,28 @@ import Layout from "../layouts/Layout.astro";
                         >
                     </div>
                     <div class="mt-5">
-                        <table class="table-auto w-full">
-                            <thead>
-                                <tr>
-                                    <th class="w-10"></th>
-                                    <th class="font-medium text-left">Name</th>
-                                    <th class="font-medium text-left">Url</th>
-                                </tr>
-                            </thead>
-                            <tbody id="goggles-list"> </tbody>
-                        </table>
+                        <div
+                            class="grid grid-cols-[auto_1fr_1fr] w-full space-y-5"
+                            id="goggles-list"
+                        >
+                            <div class="w-10"></div>
+                            <div class="font-medium">Name</div>
+                            <div class="font-medium">Url</div>
+                            {
+                                askama.for_("goggle in default_goggles", () => (
+                                    <>
+                                        <div class="w-5">
+                                            <img
+                                                src="/assets/images/disabled-delete.svg"
+                                                class="h-5 w-5"
+                                            />
+                                        </div>
+                                        <div class="text-sm">{askama`goggle.name`}</div>
+                                        <div class="text-sm">{askama`goggle.url`}</div>
+                                    </>
+                                ))
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -72,8 +87,8 @@ import Layout from "../layouts/Layout.astro";
 
 <script is:inline>
     const addBtn = document.querySelector("#add-btn");
-    const gogglesList = document.querySelector("#goggles-list");
     const nameInput = document.querySelector("#name");
+    const gogglesList = document.querySelector("#goggles-list");
     const urlInput = document.querySelector("#url");
 
     nameInput.addEventListener("keypress", function (event) {
@@ -95,17 +110,32 @@ import Layout from "../layouts/Layout.astro";
     function updateList() {
         goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
 
-        gogglesList.innerHTML = "";
+        document
+            .querySelectorAll(".user-goggle")
+            .forEach((goggle) => goggle.remove());
 
         goggles.forEach((goggle, i) => {
-            let row = gogglesList.insertRow(i);
+            let img = document.createElement("div");
+            img.classList.add("user-goggle");
 
-            row.insertCell(0).innerHTML =
-                '<div><img src="/assets/images/delete.svg" class="w-5 h-5 hover:cursor-pointer" id="' +
+            img.innerHTML =
+                '<img src="/assets/images/delete.svg" class="w-5 h-5 hover:cursor-pointer" id="' +
                 i +
-                '" onclick="deleteRow(this)"/></div>';
-            row.insertCell(1).innerHTML = goggle.name;
-            row.insertCell(2).innerHTML = goggle.url;
+                '" onclick="deleteRow(this)"/>';
+
+            let name = document.createElement("div");
+            name.innerHTML = goggle.name;
+            name.classList.add("user-goggle");
+            name.classList.add("text-sm");
+
+            let url = document.createElement("div");
+            url.innerHTML = goggle.url;
+            url.classList.add("user-goggle");
+            url.classList.add("text-sm");
+
+            gogglesList.appendChild(img);
+            gogglesList.appendChild(name);
+            gogglesList.appendChild(url);
         });
     }
 

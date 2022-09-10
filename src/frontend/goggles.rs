@@ -21,14 +21,15 @@ use axum::response::IntoResponse;
 pub const DEFAULT_GOGGLES: [GoggleLink; 2] = [
     GoggleLink {
         name: "Copycats removal",
-        url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/copycats_removal.goggle",
+        url: "https://raw.githubusercontent.com/Cuely/sample-goggles/main/copycats_removal.goggle",
     },
     GoggleLink {
-    name: "Hacker News",
-    url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/hacker_news.goggle",
-}];
+        name: "Hacker News",
+        url: "https://raw.githubusercontent.com/Cuely/sample-goggles/main/hacker_news.goggle",
+    },
+];
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GoggleLink {
     pub name: &'static str,
     pub url: &'static str,

@@ -4,6 +4,7 @@ import Searchbar from "../components/Searchbar.astro";
 import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
+import GoggleSelector from "../components/GoggleSelector.astro";
 import { askama } from "../askama";
 ---
 
@@ -32,41 +33,10 @@ import { askama } from "../askama";
             </p>
           </div>
           <div class="flex">
-            <div class="h-full flex flex-col justify-center p-0 m-0">
-              <select
-                form="searchbar-form"
-                name="goggle"
-                onchange="document.getElementById('searchbar-form').submit()"
-                class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
-              >
-                <option value="">Goggle</option>
-                {
-                  askama.for_(
-                    "goggle in default_goggles",
-                    askama.match("current_goggle_url", {
-                      "Some(current_goggle)": askama.if_(
-                        "current_goggle == goggle.url",
-                        () => (
-                          <option selected value="{{ goggle.url }}">
-                            {askama`goggle.name`}
-                          </option>
-                        ),
-                        () => (
-                          <option value="{{ goggle.url }}">
-                            {askama`goggle.name`}
-                          </option>
-                        )
-                      ),
-                      None: (
-                        <option value="{{ goggle.url }}">
-                          {askama`goggle.name`}
-                        </option>
-                      ),
-                    })
-                  )
-                }
-              </select>
-            </div>
+            <GoggleSelector
+              current_goggle_url="current_goggle_url"
+              default_goggles="default_goggles"
+            />
             <div
               class="select-region h-full flex flex-col justify-center p-0 m-0"
             >
