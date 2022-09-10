@@ -23,14 +23,32 @@ import Layout from "../layouts/Layout.astro";
         <div class="flex flex-col w-full h-fit items-center pt-10">
             <div class="flex flex-col max-w-2xl">
                 <h1 class="font-medium text-2xl">Manage Goggles</h1>
-                <div class="text-sm mt-2">
-                    Description of what goggles are...
+                <div class="text-sm mt-5">
+                    Goggles lets you control almost everything about which
+                    search results that gets returned to you. You can discard
+                    results from specific sites, boost results from other sites
+                    and much more.
                 </div>
-                <div class="mt-10">
-                    <div>
+                <div class="text-sm mt-3">
+                    See our quickstart for how to get started. Once you have
+                    developed your goggle, you can add it here to be used during
+                    your search.
+                </div>
+                <div class="text-sm mt-3">
+                    Simply host the goggle on a url that returns a plain-text
+                    HTTP response with the goggle. We use
+                    raw.githubusercontent.com, but you are free to host them
+                    elsewhere.
+                </div>
+                <div class="mt-16">
+                    <div class="w-full flex justify-between pl-5 pr-5">
                         <input id="name" type="text" placeholder="Name" />
                         <input id="url" type="text" placeholder="Url" />
-                        <button id="add-btn">Add</button>
+                        <button
+                            id="add-btn"
+                            class="bg-brand text-white rounded-full w-20 h-10 border-0 text-sm"
+                            >Add</button
+                        >
                     </div>
                     <div class="mt-5">
                         <table class="table-auto w-full">
@@ -52,16 +70,27 @@ import Layout from "../layouts/Layout.astro";
     </div>
 </Layout>
 
-<script>
-    const addBtn: HTMLElement = document.querySelector("#add-btn")!;
-    const gogglesList: HTMLTableElement =
-        document.querySelector("#goggles-list")!;
-    const nameInput: HTMLInputElement = document.querySelector("#name")!;
-    const urlInput: HTMLInputElement = document.querySelector("#url")!;
+<script is:inline>
+    const addBtn = document.querySelector("#add-btn");
+    const gogglesList = document.querySelector("#goggles-list");
+    const nameInput = document.querySelector("#name");
+    const urlInput = document.querySelector("#url");
 
-    let goggles: { name: string; url: string }[] = JSON.parse(
-        window.localStorage.getItem("goggles") || "[]"
-    );
+    nameInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addBtn.click();
+        }
+    });
+
+    urlInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addBtn.click();
+        }
+    });
+
+    let goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
 
     function updateList() {
         goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
@@ -72,15 +101,31 @@ import Layout from "../layouts/Layout.astro";
             let row = gogglesList.insertRow(i);
 
             row.insertCell(0).innerHTML =
-                '<div><img src="/assets/images/delete.svg" class="w-5 h-5"/></div>';
+                '<div><img src="/assets/images/delete.svg" class="w-5 h-5 hover:cursor-pointer" id="' +
+                i +
+                '" onclick="deleteRow(this)"/></div>';
             row.insertCell(1).innerHTML = goggle.name;
             row.insertCell(2).innerHTML = goggle.url;
         });
     }
 
+    function deleteRow(deleteBtn) {
+        let row = deleteBtn.id;
+
+        goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+        goggles.splice(row, 1);
+        window.localStorage.setItem("goggles", JSON.stringify(goggles));
+
+        updateList();
+    }
+
     updateList();
 
     function add() {
+        if (nameInput.value == "" || urlInput.value == "") {
+            return; // TODO: give some kind of feedback to the user
+        }
+
         goggles.push({ name: nameInput.value, url: urlInput.value });
         window.localStorage.setItem("goggles", JSON.stringify(goggles));
         updateList();

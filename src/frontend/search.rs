@@ -32,7 +32,10 @@ use crate::{
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use super::{HtmlTemplate, State};
+use super::{
+    goggles::{GoggleLink, DEFAULT_GOGGLES},
+    HtmlTemplate, State,
+};
 use askama::Template;
 use axum::{
     extract,
@@ -45,16 +48,6 @@ pub fn html_escape(s: &str) -> String {
         .filter(|c| !matches!(c, '<' | '>' | '&'))
         .collect()
 }
-
-const DEFAULT_GOGGLES: [GoggleLink; 2] = [
-    GoggleLink {
-        name: "Copycats removal",
-        url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/copycats_removal.goggle",
-    },
-    GoggleLink {
-    name: "Hacker News",
-    url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/hacker_news.goggle",
-}];
 
 pub struct DisplayedWebpage {
     pub title: String,
@@ -246,12 +239,6 @@ fn maybe_prettify_entity_date(value: String) -> String {
     }
 
     value
-}
-
-#[derive(Clone)]
-struct GoggleLink {
-    name: &'static str,
-    url: &'static str,
 }
 
 #[derive(Template)]

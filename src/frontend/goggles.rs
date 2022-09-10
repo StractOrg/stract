@@ -18,12 +18,32 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
+pub const DEFAULT_GOGGLES: [GoggleLink; 2] = [
+    GoggleLink {
+        name: "Copycats removal",
+        url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/copycats_removal.goggle",
+    },
+    GoggleLink {
+    name: "Hacker News",
+    url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/hacker_news.goggle",
+}];
+
+#[derive(Clone)]
+pub struct GoggleLink {
+    pub name: &'static str,
+    pub url: &'static str,
+}
+
 #[allow(clippy::unused_async)]
 pub async fn route() -> impl IntoResponse {
-    let template = GogglesTemplate {};
+    let template = GogglesTemplate {
+        default_goggles: DEFAULT_GOGGLES.to_vec(),
+    };
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
 #[template(path = "goggles/index.html")]
-struct GogglesTemplate {}
+struct GogglesTemplate {
+    default_goggles: Vec<GoggleLink>,
+}
