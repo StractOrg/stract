@@ -22,20 +22,23 @@ import Layout from "../layouts/Layout.astro";
 
         <div class="flex flex-col w-full h-fit items-center pt-10">
             <div class="flex flex-col max-w-2xl">
-                <h1>Manage Goggles</h1>
-                <div>Description of what goggles are...</div>
-                <div>
+                <h1 class="font-medium text-2xl">Manage Goggles</h1>
+                <div class="text-sm mt-2">
+                    Description of what goggles are...
+                </div>
+                <div class="mt-10">
                     <div>
                         <input id="name" type="text" placeholder="Name" />
                         <input id="url" type="text" placeholder="Url" />
                         <button id="add-btn">Add</button>
                     </div>
-                    <div>
+                    <div class="mt-5">
                         <table class="table-auto w-full">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Url</th>
+                                    <th class="w-10"></th>
+                                    <th class="font-medium text-left">Name</th>
+                                    <th class="font-medium text-left">Url</th>
                                 </tr>
                             </thead>
                             <tbody id="goggles-list"> </tbody>
@@ -68,8 +71,10 @@ import Layout from "../layouts/Layout.astro";
         goggles.forEach((goggle, i) => {
             let row = gogglesList.insertRow(i);
 
-            row.insertCell(0).innerHTML = goggle.name;
-            row.insertCell(1).innerHTML = goggle.url;
+            row.insertCell(0).innerHTML =
+                '<div><img src="/assets/images/delete.svg" class="w-5 h-5"/></div>';
+            row.insertCell(1).innerHTML = goggle.name;
+            row.insertCell(2).innerHTML = goggle.url;
         });
     }
 
