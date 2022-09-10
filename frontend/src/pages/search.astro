@@ -1,24 +1,17 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Searchbar from "../components/Searchbar.astro";
-import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
 import Hero from "../components/Hero.astro";
 import GoggleSelector from "../components/GoggleSelector.astro";
 import { askama } from "../askama";
+import Header from "../components/Header.astro";
 ---
 
 <Layout title="Cuely - {{ query }}">
   <main class="flex flex-col w-full">
-    <div class="flex items-center h-24 border bg-neutral-50">
-      <div class="ml-14 mr-14 w-12 h-12">
-        <a href="/">
-          <img src="/assets/images/logo.svg" class="w-full h-full" />
-        </a>
-      </div>
-      <Searchbar query={askama`query`} />
-      <Navbar />
+    <div class="border-b bg-neutral-50">
+      <Header searchbar={{ query: askama`query` }} />
     </div>
 
     <div class="flex">

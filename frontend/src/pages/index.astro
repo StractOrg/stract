@@ -1,17 +1,16 @@
 ---
 import Footer from "../components/Footer.astro";
-import Navbar from "../components/Navbar.astro";
+import Header from "../components/Header.astro";
 import Searchbar from "../components/Searchbar.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Cuely">
-  <div class="grid grid-rows-[auto_2fr_1fr_auto] h-full">
-    <header class="py-9">
-      <Navbar />
-    </header>
-
-    <div class="flex flex-col justify-center items-center">
+  <div class="grid grid-rows-[auto_1fr_auto] h-full relative">
+    <Header icon={false} />
+    <div
+      class="flex flex-col justify-center items-center absolute top-1/4 w-full"
+    >
       <div class="flex">
         <h1 class="text-5xl uppercase mb-1 text-brand">cuely</h1>
         <span class="text-gray-500">BETA</span>
@@ -22,7 +21,7 @@ import Layout from "../layouts/Layout.astro";
       <Searchbar autofocus />
     </div>
 
-    <div class="row-start-4">
+    <div class="row-start-3">
       <Footer />
     </div>
   </div>
