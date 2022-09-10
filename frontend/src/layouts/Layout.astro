@@ -1,9 +1,11 @@
 ---
 import "@fontsource/montserrat";
+import "@fontsource/montserrat/300.css";
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
+import "@fontsource/montserrat/300-italic.css";
 import "@fontsource/montserrat/400-italic.css";
 import "@fontsource/montserrat/500-italic.css";
 import "@fontsource/montserrat/600-italic.css";
@@ -25,7 +27,7 @@ const { title } = Astro.props;
     <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
     <title>{title}</title>
   </head>
-  <body>
+  <body class="font-light">
     <slot />
 
     <style is:global>
