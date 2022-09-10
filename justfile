@@ -16,8 +16,16 @@
     rm -rf data/webgraph
     cargo run --release -- webgraph local configs/webgraph/local.toml
 
+@frontend-rerun:
+    # To inspect timings use the commands below instead:
+    # time ((cd frontend; npm run build) && cargo build)
+    # cargo run -- frontend data/index data/queries_us.csv data/entity data/bangs.json
+    cd frontend; npm run build
+    cargo run -- frontend data/index data/queries_us.csv data/entity data/bangs.json
+
 @frontend:
-    cargo watch -x 'run -- frontend data/index data/queries_us.csv data/entity data/bangs.json'
+    cd frontend; npm install
+    cargo watch -s 'just frontend-rerun'
 
 @astro:
     cd frontend; npm run dev
