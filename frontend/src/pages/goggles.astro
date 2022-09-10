@@ -58,8 +58,8 @@ import { askama } from "../askama";
                                                 class="h-5 w-5"
                                             />
                                         </div>
-                                        <div class="text-sm">{askama`goggle.name`}</div>
-                                        <div class="text-sm">{askama`goggle.url`}</div>
+                                        <div class="text-sm">{askama`goggle.name $ {{random.words}}`}</div>
+                                        <div class="text-sm">{askama`goggle.url $ {{internet.url}}`}</div>
                                     </>
                                 ))
                             }
