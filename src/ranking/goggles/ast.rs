@@ -275,4 +275,12 @@ mod tests {
         ))
         .is_ok());
     }
+
+    #[test]
+    fn copycats_parse() {
+        assert!(parse(include_str!(
+            "../../../testcases/goggles/copycats_removal.goggle"
+        ))
+        .is_ok());
+    }
 }

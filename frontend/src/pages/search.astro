@@ -36,29 +36,65 @@ import { askama } from "../askama";
               } seconds
             </p>
           </div>
-          <div
-            class="select-region h-full flex flex-col justify-center p-0 m-0"
-          >
-            <select
-              form="searchbar-form"
-              name="gl"
-              class="p-0 m-0 hover:cursor-pointer"
-            >
-              <AskamaFor elem="region_selection" in="all_regions">
-                <AskamaMatch expr="region_selection">
-                  <AskamaWhen pat="RegionSelection::Selected" with="(region)">
-                    <option value="{{ region.gl() }}" selected>
-                      {askama`region.name()`}
-                    </option>
-                  </AskamaWhen>
-                  <AskamaWhen pat="RegionSelection::Unselected" with="(region)">
-                    <option value="{{ region.gl() }}">
-                      {askama`region.name()`}
-                    </option>
-                  </AskamaWhen>
-                </AskamaMatch>
-              </AskamaFor>
-            </select>
+          <div class="flex h-full space-x-3">
+            <div class="h-full flex flex-col justify-center p-0 m-0">
+              <select
+                form="searchbar-form"
+                name="goggle"
+                onchange="document.getElementById('searchbar-form').submit()"
+                class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+              >
+                <option value="">Goggle</option>
+                <AskamaFor elem="goggle" in="default_goggles">
+                  <AskamaMatch expr="current_goggle_url">
+                    <AskamaWhen pat="Some" with="(current_goggle_url)">
+                      <AskamaIf expr="current_goggle_url == goggle.url">
+                        <option selected value="{{ goggle.url }}"
+                          >{askama`goggle.name`}
+                        </option>
+                        <AskamaElse>
+                          <option value="{{ goggle.url }}"
+                            >{askama`goggle.name`}
+                          </option>
+                        </AskamaElse>
+                      </AskamaIf>
+                    </AskamaWhen>
+
+                    <AskamaWhen pat="None">
+                      <option value="{{ goggle.url }}"
+                        >{askama`goggle.name`}
+                      </option>
+                    </AskamaWhen>
+                  </AskamaMatch>
+                </AskamaFor>
+              </select>
+            </div>
+            <div class="h-full flex flex-col justify-center p-0 m-0">
+              <select
+                form="searchbar-form"
+                name="gl"
+                onchange="document.getElementById('searchbar-form').submit()"
+                class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+              >
+                <AskamaFor elem="region_selection" in="all_regions">
+                  <AskamaMatch expr="region_selection">
+                    <AskamaWhen pat="RegionSelection::Selected" with="(region)">
+                      <option value="{{ region.gl() }}" selected>
+                        {askama`region.name()`}
+                      </option>
+                    </AskamaWhen>
+                    <AskamaWhen
+                      pat="RegionSelection::Unselected"
+                      with="(region)"
+                    >
+                      <option value="{{ region.gl() }}">
+                        {askama`region.name()`}
+                      </option>
+                    </AskamaWhen>
+                  </AskamaMatch>
+                </AskamaFor>
+              </select>
+            </div>
           </div>
         </div>
         <div class="flex flex-col pt-4 pb-8">
@@ -208,12 +244,5 @@ import { askama } from "../askama";
     text-rendering: optimizeLegibility;
     font-smooth: grayscale;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  .select-region > select {
-    background-color: transparent;
-    border: 0px;
-    font-size: small;
-    width: 105px;
   }
 </style>

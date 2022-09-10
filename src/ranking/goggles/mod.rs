@@ -493,6 +493,21 @@ mod tests {
             .unwrap()
             .webpages
             .documents;
+
+        let _ = searcher
+            .search(
+                "website",
+                None,
+                Some(
+                    include_str!("../../../testcases/goggles/copycats_removal.goggle").to_string(),
+                ),
+                None,
+            )
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
     }
 
     #[test]

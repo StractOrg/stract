@@ -1,0 +1,88 @@
+---
+import Footer from "../components/Footer.astro";
+import Navbar from "../components/Navbar.astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Cuely">
+    <div class="flex flex-col h-full w-full">
+        <div class="min-h-max w-full">
+            <header class="flex items-center w-full h-24">
+                <div class="ml-14 mr-14 w-12 h-12">
+                    <a href="/">
+                        <img
+                            src="/assets/images/logo.svg"
+                            class="w-full h-full"
+                        />
+                    </a>
+                </div>
+                <Navbar />
+            </header>
+        </div>
+
+        <div class="flex flex-col w-full h-fit items-center pt-10">
+            <div class="flex flex-col max-w-2xl">
+                <h1>Manage Goggles</h1>
+                <div>Description of what goggles are...</div>
+                <div>
+                    <div>
+                        <input id="name" type="text" placeholder="Name" />
+                        <input id="url" type="text" placeholder="Url" />
+                        <button id="add-btn">Add</button>
+                    </div>
+                    <div>
+                        <table class="table-auto w-full">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Url</th>
+                                </tr>
+                            </thead>
+                            <tbody id="goggles-list"> </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-grow"></div>
+        <Footer />
+    </div>
+</Layout>
+
+<script>
+    const addBtn: HTMLElement = document.querySelector("#add-btn")!;
+    const gogglesList: HTMLTableElement =
+        document.querySelector("#goggles-list")!;
+    const nameInput: HTMLInputElement = document.querySelector("#name")!;
+    const urlInput: HTMLInputElement = document.querySelector("#url")!;
+
+    let goggles: { name: string; url: string }[] = JSON.parse(
+        window.localStorage.getItem("goggles") || "[]"
+    );
+
+    function updateList() {
+        goggles = JSON.parse(window.localStorage.getItem("goggles") || "[]");
+
+        gogglesList.innerHTML = "";
+
+        goggles.forEach((goggle, i) => {
+            let row = gogglesList.insertRow(i);
+
+            row.insertCell(0).innerHTML = goggle.name;
+            row.insertCell(1).innerHTML = goggle.url;
+        });
+    }
+
+    updateList();
+
+    function add() {
+        goggles.push({ name: nameInput.value, url: urlInput.value });
+        window.localStorage.setItem("goggles", JSON.stringify(goggles));
+        updateList();
+
+        nameInput.value = "";
+        urlInput.value = "";
+    }
+
+    addBtn.addEventListener("click", add);
+</script>

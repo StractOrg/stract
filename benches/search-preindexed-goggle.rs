@@ -24,11 +24,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let searcher = Searcher::new(index, None, None);
     let goggle = include_str!("../testcases/goggles/quickstart.goggle");
 
-    for _ in 0..10 {
-        bench!("the", searcher, goggle, c);
-        bench!("dtu", searcher, goggle, c);
-        bench!("the best", searcher, goggle, c);
-    }
+    // for _ in 0..10 {
+    bench!("the", searcher, goggle, c);
+    bench!("dtu", searcher, goggle, c);
+    bench!("the best", searcher, goggle, c);
+    // }
 }
 
 criterion_group!(benches, criterion_benchmark);

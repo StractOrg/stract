@@ -46,6 +46,16 @@ pub fn html_escape(s: &str) -> String {
         .collect()
 }
 
+const DEFAULT_GOGGLES: [GoggleLink; 2] = [
+    GoggleLink {
+        name: "Copycats removal",
+        url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/copycats_removal.goggle",
+    },
+    GoggleLink {
+    name: "Hacker News",
+    url: "https://raw.githubusercontent.com/Cuely/Cuely/main/testcases/goggles/hacker_news.goggle",
+}];
+
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
@@ -238,6 +248,12 @@ fn maybe_prettify_entity_date(value: String) -> String {
     value
 }
 
+#[derive(Clone)]
+struct GoggleLink {
+    name: &'static str,
+    url: &'static str,
+}
+
 #[derive(Template)]
 #[template(path = "search/index.html", escape = "none")]
 struct SearchTemplate {
@@ -251,6 +267,8 @@ struct SearchTemplate {
     current_page: usize,
     next_page_url: String,
     prev_page_url: Option<String>,
+    default_goggles: Vec<GoggleLink>,
+    current_goggle_url: Option<String>,
 }
 
 enum RegionSelection {
@@ -270,11 +288,15 @@ pub async fn route(
     let skip_pages = params.get("p").and_then(|p| p.parse().ok());
 
     let mut goggle = None;
+    let mut current_goggle_url = None;
 
     if let Some(url) = params.get("goggle") {
-        if let Ok(res) = reqwest::get(url).await {
-            if let Ok(text) = res.text().await {
-                goggle = Some(text);
+        if !url.is_empty() {
+            if let Ok(res) = reqwest::get(url).await {
+                if let Ok(text) = res.text().await {
+                    goggle = Some(text);
+                    current_goggle_url = Some(url.to_string());
+                }
             }
         }
     }
@@ -375,6 +397,8 @@ pub async fn route(
                     current_page,
                     next_page_url,
                     prev_page_url,
+                    default_goggles: DEFAULT_GOGGLES.to_vec(),
+                    current_goggle_url,
                 };
 
                 HtmlTemplate(template).into_response()

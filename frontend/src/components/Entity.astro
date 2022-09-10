@@ -10,11 +10,11 @@ export interface Props {
 }
 ---
 
-<div class="flex grow justify-center pt-3">
+<div class="flex grow justify-center pt-10">
   <div class="max-w-md flex flex-col items-center">
     <AskamaMatch expr="entity.image">
       <AskamaWhen pat="Some(image)">
-        <div class="w-lg mb-3">
+        <div class="w-lg mb-5">
           <a href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">
             <img
               class="h-full w-full rounded-full"
@@ -25,7 +25,7 @@ export interface Props {
       </AskamaWhen>
       <AskamaWhen pat="None" />
     </AskamaMatch>
-    <div class="text-xl mb-1">
+    <div class="text-xl mb-2">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
         >{askama`entity.title`}
       </a>
