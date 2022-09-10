@@ -15,6 +15,7 @@
   "devDependencies": {
     "@astrojs/mdx": "^0.11.1",
     "@astrojs/tailwind": "^1.0.0",
+    "@fontsource/montserrat": "^4.5.12",
     "@tailwindcss/typography": "^0.5.7",
     "prettier": "^2.7.1",
     "prettier-plugin-astro": "^0.5.4",
