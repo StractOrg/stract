@@ -9,7 +9,11 @@ module.exports = {
         brand: "rgb(11 123 255 / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["Montserrat", ...defaultTheme.fontFamily.sans],
+        sans: [
+          "MontserratVariable",
+          "Montserrat",
+          ...defaultTheme.fontFamily.sans,
+        ],
       },
     },
   },
