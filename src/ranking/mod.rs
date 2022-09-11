@@ -195,7 +195,7 @@ mod tests {
                         <head>
                             <title>Website B</title>
                         </head>
-                        dr dk dr dk and some other text {CONTENT}
+                        dr and some other text {CONTENT} dk
                     </html>
                 "#
                 ),
@@ -518,5 +518,85 @@ mod tests {
 
         assert_eq!(res.webpages.num_docs, 3);
         assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
+    }
+
+    #[test]
+    fn term_proximity_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA termB d d d d d d d d d
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.first.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA d d d d d d d d d termB
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.third.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} termA d d d d termB d d d d d
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.second.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::new(index, None, None);
+
+        let result = searcher
+            .search("termA termB", None, None, None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 3);
+        assert_eq!(result.documents.len(), 3);
+        assert_eq!(result.documents[0].url, "https://www.first.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.documents[2].url, "https://www.third.com");
     }
 }

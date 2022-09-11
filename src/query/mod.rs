@@ -16,18 +16,22 @@
 
 use crate::{
     ranking::goggles::{Goggle, SignalAggregator},
+    schema::Field,
     Result,
 };
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
-    query::{BooleanQuery, Occur, QueryClone},
+    query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
     schema::Schema,
     tokenizer::TokenizerManager,
 };
 
 pub mod intersection;
+mod ngram;
 pub mod parser;
 use parser::Term;
+
+use self::ngram::NGram;
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -35,6 +39,7 @@ const MAX_SIMILAR_TERMS: usize = 10;
 pub struct Query {
     #[allow(clippy::vec_box)]
     terms: Vec<Box<Term>>,
+    simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
 }
 
@@ -65,15 +70,72 @@ impl Query {
 
         let field_boost = aggregator.field_boosts();
 
-        let queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
+        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
             .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager, field_boost))
             .collect();
+
+        let simple_terms_text: Vec<String> = terms
+            .iter()
+            .filter_map(|term| {
+                if let Term::Simple(term) = term.as_ref() {
+                    Some(term.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> =
+            Vec::new();
+
+        let ngrams: NGram<3, _> = NGram::from_iter(simple_terms_text.clone().into_iter());
+        let proxmity_fields = [Field::Title, Field::CleanBody];
+
+        for ngram in ngrams {
+            for field in &proxmity_fields {
+                let tantivy_field = schema.get_field(field.as_str()).unwrap();
+                let tantivy_entry = schema.get_field_entry(tantivy_field);
+
+                for (boost, slop) in [(3, 0), (2, 4), (1, 8)] {
+                    let mut terms = Vec::new();
+
+                    let mut num_terms = 0;
+                    for term in ngram.iter().flatten() {
+                        let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
+                        num_terms += 1;
+                        terms.append(&mut Term::process_tantivy_term(
+                            term,
+                            analyzer,
+                            tantivy_field,
+                        ));
+                    }
+
+                    if num_terms < 2 {
+                        continue;
+                    }
+
+                    let terms = terms.into_iter().enumerate().collect();
+
+                    proximity_queries.push((
+                        Occur::Should,
+                        BoostQuery::new(
+                            PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
+                            boost as f32,
+                        )
+                        .box_clone(),
+                    ))
+                }
+            }
+        }
+
+        queries.append(&mut proximity_queries);
 
         let tantivy_query = Box::new(BooleanQuery::new(queries));
 
         Ok(Query {
             terms,
+            simple_terms_text,
             tantivy_query,
         })
     }
@@ -87,16 +149,7 @@ impl Query {
     }
 
     pub fn simple_terms(&self) -> Vec<String> {
-        self.terms
-            .iter()
-            .filter_map(|term| {
-                if let Term::Simple(term) = term.as_ref() {
-                    Some(term.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        self.simple_terms_text.clone()
     }
 
     pub fn terms(&self) -> &[Box<Term>] {
