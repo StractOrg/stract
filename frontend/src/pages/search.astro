@@ -14,55 +14,55 @@ import Header from "../components/Header.astro";
       <Header searchbar={{ query: askama`query` }} />
     </div>
 
-    <div class="flex">
-      <div class="hidden md:block max-w-[10rem] w-1/6"></div>
-      <div class="flex flex-col">
-        <div
-          class="flex mt-1 pl-3 pt-2 md:max-w-3xl shrink-0 md:min-w-[50ch] pr-24 w-full justify-between mx-auto"
-        >
+    <div
+      class="grid sm:pl-5 md:pl-20 lg:px-28 mx-1 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr]"
+    >
+      <!-- Stats and settings -->
+      <div class="flex mt-1 pl-3 w-full justify-between mx-auto">
+        <div class="flex flex-col h-full justify-center text-sm text-gray-600">
+          <p class="h-fit">
+            Found {askama`num_matches $ 24`} results in {
+              askama`search_duration_sec $ 0.42s`
+            } seconds
+          </p>
+        </div>
+        <div class="flex">
+          <GoggleSelector
+            current_goggle_url="current_goggle_url"
+            default_goggles="default_goggles"
+          />
           <div
-            class="flex flex-col h-full justify-center text-sm text-gray-600"
+            class="select-region h-full flex flex-col justify-center p-0 m-0"
           >
-            <p class="h-fit">
-              Found {askama`num_matches $ 24`} results in {
-                askama`search_duration_sec $ 0.42s`
-              } seconds
-            </p>
-          </div>
-          <div class="flex">
-            <GoggleSelector
-              current_goggle_url="current_goggle_url"
-              default_goggles="default_goggles"
-            />
-            <div
-              class="select-region h-full flex flex-col justify-center p-0 m-0"
+            <select
+              form="searchbar-form"
+              name="gl"
+              onchange="document.getElementById('searchbar-form').submit()"
+              class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
             >
-              <select
-                form="searchbar-form"
-                name="gl"
-                onchange="document.getElementById('searchbar-form').submit()"
-                class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
-              >
-                {
-                  askama.for_("region_selection in all_regions", () =>
-                    askama.match("region_selection", {
-                      "RegionSelection::Selected(region)": (
-                        <option value="{{ region.gl() }}" selected>
-                          {askama`region.name() $ {{address.country}}`}
-                        </option>
-                      ),
-                      "RegionSelection::Unselected(region)": (
-                        <option value="{{ region.gl() }}">
-                          {askama`region.name() $ {{address.country}}`}
-                        </option>
-                      ),
-                    })
-                  )
-                }
-              </select>
-            </div>
+              {
+                askama.for_("region_selection in all_regions", () =>
+                  askama.match("region_selection", {
+                    "RegionSelection::Selected(region)": (
+                      <option value="{{ region.gl() }}" selected>
+                        {askama`region.name() $ {{address.country}}`}
+                      </option>
+                    ),
+                    "RegionSelection::Unselected(region)": (
+                      <option value="{{ region.gl() }}">
+                        {askama`region.name() $ {{address.country}}`}
+                      </option>
+                    ),
+                  })
+                )
+              }
+            </select>
           </div>
         </div>
+      </div>
+
+      <!-- Search results -->
+      <div class="col-start-1 flex flex-col">
         <div class="flex flex-col pt-4 pb-8">
           {
             askama.if_("let Some(correction) = spell_correction", () => (
@@ -81,7 +81,7 @@ import Header from "../components/Header.astro";
           <div class="search-result flex flex-col space-y-3">
             {
               askama.for_("item in search_result", () => (
-                <div class="flex w-full max-w-3xl p-3">
+                <div class="flex w-full p-3">
                   <div class="flex w-full flex-col">
                     <div class="mb-1 flex text-sm">
                       <div class="mr-2 flex items-center">
@@ -158,9 +158,15 @@ import Header from "../components/Header.astro";
         </div>
       </div>
 
-      <div class="hidden md:flex grow">
-        {askama.if_("let Some(entity) = entity", <Entity entity="entity" />)}
-      </div>
+      <!-- Entity -->
+      {
+        askama.if_(
+          "let Some(entity) = entity",
+          <div class="row-start-2 flex justify-center pt-10 md:col-start-2 md:row-span-2 md:row-start-1">
+            <Entity entity="entity" />
+          </div>
+        )
+      }
     </div>
   </main>
 
