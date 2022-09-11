@@ -11,11 +11,11 @@ const { icon = true, searchbar } = Astro.props;
 ---
 
 <div
-  class="grid items-center h-24 grid-cols-[auto_1fr_auto] sm:grid-cols-[3.5rem_1fr_auto] gap-4 p-4 lg:gap-8 lg:px-8"
+  class="grid items-center h-24 grid-cols-[auto_1fr_auto] sm:grid-cols-[3rem_1fr_auto] sm:gap-4 md:gap-5 p-4 lg:gap-10 lg:px-8"
 >
   {
     icon && (
-      <div class="col-start-1">
+      <div class="col-start-1 mr-4 sm:mr-0">
         <a href="/">
           <img src="/assets/images/logo.svg" class="h-full w-full" />
         </a>

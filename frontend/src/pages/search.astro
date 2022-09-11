@@ -15,10 +15,10 @@ import Header from "../components/Header.astro";
     </div>
 
     <div
-      class="grid sm:pl-5 md:pl-20 lg:px-28 mx-1 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr]"
+      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr]"
     >
       <!-- Stats and settings -->
-      <div class="flex mt-1 pl-3 w-full justify-between mx-auto">
+      <div class="flex mt-1 w-full justify-between mx-auto">
         <div class="flex flex-col h-full justify-center text-sm text-gray-600">
           <p class="h-fit">
             Found {askama`num_matches $ 24`} results in {
@@ -66,7 +66,7 @@ import Header from "../components/Header.astro";
         <div class="flex flex-col pt-4 pb-8">
           {
             askama.if_("let Some(correction) = spell_correction", () => (
-              <div class="pl-3 pb-3">
+              <div class="pb-3">
                 Did you mean:{" "}
                 <a
                   class="title-link font-bold italic"
@@ -81,7 +81,7 @@ import Header from "../components/Header.astro";
           <div class="search-result flex flex-col space-y-3">
             {
               askama.for_("item in search_result", () => (
-                <div class="flex w-full p-3">
+                <div class="flex w-full py-3">
                   <div class="flex w-full flex-col">
                     <div class="mb-1 flex text-sm">
                       <div class="mr-2 flex items-center">
