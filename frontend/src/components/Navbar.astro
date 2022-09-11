@@ -1,38 +1,22 @@
-<navbar class="flex-grow flex justify-end pr-10 space-x-10">
+---
+import { Icon } from "astro-icon";
+---
+
+<navbar class="flex-grow flex justify-end items-center pr-10 space-x-10">
   <a href="/goggles">Goggles</a>
   <a href="/about">About</a>
   <a href="https://discord.gg/BmzKHffWJM">
-    <div class="discord-logo"></div>
+    <Icon
+      title="Discord"
+      class="w-6 text-gray-500 hover:text-gray-900 transition"
+      name="simple-icons:discord"
+    />
   </a>
   <a href="https://github.com/cuely/cuely">
-    <div class="github-logo"></div>
+    <Icon
+      title="GitHub"
+      class="w-6 text-gray-500 hover:text-gray-900 transition"
+      name="simple-icons:github"
+    />
   </a>
 </navbar>
-
-<style>
-  .github-logo {
-    background-color: gray;
-    width: 22px;
-    height: 22px;
-    -webkit-mask: url(/assets/images/github.svg) no-repeat center;
-    mask: url(/assets/images/github.svg) no-repeat center;
-    mask-size: contain;
-  }
-
-  .github-logo:hover {
-    background-color: black;
-  }
-
-  .discord-logo {
-    background-color: gray;
-    width: 22px;
-    height: 22px;
-    -webkit-mask: url(/assets/images/discord.svg) no-repeat center;
-    mask: url(/assets/images/discord.svg) no-repeat center;
-    mask-size: contain;
-  }
-
-  .discord-logo:hover {
-    background-color: black;
-  }
-</style>

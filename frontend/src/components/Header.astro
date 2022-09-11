@@ -1,0 +1,31 @@
+---
+import Searchbar from "./Searchbar.astro";
+import Navbar from "./Navbar.astro";
+
+export interface Props {
+  icon?: boolean;
+  searchbar?: boolean | { query: string };
+}
+
+const { icon = true, searchbar } = Astro.props;
+---
+
+<div class="flex items-center h-24 shrink-0">
+  {
+    icon && (
+      <div class="ml-14 mr-14 h-12 w-12">
+        <a href="/">
+          <img src="/assets/images/logo.svg" class="h-full w-full" />
+        </a>
+      </div>
+    )
+  }
+  {
+    searchbar && (
+      <Searchbar
+        query={typeof searchbar == "object" ? searchbar.query : void 0}
+      />
+    )
+  }
+  <Navbar />
+</div>
