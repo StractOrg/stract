@@ -43,6 +43,56 @@ pub struct Query {
     tantivy_query: Box<BooleanQuery>,
 }
 
+fn proximity_queries(
+    simple_terms_text: Vec<String>,
+    schema: &Arc<Schema>,
+    tokenizer_manager: &TokenizerManager,
+) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
+    let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = Vec::new();
+
+    let ngrams: NGram<3, _> = NGram::from_iter(simple_terms_text.into_iter());
+    let proxmity_fields = [Field::Title, Field::CleanBody];
+
+    for ngram in ngrams {
+        for field in &proxmity_fields {
+            let tantivy_field = schema.get_field(field.as_str()).unwrap();
+            let tantivy_entry = schema.get_field_entry(tantivy_field);
+
+            for (boost, slop) in [(3, 0), (2, 4), (1, 16)] {
+                let mut terms = Vec::new();
+
+                let mut num_terms = 0;
+                for term in ngram.iter().flatten() {
+                    let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
+                    num_terms += 1;
+                    terms.append(&mut Term::process_tantivy_term(
+                        term,
+                        analyzer,
+                        tantivy_field,
+                    ));
+                }
+
+                if num_terms < 2 {
+                    continue;
+                }
+
+                let terms = terms.into_iter().enumerate().collect();
+
+                proximity_queries.push((
+                    Occur::Should,
+                    BoostQuery::new(
+                        PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
+                        boost as f32,
+                    )
+                    .box_clone(),
+                ))
+            }
+        }
+    }
+
+    proximity_queries
+}
+
 impl Query {
     pub fn parse(
         query: &str,
@@ -86,50 +136,11 @@ impl Query {
             })
             .collect();
 
-        let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> =
-            Vec::new();
-
-        let ngrams: NGram<3, _> = NGram::from_iter(simple_terms_text.clone().into_iter());
-        let proxmity_fields = [Field::Title, Field::CleanBody];
-
-        for ngram in ngrams {
-            for field in &proxmity_fields {
-                let tantivy_field = schema.get_field(field.as_str()).unwrap();
-                let tantivy_entry = schema.get_field_entry(tantivy_field);
-
-                for (boost, slop) in [(3, 0), (2, 4), (1, 8)] {
-                    let mut terms = Vec::new();
-
-                    let mut num_terms = 0;
-                    for term in ngram.iter().flatten() {
-                        let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
-                        num_terms += 1;
-                        terms.append(&mut Term::process_tantivy_term(
-                            term,
-                            analyzer,
-                            tantivy_field,
-                        ));
-                    }
-
-                    if num_terms < 2 {
-                        continue;
-                    }
-
-                    let terms = terms.into_iter().enumerate().collect();
-
-                    proximity_queries.push((
-                        Occur::Should,
-                        BoostQuery::new(
-                            PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
-                            boost as f32,
-                        )
-                        .box_clone(),
-                    ))
-                }
-            }
-        }
-
-        queries.append(&mut proximity_queries);
+        queries.append(&mut proximity_queries(
+            simple_terms_text.clone(),
+            &schema,
+            tokenizer_manager,
+        ));
 
         let tantivy_query = Box::new(BooleanQuery::new(queries));
 
