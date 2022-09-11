@@ -1,4 +1,3 @@
-use crate::exponential_backoff::ExponentialBackoff;
 // Cuely is an open source web search engine.
 // Copyright (C) 2022 Cuely ApS
 //
@@ -14,6 +13,8 @@ use crate::exponential_backoff::ExponentialBackoff;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use crate::exponential_backoff::ExponentialBackoff;
 use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
 use std::fs::File;
