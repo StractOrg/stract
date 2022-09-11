@@ -15,8 +15,11 @@ import Header from "../components/Header.astro";
     </div>
 
     <div class="flex">
-      <div class="flex pl-40 flex-col">
-        <div class="flex mt-1 pl-3 pt-2 max-w-3xl pr-24 w-full justify-between">
+      <div class="hidden md:block max-w-[10rem] w-1/6"></div>
+      <div class="flex flex-col">
+        <div
+          class="flex mt-1 pl-3 pt-2 md:max-w-3xl shrink-0 md:min-w-[50ch] pr-24 w-full justify-between mx-auto"
+        >
           <div
             class="flex flex-col h-full justify-center text-sm text-gray-600"
           >
@@ -135,7 +138,7 @@ import Header from "../components/Header.astro";
             }
           </div>
 
-          <div class="flex w-full justify-center items-center pr-24 mt-5">
+          <div class="flex w-full justify-center items-center mt-5">
             {
               askama.if_(
                 "let Some(url) = prev_page_url",
@@ -155,7 +158,9 @@ import Header from "../components/Header.astro";
         </div>
       </div>
 
-      {askama.if_("let Some(entity) = entity", <Entity entity="entity" />)}
+      <div class="hidden md:block">
+        {askama.if_("let Some(entity) = entity", <Entity entity="entity" />)}
+      </div>
     </div>
   </main>
 
@@ -167,7 +172,7 @@ import Header from "../components/Header.astro";
     @apply w-6 text-gray-500;
   }
   .change-page-active {
-    @apply text-brand/80 hover:text-brand w-6;
+    @apply w-6 text-brand/80 hover:text-brand;
   }
 
   .title-link {

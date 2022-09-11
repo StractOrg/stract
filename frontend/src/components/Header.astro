@@ -10,10 +10,12 @@ export interface Props {
 const { icon = true, searchbar } = Astro.props;
 ---
 
-<div class="flex items-center h-24 shrink-0">
+<div
+  class="grid items-center h-24 grid-cols-[auto_1fr_auto] sm:grid-cols-[3.5rem_1fr_auto] gap-4 p-4 lg:gap-8 lg:px-8"
+>
   {
     icon && (
-      <div class="ml-14 mr-14 h-12 w-12">
+      <div class="col-start-1">
         <a href="/">
           <img src="/assets/images/logo.svg" class="h-full w-full" />
         </a>
@@ -22,10 +24,14 @@ const { icon = true, searchbar } = Astro.props;
   }
   {
     searchbar && (
-      <Searchbar
-        query={typeof searchbar == "object" ? searchbar.query : void 0}
-      />
+      <div class="col-start-2 w-full max-w-xl">
+        <Searchbar
+          query={typeof searchbar == "object" ? searchbar.query : void 0}
+        />
+      </div>
     )
   }
-  <Navbar />
+  <div class="col-start-3">
+    <Navbar />
+  </div>
 </div>

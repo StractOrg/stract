@@ -25,7 +25,7 @@ export interface Props {
     }
     <div class="text-xl mb-2">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
-        >{askama`entity.title $ {{name.findName}}`}
+        >{askama`entity.title $ {{name.fullName}}`}
       </a>
     </div>
     <div class="text-sm">
@@ -75,7 +75,7 @@ export interface Props {
 
                 <div class="text-center">
                   <a href="/search?q={{ entity.title|urlencode }}">
-                    {askama`entity.title $ {{name.findName}}`}
+                    {askama`entity.title $ {{name.fullName}}`}
                   </a>
                 </div>
               </div>

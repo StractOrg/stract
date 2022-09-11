@@ -8,17 +8,19 @@ import Layout from "../layouts/Layout.astro";
 <Layout title="Cuely">
   <div class="grid grid-rows-[auto_1fr_auto] h-full relative">
     <Header icon={false} />
-    <div
-      class="flex flex-col justify-center items-center absolute top-1/4 w-full"
-    >
-      <div class="flex">
-        <h1 class="text-5xl uppercase mb-1 text-brand">cuely</h1>
-        <span class="text-gray-500">BETA</span>
+    <div class="absolute top-1/4 w-full grid place-items-center">
+      <div
+        class="flex flex-col justify-center items-center w-full px-2 md:px-0 md:max-w-2xl"
+      >
+        <div class="flex">
+          <h1 class="text-5xl uppercase mb-1 text-brand">cuely</h1>
+          <span class="text-gray-500">BETA</span>
+        </div>
+
+        <h2 class="mb-8 text-gray-500">Completely Open Search Engine</h2>
+
+        <Searchbar autofocus />
       </div>
-
-      <h2 class="mb-8 text-gray-500">Completely Open Search Engine</h2>
-
-      <Searchbar autofocus />
     </div>
 
     <div class="row-start-3">
