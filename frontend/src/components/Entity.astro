@@ -41,7 +41,7 @@ export interface Props {
     {
       askama.if_("!entity.info.is_empty()", () => (
         <div class="mt-5 flex w-full flex-col px-4 text-sm">
-          <div class="grid border-separate border-spacing-x-4 border-spacing-y-1.5 grid-cols-[auto_1fr] gap-x-4">
+          <div class="border-spacing-x-4 border-spacing-y-1.5 grid border-separate grid-cols-[auto_1fr] gap-x-4">
             {askama.for_("(key, value) in entity.info", () => (
               <>
                 <div class="text-gray-500">{askama`key $ {{word.adjective}}`}</div>

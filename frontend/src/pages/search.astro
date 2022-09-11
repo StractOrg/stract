@@ -158,7 +158,7 @@ import Header from "../components/Header.astro";
         </div>
       </div>
 
-      <div class="hidden md:block flex grow">
+      <div class="hidden md:flex grow">
         {askama.if_("let Some(entity) = entity", <Entity entity="entity" />)}
       </div>
     </div>
@@ -172,7 +172,7 @@ import Header from "../components/Header.astro";
     @apply w-6 text-gray-500;
   }
   .change-page-active {
-    @apply text-brand/80 hover:text-brand w-6;
+    @apply w-6 text-brand/80 hover:text-brand;
   }
 
   .title-link {
