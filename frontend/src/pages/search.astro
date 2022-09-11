@@ -4,8 +4,8 @@ import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
 import Hero from "../components/Hero.astro";
 import GoggleSelector from "../components/GoggleSelector.astro";
-import { askama } from "../askama";
 import Header from "../components/Header.astro";
+import { askama } from "../askama";
 ---
 
 <Layout title="Cuely - {{ query }}">
@@ -15,10 +15,10 @@ import Header from "../components/Header.astro";
     </div>
 
     <div
-      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr]"
+      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3"
     >
       <!-- Stats and settings -->
-      <div class="flex mt-1 w-full justify-between mx-auto">
+      <div class="flex w-full justify-between mx-auto">
         <div class="flex flex-col h-full justify-center text-sm text-gray-600">
           <p class="h-fit">
             Found {askama`num_matches $ 24`} results in {
@@ -31,14 +31,12 @@ import Header from "../components/Header.astro";
             current_goggle_url="current_goggle_url"
             default_goggles="default_goggles"
           />
-          <div
-            class="select-region h-full flex flex-col justify-center p-0 m-0"
-          >
+          <div class="select-region h-full flex flex-col justify-center">
             <select
               form="searchbar-form"
               name="gl"
               onchange="document.getElementById('searchbar-form').submit()"
-              class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+              class="hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
             >
               {
                 askama.for_("region_selection in all_regions", () =>
@@ -62,99 +60,90 @@ import Header from "../components/Header.astro";
       </div>
 
       <!-- Search results -->
-      <div class="col-start-1 flex flex-col">
-        <div class="flex flex-col pt-4 pb-8">
-          {
-            askama.if_("let Some(correction) = spell_correction", () => (
-              <div class="pb-3">
-                Did you mean:{" "}
-                <a
-                  class="title-link font-bold italic"
-                  href="/search?q={{ correction|urlencode }}"
-                >
-                  {askama`correction $ {{lorem.sentence}}`}
-                </a>
-              </div>
-            ))
-          }
-
-          <div class="search-result flex flex-col space-y-3">
-            {
-              askama.for_("item in search_result", () => (
-                <div class="flex w-full py-3">
-                  <div class="flex w-full flex-col">
-                    <div class="mb-1 flex text-sm">
-                      <div class="mr-2 flex items-center">
-                        <img
-                          src={askama.fake(
-                            "/favicons/{{ item.domain|urlencode }}",
-                            "{{image.avatar}}"
-                          )}
-                          width="13px"
-                        />
-                      </div>
-                      <div>
-                        <a
-                          class="text-gray-600 hover:no-underline"
-                          href="{{ item.url }}"
-                        >
-                          {askama`item.pretty_url $ {{internet.url}}`}
-                        </a>
-                      </div>
-                    </div>
-                    <div class="mb-1 text-lg font-medium">
-                      <a class="title-link" href="{{ item.url }}">
-                        {askama`item.title $ {{lorem.sentence}}`}
-                      </a>
-                    </div>
-                    <div class="text-sm">
-                      {askama.if_("let Some(val) = item.last_updated", () => (
-                        <>
-                          <span class="text-gray-500">{askama`val $ 2. May 2022`}</span>{" "}
-                          —
-                        </>
-                      ))}
-                      {askama`item.snippet $ {{lorem.lines}}`}
-                    </div>
-                  </div>
-                  <div class="flex h-full items-center">
-                    <div class="h-20 w-20 pl-2 pt-1 pb-1">
-                      {askama.if_(
-                        "let Some(val) = item.primary_image_uuid",
-                        <a href="{{ item.url|urlencode }}">
-                          <img
-                            class="h-full w-full rounded-full object-cover"
-                            src={askama.fake(
-                              "/image/{{ val|urlencode }}",
-                              "{{image.avatar}}"
-                            )}
-                          />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-
-          <div class="flex w-full justify-center items-center mt-5">
-            {
-              askama.if_(
-                "let Some(url) = prev_page_url",
-                <a href="{{ url }}">
-                  <Hero class="change-page-active" icon="chevron-left" />
-                </a>,
-                <Hero class="change-page-inactive" icon="chevron-left" />
-              )
-            }
-            <div class="mr-2 ml-2">
-              Page {askama`current_page $ 5`}
+      <div class="col-start-1 flex flex-col space-y-6">
+        {
+          askama.if_("let Some(correction) = spell_correction", () => (
+            <div>
+              Did you mean:{" "}
+              <a
+                class="title-link font-bold italic"
+                href="/search?q={{ correction|urlencode }}"
+              >
+                {askama`correction $ {{lorem.sentence}}`}
+              </a>
             </div>
-            <a href="{{ next_page_url }}">
-              <Hero class="change-page-active" icon="chevron-right" />
-            </a>
+          ))
+        }
+
+        {
+          askama.for_("item in search_result", () => (
+            <div class="flex w-full">
+              <div class="flex w-full flex-col space-y-1">
+                <div class="flex items-center space-x-2 text-sm">
+                  <img
+                    src={askama.fake(
+                      "/favicons/{{ item.domain|urlencode }}",
+                      "{{image.avatar}}"
+                    )}
+                    width="13px"
+                  />
+                  <a
+                    class="text-gray-600 hover:no-underline"
+                    href="{{ item.url }}"
+                  >
+                    {askama`item.pretty_url $ {{internet.url}}`}
+                  </a>
+                </div>
+                <a class="title-link text-lg font-medium" href="{{ item.url }}">
+                  {askama`item.title $ {{lorem.sentence}}`}
+                </a>
+                <div class="text-sm">
+                  {askama.if_("let Some(val) = item.last_updated", () => (
+                    <span class="text-gray-500">
+                      {askama`val $ 2. May 2022`}
+                    </span>
+                  ))}
+                  <span class="[&:nth-child(2)]:before:content-['—']">
+                    {askama`item.snippet $ {{lorem.lines}}`}
+                  </span>
+                </div>
+              </div>
+              <div class="flex h-full items-center">
+                <div class="h-20 w-20 py-1 pl-2">
+                  {askama.if_(
+                    "let Some(val) = item.primary_image_uuid",
+                    <a href="{{ item.url|urlencode }}">
+                      <img
+                        class="h-full w-full rounded-full object-cover"
+                        src={askama.fake(
+                          "/image/{{ val|urlencode }}",
+                          "{{image.avatar}}"
+                        )}
+                      />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        }
+
+        <div class="flex w-full justify-center items-center">
+          {
+            askama.if_(
+              "let Some(url) = prev_page_url",
+              <a href="{{ url }}">
+                <Hero class="change-page-active" icon="chevron-left" />
+              </a>,
+              <Hero class="change-page-inactive" icon="chevron-left" />
+            )
+          }
+          <div class="mx-2">
+            Page {askama`current_page $ 5`}
           </div>
+          <a href="{{ next_page_url }}">
+            <Hero class="change-page-active" icon="chevron-right" />
+          </a>
         </div>
       </div>
 
@@ -182,16 +171,6 @@ import Header from "../components/Header.astro";
   }
 
   .title-link {
-    color: #1a0dab;
-  }
-
-  .title-link:visited {
-    color: #609;
-  }
-
-  .search-result {
-    text-rendering: optimizeLegibility;
-    font-smooth: grayscale;
-    -moz-osx-font-smoothing: grayscale;
+    @apply text-blue-800 visited:text-purple-800;
   }
 </style>
