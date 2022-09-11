@@ -223,7 +223,7 @@ impl Term {
         Box::new(BoostQuery::new(processed_query, boost))
     }
 
-    fn get_tantivy_analyzer(
+    pub fn get_tantivy_analyzer(
         entry: &tantivy::schema::FieldEntry,
         tokenizer_manager: &tantivy::tokenizer::TokenizerManager,
     ) -> Option<TextAnalyzer> {
@@ -238,7 +238,7 @@ impl Term {
         }
     }
 
-    fn process_tantivy_term(
+    pub fn process_tantivy_term(
         term: &str,
         analyzer: Option<TextAnalyzer>,
         tantivy_field: tantivy::schema::Field,
