@@ -19,6 +19,7 @@ use std::{collections::HashSet, hash::Hash, time::Duration};
 use serde::Serialize;
 
 use crate::{
+    exponential_backoff::ExponentialBackoff,
     image_store::{Image, ImageStore},
     webpage::Url,
 };
@@ -43,16 +44,20 @@ where
                 continue;
             }
 
-            if let Some(image) = url
-                .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
-                .await
-                .and_then(|bytes| Image::from_bytes(bytes).ok())
-                .map(|image| DownloadedImage {
-                    image,
-                    key: self.key.clone(),
-                })
-            {
-                return Some(image);
+            for duration in ExponentialBackoff::from_millis(10).take(5) {
+                if let Some(image) = url
+                    .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
+                    .await
+                    .and_then(|bytes| Image::from_bytes(bytes).ok())
+                    .map(|image| DownloadedImage {
+                        image,
+                        key: self.key.clone(),
+                    })
+                {
+                    return Some(image);
+                }
+
+                tokio::time::sleep(duration).await;
             }
         }
 
