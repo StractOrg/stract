@@ -1,23 +1,17 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Searchbar from "../components/Searchbar.astro";
-import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
+import Hero from "../components/Hero.astro";
 import GoggleSelector from "../components/GoggleSelector.astro";
 import { askama } from "../askama";
+import Header from "../components/Header.astro";
 ---
 
 <Layout title="Cuely - {{ query }}">
   <main class="flex flex-col w-full">
-    <div class="flex items-center h-24 border bg-neutral-50">
-      <div class="ml-14 mr-14 w-12 h-12">
-        <a href="/">
-          <img src="/assets/images/logo.svg" class="w-full h-full" />
-        </a>
-      </div>
-      <Searchbar query={askama`query`} />
-      <Navbar />
+    <div class="border-b bg-neutral-50">
+      <Header searchbar={{ query: askama`query` }} />
     </div>
 
     <div class="flex">
@@ -144,22 +138,18 @@ import { askama } from "../askama";
           <div class="flex w-full justify-center items-center pr-24 mt-5">
             {
               askama.if_(
-                "current_page == 1",
-                <div class="prev-page gray-arrow" />,
-                askama.if_(
-                  "let Some(url) = prev_page_url",
-                  <a href="{{ url }}">
-                    <div class="prev-page cuely-color-arrow" />
-                  </a>,
-                  <div class="prev-page gray-arrow" />
-                )
+                "let Some(url) = prev_page_url",
+                <a href="{{ url }}">
+                  <Hero class="change-page-active" icon="chevron-left" />
+                </a>,
+                <Hero class="change-page-inactive" icon="chevron-left" />
               )
             }
             <div class="mr-2 ml-2">
               Page {askama`current_page $ 5`}
             </div>
             <a href="{{ next_page_url }}">
-              <div class="next-page cuely-color-arrow"></div>
+              <Hero class="change-page-active" icon="chevron-right" />
             </a>
           </div>
         </div>
@@ -173,29 +163,11 @@ import { askama } from "../askama";
 </Layout>
 
 <style>
-  .prev-page {
-    width: 16px;
-    height: 16px;
-    -webkit-mask: url(/assets/images/arrow.svg) no-repeat center;
-    mask: url(/assets/images/arrow.svg) no-repeat center;
-    mask-size: contain;
-    transform: rotate(180deg);
+  .change-page-inactive {
+    @apply w-6 text-gray-500;
   }
-
-  .next-page {
-    width: 16px;
-    height: 16px;
-    -webkit-mask: url(/assets/images/arrow.svg) no-repeat center;
-    mask: url(/assets/images/arrow.svg) no-repeat center;
-    mask-size: contain;
-  }
-
-  .gray-arrow {
-    background-color: gray;
-  }
-
-  .cuely-color-arrow {
-    background-color: #0b7bff;
+  .change-page-active {
+    @apply text-brand/80 hover:text-brand w-6;
   }
 
   .title-link {

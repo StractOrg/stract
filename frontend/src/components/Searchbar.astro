@@ -1,4 +1,6 @@
 ---
+import Hero from "./Hero.astro";
+
 export interface Props {
   autofocus?: boolean;
   query?: string;
@@ -36,10 +38,9 @@ const { autofocus, query } = Astro.props;
       id="searchbar"
       class="absolute group bg-white top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[3rem] border rounded-3xl inset-x-0 focus-within:shadow transition-shadow"
     >
-      <img
-        class="col-[1/2] row-start-1 w-5 self-center ml-5"
-        loading="lazy"
-        src="/assets/images/search.svg"
+      <Hero
+        class="col-[1/2] row-start-1 w-5 self-center ml-5 text-gray-400"
+        icon="search"
       />
       <input
         type="text"
@@ -54,12 +55,20 @@ const { autofocus, query } = Astro.props;
           type="submit"
           class="bg-transparent p-0 m-0"
           style="border: none"
+          title="Search"
         >
-          <img
-            loading="lazy"
-            src="/assets/images/arrow.svg"
-            class="h-5 cursor-pointer bg-transparent"
-          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            class="w-7 cursor-pointer bg-transparent stroke-brand"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M8.25 4.5l7.5 7.5-7.5 7.5"></path>
+          </svg>
         </button>
       </div>
     </div>
