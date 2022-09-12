@@ -199,38 +199,51 @@ impl SnippetGenerator {
     fn create(
         searcher: &Searcher,
         query: &dyn tantivy::query::Query,
-        field: tantivy::schema::Field,
         tokenizer: tantivy::tokenizer::TextAnalyzer,
     ) -> crate::Result<SnippetGenerator> {
+        let clean_field = searcher
+            .schema()
+            .get_field(Field::CleanBody.as_str())
+            .unwrap();
+
+        let stemmed_field = searcher
+            .schema()
+            .get_field(Field::StemmedCleanBody.as_str())
+            .unwrap();
+
         let mut terms: BTreeSet<&tantivy::Term> = BTreeSet::new();
         query.query_terms(&mut |term, _| {
-            if term.field() == field {
+            if term.field() == clean_field {
                 terms.insert(term);
             }
         });
+
         let mut terms_text: BTreeMap<String, Score> = Default::default();
         for term in terms {
-            let term_str = if let Some(term_str) = term.as_str() {
-                term_str
+            let term_string = if let Some(term_str) = term.as_str() {
+                tokenizer
+                    .token_stream(term_str)
+                    .next()
+                    .unwrap()
+                    .text
+                    .to_string()
             } else {
                 continue;
             };
-            let doc_freq = searcher.doc_freq(term)?;
+
+            let term = tantivy::Term::from_field_text(stemmed_field, &term_string);
+            let doc_freq = searcher.doc_freq(&term)?;
             if doc_freq > 0 {
                 let score = 1.0 / (1.0 + doc_freq as Score);
-                terms_text.insert(term_str.to_string(), score);
+                terms_text.insert(term_string, score);
             }
         }
+
         Ok(SnippetGenerator {
             terms_text,
             tokenizer,
             max_num_chars: DEFAULT_MAX_NUM_CHARS,
         })
-    }
-
-    #[cfg(test)]
-    fn terms_text(&self) -> &BTreeMap<String, Score> {
-        &self.terms_text
     }
 
     /// Generates a snippet for the given text.
@@ -251,18 +264,13 @@ pub fn generate(
     region: &Region,
     searcher: &tantivy::Searcher,
 ) -> Result<String> {
-    let field = searcher
-        .schema()
-        .get_field(Field::StemmedCleanBody.as_str())
-        .expect("Failed to get body field");
-
     let lang = match region.lang() {
         Some(lang) => lang,
         None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
     };
 
     let tokenizer = Stemmed::with_forced_language(lang).into();
-    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
 
     let mut snippet = generator.snippet(text);
 
@@ -276,7 +284,7 @@ pub fn generate(
                     };
 
                     let tokenizer = Stemmed::with_forced_language(lang).into();
-                    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+                    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
 
                     snippet = generator.snippet(desc);
                     if snippet.fragment.is_empty() {
@@ -290,7 +298,7 @@ pub fn generate(
                     };
 
                     let tokenizer = Stemmed::with_forced_language(lang).into();
-                    let generator = SnippetGenerator::create(searcher, query, field, tokenizer)?;
+                    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
 
                     snippet = generator.snippet(dirty_text);
 
@@ -564,97 +572,45 @@ Survey in 2016, 2017, and 2018."#;
     }
 
     #[test]
-    fn test_snippet_generator_term_score() {
-        let mut schema_builder = tantivy::schema::Schema::builder();
-        let text_field = schema_builder.add_text_field("text", tantivy::schema::TEXT);
-        let schema = schema_builder.build();
-        let index = tantivy::Index::create_in_ram(schema);
-        let tokenizer: TextAnalyzer = SimpleTokenizer.into();
-        {
-            // writing the segment
-            let mut index_writer = index.writer_with_num_threads(1, 10_000_000).unwrap();
-            index_writer
-                .add_document(tantivy::doc!(text_field => "a"))
-                .unwrap();
-            index_writer
-                .add_document(tantivy::doc!(text_field => "a"))
-                .unwrap();
-            index_writer
-                .add_document(tantivy::doc!(text_field => "a b"))
-                .unwrap();
-            index_writer.commit().unwrap();
-        }
-        let searcher = index.reader().unwrap().searcher();
-        let query_parser = tantivy::query::QueryParser::for_index(&index, vec![text_field]);
-        {
-            let query = query_parser.parse_query("e").unwrap();
-            let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
-                    .unwrap();
-            assert!(snippet_generator.terms_text().is_empty());
-        }
-        {
-            let query = query_parser.parse_query("a").unwrap();
-            let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
-                    .unwrap();
-            assert_eq!(
-                &btreemap!("a".to_string() => 0.25),
-                snippet_generator.terms_text()
-            );
-        }
-        {
-            let query = query_parser.parse_query("a b").unwrap();
-            let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer.clone())
-                    .unwrap();
-            assert_eq!(
-                &btreemap!("a".to_string() => 0.25, "b".to_string() => 0.5),
-                snippet_generator.terms_text()
-            );
-        }
-        {
-            let query = query_parser.parse_query("a b c").unwrap();
-            let snippet_generator =
-                SnippetGenerator::create(&searcher, &*query, text_field, tokenizer).unwrap();
-            assert_eq!(
-                &btreemap!("a".to_string() => 0.25, "b".to_string() => 0.5),
-                snippet_generator.terms_text()
-            );
-        }
-    }
+    fn test_stemmed_term() {
+        let mut index = Index::temporary().expect("Unable to open index");
 
-    #[test]
-    fn test_snippet_generator() -> crate::Result<()> {
-        let mut schema_builder = tantivy::schema::Schema::builder();
-        let text_options = tantivy::schema::TextOptions::default().set_indexing_options(
-            tantivy::schema::TextFieldIndexing::default()
-                .set_tokenizer("en_stem")
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic),
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Website for runners</title>
+                            </head>
+                            <body>
+                                {}
+                            </body>
+                        </html>
+                    "#,
+                    TEST_TEXT
+                ),
+                "https://www.example.com",
+                vec![],
+                1.0,
+                500,
+            ))
+            .expect("failed to parse webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = Searcher::from(index);
+
+        let result = searcher
+            .search("paradigms", None, None, None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
+
+        assert_eq!(result.webpages.num_docs, 1);
+        assert_eq!(result.webpages.documents.len(), 1);
+        assert_eq!(
+            result.webpages.documents[0].snippet,
+            "Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural <b>paradigms</b>. Rust is...".to_string()
         );
-        let text_field = schema_builder.add_text_field("text", text_options);
-        let schema = schema_builder.build();
-        let index = tantivy::Index::create_in_ram(schema);
-        {
-            // writing the segment
-            let mut index_writer = index.writer_with_num_threads(1, 10_000_000)?;
-            let doc = tantivy::doc!(text_field => TEST_TEXT);
-            index_writer.add_document(doc)?;
-            index_writer.commit()?;
-        }
-        let searcher = index.reader().unwrap().searcher();
-        let tokenizer = searcher.index().tokenizer_for_field(text_field).unwrap();
-        let query_parser = tantivy::query::QueryParser::for_index(&index, vec![text_field]);
-        let query = query_parser.parse_query("rust design").unwrap();
-        let snippet_generator =
-            SnippetGenerator::create(&searcher, &*query, text_field, tokenizer).unwrap();
-        {
-            let snippet = snippet_generator.snippet(TEST_TEXT);
-            assert_eq!(
-                snippet.to_html(),
-                "<b>Rust</b> is a systems programming language sponsored by\nMozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and\nimperative-procedural paradigms. <b>Rust</b> is"
-            );
-        }
-        Ok(())
     }
 }
