@@ -27,11 +27,8 @@ use tantivy::{
 };
 
 pub mod intersection;
-mod ngram;
 pub mod parser;
 use parser::Term;
-
-use self::ngram::NGram;
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -50,43 +47,40 @@ fn proximity_queries(
 ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
     let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = Vec::new();
 
-    let ngrams: NGram<3, _> = NGram::from_iter(simple_terms_text.into_iter());
     let proxmity_fields = [Field::Title, Field::CleanBody];
 
-    for ngram in ngrams {
-        for field in &proxmity_fields {
-            let tantivy_field = schema.get_field(field.as_str()).unwrap();
-            let tantivy_entry = schema.get_field_entry(tantivy_field);
+    for field in &proxmity_fields {
+        let tantivy_field = schema.get_field(field.as_str()).unwrap();
+        let tantivy_entry = schema.get_field_entry(tantivy_field);
 
-            for (boost, slop) in [(3, 0), (2, 4), (1, 16)] {
-                let mut terms = Vec::new();
+        for (boost, slop) in [(4, 0), (3, 4), (2, 16), (1, 32)] {
+            let mut terms = Vec::new();
 
-                let mut num_terms = 0;
-                for term in ngram.iter().flatten() {
-                    let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
-                    num_terms += 1;
-                    terms.append(&mut Term::process_tantivy_term(
-                        term,
-                        analyzer,
-                        tantivy_field,
-                    ));
-                }
-
-                if num_terms < 2 {
-                    continue;
-                }
-
-                let terms = terms.into_iter().enumerate().collect();
-
-                proximity_queries.push((
-                    Occur::Should,
-                    BoostQuery::new(
-                        PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
-                        boost as f32,
-                    )
-                    .box_clone(),
-                ))
+            let mut num_terms = 0;
+            for term in &simple_terms_text {
+                let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
+                num_terms += 1;
+                terms.append(&mut Term::process_tantivy_term(
+                    term,
+                    analyzer,
+                    tantivy_field,
+                ));
             }
+
+            if num_terms < 2 {
+                continue;
+            }
+
+            let terms = terms.into_iter().enumerate().collect();
+
+            proximity_queries.push((
+                Occur::Should,
+                BoostQuery::new(
+                    PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
+                    boost as f32,
+                )
+                .box_clone(),
+            ))
         }
     }
 
