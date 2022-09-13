@@ -153,6 +153,72 @@ mod tests {
     }
 
     #[test]
+    fn page_centrality_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                            example example example
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.a.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.b.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 5.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::from(index);
+        let result = searcher
+            .search("example", None, None, None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap();
+        assert_eq!(result.webpages.documents.len(), 2);
+        assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
+        assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
+    }
+
+    #[test]
     fn navigational_search() {
         let mut index = Index::temporary().expect("Unable to open index");
 

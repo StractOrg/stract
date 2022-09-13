@@ -33,6 +33,7 @@ use crate::ranking::goggles::ast::{RawAlteration, Target};
 pub enum Signal {
     Bm25,
     HostCentrality,
+    PageCentrality,
     IsHomepage,
     FetchTimeMs,
     UpdateTimestamp,
@@ -40,9 +41,10 @@ pub enum Signal {
     Region,
 }
 
-const ALL_SIGNALS: [Signal; 7] = [
+const ALL_SIGNALS: [Signal; 8] = [
     Signal::Bm25,
     Signal::HostCentrality,
+    Signal::PageCentrality,
     Signal::IsHomepage,
     Signal::FetchTimeMs,
     Signal::UpdateTimestamp,
@@ -55,6 +57,7 @@ impl Signal {
         match field {
             Field::IsHomepage => Some(Signal::IsHomepage),
             Field::HostCentrality => Some(Signal::HostCentrality),
+            Field::PageCentrality => Some(Signal::PageCentrality),
             Field::FetchTimeMs => Some(Signal::FetchTimeMs),
             Field::LastUpdated => Some(Signal::UpdateTimestamp),
             Field::NumTrackers => Some(Signal::NumTrackers),
@@ -80,7 +83,7 @@ impl Signal {
     ) -> f64 {
         match self {
             Signal::Bm25 => bm25 as f64,
-            Signal::HostCentrality => {
+            Signal::HostCentrality | Signal::PageCentrality => {
                 fastfield.unwrap().get_val(doc as u64) as f64 / CENTRALITY_SCALING as f64
             }
             Signal::IsHomepage => fastfield.unwrap().get_val(doc as u64) as f64,
@@ -130,7 +133,8 @@ impl Signal {
     fn default_coefficient(&self) -> f64 {
         match self {
             Signal::Bm25 => 1.0,
-            Signal::HostCentrality => 1024.0,
+            Signal::HostCentrality => 512.0,
+            Signal::PageCentrality => 1024.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.1,
             Signal::UpdateTimestamp => 80.0,
