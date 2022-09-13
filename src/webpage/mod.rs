@@ -118,27 +118,23 @@ pub struct StoredPrimaryImage {
 pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
-    pub centrality: f64,
+    pub host_centrality: f64,
+    pub page_centrality: f64,
     pub fetch_time_ms: u64,
     pub primary_image: Option<StoredPrimaryImage>,
 }
 
 impl Webpage {
     #[cfg(test)]
-    pub fn new(
-        html: &str,
-        url: &str,
-        backlinks: Vec<Link>,
-        centrality: f64,
-        fetch_time_ms: u64,
-    ) -> Self {
+    pub fn new(html: &str, url: &str) -> Self {
         let html = Html::parse(html, url);
 
         Self {
             html,
-            backlinks,
-            centrality,
-            fetch_time_ms,
+            backlinks: Vec::new(),
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 0,
             primary_image: None,
         }
     }
@@ -179,9 +175,16 @@ impl Webpage {
 
         doc.add_u64(
             schema
-                .get_field(Field::Centrality.as_str())
-                .expect("Failed to get centrality field"),
-            (self.centrality * CENTRALITY_SCALING as f64) as u64,
+                .get_field(Field::HostCentrality.as_str())
+                .expect("Failed to get host_centrality field"),
+            (self.host_centrality * CENTRALITY_SCALING as f64) as u64,
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::PageCentrality.as_str())
+                .expect("Failed to get page_centrality field"),
+            (self.page_centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         doc.add_u64(
@@ -577,7 +580,8 @@ impl Html {
                     doc.add_u64(tantivy_field, description.tokens.len() as u64)
                 }
                 Field::BacklinkText
-                | Field::Centrality
+                | Field::HostCentrality
+                | Field::PageCentrality
                 | Field::FetchTimeMs
                 | Field::Region
                 | Field::PrimaryImage => {}

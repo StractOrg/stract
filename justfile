@@ -2,9 +2,9 @@
     rm -rf data
     tar -zxvf data.tar.gz
 
-@flamegraph:
+@profile-indexer:
     sudo rm -rf data/index
-    cargo flamegraph --root -- indexer local configs/indexer/local.toml
+    cargo flamegraph --root -- indexer local configs/indexer/profile.toml
 
 @worker:
     cargo run --release -- webgraph worker configs/webgraph/worker.toml

@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    ranking::goggles::{Goggle, SignalAggregator},
-    schema::Field,
-    Result,
-};
+use crate::{ranking::goggles::Goggle, ranking::SignalAggregator, schema::Field, Result};
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
@@ -312,11 +308,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -330,11 +323,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -362,11 +352,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -380,11 +367,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(
@@ -450,11 +434,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -468,11 +449,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(
@@ -508,11 +486,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com/forum",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -526,11 +501,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(

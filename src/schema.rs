@@ -32,10 +32,12 @@ pub enum Field {
     Url,
     Site,
     Domain,
-    DomainIfHomepage, // this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    DomainIfHomepage,
     IsHomepage,
     BacklinkText,
-    Centrality,
+    HostCentrality,
+    PageCentrality,
     FetchTimeMs,
     PrimaryImage,
     LastUpdated,
@@ -48,7 +50,7 @@ pub enum Field {
     NumDescriptionTokens,
 }
 
-pub static ALL_FIELDS: [Field; 22] = [
+pub static ALL_FIELDS: [Field; 23] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -60,7 +62,8 @@ pub static ALL_FIELDS: [Field; 22] = [
     Field::DomainIfHomepage,
     Field::IsHomepage,
     Field::BacklinkText,
-    Field::Centrality,
+    Field::HostCentrality,
+    Field::PageCentrality,
     Field::FetchTimeMs,
     Field::PrimaryImage,
     Field::LastUpdated,
@@ -104,7 +107,12 @@ impl Field {
                     .set_indexed(),
             ),
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
-            Field::Centrality => IndexingOption::Numeric(
+            Field::HostCentrality => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::PageCentrality => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -170,7 +178,8 @@ impl Field {
             Field::Url => "url",
             Field::Site => "site",
             Field::BacklinkText => "backlink_text",
-            Field::Centrality => "centrality",
+            Field::HostCentrality => "host_centrality",
+            Field::PageCentrality => "page_centrality",
             Field::StemmedTitle => "stemmed_title",
             Field::StemmedCleanBody => "stemmed_body",
             Field::Domain => "domain",
@@ -201,7 +210,8 @@ impl Field {
             Field::Domain => Some(1.0),
             Field::AllBody => Some(0.01),
             Field::BacklinkText => Some(4.0),
-            Field::Centrality
+            Field::HostCentrality
+            | Field::PageCentrality
             | Field::IsHomepage
             | Field::PrimaryImage
             | Field::FetchTimeMs
@@ -224,7 +234,7 @@ impl Field {
         matches!(
             self,
             Field::IsHomepage
-                | Field::Centrality
+                | Field::HostCentrality
                 | Field::FetchTimeMs
                 | Field::LastUpdated
                 | Field::NumTrackers
@@ -243,7 +253,8 @@ impl Field {
             "url" => Some(Field::Url),
             "site" => Some(Field::Site),
             "backlink_text" => Some(Field::BacklinkText),
-            "centrality" => Some(Field::Centrality),
+            "host_centrality" => Some(Field::HostCentrality),
+            "page_centrality" => Some(Field::PageCentrality),
             "stemmed_title" => Some(Field::StemmedTitle),
             "stemmed_body" => Some(Field::StemmedCleanBody),
             "domain" => Some(Field::Domain),

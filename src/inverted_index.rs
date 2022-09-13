@@ -363,7 +363,8 @@ impl From<Document> for RetrievedWebpage {
                     }
                 }
                 Field::BacklinkText
-                | Field::Centrality
+                | Field::HostCentrality
+                | Field::PageCentrality
                 | Field::Site
                 | Field::StemmedTitle
                 | Field::CleanBody
@@ -388,8 +389,8 @@ mod tests {
     use maplit::hashset;
 
     use crate::{
-        ranking::{goggles::SignalAggregator, Ranker},
-        webpage::{region::RegionCount, Link},
+        ranking::{Ranker, SignalAggregator},
+        webpage::{region::RegionCount, Html, Link},
     };
 
     use super::*;
@@ -429,11 +430,8 @@ mod tests {
                     "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -471,11 +469,8 @@ mod tests {
                     "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -512,11 +507,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -553,11 +545,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -593,15 +582,13 @@ mod tests {
             "#
                 ),
                 "https://www.a.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Website B</title>
@@ -611,17 +598,20 @@ mod tests {
                 </body>
             </html>
             "#
+                    ),
+                    "https://www.b.com",
                 ),
-                "https://www.b.com",
-                vec![Link {
+                backlinks: vec![Link {
                     source: "https://www.a.com".to_string().into(),
                     destination: "https://www.b.com".to_string().into(),
                     text: "B site is great".to_string(),
                 }],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                host_centrality: 1.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 
@@ -665,11 +655,8 @@ mod tests {
                     "#
                     ),
                     "https://www.example.com",
-                    vec![],
-                    1.0,
-                    500,
                 ))
-                .expect("failed to parse webpage");
+                .expect("failed to insert webpage");
         }
 
         index.commit().expect("failed to commit index");
@@ -707,11 +694,8 @@ mod tests {
                 "#
                 ),
                 "https://www.dr.dk",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -740,11 +724,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
 
         let mut index2 = InvertedIndex::temporary().expect("Unable to open index");
 
@@ -763,11 +744,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
 
         let mut index = index1.merge(index2);
         index.commit().unwrap();
@@ -823,11 +801,8 @@ mod tests {
                     "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -836,69 +811,6 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn fetch_time_ranking() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse(
-            "test",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.first.com",
-                vec![],
-                1.0,
-                0,
-            ))
-            .expect("failed to parse webpage");
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.second.com",
-                vec![],
-                1.0,
-                5000,
-            ))
-            .expect("failed to parse webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
     }
 
     #[test]
@@ -923,14 +835,11 @@ mod tests {
                     "#
             ),
             "https://www.example.com",
-            vec![],
-            1.0,
-            500,
         );
         let uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
         webpage.set_primary_image(uuid, webpage.html.primary_image().unwrap());
 
-        index.insert(webpage).expect("failed to parse webpage");
+        index.insert(webpage).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(

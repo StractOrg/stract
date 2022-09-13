@@ -21,7 +21,7 @@ use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, Score, SegmentReader};
 
-use super::goggles::SignalAggregator;
+use super::SignalAggregator;
 
 pub(crate) struct InitialScoreTweaker {
     region_count: Arc<RegionCount>,
