@@ -32,10 +32,12 @@ pub enum Field {
     Url,
     Site,
     Domain,
-    DomainIfHomepage, // this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    DomainIfHomepage,
     IsHomepage,
     BacklinkText,
     HostCentrality,
+    PageCentrality,
     FetchTimeMs,
     PrimaryImage,
     LastUpdated,
@@ -48,7 +50,7 @@ pub enum Field {
     NumDescriptionTokens,
 }
 
-pub static ALL_FIELDS: [Field; 22] = [
+pub static ALL_FIELDS: [Field; 23] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -61,6 +63,7 @@ pub static ALL_FIELDS: [Field; 22] = [
     Field::IsHomepage,
     Field::BacklinkText,
     Field::HostCentrality,
+    Field::PageCentrality,
     Field::FetchTimeMs,
     Field::PrimaryImage,
     Field::LastUpdated,
@@ -105,6 +108,11 @@ impl Field {
             ),
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
             Field::HostCentrality => IndexingOption::Numeric(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::PageCentrality => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -171,6 +179,7 @@ impl Field {
             Field::Site => "site",
             Field::BacklinkText => "backlink_text",
             Field::HostCentrality => "host_centrality",
+            Field::PageCentrality => "page_centrality",
             Field::StemmedTitle => "stemmed_title",
             Field::StemmedCleanBody => "stemmed_body",
             Field::Domain => "domain",
@@ -202,6 +211,7 @@ impl Field {
             Field::AllBody => Some(0.01),
             Field::BacklinkText => Some(4.0),
             Field::HostCentrality
+            | Field::PageCentrality
             | Field::IsHomepage
             | Field::PrimaryImage
             | Field::FetchTimeMs
@@ -244,6 +254,7 @@ impl Field {
             "site" => Some(Field::Site),
             "backlink_text" => Some(Field::BacklinkText),
             "host_centrality" => Some(Field::HostCentrality),
+            "page_centrality" => Some(Field::PageCentrality),
             "stemmed_title" => Some(Field::StemmedTitle),
             "stemmed_body" => Some(Field::StemmedCleanBody),
             "domain" => Some(Field::Domain),

@@ -364,6 +364,7 @@ impl From<Document> for RetrievedWebpage {
                 }
                 Field::BacklinkText
                 | Field::HostCentrality
+                | Field::PageCentrality
                 | Field::Site
                 | Field::StemmedTitle
                 | Field::CleanBody

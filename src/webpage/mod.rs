@@ -176,8 +176,15 @@ impl Webpage {
         doc.add_u64(
             schema
                 .get_field(Field::HostCentrality.as_str())
-                .expect("Failed to get centrality field"),
+                .expect("Failed to get host_centrality field"),
             (self.host_centrality * CENTRALITY_SCALING as f64) as u64,
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::PageCentrality.as_str())
+                .expect("Failed to get page_centrality field"),
+            (self.page_centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         doc.add_u64(
@@ -574,6 +581,7 @@ impl Html {
                 }
                 Field::BacklinkText
                 | Field::HostCentrality
+                | Field::PageCentrality
                 | Field::FetchTimeMs
                 | Field::Region
                 | Field::PrimaryImage => {}
