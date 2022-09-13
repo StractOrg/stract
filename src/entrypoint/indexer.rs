@@ -144,7 +144,6 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
             std::fs::remove_file(file).ok();
         }
         index.commit().unwrap();
-        index.inverted_index.merge_all_segments().unwrap();
 
         info!("{} done", name);
 
@@ -218,9 +217,13 @@ impl Indexer {
             warc_paths = Box::new(warc_paths.take(limit));
         }
 
-        let _index: Index = warc_paths
+        let mut index: Index = warc_paths
             .map_reduce(&workers)
             .expect("failed to build index");
+
+        index
+            .inverted_index
+            .merge_into_segments(config.final_num_segments.unwrap_or(20))?;
 
         Ok(())
     }
@@ -287,7 +290,9 @@ impl Indexer {
             );
 
         if let Some(index) = index.as_mut() {
-            index.inverted_index.merge_all_segments().unwrap();
+            index
+                .inverted_index
+                .merge_into_segments(config.final_num_segments.unwrap_or(20))?;
         }
 
         Ok(())

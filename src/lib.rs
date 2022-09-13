@@ -57,6 +57,7 @@ mod webpage;
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
     limit_warc_files: Option<usize>,
+    final_num_segments: Option<u32>,
     warc_source: WarcSource,
     workers: Vec<String>,
     batch_size: Option<usize>,
@@ -67,6 +68,7 @@ pub struct IndexingMasterConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
     limit_warc_files: Option<usize>,
+    final_num_segments: Option<u32>,
     warc_source: WarcSource,
     batch_size: Option<usize>,
     webgraph_path: Option<String>,
