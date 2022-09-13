@@ -127,7 +127,7 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                     let webpage = Webpage {
                         html,
                         backlinks,
-                        centrality,
+                        host_centrality: centrality,
                         fetch_time_ms,
                         primary_image: None,
                     };

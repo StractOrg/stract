@@ -27,7 +27,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use super::ast::{RawAlteration, Target};
+use crate::ranking::goggles::ast::{RawAlteration, Target};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Signal {
@@ -54,7 +54,7 @@ impl Signal {
     fn from_field(field: &Field) -> Option<Self> {
         match field {
             Field::IsHomepage => Some(Signal::IsHomepage),
-            Field::Centrality => Some(Signal::HostCentrality),
+            Field::HostCentrality => Some(Signal::HostCentrality),
             Field::FetchTimeMs => Some(Signal::FetchTimeMs),
             Field::LastUpdated => Some(Signal::UpdateTimestamp),
             Field::NumTrackers => Some(Signal::NumTrackers),

@@ -363,7 +363,7 @@ impl From<Document> for RetrievedWebpage {
                     }
                 }
                 Field::BacklinkText
-                | Field::Centrality
+                | Field::HostCentrality
                 | Field::Site
                 | Field::StemmedTitle
                 | Field::CleanBody
@@ -388,7 +388,7 @@ mod tests {
     use maplit::hashset;
 
     use crate::{
-        ranking::{goggles::SignalAggregator, Ranker},
+        ranking::{Ranker, SignalAggregator},
         webpage::{region::RegionCount, Link},
     };
 

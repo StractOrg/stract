@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    ranking::goggles::{Goggle, SignalAggregator},
-    schema::Field,
-    Result,
-};
+use crate::{ranking::goggles::Goggle, ranking::SignalAggregator, schema::Field, Result};
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},

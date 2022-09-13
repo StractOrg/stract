@@ -18,6 +18,7 @@ mod bm25;
 pub mod centrality_store;
 pub mod goggles;
 mod initial;
+pub mod signal;
 
 use std::sync::Arc;
 
@@ -29,7 +30,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use self::goggles::SignalAggregator;
+pub use self::signal::*;
 
 pub struct Ranker {
     region_count: Arc<RegionCount>,

@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod ast;
+pub mod ast;
 mod pattern_query;
-mod signal;
 
 use std::convert::TryFrom;
 
@@ -28,11 +27,12 @@ use tantivy::{
     tokenizer::TextAnalyzer,
 };
 
-pub use self::signal::*;
 use self::{
     ast::{RawAction, RawGoggle, RawInstruction, RawPatternOption, RawPatternPart},
     pattern_query::PatternQuery,
 };
+
+use super::signal::SignalAggregator;
 
 pub fn parse(goggle: &str) -> Result<Goggle> {
     let raw_goggle = ast::parse(goggle)?;

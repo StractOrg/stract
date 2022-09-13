@@ -156,7 +156,7 @@ impl Index {
 
     fn maybe_insert_primary_image(&mut self, webpage: &mut Webpage) {
         match webpage
-            .centrality
+            .host_centrality
             .partial_cmp(&IMAGE_WEBPAGE_CENTRALITY_THRESHOLD)
         {
             None | Some(Ordering::Greater) => {}
@@ -291,7 +291,7 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::ranking::{goggles::SignalAggregator, Ranker};
+    use crate::ranking::{Ranker, SignalAggregator};
 
     use super::*;
 

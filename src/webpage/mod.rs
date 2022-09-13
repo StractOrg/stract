@@ -118,7 +118,7 @@ pub struct StoredPrimaryImage {
 pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
-    pub centrality: f64,
+    pub host_centrality: f64,
     pub fetch_time_ms: u64,
     pub primary_image: Option<StoredPrimaryImage>,
 }
@@ -129,7 +129,7 @@ impl Webpage {
         html: &str,
         url: &str,
         backlinks: Vec<Link>,
-        centrality: f64,
+        host_centrality: f64,
         fetch_time_ms: u64,
     ) -> Self {
         let html = Html::parse(html, url);
@@ -137,7 +137,7 @@ impl Webpage {
         Self {
             html,
             backlinks,
-            centrality,
+            host_centrality,
             fetch_time_ms,
             primary_image: None,
         }
@@ -179,9 +179,9 @@ impl Webpage {
 
         doc.add_u64(
             schema
-                .get_field(Field::Centrality.as_str())
+                .get_field(Field::HostCentrality.as_str())
                 .expect("Failed to get centrality field"),
-            (self.centrality * CENTRALITY_SCALING as f64) as u64,
+            (self.host_centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         doc.add_u64(
@@ -577,7 +577,7 @@ impl Html {
                     doc.add_u64(tantivy_field, description.tokens.len() as u64)
                 }
                 Field::BacklinkText
-                | Field::Centrality
+                | Field::HostCentrality
                 | Field::FetchTimeMs
                 | Field::Region
                 | Field::PrimaryImage => {}
