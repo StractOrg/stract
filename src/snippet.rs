@@ -356,11 +356,8 @@ Survey in 2016, 2017, and 2018."#;
                     TEST_TEXT
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = Searcher::from(index);
@@ -396,11 +393,8 @@ Survey in 2016, 2017, and 2018."#;
                     TEST_TEXT
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = Searcher::from(index);
@@ -591,11 +585,8 @@ Survey in 2016, 2017, and 2018."#;
                     TEST_TEXT
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = Searcher::from(index);

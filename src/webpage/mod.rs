@@ -119,26 +119,22 @@ pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
     pub host_centrality: f64,
+    pub page_centrality: f64,
     pub fetch_time_ms: u64,
     pub primary_image: Option<StoredPrimaryImage>,
 }
 
 impl Webpage {
     #[cfg(test)]
-    pub fn new(
-        html: &str,
-        url: &str,
-        backlinks: Vec<Link>,
-        host_centrality: f64,
-        fetch_time_ms: u64,
-    ) -> Self {
+    pub fn new(html: &str, url: &str) -> Self {
         let html = Html::parse(html, url);
 
         Self {
             html,
-            backlinks,
-            host_centrality,
-            fetch_time_ms,
+            backlinks: Vec::new(),
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 0,
             primary_image: None,
         }
     }

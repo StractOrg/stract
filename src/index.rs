@@ -316,11 +316,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
 
         index.commit().unwrap();
 
@@ -373,11 +370,8 @@ mod tests {
             "#
                 ),
                 "https://www.example.com",
-                vec![],
-                1.0,
-                500,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
 
         index.commit().unwrap();
 

@@ -49,14 +49,19 @@ struct Job {
 }
 
 struct IndexingWorker {
-    centrality_store: CentralityStore,
+    host_centrality_store: CentralityStore,
+    page_centrality_store: CentralityStore,
     webgraph: Option<Webgraph>,
 }
 
 impl IndexingWorker {
     fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
+        let host_centrality_path = Path::new(&centrality_store_path).join("host");
+        let page_centrality_path = Path::new(&centrality_store_path).join("full");
+
         Self {
-            centrality_store: CentralityStore::new(centrality_store_path),
+            host_centrality_store: CentralityStore::new(host_centrality_path),
+            page_centrality_store: CentralityStore::new(page_centrality_path),
             webgraph: webgraph_path.map(|path| {
                 WebgraphBuilder::new(path)
                     .with_full_graph()
@@ -113,10 +118,17 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                                 .collect()
                         })
                         .unwrap_or_else(Vec::new);
-                    let centrality = worker
-                        .centrality_store
+
+                    let host_centrality = worker
+                        .host_centrality_store
                         .get(html.url().host_without_specific_subdomains())
                         .unwrap_or_default();
+
+                    let page_centrality = worker
+                        .page_centrality_store
+                        .get(html.url().raw())
+                        .unwrap_or_default();
+
                     let fetch_time_ms = record.metadata.fetch_time_ms as u64;
 
                     trace!("inserting webpage: {:?}", html.url());
@@ -127,7 +139,8 @@ impl Map<IndexingWorker, FrozenIndex> for Job {
                     let webpage = Webpage {
                         html,
                         backlinks,
-                        host_centrality: centrality,
+                        page_centrality,
+                        host_centrality,
                         fetch_time_ms,
                         primary_image: None,
                     };

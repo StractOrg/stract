@@ -308,11 +308,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -326,11 +323,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let result = index
@@ -358,11 +352,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -376,11 +367,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(
@@ -446,11 +434,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -464,11 +449,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(
@@ -504,11 +486,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.first.com/forum",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
                 r#"
@@ -522,11 +501,8 @@ mod tests {
                         </html>
                     "#,
                 "https://www.second.com",
-                vec![],
-                1.0,
-                0,
             ))
-            .expect("failed to parse webpage");
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let query = Query::parse(

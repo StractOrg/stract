@@ -173,7 +173,7 @@ impl SearchResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::webpage::Webpage;
+    use crate::webpage::{Html, Webpage};
 
     use super::*;
 
@@ -186,8 +186,9 @@ mod tests {
 
         for i in 0..NUM_WEBSITES {
             index
-                .insert(Webpage::new(
-                    r#"
+                .insert(Webpage {
+                    html: Html::parse(
+                        r#"
             <html>
                 <head>
                     <title>Example website</title>
@@ -197,12 +198,15 @@ mod tests {
                 </body>
             </html>
             "#,
-                    &format!("https://www.{i}.com"),
-                    vec![],
-                    (NUM_WEBSITES - i) as f64,
-                    500,
-                ))
-                .expect("failed to parse webpage");
+                        &format!("https://www.{i}.com"),
+                    ),
+                    backlinks: vec![],
+                    host_centrality: (NUM_WEBSITES - i) as f64,
+                    fetch_time_ms: 500,
+                    page_centrality: 0.0,
+                    primary_image: None,
+                })
+                .expect("failed to insert webpage");
         }
 
         index.commit().unwrap();

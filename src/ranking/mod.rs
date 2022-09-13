@@ -81,19 +81,20 @@ mod tests {
     use crate::{
         index::Index,
         searcher::Searcher,
-        webpage::{Link, Webpage},
+        webpage::{Html, Link, Webpage},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[test]
-    fn harmonic_ranking() {
+    fn host_centrality_ranking() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Website A</title>
@@ -104,17 +105,21 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.a.com",
                 ),
-                "https://www.a.com",
-                vec![],
-                0.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Website B</title>
@@ -124,13 +129,16 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.b.com",
                 ),
-                "https://www.b.com",
-                vec![],
-                5.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 5.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -149,9 +157,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>DR Homepage</title>
@@ -161,17 +170,21 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.dr.dk",
                 ),
-                "https://www.dr.dk",
-                vec![],
-                0.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Subsite dr</title>
@@ -181,17 +194,21 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.dr.dk/whatever",
                 ),
-                "https://www.dr.dk/whatever",
-                vec![],
-                0.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Website B</title>
@@ -199,13 +216,16 @@ mod tests {
                         dr and some other text {CONTENT} dk
                     </html>
                 "#
+                    ),
+                    "https://www.b.com",
                 ),
-                "https://www.b.com",
-                vec![],
-                0.003,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.003,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -224,9 +244,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Title</title>
@@ -237,17 +258,21 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.old.com",
                 ),
-                "https://www.old.com",
-                vec![],
-                0.092,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.092,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>Title</title>
@@ -258,13 +283,16 @@ mod tests {
                         </body>
                     </html>
                 "#
+                    ),
+                    "https://www.new.com",
                 ),
-                "https://www.new.com",
-                vec![],
-                0.09,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 0.09,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -282,8 +310,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
                     <html>
                         <head>
                             <title>Test site</title>
@@ -293,15 +322,18 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                "https://www.first.com",
-                vec![],
-                0.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                    "https://www.first.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                    r#"
+            .insert(Webpage {
+                    html: Html::parse(r#"
                     <html>
                         <head>
                             <script>
@@ -325,12 +357,14 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                "https://www.second.com",
-                vec![],
-                0.003,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                "https://www.second.com"),
+                backlinks: vec![],
+                host_centrality: 0.003,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+    })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -349,8 +383,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
                     <html>
                         <head>
                             <title>Test site</title>
@@ -360,19 +395,23 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                "https://www.first.com",
-                vec![Link {
+                    "https://www.first.com",
+                ),
+                backlinks: vec![Link {
                     source: "https://www.second.com".to_string().into(),
                     destination: "https://www.first.com".to_string().into(),
                     text: "test this is the best test site".to_string(),
                 }],
-                0.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
                     <html>
                         <head>
                             <title>Second test site</title>
@@ -382,12 +421,15 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                "https://www.second.com",
-                vec![],
-                0.003,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                    "https://www.second.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.003,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
         let searcher = Searcher::from(index);
@@ -406,8 +448,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
             <html>
                 <head>
                     <title>Test website</title>
@@ -417,16 +460,20 @@ mod tests {
                 </body>
             </html>
             "#,
-                "https://www.body.com",
-                vec![],
-                1.0,
-                20,
-            ))
-            .expect("failed to parse webpage");
+                    "https://www.body.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 20,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
             <html>
                 <head>
                     <title>Example website</title>
@@ -436,16 +483,20 @@ mod tests {
                 </body>
             </html>
             "#,
-                "https://www.title.com",
-                vec![],
-                1.0,
-                20,
-            ))
-            .expect("failed to parse webpage");
+                    "https://www.title.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 20,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
             <html>
                 <head>
                     <title>Example website</title>
@@ -455,12 +506,15 @@ mod tests {
                 </body>
             </html>
             "#,
-                "https://www.centrality.com",
-                vec![],
-                1.0002,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                    "https://www.centrality.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0002,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
 
         index.commit().unwrap();
 
@@ -525,9 +579,10 @@ mod tests {
     fn term_proximity_ranking() {
         let mut index = Index::temporary().expect("Unable to open index");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -537,17 +592,21 @@ mod tests {
                             </body>
                         </html>
                     "#
+                    ),
+                    "https://www.first.com",
                 ),
-                "https://www.first.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -557,17 +616,21 @@ mod tests {
                             </body>
                         </html>
                     "#
+                    ),
+                    "https://www.third.com",
                 ),
-                "https://www.third.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -577,13 +640,16 @@ mod tests {
                             </body>
                         </html>
                     "#
+                    ),
+                    "https://www.second.com",
                 ),
-                "https://www.second.com",
-                vec![],
-                1.0,
-                500,
-            ))
-            .expect("failed to parse webpage");
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = Searcher::new(index, None, None);
 
@@ -599,5 +665,73 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.first.com");
         assert_eq!(result.documents[1].url, "https://www.second.com");
         assert_eq!(result.documents[2].url, "https://www.third.com");
+    }
+
+    #[test]
+    fn fetch_time_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.first.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 0,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.second.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 5000,
+                page_centrality: 0.0,
+                primary_image: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = Searcher::new(index, None, None);
+
+        let result = searcher
+            .search("test", None, None, None)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.first.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
     }
 }
