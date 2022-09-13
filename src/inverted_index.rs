@@ -20,7 +20,7 @@ use tantivy::collector::{Collector, Count};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{DocAddress, Document, IndexReader, IndexWriter};
+use tantivy::{DocAddress, Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::image_store::Image;
 use crate::query::Query;
@@ -33,6 +33,11 @@ use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+
+struct SegmentMergeCandidate {
+    num_docs: u32,
+    segments: Vec<SegmentMeta>,
+}
 
 pub struct InvertedIndex {
     pub path: String,
@@ -149,8 +154,19 @@ impl InvertedIndex {
         })
     }
 
-    pub fn merge_all_segments(&mut self) -> Result<()> {
-        let segments: Vec<_> = self
+    pub fn merge_into_segments(&mut self, num_segments: u32) -> Result<()> {
+        assert!(num_segments > 0);
+
+        let mut merge_segments = Vec::new();
+
+        for _ in 0..num_segments {
+            merge_segments.push(SegmentMergeCandidate {
+                num_docs: 0,
+                segments: Vec::new(),
+            });
+        }
+
+        let mut segments: Vec<_> = self
             .tantivy_index
             .load_metas()?
             .segments
@@ -158,13 +174,31 @@ impl InvertedIndex {
             .collect();
 
         if segments.len() > 1 {
-            let segment_ids: Vec<_> = segments.iter().map(|segment| segment.id()).collect();
-            self.writer.merge(&segment_ids[..]).wait()?;
+            segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
 
-            let path = Path::new(&self.path);
             for segment in segments {
-                for file in segment.list_files() {
-                    std::fs::remove_file(path.join(file)).ok();
+                let best_candidate = merge_segments
+                    .iter_mut()
+                    .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
+                    .unwrap();
+
+                best_candidate.num_docs += segment.num_docs();
+                best_candidate.segments.push(segment);
+            }
+
+            for merge in merge_segments
+                .into_iter()
+                .filter(|merge| !merge.segments.is_empty())
+            {
+                let segment_ids: Vec<_> =
+                    merge.segments.iter().map(|segment| segment.id()).collect();
+                self.writer.merge(&segment_ids[..]).wait()?;
+
+                let path = Path::new(&self.path);
+                for segment in merge.segments {
+                    for file in segment.list_files() {
+                        std::fs::remove_file(path.join(file)).ok();
+                    }
                 }
             }
         }
