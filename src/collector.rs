@@ -90,7 +90,7 @@ impl Collector for TopDocs {
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        let mut collector = BucketCollector::new(self.top_n);
+        let mut collector = BucketCollector::new(self.top_n + self.offset);
 
         for docs in segment_fruits {
             for doc in docs {
