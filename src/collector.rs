@@ -27,7 +27,8 @@ use crate::{
 };
 
 fn adjust_score(num_taken: usize, original_score: f64) -> f64 {
-    original_score / (num_taken as f64 + 1.0)
+    const SCALE: f64 = 14.0;
+    original_score * (SCALE / (num_taken as f64 + SCALE))
 }
 
 pub struct TopDocs {
