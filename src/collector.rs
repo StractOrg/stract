@@ -147,6 +147,7 @@ impl SegmentCollector for TopSegmentCollector {
 
 struct BucketCollector {
     buckets: PrehashMap<Bucket>,
+    heads: MinMaxHeap<BucketHead>,
     top_n: usize,
 }
 
@@ -156,6 +157,7 @@ impl BucketCollector {
 
         Self {
             top_n,
+            heads: MinMaxHeap::with_capacity(top_n * 2 + 1),
             buckets: PrehashMap::new(),
         }
     }
@@ -165,10 +167,43 @@ impl BucketCollector {
             bucket.insert(doc);
         } else {
             let mut bucket = Bucket::new(self.top_n);
-            let key = doc.key.clone();
-            bucket.insert(doc);
+            bucket.insert(doc.clone());
 
-            self.buckets.insert(key, bucket);
+            self.buckets.insert(doc.key.clone(), bucket);
+
+            self.heads.push(BucketHead {
+                key: doc.key,
+                tweaked_score: doc.score,
+            });
+        }
+
+        if self.buckets.len() > (self.top_n * 2) + 1 {
+            self.prune_buckets()
+        }
+    }
+
+    fn prune_buckets(&mut self) {
+        self.update_worst_head();
+        let worst_head = self.heads.pop_min().unwrap();
+        self.buckets.remove(&worst_head.key);
+    }
+
+    fn update_worst_head(&mut self) {
+        loop {
+            let mut worst_head = self.heads.peek_min_mut().unwrap();
+            let current_score = self
+                .buckets
+                .get(&worst_head.key)
+                .unwrap()
+                .get_best()
+                .unwrap()
+                .tweaked_score;
+
+            if worst_head.tweaked_score != current_score {
+                worst_head.tweaked_score = current_score;
+            } else {
+                break;
+            }
         }
     }
 
@@ -300,7 +335,7 @@ struct TweakedDoc<'a> {
     _doc_id: &'a DocId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Doc {
     key: Prehashed,
     id: DocId,
@@ -458,14 +493,18 @@ mod tests {
     fn same_key_de_prioritised() {
         test(
             10,
-            &[(1, 125, 3.0), (2, 126, 4.0), (2, 127, 5.0)],
-            &[(5.0, 127), (3.0, 125), (2.0, 126)],
+            &[(1, 125, 3.0), (2, 126, 3.1), (2, 127, 5.0)],
+            &[
+                (adjust_score(0, 5.0), 127),
+                (adjust_score(0, 3.0), 125),
+                (adjust_score(1, 3.1), 126),
+            ],
         );
 
         test(
             2,
-            &[(1, 125, 3.0), (2, 126, 4.0), (2, 127, 5.0)],
-            &[(5.0, 127), (3.0, 125)],
+            &[(1, 125, 3.0), (2, 126, 3.1), (2, 127, 5.0)],
+            &[(adjust_score(0, 5.0), 127), (adjust_score(0, 3.0), 125)],
         );
     }
 }

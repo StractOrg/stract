@@ -567,16 +567,17 @@ mod tests {
             <html>
                 <head>
                     <title>Test website</title>
+                    <meta property="og:description" content="example" />
                 </head>
                 <body>
-                    example
+                    test
                 </body>
             </html>
             "#,
                     "https://www.centrality.com",
                 ),
                 backlinks: vec![],
-                host_centrality: 1.0002,
+                host_centrality: 1.02,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 primary_image: None,
