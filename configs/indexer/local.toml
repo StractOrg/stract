@@ -1,8 +1,8 @@
 warc_paths_file = "warc.paths"
 centrality_store_path = "./data/centrality"
-limit_warc_files = 100
+limit_warc_files = 25
 download_images = false
-batch_size = 10
+batch_size = 3
 
 [warc_source]
 # type = "Local"

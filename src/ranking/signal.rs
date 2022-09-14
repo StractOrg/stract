@@ -134,7 +134,7 @@ impl Signal {
         match self {
             Signal::Bm25 => 1.0,
             Signal::HostCentrality => 512.0,
-            Signal::PageCentrality => 1024.0,
+            Signal::PageCentrality => 1512.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.1,
             Signal::UpdateTimestamp => 80.0,

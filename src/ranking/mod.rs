@@ -23,9 +23,10 @@ pub mod signal;
 use std::sync::Arc;
 
 use initial::InitialScoreTweaker;
-use tantivy::collector::{Collector, TopDocs};
+use tantivy::collector::Collector;
 
 use crate::{
+    collector::TopDocs,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::{Region, RegionCount},
 };
@@ -565,10 +566,10 @@ mod tests {
                     r#"
             <html>
                 <head>
-                    <title>Example website</title>
+                    <title>Test website</title>
                 </head>
                 <body>
-                    test
+                    example
                 </body>
             </html>
             "#,

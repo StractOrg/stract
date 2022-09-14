@@ -34,6 +34,7 @@ pub mod mapreduce;
 
 mod autosuggest;
 mod bangs;
+mod collector;
 mod directory;
 mod entity_index;
 mod exponential_backoff;
@@ -42,6 +43,7 @@ mod image_downloader;
 mod image_store;
 pub mod index;
 mod kv;
+pub mod prehashed;
 mod query;
 mod ranking;
 mod schema;
