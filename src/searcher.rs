@@ -214,7 +214,7 @@ mod tests {
         let searcher = Searcher::new(index, None, None);
 
         for p in 0..NUM_PAGES {
-            let urls = searcher
+            let urls: Vec<_> = searcher
                 .search("test", None, None, Some(p))
                 .unwrap()
                 .into_websites()
@@ -222,9 +222,12 @@ mod tests {
                 .webpages
                 .documents
                 .into_iter()
-                .map(|page| page.url);
+                .map(|page| page.url)
+                .collect();
 
-            for (i, url) in urls.enumerate() {
+            assert!(!urls.is_empty());
+
+            for (i, url) in urls.into_iter().enumerate() {
                 assert_eq!(
                     url,
                     format!("https://www.{}.com", i + (p * NUM_RESULTS_PER_PAGE))

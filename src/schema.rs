@@ -48,9 +48,10 @@ pub enum Field {
     NumTitleTokens,
     NumCleanBodyTokens,
     NumDescriptionTokens,
+    SiteHash,
 }
 
-pub static ALL_FIELDS: [Field; 23] = [
+pub static ALL_FIELDS: [Field; 24] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -74,6 +75,7 @@ pub static ALL_FIELDS: [Field; 23] = [
     Field::NumTitleTokens,
     Field::NumCleanBodyTokens,
     Field::NumDescriptionTokens,
+    Field::SiteHash,
 ];
 
 impl Field {
@@ -168,6 +170,9 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
+            Field::SiteHash => IndexingOption::Numeric(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
         }
     }
 
@@ -196,6 +201,7 @@ impl Field {
             Field::NumTitleTokens => "num_title_tokens",
             Field::NumCleanBodyTokens => "num_clean_body_tokens",
             Field::NumDescriptionTokens => "num_description_tokens",
+            Field::SiteHash => "site_hash",
         }
     }
 
@@ -212,6 +218,7 @@ impl Field {
             Field::BacklinkText => Some(4.0),
             Field::HostCentrality
             | Field::PageCentrality
+            | Field::SiteHash
             | Field::IsHomepage
             | Field::PrimaryImage
             | Field::FetchTimeMs
@@ -243,6 +250,7 @@ impl Field {
                 | Field::NumTitleTokens
                 | Field::NumCleanBodyTokens
                 | Field::NumDescriptionTokens
+                | Field::SiteHash
         )
     }
 
@@ -267,6 +275,7 @@ impl Field {
             "all_body" => Some(Field::AllBody),
             "num_trackers" => Some(Field::NumTrackers),
             "region" => Some(Field::Region),
+            "site_hash" => Some(Field::SiteHash),
             _ => None,
         }
     }

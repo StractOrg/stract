@@ -13,7 +13,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{schema_org::SchemaOrg, tokenizer, Error, Result};
+use crate::{
+    prehashed::{hash, split_u128},
+    schema_org::SchemaOrg,
+    tokenizer, Error, Result,
+};
 use chrono::{DateTime, FixedOffset};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
@@ -578,6 +582,12 @@ impl Html {
                 }
                 Field::NumDescriptionTokens => {
                     doc.add_u64(tantivy_field, description.tokens.len() as u64)
+                }
+                Field::SiteHash => {
+                    let hash = hash(self.url().site()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
                 }
                 Field::BacklinkText
                 | Field::HostCentrality

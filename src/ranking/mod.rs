@@ -23,9 +23,10 @@ pub mod signal;
 use std::sync::Arc;
 
 use initial::InitialScoreTweaker;
-use tantivy::collector::{Collector, TopDocs};
+use tantivy::collector::Collector;
 
 use crate::{
+    collector::TopDocs,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::{Region, RegionCount},
 };
@@ -565,7 +566,8 @@ mod tests {
                     r#"
             <html>
                 <head>
-                    <title>Example website</title>
+                    <title>Test website</title>
+                    <meta property="og:description" content="example" />
                 </head>
                 <body>
                     test
@@ -575,7 +577,7 @@ mod tests {
                     "https://www.centrality.com",
                 ),
                 backlinks: vec![],
-                host_centrality: 1.0002,
+                host_centrality: 1.02,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 primary_image: None,
