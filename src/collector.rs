@@ -157,7 +157,7 @@ impl BucketCollector {
 
         Self {
             top_n,
-            heads: MinMaxHeap::with_capacity(top_n * 2 + 1),
+            heads: MinMaxHeap::with_capacity(top_n + 1),
             buckets: PrehashMap::new(),
         }
     }
@@ -177,7 +177,7 @@ impl BucketCollector {
             });
         }
 
-        if self.buckets.len() > (self.top_n * 2) + 1 {
+        if self.buckets.len() > self.top_n + 1 {
             self.prune_buckets()
         }
     }
