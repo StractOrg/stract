@@ -1,0 +1,11 @@
+**/.DS_Store
+**/flamegraph.svg
+**/target
+**/static/**/*.css
+**/node_modules
+**/package-lock.json
+**/*.log
+**/data/
+**/data.tar.gz
+**/testcases
+.git/
