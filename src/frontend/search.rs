@@ -52,6 +52,7 @@ pub fn html_escape(s: &str) -> String {
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
+    pub favicon_base64: String,
     pub domain: String,
     pub pretty_url: String,
     pub snippet: String,
@@ -124,11 +125,19 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             title += "...";
         }
 
+        let favicon_bytes = webpage
+            .favicon
+            .map(|favicon| favicon.as_raw_bytes())
+            .unwrap_or_else(|| {
+                include_bytes!("../../frontend/dist/assets/images/globe.png").to_vec()
+            });
+
         Self {
             title,
             url: webpage.url,
             pretty_url,
             domain,
+            favicon_base64: base64::encode(favicon_bytes),
             snippet: webpage.snippet, // snippet has already been html-escaped.
             body: webpage.body,
             primary_image_uuid: webpage.primary_image.map(|image| image.uuid.to_string()),
@@ -141,7 +150,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,
-    pub image: Option<String>,
+    pub image_base64: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
     pub info: Vec<(String, String)>,
 }
@@ -197,10 +206,15 @@ impl DisplayedEntity {
 
         let small_abstract = entity_link_to_html(entity_abstract, 300);
 
+        let image_base64 = entity
+            .image
+            .and_then(|image| searcher.entity_image(image))
+            .map(|image| base64::encode(image.as_raw_bytes()));
+
         Self {
             title: entity.title,
             small_abstract,
-            image: entity.image,
+            image_base64,
             related_entities: entity
                 .related_entities
                 .into_iter()
@@ -318,6 +332,9 @@ pub async fn route(
                                 None
                             }
                         });
+
+                        let url: Url = webpage.url.clone().into();
+                        webpage.favicon = state.searcher.favicon(&url.site().to_string().into());
                         webpage
                     })
                     .map(DisplayedWebpage::from)

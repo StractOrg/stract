@@ -674,6 +674,7 @@ dependencies = [
  "askama",
  "axum",
  "axum-extra",
+ "base64",
  "bincode",
  "bzip2",
  "chrono",

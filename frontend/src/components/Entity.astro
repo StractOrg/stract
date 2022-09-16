@@ -9,13 +9,13 @@ export interface Props {
 <div class="flex grow justify-center pt-10">
   <div class="max-w-md flex flex-col items-center">
     {
-      askama.if_("let Some(image) = entity.image", () => (
+      askama.if_("let Some(image) = entity.image_base64", () => (
         <div class="w-lg mb-5">
           <a href="https://en.wikipedia.org/wiki/{{ entity.title|urlencode }}">
             <img
               class="h-full w-full rounded-full"
               src={askama.fake(
-                "/entity/image/{{ image|urlencode }}",
+                "data:image/png;base64, {{ image }}",
                 "{{image.avatar}}"
               )}
             />
@@ -41,7 +41,7 @@ export interface Props {
     {
       askama.if_("!entity.info.is_empty()", () => (
         <div class="mt-5 flex w-full flex-col px-4 text-sm">
-          <div class="border-spacing-x-4 border-spacing-y-1.5 grid border-separate grid-cols-[auto_1fr] gap-x-4">
+          <div class="grid border-separate border-spacing-x-4 border-spacing-y-1.5 grid-cols-[auto_1fr] gap-x-4">
             {askama.for_("(key, value) in entity.info", () => (
               <>
                 <div class="text-gray-500">{askama`key $ {{word.adjective}}`}</div>
@@ -59,13 +59,13 @@ export interface Props {
           <div class="flex">
             {askama.for_("entity in entity.related_entities", () => (
               <div class="flex flex-col items-center p-4">
-                {askama.if_("let Some(image) = entity.image", () => (
+                {askama.if_("let Some(image) = entity.image_base64", () => (
                   <div class="mb-3 h-20 w-20">
                     <a href="/search?q={{ entity.title|urlencode }}">
                       <img
                         class="h-full w-full rounded-full object-cover"
                         src={askama.fake(
-                          "/entity/image/{{ image|urlencode }}",
+                          "data:image/png;base64, {{ image }}",
                           "{{image.avatar}}"
                         )}
                       />

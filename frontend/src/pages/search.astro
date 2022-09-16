@@ -84,7 +84,7 @@ import Header from "../components/Header.astro";
                       <div class="mr-2 flex items-center">
                         <img
                           src={askama.fake(
-                            "/favicons/{{ item.domain|urlencode }}",
+                            "data:image/png;base64, {{ item.favicon_base64 }}",
                             "{{image.avatar}}"
                           )}
                           width="13px"
