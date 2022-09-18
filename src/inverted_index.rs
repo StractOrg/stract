@@ -58,7 +58,7 @@ impl InvertedIndex {
             tantivy::Index::create_in_dir(&path, schema.clone())?
         };
 
-        tantivy_index.set_default_multithread_executor()?;
+        // tantivy_index.set_default_multithread_executor()?;
 
         let tokenizer = Tokenizer::default();
         tantivy_index
@@ -70,7 +70,7 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
-        let writer = tantivy_index.writer_with_num_threads(1, 4_000_000_000)?;
+        let writer = tantivy_index.writer_with_num_threads(1, 1_000_000_000)?;
 
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
@@ -366,9 +366,11 @@ impl From<Document> for RetrievedWebpage {
                 | Field::HostCentrality
                 | Field::PageCentrality
                 | Field::Site
+                | Field::Domain
+                | Field::SiteNoTokenizer
+                | Field::DomainNoTokenizer
                 | Field::StemmedTitle
                 | Field::CleanBody
-                | Field::Domain
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::SiteHash

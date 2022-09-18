@@ -18,11 +18,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let searcher = Searcher::new(index, None, None);
 
-    for _ in 0..10 {
-        bench!("the", searcher, c);
-        bench!("dtu", searcher, c);
-        bench!("the best", searcher, c);
-    }
+    // for _ in 0..100 {
+    bench!("the", searcher, c);
+    bench!("dtu", searcher, c);
+    bench!("the best", searcher, c);
+    bench!("the circle of life", searcher, c);
+    // }
 }
 
 criterion_group!(benches, criterion_benchmark);

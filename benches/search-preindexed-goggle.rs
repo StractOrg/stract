@@ -22,12 +22,13 @@ macro_rules! bench {
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let searcher = Searcher::new(index, None, None);
-    let goggle = include_str!("../testcases/goggles/quickstart.goggle");
+    let goggle = include_str!("../testcases/goggles/hacker_news.goggle");
 
     // for _ in 0..10 {
     bench!("the", searcher, goggle, c);
     bench!("dtu", searcher, goggle, c);
     bench!("the best", searcher, goggle, c);
+    bench!("the circle of life", searcher, goggle, c);
     // }
 }
 

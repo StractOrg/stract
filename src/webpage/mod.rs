@@ -558,6 +558,32 @@ impl Html {
                 Field::Url => doc.add_pre_tokenized_text(tantivy_field, url.clone()),
                 Field::Site => doc.add_text(tantivy_field, self.url().site()),
                 Field::Domain => doc.add_text(tantivy_field, self.url().domain()),
+                Field::SiteNoTokenizer => doc.add_pre_tokenized_text(
+                    tantivy_field,
+                    PreTokenizedString {
+                        text: self.url().site().to_string(),
+                        tokens: vec![tantivy::tokenizer::Token {
+                            offset_from: 0,
+                            offset_to: self.url().site().len(),
+                            position: 0,
+                            text: self.url().site().to_string(),
+                            position_length: 1,
+                        }],
+                    },
+                ),
+                Field::DomainNoTokenizer => doc.add_pre_tokenized_text(
+                    tantivy_field,
+                    PreTokenizedString {
+                        text: self.url().domain().to_string(),
+                        tokens: vec![tantivy::tokenizer::Token {
+                            offset_from: 0,
+                            offset_to: self.url().domain().len(),
+                            position: 0,
+                            text: self.url().domain().to_string(),
+                            position_length: 1,
+                        }],
+                    },
+                ),
                 Field::DomainIfHomepage => {
                     if self.url().is_homepage() {
                         doc.add_text(tantivy_field, self.url().domain());

@@ -24,6 +24,7 @@ use tantivy::{
 
 pub mod intersection;
 pub mod parser;
+pub mod union;
 use parser::Term;
 
 const MAX_SIMILAR_TERMS: usize = 10;
@@ -49,7 +50,7 @@ fn proximity_queries(
         let tantivy_field = schema.get_field(field.as_str()).unwrap();
         let tantivy_entry = schema.get_field_entry(tantivy_field);
 
-        for (boost, slop) in [(4, 0), (3, 4), (2, 16), (1, 32)] {
+        for (boost, slop) in [(6, 0), (5, 1), (4, 2), (3, 4), (2, 16), (1, 32)] {
             let mut terms = Vec::new();
 
             let mut num_terms = 0;

@@ -19,12 +19,11 @@ mod pattern_query;
 
 use std::convert::TryFrom;
 
-use crate::{schema::Field, tokenizer, Result};
+use crate::{query::union::UnionQuery, schema::Field, Result};
 use itertools::Itertools;
 use tantivy::{
-    query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone, TermQuery},
+    query::{BooleanQuery, BoostQuery, Occur, QueryClone, TermQuery},
     schema::{IndexRecordOption, Schema},
-    tokenizer::TextAnalyzer,
 };
 
 use self::{
@@ -164,10 +163,11 @@ impl Goggle {
         {
             vec![(
                 Occur::Must,
-                BooleanQuery::from(
+                UnionQuery::from(
                     self.instructions
                         .iter()
-                        .map(|instruction| instruction.as_tantivy(schema))
+                        .filter_map(|instruction| instruction.as_tantivy(schema))
+                        .map(|query| BooleanQuery::from(vec![query]).box_clone())
                         .collect_vec(),
                 )
                 .box_clone(),
@@ -175,47 +175,22 @@ impl Goggle {
         } else {
             self.instructions
                 .iter()
-                .map(|instruction| instruction.as_tantivy(schema))
+                .filter_map(|instruction| instruction.as_tantivy(schema))
                 .collect()
         }
     }
 }
 
-fn process_tantivy_term(
-    term: &str,
-    analyzer: TextAnalyzer,
-    tantivy_field: tantivy::schema::Field,
-) -> Vec<tantivy::Term> {
-    let mut terms: Vec<tantivy::Term> = Vec::new();
-    let mut token_stream = analyzer.token_stream(term);
-    token_stream.process(&mut |token| {
-        let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
-        terms.push(term);
-    });
-
-    terms
-}
-
 fn process_site(site: &str, field: tantivy::schema::Field) -> Box<dyn tantivy::query::Query> {
-    let mut terms = process_tantivy_term(
-        site,
-        TextAnalyzer::new(tokenizer::Normal::default(), vec![]),
-        field,
-    );
-
-    if terms.len() > 1 {
-        Box::new(PhraseQuery::new(terms)) as Box<dyn tantivy::query::Query>
-    } else {
-        let term = terms.pop().unwrap();
-        Box::new(TermQuery::new(
-            term,
-            IndexRecordOption::WithFreqsAndPositions,
-        ))
-    }
+    let term = tantivy::Term::from_field_text(field, site);
+    Box::new(TermQuery::new(
+        term,
+        IndexRecordOption::WithFreqsAndPositions,
+    ))
 }
 
 impl Instruction {
-    pub fn as_tantivy(&self, schema: &Schema) -> (Occur, Box<dyn tantivy::query::Query>) {
+    pub fn as_tantivy(&self, schema: &Schema) -> Option<(Occur, Box<dyn tantivy::query::Query>)> {
         let mut subqueries = Vec::new();
 
         let mut field = None;
@@ -226,14 +201,14 @@ impl Instruction {
                 PatternOption::Site(site) if field.is_none() => {
                     field = Some(schema.get_field(Field::Site.as_str()).unwrap());
 
-                    let domain_field = schema.get_field(Field::Domain.as_str()).unwrap();
-                    let site_field = schema.get_field(Field::Site.as_str()).unwrap();
+                    let domain_field = schema.get_field(Field::DomainNoTokenizer.as_str()).unwrap();
+                    let site_field = schema.get_field(Field::SiteNoTokenizer.as_str()).unwrap();
 
                     subqueries.push((
                         Occur::Must,
-                        BooleanQuery::new(vec![
-                            (Occur::Should, process_site(site, domain_field)),
-                            (Occur::Should, process_site(site, site_field)),
+                        UnionQuery::from(vec![
+                            process_site(site, domain_field),
+                            process_site(site, site_field),
                         ])
                         .box_clone(),
                     ));
@@ -265,24 +240,26 @@ impl Instruction {
             subqueries.push((Occur::Must, query));
         }
 
+        if subqueries.is_empty() {
+            return None;
+        }
+
+        let subquery = if subqueries.len() == 1 {
+            subqueries.pop().unwrap().1
+        } else {
+            BooleanQuery::from(subqueries).box_clone()
+        };
+
         match action {
-            Action::Boost(boost) => (
+            Action::Boost(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(
-                    BooleanQuery::from(subqueries).box_clone(),
-                    boost as f32 + 1.0,
-                )
-                .box_clone(),
-            ),
-            Action::Downrank(boost) => (
+                BoostQuery::new(subquery, boost as f32 + 1.0).box_clone(),
+            )),
+            Action::Downrank(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(
-                    BooleanQuery::from(subqueries).box_clone(),
-                    1.0 / (boost as f32 + 1.0),
-                )
-                .box_clone(),
-            ),
-            Action::Discard => (Occur::MustNot, BooleanQuery::from(subqueries).box_clone()),
+                BoostQuery::new(subquery, 1.0 / (boost as f32 + 1.0)).box_clone(),
+            )),
+            Action::Discard => Some((Occur::MustNot, subquery)),
         }
     }
 

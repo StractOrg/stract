@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
@@ -139,7 +140,9 @@ impl WarcFile {
 
         let client = reqwest::ClientBuilder::new()
             .tcp_keepalive(None)
-            .pool_idle_timeout(None)
+            .pool_idle_timeout(Duration::from_secs(30 * 60))
+            .timeout(Duration::from_secs(30 * 60))
+            .connect_timeout(Duration::from_secs(30 * 60))
             .build()?;
         let res = client.get(url).send().await?;
 

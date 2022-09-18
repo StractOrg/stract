@@ -32,6 +32,8 @@ pub enum Field {
     Url,
     Site,
     Domain,
+    SiteNoTokenizer,
+    DomainNoTokenizer,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     DomainIfHomepage,
     IsHomepage,
@@ -51,7 +53,7 @@ pub enum Field {
     SiteHash,
 }
 
-pub static ALL_FIELDS: [Field; 24] = [
+pub static ALL_FIELDS: [Field; 26] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -60,6 +62,8 @@ pub static ALL_FIELDS: [Field; 24] = [
     Field::Url,
     Field::Site,
     Field::Domain,
+    Field::SiteNoTokenizer,
+    Field::DomainNoTokenizer,
     Field::DomainIfHomepage,
     Field::IsHomepage,
     Field::BacklinkText,
@@ -101,6 +105,18 @@ impl Field {
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Site => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
+            Field::SiteNoTokenizer => IndexingOption::Text(
+                TextOptions::default().set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                ),
+            ),
+            Field::DomainNoTokenizer => IndexingOption::Text(
+                TextOptions::default().set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                ),
+            ),
             Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::IsHomepage => IndexingOption::Numeric(
@@ -182,12 +198,14 @@ impl Field {
             Field::CleanBody => "body",
             Field::Url => "url",
             Field::Site => "site",
+            Field::Domain => "domain",
+            Field::SiteNoTokenizer => "site_no_tokenizer",
+            Field::DomainNoTokenizer => "domain_no_tokenizer",
             Field::BacklinkText => "backlink_text",
             Field::HostCentrality => "host_centrality",
             Field::PageCentrality => "page_centrality",
             Field::StemmedTitle => "stemmed_title",
             Field::StemmedCleanBody => "stemmed_body",
-            Field::Domain => "domain",
             Field::DomainIfHomepage => "domain_if_homepage",
             Field::IsHomepage => "is_homepage",
             Field::FetchTimeMs => "fetch_time_ms",
@@ -219,6 +237,8 @@ impl Field {
             Field::HostCentrality
             | Field::PageCentrality
             | Field::SiteHash
+            | Field::SiteNoTokenizer
+            | Field::DomainNoTokenizer
             | Field::IsHomepage
             | Field::PrimaryImage
             | Field::FetchTimeMs
