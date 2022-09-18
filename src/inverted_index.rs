@@ -58,7 +58,7 @@ impl InvertedIndex {
             tantivy::Index::create_in_dir(&path, schema.clone())?
         };
 
-        // tantivy_index.set_default_multithread_executor()?;
+        tantivy_index.set_default_multithread_executor()?;
 
         let tokenizer = Tokenizer::default();
         tantivy_index
