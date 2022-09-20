@@ -33,6 +33,10 @@ impl<'a, T: EditStrategy, const DICT_N: usize> SpellChecker<'a, T, DICT_N> {
     pub fn correct_top(&self, term: &str, top_n: usize) -> Vec<String> {
         let mut res = Vec::new();
 
+        if term.chars().any(|c| !c.is_alphabetic()) {
+            return Vec::new();
+        }
+
         // this is sorted by increasing edit distance
         for corrections in self
             .dict
@@ -166,5 +170,23 @@ mod tests {
             spell_checker.correct_top("fhe", 3),
             vec!["the".to_string(), "he".to_string()]
         );
+    }
+
+    #[test]
+    fn dont_correct_non_alphabet() {
+        let mut dict = Dictionary::default();
+
+        dict.insert("this");
+        dict.insert("is");
+        dict.insert("a");
+        dict.insert("test");
+        dict.insert("c");
+
+        dict.commit().unwrap();
+
+        let spell_checker = SpellChecker::new(&dict, MaxEdit::new(1));
+
+        assert_eq!(spell_checker.correct("c++"), None);
+        assert_eq!(spell_checker.correct("c#"), None);
     }
 }
