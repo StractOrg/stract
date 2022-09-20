@@ -90,6 +90,16 @@ impl Url {
         }
     }
 
+    pub fn domain_name(&self) -> &str {
+        let domain = self.domain();
+
+        if let Some(tld_start) = domain.find('.') {
+            &domain[..tld_start]
+        } else {
+            domain
+        }
+    }
+
     pub fn subdomain(&self) -> Option<&str> {
         if let Some(subdomain) = self.site().strip_suffix(self.domain()) {
             if subdomain.is_empty() || subdomain == "." {
@@ -194,6 +204,7 @@ mod tests {
         let url: Url = "//scripts.dailymail.co.uk".to_string().into();
 
         assert_eq!(url.domain(), "dailymail.co.uk");
+        assert_eq!(url.domain_name(), "dailymail");
         assert_eq!(url.site(), "scripts.dailymail.co.uk");
     }
 

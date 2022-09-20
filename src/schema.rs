@@ -36,6 +36,8 @@ pub enum Field {
     DomainNoTokenizer,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     DomainIfHomepage,
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    DomainNameIfHomepageNoTokenizer,
     IsHomepage,
     BacklinkText,
     HostCentrality,
@@ -53,7 +55,7 @@ pub enum Field {
     SiteHash,
 }
 
-pub static ALL_FIELDS: [Field; 26] = [
+pub static ALL_FIELDS: [Field; 27] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -65,6 +67,7 @@ pub static ALL_FIELDS: [Field; 26] = [
     Field::SiteNoTokenizer,
     Field::DomainNoTokenizer,
     Field::DomainIfHomepage,
+    Field::DomainNameIfHomepageNoTokenizer,
     Field::IsHomepage,
     Field::BacklinkText,
     Field::HostCentrality,
@@ -119,6 +122,12 @@ impl Field {
             ),
             Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
+            Field::DomainNameIfHomepageNoTokenizer => IndexingOption::Text(
+                TextOptions::default().set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                ),
+            ),
             Field::IsHomepage => IndexingOption::Numeric(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -207,6 +216,7 @@ impl Field {
             Field::StemmedTitle => "stemmed_title",
             Field::StemmedCleanBody => "stemmed_body",
             Field::DomainIfHomepage => "domain_if_homepage",
+            Field::DomainNameIfHomepageNoTokenizer => "domain_name_if_homepage_no_tokenizer",
             Field::IsHomepage => "is_homepage",
             Field::FetchTimeMs => "fetch_time_ms",
             Field::PrimaryImage => "primary_image_uuid",
@@ -226,7 +236,8 @@ impl Field {
     pub fn boost(&self) -> Option<f32> {
         match self {
             Field::Site => Some(6.0),
-            Field::DomainIfHomepage => Some(250.0),
+            Field::DomainIfHomepage => Some(50.0),
+            Field::DomainNameIfHomepageNoTokenizer => Some(50.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
@@ -296,6 +307,7 @@ impl Field {
             "num_trackers" => Some(Field::NumTrackers),
             "region" => Some(Field::Region),
             "site_hash" => Some(Field::SiteHash),
+            "domain_name_if_homepage_no_tokenizer" => Some(Field::DomainNameIfHomepageNoTokenizer),
             _ => None,
         }
     }

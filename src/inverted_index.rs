@@ -369,6 +369,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::Domain
                 | Field::SiteNoTokenizer
                 | Field::DomainNoTokenizer
+                | Field::DomainNameIfHomepageNoTokenizer
                 | Field::StemmedTitle
                 | Field::CleanBody
                 | Field::DomainIfHomepage

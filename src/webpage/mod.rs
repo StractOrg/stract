@@ -591,6 +591,25 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
+                Field::DomainNameIfHomepageNoTokenizer => {
+                    if self.url().is_homepage() {
+                        doc.add_pre_tokenized_text(
+                            tantivy_field,
+                            PreTokenizedString {
+                                text: self.url().domain_name().to_string(),
+                                tokens: vec![tantivy::tokenizer::Token {
+                                    offset_from: 0,
+                                    offset_to: self.url().domain_name().len(),
+                                    position: 0,
+                                    text: self.url().domain_name().to_string(),
+                                    position_length: 1,
+                                }],
+                            },
+                        );
+                    } else {
+                        doc.add_text(tantivy_field, "");
+                    }
+                }
                 Field::IsHomepage => {
                     doc.add_u64(tantivy_field, if self.url().is_homepage() { 1 } else { 0 });
                 }
