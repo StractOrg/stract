@@ -375,6 +375,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::DomainIfHomepage
                 | Field::IsHomepage
                 | Field::SiteHash
+                | Field::UrlWithoutQueryHash
                 | Field::NumTrackers
                 | Field::NumCleanBodyTokens
                 | Field::NumDescriptionTokens

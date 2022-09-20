@@ -53,9 +53,10 @@ pub enum Field {
     NumCleanBodyTokens,
     NumDescriptionTokens,
     SiteHash,
+    UrlWithoutQueryHash,
 }
 
-pub static ALL_FIELDS: [Field; 27] = [
+pub static ALL_FIELDS: [Field; 28] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -83,6 +84,7 @@ pub static ALL_FIELDS: [Field; 27] = [
     Field::NumCleanBodyTokens,
     Field::NumDescriptionTokens,
     Field::SiteHash,
+    Field::UrlWithoutQueryHash,
 ];
 
 impl Field {
@@ -198,6 +200,9 @@ impl Field {
             Field::SiteHash => IndexingOption::Numeric(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
+            Field::UrlWithoutQueryHash => IndexingOption::Numeric(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
         }
     }
 
@@ -230,6 +235,7 @@ impl Field {
             Field::NumCleanBodyTokens => "num_clean_body_tokens",
             Field::NumDescriptionTokens => "num_description_tokens",
             Field::SiteHash => "site_hash",
+            Field::UrlWithoutQueryHash => "url_without_query_hash",
         }
     }
 
@@ -237,7 +243,7 @@ impl Field {
         match self {
             Field::Site => Some(6.0),
             Field::DomainIfHomepage => Some(50.0),
-            Field::DomainNameIfHomepageNoTokenizer => Some(50.0),
+            Field::DomainNameIfHomepageNoTokenizer => Some(100.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
@@ -248,6 +254,7 @@ impl Field {
             Field::HostCentrality
             | Field::PageCentrality
             | Field::SiteHash
+            | Field::UrlWithoutQueryHash
             | Field::SiteNoTokenizer
             | Field::DomainNoTokenizer
             | Field::IsHomepage
@@ -282,6 +289,7 @@ impl Field {
                 | Field::NumCleanBodyTokens
                 | Field::NumDescriptionTokens
                 | Field::SiteHash
+                | Field::UrlWithoutQueryHash
         )
     }
 
@@ -307,6 +315,7 @@ impl Field {
             "num_trackers" => Some(Field::NumTrackers),
             "region" => Some(Field::Region),
             "site_hash" => Some(Field::SiteHash),
+            "url_without_query_hash" => Some(Field::UrlWithoutQueryHash),
             "domain_name_if_homepage_no_tokenizer" => Some(Field::DomainNameIfHomepageNoTokenizer),
             _ => None,
         }

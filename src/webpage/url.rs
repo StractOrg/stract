@@ -193,6 +193,14 @@ impl Url {
             self.site()
         }
     }
+
+    pub fn without_query(&self) -> &str {
+        if let Some(query_begin) = self.0.find('?') {
+            &self.0[..query_begin]
+        } else {
+            &self.0
+        }
+    }
 }
 
 #[cfg(test)]
@@ -274,5 +282,14 @@ mod tests {
 
         let url: Url = "https://example.com".to_string().into();
         assert_eq!(url.subdomain(), None);
+    }
+
+    #[test]
+    fn url_without_query() {
+        let url: Url = "https://test.example.com?key=val&key2=val2"
+            .to_string()
+            .into();
+
+        assert_eq!(url.without_query(), "https://test.example.com");
     }
 }
