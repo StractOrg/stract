@@ -29,7 +29,7 @@ use std::{net::SocketAddr, path::Path};
 use tracing::{info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GraphPath(String);
+struct GraphPointer(String);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 enum JobConfig {
@@ -103,10 +103,10 @@ impl Map<StatelessWorker, FrozenWebgraph> for Job {
     }
 }
 
-impl Map<StatelessWorker, GraphPath> for Job {
-    fn map(self, _worker: &StatelessWorker) -> GraphPath {
+impl Map<StatelessWorker, GraphPointer> for Job {
+    fn map(self, _worker: &StatelessWorker) -> GraphPointer {
         let graph = process_job(&self);
-        GraphPath(graph.path)
+        GraphPointer(graph.path)
     }
 }
 
@@ -139,8 +139,8 @@ impl Reduce<webgraph::Webgraph> for webgraph::Webgraph {
     }
 }
 
-impl Reduce<GraphPath> for GraphPath {
-    fn reduce(self, other: GraphPath) -> Self {
+impl Reduce<GraphPointer> for GraphPointer {
+    fn reduce(self, other: GraphPointer) -> Self {
         let other_path = other.0.clone();
         let self_path = self.0.clone();
 
@@ -153,7 +153,7 @@ impl Reduce<GraphPath> for GraphPath {
 
         std::fs::remove_dir_all(other_path).unwrap();
 
-        GraphPath(self_path)
+        GraphPointer(self_path)
     }
 }
 
@@ -242,7 +242,7 @@ impl Webgraph {
             })
             .collect_vec()
             .into_par_iter()
-            .map(|job| -> GraphPath { job.map(&worker) })
+            .map(|job| -> GraphPointer { job.map(&worker) })
             .map(Some)
             .reduce(
                 || None,
