@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+const SCALE: f32 = 1000.0;
+
 pub mod ast;
+mod const_query;
 mod pattern_query;
 
 use std::convert::TryFrom;
@@ -28,6 +31,7 @@ use tantivy::{
 
 use self::{
     ast::{RawAction, RawGoggle, RawInstruction, RawPatternOption, RawPatternPart},
+    const_query::ConstQuery,
     pattern_query::PatternQuery,
 };
 
@@ -253,11 +257,19 @@ impl Instruction {
         match action {
             Action::Boost(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(subquery, boost as f32 + 1.0).box_clone(),
+                BoostQuery::new(
+                    ConstQuery::new(subquery, 1.0).box_clone(),
+                    boost as f32 * SCALE,
+                )
+                .box_clone(),
             )),
             Action::Downrank(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(subquery, 1.0 / (boost as f32 + 1.0)).box_clone(),
+                BoostQuery::new(
+                    ConstQuery::new(subquery, 1.0).box_clone(),
+                    boost as f32 * -SCALE,
+                )
+                .box_clone(),
             )),
             Action::Discard => Some((Occur::MustNot, subquery)),
         }
