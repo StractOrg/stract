@@ -324,6 +324,7 @@ impl Bucket {
 
             worst.id = doc.id;
             worst.score = doc.score;
+            worst.segment = doc.segment;
         } else {
             self.docs.push(doc);
         }
