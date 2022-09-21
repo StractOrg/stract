@@ -241,9 +241,9 @@ impl Field {
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Site => Some(6.0),
-            Field::DomainIfHomepage => Some(50.0),
-            Field::DomainNameIfHomepageNoTokenizer => Some(100.0),
+            Field::Site => Some(3.0),
+            Field::DomainIfHomepage => Some(10.0),
+            Field::DomainNameIfHomepageNoTokenizer => Some(30.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
             Field::CleanBody => Some(4.0),
             Field::Title => Some(10.0),
