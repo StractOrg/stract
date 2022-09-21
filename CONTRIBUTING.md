@@ -31,8 +31,6 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 * Update ulimit. RocksDB tends to exceed the max number of allowed open files, so you will have to run `ulimit -n 10240` to increase the allowed max number of open files.
 * (Optional) Install cargo-watch by running `cargo install cargo-watch`. This makes frontend development easier.
 * (Optional) Install just by running `cargo install just`. This allows you to run the scripts in the Justfile. A Justfile is basically a simple Makefile, so this is just for convenience.
-* (Optional) Install git-lfs and download the data.
-  * `git lfs pull` downloads a compressed sample index.
-  * `just unpack-data` un-packs the data.
   
-After the non optional steps you can now run `cargo test` and should see all tests passing. If you have followed the optional steps, you should be able to run `just frontend` which will launch the frontend on `0.0.0.0:3000`.
+After the non optional steps you can now run `cargo test` and should see all tests passing. If you have followed the optional steps, you should be able to run `just local` which will index some warc files and launch the frontend on `0.0.0.0:3000`.
+After you have run the intial indexing, you can run `just frontend` to reuse the index.

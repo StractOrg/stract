@@ -7,3 +7,5 @@ package-lock.json
 notes
 *.log
 /data/**/*
+*.tar.gz
+
