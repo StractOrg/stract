@@ -72,7 +72,7 @@ impl Signal {
     }
 
     fn is_computable_before_search(&self) -> bool {
-        todo!();
+        !matches!(self, Signal::Bm25)
     }
 
     fn value(
