@@ -8,7 +8,7 @@ import { askama } from "../askama";
 import Header from "../components/Header.astro";
 ---
 
-<Layout title="Cuely - {{ query }}">
+<Layout title="{{ query }} - Cuely">
   <main class="flex flex-col w-full">
     <div class="border-b bg-neutral-50">
       <Header searchbar={{ query: askama`query` }} />
@@ -151,6 +151,32 @@ import Header from "../components/Header.astro";
             <a href="{{ next_page_url }}">
               <Hero class="change-page-active" icon="chevron-right" />
             </a>
+          </div>
+          <div class="flex flex-col w-full mt-5 pl-4 pr-24">
+            Didn't find what you were looking for? Try on:
+            <div class="flex w-full justify-between mt-2">
+              <div class="bg-neutral-100 rounded-full py-2 px-5">
+                <a href="https://www.google.com/search?q={{ query|urlencode }}"
+                  >Google</a
+                >
+              </div>
+              <div class="bg-neutral-100 rounded-full py-2 px-5">
+                <a href="https://duckduckgo.com/?q={{ query|urlencode }}"
+                  >DuckDuckGo</a
+                >
+              </div>
+              <div class="bg-neutral-100 rounded-full py-2 px-5">
+                <a
+                  href="https://search.brave.com/search?q={{ query|urlencode }}"
+                  >Brave</a
+                >
+              </div>
+              <div class="bg-neutral-100 rounded-full py-2 px-5">
+                <a href="https://www.mojeek.com/search?q={{ query|urlencode }}"
+                  >Mojeek</a
+                >
+              </div>
+            </div>
           </div>
         </div>
       </div>
