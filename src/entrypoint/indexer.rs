@@ -25,6 +25,7 @@ use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Map, MapReduce, Reduce, Worker};
 use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::SignalAggregator;
 use crate::warc::WarcFile;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
@@ -86,6 +87,7 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     };
 
     let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
+    let signal_aggregator = SignalAggregator::default();
 
     for file in warc_files {
         if let Ok(file) = WarcFile::open(&file) {
@@ -131,14 +133,19 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 trace!("title = {:?}", html.title());
                 trace!("text = {:?}", html.clean_text());
 
-                let webpage = Webpage {
+                let mut webpage = Webpage {
                     html,
                     backlinks,
                     page_centrality,
                     host_centrality,
                     fetch_time_ms,
                     primary_image: None,
+                    pre_computed_score: 0.0,
                 };
+
+                webpage.pre_computed_score =
+                    signal_aggregator.precompute_score(&webpage, &index.region_count);
+
                 if let Err(err) = index.insert(webpage) {
                     debug!("{:?}", err);
                 }

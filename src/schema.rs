@@ -54,9 +54,10 @@ pub enum Field {
     NumDescriptionTokens,
     SiteHash,
     UrlWithoutQueryHash,
+    PreComputedScore,
 }
 
-pub static ALL_FIELDS: [Field; 28] = [
+pub static ALL_FIELDS: [Field; 29] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -85,6 +86,7 @@ pub static ALL_FIELDS: [Field; 28] = [
     Field::NumDescriptionTokens,
     Field::SiteHash,
     Field::UrlWithoutQueryHash,
+    Field::PreComputedScore,
 ];
 
 impl Field {
@@ -130,18 +132,18 @@ impl Field {
                         .set_index_option(IndexRecordOption::WithFreqsAndPositions),
                 ),
             ),
-            Field::IsHomepage => IndexingOption::Numeric(
+            Field::IsHomepage => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
             Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
-            Field::HostCentrality => IndexingOption::Numeric(
+            Field::HostCentrality => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::PageCentrality => IndexingOption::Numeric(
+            Field::PageCentrality => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -153,55 +155,61 @@ impl Field {
                 self.default_text_options_with_tokenizer(Stemmed::as_str())
                     .set_stored(),
             ),
-            Field::FetchTimeMs => IndexingOption::Numeric(
+            Field::FetchTimeMs => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumTrackers => IndexingOption::Numeric(
+            Field::NumTrackers => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
             Field::PrimaryImage => IndexingOption::Bytes(BytesOptions::default().set_stored()),
-            Field::LastUpdated => IndexingOption::Numeric(
+            Field::LastUpdated => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_stored()
                     .set_indexed(),
             ),
             Field::Description => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Region => IndexingOption::Numeric(
+            Field::Region => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::NumCleanBodyTokens => IndexingOption::Numeric(
+            Field::NumCleanBodyTokens => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumDescriptionTokens => IndexingOption::Numeric(
+            Field::NumDescriptionTokens => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumTitleTokens => IndexingOption::Numeric(
+            Field::NumTitleTokens => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumUrlTokens => IndexingOption::Numeric(
+            Field::NumUrlTokens => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::SiteHash => IndexingOption::Numeric(
+            Field::SiteHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::UrlWithoutQueryHash => IndexingOption::Numeric(
+            Field::UrlWithoutQueryHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
+            Field::PreComputedScore => IndexingOption::Float(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed()
+                    .set_stored(),
             ),
         }
     }
@@ -236,6 +244,7 @@ impl Field {
             Field::NumDescriptionTokens => "num_description_tokens",
             Field::SiteHash => "site_hash",
             Field::UrlWithoutQueryHash => "url_without_query_hash",
+            Field::PreComputedScore => "pre_computed_score",
         }
     }
 
@@ -267,6 +276,7 @@ impl Field {
             | Field::NumCleanBodyTokens
             | Field::NumDescriptionTokens
             | Field::Region
+            | Field::PreComputedScore
             | Field::LastUpdated => None,
         }
     }
@@ -290,6 +300,7 @@ impl Field {
                 | Field::NumDescriptionTokens
                 | Field::SiteHash
                 | Field::UrlWithoutQueryHash
+                | Field::PreComputedScore
         )
     }
 
@@ -317,6 +328,7 @@ impl Field {
             "site_hash" => Some(Field::SiteHash),
             "url_without_query_hash" => Some(Field::UrlWithoutQueryHash),
             "domain_name_if_homepage_no_tokenizer" => Some(Field::DomainNameIfHomepageNoTokenizer),
+            "pre_computed_score" => Some(Field::PreComputedScore),
             _ => None,
         }
     }
@@ -328,7 +340,8 @@ pub fn create_schema() -> tantivy::schema::Schema {
     for field in &ALL_FIELDS {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
-            IndexingOption::Numeric(options) => builder.add_u64_field(field.as_str(), options),
+            IndexingOption::Integer(options) => builder.add_u64_field(field.as_str(), options),
+            IndexingOption::Float(options) => builder.add_f64_field(field.as_str(), options),
             IndexingOption::Bytes(options) => builder.add_bytes_field(field.as_str(), options),
         };
     }
@@ -338,6 +351,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
 
 pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
-    Numeric(tantivy::schema::NumericOptions),
+    Integer(tantivy::schema::NumericOptions),
+    Float(tantivy::schema::NumericOptions),
     Bytes(tantivy::schema::BytesOptions),
 }

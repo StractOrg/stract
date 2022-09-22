@@ -113,6 +113,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -137,6 +138,7 @@ mod tests {
                 host_centrality: 5.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -179,6 +181,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -203,6 +206,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 5.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -244,6 +248,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -268,6 +273,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -290,6 +296,7 @@ mod tests {
                 host_centrality: 0.003,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -332,6 +339,7 @@ mod tests {
                 host_centrality: 0.092,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -356,6 +364,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.09,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -395,6 +404,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -429,6 +439,7 @@ mod tests {
                 host_centrality: 0.003,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
     })
             .expect("failed to insert webpage");
@@ -472,6 +483,7 @@ mod tests {
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -493,6 +505,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.003,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -532,6 +545,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -556,6 +570,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -580,6 +595,7 @@ mod tests {
                 host_centrality: 1.02,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -665,6 +681,7 @@ mod tests {
                 ),
                 backlinks: vec![],
                 host_centrality: 1.0,
+                pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 primary_image: None,
@@ -690,6 +707,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -714,6 +732,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -759,6 +778,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 0,
+                pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
             })
@@ -784,6 +804,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 5000,
                 page_centrality: 0.0,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");

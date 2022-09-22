@@ -195,6 +195,9 @@ pub enum Error {
 
     #[error("String is not float")]
     ParseFloat(#[from] std::num::ParseFloatError),
+
+    #[error("Could not open inverted-index directory")]
+    Directory(#[from] tantivy::directory::error::OpenDirectoryError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

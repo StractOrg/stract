@@ -204,6 +204,7 @@ mod tests {
                     host_centrality: (NUM_WEBSITES - i) as f64,
                     fetch_time_ms: 500,
                     page_centrality: 0.0,
+                    pre_computed_score: 0.0,
                     primary_image: None,
                 })
                 .expect("failed to insert webpage");

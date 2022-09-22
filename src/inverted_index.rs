@@ -17,6 +17,7 @@
 use chrono::NaiveDateTime;
 use serde::Serialize;
 use tantivy::collector::{Collector, Count};
+use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
@@ -52,10 +53,20 @@ impl InvertedIndex {
         let schema = create_schema();
 
         let mut tantivy_index = if path.as_ref().exists() {
-            tantivy::Index::open_in_dir(&path)?
+            let mmap_directory = MmapDirectory::open(&path)?;
+            tantivy::Index::open(mmap_directory)?
         } else {
+            let index_settings = tantivy::IndexSettings {
+                sort_by_field: Some(tantivy::IndexSortByField {
+                    field: Field::PreComputedScore.as_str().to_string(),
+                    order: tantivy::Order::Desc,
+                }),
+                ..Default::default()
+            };
+
             fs::create_dir_all(&path)?;
-            tantivy::Index::create_in_dir(&path, schema.clone())?
+            let mmap_directory = MmapDirectory::open(&path)?;
+            tantivy::Index::create(mmap_directory, schema.clone(), index_settings)?
         };
 
         tantivy_index.set_default_multithread_executor()?;
@@ -377,6 +388,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::SiteHash
                 | Field::UrlWithoutQueryHash
                 | Field::NumTrackers
+                | Field::PreComputedScore
                 | Field::NumCleanBodyTokens
                 | Field::NumDescriptionTokens
                 | Field::NumTitleTokens
@@ -614,6 +626,7 @@ mod tests {
                 host_centrality: 1.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
