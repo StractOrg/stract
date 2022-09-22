@@ -327,6 +327,7 @@ mod tests {
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -351,6 +352,7 @@ mod tests {
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
                 primary_image: None,
+                pre_computed_score: 0.0,
                 fetch_time_ms: 500,
             })
             .expect("failed to insert webpage");
@@ -447,6 +449,7 @@ mod tests {
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -471,6 +474,7 @@ mod tests {
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
                 primary_image: None,
+                pre_computed_score: 0.0,
                 fetch_time_ms: 500,
             })
             .expect("failed to insert webpage");
@@ -546,6 +550,7 @@ mod tests {
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
+                pre_computed_score: 0.0,
                 primary_image: None,
             })
             .expect("failed to insert webpage");
@@ -570,6 +575,7 @@ mod tests {
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
                 primary_image: None,
+                pre_computed_score: 0.0,
                 fetch_time_ms: 500,
             })
             .expect("failed to insert webpage");
@@ -594,6 +600,7 @@ mod tests {
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
                 primary_image: None,
+                pre_computed_score: 0.0,
                 fetch_time_ms: 500,
             })
             .expect("failed to insert webpage");

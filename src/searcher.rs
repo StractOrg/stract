@@ -119,6 +119,8 @@ impl Searcher {
             }
         }
 
+        ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
+
         let webpages = self.index.search(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 
@@ -204,6 +206,7 @@ mod tests {
                     host_centrality: (NUM_WEBSITES - i) as f64,
                     fetch_time_ms: 500,
                     page_centrality: 0.0,
+                    pre_computed_score: 0.0,
                     primary_image: None,
                 })
                 .expect("failed to insert webpage");

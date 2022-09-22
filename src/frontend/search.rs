@@ -62,7 +62,7 @@ pub struct DisplayedWebpage {
 }
 
 const MAX_PRETTY_URL_LEN: usize = 50;
-const MAX_TITLE_LEN: usize = 50;
+const MAX_TITLE_LEN: usize = 70;
 
 fn prettify_url(url: &Url) -> String {
     let mut pretty_url = url.strip_query().to_string();

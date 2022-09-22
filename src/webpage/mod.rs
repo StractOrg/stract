@@ -125,6 +125,7 @@ pub struct Webpage {
     pub host_centrality: f64,
     pub page_centrality: f64,
     pub fetch_time_ms: u64,
+    pub pre_computed_score: f64,
     pub primary_image: Option<StoredPrimaryImage>,
 }
 
@@ -139,6 +140,7 @@ impl Webpage {
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 0,
+            pre_computed_score: 0.0,
             primary_image: None,
         }
     }
@@ -196,6 +198,13 @@ impl Webpage {
                 .get_field(Field::FetchTimeMs.as_str())
                 .expect("Failed to get fetch_time_ms field"),
             self.fetch_time_ms,
+        );
+
+        doc.add_f64(
+            schema
+                .get_field(Field::PreComputedScore.as_str())
+                .expect("failed to get pre_computed_score field"),
+            self.pre_computed_score,
         );
 
         let image = bincode::serialize(&self.primary_image).unwrap();
@@ -644,6 +653,7 @@ impl Html {
                 | Field::HostCentrality
                 | Field::PageCentrality
                 | Field::FetchTimeMs
+                | Field::PreComputedScore
                 | Field::Region
                 | Field::PrimaryImage => {}
             }

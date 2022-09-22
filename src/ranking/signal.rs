@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Result;
-use std::{array, convert::TryFrom, sync::Arc};
+use crate::{webpage::Webpage, Result};
+use std::{array, convert::TryFrom, ops::Deref, sync::Arc};
 
+use chrono::Utc;
 use tantivy::{
     fastfield::{Column, DynamicFastFieldReader},
     DocId, Score, SegmentReader,
@@ -70,13 +71,15 @@ impl Signal {
         !matches!(self, Signal::Bm25)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    fn is_computable_before_search(&self) -> bool {
+        todo!();
+    }
+
     fn value(
         &self,
-        doc: DocId,
         bm25: Score,
-        fastfield: Option<&DynamicFastFieldReader<u64>>,
-        region_count: &Arc<RegionCount>,
+        fastfield_value: Option<u64>,
+        region_count: &impl Deref<Target = RegionCount>,
         current_timestamp: usize,
         selected_region: Option<Region>,
         aggregator: &SignalAggregator,
@@ -84,11 +87,11 @@ impl Signal {
         match self {
             Signal::Bm25 => bm25 as f64,
             Signal::HostCentrality | Signal::PageCentrality => {
-                fastfield.unwrap().get_val(doc as u64) as f64 / CENTRALITY_SCALING as f64
+                fastfield_value.unwrap() as f64 / CENTRALITY_SCALING as f64
             }
-            Signal::IsHomepage => fastfield.unwrap().get_val(doc as u64) as f64,
+            Signal::IsHomepage => fastfield_value.unwrap() as f64,
             Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield.unwrap().get_val(doc as u64) as usize;
+                let fetch_time_ms = fastfield_value.unwrap() as usize;
 
                 if fetch_time_ms >= aggregator.fetch_time_ms_cache.len() {
                     0.0
@@ -97,7 +100,7 @@ impl Signal {
                 }
             }
             Signal::UpdateTimestamp => {
-                let update_timestamp = fastfield.unwrap().get_val(doc as u64) as i64;
+                let update_timestamp = fastfield_value.unwrap() as i64;
 
                 if current_timestamp as i64 - update_timestamp <= 0 {
                     return 0.0;
@@ -113,11 +116,11 @@ impl Signal {
                 }
             }
             Signal::NumTrackers => {
-                let num_trackers = fastfield.unwrap().get_val(doc as u64) as f64;
+                let num_trackers = fastfield_value.unwrap() as f64;
                 1.0 / (num_trackers + 1.0)
             }
             Signal::Region => {
-                let webpage_region = Region::from_id(fastfield.unwrap().get_val(doc as u64));
+                let webpage_region = Region::from_id(fastfield_value.unwrap());
 
                 let boost =
                     selected_region.map_or(
@@ -308,19 +311,63 @@ impl SignalAggregator {
         ALL_SIGNALS
             .into_iter()
             .map(|signal| {
-                let reader = match self.readers.get(signal as usize) {
-                    Some(Some(reader)) => Some(reader),
+                let fastfield_value = match self.readers.get(signal as usize) {
+                    Some(Some(reader)) => Some(reader.get_val(doc as u64)),
                     _ => None,
                 };
 
                 self.coefficients().get(&signal)
                     * signal.value(
-                        doc,
                         bm25,
-                        reader,
+                        fastfield_value,
                         region_count,
                         current_timestamp,
                         selected_region,
+                        self,
+                    )
+            })
+            .sum()
+    }
+
+    pub fn precompute_score(&self, webpage: &Webpage, region_count: &RegionCount) -> f64 {
+        ALL_SIGNALS
+            .into_iter()
+            .filter(|signal| signal.is_computable_before_search())
+            .map(|signal| {
+                let fastfield_value = match &signal {
+                    Signal::HostCentrality => {
+                        (webpage.host_centrality * (CENTRALITY_SCALING as f64)) as u64
+                    }
+                    Signal::PageCentrality => {
+                        (webpage.page_centrality * (CENTRALITY_SCALING as f64)) as u64
+                    }
+                    Signal::IsHomepage => {
+                        if webpage.html.url().is_homepage() {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    Signal::FetchTimeMs => webpage.fetch_time_ms,
+                    Signal::UpdateTimestamp => webpage
+                        .html
+                        .updated_time()
+                        .map(|date| date.timestamp().max(0) as u64)
+                        .unwrap_or(0),
+                    Signal::NumTrackers => webpage.html.trackers().len() as u64,
+                    Signal::Region => Region::guess_from(webpage).unwrap_or(Region::All).id(),
+                    _ => panic!("signal cannot be determined from webpage"),
+                };
+
+                let current_timestamp = Utc::now().timestamp() as usize;
+
+                self.coefficients().get(&signal)
+                    * signal.value(
+                        0.0,
+                        Some(fastfield_value),
+                        &region_count,
+                        current_timestamp,
+                        None,
                         self,
                     )
             })

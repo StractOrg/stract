@@ -31,18 +31,35 @@ fn adjust_score(num_taken: usize, original_score: f64) -> f64 {
     original_score * (SCALE / (num_taken as f64 + SCALE))
 }
 
+#[derive(Clone)]
+pub struct MaxDocsConsidered {
+    pub total_docs: usize,
+    pub segments: usize,
+}
+
 pub struct TopDocs {
     top_n: usize,
     offset: usize,
+    max_docs: Option<MaxDocsConsidered>,
 }
 
 impl TopDocs {
     pub fn with_limit(top_n: usize) -> Self {
-        Self { top_n, offset: 0 }
+        Self {
+            top_n,
+            offset: 0,
+            max_docs: None,
+        }
     }
 
     pub fn and_offset(mut self, offset: usize) -> Self {
         self.offset = offset;
+        self
+    }
+
+    pub fn and_max_docs(mut self, max_docs: MaxDocsConsidered) -> Self {
+        self.max_docs = Some(max_docs);
+
         self
     }
 
@@ -75,8 +92,15 @@ impl Collector for TopDocs {
                 .unwrap(),
         )?;
 
+        let max_docs = self
+            .max_docs
+            .as_ref()
+            .map(|max_docs| max_docs.total_docs / max_docs.segments);
+
         Ok(TopSegmentCollector {
             key_reader,
+            max_docs,
+            num_docs_taken: 0,
             segment_ord: segment_local_id,
             bucket_collector: BucketCollector::new(self.top_n + self.offset),
         })
@@ -117,6 +141,8 @@ impl Collector for TopDocs {
 
 pub struct TopSegmentCollector {
     key_reader: MultiValuedFastFieldReader<u64>,
+    max_docs: Option<usize>,
+    num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
     bucket_collector: BucketCollector,
 }
@@ -125,6 +151,13 @@ impl SegmentCollector for TopSegmentCollector {
     type Fruit = Vec<Doc>;
 
     fn collect(&mut self, doc: DocId, score: Score) {
+        if let Some(max_docs) = &self.max_docs {
+            if self.num_docs_taken >= *max_docs {
+                return;
+            }
+
+            self.num_docs_taken += 1;
+        }
         let mut keys = Vec::new();
         self.key_reader.get_vals(doc, &mut keys);
         debug_assert_eq!(keys.len(), 2);
@@ -137,7 +170,7 @@ impl SegmentCollector for TopSegmentCollector {
             id: doc,
             segment: self.segment_ord,
             score: score as f64,
-        })
+        });
     }
 
     fn harvest(self) -> Self::Fruit {
