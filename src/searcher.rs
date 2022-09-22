@@ -119,6 +119,8 @@ impl Searcher {
             }
         }
 
+        ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
+
         let webpages = self.index.search(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 

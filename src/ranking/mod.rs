@@ -26,7 +26,7 @@ use initial::InitialScoreTweaker;
 use tantivy::collector::Collector;
 
 use crate::{
-    collector::TopDocs,
+    collector::{MaxDocsConsidered, TopDocs},
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::{Region, RegionCount},
 };
@@ -36,6 +36,7 @@ pub use self::signal::*;
 pub struct Ranker {
     region_count: Arc<RegionCount>,
     selected_region: Option<Region>,
+    max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     aggregator: SignalAggregator,
 }
@@ -47,6 +48,7 @@ impl Ranker {
             selected_region: None,
             offset: None,
             aggregator,
+            max_docs: None,
         }
     }
 
@@ -57,6 +59,14 @@ impl Ranker {
 
     pub fn with_offset(mut self, offset: usize) -> Self {
         self.offset = Some(offset);
+        self
+    }
+
+    pub fn with_max_docs(mut self, total_docs: usize, segments: usize) -> Self {
+        self.max_docs = Some(MaxDocsConsidered {
+            total_docs,
+            segments,
+        });
         self
     }
 
@@ -71,6 +81,10 @@ impl Ranker {
 
         if let Some(offset) = self.offset {
             collector = collector.and_offset(offset);
+        }
+
+        if let Some(max_docs) = &self.max_docs {
+            collector = collector.and_max_docs(max_docs.clone());
         }
 
         collector.tweak_score(score_tweaker)

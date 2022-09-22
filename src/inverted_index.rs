@@ -282,6 +282,10 @@ impl InvertedIndex {
     pub fn schema(&self) -> Arc<Schema> {
         Arc::clone(&self.schema)
     }
+
+    pub fn num_segments(&self) -> usize {
+        self.tantivy_index.searchable_segments().unwrap().len()
+    }
 }
 
 #[derive(Debug, Serialize)]

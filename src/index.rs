@@ -250,6 +250,10 @@ impl Index {
     pub fn spell_correction(&self, terms: &[String]) -> Option<String> {
         self.spell_check(terms).or_else(|| self.split_words(terms))
     }
+
+    pub fn num_segments(&self) -> usize {
+        self.inverted_index.num_segments()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
