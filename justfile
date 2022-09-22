@@ -31,6 +31,7 @@
     cd frontend; npm run dev
 
 @local:
+    cd frontend; npm install
     rm -rf data/index/
     cargo run --release -- indexer local configs/indexer/local.toml
     mv data/index/CC-MAIN-*/* data/index/
