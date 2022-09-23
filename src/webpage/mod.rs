@@ -620,7 +620,7 @@ impl Html {
                     }
                 }
                 Field::IsHomepage => {
-                    doc.add_u64(tantivy_field, if self.url().is_homepage() { 1 } else { 0 });
+                    doc.add_u64(tantivy_field, self.url().is_homepage().into());
                 }
                 Field::LastUpdated => doc.add_u64(
                     tantivy_field,

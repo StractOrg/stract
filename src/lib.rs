@@ -50,6 +50,7 @@ mod schema;
 mod schema_org;
 pub mod searcher;
 mod snippet;
+mod sonic;
 mod spell;
 mod tokenizer;
 mod warc;

@@ -39,11 +39,11 @@ impl LevenshteinDistance {
     ///
     /// The runtime complexity is `O(m*n)`, where `m` and `n` are the
     /// strings' lengths.
-    pub fn compare(&self, a: &str, b: &str) -> usize {
+    pub fn compare(a: &str, b: &str) -> usize {
         let len_a = a.chars().count();
         let len_b = b.chars().count();
         if len_a < len_b {
-            return self.compare(b, a);
+            return Self::compare(b, a);
         }
         // handle special case of 0 length
         if len_a == 0 {

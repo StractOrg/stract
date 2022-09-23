@@ -1,84 +1,55 @@
-use std::{
-    io::{Read, Write},
-    net::{SocketAddr, TcpListener},
-};
+// Cuely is an open source web search engine.
+// Copyright (C) 2022 Cuely ApS
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::mapreduce::manager::{BUF_SIZE, END_OF_MESSAGE};
+use std::net::SocketAddr;
 
-use super::{Error, Map, Result, Task};
+use crate::sonic;
+
+use super::{Map, Result, Task};
+use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, info};
 
 #[derive(Default)]
 pub struct StatelessWorker {}
 
-pub enum State {
-    Continue,
-    Finished,
-}
-
+#[async_trait]
 pub trait Worker {
-    fn run_stream<W, I, O, S>(&self, mut stream: S) -> Result<State>
+    async fn run<I, O>(&self, addr: SocketAddr) -> Result<()>
     where
         Self: Sized,
-        I: Map<Self, O>,
-        O: Serialize + DeserializeOwned + Send,
-        S: Read + Write + Unpin,
-    {
-        let mut buf = [0; BUF_SIZE];
-        let mut bytes = Vec::new();
-        loop {
-            if let Ok(size) = stream.read(&mut buf) {
-                debug!("read {:?} bytes", size);
-                if size == 0 && bytes.is_empty() {
-                    return Err(Error::NoResponse);
-                }
-
-                bytes.extend_from_slice(&buf[..size]);
-
-                if bytes.len() >= END_OF_MESSAGE.len()
-                    && bytes[bytes.len() - END_OF_MESSAGE.len()..] == END_OF_MESSAGE
-                {
-                    break;
-                }
-            }
-        }
-
-        bytes = bytes[..bytes.len() - END_OF_MESSAGE.len()].to_vec();
-
-        match bincode::deserialize::<Task<I>>(&bytes)? {
-            Task::Job(job) => {
-                debug!("received job");
-                let res = job.map(self);
-                let bytes = bincode::serialize(&res)?;
-                debug!("serialized result into {} bytes", bytes.len());
-                stream.write_all(&bytes)?;
-                stream.write_all(&END_OF_MESSAGE)?;
-            }
-            Task::AllFinished => {
-                debug!("shutting down");
-                return Ok(State::Finished);
-            }
-        };
-
-        Ok(State::Continue)
-    }
-
-    fn run<I, O>(&self, addr: SocketAddr) -> Result<()>
-    where
-        Self: Sized,
-        I: Map<Self, O>,
+        I: Map<Self, O> + Send + Sync,
         O: Serialize + DeserializeOwned + Send,
     {
-        let listener = TcpListener::bind(addr)?;
+        let server = sonic::Server::bind(addr).await?;
         info!("worker listening on: {:}", addr);
 
         loop {
-            let (socket, _) = listener.accept()?;
-            debug!("received connection");
-            match self.run_stream::<Self, I, O, _>(socket)? {
-                State::Finished => break,
-                State::Continue => {}
+            let req: sonic::Request<Task<I>> = server.accept().await?;
+            debug!("received request");
+            match &req.body {
+                Task::Job(job) => {
+                    debug!("request is a job");
+                    let res = job.map(self);
+                    req.respond(sonic::Response::Content(res)).await?;
+                }
+                Task::AllFinished => {
+                    req.respond::<Task<I>>(sonic::Response::Empty).await?;
+                    break;
+                }
             }
         }
 
@@ -87,81 +58,3 @@ pub trait Worker {
 }
 
 impl Worker for StatelessWorker {}
-
-#[cfg(test)]
-mod tests {
-    use serde::Deserialize;
-
-    use super::*;
-
-    struct MockTcpStream {
-        contents: Vec<u8>,
-        result: Vec<u8>,
-        num_read: usize,
-    }
-
-    impl MockTcpStream {
-        fn new(contents: Vec<u8>) -> Self {
-            Self {
-                contents,
-                num_read: 0,
-                result: Vec::new(),
-            }
-        }
-    }
-
-    impl Read for MockTcpStream {
-        fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
-            if self.num_read == 0 {
-                buf.write_all(&self.contents[..]).unwrap();
-            } else if self.num_read == 1 {
-                buf.write_all(&END_OF_MESSAGE).unwrap();
-            }
-
-            self.contents = Vec::new();
-            self.num_read += 1;
-            Ok(buf.len())
-        }
-    }
-
-    impl Write for MockTcpStream {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.result.extend(Vec::from(buf));
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    struct MockJob {
-        contents: Vec<usize>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    struct Count(usize);
-
-    impl Map<StatelessWorker, Count> for MockJob {
-        fn map(self, _worker: &StatelessWorker) -> Count {
-            Count(self.contents.into_iter().filter(|d| *d == 0).count())
-        }
-    }
-
-    #[test]
-    fn execute() {
-        let contents = vec![1, 2, 0, 1, 0, 1, 0];
-        let job = bincode::serialize(&Task::Job(MockJob { contents })).unwrap();
-
-        let mut stream = MockTcpStream::new(job);
-        StatelessWorker::default()
-            .run_stream::<StatelessWorker, MockJob, _, _>(&mut stream)
-            .expect("worker failed");
-
-        let result_bytes = &stream.result[..stream.result.len() - END_OF_MESSAGE.len()];
-        let res: Count = bincode::deserialize(result_bytes).unwrap();
-
-        assert_eq!(res.0, 3);
-    }
-}
