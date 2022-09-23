@@ -146,16 +146,3 @@ impl Connection {
         Ok(bincode::deserialize(&buf)?)
     }
 }
-
-// let server = sonic::Server::new();
-// loop {
-//     let job = server.accept();
-//
-//     job.respond(respons)
-// }
-//
-//
-//
-//
-// let connection = sonic::connect("123.123.123.123:1337");
-// let res = connection.send(job);
