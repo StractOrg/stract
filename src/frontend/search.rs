@@ -22,7 +22,7 @@ use serde::Serialize;
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
-    searcher::{SearchResult, Searcher},
+    searcher::{LocalSearcher, SearchResult},
     webpage::{
         region::{Region, ALL_REGIONS},
         Url,
@@ -155,7 +155,7 @@ pub struct DisplayedEntity {
     pub info: Vec<(String, String)>,
 }
 
-fn prepare_info(info: BTreeMap<String, Span>, searcher: &Searcher) -> Vec<(String, String)> {
+fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(String, String)> {
     let mut info: Vec<_> = info.into_iter().collect();
 
     info.sort_by(|(a, _), (b, _)| {
@@ -198,7 +198,7 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &Searcher) -> Vec<(Strin
 }
 
 impl DisplayedEntity {
-    fn from(entity: StoredEntity, searcher: &Searcher) -> Self {
+    fn from(entity: StoredEntity, searcher: &LocalSearcher) -> Self {
         let entity_abstract = Span {
             text: entity.entity_abstract,
             links: entity.links,

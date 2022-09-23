@@ -294,7 +294,7 @@ mod tests {
     use crate::{
         index::Index,
         schema::create_schema,
-        searcher::Searcher,
+        searcher::LocalSearcher,
         webpage::{Html, Webpage},
     };
 
@@ -358,7 +358,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let res = searcher
             .search("website", None, None, None)
@@ -480,7 +480,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let _ = searcher
             .search(
@@ -606,7 +606,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let res = searcher
             .search(

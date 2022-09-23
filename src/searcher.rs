@@ -48,21 +48,21 @@ pub enum SearchResult {
     Bang(BangHit),
 }
 
-pub struct Searcher {
+pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
 }
 
-impl From<Index> for Searcher {
+impl From<Index> for LocalSearcher {
     fn from(index: Index) -> Self {
         Self::new(index, None, None)
     }
 }
 
-impl Searcher {
+impl LocalSearcher {
     pub fn new(index: Index, entity_index: Option<EntityIndex>, bangs: Option<Bangs>) -> Self {
-        Searcher {
+        LocalSearcher {
             index,
             entity_index,
             bangs,
@@ -214,7 +214,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = Searcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index, None, None);
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher

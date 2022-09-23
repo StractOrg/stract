@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::{index::Index, searcher::Searcher};
+use cuely::{index::Index, searcher::LocalSearcher};
 
 const INDEX_PATH: &str = "data/index";
 
@@ -21,7 +21,7 @@ macro_rules! bench {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
-    let searcher = Searcher::new(index, None, None);
+    let searcher = LocalSearcher::new(index, None, None);
     let goggle = include_str!("../testcases/goggles/hacker_news.goggle");
 
     // for _ in 0..10 {

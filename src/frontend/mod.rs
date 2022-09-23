@@ -19,7 +19,7 @@ use tower_http::compression::CompressionLayer;
 
 use crate::{
     autosuggest::Autosuggest, bangs::Bangs, entity_index::EntityIndex, index::Index,
-    searcher::Searcher,
+    searcher::LocalSearcher,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -46,7 +46,7 @@ pub mod search;
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
-    pub searcher: Searcher,
+    pub searcher: LocalSearcher,
     pub autosuggest: Autosuggest,
 }
 
@@ -86,7 +86,7 @@ pub fn router(
     let bangs = bangs_path.map(Bangs::from_path);
     let search_index = Index::open(index_path)?;
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
-    let searcher = Searcher::new(search_index, entity_index, bangs);
+    let searcher = LocalSearcher::new(search_index, entity_index, bangs);
 
     let state = Arc::new(State {
         searcher,
