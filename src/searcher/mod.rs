@@ -19,3 +19,31 @@ mod local;
 
 pub use distributed::*;
 pub use local::*;
+use serde::Serialize;
+
+use crate::{bangs::BangHit, entity_index::StoredEntity, inverted_index};
+
+#[derive(Debug, Serialize)]
+pub struct WebsitesResult {
+    pub spell_corrected_query: Option<String>,
+    pub webpages: inverted_index::SearchResult,
+    pub entity: Option<StoredEntity>,
+    pub search_duration_ms: u128,
+}
+
+#[derive(Debug, Serialize)]
+pub enum SearchResult {
+    Websites(WebsitesResult),
+    Bang(BangHit),
+}
+
+pub enum InitialSearchResult {
+    Websites(InitialWebsiteResult),
+    Bang(BangHit),
+}
+
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<String>,
+    pub webpages: inverted_index::InitialSearchResult,
+    pub entity: Option<StoredEntity>,
+}

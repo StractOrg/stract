@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{bangs::BangHit, entity_index::StoredEntity, inverted_index::RetrievedWebpage, Result};
+use crate::{
+    bangs::BangHit, entity_index::StoredEntity, inverted_index::RetrievedWebpage,
+    prehashed::Prehashed, Result,
+};
 
 use std::net::SocketAddr;
 
@@ -31,7 +34,7 @@ struct RemoteSearcher {
 }
 
 impl RemoteSearcher {
-    async fn search(&self, query: &SearchQuery) {
+    async fn search(&self, query: &SearchQuery) -> InitialSearchResult {
         todo!()
     }
 }
@@ -56,7 +59,7 @@ impl Replica {
 
 struct ShardId(String);
 
-struct Shard {
+pub struct Shard {
     id: ShardId,
     replicas: Vec<Replica>,
 }
@@ -80,26 +83,15 @@ enum InitialSearchResult {
     Websites(InitialWebsiteResult),
 }
 
-impl InitialSearchResult {
-    fn combine(self, other: Self) -> Self {
-        todo!();
-    }
-}
-
 struct InitialWebsiteResult {
     pub spell_corrected_query: Option<String>,
     pub webpages: Vec<WebsitePointer>,
     pub entity: Option<EntityPointer>,
 }
 
-impl InitialWebsiteResult {
-    fn combine(self, other: Self) -> Self {
-        todo!();
-    }
-}
-
 struct WebsitePointer {
     score: f64,
+    site_hash: Prehashed,
     shard: ShardId,
     doc_address: DocAddress,
 }
@@ -118,39 +110,45 @@ struct SearchQuery {
     skip_pages: Option<usize>,
 }
 
+#[derive(Serialize, Deserialize)]
+enum Request {
+    Search(SearchQuery),
+}
+
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
     handle: JoinHandle<()>,
 }
 
 impl DistributedSearcher {
-    pub async fn bind(addr: SocketAddr, local_searcher: LocalSearcher) -> Self {
+    pub async fn bind(addr: SocketAddr, local_searcher: LocalSearcher, shards: Vec<Shard>) -> Self {
         let handle = tokio::task::spawn(Self::start_server(addr, local_searcher));
 
-        Self {
-            handle,
-            shards: Vec::new(),
-        }
+        Self { handle, shards }
     }
 
     async fn start_server(addr: SocketAddr, local_searcher: LocalSearcher) {
         let server = sonic::Server::bind(addr).await.unwrap();
 
         loop {
-            if let Ok(req) = server.accept::<SearchQuery>().await {
-                match local_searcher.search(
-                    &req.body.query,
-                    req.body.selected_region,
-                    req.body.goggle_program.clone(),
-                    req.body.skip_pages,
-                ) {
-                    Ok(response) => {
-                        req.respond(sonic::Response::Content(response)).await.ok();
-                    }
-                    Err(_) => {
-                        req.respond::<SearchResult>(sonic::Response::Empty)
-                            .await
-                            .ok();
+            if let Ok(req) = server.accept::<Request>().await {
+                match &req.body {
+                    Request::Search(search) => {
+                        match local_searcher.search(
+                            &search.query,
+                            search.selected_region,
+                            search.goggle_program.clone(),
+                            search.skip_pages,
+                        ) {
+                            Ok(response) => {
+                                req.respond(sonic::Response::Content(response)).await.ok();
+                            }
+                            Err(_) => {
+                                req.respond::<SearchResult>(sonic::Response::Empty)
+                                    .await
+                                    .ok();
+                            }
+                        }
                     }
                 }
             }
@@ -170,6 +168,14 @@ impl DistributedSearcher {
             goggle_program,
             skip_pages,
         };
+
+        // search shards
+
+        // combine results
+
+        // retrieve webpages
+
+        // return result
 
         todo!();
     }

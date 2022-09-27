@@ -22,6 +22,7 @@ use tantivy::{
 };
 
 use crate::{
+    inverted_index::WebsitePointer,
     prehashed::{combine_u64s, PrehashMap, Prehashed},
     schema::Field,
 };
@@ -66,7 +67,7 @@ impl TopDocs {
     pub fn tweak_score<TScoreSegmentTweaker, TScoreTweaker>(
         self,
         score_tweaker: TScoreTweaker,
-    ) -> impl Collector<Fruit = Vec<(f64, DocAddress)>>
+    ) -> impl Collector<Fruit = Vec<WebsitePointer>>
     where
         TScoreSegmentTweaker: ScoreSegmentTweaker<f64> + 'static,
         TScoreTweaker: ScoreTweaker<f64, Child = TScoreSegmentTweaker> + Send + Sync,
@@ -76,7 +77,7 @@ impl TopDocs {
 }
 
 impl Collector for TopDocs {
-    type Fruit = Vec<(f64, DocAddress)>;
+    type Fruit = Vec<WebsitePointer>;
 
     type Child = TopSegmentCollector;
 
@@ -126,14 +127,13 @@ impl Collector for TopDocs {
             .into_sorted_vec(true)
             .into_iter()
             .skip(self.offset)
-            .map(|doc| {
-                (
-                    doc.score,
-                    DocAddress {
-                        segment_ord: doc.segment,
-                        doc_id: doc.id,
-                    },
-                )
+            .map(|doc| WebsitePointer {
+                score: doc.score,
+                title_hash: doc.key,
+                address: DocAddress {
+                    segment_ord: doc.segment,
+                    doc_id: doc.id,
+                },
             })
             .collect())
     }
@@ -418,7 +418,7 @@ impl<TScoreTweaker> Collector for TweakedScoreTopCollector<TScoreTweaker>
 where
     TScoreTweaker: ScoreTweaker<f64> + Send + Sync,
 {
-    type Fruit = Vec<(f64, DocAddress)>;
+    type Fruit = Vec<WebsitePointer>;
 
     type Child = TopTweakedScoreSegmentCollector<TScoreTweaker::Child>;
 

@@ -17,36 +17,22 @@
 use std::str::FromStr;
 use std::time::Instant;
 
-use serde::Serialize;
 use uuid::Uuid;
 
-use crate::bangs::{BangHit, Bangs};
-use crate::entity_index::{EntityIndex, StoredEntity};
+use crate::bangs::Bangs;
+use crate::entity_index::EntityIndex;
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::goggles;
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::webpage::region::Region;
 use crate::webpage::Url;
-use crate::{Error, Result};
+use crate::{inverted_index, Error, Result};
+
+use super::{InitialSearchResult, InitialWebsiteResult, SearchResult, WebsitesResult};
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
-
-#[derive(Debug, Serialize)]
-pub struct WebsitesResult {
-    pub spell_corrected_query: Option<String>,
-    pub webpages: InvertedIndexSearchResult,
-    pub entity: Option<StoredEntity>,
-    pub search_duration_ms: u128,
-}
-
-#[derive(Debug, Serialize)]
-pub enum SearchResult {
-    Websites(WebsitesResult),
-    Bang(BangHit),
-}
 
 pub struct LocalSearcher {
     index: Index,
@@ -69,15 +55,13 @@ impl LocalSearcher {
         }
     }
 
-    pub fn search(
+    pub fn search_initial(
         &self,
         query: &str,
         selected_region: Option<Region>,
         goggle_program: Option<String>,
         skip_pages: Option<usize>,
-    ) -> Result<SearchResult> {
-        let start = Instant::now();
-
+    ) -> Result<InitialSearchResult> {
         let raw_query = query.to_string();
         let goggle = goggle_program.and_then(|program| goggles::parse(&program).ok());
 
@@ -94,13 +78,14 @@ impl LocalSearcher {
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
+
         if let Some(goggle) = &goggle {
             query.set_goggle(goggle, &self.index.schema());
         }
 
         if let Some(bangs) = self.bangs.as_ref() {
             if let Some(bang) = bangs.get(&query) {
-                return Ok(SearchResult::Bang(bang));
+                return Ok(InitialSearchResult::Bang(bang));
             }
         }
 
@@ -121,7 +106,7 @@ impl LocalSearcher {
 
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
 
-        let webpages = self.index.search(&query, ranker.collector())?;
+        let webpages = self.index.search_initial(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 
         let entity = self
@@ -129,14 +114,61 @@ impl LocalSearcher {
             .as_ref()
             .and_then(|index| index.search(&raw_query));
 
-        let search_duration_ms = start.elapsed().as_millis();
-
-        Ok(SearchResult::Websites(WebsitesResult {
+        Ok(InitialSearchResult::Websites(InitialWebsiteResult {
+            spell_corrected_query: correction,
             webpages,
             entity,
-            spell_corrected_query: correction,
-            search_duration_ms,
         }))
+    }
+
+    pub fn retrieve_websites(
+        &self,
+        websites: &[inverted_index::WebsitePointer],
+        query: &str,
+    ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
+        let query = Query::parse(
+            query,
+            self.index.schema(),
+            self.index.tokenizers(),
+            &SignalAggregator::default(),
+        )?;
+
+        if query.is_empty() {
+            return Err(Error::EmptyQuery);
+        }
+
+        self.index.retrieve_websites(websites, &query)
+    }
+
+    pub fn search(
+        &self,
+        query: &str,
+        selected_region: Option<Region>,
+        goggle_program: Option<String>,
+        skip_pages: Option<usize>,
+    ) -> Result<SearchResult> {
+        let start = Instant::now();
+
+        let initial_result =
+            self.search_initial(query, selected_region, goggle_program, skip_pages)?;
+
+        match initial_result {
+            InitialSearchResult::Websites(search_result) => {
+                let retrieved_sites =
+                    self.retrieve_websites(&search_result.webpages.top_websites, query)?;
+
+                Ok(SearchResult::Websites(WebsitesResult {
+                    spell_corrected_query: search_result.spell_corrected_query,
+                    webpages: inverted_index::SearchResult {
+                        num_docs: search_result.webpages.num_websites,
+                        documents: retrieved_sites,
+                    },
+                    entity: search_result.entity,
+                    search_duration_ms: start.elapsed().as_millis(),
+                }))
+            }
+            InitialSearchResult::Bang(bang) => Ok(SearchResult::Bang(bang)),
+        }
     }
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {

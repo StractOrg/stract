@@ -27,6 +27,7 @@ use tantivy::collector::Collector;
 
 use crate::{
     collector::{MaxDocsConsidered, TopDocs},
+    inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::{Region, RegionCount},
 };
@@ -70,7 +71,7 @@ impl Ranker {
         self
     }
 
-    pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
+    pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
             self.selected_region,
