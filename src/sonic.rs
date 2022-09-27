@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -26,10 +28,13 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Got an IO error")]
-    IOError(#[from] std::io::Error),
+    IO(#[from] std::io::Error),
 
     #[error("Error while serializing/deserializing to/from bytes")]
     Serialization(#[from] bincode::Error),
+
+    #[error("Failed to connect to peer: connection timeout")]
+    ConnectionTimeout,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,8 +67,6 @@ impl<T> Request<T> {
         self.stream
             .write_all(unsafe { any_as_u8_slice(&header) })
             .await?;
-        self.stream.flush().await?;
-
         self.stream.write_all(&bytes).await?;
         self.stream.flush().await?;
 
@@ -111,12 +114,23 @@ pub struct Connection {
 
 impl Connection {
     pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
-        let stream = TcpStream::connect(server).await?;
-
-        Ok(Connection { stream })
+        Self::create_with_timeout(server, Duration::from_secs(30)).await
     }
 
-    pub async fn send<T: Serialize, R: DeserializeOwned + Serialize>(
+    pub async fn create_with_timeout(
+        server: impl ToSocketAddrs,
+        timeout: Duration,
+    ) -> Result<Self> {
+        match tokio::time::timeout(timeout, TcpStream::connect(server)).await {
+            Ok(stream) => {
+                let stream = stream?;
+                Ok(Connection { stream })
+            }
+            Err(_) => Err(Error::ConnectionTimeout),
+        }
+    }
+
+    pub async fn send_without_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
         mut self,
         request: T,
     ) -> Result<Response<R>> {
@@ -129,8 +143,6 @@ impl Connection {
         self.stream
             .write_all(unsafe { any_as_u8_slice(&header) })
             .await?;
-        self.stream.flush().await?;
-
         self.stream.write_all(&bytes).await?;
         self.stream.flush().await?;
 
@@ -144,5 +156,24 @@ impl Connection {
         self.stream.shutdown().await?;
 
         Ok(bincode::deserialize(&buf)?)
+    }
+
+    pub async fn send<T: Serialize, R: DeserializeOwned + Serialize>(
+        self,
+        request: T,
+    ) -> Result<Response<R>> {
+        self.send_with_timeout(request, Duration::from_secs(30))
+            .await
+    }
+
+    pub async fn send_with_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
+        self,
+        request: T,
+        timeout: Duration,
+    ) -> Result<Response<R>> {
+        match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
+            Ok(res) => res,
+            Err(_) => Err(Error::ConnectionTimeout),
+        }
     }
 }
