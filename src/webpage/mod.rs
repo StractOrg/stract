@@ -593,6 +593,13 @@ impl Html {
                         }],
                     },
                 ),
+                Field::TitleIfHomepage => {
+                    if self.url().is_homepage() {
+                        doc.add_pre_tokenized_text(tantivy_field, title.clone());
+                    } else {
+                        doc.add_text(tantivy_field, "");
+                    }
+                }
                 Field::DomainIfHomepage => {
                     if self.url().is_homepage() {
                         doc.add_text(tantivy_field, self.url().domain());
@@ -645,6 +652,18 @@ impl Html {
                 }
                 Field::UrlWithoutQueryHash => {
                     let hash = hash(self.url().without_query()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::UrlHash => {
+                    let hash = hash(self.url().full()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::TitleHash => {
+                    let hash = hash(self.title().unwrap_or_default()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);

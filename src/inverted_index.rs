@@ -388,9 +388,12 @@ impl From<Document> for RetrievedWebpage {
                 | Field::StemmedTitle
                 | Field::CleanBody
                 | Field::DomainIfHomepage
+                | Field::TitleIfHomepage
                 | Field::IsHomepage
                 | Field::SiteHash
                 | Field::UrlWithoutQueryHash
+                | Field::TitleHash
+                | Field::UrlHash
                 | Field::NumTrackers
                 | Field::PreComputedScore
                 | Field::NumCleanBodyTokens

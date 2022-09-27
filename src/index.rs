@@ -50,7 +50,7 @@ pub struct Index {
     primary_image_store: PrimaryImageStore,
     favicon_downloader: ImageDownloader<String>,
     primary_image_downloader: ImageDownloader<Uuid>,
-    spell_dictionary: Dictionary<1_000_000>,
+    spell_dictionary: Dictionary<100_000>,
     pub region_count: RegionCount,
     pub path: String,
 }
