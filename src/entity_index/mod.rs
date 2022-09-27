@@ -22,7 +22,7 @@ use std::{
     time::Duration,
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
@@ -145,7 +145,7 @@ fn wikipedify_url(url: &Url) -> Vec<Url> {
     ]
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,

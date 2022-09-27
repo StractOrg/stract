@@ -15,13 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::NaiveDateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tantivy::collector::{Collector, Count};
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{DocAddress, Document, IndexReader, IndexWriter, SegmentMeta};
+use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::image_store::Image;
 use crate::prehashed::Prehashed;
@@ -36,15 +36,41 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+#[derive(Serialize, Deserialize)]
 pub struct InitialSearchResult {
     pub num_websites: usize,
     pub top_websites: Vec<WebsitePointer>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct WebsitePointer {
     pub score: f64,
-    pub title_hash: Prehashed,
+    pub site_hash: Prehashed,
     pub address: DocAddress,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct DocAddress {
+    pub segment: u32,
+    pub doc_id: u32,
+}
+
+impl From<tantivy::DocAddress> for DocAddress {
+    fn from(address: tantivy::DocAddress) -> Self {
+        Self {
+            segment: address.segment_ord,
+            doc_id: address.doc_id,
+        }
+    }
+}
+
+impl From<DocAddress> for tantivy::DocAddress {
+    fn from(address: DocAddress) -> Self {
+        Self {
+            segment_ord: address.segment,
+            doc_id: address.doc_id,
+        }
+    }
 }
 
 struct SegmentMergeCandidate {
@@ -255,7 +281,7 @@ impl InvertedIndex {
         doc_address: DocAddress,
         searcher: &tantivy::Searcher,
     ) -> Result<RetrievedWebpage> {
-        let doc = searcher.doc(doc_address)?;
+        let doc = searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
     }
 

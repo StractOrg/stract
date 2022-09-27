@@ -15,94 +15,98 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    bangs::BangHit, entity_index::StoredEntity, inverted_index::RetrievedWebpage,
-    prehashed::Prehashed, Result,
+    exponential_backoff::ExponentialBackoff,
+    inverted_index::{self, RetrievedWebpage},
 };
 
 use std::net::SocketAddr;
 
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tantivy::DocAddress;
+use thiserror::Error;
 use tokio::task::JoinHandle;
 
 use crate::{sonic, webpage::region::Region};
 
-use super::{LocalSearcher, SearchResult};
+use super::{local, LocalSearcher, SearchResult};
+
+type Result<T> = std::result::Result<T, Error>;
 
 struct RemoteSearcher {
     addr: SocketAddr,
 }
 
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to get search result")]
+    NoResult,
+}
+
 impl RemoteSearcher {
-    async fn search(&self, query: &SearchQuery) -> InitialSearchResult {
-        todo!()
+    async fn search(&self, query: &SearchQuery) -> Result<local::InitialSearchResult> {
+        for timeout in ExponentialBackoff::from_millis(30).take(5) {
+            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
+            {
+                if let Ok(sonic::Response::Content(body)) =
+                    connection.send(Request::Search(query.clone())).await
+                {
+                    return Ok(body);
+                }
+            }
+        }
+
+        Err(Error::NoResult)
     }
-}
 
-struct Replica {
-    searchers: Vec<RemoteSearcher>,
-}
-
-impl Replica {
-    async fn search(&self, query: &SearchQuery) -> InitialSearchResult {
-        todo!()
-    }
-
-    async fn retrieve_websites(&self, pointers: &[WebsitePointer]) -> Vec<RetrievedWebpage> {
+    async fn retrieve_websites(
+        &self,
+        pointers: &[inverted_index::WebsitePointer],
+    ) -> Vec<RetrievedWebpage> {
         todo!();
     }
-
-    async fn retrieve_entity(&self, pointer: EntityPointer) -> StoredEntity {
-        todo!();
-    }
 }
 
+#[derive(Clone)]
 struct ShardId(String);
 
 pub struct Shard {
     id: ShardId,
-    replicas: Vec<Replica>,
+    replicas: Vec<RemoteSearcher>,
 }
 
 impl Shard {
-    async fn search(&self, query: &SearchQuery) -> InitialSearchResult {
-        todo!()
+    async fn search(&self, query: &SearchQuery) -> Result<InitialSearchResult> {
+        match self
+            .replicas
+            .iter()
+            .map(|remote| remote.search(query))
+            .collect::<FuturesUnordered<_>>()
+            .next()
+            .await
+        {
+            Some(result) => Ok(InitialSearchResult {
+                local_result: result?,
+                shard: self.id.clone(),
+            }),
+            None => Err(Error::NoResult),
+        }
     }
 
-    async fn retrieve_websites(&self, pointers: &[WebsitePointer]) -> Vec<RetrievedWebpage> {
+    async fn retrieve_websites(
+        &self,
+        pointers: &[inverted_index::WebsitePointer],
+    ) -> Vec<RetrievedWebpage> {
         todo!();
     }
-
-    async fn retrieve_entity(&self, pointer: EntityPointer) -> StoredEntity {
-        todo!();
-    }
 }
 
-enum InitialSearchResult {
-    Bang(BangHit),
-    Websites(InitialWebsiteResult),
-}
-
-struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
-    pub webpages: Vec<WebsitePointer>,
-    pub entity: Option<EntityPointer>,
-}
-
-struct WebsitePointer {
-    score: f64,
-    site_hash: Prehashed,
+struct InitialSearchResult {
+    local_result: local::InitialSearchResult,
     shard: ShardId,
-    doc_address: DocAddress,
 }
 
-struct EntityPointer {
-    score: f64,
-    shard: ShardId,
-    doc_address: DocAddress,
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct SearchQuery {
     query: String,
     selected_region: Option<Region>,
@@ -134,7 +138,7 @@ impl DistributedSearcher {
             if let Ok(req) = server.accept::<Request>().await {
                 match &req.body {
                     Request::Search(search) => {
-                        match local_searcher.search(
+                        match local_searcher.search_initial(
                             &search.query,
                             search.selected_region,
                             search.goggle_program.clone(),
@@ -170,6 +174,18 @@ impl DistributedSearcher {
         };
 
         // search shards
+        let results = self
+            .shards
+            .iter()
+            .map(|shard| shard.search(&query))
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter_map(|result| result.ok())
+            .collect::<Vec<_>>();
+
+        // check if any result has a bang hit
 
         // combine results
 

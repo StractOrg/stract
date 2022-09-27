@@ -17,6 +17,8 @@ use std::{
     hash::{BuildHasher, Hash, Hasher},
 };
 
+use serde::{Deserialize, Serialize};
+
 struct PrehashBuilder {}
 
 impl BuildHasher for PrehashBuilder {
@@ -45,7 +47,7 @@ impl Hasher for Prehasher {
     }
 }
 
-#[derive(Debug, Eq, Clone)]
+#[derive(Debug, Eq, Clone, Serialize, Deserialize)]
 pub struct Prehashed(pub u128);
 
 impl Hash for Prehashed {

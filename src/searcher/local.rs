@@ -17,10 +17,11 @@
 use std::str::FromStr;
 use std::time::Instant;
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bangs::Bangs;
-use crate::entity_index::EntityIndex;
+use crate::bangs::{BangHit, Bangs};
+use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
@@ -30,7 +31,7 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{InitialSearchResult, InitialWebsiteResult, SearchResult, WebsitesResult};
+use super::{SearchResult, WebsitesResult};
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
@@ -44,6 +45,19 @@ impl From<Index> for LocalSearcher {
     fn from(index: Index) -> Self {
         Self::new(index, None, None)
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum InitialSearchResult {
+    Websites(InitialWebsiteResult),
+    Bang(BangHit),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<String>,
+    pub webpages: inverted_index::InitialSearchResult,
+    pub entity: Option<StoredEntity>,
 }
 
 impl LocalSearcher {

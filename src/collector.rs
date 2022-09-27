@@ -18,11 +18,11 @@ use min_max_heap::MinMaxHeap;
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
     fastfield::MultiValuedFastFieldReader,
-    DocAddress, DocId, Score, SegmentOrdinal, SegmentReader,
+    DocId, Score, SegmentOrdinal, SegmentReader,
 };
 
 use crate::{
-    inverted_index::WebsitePointer,
+    inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, PrehashMap, Prehashed},
     schema::Field,
 };
@@ -129,9 +129,9 @@ impl Collector for TopDocs {
             .skip(self.offset)
             .map(|doc| WebsitePointer {
                 score: doc.score,
-                title_hash: doc.key,
+                site_hash: doc.key,
                 address: DocAddress {
-                    segment_ord: doc.segment,
+                    segment: doc.segment,
                     doc_id: doc.id,
                 },
             })

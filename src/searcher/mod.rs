@@ -36,14 +36,3 @@ pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(BangHit),
 }
-
-pub enum InitialSearchResult {
-    Websites(InitialWebsiteResult),
-    Bang(BangHit),
-}
-
-pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
-    pub webpages: inverted_index::InitialSearchResult,
-    pub entity: Option<StoredEntity>,
-}
