@@ -517,7 +517,7 @@ mod tests {
                     "https://www.second.com",
                 ),
                 backlinks: vec![],
-                host_centrality: 0.003,
+                host_centrality: 0.00003,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,

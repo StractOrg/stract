@@ -11,7 +11,7 @@ RUN apt-get update -y \
     libssl-dev \
     nodejs
 
-RUN rustup toolchain install beta && rustup default beta
+RUN rustup toolchain install beta && rustup default beta && rustup component add rustfmt
 
 COPY . .
 

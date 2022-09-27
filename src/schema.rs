@@ -38,6 +38,8 @@ pub enum Field {
     DomainIfHomepage,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     DomainNameIfHomepageNoTokenizer,
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    TitleIfHomepage,
     IsHomepage,
     BacklinkText,
     HostCentrality,
@@ -54,10 +56,12 @@ pub enum Field {
     NumDescriptionTokens,
     SiteHash,
     UrlWithoutQueryHash,
+    TitleHash,
+    UrlHash,
     PreComputedScore,
 }
 
-pub static ALL_FIELDS: [Field; 29] = [
+pub static ALL_FIELDS: [Field; 32] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -70,6 +74,7 @@ pub static ALL_FIELDS: [Field; 29] = [
     Field::DomainNoTokenizer,
     Field::DomainIfHomepage,
     Field::DomainNameIfHomepageNoTokenizer,
+    Field::TitleIfHomepage,
     Field::IsHomepage,
     Field::BacklinkText,
     Field::HostCentrality,
@@ -86,6 +91,8 @@ pub static ALL_FIELDS: [Field; 29] = [
     Field::NumDescriptionTokens,
     Field::SiteHash,
     Field::UrlWithoutQueryHash,
+    Field::TitleHash,
+    Field::UrlHash,
     Field::PreComputedScore,
 ];
 
@@ -126,6 +133,7 @@ impl Field {
             ),
             Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
+            Field::TitleIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::DomainNameIfHomepageNoTokenizer => IndexingOption::Text(
                 TextOptions::default().set_indexing_options(
                     TextFieldIndexing::default()
@@ -205,6 +213,12 @@ impl Field {
             Field::UrlWithoutQueryHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
+            Field::UrlHash => IndexingOption::Integer(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
+            Field::TitleHash => IndexingOption::Integer(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
             Field::PreComputedScore => IndexingOption::Float(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -245,12 +259,16 @@ impl Field {
             Field::SiteHash => "site_hash",
             Field::UrlWithoutQueryHash => "url_without_query_hash",
             Field::PreComputedScore => "pre_computed_score",
+            Field::TitleIfHomepage => "title_if_homepage",
+            Field::TitleHash => "title_hash",
+            Field::UrlHash => "url_hash",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
             Field::Site => Some(3.0),
+            Field::TitleIfHomepage => Some(2.0),
             Field::DomainIfHomepage => Some(10.0),
             Field::DomainNameIfHomepageNoTokenizer => Some(30.0),
             Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
@@ -263,6 +281,8 @@ impl Field {
             Field::HostCentrality
             | Field::PageCentrality
             | Field::SiteHash
+            | Field::TitleHash
+            | Field::UrlHash
             | Field::UrlWithoutQueryHash
             | Field::SiteNoTokenizer
             | Field::DomainNoTokenizer
@@ -300,6 +320,8 @@ impl Field {
                 | Field::NumDescriptionTokens
                 | Field::SiteHash
                 | Field::UrlWithoutQueryHash
+                | Field::TitleHash
+                | Field::UrlHash
                 | Field::PreComputedScore
         )
     }
@@ -329,6 +351,9 @@ impl Field {
             "url_without_query_hash" => Some(Field::UrlWithoutQueryHash),
             "domain_name_if_homepage_no_tokenizer" => Some(Field::DomainNameIfHomepageNoTokenizer),
             "pre_computed_score" => Some(Field::PreComputedScore),
+            "title_if_homepage" => Some(Field::TitleIfHomepage),
+            "url_hash" => Some(Field::UrlHash),
+            "title_hash" => Some(Field::TitleHash),
             _ => None,
         }
     }

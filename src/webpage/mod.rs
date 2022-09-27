@@ -18,7 +18,7 @@ use crate::{
     schema_org::SchemaOrg,
     tokenizer, Error, Result,
 };
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
@@ -593,6 +593,13 @@ impl Html {
                         }],
                     },
                 ),
+                Field::TitleIfHomepage => {
+                    if self.url().is_homepage() {
+                        doc.add_pre_tokenized_text(tantivy_field, title.clone());
+                    } else {
+                        doc.add_text(tantivy_field, "");
+                    }
+                }
                 Field::DomainIfHomepage => {
                     if self.url().is_homepage() {
                         doc.add_text(tantivy_field, self.url().domain());
@@ -645,6 +652,18 @@ impl Html {
                 }
                 Field::UrlWithoutQueryHash => {
                     let hash = hash(self.url().without_query()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::UrlHash => {
+                    let hash = hash(self.url().full()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::TitleHash => {
+                    let hash = hash(self.title().unwrap_or_default()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
@@ -800,8 +819,20 @@ impl Html {
     }
 
     pub fn updated_time(&self) -> Option<DateTime<FixedOffset>> {
-        self.og_updated_time()
+        if let Some(time) = self
+            .og_updated_time()
             .or_else(|| self.article_modified_time())
+        {
+            let current_time = Utc::now();
+
+            if time > current_time {
+                None
+            } else {
+                Some(time)
+            }
+        } else {
+            None
+        }
     }
 
     pub fn primary_image(&self) -> Option<ImageLink> {
@@ -1413,6 +1444,22 @@ mod tests {
                 description: None
             })
         );
+    }
+
+    #[test]
+    fn future_updated_time_none() {
+        let html = r#"
+    <html>
+        <head>
+            <meta property="og:updated_time" content="2122-06-22T19:37:34+00:00" />
+        </head>
+        <body>
+        </body>
+    </html>
+        "#;
+        let html = Html::parse(html, "example.com");
+
+        assert_eq!(html.updated_time(), None);
     }
 
     #[test]
