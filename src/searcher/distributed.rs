@@ -19,7 +19,7 @@ use crate::{
     inverted_index::{self, RetrievedWebpage},
 };
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Instant};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -166,6 +166,8 @@ impl DistributedSearcher {
         goggle_program: Option<String>,
         skip_pages: Option<usize>,
     ) -> Result<SearchResult> {
+        let start = Instant::now();
+
         let query = SearchQuery {
             query: query.to_string(),
             selected_region,
