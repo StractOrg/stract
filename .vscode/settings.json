@@ -1,0 +1,11 @@
+{
+  "prettier.documentSelectors": [
+    "**/*.astro"
+  ],
+  "prettier.configPath": "frontend/.prettierrc",
+  "prettier.prettierPath": "frontend/node_modules/prettier",
+  "tailwindCSS.experimental.configFile": "frontend/tailwind.config.cjs",
+  "[astro]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
