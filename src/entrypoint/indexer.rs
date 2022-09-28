@@ -23,7 +23,7 @@ use tracing::{debug, info, trace};
 
 use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
-use crate::mapreduce::{Map, MapReduce, Reduce, Worker};
+use crate::mapreduce::{Manager, Map, Reduce, Worker};
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::SignalAggregator;
 use crate::warc::WarcFile;
@@ -171,15 +171,15 @@ struct IndexPointer(String);
 impl Worker for IndexingWorker {}
 
 impl Map<IndexingWorker, FrozenIndex> for Job {
-    fn map(self, worker: &IndexingWorker) -> FrozenIndex {
-        let index = process_job(&self, worker);
+    fn map(&self, worker: &IndexingWorker) -> FrozenIndex {
+        let index = process_job(self, worker);
         index.into()
     }
 }
 
 impl Map<IndexingWorker, IndexPointer> for Job {
-    fn map(self, worker: &IndexingWorker) -> IndexPointer {
-        let index = process_job(&self, worker);
+    fn map(&self, worker: &IndexingWorker) -> IndexPointer {
+        let index = process_job(self, worker);
         IndexPointer(index.path)
     }
 }
@@ -227,54 +227,59 @@ impl Reduce<Index> for Index {
 
 impl Indexer {
     pub fn run_master(config: &IndexingMasterConfig) -> Result<()> {
-        info!("Running master for index construction");
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                info!("Running master for index construction");
 
-        let warc_paths = config.warc_source.paths()?;
+                let warc_paths = config.warc_source.paths().unwrap();
 
-        let workers: Vec<SocketAddr> = config
-            .workers
-            .iter()
-            .map(|worker| worker.parse().unwrap())
-            .collect();
+                let workers: Vec<SocketAddr> = config
+                    .workers
+                    .iter()
+                    .map(|worker| worker.parse().unwrap())
+                    .collect();
 
-        let job_config = match config.warc_source.clone() {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-        };
+                let job_config = match config.warc_source.clone() {
+                    WarcSource::HTTP(config) => JobConfig::Http(config),
+                    WarcSource::Local(config) => JobConfig::Local(config),
+                };
 
-        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
-            warc_paths
-                .into_iter()
-                .chunks(config.batch_size.unwrap_or(1))
-                .into_iter()
-                .map(|warc_paths| Job {
-                    source_config: job_config.clone(),
-                    warc_paths: warc_paths.collect_vec(),
-                    download_images: config.download_images.unwrap_or(true),
-                    base_path: config
-                        .index_base_path
-                        .clone()
-                        .unwrap_or_else(|| "data/index".to_string()),
-                })
-                .collect_vec()
-                .into_iter(),
-        );
+                let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
+                    warc_paths
+                        .into_iter()
+                        .chunks(config.batch_size.unwrap_or(1))
+                        .into_iter()
+                        .map(|warc_paths| Job {
+                            source_config: job_config.clone(),
+                            warc_paths: warc_paths.collect_vec(),
+                            download_images: config.download_images.unwrap_or(true),
+                            base_path: config
+                                .index_base_path
+                                .clone()
+                                .unwrap_or_else(|| "data/index".to_string()),
+                        })
+                        .collect_vec()
+                        .into_iter(),
+                );
 
-        if let Some(limit) = config.limit_warc_files {
-            warc_paths = Box::new(warc_paths.take(limit));
-        }
+                if let Some(limit) = config.limit_warc_files {
+                    warc_paths = Box::new(warc_paths.take(limit));
+                }
 
-        let mut index = <Box<dyn Iterator<Item = Job> + std::marker::Send> as MapReduce<
-            IndexingWorker,
-            Job,
-            FrozenIndex,
-            Index,
-        >>::map_reduce(warc_paths, &workers)
-        .expect("failed to build index");
+                let manager = Manager::new(&workers);
+                let mut index: Index = manager
+                    .run::<IndexingWorker, Job, FrozenIndex, Index>(warc_paths)
+                    .await
+                    .unwrap();
 
-        index
-            .inverted_index
-            .merge_into_segments(config.final_num_segments.unwrap_or(20))?;
+                index
+                    .inverted_index
+                    .merge_into_segments(config.final_num_segments.unwrap_or(20))
+                    .unwrap();
+            });
 
         Ok(())
     }
@@ -284,11 +289,20 @@ impl Indexer {
         centrality_store_path: String,
         webgraph_path: Option<String>,
     ) -> Result<()> {
-        IndexingWorker::new(centrality_store_path, webgraph_path).run::<Job, FrozenIndex>(
-            worker_addr
-                .parse::<SocketAddr>()
-                .expect("Could not parse worker address"),
-        )?;
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                IndexingWorker::new(centrality_store_path, webgraph_path)
+                    .run::<Job, FrozenIndex>(
+                        worker_addr
+                            .parse::<SocketAddr>()
+                            .expect("Could not parse worker address"),
+                    )
+                    .await
+                    .unwrap();
+            });
         Ok(())
     }
 

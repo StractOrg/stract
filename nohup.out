@@ -1,0 +1,20 @@
+   Compiling cuely v0.1.0 (/Users/mikkeldenker/cuely/cuely)
+   Compiling cuely v0.1.0 (/Users/mikkeldenker/cuely/cuely)
+    Finished dev [unoptimized + debuginfo] target(s) in 4.40s
+     Running `target/debug/cuely frontend data/index data/queries_us.csv data/entity data/bangs.json`
+[2m2022-09-28T09:43:26.587009Z[0m [32m INFO[0m [2mcuely::entrypoint::frontend[0m[2m:[0m listening on 0.0.0.0:3000
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished dev [unoptimized + debuginfo] target(s) in 4.31s
+     Running `target/debug/cuely frontend data/index data/queries_us.csv data/entity data/bangs.json`
+thread 'main' panicked at 'unable to open rocks db: Error { message: "IO error: While lock file: data/entity/attribute_occurrences/LOCK: Resource temporarily unavailable" }', src/kv/rocksdb_store.rs:39:41
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling cuely v0.1.0 (/Users/mikkeldenker/cuely/cuely)
+    Finished dev [unoptimized + debuginfo] target(s) in 4.22s
+     Running `target/debug/cuely frontend data/index data/queries_us.csv data/entity data/bangs.json`
+[2m2022-09-28T09:44:05.809083Z[0m [32m INFO[0m [2mcuely::entrypoint::frontend[0m[2m:[0m listening on 0.0.0.0:3000

@@ -297,11 +297,10 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
         let searcher = searcher.unwrap();
 
         let mut matches = self.perform_search(&searcher);
-        let dist_metric = LevenshteinDistance::new(edit_distance);
 
         while let Some((correction, freq)) = matches.next() {
             let correction = std::str::from_utf8(correction).unwrap().to_owned();
-            let dist = dist_metric.compare(term, &correction);
+            let dist = LevenshteinDistance::compare(term, &correction);
 
             let prob = freq as f64 / self.total_freq as f64;
 

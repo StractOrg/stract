@@ -17,67 +17,61 @@
 use std::str::FromStr;
 use std::time::Instant;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bangs::{BangHit, Bangs};
+use crate::bangs::Bangs;
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::inverted_index::InvertedIndexSearchResult;
 use crate::query::Query;
 use crate::ranking::goggles;
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::webpage::region::Region;
 use crate::webpage::Url;
-use crate::{Error, Result};
+use crate::{inverted_index, Error, Result};
 
-pub const NUM_RESULTS_PER_PAGE: usize = 20;
+use super::{
+    InitialSearchResult, InitialWebsitesFormatting, SearchResult, WebsitesResult,
+    NUM_RESULTS_PER_PAGE,
+};
 
-#[derive(Debug, Serialize)]
-pub struct WebsitesResult {
-    pub spell_corrected_query: Option<String>,
-    pub webpages: InvertedIndexSearchResult,
-    pub entity: Option<StoredEntity>,
-    pub search_duration_ms: u128,
-}
-
-#[derive(Debug, Serialize)]
-pub enum SearchResult {
-    Websites(WebsitesResult),
-    Bang(BangHit),
-}
-
-pub struct Searcher {
+pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
 }
 
-impl From<Index> for Searcher {
+impl From<Index> for LocalSearcher {
     fn from(index: Index) -> Self {
         Self::new(index, None, None)
     }
 }
 
-impl Searcher {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<String>,
+    pub websites: inverted_index::InitialSearchResult,
+    pub entity: Option<StoredEntity>,
+}
+
+impl LocalSearcher {
     pub fn new(index: Index, entity_index: Option<EntityIndex>, bangs: Option<Bangs>) -> Self {
-        Searcher {
+        LocalSearcher {
             index,
             entity_index,
             bangs,
         }
     }
 
-    pub fn search(
+    pub fn search_initial(
         &self,
         query: &str,
         selected_region: Option<Region>,
         goggle_program: Option<String>,
         skip_pages: Option<usize>,
-    ) -> Result<SearchResult> {
-        let start = Instant::now();
-
+        de_rank_similar: bool,
+    ) -> Result<InitialSearchResult> {
         let raw_query = query.to_string();
         let goggle = goggle_program.and_then(|program| goggles::parse(&program).ok());
 
@@ -94,14 +88,15 @@ impl Searcher {
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
-        if let Some(goggle) = &goggle {
-            query.set_goggle(goggle, &self.index.schema());
-        }
 
         if let Some(bangs) = self.bangs.as_ref() {
             if let Some(bang) = bangs.get(&query) {
-                return Ok(SearchResult::Bang(bang));
+                return Ok(InitialSearchResult::Bang(bang));
             }
+        }
+
+        if let Some(goggle) = &goggle {
+            query.set_goggle(goggle, &self.index.schema());
         }
 
         let mut ranker = Ranker::new(
@@ -120,8 +115,9 @@ impl Searcher {
         }
 
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
+        ranker.de_rank_similar(de_rank_similar);
 
-        let webpages = self.index.search(&query, ranker.collector())?;
+        let webpages = self.index.search_initial(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
 
         let entity = self
@@ -129,14 +125,64 @@ impl Searcher {
             .as_ref()
             .and_then(|index| index.search(&raw_query));
 
-        let search_duration_ms = start.elapsed().as_millis();
+        Ok(InitialSearchResult::Websites(
+            InitialWebsitesFormatting::Raw(InitialWebsiteResult {
+                spell_corrected_query: correction,
+                websites: webpages,
+                entity,
+            }),
+        ))
+    }
 
-        Ok(SearchResult::Websites(WebsitesResult {
-            webpages,
-            entity,
-            spell_corrected_query: correction,
-            search_duration_ms,
-        }))
+    pub fn retrieve_websites(
+        &self,
+        websites: &[inverted_index::WebsitePointer],
+        query: &str,
+    ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
+        let query = Query::parse(
+            query,
+            self.index.schema(),
+            self.index.tokenizers(),
+            &SignalAggregator::default(),
+        )?;
+
+        if query.is_empty() {
+            return Err(Error::EmptyQuery);
+        }
+
+        self.index.retrieve_websites(websites, &query)
+    }
+
+    pub fn search(
+        &self,
+        query: &str,
+        selected_region: Option<Region>,
+        goggle_program: Option<String>,
+        skip_pages: Option<usize>,
+    ) -> Result<SearchResult> {
+        let start = Instant::now();
+
+        let initial_result =
+            self.search_initial(query, selected_region, goggle_program, skip_pages, true)?;
+
+        match initial_result {
+            InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(search_result)) => {
+                let retrieved_sites =
+                    self.retrieve_websites(&search_result.websites.top_websites, query)?;
+
+                Ok(SearchResult::Websites(WebsitesResult {
+                    spell_corrected_query: search_result.spell_corrected_query,
+                    webpages: inverted_index::SearchResult {
+                        num_docs: search_result.websites.num_websites,
+                        documents: retrieved_sites,
+                    },
+                    entity: search_result.entity,
+                    search_duration_ms: start.elapsed().as_millis(),
+                }))
+            }
+            InitialSearchResult::Bang(bang) => Ok(SearchResult::Bang(bang)),
+            _ => unreachable!(),
+        }
     }
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {
@@ -214,7 +260,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = Searcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index, None, None);
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher

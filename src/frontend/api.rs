@@ -40,7 +40,8 @@ pub async fn search(
 
     match state
         .searcher
-        .search(query.as_str(), selected_region, None, skip_pages)
+        .search_api(query.as_str(), selected_region, None, skip_pages)
+        .await
     {
         Ok(result) => Json(result),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here

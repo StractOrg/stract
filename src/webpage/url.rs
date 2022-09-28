@@ -16,10 +16,10 @@
 
 use std::{fmt::Display, time::Duration};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-#[derive(Debug, Serialize, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Hash)]
 pub struct Url(String);
 
 impl Display for Url {
@@ -71,7 +71,7 @@ impl Url {
 
     pub fn domain(&self) -> &str {
         let site = self.site();
-        let num_punctuations: usize = site.chars().map(|c| if c == '.' { 1 } else { 0 }).sum();
+        let num_punctuations: usize = site.chars().map(|c| (c == '.') as usize).sum();
         if num_punctuations > 1 {
             let domain_index = site.rfind('.').unwrap();
             let mut start_index = site[..domain_index].rfind('.').unwrap() + 1;

@@ -15,15 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::NaiveDateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tantivy::collector::{Collector, Count};
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{DocAddress, Document, IndexReader, IndexWriter, SegmentMeta};
+use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::image_store::Image;
+use crate::prehashed::Prehashed;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
@@ -34,6 +35,43 @@ use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialSearchResult {
+    pub num_websites: usize,
+    pub top_websites: Vec<WebsitePointer>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebsitePointer {
+    pub score: f64,
+    pub site_hash: Prehashed,
+    pub address: DocAddress,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct DocAddress {
+    pub segment: u32,
+    pub doc_id: u32,
+}
+
+impl From<tantivy::DocAddress> for DocAddress {
+    fn from(address: tantivy::DocAddress) -> Self {
+        Self {
+            segment: address.segment_ord,
+            doc_id: address.doc_id,
+        }
+    }
+}
+
+impl From<DocAddress> for tantivy::DocAddress {
+    fn from(address: DocAddress) -> Self {
+        Self {
+            segment_ord: address.segment,
+            doc_id: address.doc_id,
+        }
+    }
+}
 
 struct SegmentMergeCandidate {
     num_docs: u32,
@@ -118,17 +156,28 @@ impl InvertedIndex {
         Ok(())
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
+    pub fn search_initial<C>(&self, query: &Query, collector: C) -> Result<InitialSearchResult>
     where
-        C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
+        C: Collector<Fruit = Vec<WebsitePointer>>,
     {
         let searcher = self.reader.searcher();
 
         let (count, docs) = searcher.search(query, &(Count, collector))?;
+        Ok(InitialSearchResult {
+            num_websites: count,
+            top_websites: docs,
+        })
+    }
 
-        let mut webpages: Vec<RetrievedWebpage> = docs
-            .into_iter()
-            .map(|(_score, doc_address)| self.retrieve_doc(doc_address, &searcher))
+    pub fn retrieve_websites(
+        &self,
+        websites: &[WebsitePointer],
+        query: &Query,
+    ) -> Result<Vec<RetrievedWebpage>> {
+        let searcher = self.reader.searcher();
+        let mut webpages: Vec<RetrievedWebpage> = websites
+            .iter()
+            .map(|website| self.retrieve_doc(website.address, &searcher))
             .filter_map(|page| page.ok())
             .map(|mut doc| {
                 if let Some(image) = doc.primary_image.as_ref() {
@@ -159,9 +208,19 @@ impl InvertedIndex {
             )?;
         }
 
-        Ok(InvertedIndexSearchResult {
-            num_docs: count,
-            documents: webpages,
+        Ok(webpages)
+    }
+
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
+    where
+        C: Collector<Fruit = Vec<WebsitePointer>>,
+    {
+        let initial_result = self.search_initial(query, collector)?;
+        let websites = self.retrieve_websites(&initial_result.top_websites, query)?;
+
+        Ok(SearchResult {
+            num_docs: initial_result.num_websites,
+            documents: websites,
         })
     }
 
@@ -222,7 +281,7 @@ impl InvertedIndex {
         doc_address: DocAddress,
         searcher: &tantivy::Searcher,
     ) -> Result<RetrievedWebpage> {
-        let doc = searcher.doc(doc_address)?;
+        let doc = searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
     }
 
@@ -289,12 +348,12 @@ impl InvertedIndex {
 }
 
 #[derive(Debug, Serialize)]
-pub struct InvertedIndexSearchResult {
+pub struct SearchResult {
     pub num_docs: usize,
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug, Serialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,

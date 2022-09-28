@@ -30,7 +30,7 @@ use uuid::Uuid;
 use crate::directory::{self, DirEntry};
 use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
-use crate::inverted_index::{InvertedIndex, InvertedIndexSearchResult};
+use crate::inverted_index::{self, InitialSearchResult, InvertedIndex, SearchResult};
 use crate::query::Query;
 use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker, TermSplitter};
 use crate::webpage::region::{Region, RegionCount};
@@ -111,11 +111,26 @@ impl Index {
         Ok(())
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<InvertedIndexSearchResult>
+    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
     where
-        C: Collector<Fruit = Vec<(f64, tantivy::DocAddress)>>,
+        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
     {
         self.inverted_index.search(query, collector)
+    }
+
+    pub fn search_initial<C>(&self, query: &Query, collector: C) -> Result<InitialSearchResult>
+    where
+        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
+    {
+        self.inverted_index.search_initial(query, collector)
+    }
+
+    pub fn retrieve_websites(
+        &self,
+        websites: &[inverted_index::WebsitePointer],
+        query: &Query,
+    ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
+        self.inverted_index.retrieve_websites(websites, query)
     }
 
     pub fn merge(mut self, other: Self) -> Self {

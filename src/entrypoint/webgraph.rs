@@ -16,7 +16,7 @@
 use crate::{
     directory::DirEntry,
     entrypoint::download_all_warc_files,
-    mapreduce::{Map, MapReduce, Reduce, StatelessWorker, Worker},
+    mapreduce::{Manager, Map, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
@@ -97,15 +97,15 @@ fn process_job(job: &Job) -> webgraph::Webgraph {
 }
 
 impl Map<StatelessWorker, FrozenWebgraph> for Job {
-    fn map(self, _worker: &StatelessWorker) -> FrozenWebgraph {
-        let graph = process_job(&self);
+    fn map(&self, _worker: &StatelessWorker) -> FrozenWebgraph {
+        let graph = process_job(self);
         graph.into()
     }
 }
 
 impl Map<StatelessWorker, GraphPointer> for Job {
-    fn map(self, _worker: &StatelessWorker) -> GraphPointer {
-        let graph = process_job(&self);
+    fn map(&self, _worker: &StatelessWorker) -> GraphPointer {
+        let graph = process_job(self);
         GraphPointer(graph.path)
     }
 }
@@ -161,60 +161,74 @@ pub struct Webgraph {}
 
 impl Webgraph {
     pub fn run_master(config: &WebgraphMasterConfig) -> Result<()> {
-        info!("Running master for webgraph construction");
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                info!("Running master for webgraph construction");
 
-        let warc_paths = config.warc_source.paths()?;
+                let warc_paths = config.warc_source.paths().unwrap();
 
-        let workers: Vec<SocketAddr> = config
-            .workers
-            .iter()
-            .map(|worker| worker.parse().unwrap())
-            .collect();
+                let workers: Vec<SocketAddr> = config
+                    .workers
+                    .iter()
+                    .map(|worker| worker.parse().unwrap())
+                    .collect();
 
-        let job_config = match config.warc_source.clone() {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-        };
+                let job_config = match config.warc_source.clone() {
+                    WarcSource::HTTP(config) => JobConfig::Http(config),
+                    WarcSource::Local(config) => JobConfig::Local(config),
+                };
 
-        let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
-            warc_paths
-                .into_iter()
-                .chunks(config.batch_size.unwrap_or(1))
-                .into_iter()
-                .map(|warc_paths| Job {
-                    config: job_config.clone(),
-                    warc_paths: warc_paths.into_iter().collect(),
-                    graph_base_path: config
-                        .graph_base_path
-                        .clone()
-                        .unwrap_or_else(|| "data/webgraph".to_string()),
-                })
-                .collect::<Vec<_>>()
-                .into_iter(),
-        );
+                let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
+                    warc_paths
+                        .into_iter()
+                        .chunks(config.batch_size.unwrap_or(1))
+                        .into_iter()
+                        .map(|warc_paths| Job {
+                            config: job_config.clone(),
+                            warc_paths: warc_paths.into_iter().collect(),
+                            graph_base_path: config
+                                .graph_base_path
+                                .clone()
+                                .unwrap_or_else(|| "data/webgraph".to_string()),
+                        })
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                );
 
-        if let Some(limit) = config.limit_warc_files {
-            warc_paths = Box::new(warc_paths.take(limit));
-        }
+                if let Some(limit) = config.limit_warc_files {
+                    warc_paths = Box::new(warc_paths.take(limit));
+                }
 
-        let _graph: webgraph::Webgraph =
-            <Box<dyn Iterator<Item = Job> + std::marker::Send> as MapReduce<
-                StatelessWorker,
-                Job,
-                webgraph::FrozenWebgraph,
-                webgraph::Webgraph,
-            >>::map_reduce(warc_paths, &workers)
-            .expect("failed to build webgraph");
+                let manager = Manager::new(&workers);
+                let _graph: webgraph::Webgraph = manager
+                    .run::<StatelessWorker, Job, webgraph::FrozenWebgraph, webgraph::Webgraph>(
+                        warc_paths,
+                    )
+                    .await
+                    .unwrap();
+            });
 
         Ok(())
     }
 
     pub fn run_worker(worker_addr: String) -> Result<()> {
-        StatelessWorker::default().run::<Job, FrozenWebgraph>(
-            worker_addr
-                .parse::<SocketAddr>()
-                .expect("Could not parse worker address"),
-        )?;
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                StatelessWorker::default()
+                    .run::<Job, FrozenWebgraph>(
+                        worker_addr
+                            .parse::<SocketAddr>()
+                            .expect("Could not parse worker address"),
+                    )
+                    .await
+                    .unwrap();
+            });
         Ok(())
     }
 

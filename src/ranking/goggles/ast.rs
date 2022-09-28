@@ -112,7 +112,7 @@ pub enum RawAction {
 pub fn parse(goggle: &str) -> CrateResult<RawGoggle> {
     let newlines = Regex::new(r"[\n]+").unwrap();
     let clean = newlines.replace_all(goggle.trim(), "\n").to_string();
-    let clean = clean.trim().replace('\n', ";").replace('\r', ";");
+    let clean = clean.trim().replace(['\n', '\r'], ";");
 
     match PARSER.parse(clean.as_str()) {
         Ok(blocks) => Ok(RawGoggle::from(blocks)),

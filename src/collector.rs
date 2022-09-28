@@ -18,10 +18,11 @@ use min_max_heap::MinMaxHeap;
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
     fastfield::MultiValuedFastFieldReader,
-    DocAddress, DocId, Score, SegmentOrdinal, SegmentReader,
+    DocId, Score, SegmentOrdinal, SegmentReader,
 };
 
 use crate::{
+    inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, PrehashMap, Prehashed},
     schema::Field,
 };
@@ -37,10 +38,23 @@ pub struct MaxDocsConsidered {
     pub segments: usize,
 }
 
+pub trait Doc: PartialEq + Eq + PartialOrd + Ord + Clone {
+    fn score(&self) -> &f64;
+    fn key(&self) -> &Prehashed;
+    fn id(&self) -> &DocId;
+
+    fn set_score(&mut self, score: f64);
+    fn set_key(&mut self, key: Prehashed);
+    fn set_id(&mut self, id: DocId);
+
+    fn update_values_from(&mut self, other: &Self);
+}
+
 pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
+    de_rank_similar: bool,
 }
 
 impl TopDocs {
@@ -49,6 +63,7 @@ impl TopDocs {
             top_n,
             offset: 0,
             max_docs: None,
+            de_rank_similar: false,
         }
     }
 
@@ -63,10 +78,16 @@ impl TopDocs {
         self
     }
 
+    pub fn and_de_rank_similar(mut self) -> Self {
+        self.de_rank_similar = true;
+
+        self
+    }
+
     pub fn tweak_score<TScoreSegmentTweaker, TScoreTweaker>(
         self,
         score_tweaker: TScoreTweaker,
-    ) -> impl Collector<Fruit = Vec<(f64, DocAddress)>>
+    ) -> impl Collector<Fruit = Vec<WebsitePointer>>
     where
         TScoreSegmentTweaker: ScoreSegmentTweaker<f64> + 'static,
         TScoreTweaker: ScoreTweaker<f64, Child = TScoreSegmentTweaker> + Send + Sync,
@@ -76,7 +97,7 @@ impl TopDocs {
 }
 
 impl Collector for TopDocs {
-    type Fruit = Vec<(f64, DocAddress)>;
+    type Fruit = Vec<WebsitePointer>;
 
     type Child = TopSegmentCollector;
 
@@ -123,17 +144,16 @@ impl Collector for TopDocs {
         }
 
         Ok(collector
-            .into_sorted_vec(true)
+            .into_sorted_vec(self.de_rank_similar)
             .into_iter()
             .skip(self.offset)
-            .map(|doc| {
-                (
-                    doc.score,
-                    DocAddress {
-                        segment_ord: doc.segment,
-                        doc_id: doc.id,
-                    },
-                )
+            .map(|doc| WebsitePointer {
+                score: doc.score,
+                site_hash: doc.key,
+                address: DocAddress {
+                    segment: doc.segment,
+                    doc_id: doc.id,
+                },
             })
             .collect())
     }
@@ -144,11 +164,11 @@ pub struct TopSegmentCollector {
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
-    bucket_collector: BucketCollector,
+    bucket_collector: BucketCollector<SegmentDoc>,
 }
 
 impl SegmentCollector for TopSegmentCollector {
-    type Fruit = Vec<Doc>;
+    type Fruit = Vec<SegmentDoc>;
 
     fn collect(&mut self, doc: DocId, score: Score) {
         if let Some(max_docs) = &self.max_docs {
@@ -165,7 +185,7 @@ impl SegmentCollector for TopSegmentCollector {
         let keys = [keys[0], keys[1]];
         let key = combine_u64s(keys);
 
-        self.bucket_collector.insert(Doc {
+        self.bucket_collector.insert(SegmentDoc {
             key: Prehashed(key),
             id: doc,
             segment: self.segment_ord,
@@ -178,13 +198,13 @@ impl SegmentCollector for TopSegmentCollector {
     }
 }
 
-struct BucketCollector {
-    buckets: PrehashMap<Bucket>,
+pub struct BucketCollector<T: Doc> {
+    buckets: PrehashMap<Bucket<T>>,
     heads: MinMaxHeap<BucketHead>,
     top_n: usize,
 }
 
-impl BucketCollector {
+impl<T: Doc> BucketCollector<T> {
     pub fn new(top_n: usize) -> Self {
         assert!(top_n > 0);
 
@@ -195,18 +215,18 @@ impl BucketCollector {
         }
     }
 
-    pub fn insert(&mut self, doc: Doc) {
-        if let Some(bucket) = self.buckets.get_mut(&doc.key) {
+    pub fn insert(&mut self, doc: T) {
+        if let Some(bucket) = self.buckets.get_mut(doc.key()) {
             bucket.insert(doc);
         } else {
             let mut bucket = Bucket::new(self.top_n);
             bucket.insert(doc.clone());
 
-            self.buckets.insert(doc.key.clone(), bucket);
+            self.buckets.insert(doc.key().clone(), bucket);
 
             self.heads.push(BucketHead {
-                key: doc.key,
-                tweaked_score: doc.score,
+                key: doc.key().clone(),
+                tweaked_score: *doc.score(),
             });
         }
 
@@ -263,7 +283,7 @@ impl BucketCollector {
         bucket_heads
     }
 
-    pub fn into_sorted_vec(mut self, apply_adjust_score: bool) -> Vec<Doc> {
+    pub fn into_sorted_vec(mut self, de_rank_similar: bool) -> Vec<T> {
         let mut res = Vec::new();
 
         let mut bucket_heads = self.build_heads();
@@ -272,8 +292,8 @@ impl BucketCollector {
             let bucket = self.buckets.get_mut(&head.key).unwrap();
 
             if let Some(mut doc) = bucket.pop_best() {
-                if apply_adjust_score {
-                    doc.score = adjust_score(bucket.num_taken - 1, doc.score);
+                if de_rank_similar {
+                    doc.set_score(adjust_score(bucket.num_taken - 1, *doc.score()));
                 }
 
                 res.push(doc);
@@ -319,13 +339,13 @@ impl Ord for BucketHead {
     }
 }
 
-struct Bucket {
+struct Bucket<T: Doc> {
     num_taken: usize,
-    docs: MinMaxHeap<Doc>,
+    docs: MinMaxHeap<T>,
     top_n: usize,
 }
 
-impl Bucket {
+impl<T: Doc> Bucket<T> {
     pub fn new(top_n: usize) -> Self {
         assert!(top_n > 0);
 
@@ -336,7 +356,7 @@ impl Bucket {
         }
     }
 
-    pub fn pop_best(&mut self) -> Option<Doc> {
+    pub fn pop_best(&mut self) -> Option<T> {
         let res = self.docs.pop_max();
 
         self.num_taken += 1;
@@ -346,18 +366,16 @@ impl Bucket {
 
     pub fn get_best(&self) -> Option<TweakedDoc<'_>> {
         self.docs.peek_max().map(|doc| TweakedDoc {
-            tweaked_score: adjust_score(self.num_taken, doc.score),
-            _doc_id: &doc.id,
+            tweaked_score: adjust_score(self.num_taken, *doc.score()),
+            _doc_id: doc.id(),
         })
     }
 
-    pub fn insert(&mut self, doc: Doc) {
+    pub fn insert(&mut self, doc: T) {
         if self.docs.len() >= self.top_n {
             let mut worst = self.docs.peek_min_mut().unwrap();
 
-            worst.id = doc.id;
-            worst.score = doc.score;
-            worst.segment = doc.segment;
+            worst.update_values_from(&doc);
         } else {
             self.docs.push(doc);
         }
@@ -370,30 +388,64 @@ struct TweakedDoc<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Doc {
+pub struct SegmentDoc {
     key: Prehashed,
     id: DocId,
     segment: SegmentOrdinal,
     score: f64,
 }
 
-impl PartialEq for Doc {
+impl PartialEq for SegmentDoc {
     fn eq(&self, other: &Self) -> bool {
         self.score == other.score
     }
 }
 
-impl Eq for Doc {}
+impl Eq for SegmentDoc {}
 
-impl PartialOrd for Doc {
+impl PartialOrd for SegmentDoc {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.score.partial_cmp(&other.score)
     }
 }
 
-impl Ord for Doc {
+impl Ord for SegmentDoc {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl Doc for SegmentDoc {
+    fn score(&self) -> &f64 {
+        &self.score
+    }
+
+    fn key(&self) -> &Prehashed {
+        &self.key
+    }
+
+    fn id(&self) -> &DocId {
+        &self.id
+    }
+
+    fn set_score(&mut self, score: f64) {
+        self.score = score;
+    }
+
+    fn set_key(&mut self, key: Prehashed) {
+        self.key = key;
+    }
+
+    fn set_id(&mut self, id: DocId) {
+        self.id = id;
+    }
+
+    fn update_values_from(&mut self, other: &Self) {
+        self.set_id(*other.id());
+        self.set_key(other.key().clone());
+        self.set_score(*other.score());
+
+        self.segment = other.segment;
     }
 }
 
@@ -418,7 +470,7 @@ impl<TScoreTweaker> Collector for TweakedScoreTopCollector<TScoreTweaker>
 where
     TScoreTweaker: ScoreTweaker<f64> + Send + Sync,
 {
-    type Fruit = Vec<(f64, DocAddress)>;
+    type Fruit = Vec<WebsitePointer>;
 
     type Child = TopTweakedScoreSegmentCollector<TScoreTweaker::Child>;
 
@@ -462,7 +514,7 @@ impl<TSegmentScoreTweaker> SegmentCollector
 where
     TSegmentScoreTweaker: 'static + ScoreSegmentTweaker<f64>,
 {
-    type Fruit = Vec<Doc>;
+    type Fruit = Vec<SegmentDoc>;
 
     fn collect(&mut self, doc: DocId, score: Score) {
         let score = self.segment_scorer.score(doc, score);
@@ -482,7 +534,7 @@ mod tests {
         let mut collector = BucketCollector::new(top_n);
 
         for doc in docs {
-            collector.insert(Doc {
+            collector.insert(SegmentDoc {
                 key: Prehashed(doc.0),
                 id: doc.1,
                 score: doc.2,

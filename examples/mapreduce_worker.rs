@@ -14,7 +14,7 @@ struct Job {
 struct Count(usize);
 
 impl Map<StatelessWorker, Count> for Job {
-    fn map(self, _worker: &StatelessWorker) -> Count {
+    fn map(&self, _worker: &StatelessWorker) -> Count {
         std::thread::sleep(std::time::Duration::from_secs(2)); // simulate some long running task
         Count(1)
     }
@@ -26,7 +26,8 @@ impl Reduce<Count> for Count {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
         .finish();
@@ -36,5 +37,6 @@ fn main() {
 
     StatelessWorker::default()
         .run::<Job, Count>(args[1].parse::<SocketAddr>().unwrap())
+        .await
         .expect("failed to run worker");
 }

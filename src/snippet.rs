@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::frontend::search::html_escape;
+use crate::search_prettifier::html_escape;
 use crate::tokenizer::Stemmed;
 use crate::webpage::region::Region;
 use std::cmp::Ordering;
@@ -320,7 +320,7 @@ pub fn generate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{index::Index, searcher::Searcher, webpage::Webpage};
+    use crate::{index::Index, searcher::LocalSearcher, webpage::Webpage};
     use maplit::btreemap;
     use tantivy::tokenizer::SimpleTokenizer;
 
@@ -360,7 +360,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let result = searcher
             .search("rust language", None, None, None)
@@ -397,7 +397,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let result = searcher
             .search("describe", None, None, None)
@@ -589,7 +589,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
 
         let result = searcher
             .search("paradigms", None, None, None)

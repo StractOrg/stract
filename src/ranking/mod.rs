@@ -27,6 +27,7 @@ use tantivy::collector::Collector;
 
 use crate::{
     collector::{MaxDocsConsidered, TopDocs},
+    inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::{Region, RegionCount},
 };
@@ -39,6 +40,7 @@ pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     aggregator: SignalAggregator,
+    de_rank_similar: bool,
 }
 
 impl Ranker {
@@ -49,6 +51,7 @@ impl Ranker {
             offset: None,
             aggregator,
             max_docs: None,
+            de_rank_similar: true,
         }
     }
 
@@ -70,7 +73,11 @@ impl Ranker {
         self
     }
 
-    pub fn collector(&self) -> impl Collector<Fruit = Vec<(f64, tantivy::DocAddress)>> {
+    pub fn de_rank_similar(&mut self, de_rank_similar: bool) {
+        self.de_rank_similar = de_rank_similar;
+    }
+
+    pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
             self.selected_region,
@@ -78,6 +85,10 @@ impl Ranker {
         );
 
         let mut collector = TopDocs::with_limit(NUM_RESULTS_PER_PAGE);
+
+        if self.de_rank_similar {
+            collector = collector.and_de_rank_similar()
+        }
 
         if let Some(offset) = self.offset {
             collector = collector.and_offset(offset);
@@ -95,7 +106,7 @@ impl Ranker {
 mod tests {
     use crate::{
         index::Index,
-        searcher::Searcher,
+        searcher::LocalSearcher,
         webpage::{Html, Link, Webpage},
     };
 
@@ -158,7 +169,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("example", None, None, None)
             .expect("Search failed")
@@ -226,7 +237,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("example", None, None, None)
             .expect("Search failed")
@@ -316,7 +327,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("dr dk", None, None, None)
             .expect("Search failed")
@@ -385,7 +396,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("title", None, None, None)
             .expect("Search failed")
@@ -459,7 +470,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("test", None, None, None)
             .expect("Search failed")
@@ -526,7 +537,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::from(index);
+        let searcher = LocalSearcher::from(index);
         let result = searcher
             .search("test", None, None, None)
             .expect("Search failed")
@@ -616,7 +627,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = Searcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index, None, None);
 
         let res = searcher
             .search(
@@ -752,7 +763,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index, None, None);
 
         let result = searcher
             .search("termA termB", None, None, None)
@@ -823,7 +834,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = Searcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index, None, None);
 
         let result = searcher
             .search("test", None, None, None)

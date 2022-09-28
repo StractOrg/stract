@@ -341,13 +341,7 @@ impl SignalAggregator {
                     Signal::PageCentrality => {
                         (webpage.page_centrality * (CENTRALITY_SCALING as f64)) as u64
                     }
-                    Signal::IsHomepage => {
-                        if webpage.html.url().is_homepage() {
-                            1
-                        } else {
-                            0
-                        }
-                    }
+                    Signal::IsHomepage => webpage.html.url().is_homepage().into(),
                     Signal::FetchTimeMs => webpage.fetch_time_ms,
                     Signal::UpdateTimestamp => webpage
                         .html
