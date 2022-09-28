@@ -15,7 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cuely::entrypoint::{self, frontend};
+use cuely::entrypoint::{self, frontend, search_server};
+use cuely::{FrontendConfig, SearchServerConfig};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
@@ -44,13 +45,11 @@ enum Commands {
         #[clap(subcommand)]
         options: WebgraphOptions,
     },
+    SearchServer {
+        config_path: String,
+    },
     Frontend {
-        index_path: String,
-        queries_csv_path: String,
-        entity_index_path: Option<String>,
-        bangs_path: Option<String>,
-        #[clap(default_value = "0.0.0.0:3000")]
-        host: String,
+        config_path: String,
     },
 }
 
@@ -132,22 +131,26 @@ fn main() -> Result<()> {
                 entrypoint::Webgraph::run_locally(&config)?;
             }
         },
-        Commands::Frontend {
-            index_path,
-            queries_csv_path,
-            host,
-            entity_index_path,
-            bangs_path,
-        } => tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()?
-            .block_on(frontend::run(
-                &index_path,
-                &queries_csv_path,
-                entity_index_path,
-                bangs_path,
-                &host,
-            ))?,
+        Commands::Frontend { config_path } => {
+            let config: FrontendConfig = load_toml_config(&config_path);
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(frontend::run(
+                    &config.queries_csv_path,
+                    &config.host,
+                    config.search_servers,
+                ))?
+        }
+        Commands::SearchServer { config_path } => {
+            let config: SearchServerConfig = load_toml_config(&config_path);
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(search_server::run(config))?
+        }
     }
 
     Ok(())

@@ -18,8 +18,8 @@ use axum::{body::Body, Extension, Router};
 use tower_http::compression::CompressionLayer;
 
 use crate::{
-    autosuggest::Autosuggest, bangs::Bangs, entity_index::EntityIndex, index::Index,
-    searcher::LocalSearcher,
+    autosuggest::Autosuggest,
+    searcher::{DistributedSearcher, Shard},
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -35,18 +35,15 @@ use axum_extra::routing::SpaRouter;
 mod about;
 mod api;
 mod autosuggest;
-mod entity_image;
-mod favicons;
 mod goggles;
 mod index;
-mod primary_image;
 mod privacy;
 pub mod search;
 
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
-    pub searcher: LocalSearcher,
+    pub searcher: DistributedSearcher,
     pub autosuggest: Autosuggest,
 }
 
@@ -76,17 +73,15 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn router(
-    index_path: &str,
-    queries_csv_path: &str,
-    entity_index_path: Option<String>,
-    bangs_path: Option<String>,
-) -> Result<Router> {
-    let entity_index = entity_index_path.map(|path| EntityIndex::open(path).unwrap());
-    let bangs = bangs_path.map(Bangs::from_path);
-    let search_index = Index::open(index_path)?;
+pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router> {
+    let shards: Vec<_> = shards
+        .into_iter()
+        .enumerate()
+        .map(|(id, replicas)| Shard::new(id as u32, replicas))
+        .collect();
+
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
-    let searcher = LocalSearcher::new(search_index, entity_index, bangs);
+    let searcher = DistributedSearcher::new(shards);
 
     let state = Arc::new(State {
         searcher,
@@ -97,9 +92,6 @@ pub fn router(
         .route("/", get(index::route))
         .route("/search", get(search::route))
         .route("/autosuggest", get(autosuggest::route))
-        .route("/favicons/:site", get(favicons::route))
-        .route("/image/:uuid", get(primary_image::route))
-        .route("/entity/image/:entity", get(entity_image::route))
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
         .route("/goggles", get(goggles::route))

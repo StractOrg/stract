@@ -14,14 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod distributed;
-mod local;
+pub mod distributed;
+pub mod local;
 
 pub use distributed::*;
 pub use local::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{bangs::BangHit, entity_index::StoredEntity, inverted_index};
+use crate::{
+    bangs::BangHit,
+    entity_index::StoredEntity,
+    inverted_index,
+    search_prettifier::{self, DisplayedEntity, DisplayedWebpage},
+};
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
@@ -37,4 +42,31 @@ pub struct WebsitesResult {
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(BangHit),
+}
+
+#[derive(Debug, Serialize)]
+pub enum PrettifiedSearchResult {
+    Websites(PrettifiedWebsitesResult),
+    Bang(BangHit),
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrettifiedWebsitesResult {
+    pub spell_corrected_query: Option<String>,
+    pub webpages: Vec<DisplayedWebpage>,
+    pub num_docs: usize,
+    pub entity: Option<DisplayedEntity>,
+    pub search_duration_ms: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum InitialSearchResult {
+    Websites(InitialWebsitesFormatting),
+    Bang(BangHit),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum InitialWebsitesFormatting {
+    Raw(local::InitialWebsiteResult),
+    Prettified(search_prettifier::InitialWebsiteResult),
 }

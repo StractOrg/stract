@@ -48,6 +48,7 @@ mod query;
 mod ranking;
 mod schema;
 mod schema_org;
+mod search_prettifier;
 pub mod searcher;
 mod snippet;
 mod sonic;
@@ -133,6 +134,21 @@ pub struct LocalConfig {
 pub struct HttpConfig {
     base_url: String,
     warc_paths_file: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FrontendConfig {
+    pub queries_csv_path: String,
+    pub host: String,
+    pub search_servers: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SearchServerConfig {
+    pub index_path: String,
+    pub entity_index_path: Option<String>,
+    pub bangs_path: Option<String>,
+    pub host: String,
 }
 
 #[derive(Error, Debug)]

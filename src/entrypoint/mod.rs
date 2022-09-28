@@ -17,6 +17,7 @@ mod centrality;
 mod entity;
 pub mod frontend;
 mod indexer;
+pub mod search_server;
 mod webgraph;
 
 use std::{fs::File, path::Path};

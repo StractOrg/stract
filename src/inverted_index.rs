@@ -36,20 +36,20 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
     pub num_websites: usize,
     pub top_websites: Vec<WebsitePointer>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebsitePointer {
     pub score: f64,
     pub site_hash: Prehashed,
     pub address: DocAddress,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct DocAddress {
     pub segment: u32,
     pub doc_id: u32,

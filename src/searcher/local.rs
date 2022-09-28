@@ -20,7 +20,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bangs::{BangHit, Bangs};
+use crate::bangs::Bangs;
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
@@ -31,7 +31,10 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE};
+use super::{
+    InitialSearchResult, InitialWebsitesFormatting, SearchResult, WebsitesResult,
+    NUM_RESULTS_PER_PAGE,
+};
 
 pub struct LocalSearcher {
     index: Index,
@@ -45,13 +48,7 @@ impl From<Index> for LocalSearcher {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum InitialSearchResult {
-    Websites(InitialWebsiteResult),
-    Bang(BangHit),
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<String>,
     pub websites: inverted_index::InitialSearchResult,
@@ -92,14 +89,14 @@ impl LocalSearcher {
             return Err(Error::EmptyQuery);
         }
 
-        if let Some(goggle) = &goggle {
-            query.set_goggle(goggle, &self.index.schema());
-        }
-
         if let Some(bangs) = self.bangs.as_ref() {
             if let Some(bang) = bangs.get(&query) {
                 return Ok(InitialSearchResult::Bang(bang));
             }
+        }
+
+        if let Some(goggle) = &goggle {
+            query.set_goggle(goggle, &self.index.schema());
         }
 
         let mut ranker = Ranker::new(
@@ -128,11 +125,13 @@ impl LocalSearcher {
             .as_ref()
             .and_then(|index| index.search(&raw_query));
 
-        Ok(InitialSearchResult::Websites(InitialWebsiteResult {
-            spell_corrected_query: correction,
-            websites: webpages,
-            entity,
-        }))
+        Ok(InitialSearchResult::Websites(
+            InitialWebsitesFormatting::Raw(InitialWebsiteResult {
+                spell_corrected_query: correction,
+                websites: webpages,
+                entity,
+            }),
+        ))
     }
 
     pub fn retrieve_websites(
@@ -167,7 +166,7 @@ impl LocalSearcher {
             self.search_initial(query, selected_region, goggle_program, skip_pages, true)?;
 
         match initial_result {
-            InitialSearchResult::Websites(search_result) => {
+            InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(search_result)) => {
                 let retrieved_sites =
                     self.retrieve_websites(&search_result.websites.top_websites, query)?;
 
@@ -182,6 +181,7 @@ impl LocalSearcher {
                 }))
             }
             InitialSearchResult::Bang(bang) => Ok(SearchResult::Bang(bang)),
+            _ => unreachable!(),
         }
     }
 

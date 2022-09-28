@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::frontend::search::html_escape;
+use crate::search_prettifier::html_escape;
 use crate::tokenizer::Stemmed;
 use crate::webpage::region::Region;
 use std::cmp::Ordering;
