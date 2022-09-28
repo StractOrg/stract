@@ -29,6 +29,7 @@ use crate::{
 pub async fn run(config: SearchServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host.parse().unwrap();
     let server = sonic::Server::bind(addr).await.unwrap();
+    tracing::info!("listening on {}", addr);
 
     let entity_index = config
         .entity_index_path

@@ -21,8 +21,7 @@
     # time ((cd frontend; npm run build) && cargo build)
     # cargo run -- frontend data/index data/queries_us.csv data/entity data/bangs.json
     cd frontend; npm run build
-    cargo run -- search-server configs/search_server.toml &
-    cargo run -- frontend configs/frontend.toml
+    bash scripts/run_frontend.sh
 
 @frontend:
     cd frontend; npm install
