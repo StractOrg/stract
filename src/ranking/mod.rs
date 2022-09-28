@@ -40,6 +40,7 @@ pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     aggregator: SignalAggregator,
+    de_rank_similar: bool,
 }
 
 impl Ranker {
@@ -50,6 +51,7 @@ impl Ranker {
             offset: None,
             aggregator,
             max_docs: None,
+            de_rank_similar: true,
         }
     }
 
@@ -71,6 +73,10 @@ impl Ranker {
         self
     }
 
+    pub fn de_rank_similar(&mut self, de_rank_similar: bool) {
+        self.de_rank_similar = de_rank_similar;
+    }
+
     pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
@@ -79,6 +85,10 @@ impl Ranker {
         );
 
         let mut collector = TopDocs::with_limit(NUM_RESULTS_PER_PAGE);
+
+        if self.de_rank_similar {
+            collector = collector.and_de_rank_similar()
+        }
 
         if let Some(offset) = self.offset {
             collector = collector.and_offset(offset);

@@ -54,6 +54,7 @@ pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
+    de_rank_similar: bool,
 }
 
 impl TopDocs {
@@ -62,6 +63,7 @@ impl TopDocs {
             top_n,
             offset: 0,
             max_docs: None,
+            de_rank_similar: false,
         }
     }
 
@@ -72,6 +74,12 @@ impl TopDocs {
 
     pub fn and_max_docs(mut self, max_docs: MaxDocsConsidered) -> Self {
         self.max_docs = Some(max_docs);
+
+        self
+    }
+
+    pub fn and_de_rank_similar(mut self) -> Self {
+        self.de_rank_similar = true;
 
         self
     }
@@ -136,7 +144,7 @@ impl Collector for TopDocs {
         }
 
         Ok(collector
-            .into_sorted_vec(true)
+            .into_sorted_vec(self.de_rank_similar)
             .into_iter()
             .skip(self.offset)
             .map(|doc| WebsitePointer {
@@ -190,7 +198,7 @@ impl SegmentCollector for TopSegmentCollector {
     }
 }
 
-struct BucketCollector<T: Doc> {
+pub struct BucketCollector<T: Doc> {
     buckets: PrehashMap<Bucket<T>>,
     heads: MinMaxHeap<BucketHead>,
     top_n: usize,
@@ -275,7 +283,7 @@ impl<T: Doc> BucketCollector<T> {
         bucket_heads
     }
 
-    pub fn into_sorted_vec(mut self, apply_adjust_score: bool) -> Vec<T> {
+    pub fn into_sorted_vec(mut self, de_rank_similar: bool) -> Vec<T> {
         let mut res = Vec::new();
 
         let mut bucket_heads = self.build_heads();
@@ -284,7 +292,7 @@ impl<T: Doc> BucketCollector<T> {
             let bucket = self.buckets.get_mut(&head.key).unwrap();
 
             if let Some(mut doc) = bucket.pop_best() {
-                if apply_adjust_score {
+                if de_rank_similar {
                     doc.set_score(adjust_score(bucket.num_taken - 1, *doc.score()));
                 }
 

@@ -37,7 +37,7 @@ pub struct Entity {
     pub categories: HashSet<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Span {
     pub text: String,
     pub links: Vec<Link>,

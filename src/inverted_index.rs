@@ -42,7 +42,7 @@ pub struct InitialSearchResult {
     pub top_websites: Vec<WebsitePointer>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WebsitePointer {
     pub score: f64,
     pub site_hash: Prehashed,
@@ -353,7 +353,7 @@ pub struct SearchResult {
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug, Serialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,

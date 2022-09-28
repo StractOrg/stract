@@ -23,6 +23,8 @@ use serde::Serialize;
 
 use crate::{bangs::BangHit, entity_index::StoredEntity, inverted_index};
 
+pub const NUM_RESULTS_PER_PAGE: usize = 20;
+
 #[derive(Debug, Serialize)]
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<String>,

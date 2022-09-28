@@ -15,17 +15,18 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self, RetrievedWebpage},
+    searcher::{WebsitesResult, NUM_RESULTS_PER_PAGE},
 };
 
-use std::{net::SocketAddr, time::Instant};
+use std::{cmp::Ordering, net::SocketAddr, time::Instant};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::task::JoinHandle;
 
 use crate::{sonic, webpage::region::Region};
 
@@ -40,7 +41,7 @@ struct RemoteSearcher {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to get search result")]
-    NoResult,
+    SearchFailed,
 }
 
 impl RemoteSearcher {
@@ -56,18 +57,34 @@ impl RemoteSearcher {
             }
         }
 
-        Err(Error::NoResult)
+        Err(Error::SearchFailed)
     }
 
     async fn retrieve_websites(
         &self,
         pointers: &[inverted_index::WebsitePointer],
-    ) -> Vec<RetrievedWebpage> {
-        todo!();
+        original_query: &str,
+    ) -> Result<Vec<RetrievedWebpage>> {
+        for timeout in ExponentialBackoff::from_millis(30).take(5) {
+            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
+            {
+                if let Ok(sonic::Response::Content(body)) = connection
+                    .send(Request::RetrieveWebites {
+                        websites: pointers.to_vec(),
+                        query: original_query.to_string(),
+                    })
+                    .await
+                {
+                    return Ok(body);
+                }
+            }
+        }
+
+        Err(Error::SearchFailed)
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 struct ShardId(String);
 
 pub struct Shard {
@@ -89,15 +106,26 @@ impl Shard {
                 local_result: result?,
                 shard: self.id.clone(),
             }),
-            None => Err(Error::NoResult),
+            None => Err(Error::SearchFailed),
         }
     }
 
     async fn retrieve_websites(
         &self,
         pointers: &[inverted_index::WebsitePointer],
-    ) -> Vec<RetrievedWebpage> {
-        todo!();
+        original_query: &str,
+    ) -> Result<Vec<RetrievedWebpage>> {
+        match self
+            .replicas
+            .iter()
+            .map(|remote| remote.retrieve_websites(pointers, original_query))
+            .collect::<FuturesUnordered<_>>()
+            .next()
+            .await
+        {
+            Some(Ok(websites)) => Ok(websites),
+            _ => Err(Error::SearchFailed),
+        }
     }
 }
 
@@ -108,7 +136,7 @@ struct InitialSearchResult {
 
 #[derive(Serialize, Deserialize, Clone)]
 struct SearchQuery {
-    query: String,
+    original: String,
     selected_region: Option<Region>,
     goggle_program: Option<String>,
     skip_pages: Option<usize>,
@@ -117,18 +145,83 @@ struct SearchQuery {
 #[derive(Serialize, Deserialize)]
 enum Request {
     Search(SearchQuery),
+    RetrieveWebites {
+        websites: Vec<inverted_index::WebsitePointer>,
+        query: String,
+    },
 }
 
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
-    handle: JoinHandle<()>,
 }
+
+#[derive(Clone)]
+struct ScoredWebsitePointer {
+    local_pointer: inverted_index::WebsitePointer,
+    shard: ShardId,
+}
+
+impl collector::Doc for ScoredWebsitePointer {
+    fn score(&self) -> &f64 {
+        &self.local_pointer.score
+    }
+
+    fn key(&self) -> &crate::prehashed::Prehashed {
+        &self.local_pointer.site_hash
+    }
+
+    fn id(&self) -> &tantivy::DocId {
+        &self.local_pointer.address.doc_id
+    }
+
+    fn set_score(&mut self, score: f64) {
+        self.local_pointer.score = score;
+    }
+
+    fn set_key(&mut self, key: crate::prehashed::Prehashed) {
+        self.local_pointer.site_hash = key;
+    }
+
+    fn set_id(&mut self, id: tantivy::DocId) {
+        self.local_pointer.address.doc_id = id;
+    }
+
+    fn update_values_from(&mut self, other: &Self) {
+        self.set_score(*other.score());
+        self.set_key(other.key().clone());
+        self.set_id(*other.id());
+
+        self.shard = other.shard.clone();
+    }
+}
+
+impl PartialOrd for ScoredWebsitePointer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.local_pointer
+            .score
+            .partial_cmp(&other.local_pointer.score)
+    }
+}
+
+impl Ord for ScoredWebsitePointer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+impl PartialEq for ScoredWebsitePointer {
+    fn eq(&self, other: &Self) -> bool {
+        self.local_pointer.score == other.local_pointer.score
+    }
+}
+
+impl Eq for ScoredWebsitePointer {}
 
 impl DistributedSearcher {
     pub async fn bind(addr: SocketAddr, local_searcher: LocalSearcher, shards: Vec<Shard>) -> Self {
-        let handle = tokio::task::spawn(Self::start_server(addr, local_searcher));
+        tokio::task::spawn(Self::start_server(addr, local_searcher));
 
-        Self { handle, shards }
+        Self { shards }
     }
 
     async fn start_server(addr: SocketAddr, local_searcher: LocalSearcher) {
@@ -139,16 +232,29 @@ impl DistributedSearcher {
                 match &req.body {
                     Request::Search(search) => {
                         match local_searcher.search_initial(
-                            &search.query,
+                            &search.original,
                             search.selected_region,
                             search.goggle_program.clone(),
                             search.skip_pages,
+                            false,
                         ) {
                             Ok(response) => {
                                 req.respond(sonic::Response::Content(response)).await.ok();
                             }
                             Err(_) => {
                                 req.respond::<SearchResult>(sonic::Response::Empty)
+                                    .await
+                                    .ok();
+                            }
+                        }
+                    }
+                    Request::RetrieveWebites { websites, query } => {
+                        match local_searcher.retrieve_websites(websites, query) {
+                            Ok(response) => {
+                                req.respond(sonic::Response::Content(response)).await.ok();
+                            }
+                            Err(_) => {
+                                req.respond::<Vec<RetrievedWebpage>>(sonic::Response::Empty)
                                     .await
                                     .ok();
                             }
@@ -169,14 +275,14 @@ impl DistributedSearcher {
         let start = Instant::now();
 
         let query = SearchQuery {
-            query: query.to_string(),
+            original: query.to_string(),
             selected_region,
             goggle_program,
             skip_pages,
         };
 
         // search shards
-        let results = self
+        let initial_results = self
             .shards
             .iter()
             .map(|shard| shard.search(&query))
@@ -188,13 +294,104 @@ impl DistributedSearcher {
             .collect::<Vec<_>>();
 
         // check if any result has a bang hit
+        if let Some(result) = initial_results
+            .iter()
+            .find(|result| matches!(result.local_result, local::InitialSearchResult::Bang(_)))
+        {
+            if let local::InitialSearchResult::Bang(bang) = &result.local_result {
+                return Ok(SearchResult::Bang(bang.clone()));
+            }
+        }
+
+        let spell_corrected_query = initial_results.first().and_then(|result| {
+            if let local::InitialSearchResult::Websites(result) = &result.local_result {
+                result.spell_corrected_query.clone()
+            } else {
+                None
+            }
+        });
+
+        let entity = initial_results.first().and_then(|result| {
+            if let local::InitialSearchResult::Websites(result) = &result.local_result {
+                result.entity.clone()
+            } else {
+                None
+            }
+        });
+
+        let num_docs = initial_results
+            .iter()
+            .map(|result| {
+                if let local::InitialSearchResult::Websites(result) = &result.local_result {
+                    result.websites.num_websites
+                } else {
+                    0
+                }
+            })
+            .sum();
 
         // combine results
+        let top_n = NUM_RESULTS_PER_PAGE + skip_pages.unwrap_or(0);
+        let mut collector = BucketCollector::new(top_n);
+
+        for result in initial_results {
+            if let local::InitialSearchResult::Websites(local_result) = result.local_result {
+                for website in local_result.websites.top_websites {
+                    let pointer = ScoredWebsitePointer {
+                        local_pointer: website,
+                        shard: result.shard.clone(),
+                    };
+
+                    collector.insert(pointer);
+                }
+            }
+        }
+
+        let top_websites = collector
+            .into_sorted_vec(true)
+            .into_iter()
+            .skip(skip_pages.unwrap_or(0))
+            .take(NUM_RESULTS_PER_PAGE)
+            .collect::<Vec<_>>();
 
         // retrieve webpages
+        let mut retrieved_webpages = Vec::new();
 
-        // return result
+        for _ in 0..top_websites.len() {
+            retrieved_webpages.push(None);
+        }
 
-        todo!();
+        for shard in &self.shards {
+            let (indexes, pointers): (Vec<_>, Vec<_>) = top_websites
+                .iter()
+                .enumerate()
+                .filter(|(_, pointer)| pointer.shard == shard.id)
+                .map(|(idx, pointer)| (idx, pointer.local_pointer.clone()))
+                .unzip();
+
+            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.original).await {
+                for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
+                    retrieved_webpages[index] = Some(website);
+                }
+            }
+        }
+
+        let retrieved_webpages: Vec<_> = retrieved_webpages.into_iter().flatten().collect();
+
+        debug_assert_eq!(retrieved_webpages.len(), top_websites.len());
+
+        if retrieved_webpages.is_empty() && !top_websites.is_empty() {
+            return Err(Error::SearchFailed);
+        }
+
+        Ok(SearchResult::Websites(WebsitesResult {
+            spell_corrected_query,
+            webpages: inverted_index::SearchResult {
+                num_docs,
+                documents: retrieved_webpages,
+            },
+            entity,
+            search_duration_ms: start.elapsed().as_millis(),
+        }))
     }
 }

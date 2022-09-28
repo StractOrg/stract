@@ -145,7 +145,7 @@ fn wikipedify_url(url: &Url) -> Vec<Url> {
     ]
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,

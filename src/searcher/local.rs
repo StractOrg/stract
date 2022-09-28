@@ -31,9 +31,7 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{SearchResult, WebsitesResult};
-
-pub const NUM_RESULTS_PER_PAGE: usize = 20;
+use super::{SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE};
 
 pub struct LocalSearcher {
     index: Index,
@@ -56,7 +54,7 @@ pub enum InitialSearchResult {
 #[derive(Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<String>,
-    pub webpages: inverted_index::InitialSearchResult,
+    pub websites: inverted_index::InitialSearchResult,
     pub entity: Option<StoredEntity>,
 }
 
@@ -75,6 +73,7 @@ impl LocalSearcher {
         selected_region: Option<Region>,
         goggle_program: Option<String>,
         skip_pages: Option<usize>,
+        de_rank_similar: bool,
     ) -> Result<InitialSearchResult> {
         let raw_query = query.to_string();
         let goggle = goggle_program.and_then(|program| goggles::parse(&program).ok());
@@ -119,6 +118,7 @@ impl LocalSearcher {
         }
 
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
+        ranker.de_rank_similar(de_rank_similar);
 
         let webpages = self.index.search_initial(&query, ranker.collector())?;
         let correction = self.index.spell_correction(&query.simple_terms());
@@ -130,7 +130,7 @@ impl LocalSearcher {
 
         Ok(InitialSearchResult::Websites(InitialWebsiteResult {
             spell_corrected_query: correction,
-            webpages,
+            websites: webpages,
             entity,
         }))
     }
@@ -164,17 +164,17 @@ impl LocalSearcher {
         let start = Instant::now();
 
         let initial_result =
-            self.search_initial(query, selected_region, goggle_program, skip_pages)?;
+            self.search_initial(query, selected_region, goggle_program, skip_pages, true)?;
 
         match initial_result {
             InitialSearchResult::Websites(search_result) => {
                 let retrieved_sites =
-                    self.retrieve_websites(&search_result.webpages.top_websites, query)?;
+                    self.retrieve_websites(&search_result.websites.top_websites, query)?;
 
                 Ok(SearchResult::Websites(WebsitesResult {
                     spell_corrected_query: search_result.spell_corrected_query,
                     webpages: inverted_index::SearchResult {
-                        num_docs: search_result.webpages.num_websites,
+                        num_docs: search_result.websites.num_websites,
                         documents: retrieved_sites,
                     },
                     entity: search_result.entity,
