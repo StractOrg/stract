@@ -106,7 +106,7 @@ impl Ranker {
 mod tests {
     use crate::{
         index::Index,
-        searcher::LocalSearcher,
+        searcher::{LocalSearcher, SearchQuery},
         webpage::{Html, Link, Webpage},
     };
 
@@ -171,7 +171,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("example", None, None, None)
+            .search(&SearchQuery {
+                original: "example".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -239,7 +244,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("example", None, None, None)
+            .search(&SearchQuery {
+                original: "example".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -329,7 +339,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("dr dk", None, None, None)
+            .search(&SearchQuery {
+                original: "dr dk".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -398,7 +413,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("title", None, None, None)
+            .search(&SearchQuery {
+                original: "title".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -472,7 +492,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("test", None, None, None)
+            .search(&SearchQuery {
+                original: "test".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -539,7 +564,12 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search("test", None, None, None)
+            .search(&SearchQuery {
+                original: "test".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -630,18 +660,18 @@ mod tests {
         let searcher = LocalSearcher::new(index, None, None);
 
         let res = searcher
-            .search(
-                "example",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "example".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     r#"
                         @field_title = 20000000
                         @host_centrality = 0
                     "#
                     .to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap();
@@ -650,18 +680,18 @@ mod tests {
         assert_eq!(&res.webpages.documents[0].url, "https://www.title.com");
 
         let res = searcher
-            .search(
-                "example",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "example".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     r#"
-                        @field_all_body= 20000000
+                        @field_all_body = 20000000
                         @host_centrality = 0
                     "#
                     .to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap();
@@ -670,12 +700,17 @@ mod tests {
         assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
 
         let res = searcher
-            .search(
-                "example",
-                None,
-                Some("@host_centrality= 2000000".to_string()),
-                None,
-            )
+            .search(&SearchQuery {
+                original: "example".to_string(),
+                selected_region: None,
+                goggle_program: Some(
+                    r#"
+                        @host_centrality = 2000000
+                    "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap();
@@ -766,7 +801,12 @@ mod tests {
         let searcher = LocalSearcher::new(index, None, None);
 
         let result = searcher
-            .search("termA termB", None, None, None)
+            .search(&SearchQuery {
+                original: "termA termB".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap()
@@ -837,7 +877,12 @@ mod tests {
         let searcher = LocalSearcher::new(index, None, None);
 
         let result = searcher
-            .search("test", None, None, None)
+            .search(&SearchQuery {
+                original: "test".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap()

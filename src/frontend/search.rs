@@ -20,7 +20,7 @@ use axum::Extension;
 
 use crate::{
     search_prettifier::{thousand_sep_number, DisplayedEntity, DisplayedWebpage},
-    searcher::{self, PrettifiedSearchResult},
+    searcher::{self, PrettifiedSearchResult, SearchQuery},
     webpage::region::{Region, ALL_REGIONS},
 };
 
@@ -91,7 +91,12 @@ pub async fn route(
 
     match state
         .searcher
-        .search_prettified(query.as_str(), selected_region, goggle, skip_pages)
+        .search_prettified(&SearchQuery {
+            original: query.clone(),
+            selected_region,
+            goggle_program: goggle,
+            skip_pages,
+        })
         .await
     {
         Ok(result) => match result {

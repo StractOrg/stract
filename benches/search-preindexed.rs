@@ -1,5 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::{index::Index, searcher::LocalSearcher};
+use cuely::{
+    index::Index,
+    searcher::{LocalSearcher, SearchQuery},
+};
 
 const INDEX_PATH: &str = "data/index";
 
@@ -9,7 +12,16 @@ macro_rules! bench {
         desc.push_str($query);
         desc.push('\'');
         $c.bench_function(desc.as_str(), |b| {
-            b.iter(|| $searcher.search($query, None, None, None).unwrap())
+            b.iter(|| {
+                $searcher
+                    .search(&SearchQuery {
+                        original: $query.to_string(),
+                        selected_region: None,
+                        goggle_program: None,
+                        skip_pages: None,
+                    })
+                    .unwrap()
+            })
         });
     };
 }

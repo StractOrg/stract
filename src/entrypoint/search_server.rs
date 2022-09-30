@@ -42,14 +42,8 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     loop {
         if let Ok(req) = server.accept::<searcher::distributed::Request>().await {
             match &req.body {
-                searcher::Request::Search(search) => {
-                    match local_searcher.search_initial(
-                        &search.original,
-                        search.selected_region,
-                        search.goggle_program.clone(),
-                        search.skip_pages,
-                        false,
-                    ) {
+                searcher::Request::Search(query) => {
+                    match local_searcher.search_initial(query, false) {
                         Ok(response) => {
                             req.respond(sonic::Response::Content(response)).await.ok();
                         }
@@ -74,30 +68,19 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                         }
                     }
                 }
-                searcher::Request::SearchPrettified(search) => {
-                    match local_searcher.search_initial(
-                        &search.original,
-                        search.selected_region,
-                        search.goggle_program.clone(),
-                        search.skip_pages,
-                        false,
-                    ) {
+                searcher::Request::SearchPrettified(query) => {
+                    match local_searcher.search_initial(query, false) {
                         Ok(result) => match result {
-                            searcher::InitialSearchResult::Websites(
-                                searcher::InitialWebsitesFormatting::Raw(result),
-                            ) => {
+                            searcher::InitialSearchResult::Websites(result) => {
                                 let res = search_prettifier::initial(result, &local_searcher);
 
                                 req.respond(sonic::Response::Content(
-                                    searcher::InitialSearchResult::Websites(
-                                        searcher::InitialWebsitesFormatting::Prettified(res),
-                                    ),
+                                    searcher::InitialPrettifiedSearchResult::Websites(res),
                                 ))
                                 .await
                                 .ok();
                             }
                             searcher::InitialSearchResult::Bang(_) => todo!(),
-                            _ => unreachable!(),
                         },
                         Err(_) => {
                             req.respond::<inverted_index::SearchResult>(sonic::Response::Empty)

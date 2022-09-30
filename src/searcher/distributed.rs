@@ -19,10 +19,7 @@ use crate::{
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self, RetrievedWebpage},
     search_prettifier::DisplayedWebpage,
-    searcher::{
-        InitialWebsitesFormatting, PrettifiedWebsitesResult, SearchResult, WebsitesResult,
-        NUM_RESULTS_PER_PAGE,
-    },
+    searcher::{PrettifiedWebsitesResult, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
 };
 
 use std::{cmp::Ordering, net::SocketAddr, time::Instant};
@@ -32,9 +29,11 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{sonic, webpage::region::Region};
+use crate::sonic;
 
-use super::{InitialSearchResult, PrettifiedSearchResult};
+use super::{
+    InitialPrettifiedSearchResult, InitialSearchResult, PrettifiedSearchResult, SearchQuery,
+};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -67,7 +66,10 @@ impl RemoteSearcher {
         Err(Error::SearchFailed)
     }
 
-    async fn search_prettified(&self, query: &SearchQuery) -> Result<InitialSearchResult> {
+    async fn search_prettified(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<InitialPrettifiedSearchResult> {
         for timeout in ExponentialBackoff::from_millis(30).take(5) {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
@@ -171,7 +173,10 @@ impl Shard {
         }
     }
 
-    async fn search_prettified(&self, query: &SearchQuery) -> Result<InitialSearchResultShard> {
+    async fn search_prettified(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<InitialPrettifiedSearchResultShard> {
         match self
             .replicas
             .iter()
@@ -180,7 +185,7 @@ impl Shard {
             .next()
             .await
         {
-            Some(result) => Ok(InitialSearchResultShard {
+            Some(result) => Ok(InitialPrettifiedSearchResultShard {
                 local_result: result?,
                 shard: self.id.clone(),
             }),
@@ -230,12 +235,9 @@ struct InitialSearchResultShard {
     shard: ShardId,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SearchQuery {
-    pub original: String,
-    pub selected_region: Option<Region>,
-    pub goggle_program: Option<String>,
-    pub skip_pages: Option<usize>,
+struct InitialPrettifiedSearchResultShard {
+    local_result: InitialPrettifiedSearchResult,
+    shard: ShardId,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -323,31 +325,18 @@ impl DistributedSearcher {
         Self { shards }
     }
 
-    pub async fn search_api(
-        &self,
-        query: &str,
-        selected_region: Option<Region>,
-        goggle_program: Option<String>,
-        skip_pages: Option<usize>,
-    ) -> Result<SearchResult> {
+    pub async fn search_api(&self, query: &SearchQuery) -> Result<SearchResult> {
         let start = Instant::now();
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
 
-        let query = SearchQuery {
-            original: query.to_string(),
-            selected_region,
-            goggle_program,
-            skip_pages,
-        };
-
         // search shards
         let initial_results = self
             .shards
             .iter()
-            .map(|shard| shard.search(&query))
+            .map(|shard| shard.search(query))
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
             .await
@@ -366,9 +355,7 @@ impl DistributedSearcher {
         }
 
         let spell_corrected_query = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(result)) =
-                &result.local_result
-            {
+            if let InitialSearchResult::Websites(result) = &result.local_result {
                 result.spell_corrected_query.clone()
             } else {
                 None
@@ -376,9 +363,7 @@ impl DistributedSearcher {
         });
 
         let entity = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(result)) =
-                &result.local_result
-            {
+            if let InitialSearchResult::Websites(result) = &result.local_result {
                 result.entity.clone()
             } else {
                 None
@@ -388,9 +373,7 @@ impl DistributedSearcher {
         let num_docs = initial_results
             .iter()
             .map(|result| {
-                if let InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(result)) =
-                    &result.local_result
-                {
+                if let InitialSearchResult::Websites(result) = &result.local_result {
                     result.websites.num_websites
                 } else {
                     0
@@ -399,13 +382,11 @@ impl DistributedSearcher {
             .sum();
 
         // combine results
-        let top_n = NUM_RESULTS_PER_PAGE + skip_pages.unwrap_or(0);
+        let top_n = NUM_RESULTS_PER_PAGE + query.skip_pages.unwrap_or(0);
         let mut collector = BucketCollector::new(top_n);
 
         for result in initial_results {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(local_result)) =
-                result.local_result
-            {
+            if let InitialSearchResult::Websites(local_result) = result.local_result {
                 for website in local_result.websites.top_websites {
                     let pointer = ScoredWebsitePointer {
                         local_pointer: website,
@@ -420,7 +401,7 @@ impl DistributedSearcher {
         let top_websites = collector
             .into_sorted_vec(true)
             .into_iter()
-            .skip(skip_pages.unwrap_or(0))
+            .skip(query.skip_pages.unwrap_or(0))
             .take(NUM_RESULTS_PER_PAGE)
             .collect::<Vec<_>>();
 
@@ -465,31 +446,18 @@ impl DistributedSearcher {
         }))
     }
 
-    pub async fn search_prettified(
-        &self,
-        query: &str,
-        selected_region: Option<Region>,
-        goggle_program: Option<String>,
-        skip_pages: Option<usize>,
-    ) -> Result<PrettifiedSearchResult> {
+    pub async fn search_prettified(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
         let start = Instant::now();
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
 
-        let query = SearchQuery {
-            original: query.to_string(),
-            selected_region,
-            goggle_program,
-            skip_pages,
-        };
-
         // search shards
         let initial_results = self
             .shards
             .iter()
-            .map(|shard| shard.search_prettified(&query))
+            .map(|shard| shard.search_prettified(query))
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
             .await
@@ -500,17 +468,15 @@ impl DistributedSearcher {
         // check if any result has a bang hit
         if let Some(result) = initial_results
             .iter()
-            .find(|result| matches!(result.local_result, InitialSearchResult::Bang(_)))
+            .find(|result| matches!(result.local_result, InitialPrettifiedSearchResult::Bang(_)))
         {
-            if let InitialSearchResult::Bang(bang) = &result.local_result {
+            if let InitialPrettifiedSearchResult::Bang(bang) = &result.local_result {
                 return Ok(PrettifiedSearchResult::Bang(bang.clone()));
             }
         }
 
         let spell_corrected_query = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Prettified(result)) =
-                &result.local_result
-            {
+            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
                 result.spell_corrected_query.clone()
             } else {
                 None
@@ -518,9 +484,7 @@ impl DistributedSearcher {
         });
 
         let entity = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Prettified(result)) =
-                &result.local_result
-            {
+            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
                 result.entity.clone()
             } else {
                 None
@@ -530,10 +494,7 @@ impl DistributedSearcher {
         let num_docs = initial_results
             .iter()
             .map(|result| {
-                if let InitialSearchResult::Websites(InitialWebsitesFormatting::Prettified(
-                    result,
-                )) = &result.local_result
-                {
+                if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
                     result.websites.num_websites
                 } else {
                     0
@@ -542,14 +503,11 @@ impl DistributedSearcher {
             .sum();
 
         // combine results
-        let top_n = NUM_RESULTS_PER_PAGE + skip_pages.unwrap_or(0);
+        let top_n = NUM_RESULTS_PER_PAGE + query.skip_pages.unwrap_or(0);
         let mut collector = BucketCollector::new(top_n);
 
         for result in initial_results {
-            if let InitialSearchResult::Websites(InitialWebsitesFormatting::Prettified(
-                local_result,
-            )) = result.local_result
-            {
+            if let InitialPrettifiedSearchResult::Websites(local_result) = result.local_result {
                 for website in local_result.websites.top_websites {
                     let pointer = ScoredWebsitePointer {
                         local_pointer: website,
@@ -564,7 +522,7 @@ impl DistributedSearcher {
         let top_websites = collector
             .into_sorted_vec(true)
             .into_iter()
-            .skip(skip_pages.unwrap_or(0))
+            .skip(query.skip_pages.unwrap_or(0))
             .take(NUM_RESULTS_PER_PAGE)
             .collect::<Vec<_>>();
 

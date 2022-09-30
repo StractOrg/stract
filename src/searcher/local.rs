@@ -31,10 +31,7 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{
-    InitialSearchResult, InitialWebsitesFormatting, SearchResult, WebsitesResult,
-    NUM_RESULTS_PER_PAGE,
-};
+use super::{InitialSearchResult, SearchQuery, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE};
 
 pub struct LocalSearcher {
     index: Index,
@@ -66,17 +63,17 @@ impl LocalSearcher {
 
     pub fn search_initial(
         &self,
-        query: &str,
-        selected_region: Option<Region>,
-        goggle_program: Option<String>,
-        skip_pages: Option<usize>,
+        query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InitialSearchResult> {
-        let raw_query = query.to_string();
-        let goggle = goggle_program.and_then(|program| goggles::parse(&program).ok());
+        let raw_query = query.original.clone();
+        let goggle = query
+            .goggle_program
+            .as_ref()
+            .and_then(|program| goggles::parse(program).ok());
 
-        let mut query = Query::parse(
-            query,
+        let mut parsed_query = Query::parse(
+            &query.original,
             self.index.schema(),
             self.index.tokenizers(),
             goggle
@@ -85,18 +82,18 @@ impl LocalSearcher {
                 .unwrap_or(&SignalAggregator::default()),
         )?;
 
-        if query.is_empty() {
+        if parsed_query.is_empty() {
             return Err(Error::EmptyQuery);
         }
 
         if let Some(bangs) = self.bangs.as_ref() {
-            if let Some(bang) = bangs.get(&query) {
+            if let Some(bang) = bangs.get(&parsed_query) {
                 return Ok(InitialSearchResult::Bang(bang));
             }
         }
 
         if let Some(goggle) = &goggle {
-            query.set_goggle(goggle, &self.index.schema());
+            parsed_query.set_goggle(goggle, &self.index.schema());
         }
 
         let mut ranker = Ranker::new(
@@ -104,11 +101,11 @@ impl LocalSearcher {
             goggle.map(|goggle| goggle.aggregator).unwrap_or_default(),
         );
 
-        if let Some(skip_pages) = skip_pages {
+        if let Some(skip_pages) = query.skip_pages {
             ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
         }
 
-        if let Some(region) = selected_region {
+        if let Some(region) = query.selected_region {
             if region != Region::All {
                 ranker = ranker.with_region(region);
             }
@@ -117,21 +114,21 @@ impl LocalSearcher {
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
         ranker.de_rank_similar(de_rank_similar);
 
-        let webpages = self.index.search_initial(&query, ranker.collector())?;
-        let correction = self.index.spell_correction(&query.simple_terms());
+        let webpages = self
+            .index
+            .search_initial(&parsed_query, ranker.collector())?;
+        let correction = self.index.spell_correction(&parsed_query.simple_terms());
 
         let entity = self
             .entity_index
             .as_ref()
             .and_then(|index| index.search(&raw_query));
 
-        Ok(InitialSearchResult::Websites(
-            InitialWebsitesFormatting::Raw(InitialWebsiteResult {
-                spell_corrected_query: correction,
-                websites: webpages,
-                entity,
-            }),
-        ))
+        Ok(InitialSearchResult::Websites(InitialWebsiteResult {
+            spell_corrected_query: correction,
+            websites: webpages,
+            entity,
+        }))
     }
 
     pub fn retrieve_websites(
@@ -153,22 +150,16 @@ impl LocalSearcher {
         self.index.retrieve_websites(websites, &query)
     }
 
-    pub fn search(
-        &self,
-        query: &str,
-        selected_region: Option<Region>,
-        goggle_program: Option<String>,
-        skip_pages: Option<usize>,
-    ) -> Result<SearchResult> {
+    pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         let start = Instant::now();
 
-        let initial_result =
-            self.search_initial(query, selected_region, goggle_program, skip_pages, true)?;
+        let query_text = query.original.clone();
+        let initial_result = self.search_initial(query, true)?;
 
         match initial_result {
-            InitialSearchResult::Websites(InitialWebsitesFormatting::Raw(search_result)) => {
+            InitialSearchResult::Websites(search_result) => {
                 let retrieved_sites =
-                    self.retrieve_websites(&search_result.websites.top_websites, query)?;
+                    self.retrieve_websites(&search_result.websites.top_websites, &query_text)?;
 
                 Ok(SearchResult::Websites(WebsitesResult {
                     spell_corrected_query: search_result.spell_corrected_query,
@@ -181,7 +172,6 @@ impl LocalSearcher {
                 }))
             }
             InitialSearchResult::Bang(bang) => Ok(SearchResult::Bang(bang)),
-            _ => unreachable!(),
         }
     }
 
@@ -264,7 +254,12 @@ mod tests {
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher
-                .search("test", None, None, Some(p))
+                .search(&SearchQuery {
+                    original: "test".to_string(),
+                    selected_region: None,
+                    goggle_program: None,
+                    skip_pages: Some(p),
+                })
                 .unwrap()
                 .into_websites()
                 .unwrap()
