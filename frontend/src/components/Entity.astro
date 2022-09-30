@@ -23,7 +23,7 @@ export interface Props {
         </div>
       ))
     }
-    <div class="text-xl mb-2">
+    <div class="text-xl mb-5">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
         >{askama`entity.title $ {{name.fullName}}`}
       </a>
@@ -40,8 +40,8 @@ export interface Props {
     </div>
     {
       askama.if_("!entity.info.is_empty()", () => (
-        <div class="mt-5 flex w-full flex-col px-4 text-sm">
-          <div class="grid border-separate border-spacing-x-4 border-spacing-y-1.5 grid-cols-[auto_1fr] gap-x-4">
+        <div class="mt-7 mb-2 flex w-full flex-col px-4 text-sm">
+          <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
             {askama.for_("(key, value) in entity.info", () => (
               <>
                 <div class="text-gray-500">{askama`key $ {{word.adjective}}`}</div>

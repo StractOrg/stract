@@ -83,6 +83,7 @@ pub fn html_escape(s: &str) -> String {
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
+    pub site: String,
     pub favicon_base64: String,
     pub domain: String,
     pub pretty_url: String,
@@ -91,9 +92,6 @@ pub struct DisplayedWebpage {
     pub primary_image_uuid: Option<String>,
     pub last_updated: Option<String>,
 }
-
-const MAX_PRETTY_URL_LEN: usize = 50;
-const MAX_TITLE_LEN: usize = 70;
 
 fn prettify_url(url: &Url) -> String {
     let mut pretty_url = url.strip_query().to_string();
@@ -107,11 +105,6 @@ fn prettify_url(url: &Url) -> String {
         .strip_protocol()
         .replace('/', " › ");
     pretty_url = protocol + &pretty_url;
-
-    if pretty_url.len() > MAX_PRETTY_URL_LEN {
-        pretty_url = pretty_url.chars().take(MAX_PRETTY_URL_LEN).collect();
-        pretty_url += "...";
-    }
 
     pretty_url
 }
@@ -149,12 +142,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
         let domain = url.domain().to_string();
         let pretty_url = prettify_url(&url);
 
-        let mut title = html_escape(&webpage.title);
-
-        if title.len() > MAX_TITLE_LEN {
-            title = title.chars().take(MAX_TITLE_LEN).collect();
-            title += "...";
-        }
+        let title = html_escape(&webpage.title);
 
         let favicon_bytes = webpage
             .favicon
@@ -163,6 +151,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
         Self {
             title,
+            site: url.site().to_string(),
             url: webpage.url,
             pretty_url,
             domain,

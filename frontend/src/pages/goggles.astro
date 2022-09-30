@@ -2,6 +2,7 @@
 import Footer from "../components/Footer.astro";
 import Layout from "../layouts/Layout.astro";
 import Header from "../components/Header.astro";
+import SettingsMenu from "../components/SettingsMenu.astro";
 import { askama } from "../askama";
 ---
 
@@ -9,7 +10,8 @@ import { askama } from "../askama";
     <div class="flex flex-col h-full w-full">
         <Header/>        
 
-        <div class="flex flex-col w-full h-fit items-center pt-10">
+        <div class="flex w-full h-fit justify-center pt-10">
+            <SettingsMenu />
             <div class="flex flex-col max-w-2xl">
                 <h1 class="font-medium text-2xl">Manage Goggles</h1>
                 <div class="text-sm mt-5">

@@ -1,0 +1,146 @@
+---
+import Footer from "../components/Footer.astro";
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import SettingsMenu from "../components/SettingsMenu.astro";
+---
+
+<Layout title="Cuely">
+    <div class="flex flex-col h-full w-full">
+        <Header />        
+
+        <div class="flex w-full h-fit justify-center pt-10">
+            <SettingsMenu />
+            <div class="flex w-full flex-col max-w-2xl space-y-10">
+                <div>
+                    <h1 class="font-medium text-2xl mb-2">Preffered Sites</h1>
+                    <div class="text-sm">
+                        These sites receive a boost during search.
+                        Results from these sites are more likely to appear in your search results.
+                    </div>
+                    <div class="mt-5">
+                        <div
+                            class="grid grid-cols-[auto_1fr] w-full space-y-5"
+                            id="preffered-list"
+                        >
+                            <div class="w-10"></div>
+                            <div class="font-medium">Site Name</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h1 class="font-medium text-2xl mb-2">Junk Sites</h1>
+                    <div class="text-sm">
+                        These sites gets de-prioritized during search.
+                        Results from these sites are less likely to appear in your search results.
+                    </div>
+                    <div class="mt-5">
+                        <div
+                            class="grid grid-cols-[auto_1fr] w-full space-y-5"
+                            id="junk-list"
+                        >
+                            <div class="w-10"></div>
+                            <div class="font-medium">Site Name</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h1 class="font-medium text-2xl mb-2">Blocked Sites</h1>
+                    <div class="text-sm">These are the sites you have blocked. They won't appear in any of your searches.</div>
+                    <div class="mt-5">
+                        <div
+                            class="grid grid-cols-[auto_1fr] w-full space-y-5"
+                            id="blocked-list"
+                        >
+                            <div class="w-10"></div>
+                            <div class="font-medium">Site Name</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-grow"></div>
+        <Footer />
+    </div>
+</Layout>
+
+<script is:inline>
+    let sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+
+    console.log(sites);
+
+    const prefferedList = document.getElementById("preffered-list");
+    const junkList = document.getElementById("junk-list");
+    const blockedList = document.getElementById("blocked-list");
+
+    const BLOCKED = 0;
+    const LESS = 1;
+    const MORE = 2;
+
+    function addMoreRow(site) {
+        addRow(site, prefferedList);
+    }
+
+    function addLessRow(site) {
+        addRow(site,junkList);
+    }
+
+    function addBlockedRow(site) {
+        addRow(site,blockedList);
+    }
+
+    function addRow(site, list) {
+        let img = document.createElement("div");
+        img.classList.add("site");
+
+        img.innerHTML =
+            '<img src="/assets/images/delete.svg" class="w-5 h-5 hover:cursor-pointer" onclick="deleteRow(this)" id="' + site + '"/>';
+
+        let name = document.createElement("div");
+        name.innerHTML = site;
+        name.classList.add("site");
+        name.classList.add("text-sm");
+
+        list.appendChild(img);
+        list.appendChild(name);
+    }
+
+
+    function updateList() {
+        sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+
+        clearList();
+
+        for (const [site, ranking] of Object.entries(sites)) {
+            if (ranking == MORE) {
+                addMoreRow(site);
+            } else if (ranking == LESS) {
+                addLessRow(site);
+            } else if (ranking == BLOCKED) {
+                addBlockedRow(site);
+            }
+        }
+    }
+
+    function clearList() {
+        document
+            .querySelectorAll(".site")
+            .forEach((site) => site.remove());
+    }
+
+    function deleteRow(deleteBtn) {
+        let site = deleteBtn.id;
+        sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+
+        if (sites[site] != undefined) {
+            delete sites[site];
+            window.localStorage.setItem("sites-ranking-adjustment", JSON.stringify(sites));
+        }
+
+        updateList();
+    }
+
+    updateList();
+</script>
