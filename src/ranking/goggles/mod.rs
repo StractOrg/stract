@@ -294,7 +294,7 @@ mod tests {
     use crate::{
         index::Index,
         schema::create_schema,
-        searcher::LocalSearcher,
+        searcher::{LocalSearcher, SearchQuery},
         webpage::{Html, Webpage},
     };
 
@@ -361,7 +361,12 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search("website", None, None, None)
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -373,17 +378,17 @@ mod tests {
         assert_eq!(res[1].url, "https://www.a.com");
 
         let res = searcher
-            .search(
-                "website",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     r#"
-                $discard,site=b.com
-            "#
+                        $discard,site=b.com
+                    "#
                     .to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -394,17 +399,17 @@ mod tests {
         assert_eq!(res[0].url, "https://www.a.com");
 
         let res = searcher
-            .search(
-                "website",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     r#"
-                $boost=10,site=a.com
-            "#
+                        $boost=10,site=a.com
+                    "#
                     .to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -483,12 +488,14 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let _ = searcher
-            .search(
-                "website",
-                None,
-                Some(include_str!("../../../testcases/goggles/quickstart.goggle").to_string()),
-                None,
-            )
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
+                    include_str!("../../../testcases/goggles/quickstart.goggle").to_string(),
+                ),
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -496,12 +503,14 @@ mod tests {
             .documents;
 
         let _ = searcher
-            .search(
-                "website",
-                None,
-                Some(include_str!("../../../testcases/goggles/hacker_news.goggle").to_string()),
-                None,
-            )
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
+                    include_str!("../../../testcases/goggles/hacker_news.goggle").to_string(),
+                ),
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -509,14 +518,14 @@ mod tests {
             .documents;
 
         let _ = searcher
-            .search(
-                "website",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     include_str!("../../../testcases/goggles/copycats_removal.goggle").to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()
@@ -609,10 +618,10 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(
-                "website",
-                None,
-                Some(
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
                     r#"
                 $discard
                 $site=a.com,boost=6
@@ -620,8 +629,8 @@ mod tests {
                 "#
                     .to_string(),
                 ),
-                None,
-            )
+                skip_pages: None,
+            })
             .unwrap()
             .into_websites()
             .unwrap()

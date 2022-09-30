@@ -26,6 +26,7 @@ use crate::{
     entity_index::StoredEntity,
     inverted_index,
     search_prettifier::{self, DisplayedEntity, DisplayedWebpage},
+    webpage::region::Region,
 };
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
@@ -61,12 +62,26 @@ pub struct PrettifiedWebsitesResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum InitialSearchResult {
-    Websites(InitialWebsitesFormatting),
+    Websites(local::InitialWebsiteResult),
     Bang(BangHit),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum InitialWebsitesFormatting {
-    Raw(local::InitialWebsiteResult),
-    Prettified(search_prettifier::InitialWebsiteResult),
+pub enum InitialPrettifiedSearchResult {
+    Websites(search_prettifier::InitialWebsiteResult),
+    Bang(BangHit),
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SearchQuery {
+    pub original: String,
+    pub selected_region: Option<Region>,
+    pub goggle_program: Option<String>,
+    pub skip_pages: Option<usize>,
+}
+
+impl SearchQuery {
+    pub fn is_empty(&self) -> bool {
+        self.original.is_empty()
+    }
 }

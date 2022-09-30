@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::webpage::region::Region;
+use crate::{searcher::SearchQuery, webpage::region::Region};
 
 use super::State;
 use axum::{extract, response::IntoResponse, Extension, Json};
@@ -40,7 +40,12 @@ pub async fn search(
 
     match state
         .searcher
-        .search_api(query.as_str(), selected_region, None, skip_pages)
+        .search_api(&SearchQuery {
+            original: query.to_string(),
+            selected_region,
+            goggle_program: None,
+            skip_pages,
+        })
         .await
     {
         Ok(result) => Json(result),

@@ -320,7 +320,11 @@ pub fn generate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{index::Index, searcher::LocalSearcher, webpage::Webpage};
+    use crate::{
+        index::Index,
+        searcher::{LocalSearcher, SearchQuery},
+        webpage::Webpage,
+    };
     use maplit::btreemap;
     use tantivy::tokenizer::SimpleTokenizer;
 
@@ -363,7 +367,12 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search("rust language", None, None, None)
+            .search(&SearchQuery {
+                original: "rust language".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -400,7 +409,12 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search("describe", None, None, None)
+            .search(&SearchQuery {
+                original: "describe".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
@@ -592,7 +606,12 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search("paradigms", None, None, None)
+            .search(&SearchQuery {
+                original: "paradigms".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+            })
             .expect("Search failed")
             .into_websites()
             .unwrap();
