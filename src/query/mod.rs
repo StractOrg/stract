@@ -551,4 +551,85 @@ mod tests {
 
         assert!(!query.is_empty());
     }
+
+    #[test]
+    fn site_query_split_domain() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website
+                            </body>
+                        </html>
+                    "#,
+                "https://www.the-first.com",
+            ))
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage::new(
+                r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This test page does not contain the forbidden word
+                            </body>
+                        </html>
+                    "#,
+                "https://www.second.com",
+            ))
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let query = Query::parse(
+            "test site:first.com",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 0);
+        assert_eq!(result.documents.len(), 0);
+
+        let query = Query::parse(
+            "test site:the-first.com",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.the-first.com");
+
+        let query = Query::parse(
+            "test site:www.the-first.com",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.the-first.com");
+    }
 }
