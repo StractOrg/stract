@@ -94,7 +94,7 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .route("/", get(index::route))
         .route("/search", get(search::route))
         .route("/autosuggest", get(autosuggest::route))
-        .route("/browser_autosuggest", get(autosuggest::browser))
+        .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
         .route("/settings", get(goggles::route))
