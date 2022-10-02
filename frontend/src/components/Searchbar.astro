@@ -77,6 +77,7 @@ const { autofocus, query } = Astro.props;
 
 <script>
   const searchbar = document.querySelector("#searchbar")!;
+  const searchbarForm = document.querySelector("#searchbar-form")!;
   const searchbarInput: HTMLInputElement =
     document.querySelector(".searchbar-input")!;
   let suggestionItems = () =>
@@ -251,4 +252,13 @@ const { autofocus, query } = Astro.props;
     searchbar.classList.add("suggestions-visible");
     fetchAndUpdateSuggestions();
   });
+
+  searchbarForm.addEventListener("submit", (event: Event) => {uploadSiteRankings(event)}, false);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function uploadSiteRankings(event: Event) {
+    event.preventDefault();
+    await sleep(1000);
+    console.log("TEST");
+  }
 </script>

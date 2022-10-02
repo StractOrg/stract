@@ -379,7 +379,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is syntactically similar to C++[according to whom?], but its designers intend it to provide better memory safety...".to_string());
+        assert_eq!(result.webpages.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string());
     }
 
     #[test]
@@ -421,7 +421,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide better memory safety...".to_string());
+        assert_eq!(result.webpages.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string());
     }
 
     #[test]
@@ -620,7 +620,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.webpages.documents.len(), 1);
         assert_eq!(
             result.webpages.documents[0].snippet,
-            "Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural <b>paradigms</b>. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide better memory safety...".to_string()
+            "Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural <b>paradigms</b>. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string()
         );
     }
 }
