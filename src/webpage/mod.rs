@@ -662,6 +662,12 @@ impl Html {
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
+                Field::DomainHash => {
+                    let hash = hash(self.url().domain()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
                 Field::TitleHash => {
                     let hash = hash(self.title().unwrap_or_default()).0;
                     let u64s = split_u128(hash);

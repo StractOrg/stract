@@ -58,10 +58,11 @@ pub enum Field {
     UrlWithoutQueryHash,
     TitleHash,
     UrlHash,
+    DomainHash,
     PreComputedScore,
 }
 
-pub static ALL_FIELDS: [Field; 32] = [
+pub static ALL_FIELDS: [Field; 33] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -93,6 +94,7 @@ pub static ALL_FIELDS: [Field; 32] = [
     Field::UrlWithoutQueryHash,
     Field::TitleHash,
     Field::UrlHash,
+    Field::DomainHash,
     Field::PreComputedScore,
 ];
 
@@ -207,6 +209,9 @@ impl Field {
             Field::UrlHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
+            Field::DomainHash => IndexingOption::Integer(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
             Field::TitleHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
@@ -253,6 +258,7 @@ impl Field {
             Field::TitleIfHomepage => "title_if_homepage",
             Field::TitleHash => "title_hash",
             Field::UrlHash => "url_hash",
+            Field::DomainHash => "domain_hash",
         }
     }
 
@@ -283,6 +289,7 @@ impl Field {
             | Field::Description
             | Field::NumTrackers
             | Field::NumUrlTokens
+            | Field::DomainHash
             | Field::NumTitleTokens
             | Field::NumCleanBodyTokens
             | Field::NumDescriptionTokens
@@ -313,6 +320,7 @@ impl Field {
                 | Field::UrlWithoutQueryHash
                 | Field::TitleHash
                 | Field::UrlHash
+                | Field::DomainHash
                 | Field::PreComputedScore
         )
     }
@@ -344,6 +352,7 @@ impl Field {
             "pre_computed_score" => Some(Field::PreComputedScore),
             "title_if_homepage" => Some(Field::TitleIfHomepage),
             "url_hash" => Some(Field::UrlHash),
+            "domain_hash" => Some(Field::DomainHash),
             "title_hash" => Some(Field::TitleHash),
             _ => None,
         }

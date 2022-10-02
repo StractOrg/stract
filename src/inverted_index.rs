@@ -459,6 +459,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::UrlWithoutQueryHash
                 | Field::TitleHash
                 | Field::UrlHash
+                | Field::DomainHash
                 | Field::NumTrackers
                 | Field::PreComputedScore
                 | Field::NumCleanBodyTokens
