@@ -497,7 +497,7 @@ impl Html {
     }
 
     fn pretokenize_url(&self) -> PreTokenizedString {
-        let url = self.url().full();
+        let url = self.url().full_without_id_tags();
         self.pretokenize_string(url)
     }
 
