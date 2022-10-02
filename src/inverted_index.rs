@@ -28,6 +28,7 @@ use crate::prehashed::Prehashed;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
+use crate::tokenizer::Identity;
 use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
@@ -115,6 +116,11 @@ impl InvertedIndex {
             .register(tokenizer.as_str(), tokenizer);
 
         let tokenizer = Tokenizer::new_stemmed();
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
+
+        let tokenizer = Tokenizer::Identity(Identity::default());
         tantivy_index
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);

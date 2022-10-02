@@ -18,7 +18,7 @@ use tantivy::schema::{
     BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{Normal, Stemmed};
+use crate::tokenizer::{Identity, Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
@@ -119,27 +119,18 @@ impl Field {
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Site => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
-            Field::SiteNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
-            Field::DomainNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
+            Field::SiteNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
+            Field::DomainNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
             Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::TitleIfHomepage => IndexingOption::Text(self.default_text_options()),
-            Field::DomainNameIfHomepageNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
+            Field::DomainNameIfHomepageNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
             Field::IsHomepage => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)

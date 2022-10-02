@@ -532,8 +532,23 @@ mod tests {
             &TokenizerManager::new(),
             &SignalAggregator::default(),
         )
-        .expect("Failed to parse query");
+        .expect("failed to parse query");
 
         assert!(query.is_empty())
+    }
+
+    #[test]
+    fn query_term_only_special_char() {
+        let index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let query = Query::parse(
+            "&",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+
+        assert!(!query.is_empty());
     }
 }

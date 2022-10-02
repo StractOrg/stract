@@ -48,25 +48,27 @@ impl From<Lang> for MyStemmer {
 
 #[derive(Clone)]
 pub enum Tokenizer {
-    NormalTokenizer(Normal),
-    StemmedTokenizer(Stemmed),
+    Normal(Normal),
+    Identity(Identity),
+    Stemmed(Stemmed),
 }
 
 impl Tokenizer {
     pub fn new_stemmed() -> Self {
-        Self::StemmedTokenizer(Stemmed::default())
+        Self::Stemmed(Stemmed::default())
     }
     pub fn as_str(&self) -> &'static str {
         match self {
-            Tokenizer::NormalTokenizer(_) => Normal::as_str(),
-            Tokenizer::StemmedTokenizer(_) => Stemmed::as_str(),
+            Tokenizer::Normal(_) => Normal::as_str(),
+            Tokenizer::Stemmed(_) => Stemmed::as_str(),
+            Tokenizer::Identity(_) => Identity::as_str(),
         }
     }
 }
 
 impl Default for Tokenizer {
     fn default() -> Self {
-        Self::NormalTokenizer(Normal::default())
+        Self::Normal(Normal::default())
     }
 }
 
@@ -103,11 +105,21 @@ impl Stemmed {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct Identity {}
+
+impl Identity {
+    pub fn as_str() -> &'static str {
+        "identity_tokenizer"
+    }
+}
+
 impl tantivy::tokenizer::Tokenizer for Tokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         match self {
-            Tokenizer::NormalTokenizer(tokenizer) => tokenizer.token_stream(text),
-            Tokenizer::StemmedTokenizer(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Normal(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Stemmed(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Identity(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }
@@ -139,6 +151,53 @@ impl tantivy::tokenizer::Tokenizer for Stemmed {
             Some(lang) => analyzer.filter(MyStemmer::from(lang).0).token_stream(text),
             None => analyzer.token_stream(text),
         }
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for Identity {
+    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+        BoxTokenStream::from(IdentityTokenStream::from(text.to_string()))
+    }
+}
+
+pub struct IdentityTokenStream {
+    num_advances: usize,
+    token: Option<tantivy::tokenizer::Token>,
+}
+
+impl From<String> for IdentityTokenStream {
+    fn from(text: String) -> Self {
+        Self {
+            num_advances: 0,
+            token: Some(tantivy::tokenizer::Token {
+                offset_from: 0,
+                offset_to: text.len(),
+                position: 0,
+                text,
+                ..Default::default()
+            }),
+        }
+    }
+}
+
+impl tantivy::tokenizer::TokenStream for IdentityTokenStream {
+    fn advance(&mut self) -> bool {
+        self.num_advances += 1;
+
+        if self.num_advances == 1 {
+            true
+        } else {
+            self.token = None;
+            false
+        }
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        self.token.as_ref().unwrap()
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        self.token.as_mut().unwrap()
     }
 }
 
