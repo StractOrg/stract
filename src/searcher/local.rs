@@ -92,9 +92,17 @@ impl LocalSearcher {
             }
         }
 
+        let mut goggles = Vec::new();
+
         if let Some(goggle) = &goggle {
-            parsed_query.set_goggle(goggle, &self.index.schema());
+            goggles.push(goggle.clone());
         }
+
+        if let Some(site_rankings) = &query.site_rankings {
+            goggles.push(site_rankings.clone().into_goggle())
+        }
+
+        parsed_query.set_goggles(&goggles, &self.index.schema());
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
@@ -259,6 +267,7 @@ mod tests {
                     selected_region: None,
                     goggle_program: None,
                     skip_pages: Some(p),
+                    site_rankings: None,
                 })
                 .unwrap()
                 .into_websites()

@@ -25,6 +25,7 @@ use crate::{
     bangs::BangHit,
     entity_index::StoredEntity,
     inverted_index,
+    ranking::site_rankings::SiteRankings,
     search_prettifier::{self, DisplayedEntity, DisplayedWebpage},
     webpage::region::Region,
 };
@@ -72,12 +73,13 @@ pub enum InitialPrettifiedSearchResult {
     Bang(BangHit),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchQuery {
     pub original: String,
     pub selected_region: Option<Region>,
     pub goggle_program: Option<String>,
     pub skip_pages: Option<usize>,
+    pub site_rankings: Option<SiteRankings>,
 }
 
 impl SearchQuery {

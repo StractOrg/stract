@@ -226,6 +226,7 @@ impl FieldBoost {
     }
 }
 
+#[derive(Clone)]
 pub struct SignalAggregator {
     readers: Vec<Option<DynamicFastFieldReader<u64>>>,
     signal_coefficients: SignalCoefficient,

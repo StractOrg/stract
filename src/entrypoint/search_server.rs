@@ -80,7 +80,13 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                                 .await
                                 .ok();
                             }
-                            searcher::InitialSearchResult::Bang(_) => todo!(),
+                            searcher::InitialSearchResult::Bang(bang) => {
+                                req.respond(sonic::Response::Content(
+                                    searcher::InitialPrettifiedSearchResult::Bang(bang),
+                                ))
+                                .await
+                                .ok();
+                            }
                         },
                         Err(_) => {
                             req.respond::<inverted_index::SearchResult>(sonic::Response::Empty)

@@ -19,6 +19,7 @@ pub mod centrality_store;
 pub mod goggles;
 mod initial;
 pub mod signal;
+pub mod site_rankings;
 
 use std::sync::Arc;
 
@@ -176,6 +177,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -249,6 +251,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -344,6 +347,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -418,6 +422,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -497,6 +502,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -569,6 +575,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -671,6 +678,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -691,6 +699,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -710,6 +719,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -806,6 +816,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -882,6 +893,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()

@@ -73,12 +73,22 @@ const { autofocus, query } = Astro.props;
       </div>
     </div>
   </div>
+
+  <input
+    type="hidden"
+    value=""
+    name="sr"
+    id="siteRankingsUuid"
+  />
 </form>
 
 <script>
   const searchbar = document.querySelector("#searchbar")!;
+  const searchbarForm: HTMLFormElement = document.querySelector("#searchbar-form")!;
+  const siteRankingsUuid: HTMLInputElement = document.querySelector("#siteRankingsUuid")!;
   const searchbarInput: HTMLInputElement =
     document.querySelector(".searchbar-input")!;
+  
   let suggestionItems = () =>
     Array.from(document.querySelectorAll(".suggestion-item")) as HTMLElement[];
 
@@ -251,4 +261,40 @@ const { autofocus, query } = Astro.props;
     searchbar.classList.add("suggestions-visible");
     fetchAndUpdateSuggestions();
   });
+
+  HTMLFormElement.prototype._submit = HTMLFormElement.prototype.submit;
+
+  HTMLFormElement.prototype.submit = function (){ 
+    this.dispatchEvent(new SubmitEvent('submit', {
+        'bubbles': true,
+        'cancelable': true
+    }));
+    
+    this._submit();
+  };
+
+  searchbarForm.addEventListener("submit", (event: Event) => {encodeSiteRankings()}, false);
+
+  function encodeSiteRankings() {
+    const BLOCKED = 0;
+    const LESS = 1;
+    const MORE = 2;
+
+    let sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+
+    let rankings = {"preferred": [], "disliked": [], "blocked": []};
+
+    for (const [site, ranking] of Object.entries(sites)) {
+        if (ranking == MORE) {
+          rankings.preferred.push(site);
+        } else if (ranking == LESS) {
+          rankings.disliked.push(site);
+        } else if (ranking == BLOCKED) {
+          rankings.blocked.push(site);
+        }
+    }
+
+    let encoded = btoa(JSON.stringify(rankings));
+    siteRankingsUuid.value = encoded;
+  }
 </script>

@@ -497,7 +497,7 @@ impl Html {
     }
 
     fn pretokenize_url(&self) -> PreTokenizedString {
-        let url = self.url().full();
+        let url = self.url().full_without_id_tags();
         self.pretokenize_string(url)
     }
 
@@ -658,6 +658,12 @@ impl Html {
                 }
                 Field::UrlHash => {
                     let hash = hash(self.url().full()).0;
+                    let u64s = split_u128(hash);
+                    doc.add_u64(tantivy_field, u64s[0]);
+                    doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::DomainHash => {
+                    let hash = hash(self.url().domain()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);

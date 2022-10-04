@@ -5,6 +5,7 @@ import Entity from "../components/Entity.astro";
 import Hero from "../components/Hero.astro";
 import GoggleSelector from "../components/GoggleSelector.astro";
 import Header from "../components/Header.astro";
+import RankingModal from "../components/RankingModal.astro";
 import { askama } from "../askama";
 ---
 
@@ -15,7 +16,7 @@ import { askama } from "../askama";
     </div>
 
     <div
-      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3"
+      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3 search-content"
     >
       <!-- Stats and settings -->
       <div class="flex w-full justify-between mx-auto">
@@ -60,7 +61,7 @@ import { askama } from "../askama";
       </div>
 
       <!-- Search results -->
-      <div class="col-start-1 flex flex-col space-y-6">
+      <div class="col-start-1 flex flex-col max-w-4xl min-w-0 space-y-10">
         {
           askama.if_("let Some(correction) = spell_correction", () => (
             <div>
@@ -78,25 +79,32 @@ import { askama } from "../askama";
         {
           askama.for_("item in search_result", () => (
             <div class="flex w-full">
-              <div class="flex w-full flex-col space-y-1">
-                <div class="flex items-center space-x-2 text-sm">
-                  <img
-                      src={askama.fake(
-                        "data:image/png;base64, {{ item.favicon_base64 }}",
-                        "{{image.avatar}}"
-                      )}
-                      width="13px"
-                    />
-                  <a
-                    class="text-gray-600 hover:no-underline"
-                    href="{{ item.url }}"
-                  >
-                    {askama`item.pretty_url $ {{internet.url}}`}
-                  </a>
+              <div class="flex grow min-w-0 flex-col space-y-1.5">
+                <div class="flex min-w-0">
+                  <div class="flex flex-col space-y-1.5 grow min-w-0">
+                    <div class="flex items-center space-x-2 text-sm">
+                      <img
+                          src={askama.fake(
+                            "data:image/png;base64, {{ item.favicon_base64 }}",
+                            "{{image.avatar}}"
+                          )}
+                          width="13px"
+                        />
+                      <a
+                        class="text-gray-600 hover:no-underline truncate url"
+                        href="{{ item.url }}"
+                      >
+                        {askama`item.pretty_url $ {{internet.url}}`}
+                      </a>
+                    </div>
+                    <a class="title-link truncate text-lg font-medium" title="{{ item.title }}" href="{{ item.url }}">
+                      {askama`item.title $ {{lorem.sentence}}`}
+                    </a>
+                  </div>
+                  <div class="adjust-btn min-w-fit hidden justify-center items-center md:flex" data-site="{{ item.site }}">
+                    <Hero class="w-6" icon="adjustments" />
+                  </div>
                 </div>
-                <a class="title-link text-lg font-medium" href="{{ item.url }}">
-                  {askama`item.title $ {{lorem.sentence}}`}
-                </a>
                 <div class="text-sm">
                   {askama.if_("let Some(val) = item.last_updated", () => (
                     <span class="text-gray-500">
@@ -108,7 +116,7 @@ import { askama } from "../askama";
                   </span>
                 </div>
               </div>
-              <div class="flex h-full items-center">
+              <div class="flex h-full w-20 items-center">
                 <div class="h-20 w-20 py-1 pl-2">
                   {askama.if_(
                     "let Some(val) = item.primary_image_uuid",
@@ -157,6 +165,9 @@ import { askama } from "../askama";
         )
       }
     </div>
+
+    <!-- Ranking modal -->
+    <RankingModal />
   </main>
 
   <Footer />
@@ -166,11 +177,70 @@ import { askama } from "../askama";
   .change-page-inactive {
     @apply w-6 text-gray-500;
   }
+
   .change-page-active {
     @apply w-6 text-brand/80 hover:text-brand;
   }
 
   .title-link {
     @apply text-blue-800 visited:text-purple-800;
+    max-width: calc(100% - 30px);
+  }
+
+  .url {
+    max-width: calc(100% - 100px);
+  }
+
+  .adjust-btn {
+    @apply text-gray-500/25 hover:text-gray-500 w-5 hover:cursor-pointer;
+  }
+
+  .adjust-btn * {
+    pointer-events: none;
+  }
+
+  .search-content {
+    text-rendering: optimizeLegibility;
+    font-smooth: grayscale;
+    -moz-osx-font-smoothing: grayscale;
   }
 </style>
+
+<noscript>
+  <style>
+    .adjust-btn {
+      display: none;
+    }
+  </style>
+</noscript>
+
+<script is:inline>
+  var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
+  var rankingModal = document.getElementById("ranking-modal");
+
+  document.addEventListener("click", (elem) => {
+      rankingModal.classList.remove("modal-open");
+      rankingModal.classList.add("modal-closed");
+  })
+
+  var rankingModalHeight = rankingModal.clientHeight;
+
+  rankingAdjustButtons.forEach(btn => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      const elem = event.target;
+
+      updateModal(elem.dataset.site);
+
+      const rect = elem.getBoundingClientRect();
+      rankingModal.style.left = rect.left + rect.width + 5 +"px";
+      rankingModal.style.top = (rect.top + document.documentElement.scrollTop - (rankingModalHeight/2)) + "px";
+
+      setTimeout(() => {
+        rankingModal.classList.remove("modal-closed");
+        rankingModal.classList.add("modal-open");
+      }, 0);
+    })
+  });
+</script>

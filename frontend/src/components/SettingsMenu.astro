@@ -1,0 +1,21 @@
+---
+const links = [
+  { url: "/settings", title: "Manage Goggles" },
+  { url: "/settings/sites", title: "Site Rankings" },
+];
+---
+
+<div class="relative flex flex-col right-20 space-y-3">
+  {
+    links.map((l) => (
+      <a class="link rounded-full px-2 py-1 text-center" href={l.url}>
+        {l.title}
+      </a>
+    ))
+  }
+</div>
+<style>
+  .link {
+    @apply transition hover:bg-brand/5 hover:text-brand hover:no-underline;
+  }
+</style>

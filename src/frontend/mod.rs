@@ -37,8 +37,10 @@ mod api;
 mod autosuggest;
 mod goggles;
 mod index;
+mod opensearch;
 mod privacy;
 pub mod search;
+mod sites;
 
 pub struct HtmlTemplate<T>(T);
 
@@ -92,11 +94,15 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .route("/", get(index::route))
         .route("/search", get(search::route))
         .route("/autosuggest", get(autosuggest::route))
+        .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
-        .route("/goggles", get(goggles::route))
+        .route("/settings", get(goggles::route))
+        .route("/settings/goggles", get(goggles::route))
+        .route("/settings/sites", get(sites::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/api/beta/search", get(api::search))
+        .route("/opensearch.xml", get(opensearch::route))
         .merge(SpaRouter::new("/assets", "frontend/dist/assets"))
         .layer(Extension(state))
         .layer(CompressionLayer::new()))

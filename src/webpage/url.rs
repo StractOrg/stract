@@ -201,6 +201,15 @@ impl Url {
             &self.0
         }
     }
+
+    pub fn full_without_id_tags(&self) -> String {
+        let full = self.full();
+        if let Some(id_begin) = full.find('#') {
+            full[..id_begin].to_string()
+        } else {
+            full
+        }
+    }
 }
 
 #[cfg(test)]
@@ -291,5 +300,12 @@ mod tests {
             .into();
 
         assert_eq!(url.without_query(), "https://test.example.com");
+    }
+
+    #[test]
+    fn url_without_id() {
+        let url: Url = "https://test.example.com#id".to_string().into();
+
+        assert_eq!(&url.full_without_id_tags(), "https://test.example.com");
     }
 }

@@ -156,9 +156,10 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
             }
         }
 
+        index.commit().unwrap();
+
         std::fs::remove_file(file).ok();
     }
-    index.commit().unwrap();
 
     info!("{} done", name);
 

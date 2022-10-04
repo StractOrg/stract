@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-const SCALE: f32 = 1000.0;
+const SCALE: f32 = 500.0;
 
 pub mod ast;
 mod const_query;
@@ -121,7 +121,7 @@ impl TryFrom<RawAction> for Action {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Instruction {
     pub patterns: Vec<PatternPart>,
     pub options: Vec<PatternOption>,
@@ -135,7 +135,7 @@ pub enum PatternPart {
     Anchor,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PatternOption {
     Site(String),
     InUrl,
@@ -152,10 +152,10 @@ pub enum Action {
     Discard,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Goggle {
     pub aggregator: SignalAggregator,
-    instructions: Vec<Instruction>,
+    pub instructions: Vec<Instruction>,
 }
 
 impl Goggle {
@@ -366,6 +366,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -388,6 +389,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -409,6 +411,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -495,6 +498,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/quickstart.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -510,6 +514,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/hacker_news.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -525,6 +530,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/copycats_removal.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -630,6 +636,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()

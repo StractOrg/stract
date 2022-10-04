@@ -18,7 +18,7 @@ use tantivy::schema::{
     BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{Normal, Stemmed};
+use crate::tokenizer::{Identity, Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
@@ -58,10 +58,11 @@ pub enum Field {
     UrlWithoutQueryHash,
     TitleHash,
     UrlHash,
+    DomainHash,
     PreComputedScore,
 }
 
-pub static ALL_FIELDS: [Field; 32] = [
+pub static ALL_FIELDS: [Field; 33] = [
     Field::Title,
     Field::CleanBody,
     Field::StemmedTitle,
@@ -93,6 +94,7 @@ pub static ALL_FIELDS: [Field; 32] = [
     Field::UrlWithoutQueryHash,
     Field::TitleHash,
     Field::UrlHash,
+    Field::DomainHash,
     Field::PreComputedScore,
 ];
 
@@ -119,27 +121,18 @@ impl Field {
             Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::Site => IndexingOption::Text(self.default_text_options()),
             Field::Domain => IndexingOption::Text(self.default_text_options()),
-            Field::SiteNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
-            Field::DomainNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
+            Field::SiteNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
+            Field::DomainNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
             Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
             Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
             Field::TitleIfHomepage => IndexingOption::Text(self.default_text_options()),
-            Field::DomainNameIfHomepageNoTokenizer => IndexingOption::Text(
-                TextOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-                ),
-            ),
+            Field::DomainNameIfHomepageNoTokenizer => {
+                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+            }
             Field::IsHomepage => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -216,6 +209,9 @@ impl Field {
             Field::UrlHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
+            Field::DomainHash => IndexingOption::Integer(
+                NumericOptions::default().set_fast(Cardinality::MultiValues),
+            ),
             Field::TitleHash => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
@@ -262,6 +258,7 @@ impl Field {
             Field::TitleIfHomepage => "title_if_homepage",
             Field::TitleHash => "title_hash",
             Field::UrlHash => "url_hash",
+            Field::DomainHash => "domain_hash",
         }
     }
 
@@ -292,6 +289,7 @@ impl Field {
             | Field::Description
             | Field::NumTrackers
             | Field::NumUrlTokens
+            | Field::DomainHash
             | Field::NumTitleTokens
             | Field::NumCleanBodyTokens
             | Field::NumDescriptionTokens
@@ -322,6 +320,7 @@ impl Field {
                 | Field::UrlWithoutQueryHash
                 | Field::TitleHash
                 | Field::UrlHash
+                | Field::DomainHash
                 | Field::PreComputedScore
         )
     }
@@ -353,6 +352,7 @@ impl Field {
             "pre_computed_score" => Some(Field::PreComputedScore),
             "title_if_homepage" => Some(Field::TitleIfHomepage),
             "url_hash" => Some(Field::UrlHash),
+            "domain_hash" => Some(Field::DomainHash),
             "title_hash" => Some(Field::TitleHash),
             _ => None,
         }

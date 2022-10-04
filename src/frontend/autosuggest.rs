@@ -63,6 +63,18 @@ pub async fn route(
     }
 }
 
+#[allow(clippy::unused_async)]
+pub async fn browser(
+    extract::Query(params): extract::Query<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    if let Some(query) = params.get("q") {
+        Json((query.clone(), state.autosuggest.suggestions(query).unwrap()))
+    } else {
+        Json((String::new(), Vec::new()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -28,6 +28,7 @@ use crate::prehashed::Prehashed;
 use crate::query::Query;
 use crate::schema::{Field, ALL_FIELDS};
 use crate::snippet;
+use crate::tokenizer::Identity;
 use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
@@ -115,6 +116,11 @@ impl InvertedIndex {
             .register(tokenizer.as_str(), tokenizer);
 
         let tokenizer = Tokenizer::new_stemmed();
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
+
+        let tokenizer = Tokenizer::Identity(Identity::default());
         tantivy_index
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
@@ -453,6 +459,7 @@ impl From<Document> for RetrievedWebpage {
                 | Field::UrlWithoutQueryHash
                 | Field::TitleHash
                 | Field::UrlHash
+                | Field::DomainHash
                 | Field::NumTrackers
                 | Field::PreComputedScore
                 | Field::NumCleanBodyTokens
@@ -966,5 +973,50 @@ mod tests {
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
         assert_eq!(result.documents[0].primary_image, None);
+    }
+
+    #[test]
+    fn id_links_removed_during_indexing() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let query = Query::parse(
+            "website",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.documents.len(), 0);
+        assert_eq!(result.num_docs, 0);
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.example.com#tag",
+            ))
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
     }
 }
