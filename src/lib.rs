@@ -54,6 +54,7 @@ mod snippet;
 mod sonic;
 mod spell;
 mod tokenizer;
+#[allow(unused)]
 mod ttl_cache;
 mod warc;
 mod webgraph;

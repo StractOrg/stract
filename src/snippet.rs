@@ -372,6 +372,7 @@ Survey in 2016, 2017, and 2018."#;
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -414,6 +415,7 @@ Survey in 2016, 2017, and 2018."#;
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()
@@ -611,6 +613,7 @@ Survey in 2016, 2017, and 2018."#;
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .expect("Search failed")
             .into_websites()

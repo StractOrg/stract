@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 use std::{
     collections::{HashMap, VecDeque},
     hash::Hash,
@@ -25,15 +24,17 @@ pub struct TTLCache<K, V> {
     data: HashMap<K, V>,
     insertion_order: VecDeque<K>,
     insertion_times: HashMap<K, SystemTime>,
+    max_size: usize,
 }
 
 impl<K: Hash + Eq + Clone, V> TTLCache<K, V> {
-    pub fn new(ttl: Duration) -> Self {
+    pub fn with_ttl_and_max_size(ttl: Duration, max_size: usize) -> Self {
         Self {
             ttl,
             data: HashMap::new(),
             insertion_order: VecDeque::new(),
             insertion_times: HashMap::new(),
+            max_size,
         }
     }
 
@@ -71,6 +72,12 @@ impl<K: Hash + Eq + Clone, V> TTLCache<K, V> {
     fn prune_old_entries(&mut self) {
         let current_time = SystemTime::now();
 
+        while self.data.len() >= self.max_size {
+            let front = self.insertion_order.pop_front().unwrap();
+            self.insertion_times.remove(&front);
+            self.data.remove(&front);
+        }
+
         while let Some(front) = self.insertion_order.front() {
             if current_time
                 .duration_since(*self.insertion_times.get(front).unwrap())
@@ -93,7 +100,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut cache = TTLCache::new(Duration::from_millis(5));
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(5), 5);
 
         cache.insert(0, 0);
         std::thread::sleep(Duration::from_millis(3));
@@ -117,5 +124,16 @@ mod tests {
         assert_eq!(cache.data.len(), 1);
         assert_eq!(cache.insertion_order.len(), 1);
         assert_eq!(cache.insertion_times.len(), 1);
+    }
+
+    #[test]
+    fn max_size() {
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(5), 1);
+
+        cache.insert(0, 0);
+        cache.insert(1, 1);
+
+        assert_eq!(cache.get(&0), None);
+        assert_eq!(cache.get(&1), Some(&1));
     }
 }

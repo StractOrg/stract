@@ -44,6 +44,7 @@ pub async fn search(
             original: query.to_string(),
             selected_region,
             goggle_program: None,
+            site_rankings: None,
             skip_pages,
         })
         .await

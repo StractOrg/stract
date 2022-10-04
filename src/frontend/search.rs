@@ -19,6 +19,7 @@ use std::{collections::HashMap, sync::Arc};
 use axum::Extension;
 
 use crate::{
+    ranking::site_rankings::SiteRankings,
     search_prettifier::{thousand_sep_number, DisplayedEntity, DisplayedWebpage},
     searcher::{self, PrettifiedSearchResult, SearchQuery},
     webpage::region::{Region, ALL_REGIONS},
@@ -89,6 +90,25 @@ pub async fn route(
         }
     });
 
+    let site_rankings: Option<SiteRankings> = match params.get("sr") {
+        Some(sr) => {
+            if !sr.is_empty() {
+                if let Ok(site_rankings) = base64::decode(sr) {
+                    if let Ok(site_rankings) = std::str::from_utf8(&site_rankings) {
+                        serde_json::from_str(site_rankings).ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        None => None,
+    };
+
     match state
         .searcher
         .search_prettified(&SearchQuery {
@@ -96,6 +116,7 @@ pub async fn route(
             selected_region,
             goggle_program: goggle,
             skip_pages,
+            site_rankings,
         })
         .await
     {

@@ -366,6 +366,7 @@ mod tests {
                 selected_region: None,
                 goggle_program: None,
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -388,6 +389,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -409,6 +411,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -495,6 +498,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/quickstart.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -510,6 +514,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/hacker_news.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -525,6 +530,7 @@ mod tests {
                     include_str!("../../../testcases/goggles/copycats_removal.goggle").to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()
@@ -630,6 +636,7 @@ mod tests {
                     .to_string(),
                 ),
                 skip_pages: None,
+                site_rankings: None,
             })
             .unwrap()
             .into_websites()

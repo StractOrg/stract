@@ -259,6 +259,7 @@ mod tests {
                     selected_region: None,
                     goggle_program: None,
                     skip_pages: Some(p),
+                    site_rankings: None,
                 })
                 .unwrap()
                 .into_websites()
