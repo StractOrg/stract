@@ -69,6 +69,7 @@ pub struct IndexingMasterConfig {
     workers: Vec<String>,
     batch_size: Option<usize>,
     download_images: Option<bool>,
+    host_centrality_threshold: Option<f64>,
     index_base_path: Option<String>,
 }
 
@@ -81,6 +82,7 @@ pub struct IndexingLocalConfig {
     webgraph_path: Option<String>,
     output_path: Option<String>,
     download_images: Option<bool>,
+    host_centrality_threshold: Option<f64>,
     centrality_store_path: String,
 }
 

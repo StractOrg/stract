@@ -68,8 +68,7 @@ fn process_job(job: &Job) -> webgraph::Webgraph {
     for warc_path in &warc_files {
         if let Ok(file) = WarcFile::open(warc_path) {
             for record in file.records().flatten() {
-                let webpage =
-                    Html::parse_including_text(&record.response.body, &record.request.url, false);
+                let webpage = Html::parse_without_text(&record.response.body, &record.request.url);
                 for link in webpage
                     .links()
                     .into_iter()

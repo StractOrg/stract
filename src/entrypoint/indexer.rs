@@ -47,6 +47,7 @@ struct Job {
     download_images: bool,
     warc_paths: Vec<String>,
     base_path: String,
+    host_centrality_threshold: Option<f64>,
 }
 
 struct IndexingWorker {
@@ -99,7 +100,21 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                         None => true,
                     })
             {
-                let html = Html::parse(&record.response.body, &record.request.url);
+                let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
+
+                let host_centrality = worker
+                    .host_centrality_store
+                    .get(html.url().host_without_specific_subdomains())
+                    .unwrap_or_default();
+
+                if let Some(host_centrality_threshold) = job.host_centrality_threshold {
+                    if host_centrality < host_centrality_threshold {
+                        continue;
+                    }
+                }
+
+                html.parse_text();
+
                 let backlinks: Vec<Link> = worker
                     .webgraph
                     .as_ref()
@@ -115,11 +130,6 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                             .collect()
                     })
                     .unwrap_or_else(Vec::new);
-
-                let host_centrality = worker
-                    .host_centrality_store
-                    .get(html.url().host_without_specific_subdomains())
-                    .unwrap_or_default();
 
                 let page_centrality = worker
                     .page_centrality_store
@@ -257,6 +267,7 @@ impl Indexer {
                             source_config: job_config.clone(),
                             warc_paths: warc_paths.collect_vec(),
                             download_images: config.download_images.unwrap_or(true),
+                            host_centrality_threshold: config.host_centrality_threshold,
                             base_path: config
                                 .index_base_path
                                 .clone()
@@ -329,6 +340,7 @@ impl Indexer {
                 source_config: job_config.clone(),
                 warc_paths: warc_paths.collect_vec(),
                 download_images: config.download_images.unwrap_or(true),
+                host_centrality_threshold: config.host_centrality_threshold,
                 base_path: config
                     .output_path
                     .clone()

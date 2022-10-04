@@ -261,43 +261,43 @@ pub struct Html {
 
 impl Html {
     pub fn parse(html: &str, url: &str) -> Self {
-        Self::parse_including_text(html, url, true)
+        let mut html = Self::parse_without_text(html, url);
+
+        html.parse_text();
+
+        html
     }
 
-    pub fn parse_including_text(html: &str, url: &str, include_text: bool) -> Self {
+    pub fn parse_without_text(html: &str, url: &str) -> Self {
         let root = kuchiki::parse_html().one(html);
-
-        let mut all_text = None;
-        let mut clean_text = None;
-        let mut lang = None;
-
-        if include_text {
-            let paragraphs = JustText::paragraphs(root.clone());
-
-            lang = paragraphs
-                .iter()
-                .max_by_key(|paragraph| paragraph.text.len())
-                .and_then(|paragraph| {
-                    whatlang::detect(&paragraph.text).and_then(|info| {
-                        if info.is_reliable() && info.confidence() > 0.95 {
-                            Some(info.lang())
-                        } else {
-                            None
-                        }
-                    })
-                });
-
-            all_text = Html::calculate_all_text(&paragraphs, &lang.unwrap_or(Lang::Eng));
-            clean_text = Html::calculate_clean_text(&paragraphs, &lang.unwrap_or(Lang::Eng));
-        }
 
         Self {
             root,
-            all_text,
-            clean_text,
-            lang,
+            all_text: None,
+            clean_text: None,
+            lang: None,
             url: url.to_string().into(),
         }
+    }
+
+    pub fn parse_text(&mut self) {
+        let paragraphs = JustText::paragraphs(self.root.clone());
+
+        self.lang = paragraphs
+            .iter()
+            .max_by_key(|paragraph| paragraph.text.len())
+            .and_then(|paragraph| {
+                whatlang::detect(&paragraph.text).and_then(|info| {
+                    if info.is_reliable() && info.confidence() > 0.95 {
+                        Some(info.lang())
+                    } else {
+                        None
+                    }
+                })
+            });
+
+        self.all_text = Html::calculate_all_text(&paragraphs, &self.lang.unwrap_or(Lang::Eng));
+        self.clean_text = Html::calculate_clean_text(&paragraphs, &self.lang.unwrap_or(Lang::Eng));
     }
 
     pub fn links(&self) -> Vec<Link> {

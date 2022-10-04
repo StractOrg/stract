@@ -19,6 +19,7 @@ macro_rules! bench {
                         selected_region: None,
                         goggle_program: None,
                         skip_pages: None,
+                        site_rankings: None,
                     })
                     .unwrap()
             })

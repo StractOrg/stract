@@ -20,6 +20,7 @@ macro_rules! bench {
                         selected_region: None,
                         goggle_program: Some($goggle.to_string()),
                         skip_pages: None,
+                        site_rankings: None,
                     })
                     .unwrap()
             })
