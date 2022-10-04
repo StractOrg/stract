@@ -262,8 +262,20 @@ const { autofocus, query } = Astro.props;
     fetchAndUpdateSuggestions();
   });
 
-  searchbarForm.addEventListener("submit", (event: Event) => {uploadSiteRankings(event)}, false);
-  async function uploadSiteRankings(event: Event) {
+  HTMLFormElement.prototype._submit = HTMLFormElement.prototype.submit;
+
+  HTMLFormElement.prototype.submit = function (){ 
+    this.dispatchEvent(new SubmitEvent('submit', {
+        'bubbles': true,
+        'cancelable': true
+    }));
+    
+    this._submit();
+  };
+
+  searchbarForm.addEventListener("submit", (event: Event) => {encodeSiteRankings()}, false);
+
+  function encodeSiteRankings() {
     const BLOCKED = 0;
     const LESS = 1;
     const MORE = 2;

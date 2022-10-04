@@ -73,7 +73,7 @@ pub enum InitialPrettifiedSearchResult {
     Bang(BangHit),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchQuery {
     pub original: String,
     pub selected_region: Option<Region>,

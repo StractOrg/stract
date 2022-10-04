@@ -69,8 +69,6 @@ import SettingsMenu from "../components/SettingsMenu.astro";
 <script is:inline>
     let sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
 
-    console.log(sites);
-
     const prefferedList = document.getElementById("preffered-list");
     const junkList = document.getElementById("junk-list");
     const blockedList = document.getElementById("blocked-list");
