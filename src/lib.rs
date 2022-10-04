@@ -53,6 +53,7 @@ pub mod searcher;
 mod snippet;
 mod sonic;
 mod spell;
+mod subdomain_count;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;

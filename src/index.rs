@@ -33,6 +33,7 @@ use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{self, InitialSearchResult, InvertedIndex, SearchResult};
 use crate::query::Query;
 use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker, TermSplitter};
+use crate::subdomain_count::SubdomainCounter;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::{Url, Webpage};
 use crate::Result;
@@ -42,6 +43,7 @@ const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 const SPELL_SUBFOLDER_NAME: &str = "primary_image_store";
 const REGION_COUNT_FILE_NAME: &str = "region_count.json";
+const SUBDOMAIN_COUNT_SUBFOLDER_NAME: &str = "subdomain_count";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
 pub struct Index {
@@ -52,6 +54,7 @@ pub struct Index {
     primary_image_downloader: ImageDownloader<Uuid>,
     spell_dictionary: Dictionary<100_000>,
     pub region_count: RegionCount,
+    pub subdomain_counter: SubdomainCounter,
     pub path: String,
 }
 
@@ -78,6 +81,9 @@ impl Index {
             primary_image_downloader: ImageDownloader::new(),
             favicon_downloader: ImageDownloader::new(),
             spell_dictionary: Dictionary::open(Some(path.as_ref().join(SPELL_SUBFOLDER_NAME)))?,
+            subdomain_counter: SubdomainCounter::open(
+                path.as_ref().join(SUBDOMAIN_COUNT_SUBFOLDER_NAME),
+            ),
             path: path.as_ref().to_str().unwrap().to_string(),
         })
     }
@@ -96,6 +102,7 @@ impl Index {
         self.maybe_insert_favicon(&webpage);
         self.maybe_insert_primary_image(&mut webpage);
         self.spell_dictionary.insert_page(&webpage);
+        self.subdomain_counter.increment(webpage.html.url().clone());
 
         if let Ok(region) = Region::guess_from(&webpage) {
             self.region_count.increment(&region);
@@ -108,6 +115,7 @@ impl Index {
         self.spell_dictionary.commit()?;
         self.inverted_index.commit()?;
         self.region_count.commit();
+        self.subdomain_counter.commit();
         Ok(())
     }
 
