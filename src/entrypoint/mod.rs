@@ -24,77 +24,52 @@ use std::{fs::File, path::Path};
 
 pub use centrality::Centrality;
 pub use entity::EntityIndexer;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 pub use indexer::Indexer;
 use tracing::debug;
 pub use webgraph::Webgraph;
 
 use crate::{warc::WarcFile, WarcSource};
 
-async fn async_download_all_warc_files(
-    warc_paths: &[String],
-    source: &WarcSource,
-    download_path: &Path,
-) {
-    futures::stream::iter(
-        warc_paths
-            .iter()
-            .map(|path| (path.split('/').last().unwrap(), path))
-            .map(|(name, path)| {
-                let file = File::options()
-                    .create(true)
-                    .truncate(true)
-                    .write(true)
-                    .open(download_path.join(name))
-                    .unwrap();
-                (file, path)
-            })
-            .map(|(mut file, warc_path)| async move {
-                debug!("downloading warc file {}", &warc_path);
-                let res = WarcFile::download_into_buf(source, warc_path, &mut file)
-                    .await
-                    .ok();
-                debug!("finished downloading");
-
-                res
-            }),
-    )
-    .buffer_unordered(warc_paths.len())
-    .collect::<Vec<Option<()>>>()
-    .await;
-}
-
-fn download_all_warc_files(
-    warc_paths: &[String],
-    source: &WarcSource,
-    base_path: &str,
-) -> Vec<String> {
+async fn async_download_all_warc_files<'a>(
+    warc_paths: &'a [String],
+    source: &'a WarcSource,
+    base_path: &'a str,
+) -> impl Stream<Item = String> + 'a {
     let download_path = Path::new(base_path).join("warc_files");
 
     if !download_path.exists() {
         std::fs::create_dir_all(&download_path).unwrap();
     }
 
-    let file_paths = warc_paths
+    let warc_paths: Vec<_> = warc_paths
         .iter()
-        .map(|warc_path| warc_path.split('/').last().unwrap())
-        .map(|name| {
-            download_path
-                .join(name)
-                .as_os_str()
-                .to_str()
-                .unwrap()
-                .to_string()
-        })
+        .map(|warc_path| warc_path.to_string())
         .collect();
 
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            async_download_all_warc_files(warc_paths, source, &download_path).await
-        });
+    let num_files = warc_paths.len();
 
-    file_paths
+    futures::stream::iter(warc_paths.into_iter().map(|warc_path| async {
+        let download_path = Path::new(base_path).join("warc_files");
+        let name = warc_path.split('/').last().unwrap();
+        let mut file = File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(download_path.join(name))
+            .unwrap();
+        debug!("downloading warc file {}", &warc_path);
+        let res = WarcFile::download_into_buf(source, &warc_path, &mut file).await;
+        debug!("finished downloading");
+
+        (warc_path, res)
+    }))
+    .buffer_unordered(num_files)
+    .filter_map(|(path, res)| async move {
+        if res.is_ok() {
+            Some(path.clone())
+        } else {
+            None
+        }
+    })
 }

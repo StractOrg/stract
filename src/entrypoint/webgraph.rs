@@ -15,17 +15,19 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     directory::DirEntry,
-    entrypoint::download_all_warc_files,
+    entrypoint::async_download_all_warc_files,
     mapreduce::{Manager, Map, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
+use futures::StreamExt;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::Path};
+use tokio::pin;
 use tracing::{info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,7 +53,7 @@ fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
         .open()
 }
 
-fn process_job(job: &Job) -> webgraph::Webgraph {
+async fn async_process_job(job: &Job) -> webgraph::Webgraph {
     let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
     info!("processing {}", name);
@@ -63,10 +65,17 @@ fn process_job(job: &Job) -> webgraph::Webgraph {
         JobConfig::Local(config) => WarcSource::Local(config),
     };
 
-    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
+    let warc_files =
+        async_download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path).await;
+    pin!(warc_files);
 
-    for warc_path in &warc_files {
-        if let Ok(file) = WarcFile::open(warc_path) {
+    while let Some(warc_path) = warc_files.next().await {
+        let name = warc_path.split('/').last().unwrap();
+        let path = Path::new(&job.graph_base_path)
+            .join("warc_files")
+            .join(name);
+
+        if let Ok(file) = WarcFile::open(path) {
             for record in file.records().flatten() {
                 let webpage = Html::parse_without_text(&record.response.body, &record.request.url);
                 for link in webpage
@@ -93,6 +102,14 @@ fn process_job(job: &Job) -> webgraph::Webgraph {
     info!("{} done", name);
 
     graph
+}
+
+fn process_job(job: &Job) -> webgraph::Webgraph {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async { async_process_job(job).await })
 }
 
 impl Map<StatelessWorker, FrozenWebgraph> for Job {

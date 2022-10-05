@@ -13,15 +13,17 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use futures::StreamExt;
 use std::net::SocketAddr;
 use std::path::Path;
 
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tokio::pin;
 use tracing::{debug, info, trace};
 
-use crate::entrypoint::download_all_warc_files;
+use crate::entrypoint::async_download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Manager, Map, Reduce, Worker};
 use crate::ranking::centrality_store::CentralityStore;
@@ -75,7 +77,7 @@ impl IndexingWorker {
     }
 }
 
-fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
+async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
     let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
     info!("processing {}", name);
@@ -87,11 +89,16 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
         JobConfig::Local(config) => WarcSource::Local(config),
     };
 
-    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
+    let warc_files = async_download_all_warc_files(&job.warc_paths, &source, &job.base_path).await;
+    pin!(warc_files);
+
     let signal_aggregator = SignalAggregator::default();
 
-    for file in warc_files {
-        if let Ok(file) = WarcFile::open(&file) {
+    while let Some(file) = warc_files.next().await {
+        let name = file.split('/').last().unwrap();
+        let path = Path::new(&job.base_path).join("warc_files").join(name);
+
+        if let Ok(file) = WarcFile::open(path) {
             for record in
                 file.records()
                     .flatten()
@@ -174,6 +181,14 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     info!("{} done", name);
 
     index
+}
+
+fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async { async_process_job(job, worker).await })
 }
 
 #[derive(Debug, Serialize, Deserialize)]
