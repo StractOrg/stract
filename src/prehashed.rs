@@ -47,8 +47,14 @@ impl Hasher for Prehasher {
     }
 }
 
-#[derive(Debug, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct Prehashed(pub u128);
+
+impl From<u128> for Prehashed {
+    fn from(val: u128) -> Self {
+        Self(val)
+    }
+}
 
 impl Hash for Prehashed {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

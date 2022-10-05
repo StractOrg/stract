@@ -130,6 +130,13 @@ impl DocCache {
             _ => None,
         }
     }
+
+    pub fn get_u64s(&self, doc: &DocId) -> Option<&[u64]> {
+        match self.get(doc) {
+            FieldValue::U64s(res) => Some(res),
+            _ => None,
+        }
+    }
 }
 
 pub struct SegmentCache {

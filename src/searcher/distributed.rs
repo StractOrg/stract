@@ -22,7 +22,7 @@ use crate::{
     searcher::{PrettifiedWebsitesResult, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
 };
 
-use std::{cmp::Ordering, net::SocketAddr, time::Instant};
+use std::{net::SocketAddr, time::Instant};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -269,56 +269,14 @@ impl collector::Doc for ScoredWebsitePointer {
         &self.local_pointer.score
     }
 
-    fn key(&self) -> &crate::prehashed::Prehashed {
-        &self.local_pointer.site_hash
-    }
-
     fn id(&self) -> &tantivy::DocId {
         &self.local_pointer.address.doc_id
     }
 
-    fn set_score(&mut self, score: f64) {
-        self.local_pointer.score = score;
-    }
-
-    fn set_key(&mut self, key: crate::prehashed::Prehashed) {
-        self.local_pointer.site_hash = key;
-    }
-
-    fn set_id(&mut self, id: tantivy::DocId) {
-        self.local_pointer.address.doc_id = id;
-    }
-
-    fn update_values_from(&mut self, other: &Self) {
-        self.set_score(*other.score());
-        self.set_key(other.key().clone());
-        self.set_id(*other.id());
-
-        self.shard = other.shard.clone();
+    fn hashes(&self) -> collector::Hashes {
+        self.local_pointer.hashes
     }
 }
-
-impl PartialOrd for ScoredWebsitePointer {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.local_pointer
-            .score
-            .partial_cmp(&other.local_pointer.score)
-    }
-}
-
-impl Ord for ScoredWebsitePointer {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
-    }
-}
-
-impl PartialEq for ScoredWebsitePointer {
-    fn eq(&self, other: &Self) -> bool {
-        self.local_pointer.score == other.local_pointer.score
-    }
-}
-
-impl Eq for ScoredWebsitePointer {}
 
 impl DistributedSearcher {
     pub fn new(shards: Vec<Shard>) -> Self {

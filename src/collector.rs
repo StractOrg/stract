@@ -14,23 +14,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, sync::Arc};
+
 use min_max_heap::MinMaxHeap;
+use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
-    fastfield::MultiValuedFastFieldReader,
     DocId, Score, SegmentOrdinal, SegmentReader,
 };
 
 use crate::{
+    fastfield_cache,
     inverted_index::{DocAddress, WebsitePointer},
-    prehashed::{combine_u64s, PrehashMap, Prehashed},
-    schema::{FastField, Field},
+    prehashed::{combine_u64s, Prehashed},
+    schema::FastField,
 };
 
-fn adjust_score(num_taken: usize, original_score: f64) -> f64 {
-    const SCALE: f64 = 14.0;
-    original_score * (SCALE / (num_taken as f64 + SCALE))
-}
+// lower scale -> higher penalty
+const SITE_SCALE: f64 = 14.0;
+const TITLE_SCALE: f64 = 6.0;
+const URL_SCALE: f64 = 0.1;
 
 #[derive(Clone)]
 pub struct MaxDocsConsidered {
@@ -38,32 +41,35 @@ pub struct MaxDocsConsidered {
     pub segments: usize,
 }
 
-pub trait Doc: PartialEq + Eq + PartialOrd + Ord + Clone {
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Hashes {
+    site: Prehashed,
+    title: Prehashed,
+    url: Prehashed,
+}
+
+pub trait Doc: Clone {
     fn score(&self) -> &f64;
-    fn key(&self) -> &Prehashed;
     fn id(&self) -> &DocId;
-
-    fn set_score(&mut self, score: f64);
-    fn set_key(&mut self, key: Prehashed);
-    fn set_id(&mut self, id: DocId);
-
-    fn update_values_from(&mut self, other: &Self);
+    fn hashes(&self) -> Hashes;
 }
 
 pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
+    fastfield_cache: Arc<fastfield_cache::FastFieldCache>,
     de_rank_similar: bool,
 }
 
 impl TopDocs {
-    pub fn with_limit(top_n: usize) -> Self {
+    pub fn with_limit(top_n: usize, fastfield_cache: Arc<fastfield_cache::FastFieldCache>) -> Self {
         Self {
             top_n,
             offset: 0,
             max_docs: None,
             de_rank_similar: false,
+            fastfield_cache,
         }
     }
 
@@ -106,20 +112,13 @@ impl Collector for TopDocs {
         segment_local_id: tantivy::SegmentOrdinal,
         segment: &tantivy::SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let key_reader = segment.fast_fields().u64s(
-            segment
-                .schema()
-                .get_field(Field::Fast(FastField::SiteHash).name())
-                .unwrap(),
-        )?;
-
         let max_docs = self
             .max_docs
             .as_ref()
             .map(|max_docs| max_docs.total_docs / max_docs.segments);
 
         Ok(TopSegmentCollector {
-            key_reader,
+            fastfield_segment_cache: self.fastfield_cache.get_segment(&segment.segment_id()),
             max_docs,
             num_docs_taken: 0,
             segment_ord: segment_local_id,
@@ -149,7 +148,7 @@ impl Collector for TopDocs {
             .skip(self.offset)
             .map(|doc| WebsitePointer {
                 score: doc.score,
-                site_hash: doc.key,
+                hashes: doc.hashes,
                 address: DocAddress {
                     segment: doc.segment,
                     doc_id: doc.id,
@@ -160,11 +159,26 @@ impl Collector for TopDocs {
 }
 
 pub struct TopSegmentCollector {
-    key_reader: MultiValuedFastFieldReader<u64>,
+    fastfield_segment_cache: Arc<fastfield_cache::SegmentCache>,
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
     bucket_collector: BucketCollector<SegmentDoc>,
+}
+
+impl TopSegmentCollector {
+    fn get_hash(&self, doc: &DocId, field: &FastField) -> Prehashed {
+        let hash = self
+            .fastfield_segment_cache
+            .get_doc_cache(field)
+            .get_u64s(doc)
+            .unwrap();
+
+        debug_assert_eq!(hash.len(), 2);
+
+        let hash = [hash[0], hash[1]];
+        combine_u64s(hash).into()
+    }
 }
 
 impl SegmentCollector for TopSegmentCollector {
@@ -178,15 +192,13 @@ impl SegmentCollector for TopSegmentCollector {
 
             self.num_docs_taken += 1;
         }
-        let mut keys = Vec::new();
-        self.key_reader.get_vals(doc, &mut keys);
-        debug_assert_eq!(keys.len(), 2);
-
-        let keys = [keys[0], keys[1]];
-        let key = combine_u64s(keys);
 
         self.bucket_collector.insert(SegmentDoc {
-            key: Prehashed(key),
+            hashes: Hashes {
+                site: self.get_hash(&doc, &FastField::SiteHash),
+                title: self.get_hash(&doc, &FastField::TitleHash),
+                url: self.get_hash(&doc, &FastField::UrlHash),
+            },
             id: doc,
             segment: self.segment_ord,
             score: score as f64,
@@ -198,9 +210,76 @@ impl SegmentCollector for TopSegmentCollector {
     }
 }
 
+struct ScoredDoc<T: Doc> {
+    doc: T,
+    adjusted_score: f64,
+}
+
+impl<T: Doc> PartialOrd for ScoredDoc<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.adjusted_score.partial_cmp(&other.adjusted_score)
+    }
+}
+
+impl<T: Doc> PartialEq for ScoredDoc<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.adjusted_score == other.adjusted_score
+    }
+}
+
+impl<T: Doc> Ord for ScoredDoc<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<T: Doc> Eq for ScoredDoc<T> {}
+
+impl<T: Doc> From<T> for ScoredDoc<T> {
+    fn from(doc: T) -> Self {
+        Self {
+            adjusted_score: *doc.score(),
+            doc,
+        }
+    }
+}
+
+#[derive(Default)]
+struct BucketCount {
+    buckets: HashMap<Prehashed, usize>,
+}
+
+impl BucketCount {
+    pub fn adjust_score<T: Doc>(&self, doc: &mut ScoredDoc<T>) {
+        let hashes = doc.doc.hashes();
+
+        let mut adjuster = 1.0;
+
+        let taken_sites = self.buckets.get(&hashes.site).unwrap_or(&0);
+
+        adjuster *= SITE_SCALE / (SITE_SCALE + (*taken_sites as f64));
+
+        let taken_urls = self.buckets.get(&hashes.url).unwrap_or(&0);
+        adjuster *= URL_SCALE / (URL_SCALE + (*taken_urls as f64));
+
+        let taken_titles = self.buckets.get(&hashes.title).unwrap_or(&0);
+        adjuster *= TITLE_SCALE / (TITLE_SCALE + (*taken_titles as f64));
+
+        doc.adjusted_score = *doc.doc.score() * adjuster;
+    }
+
+    fn update_counts<T: Doc>(&mut self, doc: &ScoredDoc<T>) {
+        let hashes = doc.doc.hashes();
+
+        *self.buckets.entry(hashes.site).or_default() += 1;
+        *self.buckets.entry(hashes.url).or_default() += 1;
+        *self.buckets.entry(hashes.title).or_default() += 1;
+    }
+}
+
 pub struct BucketCollector<T: Doc> {
-    buckets: PrehashMap<Bucket<T>>,
-    heads: MinMaxHeap<BucketHead>,
+    count: BucketCount,
+    documents: MinMaxHeap<ScoredDoc<T>>,
     top_n: usize,
 }
 
@@ -210,100 +289,49 @@ impl<T: Doc> BucketCollector<T> {
 
         Self {
             top_n,
-            heads: MinMaxHeap::with_capacity(top_n + 1),
-            buckets: PrehashMap::new(),
+            count: BucketCount::default(),
+            documents: MinMaxHeap::with_capacity(top_n + 1),
         }
     }
 
     pub fn insert(&mut self, doc: T) {
-        if let Some(bucket) = self.buckets.get_mut(doc.key()) {
-            bucket.insert(doc);
-        } else {
-            let mut bucket = Bucket::new(self.top_n);
-            bucket.insert(doc.clone());
+        let scored_doc = doc.into();
 
-            self.buckets.insert(doc.key().clone(), bucket);
+        self.documents.push(scored_doc);
 
-            self.heads.push(BucketHead {
-                key: doc.key().clone(),
-                tweaked_score: *doc.score(),
-            });
-        }
-
-        if self.buckets.len() > self.top_n + 1 {
-            self.prune_buckets()
-        }
+        self.prune_buckets()
     }
 
     fn prune_buckets(&mut self) {
-        self.update_worst_head();
-        let worst_head = self.heads.pop_min().unwrap();
-        self.buckets.remove(&worst_head.key);
+        while self.documents.len() > self.top_n + 1 {
+            self.documents.pop_min().unwrap();
+        }
     }
 
-    fn update_worst_head(&mut self) {
-        loop {
-            let mut worst_head = self.heads.peek_min_mut().unwrap();
-            let current_score = self
-                .buckets
-                .get(&worst_head.key)
-                .unwrap()
-                .get_best()
-                .unwrap()
-                .tweaked_score;
+    fn update_best_doc(&mut self) {
+        if self.documents.len() <= 1 {
+            return;
+        }
 
-            if worst_head.tweaked_score != current_score {
-                worst_head.tweaked_score = current_score;
-            } else {
+        while let Some(mut best_doc) = self.documents.peek_max_mut() {
+            let current_score = best_doc.adjusted_score;
+            self.count.adjust_score(&mut *best_doc);
+
+            if best_doc.adjusted_score == current_score {
                 break;
             }
         }
     }
 
-    fn build_heads(&self) -> MinMaxHeap<BucketHead> {
-        let mut bucket_heads: MinMaxHeap<BucketHead> = MinMaxHeap::with_capacity(self.top_n);
-
-        for (key, bucket) in self.buckets.iter() {
-            let best_in_bucket = bucket.get_best().unwrap();
-            if bucket_heads.len() >= self.top_n {
-                let mut worst_head = bucket_heads.peek_min_mut().unwrap();
-
-                if best_in_bucket.tweaked_score > worst_head.tweaked_score {
-                    worst_head.key = key.clone();
-                    worst_head.tweaked_score = best_in_bucket.tweaked_score
-                }
-            } else {
-                bucket_heads.push(BucketHead {
-                    key: key.clone(),
-                    tweaked_score: best_in_bucket.tweaked_score,
-                });
-            }
-        }
-
-        bucket_heads
-    }
-
     pub fn into_sorted_vec(mut self, de_rank_similar: bool) -> Vec<T> {
         let mut res = Vec::new();
 
-        let mut bucket_heads = self.build_heads();
-
-        while let Some(mut head) = bucket_heads.pop_max() {
-            let bucket = self.buckets.get_mut(&head.key).unwrap();
-
-            if let Some(mut doc) = bucket.pop_best() {
-                if de_rank_similar {
-                    doc.set_score(adjust_score(bucket.num_taken - 1, *doc.score()));
-                }
-
-                res.push(doc);
-
-                if let Some(new_best) = bucket.get_best() {
-                    head.tweaked_score = new_best.tweaked_score;
-                }
-
-                bucket_heads.push(head);
+        while let Some(best_doc) = self.documents.pop_max() {
+            if de_rank_similar {
+                self.count.update_counts(&best_doc);
+                self.update_best_doc();
             }
+            res.push(best_doc.doc);
 
             if res.len() == self.top_n {
                 break;
@@ -314,105 +342,12 @@ impl<T: Doc> BucketCollector<T> {
     }
 }
 
-struct BucketHead {
-    key: Prehashed,
-    tweaked_score: f64,
-}
-
-impl PartialEq for BucketHead {
-    fn eq(&self, other: &Self) -> bool {
-        self.tweaked_score == other.tweaked_score
-    }
-}
-
-impl Eq for BucketHead {}
-
-impl PartialOrd for BucketHead {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.tweaked_score.partial_cmp(&other.tweaked_score)
-    }
-}
-
-impl Ord for BucketHead {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
-struct Bucket<T: Doc> {
-    num_taken: usize,
-    docs: MinMaxHeap<T>,
-    top_n: usize,
-}
-
-impl<T: Doc> Bucket<T> {
-    pub fn new(top_n: usize) -> Self {
-        assert!(top_n > 0);
-
-        Self {
-            top_n,
-            num_taken: 0,
-            docs: MinMaxHeap::with_capacity(top_n),
-        }
-    }
-
-    pub fn pop_best(&mut self) -> Option<T> {
-        let res = self.docs.pop_max();
-
-        self.num_taken += 1;
-
-        res
-    }
-
-    pub fn get_best(&self) -> Option<TweakedDoc<'_>> {
-        self.docs.peek_max().map(|doc| TweakedDoc {
-            tweaked_score: adjust_score(self.num_taken, *doc.score()),
-            _doc_id: doc.id(),
-        })
-    }
-
-    pub fn insert(&mut self, doc: T) {
-        if self.docs.len() >= self.top_n {
-            let mut worst = self.docs.peek_min_mut().unwrap();
-
-            worst.update_values_from(&doc);
-        } else {
-            self.docs.push(doc);
-        }
-    }
-}
-
-struct TweakedDoc<'a> {
-    tweaked_score: f64,
-    _doc_id: &'a DocId,
-}
-
 #[derive(Debug, Clone)]
 pub struct SegmentDoc {
-    key: Prehashed,
+    hashes: Hashes,
     id: DocId,
     segment: SegmentOrdinal,
     score: f64,
-}
-
-impl PartialEq for SegmentDoc {
-    fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
-    }
-}
-
-impl Eq for SegmentDoc {}
-
-impl PartialOrd for SegmentDoc {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
-    }
-}
-
-impl Ord for SegmentDoc {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
 }
 
 impl Doc for SegmentDoc {
@@ -420,32 +355,12 @@ impl Doc for SegmentDoc {
         &self.score
     }
 
-    fn key(&self) -> &Prehashed {
-        &self.key
-    }
-
     fn id(&self) -> &DocId {
         &self.id
     }
 
-    fn set_score(&mut self, score: f64) {
-        self.score = score;
-    }
-
-    fn set_key(&mut self, key: Prehashed) {
-        self.key = key;
-    }
-
-    fn set_id(&mut self, id: DocId) {
-        self.id = id;
-    }
-
-    fn update_values_from(&mut self, other: &Self) {
-        self.set_id(*other.id());
-        self.set_key(other.key().clone());
-        self.set_score(*other.score());
-
-        self.segment = other.segment;
+    fn hashes(&self) -> Hashes {
+        self.hashes
     }
 }
 
@@ -530,12 +445,12 @@ where
 mod tests {
     use super::*;
 
-    fn test(top_n: usize, docs: &[(u128, DocId, f64)], expected: &[(f64, DocId)]) {
+    fn test(top_n: usize, docs: &[(Hashes, DocId, f64)], expected: &[(f64, DocId)]) {
         let mut collector = BucketCollector::new(top_n);
 
         for doc in docs {
             collector.insert(SegmentDoc {
-                key: Prehashed(doc.0),
+                hashes: doc.0,
                 id: doc.1,
                 score: doc.2,
                 segment: 0,
@@ -556,11 +471,51 @@ mod tests {
         test(
             3,
             &[
-                (1, 123, 1.0),
-                (2, 124, 2.0),
-                (3, 125, 3.0),
-                (4, 126, 4.0),
-                (5, 127, 5.0),
+                (
+                    Hashes {
+                        site: 1.into(),
+                        title: 1.into(),
+                        url: 1.into(),
+                    },
+                    123,
+                    1.0,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                    },
+                    124,
+                    2.0,
+                ),
+                (
+                    Hashes {
+                        site: 3.into(),
+                        title: 3.into(),
+                        url: 3.into(),
+                    },
+                    125,
+                    3.0,
+                ),
+                (
+                    Hashes {
+                        site: 4.into(),
+                        title: 4.into(),
+                        url: 4.into(),
+                    },
+                    126,
+                    4.0,
+                ),
+                (
+                    Hashes {
+                        site: 5.into(),
+                        title: 5.into(),
+                        url: 5.into(),
+                    },
+                    127,
+                    5.0,
+                ),
             ],
             &[(5.0, 127), (4.0, 126), (3.0, 125)],
         );
@@ -570,7 +525,35 @@ mod tests {
     fn less_than_topn() {
         test(
             10,
-            &[(3, 125, 3.0), (4, 126, 4.0), (5, 127, 5.0)],
+            &[
+                (
+                    Hashes {
+                        site: 3.into(),
+                        title: 3.into(),
+                        url: 3.into(),
+                    },
+                    125,
+                    3.0,
+                ),
+                (
+                    Hashes {
+                        site: 4.into(),
+                        title: 4.into(),
+                        url: 4.into(),
+                    },
+                    126,
+                    4.0,
+                ),
+                (
+                    Hashes {
+                        site: 5.into(),
+                        title: 5.into(),
+                        url: 5.into(),
+                    },
+                    127,
+                    5.0,
+                ),
+            ],
             &[(5.0, 127), (4.0, 126), (3.0, 125)],
         );
     }
@@ -579,18 +562,70 @@ mod tests {
     fn same_key_de_prioritised() {
         test(
             10,
-            &[(1, 125, 3.0), (2, 126, 3.1), (2, 127, 5.0)],
             &[
-                (adjust_score(0, 5.0), 127),
-                (adjust_score(0, 3.0), 125),
-                (adjust_score(1, 3.1), 126),
+                (
+                    Hashes {
+                        site: 1.into(),
+                        title: 1.into(),
+                        url: 1.into(),
+                    },
+                    125,
+                    3.0,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                    },
+                    126,
+                    3.1,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                    },
+                    127,
+                    5.0,
+                ),
             ],
+            &[(5.0, 127), (3.0, 125), (3.1, 126)],
         );
 
         test(
             2,
-            &[(1, 125, 3.0), (2, 126, 3.1), (2, 127, 5.0)],
-            &[(adjust_score(0, 5.0), 127), (adjust_score(0, 3.0), 125)],
+            &[
+                (
+                    Hashes {
+                        site: 1.into(),
+                        title: 1.into(),
+                        url: 1.into(),
+                    },
+                    125,
+                    3.0,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                    },
+                    126,
+                    3.1,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                    },
+                    127,
+                    5.0,
+                ),
+            ],
+            &[(5.0, 127), (3.0, 125)],
         );
     }
 }

@@ -23,9 +23,9 @@ use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
+use crate::collector::Hashes;
 use crate::fastfield_cache::FastFieldCache;
 use crate::image_store::Image;
-use crate::prehashed::Prehashed;
 use crate::query::Query;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::snippet;
@@ -47,7 +47,7 @@ pub struct InitialSearchResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebsitePointer {
     pub score: f64,
-    pub site_hash: Prehashed,
+    pub hashes: Hashes,
     pub address: DocAddress,
 }
 

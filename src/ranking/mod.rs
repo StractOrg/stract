@@ -93,7 +93,8 @@ impl Ranker {
             Arc::clone(&self.fastfield_cache),
         );
 
-        let mut collector = TopDocs::with_limit(NUM_RESULTS_PER_PAGE);
+        let mut collector =
+            TopDocs::with_limit(NUM_RESULTS_PER_PAGE, Arc::clone(&self.fastfield_cache));
 
         if self.de_rank_similar {
             collector = collector.and_de_rank_similar()

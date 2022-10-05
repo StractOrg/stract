@@ -271,13 +271,15 @@ impl Html {
 
     pub fn parse_without_text(html: &str, url: &str) -> Self {
         let root = kuchiki::parse_html().one(html);
+        let mut url: Url = url.to_string().into();
+        url = url.full_without_id_tags().into();
 
         Self {
             root,
             all_text: None,
             clean_text: None,
             lang: None,
-            url: url.to_string().into(),
+            url,
         }
     }
 
@@ -498,7 +500,7 @@ impl Html {
     }
 
     fn pretokenize_url(&self) -> PreTokenizedString {
-        let url = self.url().full_without_id_tags();
+        let url = self.url().full();
         self.pretokenize_string(url)
     }
 
