@@ -48,6 +48,10 @@ impl SubdomainCounter {
     }
 
     pub fn merge(&mut self, other: Self) {
-        todo!();
+        for (key, val) in other.inner.iter() {
+            let mut current = self.inner.get(&key).unwrap_or_default();
+            current.extend(val.into_iter());
+            self.inner.insert(key, current);
+        }
     }
 }
