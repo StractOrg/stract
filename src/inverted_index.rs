@@ -23,10 +23,11 @@ use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
+use crate::fastfield_cache::FastFieldCache;
 use crate::image_store::Image;
 use crate::prehashed::Prehashed;
 use crate::query::Query;
-use crate::schema::{Field, ALL_FIELDS};
+use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::snippet;
 use crate::tokenizer::Identity;
 use crate::webpage::region::Region;
@@ -35,7 +36,7 @@ use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
@@ -84,6 +85,7 @@ pub struct InvertedIndex {
     tantivy_index: tantivy::Index,
     writer: IndexWriter,
     reader: IndexReader,
+    fastfield_cache: Arc<FastFieldCache>,
     schema: Arc<Schema>,
 }
 
@@ -97,7 +99,7 @@ impl InvertedIndex {
         } else {
             let index_settings = tantivy::IndexSettings {
                 sort_by_field: Some(tantivy::IndexSortByField {
-                    field: Field::PreComputedScore.as_str().to_string(),
+                    field: Field::Fast(FastField::PreComputedScore).name().to_string(),
                     order: tantivy::Order::Desc,
                 }),
                 ..Default::default()
@@ -130,13 +132,25 @@ impl InvertedIndex {
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
 
+        let fastfield_cache = Arc::new(FastFieldCache::default());
+
+        let warmers: Vec<Weak<dyn tantivy::Warmer>> = vec![Arc::downgrade(
+            &(Arc::clone(&fastfield_cache) as Arc<dyn tantivy::Warmer>),
+        )];
+        let reader = tantivy_index.reader_builder().warmers(warmers).try_into()?;
+
         Ok(InvertedIndex {
             writer,
-            reader: tantivy_index.reader()?,
+            reader,
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
+            fastfield_cache,
             tantivy_index,
         })
+    }
+
+    pub fn fastfield_cache(&self) -> Arc<FastFieldCache> {
+        Arc::clone(&self.fastfield_cache)
     }
 
     pub fn tokenizers(&self) -> &TokenizerManager {
@@ -379,21 +393,21 @@ impl From<Document> for RetrievedWebpage {
 
         for value in doc.field_values() {
             match ALL_FIELDS[value.field.field_id() as usize] {
-                Field::Title => {
+                Field::Text(TextField::Title) => {
                     webpage.title = value
                         .value
                         .as_text()
                         .expect("Title field should be text")
                         .to_string()
                 }
-                Field::StemmedCleanBody => {
+                Field::Text(TextField::StemmedCleanBody) => {
                     webpage.body = value
                         .value
                         .as_text()
                         .expect("Body field should be text")
                         .to_string()
                 }
-                Field::Description => {
+                Field::Text(TextField::Description) => {
                     let desc = value
                         .value
                         .as_text()
@@ -402,14 +416,14 @@ impl From<Document> for RetrievedWebpage {
 
                     webpage.description = if desc.is_empty() { None } else { Some(desc) }
                 }
-                Field::Url => {
+                Field::Text(TextField::Url) => {
                     webpage.url = value
                         .value
                         .as_text()
                         .expect("Url field should be text")
                         .to_string()
                 }
-                Field::PrimaryImage => {
+                Field::Text(TextField::PrimaryImage) => {
                     webpage.primary_image = {
                         let bytes = value
                             .value
@@ -419,7 +433,7 @@ impl From<Document> for RetrievedWebpage {
                         bincode::deserialize(bytes).unwrap()
                     }
                 }
-                Field::LastUpdated => {
+                Field::Fast(FastField::LastUpdated) => {
                     webpage.updated_time = {
                         let timestamp = value.value.as_u64().unwrap() as i64;
                         if timestamp == 0 {
@@ -429,44 +443,20 @@ impl From<Document> for RetrievedWebpage {
                         }
                     }
                 }
-                Field::AllBody => {
+                Field::Text(TextField::AllBody) => {
                     webpage.dirty_body = value
                         .value
                         .as_text()
                         .expect("All body field should be text")
                         .to_string()
                 }
-                Field::Region => {
+                Field::Fast(FastField::Region) => {
                     webpage.region = {
                         let id = value.value.as_u64().unwrap();
                         Region::from_id(id)
                     }
                 }
-                Field::BacklinkText
-                | Field::HostCentrality
-                | Field::PageCentrality
-                | Field::Site
-                | Field::Domain
-                | Field::SiteNoTokenizer
-                | Field::DomainNoTokenizer
-                | Field::DomainNameIfHomepageNoTokenizer
-                | Field::StemmedTitle
-                | Field::CleanBody
-                | Field::DomainIfHomepage
-                | Field::TitleIfHomepage
-                | Field::IsHomepage
-                | Field::SiteHash
-                | Field::UrlWithoutQueryHash
-                | Field::TitleHash
-                | Field::UrlHash
-                | Field::DomainHash
-                | Field::NumTrackers
-                | Field::PreComputedScore
-                | Field::NumCleanBodyTokens
-                | Field::NumDescriptionTokens
-                | Field::NumTitleTokens
-                | Field::NumUrlTokens
-                | Field::FetchTimeMs => {}
+                _ => {}
             }
         }
 
@@ -497,7 +487,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         let result = index
             .search(&query, ranker.collector())
@@ -542,7 +536,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -580,7 +578,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -618,7 +620,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -656,7 +662,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -728,7 +738,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         for _ in 0..100 {
             index
@@ -768,7 +782,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -848,7 +866,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         let result = index
             .search(&query, ranker.collector())
@@ -869,7 +891,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         let result = index
             .search(&query, ranker.collector())
@@ -907,7 +933,11 @@ mod tests {
     #[test]
     fn only_show_primary_images_when_relevant() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         let mut webpage = Webpage::new(
             &format!(
@@ -985,7 +1015,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         let result = index
             .search(&query, ranker.collector())

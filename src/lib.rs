@@ -38,6 +38,7 @@ mod collector;
 mod directory;
 mod entity_index;
 mod exponential_backoff;
+mod fastfield_cache;
 mod frontend;
 mod image_downloader;
 mod image_store;

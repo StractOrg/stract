@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::schema::TextField;
 use crate::search_prettifier::html_escape;
 use crate::tokenizer::Stemmed;
 use crate::webpage::region::Region;
@@ -203,12 +204,12 @@ impl SnippetGenerator {
     ) -> crate::Result<SnippetGenerator> {
         let clean_field = searcher
             .schema()
-            .get_field(Field::CleanBody.as_str())
+            .get_field(Field::Text(TextField::CleanBody).name())
             .unwrap();
 
         let stemmed_field = searcher
             .schema()
-            .get_field(Field::StemmedCleanBody.as_str())
+            .get_field(Field::Text(TextField::StemmedCleanBody).name())
             .unwrap();
 
         let mut terms: BTreeSet<&tantivy::Term> = BTreeSet::new();

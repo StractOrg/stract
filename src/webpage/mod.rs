@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     prehashed::{hash, split_u128},
+    schema::{FastField, TextField},
     schema_org::SchemaOrg,
     tokenizer, Error, Result,
 };
@@ -153,14 +154,14 @@ impl Webpage {
         if let Ok(region) = region {
             doc.add_u64(
                 schema
-                    .get_field(Field::Region.as_str())
+                    .get_field(Field::Fast(FastField::Region).name())
                     .expect("Failed to get region field"),
                 region.id() as u64,
             );
         } else {
             doc.add_u64(
                 schema
-                    .get_field(Field::Region.as_str())
+                    .get_field(Field::Fast(FastField::Region).name())
                     .expect("Failed to get region field"),
                 Region::All.id() as u64,
             );
@@ -174,35 +175,35 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::BacklinkText.as_str())
+                .get_field(Field::Text(TextField::BacklinkText).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::HostCentrality.as_str())
+                .get_field(Field::Fast(FastField::HostCentrality).name())
                 .expect("Failed to get host_centrality field"),
             (self.host_centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::PageCentrality.as_str())
+                .get_field(Field::Fast(FastField::PageCentrality).name())
                 .expect("Failed to get page_centrality field"),
             (self.page_centrality * CENTRALITY_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::FetchTimeMs.as_str())
+                .get_field(Field::Fast(FastField::FetchTimeMs).name())
                 .expect("Failed to get fetch_time_ms field"),
             self.fetch_time_ms,
         );
 
         doc.add_f64(
             schema
-                .get_field(Field::PreComputedScore.as_str())
+                .get_field(Field::Fast(FastField::PreComputedScore).name())
                 .expect("failed to get pre_computed_score field"),
             self.pre_computed_score,
         );
@@ -210,7 +211,7 @@ impl Webpage {
         let image = bincode::serialize(&self.primary_image).unwrap();
         doc.add_bytes(
             schema
-                .get_field(Field::PrimaryImage.as_str())
+                .get_field(Field::Text(TextField::PrimaryImage).name())
                 .expect("Failed to get primary_image field"),
             image,
         );
@@ -531,12 +532,14 @@ impl Html {
 
         for field in &ALL_FIELDS {
             let tantivy_field = schema
-                .get_field(field.as_str())
-                .unwrap_or_else(|| panic!("Unknown field: {}", field.as_str()));
+                .get_field(field.name())
+                .unwrap_or_else(|| panic!("Unknown field: {}", field.name()));
 
             match field {
-                Field::Title => doc.add_pre_tokenized_text(tantivy_field, title.clone()),
-                Field::StemmedTitle => {
+                Field::Text(TextField::Title) => {
+                    doc.add_pre_tokenized_text(tantivy_field, title.clone())
+                }
+                Field::Text(TextField::StemmedTitle) => {
                     let mut tokens = title.tokens.clone();
                     stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
@@ -548,8 +551,10 @@ impl Html {
                         },
                     );
                 }
-                Field::CleanBody => doc.add_pre_tokenized_text(tantivy_field, clean_text.clone()),
-                Field::StemmedCleanBody => {
+                Field::Text(TextField::CleanBody) => {
+                    doc.add_pre_tokenized_text(tantivy_field, clean_text.clone())
+                }
+                Field::Text(TextField::StemmedCleanBody) => {
                     let mut tokens = clean_text.tokens.clone();
                     stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
 
@@ -561,13 +566,15 @@ impl Html {
                         },
                     );
                 }
-                Field::Description => {
+                Field::Text(TextField::Description) => {
                     doc.add_pre_tokenized_text(tantivy_field, description.clone());
                 }
-                Field::Url => doc.add_pre_tokenized_text(tantivy_field, url.clone()),
-                Field::Site => doc.add_text(tantivy_field, self.url().site()),
-                Field::Domain => doc.add_text(tantivy_field, self.url().domain()),
-                Field::SiteNoTokenizer => doc.add_pre_tokenized_text(
+                Field::Text(TextField::Url) => {
+                    doc.add_pre_tokenized_text(tantivy_field, url.clone())
+                }
+                Field::Text(TextField::Site) => doc.add_text(tantivy_field, self.url().site()),
+                Field::Text(TextField::Domain) => doc.add_text(tantivy_field, self.url().domain()),
+                Field::Text(TextField::SiteNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
                         text: self.url().site().to_string(),
@@ -580,7 +587,7 @@ impl Html {
                         }],
                     },
                 ),
-                Field::DomainNoTokenizer => doc.add_pre_tokenized_text(
+                Field::Text(TextField::DomainNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
                         text: self.url().domain().to_string(),
@@ -593,21 +600,21 @@ impl Html {
                         }],
                     },
                 ),
-                Field::TitleIfHomepage => {
+                Field::Text(TextField::TitleIfHomepage) => {
                     if self.url().is_homepage() {
                         doc.add_pre_tokenized_text(tantivy_field, title.clone());
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::DomainIfHomepage => {
+                Field::Text(TextField::DomainIfHomepage) => {
                     if self.url().is_homepage() {
                         doc.add_text(tantivy_field, self.url().domain());
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::DomainNameIfHomepageNoTokenizer => {
+                Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
                     if self.url().is_homepage() {
                         doc.add_pre_tokenized_text(
                             tantivy_field,
@@ -626,61 +633,69 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::IsHomepage => {
+                Field::Text(TextField::AllBody) => {
+                    doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
+                }
+                Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, self.url().is_homepage().into());
                 }
-                Field::LastUpdated => doc.add_u64(
+                Field::Fast(FastField::LastUpdated) => doc.add_u64(
                     tantivy_field,
                     self.updated_time()
                         .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
-                Field::AllBody => doc.add_pre_tokenized_text(tantivy_field, all_text.clone()),
-                Field::NumTrackers => doc.add_u64(tantivy_field, self.trackers().len() as u64),
-                Field::NumUrlTokens => doc.add_u64(tantivy_field, url.tokens.len() as u64),
-                Field::NumTitleTokens => doc.add_u64(tantivy_field, title.tokens.len() as u64),
-                Field::NumCleanBodyTokens => {
+                Field::Fast(FastField::NumTrackers) => {
+                    doc.add_u64(tantivy_field, self.trackers().len() as u64)
+                }
+                Field::Fast(FastField::NumUrlTokens) => {
+                    doc.add_u64(tantivy_field, url.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumTitleTokens) => {
+                    doc.add_u64(tantivy_field, title.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumCleanBodyTokens) => {
                     doc.add_u64(tantivy_field, clean_text.tokens.len() as u64)
                 }
-                Field::NumDescriptionTokens => {
+                Field::Fast(FastField::NumDescriptionTokens) => {
                     doc.add_u64(tantivy_field, description.tokens.len() as u64)
                 }
-                Field::SiteHash => {
+                Field::Fast(FastField::SiteHash) => {
                     let hash = hash(self.url().site()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
-                Field::UrlWithoutQueryHash => {
+                Field::Fast(FastField::UrlWithoutQueryHash) => {
                     let hash = hash(self.url().without_query()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
-                Field::UrlHash => {
+                Field::Fast(FastField::UrlHash) => {
                     let hash = hash(self.url().full()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
-                Field::DomainHash => {
+                Field::Fast(FastField::DomainHash) => {
                     let hash = hash(self.url().domain()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
-                Field::TitleHash => {
+                Field::Fast(FastField::TitleHash) => {
                     let hash = hash(self.title().unwrap_or_default()).0;
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
                 }
-                Field::BacklinkText
-                | Field::HostCentrality
-                | Field::PageCentrality
-                | Field::FetchTimeMs
-                | Field::PreComputedScore
-                | Field::Region
-                | Field::PrimaryImage => {}
+                Field::Text(TextField::BacklinkText)
+                | Field::Fast(FastField::HostCentrality)
+                | Field::Fast(FastField::PageCentrality)
+                | Field::Fast(FastField::FetchTimeMs)
+                | Field::Fast(FastField::PreComputedScore)
+                | Field::Fast(FastField::Region)
+                | Field::Text(TextField::PrimaryImage) => {}
             }
         }
 

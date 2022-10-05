@@ -14,17 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{webpage::Webpage, Result};
+use crate::{
+    fastfield_cache,
+    schema::{FastField, TextField},
+    webpage::Webpage,
+    Result,
+};
 use std::{array, convert::TryFrom, ops::Deref, sync::Arc};
 
 use chrono::Utc;
-use tantivy::{
-    fastfield::{Column, DynamicFastFieldReader},
-    DocId, Score, SegmentReader,
-};
+use tantivy::{DocId, Score};
 
 use crate::{
-    schema::{Field, ALL_FIELDS, CENTRALITY_SCALING},
+    schema::{Field, CENTRALITY_SCALING},
     webpage::region::{Region, RegionCount},
 };
 
@@ -42,7 +44,7 @@ pub enum Signal {
     Region,
 }
 
-const ALL_SIGNALS: [Signal; 8] = [
+pub const ALL_SIGNALS: [Signal; 8] = [
     Signal::Bm25,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -54,23 +56,6 @@ const ALL_SIGNALS: [Signal; 8] = [
 ];
 
 impl Signal {
-    fn from_field(field: &Field) -> Option<Self> {
-        match field {
-            Field::IsHomepage => Some(Signal::IsHomepage),
-            Field::HostCentrality => Some(Signal::HostCentrality),
-            Field::PageCentrality => Some(Signal::PageCentrality),
-            Field::FetchTimeMs => Some(Signal::FetchTimeMs),
-            Field::LastUpdated => Some(Signal::UpdateTimestamp),
-            Field::NumTrackers => Some(Signal::NumTrackers),
-            Field::Region => Some(Signal::Region),
-            _ => None,
-        }
-    }
-
-    fn has_fast_reader(&self) -> bool {
-        !matches!(self, Signal::Bm25)
-    }
-
     fn is_computable_before_search(&self) -> bool {
         !matches!(self, Signal::Bm25)
     }
@@ -153,18 +138,19 @@ impl Signal {
             _ => None,
         }
     }
-}
 
-fn fastfield_reader(segment_reader: &SegmentReader, field: &Field) -> DynamicFastFieldReader<u64> {
-    let tv_field = segment_reader
-        .schema()
-        .get_field(field.as_str())
-        .unwrap_or_else(|| panic!("Faild to load {} field", field.as_str()));
-
-    segment_reader
-        .fast_fields()
-        .u64(tv_field)
-        .unwrap_or_else(|_| panic!("Failed to get {} fast-field reader", field.as_str()))
+    fn as_fastfield(&self) -> Option<FastField> {
+        match self {
+            Signal::Bm25 => None,
+            Signal::HostCentrality => Some(FastField::HostCentrality),
+            Signal::PageCentrality => Some(FastField::PageCentrality),
+            Signal::IsHomepage => Some(FastField::IsHomepage),
+            Signal::FetchTimeMs => Some(FastField::FetchTimeMs),
+            Signal::UpdateTimestamp => Some(FastField::LastUpdated),
+            Signal::NumTrackers => Some(FastField::NumTrackers),
+            Signal::Region => Some(FastField::Region),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -182,34 +168,34 @@ impl SignalCoefficient {
             .unwrap_or_else(|| signal.default_coefficient())
     }
 
-    pub fn new(scores: impl Iterator<Item = (Signal, f64)>) -> Self {
-        let mut fast_scores = Vec::new();
+    pub fn new(coefficients: impl Iterator<Item = (Signal, f64)>) -> Self {
+        let mut fast_coefficients = Vec::new();
 
-        for (signal, score) in scores {
+        for (signal, coefficient) in coefficients {
             let idx = signal as usize;
 
-            while idx >= fast_scores.len() {
-                fast_scores.push(None);
+            while idx >= fast_coefficients.len() {
+                fast_coefficients.push(None);
             }
 
-            fast_scores[idx] = Some(score);
+            fast_coefficients[idx] = Some(coefficient);
         }
 
-        Self(fast_scores)
+        Self(fast_coefficients)
     }
 }
 
 impl FieldBoost {
-    pub fn get(&self, field: &Field) -> f64 {
+    pub fn get(&self, field: &TextField) -> f64 {
         self.0
             .get((*field) as usize)
             .copied()
             .flatten()
-            .or_else(|| field.boost().map(|s| s as f64))
+            .or_else(|| Field::Text(*field).boost().map(|s| s as f64))
             .unwrap_or(1.0)
     }
 
-    pub fn new(scores: impl Iterator<Item = (Field, f64)>) -> Self {
+    pub fn new(scores: impl Iterator<Item = (TextField, f64)>) -> Self {
         let mut fast_scores = Vec::new();
 
         for (field, score) in scores {
@@ -228,7 +214,7 @@ impl FieldBoost {
 
 #[derive(Clone)]
 pub struct SignalAggregator {
-    readers: Vec<Option<DynamicFastFieldReader<u64>>>,
+    fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
     signal_coefficients: SignalCoefficient,
     field_boost: FieldBoost,
     fetch_time_ms_cache: [f64; 1000],
@@ -253,7 +239,7 @@ impl Default for SignalAggregator {
 impl SignalAggregator {
     pub fn new(
         coefficients: impl Iterator<Item = (Signal, f64)>,
-        boosts: impl Iterator<Item = (Field, f64)>,
+        boosts: impl Iterator<Item = (TextField, f64)>,
     ) -> Self {
         let signal_coefficients = SignalCoefficient::new(coefficients);
         let field_boost = FieldBoost::new(boosts);
@@ -265,7 +251,7 @@ impl SignalAggregator {
             .collect();
 
         Self {
-            readers: Vec::new(),
+            fastfield_cache: None,
             signal_coefficients,
             field_boost,
             fetch_time_ms_cache,
@@ -273,32 +259,8 @@ impl SignalAggregator {
         }
     }
 
-    pub fn new_like(other: &SignalAggregator) -> Self {
-        Self {
-            readers: Vec::new(),
-            signal_coefficients: other.signal_coefficients.clone(),
-            field_boost: other.field_boost.clone(),
-            fetch_time_ms_cache: other.fetch_time_ms_cache,
-            update_time_cache: other.update_time_cache.clone(),
-        }
-    }
-
-    pub fn register_readers(&mut self, segment_reader: &SegmentReader) {
-        self.readers.clear();
-
-        for field in &ALL_FIELDS {
-            if let Some(signal) = Signal::from_field(field) {
-                if signal.has_fast_reader() {
-                    let idx = signal as usize;
-
-                    while idx >= self.readers.len() {
-                        self.readers.push(None);
-                    }
-
-                    self.readers[idx] = Some(fastfield_reader(segment_reader, field))
-                }
-            }
-        }
+    pub fn register_segment(&mut self, cache: Arc<fastfield_cache::SegmentCache>) {
+        self.fastfield_cache = Some(cache);
     }
 
     pub fn score(
@@ -312,10 +274,11 @@ impl SignalAggregator {
         ALL_SIGNALS
             .into_iter()
             .map(|signal| {
-                let fastfield_value = match self.readers.get(signal as usize) {
-                    Some(Some(reader)) => Some(reader.get_val(doc as u64)),
-                    _ => None,
-                };
+                let fastfield_value = signal.as_fastfield().and_then(|field| {
+                    self.fastfield_cache
+                        .as_ref()
+                        .and_then(|cache| cache.get_doc_cache(&field).get_u64(&doc))
+                });
 
                 self.coefficients().get(&signal)
                     * signal.value(
@@ -410,8 +373,10 @@ impl TryFrom<Vec<RawAlteration>> for SignalAggregator {
                     }
                 }
                 Target::Field(name) => {
-                    if let Some(field) = Field::from_string(name) {
-                        boosts.push((field, alteration.score));
+                    if let Some(field) = Field::from_name(name) {
+                        if let Some(text_field) = field.as_text() {
+                            boosts.push((text_field, alteration.score));
+                        }
                     }
                 }
             }

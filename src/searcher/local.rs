@@ -107,6 +107,7 @@ impl LocalSearcher {
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
             goggle.map(|goggle| goggle.aggregator).unwrap_or_default(),
+            self.index.inverted_index.fastfield_cache(),
         );
 
         if let Some(skip_pages) = query.skip_pages {

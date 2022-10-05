@@ -16,6 +16,7 @@
 
 use std::sync::Arc;
 
+use crate::fastfield_cache::FastFieldCache;
 use crate::webpage::region::{Region, RegionCount};
 use chrono::Utc;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
@@ -26,6 +27,7 @@ use super::SignalAggregator;
 pub(crate) struct InitialScoreTweaker {
     region_count: Arc<RegionCount>,
     selected_region: Option<Region>,
+    fastfield_cache: Arc<FastFieldCache>,
     aggregator: SignalAggregator,
 }
 
@@ -34,11 +36,13 @@ impl InitialScoreTweaker {
         region_count: Arc<RegionCount>,
         selected_region: Option<Region>,
         aggregator: SignalAggregator,
+        fastfield_cache: Arc<FastFieldCache>,
     ) -> Self {
         Self {
             region_count,
             selected_region,
             aggregator,
+            fastfield_cache,
         }
     }
 }
@@ -54,8 +58,13 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let mut aggregator = SignalAggregator::new_like(&self.aggregator);
-        aggregator.register_readers(segment_reader);
+        let mut aggregator = self.aggregator.clone();
+
+        let fastfield_cache_segment = self
+            .fastfield_cache
+            .get_segment(&segment_reader.segment_id());
+
+        aggregator.register_segment(fastfield_cache_segment);
 
         let current_timestamp = Utc::now().timestamp() as usize;
 

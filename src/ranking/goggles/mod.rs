@@ -22,7 +22,11 @@ mod pattern_query;
 
 use std::convert::TryFrom;
 
-use crate::{query::union::UnionQuery, schema::Field, Result};
+use crate::{
+    query::union::UnionQuery,
+    schema::{Field, TextField},
+    Result,
+};
 use itertools::Itertools;
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, QueryClone, TermQuery},
@@ -203,10 +207,18 @@ impl Instruction {
         for option in &self.options {
             match option {
                 PatternOption::Site(site) if field.is_none() => {
-                    field = Some(schema.get_field(Field::Site.as_str()).unwrap());
+                    field = Some(
+                        schema
+                            .get_field(Field::Text(TextField::Site).name())
+                            .unwrap(),
+                    );
 
-                    let domain_field = schema.get_field(Field::DomainNoTokenizer.as_str()).unwrap();
-                    let site_field = schema.get_field(Field::SiteNoTokenizer.as_str()).unwrap();
+                    let domain_field = schema
+                        .get_field(Field::Text(TextField::DomainNoTokenizer).name())
+                        .unwrap();
+                    let site_field = schema
+                        .get_field(Field::Text(TextField::SiteNoTokenizer).name())
+                        .unwrap();
 
                     subqueries.push((
                         Occur::Must,
@@ -218,16 +230,32 @@ impl Instruction {
                     ));
                 }
                 PatternOption::InUrl if field.is_none() => {
-                    field = Some(schema.get_field(Field::Url.as_str()).unwrap())
+                    field = Some(
+                        schema
+                            .get_field(Field::Text(TextField::Url).name())
+                            .unwrap(),
+                    )
                 }
                 PatternOption::InTitle if field.is_none() => {
-                    field = Some(schema.get_field(Field::Title.as_str()).unwrap())
+                    field = Some(
+                        schema
+                            .get_field(Field::Text(TextField::Title).name())
+                            .unwrap(),
+                    )
                 }
                 PatternOption::InDescription if field.is_none() => {
-                    field = Some(schema.get_field(Field::Description.as_str()).unwrap())
+                    field = Some(
+                        schema
+                            .get_field(Field::Text(TextField::Description).name())
+                            .unwrap(),
+                    )
                 }
                 PatternOption::InContent if field.is_none() => {
-                    field = Some(schema.get_field(Field::CleanBody.as_str()).unwrap())
+                    field = Some(
+                        schema
+                            .get_field(Field::Text(TextField::CleanBody).name())
+                            .unwrap(),
+                    )
                 }
                 PatternOption::Action(pattern_action) if action.is_none() => {
                     action = Some(*pattern_action)
@@ -237,7 +265,11 @@ impl Instruction {
         }
 
         let action = action.unwrap_or(Action::Boost(1));
-        let field = field.unwrap_or_else(|| schema.get_field(Field::Url.as_str()).unwrap());
+        let field = field.unwrap_or_else(|| {
+            schema
+                .get_field(Field::Text(TextField::Url).name())
+                .unwrap()
+        });
 
         if !self.patterns.is_empty() {
             let query = self.pattern_query(field);

@@ -46,4 +46,8 @@ impl SubdomainCounter {
     pub fn commit(&self) {
         self.inner.flush();
     }
+
+    pub fn merge(&mut self, other: Self) {
+        todo!();
+    }
 }

@@ -27,7 +27,7 @@ use tantivy::{
 use crate::{
     query::intersection::Intersection,
     ranking::bm25::Bm25Weight,
-    schema::{Field, ALL_FIELDS},
+    schema::{FastField, Field, TextField, ALL_FIELDS},
     tokenizer,
 };
 
@@ -149,33 +149,33 @@ impl PatternWeight {
             .collect();
 
         let num_tokens_reader = match &ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Title => reader.fast_fields().u64(
+            Field::Text(TextField::Title) => reader.fast_fields().u64(
                 reader
                     .schema()
-                    .get_field(Field::NumTitleTokens.as_str())
+                    .get_field(Field::Fast(FastField::NumTitleTokens).name())
                     .unwrap(),
             ),
-            Field::CleanBody => reader.fast_fields().u64(
+            Field::Text(TextField::CleanBody) => reader.fast_fields().u64(
                 reader
                     .schema()
-                    .get_field(Field::NumCleanBodyTokens.as_str())
+                    .get_field(Field::Fast(FastField::NumCleanBodyTokens).name())
                     .unwrap(),
             ),
-            Field::Url => reader.fast_fields().u64(
+            Field::Text(TextField::Url) => reader.fast_fields().u64(
                 reader
                     .schema()
-                    .get_field(Field::NumUrlTokens.as_str())
+                    .get_field(Field::Fast(FastField::NumUrlTokens).name())
                     .unwrap(),
             ),
-            Field::Description => reader.fast_fields().u64(
+            Field::Text(TextField::Description) => reader.fast_fields().u64(
                 reader
                     .schema()
-                    .get_field(Field::NumDescriptionTokens.as_str())
+                    .get_field(Field::Fast(FastField::NumDescriptionTokens).name())
                     .unwrap(),
             ),
             field => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",
-                field.as_str()
+                field.name()
             ))),
         }?;
 

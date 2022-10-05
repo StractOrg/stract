@@ -23,7 +23,7 @@ use tantivy::{
 use crate::{
     bangs::BANG_PREFIX,
     ranking::FieldBoost,
-    schema::{Field, ALL_FIELDS},
+    schema::{Field, TextField, ALL_FIELDS},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -59,7 +59,12 @@ fn simple_into_tantivy(
 ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
     let (backlink_field, backlink_field_entry) = fields
         .iter()
-        .find(|(field, _)| matches!(ALL_FIELDS[field.field_id() as usize], Field::BacklinkText))
+        .find(|(field, _)| {
+            matches!(
+                ALL_FIELDS[field.field_id() as usize],
+                Field::Text(TextField::BacklinkText)
+            )
+        })
         .unwrap();
 
     vec![
@@ -115,7 +120,10 @@ impl Term {
                 let (field, entry) = fields
                     .iter()
                     .find(|(field, _)| {
-                        matches!(ALL_FIELDS[field.field_id() as usize], Field::Title)
+                        matches!(
+                            ALL_FIELDS[field.field_id() as usize],
+                            Field::Text(TextField::Title)
+                        )
                     })
                     .unwrap();
                 vec![(
@@ -127,7 +135,10 @@ impl Term {
                 let (field, entry) = fields
                     .iter()
                     .find(|(field, _)| {
-                        matches!(ALL_FIELDS[field.field_id() as usize], Field::AllBody)
+                        matches!(
+                            ALL_FIELDS[field.field_id() as usize],
+                            Field::Text(TextField::AllBody)
+                        )
                     })
                     .unwrap();
                 vec![(
@@ -138,7 +149,12 @@ impl Term {
             Term::Url(url) => {
                 let (field, entry) = fields
                     .iter()
-                    .find(|(field, _)| matches!(ALL_FIELDS[field.field_id() as usize], Field::Url))
+                    .find(|(field, _)| {
+                        matches!(
+                            ALL_FIELDS[field.field_id() as usize],
+                            Field::Text(TextField::Url)
+                        )
+                    })
                     .unwrap();
                 vec![(
                     Occur::Must,
@@ -185,7 +201,8 @@ impl Term {
             .filter(|(field, _)| {
                 matches!(
                     ALL_FIELDS[field.field_id() as usize],
-                    Field::DomainNoTokenizer | Field::SiteNoTokenizer
+                    Field::Text(TextField::DomainNoTokenizer)
+                        | Field::Text(TextField::SiteNoTokenizer)
                 )
             })
             .into_iter()
@@ -218,7 +235,8 @@ impl Term {
             ))
         };
 
-        let boost = field_boost.get(&ALL_FIELDS[field.field_id() as usize]) as f32;
+        let boost =
+            field_boost.get(&ALL_FIELDS[field.field_id() as usize].as_text().unwrap()) as f32;
 
         Box::new(BoostQuery::new(processed_query, boost))
     }

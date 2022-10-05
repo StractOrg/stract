@@ -24,7 +24,7 @@ use tantivy::{
 use crate::{
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, PrehashMap, Prehashed},
-    schema::Field,
+    schema::{FastField, Field},
 };
 
 fn adjust_score(num_taken: usize, original_score: f64) -> f64 {
@@ -109,7 +109,7 @@ impl Collector for TopDocs {
         let key_reader = segment.fast_fields().u64s(
             segment
                 .schema()
-                .get_field(Field::SiteHash.as_str())
+                .get_field(Field::Fast(FastField::SiteHash).name())
                 .unwrap(),
         )?;
 

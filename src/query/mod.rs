@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ranking::goggles::Goggle, ranking::SignalAggregator, schema::Field, Result};
+use crate::{
+    ranking::goggles::Goggle,
+    ranking::SignalAggregator,
+    schema::{Field, TextField},
+    Result,
+};
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
@@ -44,10 +49,13 @@ fn proximity_queries(
 ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
     let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = Vec::new();
 
-    let proxmity_fields = [Field::Title, Field::CleanBody];
+    let proxmity_fields = [
+        Field::Text(TextField::Title),
+        Field::Text(TextField::CleanBody),
+    ];
 
     for field in &proxmity_fields {
-        let tantivy_field = schema.get_field(field.as_str()).unwrap();
+        let tantivy_field = schema.get_field(field.name()).unwrap();
         let tantivy_entry = schema.get_field_entry(tantivy_field);
 
         for (boost, slop) in [(6, 0), (5, 1), (4, 2), (3, 4), (2, 16), (1, 32)] {
@@ -296,7 +304,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
 
         index
             .insert(Webpage::new(
@@ -381,7 +393,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -396,7 +412,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -411,7 +431,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -463,7 +487,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -515,7 +543,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -597,7 +629,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -611,7 +647,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");
@@ -626,7 +666,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
         let result = index
             .search(&query, ranker.collector())
             .expect("Search failed");

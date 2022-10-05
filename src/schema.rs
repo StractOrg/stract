@@ -22,8 +22,8 @@ use crate::tokenizer::{Identity, Normal, Stemmed};
 
 pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Field {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextField {
     Title,
     CleanBody,
     StemmedTitle,
@@ -40,14 +40,18 @@ pub enum Field {
     DomainNameIfHomepageNoTokenizer,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     TitleIfHomepage,
-    IsHomepage,
     BacklinkText,
+    PrimaryImage,
+    Description,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FastField {
+    IsHomepage,
     HostCentrality,
     PageCentrality,
     FetchTimeMs,
-    PrimaryImage,
     LastUpdated,
-    Description,
     NumTrackers,
     Region,
     NumUrlTokens,
@@ -62,40 +66,47 @@ pub enum Field {
     PreComputedScore,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Field {
+    Fast(FastField),
+    Text(TextField),
+}
+
 pub static ALL_FIELDS: [Field; 33] = [
-    Field::Title,
-    Field::CleanBody,
-    Field::StemmedTitle,
-    Field::StemmedCleanBody,
-    Field::AllBody,
-    Field::Url,
-    Field::Site,
-    Field::Domain,
-    Field::SiteNoTokenizer,
-    Field::DomainNoTokenizer,
-    Field::DomainIfHomepage,
-    Field::DomainNameIfHomepageNoTokenizer,
-    Field::TitleIfHomepage,
-    Field::IsHomepage,
-    Field::BacklinkText,
-    Field::HostCentrality,
-    Field::PageCentrality,
-    Field::FetchTimeMs,
-    Field::PrimaryImage,
-    Field::LastUpdated,
-    Field::Description,
-    Field::NumTrackers,
-    Field::Region,
-    Field::NumUrlTokens,
-    Field::NumTitleTokens,
-    Field::NumCleanBodyTokens,
-    Field::NumDescriptionTokens,
-    Field::SiteHash,
-    Field::UrlWithoutQueryHash,
-    Field::TitleHash,
-    Field::UrlHash,
-    Field::DomainHash,
-    Field::PreComputedScore,
+    Field::Text(TextField::Title),
+    Field::Text(TextField::CleanBody),
+    Field::Text(TextField::StemmedTitle),
+    Field::Text(TextField::StemmedCleanBody),
+    Field::Text(TextField::AllBody),
+    Field::Text(TextField::Url),
+    Field::Text(TextField::Site),
+    Field::Text(TextField::Domain),
+    Field::Text(TextField::SiteNoTokenizer),
+    Field::Text(TextField::DomainNoTokenizer),
+    Field::Text(TextField::DomainIfHomepage),
+    Field::Text(TextField::DomainNameIfHomepageNoTokenizer),
+    Field::Text(TextField::TitleIfHomepage),
+    Field::Text(TextField::BacklinkText),
+    Field::Text(TextField::PrimaryImage),
+    Field::Text(TextField::Description),
+    // FAST FIELDS
+    Field::Fast(FastField::IsHomepage),
+    Field::Fast(FastField::HostCentrality),
+    Field::Fast(FastField::PageCentrality),
+    Field::Fast(FastField::FetchTimeMs),
+    Field::Fast(FastField::LastUpdated),
+    Field::Fast(FastField::NumTrackers),
+    Field::Fast(FastField::Region),
+    Field::Fast(FastField::NumUrlTokens),
+    Field::Fast(FastField::NumTitleTokens),
+    Field::Fast(FastField::NumCleanBodyTokens),
+    Field::Fast(FastField::NumDescriptionTokens),
+    Field::Fast(FastField::SiteHash),
+    Field::Fast(FastField::UrlWithoutQueryHash),
+    Field::Fast(FastField::TitleHash),
+    Field::Fast(FastField::UrlHash),
+    Field::Fast(FastField::DomainHash),
+    Field::Fast(FastField::PreComputedScore),
 ];
 
 impl Field {
@@ -116,106 +127,122 @@ impl Field {
 
     pub fn options(&self) -> IndexingOption {
         match self {
-            Field::Title => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::CleanBody => IndexingOption::Text(self.default_text_options()),
-            Field::Url => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Site => IndexingOption::Text(self.default_text_options()),
-            Field::Domain => IndexingOption::Text(self.default_text_options()),
-            Field::SiteNoTokenizer => {
+            Field::Text(TextField::Title) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Text(TextField::CleanBody) => IndexingOption::Text(self.default_text_options()),
+            Field::Text(TextField::Url) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Text(TextField::Site) => IndexingOption::Text(self.default_text_options()),
+            Field::Text(TextField::Domain) => IndexingOption::Text(self.default_text_options()),
+            Field::Text(TextField::SiteNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
             }
-            Field::DomainNoTokenizer => {
+            Field::Text(TextField::DomainNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
             }
-            Field::AllBody => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::DomainIfHomepage => IndexingOption::Text(self.default_text_options()),
-            Field::TitleIfHomepage => IndexingOption::Text(self.default_text_options()),
-            Field::DomainNameIfHomepageNoTokenizer => {
+            Field::Text(TextField::AllBody) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Text(TextField::DomainIfHomepage) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::TitleIfHomepage) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
             }
-            Field::IsHomepage => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::BacklinkText => IndexingOption::Text(self.default_text_options()),
-            Field::HostCentrality => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::PageCentrality => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::StemmedTitle => {
+            Field::Text(TextField::BacklinkText) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::StemmedTitle) => {
                 IndexingOption::Text(self.default_text_options_with_tokenizer(Stemmed::as_str()))
             }
-            Field::StemmedCleanBody => IndexingOption::Text(
+            Field::Text(TextField::StemmedCleanBody) => IndexingOption::Text(
                 self.default_text_options_with_tokenizer(Stemmed::as_str())
                     .set_stored(),
             ),
-            Field::FetchTimeMs => IndexingOption::Integer(
+            Field::Text(TextField::PrimaryImage) => {
+                IndexingOption::Bytes(BytesOptions::default().set_stored())
+            }
+            Field::Text(TextField::Description) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumTrackers => IndexingOption::Integer(
+            Field::Fast(FastField::HostCentrality) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::PrimaryImage => IndexingOption::Bytes(BytesOptions::default().set_stored()),
-            Field::LastUpdated => IndexingOption::Integer(
+            Field::Fast(FastField::PageCentrality) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::Fast(FastField::FetchTimeMs) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::Fast(FastField::NumTrackers) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::Fast(FastField::LastUpdated) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::Description => IndexingOption::Text(self.default_text_options().set_stored()),
-            Field::Region => IndexingOption::Integer(
+            Field::Fast(FastField::Region) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::NumCleanBodyTokens => IndexingOption::Integer(
+            Field::Fast(FastField::NumCleanBodyTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumDescriptionTokens => IndexingOption::Integer(
+            Field::Fast(FastField::NumDescriptionTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumTitleTokens => IndexingOption::Integer(
+            Field::Fast(FastField::NumTitleTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::NumUrlTokens => IndexingOption::Integer(
+            Field::Fast(FastField::NumUrlTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::SiteHash => IndexingOption::Integer(
+            Field::Fast(FastField::SiteHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::UrlWithoutQueryHash => IndexingOption::Integer(
+            Field::Fast(FastField::UrlWithoutQueryHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::UrlHash => IndexingOption::Integer(
+            Field::Fast(FastField::UrlHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::DomainHash => IndexingOption::Integer(
+            Field::Fast(FastField::DomainHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::TitleHash => IndexingOption::Integer(
+            Field::Fast(FastField::TitleHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
-            Field::PreComputedScore => IndexingOption::Float(
+            Field::Fast(FastField::PreComputedScore) => IndexingOption::Float(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed()
@@ -224,137 +251,126 @@ impl Field {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
-            Field::Title => "title",
-            Field::CleanBody => "body",
-            Field::Url => "url",
-            Field::Site => "site",
-            Field::Domain => "domain",
-            Field::SiteNoTokenizer => "site_no_tokenizer",
-            Field::DomainNoTokenizer => "domain_no_tokenizer",
-            Field::BacklinkText => "backlink_text",
-            Field::HostCentrality => "host_centrality",
-            Field::PageCentrality => "page_centrality",
-            Field::StemmedTitle => "stemmed_title",
-            Field::StemmedCleanBody => "stemmed_body",
-            Field::DomainIfHomepage => "domain_if_homepage",
-            Field::DomainNameIfHomepageNoTokenizer => "domain_name_if_homepage_no_tokenizer",
-            Field::IsHomepage => "is_homepage",
-            Field::FetchTimeMs => "fetch_time_ms",
-            Field::PrimaryImage => "primary_image_uuid",
-            Field::LastUpdated => "last_updated",
-            Field::Description => "description",
-            Field::AllBody => "all_body",
-            Field::NumTrackers => "num_trackers",
-            Field::Region => "region",
-            Field::NumUrlTokens => "num_url_tokens",
-            Field::NumTitleTokens => "num_title_tokens",
-            Field::NumCleanBodyTokens => "num_clean_body_tokens",
-            Field::NumDescriptionTokens => "num_description_tokens",
-            Field::SiteHash => "site_hash",
-            Field::UrlWithoutQueryHash => "url_without_query_hash",
-            Field::PreComputedScore => "pre_computed_score",
-            Field::TitleIfHomepage => "title_if_homepage",
-            Field::TitleHash => "title_hash",
-            Field::UrlHash => "url_hash",
-            Field::DomainHash => "domain_hash",
+            Field::Text(TextField::Title) => "title",
+            Field::Text(TextField::CleanBody) => "body",
+            Field::Text(TextField::Url) => "url",
+            Field::Text(TextField::Site) => "site",
+            Field::Text(TextField::Domain) => "domain",
+            Field::Text(TextField::SiteNoTokenizer) => "site_no_tokenizer",
+            Field::Text(TextField::DomainNoTokenizer) => "domain_no_tokenizer",
+            Field::Text(TextField::BacklinkText) => "backlink_text",
+            Field::Text(TextField::StemmedTitle) => "stemmed_title",
+            Field::Text(TextField::StemmedCleanBody) => "stemmed_body",
+            Field::Text(TextField::DomainIfHomepage) => "domain_if_homepage",
+            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
+                "domain_name_if_homepage_no_tokenizer"
+            }
+            Field::Text(TextField::Description) => "description",
+            Field::Text(TextField::PrimaryImage) => "primary_image_uuid",
+            Field::Text(TextField::TitleIfHomepage) => "title_if_homepage",
+            Field::Text(TextField::AllBody) => "all_body",
+            Field::Fast(FastField::HostCentrality) => "host_centrality",
+            Field::Fast(FastField::PageCentrality) => "page_centrality",
+            Field::Fast(FastField::IsHomepage) => "is_homepage",
+            Field::Fast(FastField::FetchTimeMs) => "fetch_time_ms",
+            Field::Fast(FastField::LastUpdated) => "last_updated",
+            Field::Fast(FastField::NumTrackers) => "num_trackers",
+            Field::Fast(FastField::Region) => "region",
+            Field::Fast(FastField::NumUrlTokens) => "num_url_tokens",
+            Field::Fast(FastField::NumTitleTokens) => "num_title_tokens",
+            Field::Fast(FastField::NumCleanBodyTokens) => "num_clean_body_tokens",
+            Field::Fast(FastField::NumDescriptionTokens) => "num_description_tokens",
+            Field::Fast(FastField::SiteHash) => "site_hash",
+            Field::Fast(FastField::UrlWithoutQueryHash) => "url_without_query_hash",
+            Field::Fast(FastField::PreComputedScore) => "pre_computed_score",
+            Field::Fast(FastField::TitleHash) => "title_hash",
+            Field::Fast(FastField::UrlHash) => "url_hash",
+            Field::Fast(FastField::DomainHash) => "domain_hash",
         }
     }
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Site => Some(3.0),
-            Field::TitleIfHomepage => Some(2.0),
-            Field::DomainIfHomepage => Some(10.0),
-            Field::DomainNameIfHomepageNoTokenizer => Some(30.0),
-            Field::StemmedCleanBody | Field::StemmedTitle => Some(0.1),
-            Field::CleanBody => Some(4.0),
-            Field::Title => Some(10.0),
-            Field::Url => Some(1.0),
-            Field::Domain => Some(1.0),
-            Field::AllBody => Some(0.01),
-            Field::BacklinkText => Some(4.0),
-            Field::HostCentrality
-            | Field::PageCentrality
-            | Field::SiteHash
-            | Field::TitleHash
-            | Field::UrlHash
-            | Field::UrlWithoutQueryHash
-            | Field::SiteNoTokenizer
-            | Field::DomainNoTokenizer
-            | Field::IsHomepage
-            | Field::PrimaryImage
-            | Field::FetchTimeMs
-            | Field::Description
-            | Field::NumTrackers
-            | Field::NumUrlTokens
-            | Field::DomainHash
-            | Field::NumTitleTokens
-            | Field::NumCleanBodyTokens
-            | Field::NumDescriptionTokens
-            | Field::Region
-            | Field::PreComputedScore
-            | Field::LastUpdated => None,
+            Field::Text(TextField::Site) => Some(3.0),
+            Field::Text(TextField::TitleIfHomepage) => Some(2.0),
+            Field::Text(TextField::DomainIfHomepage) => Some(10.0),
+            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => Some(30.0),
+            Field::Text(TextField::StemmedCleanBody) | Field::Text(TextField::StemmedTitle) => {
+                Some(0.1)
+            }
+            Field::Text(TextField::CleanBody) => Some(4.0),
+            Field::Text(TextField::Title) => Some(10.0),
+            Field::Text(TextField::Url) => Some(1.0),
+            Field::Text(TextField::Domain) => Some(1.0),
+            Field::Text(TextField::AllBody) => Some(0.01),
+            Field::Text(TextField::BacklinkText) => Some(4.0),
+            Field::Text(TextField::SiteNoTokenizer)
+            | Field::Text(TextField::DomainNoTokenizer)
+            | Field::Text(TextField::Description)
+            | Field::Text(TextField::PrimaryImage) => None,
+            Field::Fast(_) => None,
         }
     }
 
     pub fn is_searchable(&self) -> bool {
-        !matches!(self, Field::PrimaryImage | Field::BacklinkText) && !self.is_fast()
+        !matches!(
+            self,
+            Field::Text(TextField::PrimaryImage) | Field::Text(TextField::BacklinkText)
+        ) && !self.is_fast()
     }
 
     pub fn is_fast(&self) -> bool {
-        matches!(
-            self,
-            Field::IsHomepage
-                | Field::HostCentrality
-                | Field::FetchTimeMs
-                | Field::LastUpdated
-                | Field::NumTrackers
-                | Field::Region
-                | Field::NumUrlTokens
-                | Field::NumTitleTokens
-                | Field::NumCleanBodyTokens
-                | Field::NumDescriptionTokens
-                | Field::SiteHash
-                | Field::UrlWithoutQueryHash
-                | Field::TitleHash
-                | Field::UrlHash
-                | Field::DomainHash
-                | Field::PreComputedScore
-        )
+        matches!(self, Field::Fast(_))
     }
 
-    pub fn from_string(name: String) -> Option<Field> {
+    pub fn from_name(name: String) -> Option<Field> {
         match name.as_str() {
-            "title" => Some(Field::Title),
-            "body" => Some(Field::CleanBody),
-            "url" => Some(Field::Url),
-            "site" => Some(Field::Site),
-            "backlink_text" => Some(Field::BacklinkText),
-            "host_centrality" => Some(Field::HostCentrality),
-            "page_centrality" => Some(Field::PageCentrality),
-            "stemmed_title" => Some(Field::StemmedTitle),
-            "stemmed_body" => Some(Field::StemmedCleanBody),
-            "domain" => Some(Field::Domain),
-            "domain_if_homepage" => Some(Field::DomainIfHomepage),
-            "is_homepage" => Some(Field::IsHomepage),
-            "fetch_time_ms" => Some(Field::FetchTimeMs),
-            "primary_image_uuid" => Some(Field::PrimaryImage),
-            "last_updated" => Some(Field::LastUpdated),
-            "description" => Some(Field::Description),
-            "all_body" => Some(Field::AllBody),
-            "num_trackers" => Some(Field::NumTrackers),
-            "region" => Some(Field::Region),
-            "site_hash" => Some(Field::SiteHash),
-            "url_without_query_hash" => Some(Field::UrlWithoutQueryHash),
-            "domain_name_if_homepage_no_tokenizer" => Some(Field::DomainNameIfHomepageNoTokenizer),
-            "pre_computed_score" => Some(Field::PreComputedScore),
-            "title_if_homepage" => Some(Field::TitleIfHomepage),
-            "url_hash" => Some(Field::UrlHash),
-            "domain_hash" => Some(Field::DomainHash),
-            "title_hash" => Some(Field::TitleHash),
+            "title" => Some(Field::Text(TextField::Title)),
+            "body" => Some(Field::Text(TextField::CleanBody)),
+            "url" => Some(Field::Text(TextField::Url)),
+            "site" => Some(Field::Text(TextField::Site)),
+            "backlink_text" => Some(Field::Text(TextField::BacklinkText)),
+            "stemmed_title" => Some(Field::Text(TextField::StemmedTitle)),
+            "stemmed_body" => Some(Field::Text(TextField::StemmedCleanBody)),
+            "domain" => Some(Field::Text(TextField::Domain)),
+            "domain_if_homepage" => Some(Field::Text(TextField::DomainIfHomepage)),
+            "primary_image_uuid" => Some(Field::Text(TextField::PrimaryImage)),
+            "domain_name_if_homepage_no_tokenizer" => {
+                Some(Field::Text(TextField::DomainNameIfHomepageNoTokenizer))
+            }
+            "description" => Some(Field::Text(TextField::Description)),
+            "all_body" => Some(Field::Text(TextField::AllBody)),
+            "title_if_homepage" => Some(Field::Text(TextField::TitleIfHomepage)),
+            "host_centrality" => Some(Field::Fast(FastField::HostCentrality)),
+            "page_centrality" => Some(Field::Fast(FastField::PageCentrality)),
+            "is_homepage" => Some(Field::Fast(FastField::IsHomepage)),
+            "fetch_time_ms" => Some(Field::Fast(FastField::FetchTimeMs)),
+            "last_updated" => Some(Field::Fast(FastField::LastUpdated)),
+            "num_trackers" => Some(Field::Fast(FastField::NumTrackers)),
+            "region" => Some(Field::Fast(FastField::Region)),
+            "site_hash" => Some(Field::Fast(FastField::SiteHash)),
+            "url_without_query_hash" => Some(Field::Fast(FastField::UrlWithoutQueryHash)),
+            "pre_computed_score" => Some(Field::Fast(FastField::PreComputedScore)),
+            "url_hash" => Some(Field::Fast(FastField::UrlHash)),
+            "domain_hash" => Some(Field::Fast(FastField::DomainHash)),
+            "title_hash" => Some(Field::Fast(FastField::TitleHash)),
             _ => None,
+        }
+    }
+
+    pub fn as_text(&self) -> Option<TextField> {
+        match self {
+            Field::Fast(_) => None,
+            Field::Text(field) => Some(*field),
+        }
+    }
+
+    pub fn as_fast(&self) -> Option<FastField> {
+        match self {
+            Field::Fast(field) => Some(*field),
+            Field::Text(_) => None,
         }
     }
 }
@@ -364,10 +380,10 @@ pub fn create_schema() -> tantivy::schema::Schema {
 
     for field in &ALL_FIELDS {
         match field.options() {
-            IndexingOption::Text(options) => builder.add_text_field(field.as_str(), options),
-            IndexingOption::Integer(options) => builder.add_u64_field(field.as_str(), options),
-            IndexingOption::Float(options) => builder.add_f64_field(field.as_str(), options),
-            IndexingOption::Bytes(options) => builder.add_bytes_field(field.as_str(), options),
+            IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
+            IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
+            IndexingOption::Float(options) => builder.add_f64_field(field.name(), options),
+            IndexingOption::Bytes(options) => builder.add_bytes_field(field.name(), options),
         };
     }
 
@@ -379,4 +395,34 @@ pub enum IndexingOption {
     Integer(tantivy::schema::NumericOptions),
     Float(tantivy::schema::NumericOptions),
     Bytes(tantivy::schema::BytesOptions),
+}
+
+pub enum DataType {
+    U64,
+    U64s,
+    F64,
+}
+
+impl FastField {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            FastField::IsHomepage => DataType::U64,
+            FastField::HostCentrality => DataType::U64,
+            FastField::PageCentrality => DataType::U64,
+            FastField::FetchTimeMs => DataType::U64,
+            FastField::LastUpdated => DataType::U64,
+            FastField::NumTrackers => DataType::U64,
+            FastField::Region => DataType::U64,
+            FastField::NumUrlTokens => DataType::U64,
+            FastField::NumTitleTokens => DataType::U64,
+            FastField::NumCleanBodyTokens => DataType::U64,
+            FastField::NumDescriptionTokens => DataType::U64,
+            FastField::SiteHash => DataType::U64s,
+            FastField::UrlWithoutQueryHash => DataType::U64s,
+            FastField::TitleHash => DataType::U64s,
+            FastField::UrlHash => DataType::U64s,
+            FastField::DomainHash => DataType::U64s,
+            FastField::PreComputedScore => DataType::F64,
+        }
+    }
 }

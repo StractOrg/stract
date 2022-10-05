@@ -154,6 +154,9 @@ impl Index {
 
         self.region_count.merge(other.region_count);
 
+        self.subdomain_counter.merge(other.subdomain_counter);
+        drop(self.subdomain_counter);
+
         Self::open(&self.path).expect("failed to open index")
     }
 
@@ -363,7 +366,11 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(RegionCount::default(), SignalAggregator::default());
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.inverted_index.fastfield_cache(),
+        );
 
         let result = index
             .search(&query, ranker.collector())
