@@ -136,10 +136,11 @@ impl RegionCount {
                 std::fs::create_dir_all(parent).unwrap();
             }
             File::create(path.as_ref()).unwrap();
+
             HashMap::new()
         } else {
-            let json = std::fs::read_to_string(path.as_ref()).unwrap();
-            serde_json::from_str(&json).unwrap()
+            let json = std::fs::read_to_string(path.as_ref()).unwrap_or_default();
+            serde_json::from_str(&json).unwrap_or_else(|_| HashMap::new())
         };
 
         let mut fast_count = Vec::new();
