@@ -18,28 +18,12 @@ use std::{collections::HashMap, fs::File, path::Path};
 
 use crate::{
     ranking::centrality_store::CentralityStore,
-    webgraph::{Webgraph, WebgraphBuilder},
+    webgraph::{centrality::harmonic::HarmonicCentrality, WebgraphBuilder},
 };
 
 pub struct Centrality {}
 
 impl Centrality {
-    fn host_centrality(graph: &Webgraph) -> HashMap<String, f64> {
-        graph
-            .host_harmonic_centrality()
-            .into_iter()
-            .map(|(node, centrality)| (node.name, centrality))
-            .collect()
-    }
-
-    fn full_centrality(graph: &Webgraph) -> HashMap<String, f64> {
-        graph
-            .harmonic_centrality()
-            .into_iter()
-            .map(|(node, centrality)| (node.name, centrality))
-            .collect()
-    }
-
     fn save<P: AsRef<Path>>(centrality: HashMap<String, f64>, output_path: P) {
         let mut centrality_store = CentralityStore::new(output_path.as_ref());
 
@@ -64,14 +48,28 @@ impl Centrality {
         wtr.flush().unwrap();
     }
 
-    fn host<P: AsRef<Path>>(graph: &Webgraph, output_path: P) {
-        let centrality = Self::host_centrality(graph);
-        Self::save(centrality, output_path);
+    fn host<P: AsRef<Path>>(centrality: &HarmonicCentrality, output_path: P) {
+        Self::save(
+            centrality
+                .host
+                .clone()
+                .into_iter()
+                .map(|(node, centrality)| (node.name, centrality))
+                .collect(),
+            output_path,
+        );
     }
 
-    fn full<P: AsRef<Path>>(graph: &Webgraph, output_path: P) {
-        let centrality = Self::full_centrality(graph);
-        Self::save(centrality, output_path);
+    fn full<P: AsRef<Path>>(centrality: &HarmonicCentrality, output_path: P) {
+        Self::save(
+            centrality
+                .full
+                .clone()
+                .into_iter()
+                .map(|(node, centrality)| (node.name, centrality))
+                .collect(),
+            output_path,
+        );
     }
 
     pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
@@ -80,7 +78,9 @@ impl Centrality {
             .with_full_graph()
             .open();
 
-        Self::host(&graph, output_path.as_ref().join("host"));
-        Self::full(&graph, output_path.as_ref().join("full"));
+        let centrality = HarmonicCentrality::calculate(&graph);
+
+        Self::host(&centrality, output_path.as_ref().join("host"));
+        Self::full(&centrality, output_path.as_ref().join("full"));
     }
 }
