@@ -13,3 +13,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//! Algorithm in broad strokes
+//! We first calculate the betweenness centrality for all nodes an choose top k as proxy nodes.
+//! The distances from every node to every proxy node and reverse is then calculated and stored.
+//!
+//! During search the user can choose a set of trusted node. Every proxy node then gets a weight
+//! of weight(p) = sum(1 / dist(p, t) for t in trusted_nodes). The top s proxy nodes are then chosen to be used during search.
+//! For each search candidate, u, they get a score of score(u) = 1 / (1 + sum(weight(p) * d(p, u) for p in best_proxy_nodes))

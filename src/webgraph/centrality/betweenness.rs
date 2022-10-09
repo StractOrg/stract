@@ -30,13 +30,21 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
         centrality.entry(s).or_default();
 
         let mut stack = Vec::new();
-        let mut predecessors: HashMap<u64, Vec<u64>> = HashMap::new();
+        let mut predecessors: Vec<Vec<u64>> = Vec::new();
 
-        let mut sigma = HashMap::new();
-        sigma.insert(s, 1);
+        let mut sigma = Vec::new();
 
-        let mut distances = HashMap::new();
-        distances.insert(s, 0);
+        while s as usize >= sigma.len() {
+            sigma.push(0);
+        }
+
+        sigma[s as usize] = 1;
+
+        let mut distances = Vec::new();
+        while s as usize >= distances.len() {
+            distances.push(-1);
+        }
+        distances[s as usize] = 0;
 
         let mut q = VecDeque::new();
         q.push_back(s);
@@ -45,32 +53,50 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
             stack.push(v);
             for edge in store.outgoing_edges(v) {
                 let w = edge.to;
-                let dist_v = *distances.get(&v).unwrap();
-                distances.entry(w).or_insert_with(|| {
-                    q.push_back(w);
-                    dist_v + 1
-                });
 
-                if *distances.get(&w).unwrap() == *distances.get(&v).unwrap() + 1 {
-                    let sigma_v = *sigma.get(&v).unwrap_or(&0);
-                    *sigma.entry(w).or_insert(0) += sigma_v;
-                    predecessors.entry(w).or_default().push(v);
+                while w as usize >= distances.len() {
+                    distances.push(-1);
+                }
+
+                if distances[w as usize] == -1 {
+                    let dist_v = distances[v as usize];
+                    q.push_back(w);
+                    distances[w as usize] = dist_v + 1;
+                }
+
+                if distances[w as usize] == distances[v as usize] + 1 {
+                    let sigma_v = *sigma.get(v as usize).unwrap_or(&0);
+
+                    while w as usize >= sigma.len() {
+                        sigma.push(0);
+                    }
+
+                    sigma[w as usize] += sigma_v;
+
+                    while w as usize >= predecessors.len() {
+                        predecessors.push(Vec::new());
+                    }
+
+                    predecessors[w as usize].push(v);
                 }
             }
         }
 
-        let mut delta = HashMap::new();
+        let mut delta = Vec::new();
         while let Some(w) = stack.pop() {
-            if let Some(pred) = predecessors.get(&w) {
+            if let Some(pred) = predecessors.get(w as usize) {
                 for v in pred {
-                    *delta.entry(v).or_default() += (*sigma.get(v).unwrap() as f64
-                        / *sigma.get(&w).unwrap() as f64)
-                        * (1.0 + delta.get(&w).unwrap_or(&0.0));
+                    while *v as usize >= delta.len() {
+                        delta.push(0.0);
+                    }
+
+                    delta[*v as usize] += (sigma[*v as usize] as f64 / sigma[w as usize] as f64)
+                        * (1.0 + delta.get(w as usize).unwrap_or(&0.0));
                 }
             }
 
             if w != s {
-                *centrality.entry(w).or_insert(0.0) += *delta.get(&w).unwrap_or(&0.0);
+                *centrality.entry(w).or_insert(0.0) += *delta.get(w as usize).unwrap_or(&0.0);
             }
         }
     }
@@ -86,14 +112,12 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
 
 #[derive(Debug)]
 pub struct Betweenness {
-    pub full: HashMap<Node, f64>,
     pub host: HashMap<Node, f64>,
 }
 
 impl Betweenness {
     pub fn calculate(graph: &Webgraph) -> Self {
         Self {
-            full: graph.full.as_ref().map(calculate).unwrap_or_default(),
             host: graph.host.as_ref().map(calculate).unwrap_or_default(),
         }
     }
