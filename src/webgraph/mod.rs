@@ -361,7 +361,6 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    #[allow(unused)]
     pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host
             .as_ref()
@@ -395,7 +394,6 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    #[allow(unused)]
     pub fn host_reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host
             .as_ref()

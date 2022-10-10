@@ -21,9 +21,10 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph};
 
-fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
+fn calculate<S: Store>(store: &GraphStore<S>) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
     let mut n = 0;
+    let mut max_dist = 0;
 
     for s in store.nodes() {
         n += 1;
@@ -82,6 +83,8 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
             }
         }
 
+        max_dist = max_dist.max(*distances.iter().max().unwrap_or(&0));
+
         let mut delta = Vec::new();
         while let Some(w) = stack.pop() {
             if let Some(pred) = predecessors.get(w as usize) {
@@ -104,21 +107,35 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> HashMap<Node, f64> {
     let n = n as f64;
     let norm = n * (n - 1.0);
 
-    centrality
-        .into_iter()
-        .map(|(id, centrality)| (store.id2node(&id).unwrap(), centrality / norm))
-        .collect()
+    (
+        centrality
+            .into_iter()
+            .map(|(id, centrality)| (store.id2node(&id).unwrap(), centrality / norm))
+            .collect(),
+        max_dist,
+    )
 }
 
 #[derive(Debug)]
 pub struct Betweenness {
-    pub host: HashMap<Node, f64>,
+    pub centrality: HashMap<Node, f64>,
+    pub max_dist: usize,
 }
 
 impl Betweenness {
     pub fn calculate(graph: &Webgraph) -> Self {
-        Self {
-            host: graph.host.as_ref().map(calculate).unwrap_or_default(),
+        match &graph.host {
+            Some(store) => {
+                let (host, max_dist) = calculate(store);
+                Self {
+                    centrality: host,
+                    max_dist: max_dist.min(0) as usize,
+                }
+            }
+            None => Self {
+                centrality: HashMap::new(),
+                max_dist: 0,
+            },
         }
     }
 }
@@ -167,7 +184,7 @@ mod tests {
         let centrality = Betweenness::calculate(&p);
 
         assert_eq!(
-            centrality.host,
+            centrality.centrality,
             hashmap! {
                 Node::from("0".to_string()) => 0.0,
                 Node::from("1".to_string()) => 0.15,
@@ -176,5 +193,7 @@ mod tests {
                 Node::from("4".to_string()) => 0.0,
             }
         );
+
+        assert!(false);
     }
 }
