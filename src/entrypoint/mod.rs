@@ -60,16 +60,14 @@ async fn async_download_all_warc_files<'a>(
             .unwrap();
         debug!("downloading warc file {}", &warc_path);
         let res = WarcFile::download_into_buf(source, &warc_path, &mut file).await;
+
+        if let Err(err) = res {
+            debug!("error while downloading: {:?}", err);
+        }
+
         debug!("finished downloading");
 
-        (warc_path, res)
+        warc_path
     }))
     .buffer_unordered(num_files)
-    .filter_map(|(path, res)| async move {
-        if res.is_ok() {
-            Some(path.clone())
-        } else {
-            None
-        }
-    })
 }
