@@ -129,7 +129,7 @@ impl Betweenness {
                 let (host, max_dist) = calculate(store);
                 Self {
                     centrality: host,
-                    max_dist: max_dist.min(0) as usize,
+                    max_dist: max_dist.max(0) as usize,
                 }
             }
             None => Self {
@@ -193,7 +193,5 @@ mod tests {
                 Node::from("4".to_string()) => 0.0,
             }
         );
-
-        assert!(false);
     }
 }
