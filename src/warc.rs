@@ -110,7 +110,8 @@ impl WarcFile {
                 return Ok(());
             }
 
-            debug!("warc download failed, retrying in {} ms", dur.as_millis());
+            debug!("warc download failed: {:?}", res.err().unwrap());
+            debug!("retrying in {} ms", dur.as_millis());
 
             sleep(dur).await;
         }

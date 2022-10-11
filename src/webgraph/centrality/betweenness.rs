@@ -19,14 +19,35 @@
 
 use std::collections::{HashMap, VecDeque};
 
+use indicatif::{ProgressBar, ProgressStyle};
+
 use crate::webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph};
 
-fn calculate<S: Store>(store: &GraphStore<S>) -> (HashMap<Node, f64>, i32) {
+fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
     let mut n = 0;
     let mut max_dist = 0;
 
-    for s in store.nodes() {
+    let nodes: Vec<_> = store.nodes().collect();
+
+    let pb =
+        if with_progress {
+            let pb = ProgressBar::new(nodes.len() as u64);
+            pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})")
+            .progress_chars("#>-"),
+    );
+            Some(pb)
+        } else {
+            None
+        };
+
+    for s in nodes {
+        if let Some(pb) = &pb {
+            pb.inc(1);
+        }
+
         n += 1;
         centrality.entry(s).or_default();
 
@@ -104,6 +125,10 @@ fn calculate<S: Store>(store: &GraphStore<S>) -> (HashMap<Node, f64>, i32) {
         }
     }
 
+    if let Some(pb) = &pb {
+        pb.finish();
+    }
+
     let n = n as f64;
     let norm = n * (n - 1.0);
 
@@ -123,10 +148,27 @@ pub struct Betweenness {
 }
 
 impl Betweenness {
+    #[allow(unused)]
     pub fn calculate(graph: &Webgraph) -> Self {
         match &graph.host {
             Some(store) => {
-                let (host, max_dist) = calculate(store);
+                let (host, max_dist) = calculate(store, false);
+                Self {
+                    centrality: host,
+                    max_dist: max_dist.max(0) as usize,
+                }
+            }
+            None => Self {
+                centrality: HashMap::new(),
+                max_dist: 0,
+            },
+        }
+    }
+
+    pub fn calculate_with_progress(graph: &Webgraph) -> Self {
+        match &graph.host {
+            Some(store) => {
+                let (host, max_dist) = calculate(store, true);
                 Self {
                     centrality: host,
                     max_dist: max_dist.max(0) as usize,

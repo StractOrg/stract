@@ -16,37 +16,52 @@
 
 use std::path::Path;
 
-use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+use crate::{
+    kv::{rocksdb_store::RocksDbStore, Kv},
+    webgraph::centrality::trust::TrustedCentrality,
+};
 
-pub struct CentralityStore {
-    inner: Box<dyn Kv<String, f64>>,
+pub struct HarmonicCentralityStore {
+    pub host: Box<dyn Kv<String, f64>>,
+    pub full: Box<dyn Kv<String, f64>>,
 }
 
-impl CentralityStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+impl HarmonicCentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            inner: RocksDbStore::open(path),
+            host: RocksDbStore::open(path.as_ref().join("host")),
+            full: RocksDbStore::open(path.as_ref().join("full")),
         }
     }
 
-    pub fn insert(&mut self, key: String, centrality: f64) {
-        self.inner.insert(key, centrality);
+    fn flush(&self) {
+        self.host.flush();
+        self.full.flush();
     }
+}
 
-    pub fn get(&self, key: &str) -> Option<f64> {
-        self.inner.get(&key.to_string())
-    }
+pub struct CentralityStore {
+    pub harmonic: HarmonicCentralityStore,
+    pub trust: TrustedCentrality,
+    pub base_path: String,
+}
 
-    pub fn append(&mut self, it: impl Iterator<Item = (String, f64)>) {
-        it.filter(|(_, value)| *value != 0.0)
-            .for_each(|(key, value)| {
-                self.insert(key, value);
-            });
-
-        self.flush();
+impl CentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
+            trust: TrustedCentrality::load(path.as_ref().join("trust"))
+                .ok()
+                .unwrap_or_default(),
+            base_path: path.as_ref().to_str().unwrap().to_string(),
+        }
     }
 
     pub fn flush(&self) {
-        self.inner.flush();
+        self.harmonic.flush();
+
+        self.trust
+            .save(Path::new(&self.base_path).join("trust"))
+            .unwrap();
     }
 }

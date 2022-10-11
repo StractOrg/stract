@@ -53,19 +53,14 @@ struct Job {
 }
 
 struct IndexingWorker {
-    host_centrality_store: CentralityStore,
-    page_centrality_store: CentralityStore,
+    centrality_store: CentralityStore,
     webgraph: Option<Webgraph>,
 }
 
 impl IndexingWorker {
     fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
-        let host_centrality_path = Path::new(&centrality_store_path).join("host");
-        let page_centrality_path = Path::new(&centrality_store_path).join("full");
-
         Self {
-            host_centrality_store: CentralityStore::new(host_centrality_path),
-            page_centrality_store: CentralityStore::new(page_centrality_path),
+            centrality_store: CentralityStore::open(centrality_store_path),
             webgraph: webgraph_path.map(|path| {
                 WebgraphBuilder::new(path)
                     .with_full_graph()
@@ -110,8 +105,10 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
 
                 let host_centrality = worker
-                    .host_centrality_store
-                    .get(html.url().host_without_specific_subdomains())
+                    .centrality_store
+                    .harmonic
+                    .host
+                    .get(&html.url().host_without_specific_subdomains().to_string())
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
@@ -139,8 +136,10 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .unwrap_or_else(Vec::new);
 
                 let page_centrality = worker
-                    .page_centrality_store
-                    .get(html.url().raw())
+                    .centrality_store
+                    .harmonic
+                    .full
+                    .get(&html.url().raw().to_string())
                     .unwrap_or_default();
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;

@@ -23,6 +23,8 @@
 //! For each search candidate, u, they get a score of score(u) = 1 / (1 + sum(weight(p) * d(p, u) for p in best_proxy_nodes))
 
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
 use std::path::Path;
 
 use itertools::Itertools;
@@ -116,7 +118,7 @@ impl<'a> Scorer<'a> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct TrustedCentrality {
     node2id: HashMap<Node, NodeID>,
     proxy_nodes: Vec<ProxyNode>,
@@ -129,7 +131,7 @@ impl TrustedCentrality {
     }
 
     fn new_with_num_proxy(graph: &Webgraph, num_proxy_nodes: usize) -> Self {
-        let betweenness = Betweenness::calculate(graph);
+        let betweenness = Betweenness::calculate_with_progress(graph);
 
         let mut nodes = betweenness.centrality.into_iter().collect_vec();
         nodes.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -187,11 +189,26 @@ impl TrustedCentrality {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        todo!();
+        let mut file = File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(path)?;
+
+        let buf = bincode::serialize(&self)?;
+        file.write_all(&buf)?;
+
+        Ok(())
     }
 
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<()> {
-        todo!();
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let file = File::options().open(path)?;
+        let mut reader = BufReader::new(file);
+
+        let mut buf = Vec::new();
+        reader.read_to_end(&mut buf)?;
+
+        Ok(bincode::deserialize(&buf)?)
     }
 }
 
@@ -282,7 +299,7 @@ mod tests {
         let centrality = TrustedCentrality::new_with_num_proxy(&graph, 3);
         assert_eq!(centrality.max_dist, 4);
 
-        let trusted_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
+        let trusted_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
         let scorer = centrality.scorer(&trusted_nodes);
 
@@ -322,7 +339,7 @@ mod tests {
             ) > scorer.score(
                 *centrality
                     .node2id
-                    .get(&Node::from("B".to_string()))
+                    .get(&Node::from("A".to_string()))
                     .unwrap()
             )
         );
