@@ -1,106 +1,137 @@
-<div class="flex text-sm flex-col py-5 px-2 items-center h-fit w-52 overflow-hidden absolute border rounded-lg drop-shadow-md bg-white origin-left modal-closed" id="ranking-modal">
-    <h2 class="w-fit text-center">
-        Do you like results from <span id="ranking-modal-site-label">EXAMPLE.com</span>?
-    </h2>
-    <div class="flex flex-col w-fit pt-4 space-y-3">
-        <button class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white" onclick="preferMore()" id="prefer-more">Prefer more</button>
-        <button class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white" onclick="preferLess()" id="prefer-less">Prefer less</button>
-        <button class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white" onclick="block()" id="prefer-block">Block</button>
-    </div>
+<div
+  class="flex text-sm flex-col py-5 px-2 items-center h-fit w-52 overflow-hidden absolute border rounded-lg drop-shadow-md bg-white origin-left modal-closed"
+  id="ranking-modal"
+>
+  <h2 class="w-fit text-center">
+    Do you like results from <span id="ranking-modal-site-label">
+      EXAMPLE.com
+    </span>?
+  </h2>
+  <div class="flex flex-col w-fit pt-4 space-y-3">
+    <button
+      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      onclick="preferMore()"
+      id="prefer-more"
+    >
+      Prefer more
+    </button>
+    <button
+      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      onclick="preferLess()"
+      id="prefer-less"
+    >
+      Prefer less
+    </button>
+    <button
+      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      onclick="block()"
+      id="prefer-block"
+    >
+      Block
+    </button>
+  </div>
 </div>
 
 <noscript>
-    <style>
-        #ranking-modal {
-            visibility: hidden;
-        }
-    </style>
+  <style>
+    #ranking-modal {
+      visibility: hidden;
+    }
+  </style>
 </noscript>
 
 <style>
-    #ranking-modal.modal-open {
-        transition: transform .15s ease-in-out,left .15s ease-in-out,top .15s ease-in-out;
-        transform: scale(1);
-    }
+  #ranking-modal.modal-open {
+    transition: transform 0.15s ease-in-out, left 0.15s ease-in-out,
+      top 0.15s ease-in-out;
+    transform: scale(1);
+  }
 
-    .selected {
-        @apply bg-slate-600 text-white;
-    }
+  .selected {
+    @apply bg-slate-600 text-white;
+  }
 
-    #ranking-modal.modal-closed{
-        transition: none !important;
-        transform: scale(0);
-    }
+  #ranking-modal.modal-closed {
+    transition: none !important;
+    transform: scale(0);
+  }
 </style>
 
 <script is:inline>
-    var rankingModal = document.getElementById("ranking-modal");
-    var siteLabel = document.getElementById("ranking-modal-site-label");
-    var btnPreferMore = document.getElementById("prefer-more");
-    var btnPreferLess = document.getElementById("prefer-less");
-    var btnPreferBlock = document.getElementById("prefer-block");
+  var rankingModal = document.getElementById("ranking-modal");
+  var siteLabel = document.getElementById("ranking-modal-site-label");
+  var btnPreferMore = document.getElementById("prefer-more");
+  var btnPreferLess = document.getElementById("prefer-less");
+  var btnPreferBlock = document.getElementById("prefer-block");
 
-    var currentSite = "";
+  var currentSite = "";
 
-    const BLOCKED = 0;
-    const LESS = 1;
-    const MORE = 2;
-    
-    let rankings = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+  const BLOCKED = 0;
+  const LESS = 1;
+  const MORE = 2;
 
-    rankingModal.addEventListener("click", (event) => {
-        event.stopPropagation();
-    });
+  let rankings = JSON.parse(
+    window.localStorage.getItem("sites-ranking-adjustment") || "{}"
+  );
 
-    function updateModal(site) {
-        siteLabel.innerHTML = site;
-        currentSite = site;
+  rankingModal.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
 
-        updateSelection();
+  function updateModal(site) {
+    siteLabel.innerHTML = site;
+    currentSite = site;
+
+    updateSelection();
+  }
+
+  function updateSelection() {
+    let rankings = JSON.parse(
+      window.localStorage.getItem("sites-ranking-adjustment") || "{}"
+    );
+
+    btnPreferMore.classList.remove("selected");
+    btnPreferLess.classList.remove("selected");
+    btnPreferBlock.classList.remove("selected");
+
+    if (rankings[currentSite] != undefined) {
+      let pref = rankings[currentSite];
+
+      if (pref == MORE) {
+        btnPreferMore.classList.add("selected");
+      } else if (pref == LESS) {
+        btnPreferLess.classList.add("selected");
+      } else if (pref == BLOCKED) {
+        btnPreferBlock.classList.add("selected");
+      }
+    }
+  }
+
+  function setSitePreference(pref) {
+    if (rankings[currentSite] == pref) {
+      delete rankings[currentSite];
+    } else {
+      rankings[currentSite] = pref;
     }
 
-    function updateSelection() {
-        let rankings = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+    window.localStorage.setItem(
+      "sites-ranking-adjustment",
+      JSON.stringify(rankings)
+    );
 
-        btnPreferMore.classList.remove("selected");
-        btnPreferLess.classList.remove("selected");
-        btnPreferBlock.classList.remove("selected");
+    updateSelection();
+    document.getElementById("searchbar-form").submit();
+  }
 
-        if (rankings[currentSite] != undefined) {
-            let pref = rankings[currentSite];
+  function preferMore() {
+    setSitePreference(MORE);
+  }
 
-            if (pref == MORE) {
-                btnPreferMore.classList.add("selected");
-            } else if (pref == LESS) {
-                btnPreferLess.classList.add("selected");
-            } else if (pref == BLOCKED) {
-                btnPreferBlock.classList.add("selected");
-            }
-        }
-    }
+  function preferLess() {
+    setSitePreference(LESS);
+  }
 
-    function setSitePreference(pref) {
-        if (rankings[currentSite] == pref) {
-            delete rankings[currentSite];
-        } else {
-            rankings[currentSite] = pref;
-        }
-
-        window.localStorage.setItem("sites-ranking-adjustment", JSON.stringify(rankings));
-
-        updateSelection();
-        document.getElementById('searchbar-form').submit();
-    }
-
-    function preferMore() {
-        setSitePreference(MORE);
-    }
-
-    function preferLess() {
-        setSitePreference(LESS);
-    }
-
-    function block() {
-        setSitePreference(BLOCKED);
-    }
+  function block() {
+    setSitePreference(BLOCKED);
+  }
 </script>

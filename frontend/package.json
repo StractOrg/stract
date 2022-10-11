@@ -10,6 +10,9 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@alpinejs/persist": "^3.10.4",
+    "@types/alpinejs": "^3.7.0",
+    "alpinejs": "^3.10.4",
     "astro": "^1.1.6",
     "astro-icon": "^0.7.3"
   },
@@ -20,7 +23,7 @@
     "@fontsource/montserrat": "^4.5.12",
     "@tailwindcss/typography": "^0.5.7",
     "prettier": "^2.7.1",
-    "prettier-plugin-astro": "^0.5.4",
+    "prettier-plugin-astro": "^0.5.5",
     "prettier-plugin-tailwindcss": "^0.1.13"
   }
 }
