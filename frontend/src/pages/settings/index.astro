@@ -1,0 +1,92 @@
+---
+import Footer from "../../components/Footer.astro";
+import Layout from "../../layouts/Layout.astro";
+import Header from "../../components/Header.astro";
+import SettingsMenu from "../../components/SettingsMenu.astro";
+import { askama } from "../../askama";
+---
+
+<Layout title="Cuely">
+  <div class="flex flex-col h-full w-full">
+    <Header />
+
+    <div class="flex w-full h-fit justify-center pt-10">
+      <SettingsMenu />
+      <div class="flex flex-col max-w-2xl">
+        <h1 class="font-medium text-2xl">Manage Goggles</h1>
+        <div class="text-sm mt-5">
+          Goggles lets you control almost everything about which search results
+          that gets returned to you. You can discard results from specific
+          sites, boost results from other sites and much more.
+        </div>
+        <div class="text-sm mt-3">
+          See our <a
+            href="https://github.com/Cuely/sample-goggles/blob/main/quickstart.goggle"
+            >quickstart</a
+          > for how to get started. Once you have developed your goggle, you can
+          add it here to be used during your search.
+        </div>
+        <div class="text-sm mt-3">
+          Simply host the goggle on a url that returns a plain-text HTTP
+          response with the goggle. We use raw.githubusercontent.com, but you
+          are free to host them elsewhere.
+        </div>
+        <div
+          class="mt-16"
+          x-data="{ items: $persist([]).as('goggles'), name: '', url: '' }"
+        >
+          <div class="w-full flex justify-between pl-5 pr-5">
+            <input id="name" type="text" placeholder="Name" x-model="name" />
+            <input id="url" type="text" placeholder="Url" x-model="url" />
+            <button
+              x-on:click="items.push({ name, url }); name = url = ''"
+              class="bg-brand text-white rounded-full w-20 h-10 border-0 text-sm"
+              >Add</button
+            >
+          </div>
+          <div class="mt-5">
+            <div class="grid w-full space-y-5" id="goggles-list">
+              <div class="flex">
+                <div class="w-10"></div>
+                <div class="font-medium flex-1">Name</div>
+                <div class="font-medium flex-1">Url</div>
+              </div>
+              {
+                askama.for_("goggle in default_goggles", () => (
+                  <div class="flex">
+                    <div class="mr-5 w-5">
+                      <img src="/images/disabled-delete.svg" class="h-5 w-5" />
+                    </div>
+                    <div class="flex-1 text-sm">{askama`goggle.name $ {{random.words}}`}</div>
+                    <div class="flex-1 text-sm">{askama`goggle.url $ {{internet.url}}`}</div>
+                  </div>
+                ))
+              }
+              <template x-for="(item, index) in items">
+                <div class="flex">
+                  <div class="w-10">
+                    <img
+                      src="/images/delete.svg"
+                      class="w-5 h-5 hover:cursor-pointer"
+                      x-on:click="items.splice(index, 1)"
+                    />
+                  </div>
+                  <div class="user-goggle flex-1 text-sm" x-text="item.name">
+                  </div>
+                  <div class="user-goggle flex-1 text-sm" x-text="item.url">
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-grow"></div>
+    <Footer />
+  </div>
+</Layout>
+
+<script>
+  import "$/alpine";
+</script>

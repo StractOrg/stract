@@ -2,7 +2,7 @@
   <ShortName>Cuely</ShortName>
   <Description>Open source search engine.</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="32" height="32" type="image/x-icon">https://cuely.io/assets/favicon.ico</Image>
+  <Image width="32" height="32" type="image/x-icon">https://cuely.io/favicon.ico</Image>
   <Url rel="results" type="text/html" template="https://cuely.io/search?q={searchTerms}"/>
   <Url rel="suggestions" type="application/x-suggestions+json" template="https://cuely.io/autosuggest/browser?q={searchTerms}"/>
   <moz:SearchForm>https://cuely.io/</moz:SearchForm>

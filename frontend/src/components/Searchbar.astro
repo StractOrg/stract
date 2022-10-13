@@ -74,21 +74,18 @@ const { autofocus, query } = Astro.props;
     </div>
   </div>
 
-  <input
-    type="hidden"
-    value=""
-    name="sr"
-    id="siteRankingsUuid"
-  />
+  <input type="hidden" value="" name="sr" id="siteRankingsUuid" />
 </form>
 
 <script>
   const searchbar = document.querySelector("#searchbar")!;
-  const searchbarForm: HTMLFormElement = document.querySelector("#searchbar-form")!;
-  const siteRankingsUuid: HTMLInputElement = document.querySelector("#siteRankingsUuid")!;
+  const searchbarForm: HTMLFormElement =
+    document.querySelector("#searchbar-form")!;
+  const siteRankingsUuid: HTMLInputElement =
+    document.querySelector("#siteRankingsUuid")!;
   const searchbarInput: HTMLInputElement =
     document.querySelector(".searchbar-input")!;
-  
+
   let suggestionItems = () =>
     Array.from(document.querySelectorAll(".suggestion-item")) as HTMLElement[];
 
@@ -113,7 +110,7 @@ const { autofocus, query } = Astro.props;
 
       node.innerHTML = `
                 <div class="flex w-4 mr-3 items-center">
-                    <img class="h-5" loading="lazy" src="/assets/images/search.svg" />
+                    <img class="h-5" loading="lazy" src="/images/search.svg" />
                 </div>
                 <div>
                     ${item.highlighted}
@@ -264,34 +261,42 @@ const { autofocus, query } = Astro.props;
 
   HTMLFormElement.prototype._submit = HTMLFormElement.prototype.submit;
 
-  HTMLFormElement.prototype.submit = function (){ 
-    this.dispatchEvent(new SubmitEvent('submit', {
-        'bubbles': true,
-        'cancelable': true
-    }));
-    
+  HTMLFormElement.prototype.submit = function () {
+    this.dispatchEvent(
+      new SubmitEvent("submit", {
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+
     this._submit();
   };
 
-  searchbarForm.addEventListener("submit", (event: Event) => {encodeSiteRankings()}, false);
+  searchbarForm.addEventListener("submit", () => encodeSiteRankings(), false);
 
   function encodeSiteRankings() {
     const BLOCKED = 0;
     const LESS = 1;
     const MORE = 2;
 
-    let sites = JSON.parse(window.localStorage.getItem("sites-ranking-adjustment") || "{}");
+    let sites = JSON.parse(
+      window.localStorage.getItem("sites-ranking-adjustment") || "{}"
+    ) as Record<string, number>;
 
-    let rankings = {"preferred": [], "disliked": [], "blocked": []};
+    let rankings = {
+      preferred: [] as string[],
+      disliked: [] as string[],
+      blocked: [] as string[],
+    };
 
     for (const [site, ranking] of Object.entries(sites)) {
-        if (ranking == MORE) {
-          rankings.preferred.push(site);
-        } else if (ranking == LESS) {
-          rankings.disliked.push(site);
-        } else if (ranking == BLOCKED) {
-          rankings.blocked.push(site);
-        }
+      if (ranking == MORE) {
+        rankings.preferred.push(site);
+      } else if (ranking == LESS) {
+        rankings.disliked.push(site);
+      } else if (ranking == BLOCKED) {
+        rankings.blocked.push(site);
+      }
     }
 
     let encoded = btoa(JSON.stringify(rankings));
