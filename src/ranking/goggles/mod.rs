@@ -361,6 +361,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index
@@ -386,6 +387,7 @@ mod tests {
                 primary_image: None,
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
+                node_id: None,
             })
             .expect("failed to insert webpage");
 
@@ -491,6 +493,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index
@@ -516,6 +519,7 @@ mod tests {
                 primary_image: None,
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
+                node_id: None,
             })
             .expect("failed to insert webpage");
 
@@ -599,6 +603,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index
@@ -624,6 +629,7 @@ mod tests {
                 primary_image: None,
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index
@@ -649,6 +655,7 @@ mod tests {
                 primary_image: None,
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
+                node_id: None,
             })
             .expect("failed to insert webpage");
 

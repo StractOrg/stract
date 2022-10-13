@@ -149,6 +149,13 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 trace!("title = {:?}", html.title());
                 trace!("text = {:?}", html.clean_text());
 
+                let node_id = worker
+                    .centrality_store
+                    .approx_harmonic
+                    .node2id
+                    .get(&Node::from_url(html.url()).into_host())
+                    .copied();
+
                 let mut webpage = Webpage {
                     html,
                     backlinks,
@@ -157,6 +164,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     fetch_time_ms,
                     primary_image: None,
                     pre_computed_score: 0.0,
+                    node_id,
                 };
 
                 webpage.pre_computed_score =

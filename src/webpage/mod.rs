@@ -128,6 +128,7 @@ pub struct Webpage {
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub primary_image: Option<StoredPrimaryImage>,
+    pub node_id: Option<u64>,
 }
 
 impl Webpage {
@@ -143,6 +144,7 @@ impl Webpage {
             fetch_time_ms: 0,
             pre_computed_score: 0.0,
             primary_image: None,
+            node_id: None,
         }
     }
 
@@ -214,6 +216,13 @@ impl Webpage {
                 .get_field(Field::Text(TextField::PrimaryImage).name())
                 .expect("Failed to get primary_image field"),
             image,
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::Fast(FastField::NodeID).name())
+                .expect("Failed to get node_id field"),
+            self.node_id.unwrap_or(u64::MAX),
         );
 
         Ok(doc)
@@ -697,6 +706,7 @@ impl Html {
                 | Field::Fast(FastField::FetchTimeMs)
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
+                | Field::Fast(FastField::NodeID)
                 | Field::Text(TextField::PrimaryImage) => {}
             }
         }

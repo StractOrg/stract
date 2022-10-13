@@ -253,6 +253,7 @@ mod tests {
                     page_centrality: 0.0,
                     pre_computed_score: 0.0,
                     primary_image: None,
+                    node_id: None,
                 })
                 .expect("failed to insert webpage");
         }

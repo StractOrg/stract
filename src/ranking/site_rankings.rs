@@ -106,6 +106,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index
@@ -131,6 +132,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                node_id: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
