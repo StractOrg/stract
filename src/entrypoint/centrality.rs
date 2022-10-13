@@ -40,36 +40,36 @@ impl Centrality {
 
         store.approx_harmonic = ApproximatedHarmonicCentrality::new(&graph);
 
-        // let harmonic_centrality = HarmonicCentrality::calculate(&graph);
+        let harmonic_centrality = HarmonicCentrality::calculate(&graph);
 
-        // let csv_file = File::options()
-        //     .write(true)
-        //     .create(true)
-        //     .truncate(true)
-        //     .open(output_path.as_ref().join("harmonic_full.csv"))
-        //     .unwrap();
-        // let mut wtr = csv::Writer::from_writer(csv_file);
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_full.csv"))
+            .unwrap();
+        let mut wtr = csv::Writer::from_writer(csv_file);
 
-        // for (node, centrality) in harmonic_centrality.full {
-        //     store.harmonic.full.insert(node.name.clone(), centrality);
-        //     wtr.write_record(&[node.name, centrality.to_string()])
-        //         .unwrap();
-        // }
-        // wtr.flush().unwrap();
+        for (node, centrality) in harmonic_centrality.full {
+            store.harmonic.full.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+        wtr.flush().unwrap();
 
-        // let csv_file = File::options()
-        //     .write(true)
-        //     .create(true)
-        //     .truncate(true)
-        //     .open(output_path.as_ref().join("harmonic_host.csv"))
-        //     .unwrap();
-        // let mut wtr = csv::Writer::from_writer(csv_file);
-        // for (node, centrality) in harmonic_centrality.host {
-        //     store.harmonic.host.insert(node.name.clone(), centrality);
-        //     wtr.write_record(&[node.name, centrality.to_string()])
-        //         .unwrap();
-        // }
-        // wtr.flush().unwrap();
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_host.csv"))
+            .unwrap();
+        let mut wtr = csv::Writer::from_writer(csv_file);
+        for (node, centrality) in harmonic_centrality.host {
+            store.harmonic.host.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+        wtr.flush().unwrap();
 
         store.flush();
     }
