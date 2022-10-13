@@ -24,7 +24,7 @@ use std::{cmp, fs};
 use graph_store::GraphStore;
 
 use crate::directory::{self, DirEntry};
-use crate::webpage::{Url, Webpage};
+use crate::webpage::Url;
 
 use self::graph_store::Adjacency;
 use crate::kv::rocksdb_store::RocksDbStore;
@@ -55,8 +55,8 @@ impl Node {
         }
     }
 
-    pub fn from_website(website: &Webpage) -> Self {
-        Node::from(website.html.url().full())
+    pub fn from_url(url: &Url) -> Self {
+        Node::from(url.full())
     }
 }
 
@@ -365,18 +365,12 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host
             .as_ref()
             .map(|host_graph| {
-                let distances = Webgraph::dijkstra(
-                    source,
-                    |node| host_graph.outgoing_edges(node),
-                    |edge| edge.to,
-                    host_graph,
-                );
-
-                distances
+                self.raw_host_distances(source)
                     .into_iter()
                     .map(|(id, dist)| (host_graph.id2node(&id).expect("unknown node"), dist))
                     .collect()
@@ -384,7 +378,21 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    fn raw_host_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+    pub fn raw_host_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+        self.host
+            .as_ref()
+            .map(|host_graph| {
+                Webgraph::dijkstra(
+                    source,
+                    |node| host_graph.outgoing_edges(node),
+                    |edge| edge.to,
+                    host_graph,
+                )
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn raw_host_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
         self.host
             .as_ref()
             .map(|host_graph| {
@@ -398,6 +406,7 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     pub fn host_reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
         self.host
             .as_ref()

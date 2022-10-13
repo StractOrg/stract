@@ -124,9 +124,13 @@ where
 
     fn insert(&mut self, key: K, value: V) {
         if self.cache.len() == self.cache.cap() {
-            if let Some((key, value)) = self.cache.pop_lru() {
-                self.store.insert(key, value);
+            while self.cache.len() > self.cache.cap() / 2 {
+                if let Some((key, value)) = self.cache.pop_lru() {
+                    self.store.insert(key, value);
+                }
             }
+
+            self.store.flush();
         }
 
         self.cache.push(key, value);

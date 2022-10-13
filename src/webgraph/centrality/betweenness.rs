@@ -20,6 +20,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::{Deserialize, Serialize};
 
 use crate::webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph};
 
@@ -43,7 +44,7 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
             None
         };
 
-    for s in nodes {
+    for s in nodes.into_iter().take(100_000) {
         if let Some(pb) = &pb {
             pb.inc(1);
         }
@@ -141,7 +142,7 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Betweenness {
     pub centrality: HashMap<Node, f64>,
     pub max_dist: usize,

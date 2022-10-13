@@ -19,7 +19,9 @@ use std::{fs::File, path::Path};
 use crate::{
     ranking::centrality_store::CentralityStore,
     webgraph::{
-        centrality::{harmonic::HarmonicCentrality, trust::TrustedCentrality},
+        centrality::{
+            approximate_harmonic::ApproximatedHarmonicCentrality, harmonic::HarmonicCentrality,
+        },
         WebgraphBuilder,
     },
 };
@@ -36,7 +38,7 @@ impl Centrality {
 
         let mut store = CentralityStore::open(output_path.as_ref());
 
-        store.trust = TrustedCentrality::new(&graph);
+        store.approx_harmonic = ApproximatedHarmonicCentrality::new(&graph);
 
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
 

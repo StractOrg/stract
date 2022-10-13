@@ -18,7 +18,7 @@ use std::path::Path;
 
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
-    webgraph::centrality::trust::TrustedCentrality,
+    webgraph::centrality::approximate_harmonic::ApproximatedHarmonicCentrality,
 };
 
 pub struct HarmonicCentralityStore {
@@ -42,7 +42,7 @@ impl HarmonicCentralityStore {
 
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
-    pub trust: TrustedCentrality,
+    pub approx_harmonic: ApproximatedHarmonicCentrality,
     pub base_path: String,
 }
 
@@ -50,9 +50,11 @@ impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
-            trust: TrustedCentrality::load(path.as_ref().join("trust"))
-                .ok()
-                .unwrap_or_default(),
+            approx_harmonic: ApproximatedHarmonicCentrality::load(
+                path.as_ref().join("approx_harmonic"),
+            )
+            .ok()
+            .unwrap_or_default(),
             base_path: path.as_ref().to_str().unwrap().to_string(),
         }
     }
@@ -60,8 +62,8 @@ impl CentralityStore {
     pub fn flush(&self) {
         self.harmonic.flush();
 
-        self.trust
-            .save(Path::new(&self.base_path).join("trust"))
+        self.approx_harmonic
+            .save(Path::new(&self.base_path).join("approx_harmonic"))
             .unwrap();
     }
 }

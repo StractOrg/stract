@@ -174,7 +174,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
         index.commit().unwrap();
 
-        std::fs::remove_file(file).ok();
+        std::fs::remove_file(file).unwrap();
     }
 
     info!("{} done", name);
