@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{body::Body, Extension, Router};
-use tower_http::compression::CompressionLayer;
+use axum::{body::Body, routing::get_service, Extension, Router};
+use tower_http::{compression::CompressionLayer, services::ServeDir};
 
 use crate::{
     autosuggest::Autosuggest,
@@ -30,7 +30,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::get,
 };
-use axum_extra::routing::SpaRouter;
 
 mod about;
 mod api;
@@ -70,7 +69,7 @@ pub async fn favicon() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(
-            include_bytes!("../../frontend/dist/assets/favicon.ico").to_vec(),
+            include_bytes!("../../frontend/dist/favicon.ico").to_vec(),
         ))
         .unwrap()
 }
@@ -103,7 +102,14 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/api/beta/search", get(api::search))
         .route("/opensearch.xml", get(opensearch::route))
-        .merge(SpaRouter::new("/assets", "frontend/dist/assets"))
+        .fallback(get_service(ServeDir::new("frontend/dist/")).handle_error(
+            |error: std::io::Error| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled internal error: {}", error),
+                )
+            },
+        ))
         .layer(Extension(state))
         .layer(CompressionLayer::new()))
 }

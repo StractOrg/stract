@@ -147,7 +147,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
         let favicon_bytes = webpage
             .favicon
             .map(|favicon| favicon.as_raw_bytes())
-            .unwrap_or_else(|| include_bytes!("../frontend/dist/assets/images/globe.png").to_vec());
+            .unwrap_or_else(|| include_bytes!("../frontend/dist/images/globe.png").to_vec());
 
         Self {
             title,

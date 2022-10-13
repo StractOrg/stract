@@ -44,7 +44,7 @@ pub async fn route() -> impl IntoResponse {
 }
 
 #[derive(Template)]
-#[template(path = "goggles/index.html")]
+#[template(path = "settings/index.html")]
 struct GogglesTemplate {
     default_goggles: Vec<GoggleLink>,
 }
