@@ -40,6 +40,7 @@ use crate::Result;
 
 const NUM_PROXY_NODES: usize = 10_000;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
+const USER_NODES_LIMIT: usize = 20; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
@@ -88,6 +89,7 @@ pub struct Scorer<'a> {
     fixed_scores: HashMap<NodeID, f64>,
     liked_nodes: Vec<UserNode<'a>>,
     cache: RefCell<HashMap<NodeID, f64>>,
+    num_liked_nodes: usize,
 }
 
 impl<'a> Scorer<'a> {
@@ -95,15 +97,38 @@ impl<'a> Scorer<'a> {
         proxy_nodes: &'a [ProxyNode],
         liked_nodes: &[NodeID],
         fixed_scores: HashMap<NodeID, f64>,
+        betweenness: &HashMap<NodeID, f64>,
     ) -> Self {
-        let liked_nodes = liked_nodes
-            .iter()
-            .map(|id| UserNode::new(*id, proxy_nodes))
-            .collect();
+        let mut liked_nodes_user = Vec::new();
+
+        let num_liked_nodes = liked_nodes.len();
+        let mut liked_nodes = liked_nodes.to_vec();
+        liked_nodes.sort_by(|a, b| {
+            betweenness
+                .get(b)
+                .unwrap_or(&0.0)
+                .partial_cmp(betweenness.get(a).unwrap_or(&0.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        for id in liked_nodes {
+            let user_node = UserNode::new(id, proxy_nodes);
+            if liked_nodes_user.len() < USER_NODES_LIMIT {
+                liked_nodes_user.push(user_node);
+            } else {
+                let mut best = liked_nodes_user
+                    .iter_mut()
+                    .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(1_000_000))
+                    .unwrap();
+
+                best.weight += 1;
+            }
+        }
 
         Self {
             fixed_scores,
-            liked_nodes,
+            num_liked_nodes,
+            liked_nodes: liked_nodes_user,
             cache: RefCell::new(HashMap::new()),
         }
     }
@@ -119,10 +144,10 @@ impl<'a> Scorer<'a> {
             let res = self
                 .liked_nodes
                 .iter()
-                .filter_map(|liked_node| liked_node.best_dist(&node))
-                .map(|d| 1.0 / d as f64)
+                .filter_map(|liked_node| liked_node.best_dist(&node).map(|dist| (dist, liked_node)))
+                .map(|(d, liked_node)| liked_node.weight as f64 / d as f64)
                 .sum::<f64>()
-                / self.liked_nodes.len() as f64;
+                / self.num_liked_nodes as f64;
 
             self.cache.borrow_mut().insert(node, res);
 
@@ -134,6 +159,7 @@ impl<'a> Scorer<'a> {
 struct UserNode<'a> {
     id: NodeID,
     proxy_nodes: Vec<&'a ProxyNode>,
+    weight: usize,
 }
 
 impl<'a> UserNode<'a> {
@@ -158,6 +184,7 @@ impl<'a> UserNode<'a> {
 
         Self {
             id,
+            weight: 1,
             proxy_nodes: heap.into_iter().map(|weighted| weighted.node).collect(),
         }
     }
@@ -188,7 +215,7 @@ impl<'a> UserNode<'a> {
 pub struct ApproximatedHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
     pub proxy_nodes: Vec<ProxyNode>,
-    max_dist: usize,
+    betweenness: HashMap<NodeID, f64>,
 }
 
 impl ApproximatedHarmonicCentrality {
@@ -232,11 +259,14 @@ impl ApproximatedHarmonicCentrality {
             })
             .collect();
 
-        let max_dist = betweenness.max_dist;
         Self {
-            node2id,
             proxy_nodes,
-            max_dist,
+            betweenness: betweenness
+                .centrality
+                .into_iter()
+                .filter_map(|(node, centrality)| node2id.get(&node).map(|id| (*id, centrality)))
+                .collect(),
+            node2id,
         }
     }
 
@@ -249,9 +279,12 @@ impl ApproximatedHarmonicCentrality {
 
         let fixed_scores: HashMap<_, _> = liked_nodes.iter().map(|node| (*node, 1.0)).collect();
 
-        dbg!(liked_nodes.len());
-
-        Scorer::new(&self.proxy_nodes, &liked_nodes, fixed_scores)
+        Scorer::new(
+            &self.proxy_nodes,
+            &liked_nodes,
+            fixed_scores,
+            &self.betweenness,
+        )
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
@@ -363,7 +396,6 @@ mod tests {
     fn ordering() {
         let graph = test_graph();
         let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
-        assert_eq!(centrality.max_dist, 4);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
