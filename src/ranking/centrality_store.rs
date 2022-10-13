@@ -78,11 +78,14 @@ impl CentralityStore {
             .unwrap();
         let mut wtr = csv::Writer::from_writer(csv_file);
 
-        for (node, centrality) in harmonic_centrality.full {
+        let mut full: Vec<_> = harmonic_centrality.full.into_iter().collect();
+        full.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        for (node, centrality) in full {
             store.harmonic.full.insert(node.name.clone(), centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
         }
+
         wtr.flush().unwrap();
 
         let csv_file = File::options()
@@ -91,8 +94,11 @@ impl CentralityStore {
             .truncate(true)
             .open(output_path.as_ref().join("harmonic_host.csv"))
             .unwrap();
+
+        let mut host: Vec<_> = harmonic_centrality.host.into_iter().collect();
+        host.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut wtr = csv::Writer::from_writer(csv_file);
-        for (node, centrality) in harmonic_centrality.host {
+        for (node, centrality) in host {
             store.harmonic.host.insert(node.name.clone(), centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
