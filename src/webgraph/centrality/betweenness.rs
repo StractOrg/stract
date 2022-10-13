@@ -44,7 +44,7 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
             None
         };
 
-    for s in nodes.into_iter().take(100_000) {
+    for s in nodes.into_iter() {
         if let Some(pb) = &pb {
             pb.inc(1);
         }
