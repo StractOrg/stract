@@ -88,47 +88,59 @@ impl<'a> Eq for WeightedProxyNode<'a> {}
 pub struct Scorer<'a> {
     fixed_scores: HashMap<NodeID, f64>,
     liked_nodes: Vec<UserNode<'a>>,
+    disliked_nodes: Vec<UserNode<'a>>,
     cache: RefCell<HashMap<NodeID, f64>>,
     num_liked_nodes: usize,
+}
+
+fn create_user_nodes<'a>(
+    nodes: &[NodeID],
+    proxy_nodes: &'a [ProxyNode],
+    betweenness: &HashMap<NodeID, f64>,
+) -> Vec<UserNode<'a>> {
+    let mut res = Vec::new();
+
+    let mut nodes = nodes.to_vec();
+    nodes.sort_by(|a, b| {
+        betweenness
+            .get(b)
+            .unwrap_or(&0.0)
+            .partial_cmp(betweenness.get(a).unwrap_or(&0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    for id in nodes {
+        let user_node = UserNode::new(id, proxy_nodes);
+        if res.len() < USER_NODES_LIMIT {
+            res.push(user_node);
+        } else {
+            let mut best = res
+                .iter_mut()
+                .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(1_000_000))
+                .unwrap();
+
+            best.weight += 1;
+        }
+    }
+
+    res
 }
 
 impl<'a> Scorer<'a> {
     fn new(
         proxy_nodes: &'a [ProxyNode],
         liked_nodes: &[NodeID],
+        disliked_nodes: &[NodeID],
         fixed_scores: HashMap<NodeID, f64>,
         betweenness: &HashMap<NodeID, f64>,
     ) -> Self {
-        let mut liked_nodes_user = Vec::new();
-
         let num_liked_nodes = liked_nodes.len();
-        let mut liked_nodes = liked_nodes.to_vec();
-        liked_nodes.sort_by(|a, b| {
-            betweenness
-                .get(b)
-                .unwrap_or(&0.0)
-                .partial_cmp(betweenness.get(a).unwrap_or(&0.0))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        for id in liked_nodes {
-            let user_node = UserNode::new(id, proxy_nodes);
-            if liked_nodes_user.len() < USER_NODES_LIMIT {
-                liked_nodes_user.push(user_node);
-            } else {
-                let mut best = liked_nodes_user
-                    .iter_mut()
-                    .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(1_000_000))
-                    .unwrap();
-
-                best.weight += 1;
-            }
-        }
 
         Self {
             fixed_scores,
             num_liked_nodes,
-            liked_nodes: liked_nodes_user,
+            liked_nodes: create_user_nodes(liked_nodes, proxy_nodes, betweenness),
+            disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes, betweenness),
             cache: RefCell::new(HashMap::new()),
         }
     }
@@ -141,13 +153,24 @@ impl<'a> Scorer<'a> {
                 return *cached;
             }
 
-            let res = self
+            let res = ((self
                 .liked_nodes
                 .iter()
                 .filter_map(|liked_node| liked_node.best_dist(&node).map(|dist| (dist, liked_node)))
-                .map(|(d, liked_node)| liked_node.weight as f64 / d as f64)
+                .map(|(dist, liked_node)| liked_node.weight as f64 / dist as f64)
                 .sum::<f64>()
-                / self.num_liked_nodes as f64;
+                - self
+                    .disliked_nodes
+                    .iter()
+                    .filter_map(|disliked_node| {
+                        disliked_node
+                            .best_dist(&node)
+                            .map(|dist| (dist, disliked_node))
+                    })
+                    .map(|(dist, disliked_node)| disliked_node.weight as f64 / dist as f64)
+                    .sum::<f64>())
+                / self.num_liked_nodes as f64)
+                .max(0.0);
 
             self.cache.borrow_mut().insert(node, res);
 
@@ -270,18 +293,29 @@ impl ApproximatedHarmonicCentrality {
         }
     }
 
-    pub fn scorer(&self, liked_nodes: &[Node]) -> Scorer<'_> {
+    pub fn scorer(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer<'_> {
         let liked_nodes = liked_nodes
             .iter()
             .map(|node| node.clone().into_host())
             .filter_map(|node| self.node2id.get(&node).copied())
             .collect_vec();
 
-        let fixed_scores: HashMap<_, _> = liked_nodes.iter().map(|node| (*node, 1.0)).collect();
+        let disliked_nodes = disliked_nodes
+            .iter()
+            .map(|node| node.clone().into_host())
+            .filter_map(|node| self.node2id.get(&node).copied())
+            .collect_vec();
+
+        let fixed_scores: HashMap<_, _> = liked_nodes
+            .iter()
+            .map(|node| (*node, 1.0))
+            .chain(disliked_nodes.iter().map(|node| (*node, 0.0)))
+            .collect();
 
         Scorer::new(
             &self.proxy_nodes,
             &liked_nodes,
+            &disliked_nodes,
             fixed_scores,
             &self.betweenness,
         )
@@ -385,7 +419,7 @@ mod tests {
 
         let liked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
 
-        let scorer = centrality.scorer(&liked_nodes);
+        let scorer = centrality.scorer(&liked_nodes, &[]);
 
         for node in &liked_nodes {
             assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 1.0);
@@ -399,7 +433,7 @@ mod tests {
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
-        let scorer = centrality.scorer(&liked_nodes);
+        let scorer = centrality.scorer(&liked_nodes, &[]);
 
         assert!(
             scorer.score(
@@ -414,6 +448,73 @@ mod tests {
                     .unwrap()
             )
         );
+        assert!(
+            scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("H".to_string()))
+                    .unwrap()
+            ) > scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("C".to_string()))
+                    .unwrap()
+            )
+        );
+
+        assert!(
+            scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("C".to_string()))
+                    .unwrap()
+            ) > scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("A".to_string()))
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn disliked_nodes_centrality() {
+        let graph = test_graph();
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+
+        let disliked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
+
+        let scorer = centrality.scorer(&[], &disliked_nodes);
+
+        for node in &disliked_nodes {
+            assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 0.0);
+        }
+    }
+
+    #[test]
+    fn ordering_with_dislikes() {
+        let graph = test_graph();
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+
+        let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
+        let disliked_nodes = vec![Node::from("F".to_string())];
+
+        let scorer = centrality.scorer(&liked_nodes, &disliked_nodes);
+
+        assert!(
+            scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("E".to_string()))
+                    .unwrap()
+            ) > scorer.score(
+                *centrality
+                    .node2id
+                    .get(&Node::from("H".to_string()))
+                    .unwrap()
+            )
+        );
+
         assert!(
             scorer.score(
                 *centrality

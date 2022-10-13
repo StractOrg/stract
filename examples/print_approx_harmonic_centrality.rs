@@ -94,7 +94,7 @@ fn print_top_nodes(
         .map(|host| Node::from_url(&Url::from(host.to_string())))
         .collect();
 
-    let scorer = store.approx_harmonic.scorer(&liked_nodes);
+    let scorer = store.approx_harmonic.scorer(&liked_nodes, &[]);
     let top_nodes = get_top_nodes(scorer, top_n, nodes);
     println!(
         "top {} sites for these liked sites {:?}",
