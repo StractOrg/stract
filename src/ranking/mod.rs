@@ -689,7 +689,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index);
 
         let res = searcher
             .search(&SearchQuery {
@@ -836,7 +836,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index);
 
         let result = searcher
             .search(&SearchQuery {
@@ -915,7 +915,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index);
 
         let result = searcher
             .search(&SearchQuery {

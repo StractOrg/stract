@@ -154,6 +154,7 @@ pub struct SearchServerConfig {
     pub index_path: String,
     pub entity_index_path: Option<String>,
     pub bangs_path: Option<String>,
+    pub centrality_store_path: Option<String>,
     pub host: String,
 }
 

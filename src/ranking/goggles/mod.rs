@@ -187,6 +187,15 @@ impl Goggle {
                 .collect()
         }
     }
+
+    pub fn merge(mut self, mut other: Self) -> Self {
+        self.instructions.append(&mut other.instructions);
+        self.aggregator
+            .personal_harmonic
+            .append(&mut other.aggregator.personal_harmonic);
+
+        self
+    }
 }
 
 fn process_site(site: &str, field: tantivy::schema::Field) -> Box<dyn tantivy::query::Query> {

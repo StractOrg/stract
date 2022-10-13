@@ -25,7 +25,8 @@ use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
-use crate::ranking::goggles;
+use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::goggles::{self, Goggle};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::webpage::region::Region;
 use crate::webpage::Url;
@@ -37,11 +38,12 @@ pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
+    centrality_store: Option<CentralityStore>,
 }
 
 impl From<Index> for LocalSearcher {
     fn from(index: Index) -> Self {
-        Self::new(index, None, None)
+        Self::new(index)
     }
 }
 
@@ -53,12 +55,25 @@ pub struct InitialWebsiteResult {
 }
 
 impl LocalSearcher {
-    pub fn new(index: Index, entity_index: Option<EntityIndex>, bangs: Option<Bangs>) -> Self {
+    pub fn new(index: Index) -> Self {
         LocalSearcher {
             index,
-            entity_index,
-            bangs,
+            entity_index: None,
+            bangs: None,
+            centrality_store: None,
         }
+    }
+
+    pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
+        self.entity_index = Some(entity_index);
+    }
+
+    pub fn set_bangs(&mut self, bangs: Bangs) {
+        self.bangs = Some(bangs);
+    }
+
+    pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
+        self.centrality_store = Some(centrality_store);
     }
 
     pub fn search_initial(
@@ -99,14 +114,24 @@ impl LocalSearcher {
         }
 
         if let Some(site_rankings) = &query.site_rankings {
-            goggles.push(site_rankings.clone().into_goggle())
+            if let Some(centrality_store) = self.centrality_store.as_ref() {
+                goggles.push(
+                    site_rankings
+                        .clone()
+                        .into_goggle(&centrality_store.approx_harmonic),
+                )
+            }
         }
 
-        parsed_query.set_goggles(&goggles, &self.index.schema());
+        let goggle = goggles
+            .into_iter()
+            .fold(Goggle::default(), |acc, elem| acc.merge(elem));
+
+        parsed_query.set_goggle(&goggle, &self.index.schema());
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
-            goggle.map(|goggle| goggle.aggregator).unwrap_or_default(),
+            goggle.aggregator,
             self.index.inverted_index.fastfield_cache(),
         );
 
@@ -260,7 +285,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index);
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher

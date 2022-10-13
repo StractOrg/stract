@@ -75,7 +75,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
             .join("warc_files")
             .join(name);
 
-        if let Ok(file) = WarcFile::open(path) {
+        if let Ok(file) = WarcFile::open(&path) {
             for record in file.records().flatten() {
                 let webpage = Html::parse_without_text(&record.response.body, &record.request.url);
                 for link in webpage
@@ -94,7 +94,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
             }
         }
 
-        std::fs::remove_file(warc_path).ok();
+        std::fs::remove_file(path).ok();
     }
 
     graph.flush();

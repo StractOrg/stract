@@ -14,11 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::{fs::File, path::Path};
 
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
-    webgraph::centrality::approximate_harmonic::ApproximatedHarmonicCentrality,
+    webgraph::{
+        centrality::{
+            approximate_harmonic::ApproximatedHarmonicCentrality, harmonic::HarmonicCentrality,
+        },
+        Webgraph,
+    },
 };
 
 pub struct HarmonicCentralityStore {
@@ -57,6 +62,46 @@ impl CentralityStore {
             .unwrap_or_default(),
             base_path: path.as_ref().to_str().unwrap().to_string(),
         }
+    }
+
+    pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
+        let mut store = CentralityStore::open(output_path.as_ref());
+
+        store.approx_harmonic = ApproximatedHarmonicCentrality::new(graph);
+        let harmonic_centrality = HarmonicCentrality::calculate(graph);
+
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_full.csv"))
+            .unwrap();
+        let mut wtr = csv::Writer::from_writer(csv_file);
+
+        for (node, centrality) in harmonic_centrality.full {
+            store.harmonic.full.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+        wtr.flush().unwrap();
+
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_host.csv"))
+            .unwrap();
+        let mut wtr = csv::Writer::from_writer(csv_file);
+        for (node, centrality) in harmonic_centrality.host {
+            store.harmonic.host.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+        wtr.flush().unwrap();
+
+        store.flush();
+
+        store
     }
 
     pub fn flush(&self) {

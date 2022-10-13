@@ -14,7 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    webgraph::{centrality::approximate_harmonic::ApproximatedHarmonicCentrality, Node},
+    webpage::Url,
+};
 
 use super::{
     goggles::{Action, Goggle, Instruction, PatternOption},
@@ -23,34 +30,46 @@ use super::{
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SiteRankings {
-    pub preferred: Vec<String>,
+    pub liked: Vec<String>,
     pub disliked: Vec<String>,
     pub blocked: Vec<String>,
 }
 
 impl SiteRankings {
-    pub fn into_goggle(self) -> Goggle {
+    pub fn into_goggle(self, approx_harmonic: &ApproximatedHarmonicCentrality) -> Goggle {
         let mut instructions = Vec::new();
+        let mut aggregator = SignalAggregator::default();
 
-        for site in self.preferred {
+        let mut liked_nodes = Vec::new();
+        let mut disliked_nodes = Vec::new();
+
+        for site in self.liked {
             instructions.push(Instruction {
                 patterns: Vec::new(),
                 options: vec![
-                    PatternOption::Site(site),
+                    PatternOption::Site(site.clone()),
                     PatternOption::Action(Action::Boost(5)),
                 ],
             });
+
+            liked_nodes.push(Node::from_url(&Url::from(site)).into_host());
         }
 
         for site in self.disliked {
             instructions.push(Instruction {
                 patterns: Vec::new(),
                 options: vec![
-                    PatternOption::Site(site),
+                    PatternOption::Site(site.clone()),
                     PatternOption::Action(Action::Downrank(5)),
                 ],
             });
+
+            disliked_nodes.push(Node::from_url(&Url::from(site)).into_host());
         }
+
+        aggregator.personal_harmonic.push(Arc::new(
+            approx_harmonic.scorer(&liked_nodes, &disliked_nodes),
+        ));
 
         for site in self.blocked {
             instructions.push(Instruction {
@@ -63,7 +82,7 @@ impl SiteRankings {
         }
 
         Goggle {
-            aggregator: SignalAggregator::default(),
+            aggregator,
             instructions,
         }
     }
@@ -72,9 +91,11 @@ impl SiteRankings {
 #[cfg(test)]
 mod tests {
     use crate::{
+        gen_temp_path,
         index::Index,
-        ranking::site_rankings::SiteRankings,
+        ranking::{centrality_store::CentralityStore, site_rankings::SiteRankings},
         searcher::{LocalSearcher, SearchQuery},
+        webgraph::{Node, WebgraphBuilder},
         webpage::{Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
@@ -82,6 +103,24 @@ mod tests {
     #[test]
     fn site_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut graph = WebgraphBuilder::new_memory()
+            .with_full_graph()
+            .with_host_graph()
+            .open();
+
+        graph.insert(
+            Node::from("https://www.first.com").into_host(),
+            Node::from("https://www.second.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("https://www.third.com").into_host(),
+            Node::from("https://www.third.com").into_host(),
+            String::new(),
+        );
+
+        graph.flush();
 
         index
             .insert(Webpage {
@@ -106,7 +145,14 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
-                node_id: None,
+                node_id: Some(
+                    graph
+                        .host
+                        .as_ref()
+                        .unwrap()
+                        .node2id(&Node::from("https://www.first.com").into_host())
+                        .unwrap(),
+                ),
             })
             .expect("failed to insert webpage");
         index
@@ -128,15 +174,57 @@ mod tests {
                 ),
                 backlinks: vec![],
                 host_centrality: 1.0,
+                fetch_time_ms: 2000,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                primary_image: None,
+                node_id: Some(
+                    graph
+                        .host
+                        .as_ref()
+                        .unwrap()
+                        .node2id(&Node::from("https://www.second.com").into_host())
+                        .unwrap(),
+                ),
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.third.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
                 fetch_time_ms: 0,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 primary_image: None,
-                node_id: None,
+                node_id: Some(
+                    graph
+                        .host
+                        .as_ref()
+                        .unwrap()
+                        .node2id(&Node::from("https://www.third.com").into_host())
+                        .unwrap(),
+                ),
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index, None, None);
+        let mut searcher = LocalSearcher::new(index);
+
+        searcher.set_centrality_store(CentralityStore::build(&graph, gen_temp_path()));
 
         let result = searcher
             .search(&SearchQuery {
@@ -145,8 +233,8 @@ mod tests {
                 goggle_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
-                    preferred: vec!["first.com".to_string()],
-                    disliked: vec!["second.com".to_string()],
+                    liked: vec!["first.com".to_string()],
+                    disliked: vec!["third.com".to_string()],
                     blocked: vec![],
                 }),
             })
@@ -155,10 +243,11 @@ mod tests {
             .unwrap()
             .webpages;
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.num_docs, 3);
+        assert_eq!(result.documents.len(), 3);
         assert_eq!(result.documents[0].url, "https://www.first.com");
         assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.documents[2].url, "https://www.third.com");
 
         let result = searcher
             .search(&SearchQuery {
@@ -167,7 +256,30 @@ mod tests {
                 goggle_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
-                    preferred: vec![],
+                    liked: vec!["first.com".to_string()],
+                    disliked: vec![],
+                    blocked: vec![],
+                }),
+            })
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 3);
+        assert_eq!(result.documents.len(), 3);
+        assert_eq!(result.documents[0].url, "https://www.first.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.documents[2].url, "https://www.third.com");
+
+        let result = searcher
+            .search(&SearchQuery {
+                original: "test".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+                site_rankings: Some(SiteRankings {
+                    liked: vec![],
                     disliked: vec!["second.com".to_string()],
                     blocked: vec!["first.com".to_string()],
                 }),
@@ -177,8 +289,9 @@ mod tests {
             .unwrap()
             .webpages;
 
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.second.com");
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.third.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
     }
 }

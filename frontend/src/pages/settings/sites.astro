@@ -13,7 +13,7 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
       <SettingsMenu />
       <div class="flex w-full flex-col max-w-2xl space-y-10">
         <div>
-          <h1 class="font-medium text-2xl mb-2">Preffered Sites</h1>
+          <h1 class="font-medium text-2xl mb-2">Liked Sites</h1>
           <div class="text-sm">
             These sites receive a boost during search. Results from these sites
             are more likely to appear in your search results.
@@ -21,7 +21,7 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
           <div class="mt-5">
             <div
               class="grid grid-cols-[auto_1fr] w-full space-y-5"
-              id="preffered-list"
+              id="liked-list"
             >
               <div class="w-10"></div>
               <div class="font-medium">Site Name</div>
@@ -30,7 +30,7 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
         </div>
 
         <div>
-          <h1 class="font-medium text-2xl mb-2">Junk Sites</h1>
+          <h1 class="font-medium text-2xl mb-2">Disliked Sites</h1>
           <div class="text-sm">
             These sites get de-prioritized during search. Results from these
             sites are less likely to appear in your search results.
@@ -38,7 +38,7 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
           <div class="mt-5">
             <div
               class="grid grid-cols-[auto_1fr] w-full space-y-5"
-              id="junk-list"
+              id="disliked-list"
             >
               <div class="w-10"></div>
               <div class="font-medium">Site Name</div>
@@ -74,8 +74,8 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
     window.localStorage.getItem("sites-ranking-adjustment") || "{}"
   );
 
-  const prefferedList = document.getElementById("preffered-list");
-  const junkList = document.getElementById("junk-list");
+  const likedList = document.getElementById("liked-list");
+  const dislikedList = document.getElementById("disliked-list");
   const blockedList = document.getElementById("blocked-list");
 
   const BLOCKED = 0;
@@ -83,11 +83,11 @@ import SettingsMenu from "../../components/SettingsMenu.astro";
   const MORE = 2;
 
   function addMoreRow(site) {
-    addRow(site, prefferedList);
+    addRow(site, likedList);
   }
 
   function addLessRow(site) {
-    addRow(site, junkList);
+    addRow(site, dislikedList);
   }
 
   function addBlockedRow(site) {

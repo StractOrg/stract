@@ -220,7 +220,7 @@ impl Webpage {
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::NodeID).name())
+                .get_field(Field::Fast(FastField::HostNodeID).name())
                 .expect("Failed to get node_id field"),
             self.node_id.unwrap_or(u64::MAX),
         );
@@ -706,7 +706,7 @@ impl Html {
                 | Field::Fast(FastField::FetchTimeMs)
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
-                | Field::Fast(FastField::NodeID)
+                | Field::Fast(FastField::HostNodeID)
                 | Field::Text(TextField::PrimaryImage) => {}
             }
         }

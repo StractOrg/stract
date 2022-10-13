@@ -23,11 +23,11 @@
 //! the shortest distance as the distance through their best proxy node. This distance estimate is very fast since
 //! all distances are pre-computed for the proxy nodes.
 
-use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use boomphf::hashmap::BoomHashMap;
 use itertools::Itertools;
@@ -61,43 +61,43 @@ impl ProxyNode {
     }
 }
 
-struct WeightedProxyNode<'a> {
-    node: &'a ProxyNode,
+struct WeightedProxyNode {
+    node: Arc<ProxyNode>,
     dist: usize,
 }
 
-impl<'a> PartialOrd for WeightedProxyNode<'a> {
+impl PartialOrd for WeightedProxyNode {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.dist.partial_cmp(&other.dist)
     }
 }
-impl<'a> Ord for WeightedProxyNode<'a> {
+impl Ord for WeightedProxyNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
-impl<'a> PartialEq for WeightedProxyNode<'a> {
+impl PartialEq for WeightedProxyNode {
     fn eq(&self, other: &Self) -> bool {
         self.dist == other.dist
     }
 }
 
-impl<'a> Eq for WeightedProxyNode<'a> {}
+impl Eq for WeightedProxyNode {}
 
-pub struct Scorer<'a> {
+pub struct Scorer {
     fixed_scores: HashMap<NodeID, f64>,
-    liked_nodes: Vec<UserNode<'a>>,
-    disliked_nodes: Vec<UserNode<'a>>,
-    cache: RefCell<HashMap<NodeID, f64>>,
+    liked_nodes: Vec<UserNode>,
+    disliked_nodes: Vec<UserNode>,
+    cache: Mutex<HashMap<NodeID, f64>>,
     num_liked_nodes: usize,
 }
 
-fn create_user_nodes<'a>(
+fn create_user_nodes(
     nodes: &[NodeID],
-    proxy_nodes: &'a [ProxyNode],
+    proxy_nodes: &[Arc<ProxyNode>],
     betweenness: &HashMap<NodeID, f64>,
-) -> Vec<UserNode<'a>> {
+) -> Vec<UserNode> {
     let mut res = Vec::new();
 
     let mut nodes = nodes.to_vec();
@@ -126,9 +126,9 @@ fn create_user_nodes<'a>(
     res
 }
 
-impl<'a> Scorer<'a> {
+impl Scorer {
     fn new(
-        proxy_nodes: &'a [ProxyNode],
+        proxy_nodes: &[Arc<ProxyNode>],
         liked_nodes: &[NodeID],
         disliked_nodes: &[NodeID],
         fixed_scores: HashMap<NodeID, f64>,
@@ -141,7 +141,7 @@ impl<'a> Scorer<'a> {
             num_liked_nodes,
             liked_nodes: create_user_nodes(liked_nodes, proxy_nodes, betweenness),
             disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes, betweenness),
-            cache: RefCell::new(HashMap::new()),
+            cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -149,7 +149,7 @@ impl<'a> Scorer<'a> {
         if let Some(score) = self.fixed_scores.get(&node) {
             *score
         } else {
-            if let Some(cached) = self.cache.borrow().get(&node) {
+            if let Some(cached) = self.cache.lock().unwrap().get(&node) {
                 return *cached;
             }
 
@@ -172,26 +172,26 @@ impl<'a> Scorer<'a> {
                 / self.num_liked_nodes as f64)
                 .max(0.0);
 
-            self.cache.borrow_mut().insert(node, res);
+            self.cache.lock().unwrap().insert(node, res);
 
             res
         }
     }
 }
 
-struct UserNode<'a> {
+struct UserNode {
     id: NodeID,
-    proxy_nodes: Vec<&'a ProxyNode>,
+    proxy_nodes: Vec<Arc<ProxyNode>>,
     weight: usize,
 }
 
-impl<'a> UserNode<'a> {
-    fn new(id: NodeID, proxy_nodes: &'a [ProxyNode]) -> Self {
+impl UserNode {
+    fn new(id: NodeID, proxy_nodes: &[Arc<ProxyNode>]) -> Self {
         let mut heap = BinaryHeap::with_capacity(BEST_PROXY_NODES_PER_USER_NODE);
         for proxy in proxy_nodes {
             if let Some(dist_to_proxy) = proxy.dist_from_node.get(&id) {
                 let weighted_node = WeightedProxyNode {
-                    node: proxy,
+                    node: Arc::clone(proxy),
                     dist: *dist_to_proxy,
                 };
 
@@ -220,12 +220,12 @@ impl<'a> UserNode<'a> {
                 best = match best {
                     Some((best_dist, best_proxy)) => {
                         if dist < best_dist {
-                            Some((dist, *proxy))
+                            Some((dist, proxy))
                         } else {
                             Some((best_dist, best_proxy))
                         }
                     }
-                    None => Some((dist, *proxy)),
+                    None => Some((dist, proxy)),
                 }
             }
         }
@@ -237,7 +237,7 @@ impl<'a> UserNode<'a> {
 #[derive(Serialize, Deserialize, Default)]
 pub struct ApproximatedHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
-    pub proxy_nodes: Vec<ProxyNode>,
+    pub proxy_nodes: Vec<Arc<ProxyNode>>,
     betweenness: HashMap<NodeID, f64>,
 }
 
@@ -274,11 +274,11 @@ impl ApproximatedHarmonicCentrality {
                     .into_iter()
                     .unzip();
 
-                ProxyNode {
+                Arc::new(ProxyNode {
                     id: *node2id.get(node).unwrap(),
                     dist_to_node: BoomHashMap::new(ids, dist),
                     dist_from_node: BoomHashMap::new(rev_ids, rev_dist),
-                }
+                })
             })
             .collect();
 
@@ -293,7 +293,7 @@ impl ApproximatedHarmonicCentrality {
         }
     }
 
-    pub fn scorer(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer<'_> {
+    pub fn scorer(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer {
         let liked_nodes = liked_nodes
             .iter()
             .map(|node| node.clone().into_host())

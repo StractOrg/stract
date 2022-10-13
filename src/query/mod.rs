@@ -150,12 +150,10 @@ impl Query {
         })
     }
 
-    pub fn set_goggles(&mut self, goggles: &[Goggle], schema: &Schema) {
+    pub fn set_goggle(&mut self, goggle: &Goggle, schema: &Schema) {
         let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
 
-        for goggle in goggles {
-            subqueries.append(&mut goggle.as_tantivy(schema));
-        }
+        subqueries.append(&mut goggle.as_tantivy(schema));
 
         self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
     }

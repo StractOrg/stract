@@ -17,6 +17,7 @@
 use crate::{
     fastfield_cache,
     schema::{FastField, TextField},
+    webgraph::centrality::approximate_harmonic,
     webpage::Webpage,
     Result,
 };
@@ -42,9 +43,10 @@ pub enum Signal {
     UpdateTimestamp,
     NumTrackers,
     Region,
+    PersonalCentrality,
 }
 
-pub const ALL_SIGNALS: [Signal; 8] = [
+pub const ALL_SIGNALS: [Signal; 9] = [
     Signal::Bm25,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -53,30 +55,37 @@ pub const ALL_SIGNALS: [Signal; 8] = [
     Signal::UpdateTimestamp,
     Signal::NumTrackers,
     Signal::Region,
+    Signal::PersonalCentrality,
 ];
+
+struct SignalValue {
+    bm25: Score,
+    fastfield_value: Option<u64>,
+    current_timestamp: usize,
+    selected_region: Option<Region>,
+    personal_centrality: f64,
+}
 
 impl Signal {
     fn is_computable_before_search(&self) -> bool {
-        !matches!(self, Signal::Bm25)
+        self.as_fastfield().is_some()
     }
 
     fn value(
         &self,
-        bm25: Score,
-        fastfield_value: Option<u64>,
         region_count: &impl Deref<Target = RegionCount>,
-        current_timestamp: usize,
-        selected_region: Option<Region>,
         aggregator: &SignalAggregator,
+        value: SignalValue,
     ) -> f64 {
         match self {
-            Signal::Bm25 => bm25 as f64,
+            Signal::Bm25 => value.bm25 as f64,
             Signal::HostCentrality | Signal::PageCentrality => {
-                fastfield_value.unwrap() as f64 / CENTRALITY_SCALING as f64
+                value.fastfield_value.unwrap() as f64 / CENTRALITY_SCALING as f64
             }
-            Signal::IsHomepage => fastfield_value.unwrap() as f64,
+            Signal::PersonalCentrality => value.personal_centrality,
+            Signal::IsHomepage => value.fastfield_value.unwrap() as f64,
             Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield_value.unwrap() as usize;
+                let fetch_time_ms = value.fastfield_value.unwrap() as usize;
 
                 if fetch_time_ms >= aggregator.fetch_time_ms_cache.len() {
                     0.0
@@ -85,14 +94,14 @@ impl Signal {
                 }
             }
             Signal::UpdateTimestamp => {
-                let update_timestamp = fastfield_value.unwrap() as i64;
+                let update_timestamp = value.fastfield_value.unwrap() as i64;
 
-                if current_timestamp as i64 - update_timestamp <= 0 {
+                if value.current_timestamp as i64 - update_timestamp <= 0 {
                     return 0.0;
                 }
 
                 let hours_since_update =
-                    ((current_timestamp as i64 - update_timestamp).max(1) / 3600) as usize;
+                    ((value.current_timestamp as i64 - update_timestamp).max(1) / 3600) as usize;
 
                 if hours_since_update < aggregator.update_time_cache.len() {
                     aggregator.update_time_cache[hours_since_update]
@@ -101,17 +110,19 @@ impl Signal {
                 }
             }
             Signal::NumTrackers => {
-                let num_trackers = fastfield_value.unwrap() as f64;
+                let num_trackers = value.fastfield_value.unwrap() as f64;
                 1.0 / (num_trackers + 1.0)
             }
             Signal::Region => {
-                let webpage_region = Region::from_id(fastfield_value.unwrap());
+                let webpage_region = Region::from_id(value.fastfield_value.unwrap());
 
-                let boost =
-                    selected_region.map_or(
-                        0.0,
-                        |region| if region == webpage_region { 50.0 } else { 0.0 },
-                    );
+                let boost = value.selected_region.map_or(0.0, |region| {
+                    if region == webpage_region {
+                        50.0
+                    } else {
+                        0.0
+                    }
+                });
 
                 boost + region_count.score(&webpage_region)
             }
@@ -128,6 +139,7 @@ impl Signal {
             Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
+            Signal::PersonalCentrality => 1024.0,
         }
     }
 
@@ -149,6 +161,7 @@ impl Signal {
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),
             Signal::NumTrackers => Some(FastField::NumTrackers),
             Signal::Region => Some(FastField::Region),
+            Signal::PersonalCentrality => None,
         }
     }
 }
@@ -216,6 +229,7 @@ impl FieldBoost {
 pub struct SignalAggregator {
     fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
     signal_coefficients: SignalCoefficient,
+    pub personal_harmonic: Vec<Arc<approximate_harmonic::Scorer>>,
     field_boost: FieldBoost,
     fetch_time_ms_cache: [f64; 1000],
     update_time_cache: Vec<f64>,
@@ -252,6 +266,7 @@ impl SignalAggregator {
 
         Self {
             fastfield_cache: None,
+            personal_harmonic: Vec::new(),
             signal_coefficients,
             field_boost,
             fetch_time_ms_cache,
@@ -280,14 +295,23 @@ impl SignalAggregator {
                         .and_then(|cache| cache.get_doc_cache(&field).get_u64(&doc))
                 });
 
+                let personal_centrality = self
+                    .personal_harmonic
+                    .iter()
+                    .map(|scorer| scorer.score(doc as u64))
+                    .sum();
+
                 self.coefficients().get(&signal)
                     * signal.value(
-                        bm25,
-                        fastfield_value,
                         region_count,
-                        current_timestamp,
-                        selected_region,
                         self,
+                        SignalValue {
+                            bm25,
+                            fastfield_value,
+                            current_timestamp,
+                            selected_region,
+                            personal_centrality,
+                        },
                     )
             })
             .sum()
@@ -321,12 +345,15 @@ impl SignalAggregator {
 
                 self.coefficients().get(&signal)
                     * signal.value(
-                        0.0,
-                        Some(fastfield_value),
                         &region_count,
-                        current_timestamp,
-                        None,
                         self,
+                        SignalValue {
+                            bm25: 0.0,
+                            fastfield_value: Some(fastfield_value),
+                            current_timestamp,
+                            selected_region: None,
+                            personal_centrality: 0.0,
+                        },
                     )
             })
             .sum()

@@ -93,7 +93,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
         let name = file.split('/').last().unwrap();
         let path = Path::new(&job.base_path).join("warc_files").join(name);
 
-        if let Ok(file) = WarcFile::open(path) {
+        if let Ok(file) = WarcFile::open(&path) {
             for record in
                 file.records()
                     .flatten()
@@ -113,6 +113,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
                     if host_centrality < host_centrality_threshold {
+                        debug!("skipping due to low host_centrality value");
                         continue;
                     }
                 }
@@ -182,7 +183,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
         index.commit().unwrap();
 
-        std::fs::remove_file(file).unwrap();
+        std::fs::remove_file(path).unwrap();
     }
 
     info!("{} done", name);
