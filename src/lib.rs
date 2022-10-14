@@ -46,7 +46,7 @@ pub mod index;
 mod kv;
 pub mod prehashed;
 mod query;
-mod ranking;
+pub mod ranking;
 mod schema;
 mod schema_org;
 mod search_prettifier;
@@ -59,8 +59,8 @@ mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
 mod warc;
-mod webgraph;
-mod webpage;
+pub mod webgraph;
+pub mod webpage;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
@@ -154,6 +154,7 @@ pub struct SearchServerConfig {
     pub index_path: String,
     pub entity_index_path: Option<String>,
     pub bangs_path: Option<String>,
+    pub centrality_store_path: Option<String>,
     pub host: String,
 }
 

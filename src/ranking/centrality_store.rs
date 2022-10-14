@@ -14,39 +14,107 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::{fs::File, path::Path};
 
-use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+use crate::{
+    kv::{rocksdb_store::RocksDbStore, Kv},
+    webgraph::{
+        centrality::{
+            approximate_harmonic::ApproximatedHarmonicCentrality, harmonic::HarmonicCentrality,
+        },
+        Webgraph,
+    },
+};
 
-pub struct CentralityStore {
-    inner: Box<dyn Kv<String, f64>>,
+pub struct HarmonicCentralityStore {
+    pub host: Box<dyn Kv<String, f64>>,
+    pub full: Box<dyn Kv<String, f64>>,
 }
 
-impl CentralityStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+impl HarmonicCentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            inner: RocksDbStore::open(path),
+            host: RocksDbStore::open(path.as_ref().join("host")),
+            full: RocksDbStore::open(path.as_ref().join("full")),
         }
     }
 
-    pub fn insert(&mut self, key: String, centrality: f64) {
-        self.inner.insert(key, centrality);
+    fn flush(&self) {
+        self.host.flush();
+        self.full.flush();
+    }
+}
+
+pub struct CentralityStore {
+    pub harmonic: HarmonicCentralityStore,
+    pub approx_harmonic: ApproximatedHarmonicCentrality,
+    pub base_path: String,
+}
+
+impl CentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
+            approx_harmonic: ApproximatedHarmonicCentrality::load(
+                path.as_ref().join("approx_harmonic"),
+            )
+            .ok()
+            .unwrap_or_default(),
+            base_path: path.as_ref().to_str().unwrap().to_string(),
+        }
     }
 
-    pub fn get(&self, key: &str) -> Option<f64> {
-        self.inner.get(&key.to_string())
-    }
+    pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
+        let mut store = CentralityStore::open(output_path.as_ref());
 
-    pub fn append(&mut self, it: impl Iterator<Item = (String, f64)>) {
-        it.filter(|(_, value)| *value != 0.0)
-            .for_each(|(key, value)| {
-                self.insert(key, value);
-            });
+        store.approx_harmonic = ApproximatedHarmonicCentrality::new(graph);
+        let harmonic_centrality = HarmonicCentrality::calculate(graph);
 
-        self.flush();
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_full.csv"))
+            .unwrap();
+        let mut wtr = csv::Writer::from_writer(csv_file);
+
+        let mut full: Vec<_> = harmonic_centrality.full.into_iter().collect();
+        full.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        for (node, centrality) in full {
+            store.harmonic.full.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+
+        wtr.flush().unwrap();
+
+        let csv_file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path.as_ref().join("harmonic_host.csv"))
+            .unwrap();
+
+        let mut host: Vec<_> = harmonic_centrality.host.into_iter().collect();
+        host.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut wtr = csv::Writer::from_writer(csv_file);
+        for (node, centrality) in host {
+            store.harmonic.host.insert(node.name.clone(), centrality);
+            wtr.write_record(&[node.name, centrality.to_string()])
+                .unwrap();
+        }
+        wtr.flush().unwrap();
+
+        store.flush();
+
+        store
     }
 
     pub fn flush(&self) {
-        self.inner.flush();
+        self.harmonic.flush();
+
+        self.approx_harmonic
+            .save(Path::new(&self.base_path).join("approx_harmonic"))
+            .unwrap();
     }
 }

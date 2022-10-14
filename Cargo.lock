@@ -295,6 +295,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "boomphf"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e8fb7f38fef59c32549861151d63a6190865e60cf690340c13e3d7178b42a2f"
+dependencies = [
+ "crossbeam-utils",
+ "log",
+ "rayon",
+ "serde",
+ "wyhash",
+]
+
+[[package]]
 name = "bstr"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -679,6 +692,7 @@ dependencies = [
  "axum-extra",
  "base64",
  "bincode",
+ "boomphf",
  "bzip2",
  "chrono",
  "clap 3.1.18",
@@ -3527,6 +3541,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80d0f4e272c85def139476380b12f9ac60926689dd2e01d4923222f40580869d"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "wyhash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf6e163c25e3fac820b4b453185ea2dea3b6a3e0a721d4d23d75bd33734c295"
+dependencies = [
+ "rand_core 0.6.3",
 ]
 
 [[package]]

@@ -69,7 +69,7 @@ $site=example.com
 ! web3$indescription
 ! web3$incontent
 
-! Finally, you can specify an 'action', which indicates how the ranking of a
+! You can specify an 'action', which indicates how the ranking of a
 ! matched result should be changed by your instruction. This is the mechanism
 ! through which you can customize the ranking of results to your liking. You can
 ! use one of three possible actions in your instructions, and by default, any
@@ -89,9 +89,39 @@ $site=example.com
 /r/google/$downrank=2
 /r/google/$downrank=3
 
-! Tou can also discard results completely:
+! You can also discard results completely:
 $discard,site=idontwanttobepartoftheresults.com
 /this/is/spam/$discard
+
+! Most search engines analyze how websites link to eachother to figure out, which
+! sites are better than others. Google popularized this with their
+! [PageRank](https://en.wikipedia.org/wiki/PageRank) algorithm which is often 
+! credited for their great search results when they launched. At Cuely we 
+! calculate the [Harmonic Centrality](https://en.wikipedia.org/wiki/Centrality#Harmonic_centrality)
+! and use this to rank websites (along with many other signals).
+! The thing is, people tend to like and dislike different websites. What
+! Harmonic Centrality (or PageRank for that matter) finds to be good websites might not
+! be what you think of as good websites. You should be able to personalize this value.
+! You can therefore specify a set of sites that you like, and a set of sites that you
+! dislike. A Harmonic Centrality value is then approxmiated from the sites you choose
+! during search and used in the ranking.
+
+! The liked and disliked sites are specified as follows
+liked = [
+    ilikethissite.com,
+    example.com,
+]
+
+disliked = [
+    evilwebsite.com,
+    githubspam.com,
+]
+
+! It is important to note, that the sites you like and dislike here adjusts the ranking for all
+! sites, not just the ones specified. We calculate the distance from your specified sites
+! to all sites in the search results, and essentially prioritize sites that are closely
+! linked with your liked sites while not being closely linked to your disliked sites.
+
 
 ! Last but not least, you can control exactly how the signals gets prioritized for
 ! the final ranking. We countinously add more signals used during ranking,

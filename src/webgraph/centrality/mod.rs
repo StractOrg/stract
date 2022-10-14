@@ -14,20 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
-
-use crate::{ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilder};
-
-pub struct Centrality {}
-
-impl Centrality {
-    pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
-        let graph = WebgraphBuilder::new(webgraph_path)
-            .read_only(true)
-            .with_host_graph()
-            .with_full_graph()
-            .open();
-
-        CentralityStore::build(&graph, output_path);
-    }
-}
+pub mod approximate_harmonic;
+pub mod betweenness;
+pub mod harmonic;

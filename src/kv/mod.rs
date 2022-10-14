@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::hash::Hash;
+use std::{collections::HashMap, sync::RwLock};
+
 use serde::{de::DeserializeOwned, Serialize};
 
 pub mod rocksdb_store;
@@ -41,5 +44,48 @@ where
         let val_bytes = bincode::serialize(&value).expect("failed to serialize value");
 
         self.insert_raw(key_bytes, val_bytes);
+    }
+
+    fn load_in_memory(&self) -> Memory<K, V>
+    where
+        K: Eq + Hash,
+    {
+        let mut map = HashMap::new();
+
+        for (k, v) in self.iter() {
+            map.insert(k, v);
+        }
+
+        Memory(RwLock::new(map))
+    }
+}
+
+pub struct Memory<K, V>(RwLock<HashMap<K, V>>);
+
+impl<K, V> Kv<K, V> for Memory<K, V>
+where
+    K: Serialize + DeserializeOwned + Send + Sync + Eq + Hash + Clone,
+    V: Serialize + DeserializeOwned + Send + Sync + Clone,
+{
+    fn get_raw(&self, _key: &[u8]) -> Option<Vec<u8>> {
+        unimplemented!()
+    }
+
+    fn insert_raw(&self, _key: Vec<u8>, _value: Vec<u8>) {
+        unimplemented!()
+    }
+
+    fn flush(&self) {}
+
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
+        todo!();
+    }
+
+    fn get(&self, key: &K) -> Option<V> {
+        self.0.read().unwrap().get(key).cloned()
+    }
+
+    fn insert(&self, key: K, val: V) {
+        self.0.write().unwrap().insert(key, val);
     }
 }

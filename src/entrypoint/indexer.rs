@@ -53,19 +53,14 @@ struct Job {
 }
 
 struct IndexingWorker {
-    host_centrality_store: CentralityStore,
-    page_centrality_store: CentralityStore,
+    centrality_store: CentralityStore,
     webgraph: Option<Webgraph>,
 }
 
 impl IndexingWorker {
     fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
-        let host_centrality_path = Path::new(&centrality_store_path).join("host");
-        let page_centrality_path = Path::new(&centrality_store_path).join("full");
-
         Self {
-            host_centrality_store: CentralityStore::new(host_centrality_path),
-            page_centrality_store: CentralityStore::new(page_centrality_path),
+            centrality_store: CentralityStore::open(centrality_store_path),
             webgraph: webgraph_path.map(|path| {
                 WebgraphBuilder::new(path)
                     .with_full_graph()
@@ -98,7 +93,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
         let name = file.split('/').last().unwrap();
         let path = Path::new(&job.base_path).join("warc_files").join(name);
 
-        if let Ok(file) = WarcFile::open(path) {
+        if let Ok(file) = WarcFile::open(&path) {
             for record in
                 file.records()
                     .flatten()
@@ -110,12 +105,15 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
 
                 let host_centrality = worker
-                    .host_centrality_store
-                    .get(html.url().host_without_specific_subdomains())
+                    .centrality_store
+                    .harmonic
+                    .host
+                    .get(&html.url().host_without_specific_subdomains().to_string())
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
                     if host_centrality < host_centrality_threshold {
+                        debug!("skipping due to low host_centrality value");
                         continue;
                     }
                 }
@@ -139,8 +137,10 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .unwrap_or_else(Vec::new);
 
                 let page_centrality = worker
-                    .page_centrality_store
-                    .get(html.url().raw())
+                    .centrality_store
+                    .harmonic
+                    .full
+                    .get(&html.url().raw().to_string())
                     .unwrap_or_default();
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;
@@ -150,6 +150,13 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 trace!("title = {:?}", html.title());
                 trace!("text = {:?}", html.clean_text());
 
+                let node_id = worker
+                    .centrality_store
+                    .approx_harmonic
+                    .node2id
+                    .get(&Node::from_url(html.url()).into_host())
+                    .copied();
+
                 let mut webpage = Webpage {
                     html,
                     backlinks,
@@ -158,6 +165,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     fetch_time_ms,
                     primary_image: None,
                     pre_computed_score: 0.0,
+                    node_id,
                 };
 
                 webpage.pre_computed_score =
@@ -175,7 +183,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
         index.commit().unwrap();
 
-        std::fs::remove_file(file).ok();
+        std::fs::remove_file(path).unwrap();
     }
 
     info!("{} done", name);

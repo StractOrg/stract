@@ -15,13 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod graph_store;
 
-use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
 use std::sync::Mutex;
 use std::{cmp, fs};
-use tracing::info;
 
 use graph_store::GraphStore;
 
@@ -30,6 +28,8 @@ use crate::webpage::Url;
 
 use self::graph_store::Adjacency;
 use crate::kv::rocksdb_store::RocksDbStore;
+
+pub mod centrality;
 
 type NodeID = u64;
 
@@ -45,7 +45,7 @@ pub struct Node {
 }
 
 impl Node {
-    fn into_host(self) -> Node {
+    pub fn into_host(self) -> Node {
         let url = Url::from(self.name);
 
         let host = url.host_without_specific_subdomains();
@@ -53,6 +53,10 @@ impl Node {
         Node {
             name: host.to_string(),
         }
+    }
+
+    pub fn from_url(url: &Url) -> Self {
+        Node::from(url.full())
     }
 }
 
@@ -211,14 +215,14 @@ impl WebgraphBuilder {
     pub fn open(self) -> Webgraph {
         if self.read_only {
             Webgraph {
-                full_graph: self.full_graph_path.map(GraphStore::open_read_only),
-                host_graph: self.host_graph_path.map(GraphStore::open_read_only),
+                full: self.full_graph_path.map(GraphStore::open_read_only),
+                host: self.host_graph_path.map(GraphStore::open_read_only),
                 path: self.path.to_str().unwrap().to_string(),
             }
         } else {
             Webgraph {
-                full_graph: self.full_graph_path.map(GraphStore::open),
-                host_graph: self.host_graph_path.map(GraphStore::open),
+                full: self.full_graph_path.map(GraphStore::open),
+                host: self.host_graph_path.map(GraphStore::open),
                 path: self.path.to_str().unwrap().to_string(),
             }
         }
@@ -239,31 +243,31 @@ where
 
 pub struct Webgraph<S: Store = RocksDbStore> {
     pub path: String,
-    full_graph: Option<GraphStore<S>>,
-    host_graph: Option<GraphStore<S>>,
+    pub full: Option<GraphStore<S>>,
+    pub host: Option<GraphStore<S>>,
 }
 
 impl<S: Store> Webgraph<S> {
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
-        if let Some(full_graph) = &mut self.full_graph {
+        if let Some(full_graph) = &mut self.full {
             full_graph.insert(from.clone(), to.clone(), label.clone());
         }
 
-        if let Some(host_graph) = &mut self.host_graph {
+        if let Some(host_graph) = &mut self.host {
             host_graph.insert(from.into_host(), to.into_host(), label);
         }
     }
 
     pub fn merge(&mut self, other: Webgraph<S>) {
-        match (&mut self.full_graph, other.full_graph) {
+        match (&mut self.full, other.full) {
             (Some(self_graph), Some(other_graph)) => self_graph.append(other_graph),
-            (None, Some(other_graph)) => self.full_graph = Some(other_graph),
+            (None, Some(other_graph)) => self.full = Some(other_graph),
             (Some(_), None) | (None, None) => {}
         }
 
-        match (&mut self.host_graph, other.host_graph) {
+        match (&mut self.host, other.host) {
             (Some(self_graph), Some(other_graph)) => self_graph.append(other_graph),
-            (None, Some(other_graph)) => self.host_graph = Some(other_graph),
+            (None, Some(other_graph)) => self.host = Some(other_graph),
             (Some(_), None) | (None, None) => {}
         }
 
@@ -315,7 +319,7 @@ impl<S: Store> Webgraph<S> {
 
     #[allow(unused)]
     pub fn distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.full_graph
+        self.full
             .as_ref()
             .map(|full_graph| {
                 let distances = Webgraph::dijkstra(
@@ -335,7 +339,7 @@ impl<S: Store> Webgraph<S> {
 
     #[allow(unused)]
     fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
-        self.full_graph
+        self.full
             .as_ref()
             .map(|full_graph| {
                 Webgraph::dijkstra(
@@ -350,7 +354,7 @@ impl<S: Store> Webgraph<S> {
 
     #[allow(unused)]
     pub fn reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.full_graph
+        self.full
             .as_ref()
             .map(|full_graph| {
                 self.raw_reversed_distances(source)
@@ -363,17 +367,10 @@ impl<S: Store> Webgraph<S> {
 
     #[allow(unused)]
     pub fn host_distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.host_graph
+        self.host
             .as_ref()
             .map(|host_graph| {
-                let distances = Webgraph::dijkstra(
-                    source,
-                    |node| host_graph.outgoing_edges(node),
-                    |edge| edge.to,
-                    host_graph,
-                );
-
-                distances
+                self.raw_host_distances(source)
                     .into_iter()
                     .map(|(id, dist)| (host_graph.id2node(&id).expect("unknown node"), dist))
                     .collect()
@@ -381,8 +378,22 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    fn raw_host_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
-        self.host_graph
+    pub fn raw_host_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+        self.host
+            .as_ref()
+            .map(|host_graph| {
+                Webgraph::dijkstra(
+                    source,
+                    |node| host_graph.outgoing_edges(node),
+                    |edge| edge.to,
+                    host_graph,
+                )
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn raw_host_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+        self.host
             .as_ref()
             .map(|host_graph| {
                 Webgraph::dijkstra(
@@ -397,7 +408,7 @@ impl<S: Store> Webgraph<S> {
 
     #[allow(unused)]
     pub fn host_reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
-        self.host_graph
+        self.host
             .as_ref()
             .map(|host_graph| {
                 self.raw_host_reversed_distances(source)
@@ -408,76 +419,17 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    fn calculate_centrality<F>(graph: &GraphStore<S>, node_distances: F) -> HashMap<Node, f64>
-    where
-        F: Fn(Node) -> HashMap<NodeID, usize>,
-    {
-        let nodes: Vec<_> = graph.nodes().collect();
-        info!("Found {} nodes in the graph", nodes.len());
-        let pb = ProgressBar::new(nodes.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})",
-                )
-                .progress_chars("#>-"),
-        );
-        let norm_factor = (nodes.len() - 1) as f64;
-        nodes
-            .iter()
-            .progress_with(pb)
-            .map(|node_id| {
-                let node = graph.id2node(node_id).expect("unknown node");
-                let centrality_values: HashMap<NodeID, f64> = node_distances(node.clone())
-                    .into_iter()
-                    .filter(|(other_id, _)| *other_id != *node_id)
-                    .map(|(other_node, dist)| (other_node, 1f64 / dist as f64))
-                    .collect();
-
-                let centrality = centrality_values
-                    .into_iter()
-                    .map(|(_, val)| val)
-                    .sum::<f64>()
-                    / norm_factor;
-
-                (node, centrality)
-            })
-            .filter(|(_, centrality)| *centrality > 0.0)
-            .collect()
-    }
-
-    #[allow(unused)]
-    pub fn harmonic_centrality(&self) -> HashMap<Node, f64> {
-        self.full_graph
-            .as_ref()
-            .map(|full_graph| {
-                Webgraph::calculate_centrality(full_graph, |node| self.raw_reversed_distances(node))
-            })
-            .unwrap_or_default()
-    }
-
-    pub fn host_harmonic_centrality(&self) -> HashMap<Node, f64> {
-        self.host_graph
-            .as_ref()
-            .map(|host_graph| {
-                Webgraph::calculate_centrality(host_graph, |node| {
-                    self.raw_host_reversed_distances(node)
-                })
-            })
-            .unwrap_or_default()
-    }
-
     pub fn flush(&self) {
-        if let Some(full_graph) = &self.full_graph {
+        if let Some(full_graph) = &self.full {
             full_graph.flush();
         }
-        if let Some(host_graph) = &self.host_graph {
+        if let Some(host_graph) = &self.host {
             host_graph.flush();
         }
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        if let Some(graph) = &self.full_graph {
+        if let Some(graph) = &self.full {
             if let Some(node_id) = graph.node2id(&node) {
                 graph
                     .ingoing_edges(node_id)
@@ -533,8 +485,8 @@ impl From<Webgraph> for FrozenWebgraph {
     fn from(graph: Webgraph) -> Self {
         graph.flush();
         let path = graph.path.clone();
-        let has_full = graph.full_graph.is_some();
-        let has_host = graph.host_graph.is_some();
+        let has_full = graph.full.is_some();
+        let has_host = graph.host.is_some();
         drop(graph);
         let root = directory::scan_folder(path).unwrap();
 
@@ -618,78 +570,6 @@ mod test {
         assert_eq!(distances.get(&Node::from("C")), Some(&1));
         assert_eq!(distances.get(&Node::from("D")), Some(&2));
         assert_eq!(distances.get(&Node::from("B")), Some(&2));
-    }
-
-    #[test]
-    fn harmonic_centrality() {
-        let graph = test_graph();
-
-        let centrality = graph.harmonic_centrality();
-
-        assert_eq!(centrality.get(&Node::from("C")).unwrap(), &1.0);
-        assert_eq!(centrality.get(&Node::from("D")), None);
-        assert_eq!(
-            (*centrality.get(&Node::from("A")).unwrap() * 100.0).round() / 100.0,
-            0.67
-        );
-        assert_eq!(
-            (*centrality.get(&Node::from("B")).unwrap() * 100.0).round() / 100.0,
-            0.61
-        );
-    }
-
-    #[test]
-    fn host_harmonic_centrality() {
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
-
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("C.com"), Node::from("B.com"), String::new());
-        graph.insert(Node::from("D.com"), Node::from("B.com"), String::new());
-
-        graph.flush();
-
-        let centrality = graph.harmonic_centrality();
-        assert!(
-            centrality.get(&Node::from("A.com/1")).unwrap()
-                > centrality.get(&Node::from("B.com")).unwrap()
-        );
-
-        let host_centrality = graph.host_harmonic_centrality();
-        assert!(
-            host_centrality.get(&Node::from("B.com")).unwrap()
-                > host_centrality.get(&Node::from("A.com")).unwrap_or(&0.0)
-        );
-    }
-
-    #[test]
-    fn www_subdomain_ignored() {
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
-
-        graph.insert(Node::from("B.com"), Node::from("A.com"), String::new());
-        graph.insert(Node::from("B.com"), Node::from("www.A.com"), String::new());
-
-        graph.flush();
-
-        let centrality = graph.host_harmonic_centrality();
-        assert_eq!(centrality.get(&Node::from("A.com")), Some(&1.0));
-        assert_eq!(centrality.get(&Node::from("www.A.com")), None);
     }
 
     #[test]

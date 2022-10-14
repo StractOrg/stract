@@ -124,9 +124,13 @@ where
 
     fn insert(&mut self, key: K, value: V) {
         if self.cache.len() == self.cache.cap() {
-            if let Some((key, value)) = self.cache.pop_lru() {
-                self.store.insert(key, value);
+            while self.cache.len() > self.cache.cap() / 2 {
+                if let Some((key, value)) = self.cache.pop_lru() {
+                    self.store.insert(key, value);
+                }
             }
+
+            self.store.flush();
         }
 
         self.cache.push(key, value);
@@ -325,9 +329,12 @@ impl Store for RocksDbStore {
     }
 
     fn open_read_only<P: AsRef<Path>>(path: P) -> GraphStore<Self> {
-        let adjacency = RocksDbStore::open_read_only(path.as_ref().join("adjacency"));
-        let reversed_adjacency =
-            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency"));
+        let adjacency = Box::new(
+            RocksDbStore::open_read_only(path.as_ref().join("adjacency")).load_in_memory(),
+        );
+        let reversed_adjacency = Box::new(
+            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency")).load_in_memory(),
+        );
         let node2id = RocksDbStore::open_read_only(path.as_ref().join("node2id"));
         let id2node = RocksDbStore::open_read_only(path.as_ref().join("id2node"));
         let meta = RocksDbStore::open_read_only(path.as_ref().join("meta"));

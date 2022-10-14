@@ -25,7 +25,8 @@ use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
-use crate::ranking::goggles;
+use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::goggles::{self, Goggle};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::webpage::region::Region;
 use crate::webpage::Url;
@@ -37,28 +38,35 @@ pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
+    centrality_store: Option<CentralityStore>,
 }
 
 impl From<Index> for LocalSearcher {
     fn from(index: Index) -> Self {
-        Self::new(index, None, None)
+        Self::new(index)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
-    pub websites: inverted_index::InitialSearchResult,
-    pub entity: Option<StoredEntity>,
-}
-
 impl LocalSearcher {
-    pub fn new(index: Index, entity_index: Option<EntityIndex>, bangs: Option<Bangs>) -> Self {
+    pub fn new(index: Index) -> Self {
         LocalSearcher {
             index,
-            entity_index,
-            bangs,
+            entity_index: None,
+            bangs: None,
+            centrality_store: None,
         }
+    }
+
+    pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
+        self.entity_index = Some(entity_index);
+    }
+
+    pub fn set_bangs(&mut self, bangs: Bangs) {
+        self.bangs = Some(bangs);
+    }
+
+    pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
+        self.centrality_store = Some(centrality_store);
     }
 
     pub fn search_initial(
@@ -72,14 +80,22 @@ impl LocalSearcher {
             .as_ref()
             .and_then(|program| goggles::parse(program).ok());
 
+        let query_aggregator = goggle
+            .as_ref()
+            .map(|goggle| {
+                goggle.aggregator(
+                    self.centrality_store
+                        .as_ref()
+                        .map(|centrality_store| &centrality_store.approx_harmonic),
+                )
+            })
+            .unwrap_or_default();
+
         let mut parsed_query = Query::parse(
             &query.original,
             self.index.schema(),
             self.index.tokenizers(),
-            goggle
-                .as_ref()
-                .map(|goggle| &goggle.aggregator)
-                .unwrap_or(&SignalAggregator::default()),
+            &query_aggregator,
         )?;
 
         if parsed_query.is_empty() {
@@ -102,11 +118,19 @@ impl LocalSearcher {
             goggles.push(site_rankings.clone().into_goggle())
         }
 
-        parsed_query.set_goggles(&goggles, &self.index.schema());
+        let goggle = goggles
+            .into_iter()
+            .fold(Goggle::default(), |acc, elem| acc.merge(elem));
+
+        parsed_query.set_goggle(&goggle, &self.index.schema());
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
-            goggle.map(|goggle| goggle.aggregator).unwrap_or_default(),
+            goggle.aggregator(
+                self.centrality_store
+                    .as_ref()
+                    .map(|centrality_store| &centrality_store.approx_harmonic),
+            ),
             self.index.inverted_index.fastfield_cache(),
         );
 
@@ -207,6 +231,14 @@ impl LocalSearcher {
             .and_then(|index| index.get_attribute_occurrence(attribute))
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<String>,
+    pub websites: inverted_index::InitialSearchResult,
+    pub entity: Option<StoredEntity>,
+}
+
 impl SearchResult {
     #[cfg(test)]
     pub fn into_websites(self) -> Option<WebsitesResult> {
@@ -253,13 +285,14 @@ mod tests {
                     page_centrality: 0.0,
                     pre_computed_score: 0.0,
                     primary_image: None,
+                    node_id: None,
                 })
                 .expect("failed to insert webpage");
         }
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::new(index, None, None);
+        let searcher = LocalSearcher::new(index);
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher

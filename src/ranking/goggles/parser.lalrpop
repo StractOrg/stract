@@ -9,12 +9,28 @@ Sep<S, T>: Vec<T> = {
     }
 };
 
+SepNewline<S, T>: Vec<T> = {
+    <mut xs:(<T> S ";"?)*> <x:T?> => match x {
+        Some(x) => {
+            xs.push(x);
+            xs
+        }
+        None => xs
+    }
+};
+
 pub Blocks: Vec<GoggleBlock> = <Sep<";", Block>>;
 
 Block: GoggleBlock = {
     <RawAlteration> => GoggleBlock::Alteration(<>),
     <Comment> => GoggleBlock::Comment(<>),
     <RawInstruction> => GoggleBlock::Instruction(<>),
+    <RawSitePreference> => GoggleBlock::SitePreference(<>),
+}
+
+RawSitePreference: RawSitePreference = {
+    "liked" "=" "[" ";"? <SepNewline<",", Ident>> "]" => RawSitePreference::Liked(<>),
+    "disliked" "=" "[" ";"?  <SepNewline<",", Ident>> "]" => RawSitePreference::Disliked(<>),
 }
 
 

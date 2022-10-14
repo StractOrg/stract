@@ -30,7 +30,7 @@ macro_rules! bench {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
-    let searcher = LocalSearcher::new(index, None, None);
+    let searcher = LocalSearcher::new(index);
     let goggle = include_str!("../testcases/goggles/hacker_news.goggle");
 
     // for _ in 0..10 {
