@@ -19,6 +19,8 @@ use std::{fmt::Display, time::Duration};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+use super::URL_REGEX;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Hash)]
 pub struct Url(String);
 
@@ -182,8 +184,8 @@ impl Url {
         self.full().as_str().parse::<http::Uri>().is_ok()
     }
 
-    pub(crate) fn host_without_specific_subdomains(&self) -> &str {
-        if let Some(subdomain) = self.subdomain() {
+    pub(crate) fn host_without_specific_subdomains_and_query(&self) -> &str {
+        let res = if let Some(subdomain) = self.subdomain() {
             if subdomain == "www" {
                 self.domain()
             } else {
@@ -191,6 +193,12 @@ impl Url {
             }
         } else {
             self.site()
+        };
+
+        if let Some(query_begin) = res.find('?') {
+            &res[..query_begin]
+        } else {
+            res
         }
     }
 
@@ -209,6 +217,10 @@ impl Url {
         } else {
             full
         }
+    }
+
+    pub fn matches_url_regex(&self) -> bool {
+        URL_REGEX.is_match(&self.full())
     }
 }
 
@@ -232,12 +244,14 @@ mod tests {
         assert_eq!(url.domain(), "dailymail.co.uk");
         assert_eq!(url.site(), "dailymail.co.uk");
         assert_eq!(url.full().as_str(), "https://dailymail.co.uk");
+        assert!(url.matches_url_regex());
     }
 
     #[test]
     fn full() {
         let url: Url = "https://example.com".to_string().into();
         assert_eq!(url.full().as_str(), "https://example.com");
+        assert!(url.matches_url_regex());
 
         let url: Url = "http://example.com".to_string().into();
         assert_eq!(url.full().as_str(), "http://example.com");

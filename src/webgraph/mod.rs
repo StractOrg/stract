@@ -48,7 +48,7 @@ impl Node {
     pub fn into_host(self) -> Node {
         let url = Url::from(self.name);
 
-        let host = url.host_without_specific_subdomains();
+        let host = url.host_without_specific_subdomains_and_query();
 
         Node {
             name: host.to_lowercase(),
@@ -620,5 +620,11 @@ mod test {
     fn node_lowercase_name() {
         let n = Node::from("TEST".to_string());
         assert_eq!(&n.name, "test");
+    }
+
+    #[test]
+    fn host_node_cleanup() {
+        let n = Node::from("https://www.example.com?test").into_host();
+        assert_eq!(&n.name, "example.com");
     }
 }

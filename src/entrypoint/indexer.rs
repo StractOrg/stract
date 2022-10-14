@@ -108,7 +108,12 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .centrality_store
                     .harmonic
                     .host
-                    .get(&html.url().host_without_specific_subdomains().to_string())
+                    .get(
+                        &html
+                            .url()
+                            .host_without_specific_subdomains_and_query()
+                            .to_string(),
+                    )
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
