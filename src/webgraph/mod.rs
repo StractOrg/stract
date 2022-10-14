@@ -51,7 +51,7 @@ impl Node {
         let host = url.host_without_specific_subdomains();
 
         Node {
-            name: host.to_string(),
+            name: host.to_lowercase(),
         }
     }
 
@@ -62,7 +62,9 @@ impl Node {
 
 impl From<String> for Node {
     fn from(name: String) -> Self {
-        Self { name }
+        Self {
+            name: name.to_lowercase(),
+        }
     }
 }
 
@@ -612,5 +614,11 @@ mod test {
         assert_eq!(distances.get(&Node::from("C")), Some(&1));
         assert_eq!(distances.get(&Node::from("A")), Some(&2));
         assert_eq!(distances.get(&Node::from("B")), Some(&3));
+    }
+
+    #[test]
+    fn node_lowercase_name() {
+        let n = Node::from("TEST".to_string());
+        assert_eq!(&n.name, "test");
     }
 }
