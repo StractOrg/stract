@@ -41,6 +41,7 @@ pub struct RawGoggle {
     pub comments: Vec<Comment>,
     pub instructions: Vec<RawInstruction>,
     pub alterations: Vec<RawAlteration>,
+    pub site_preferences: Vec<RawSitePreference>,
 }
 
 impl From<Vec<GoggleBlock>> for RawGoggle {
@@ -48,12 +49,14 @@ impl From<Vec<GoggleBlock>> for RawGoggle {
         let mut alterations = Vec::new();
         let mut comments = Vec::new();
         let mut instructions = Vec::new();
+        let mut site_preferences = Vec::new();
 
         for block in blocks {
             match block {
                 GoggleBlock::Comment(comment) => comments.push(comment),
                 GoggleBlock::Instruction(instruction) => instructions.push(instruction),
                 GoggleBlock::Alteration(alteration) => alterations.push(alteration),
+                GoggleBlock::SitePreference(pref) => site_preferences.push(pref),
             }
         }
 
@@ -61,6 +64,7 @@ impl From<Vec<GoggleBlock>> for RawGoggle {
             comments,
             instructions,
             alterations,
+            site_preferences,
         }
     }
 }
@@ -70,6 +74,7 @@ pub enum GoggleBlock {
     Comment(Comment),
     Instruction(RawInstruction),
     Alteration(RawAlteration),
+    SitePreference(RawSitePreference),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -82,6 +87,12 @@ pub enum Comment {
 pub struct RawInstruction {
     pub patterns: Vec<RawPatternPart>,
     pub options: Vec<RawPatternOption>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum RawSitePreference {
+    Liked(Vec<String>),
+    Disliked(Vec<String>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

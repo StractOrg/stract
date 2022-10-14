@@ -14,21 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    webgraph::{centrality::approximate_harmonic::ApproximatedHarmonicCentrality, Node},
+    webgraph::{
+        centrality::approximate_harmonic::{ApproximatedHarmonicCentrality, Scorer},
+        Node,
+    },
     webpage::Url,
 };
 
-use super::{
-    goggles::{Action, Goggle, Instruction, PatternOption},
-    SignalAggregator,
-};
+use super::goggles::{Action, Goggle, Instruction, PatternOption};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct SiteRankings {
     pub liked: Vec<String>,
     pub disliked: Vec<String>,
@@ -36,14 +34,10 @@ pub struct SiteRankings {
 }
 
 impl SiteRankings {
-    pub fn into_goggle(self, approx_harmonic: &ApproximatedHarmonicCentrality) -> Goggle {
+    pub fn instructions(&self) -> Vec<Instruction> {
         let mut instructions = Vec::new();
-        let mut aggregator = SignalAggregator::default();
 
-        let mut liked_nodes = Vec::new();
-        let mut disliked_nodes = Vec::new();
-
-        for site in self.liked {
+        for site in &self.liked {
             instructions.push(Instruction {
                 patterns: Vec::new(),
                 options: vec![
@@ -51,11 +45,9 @@ impl SiteRankings {
                     PatternOption::Action(Action::Boost(5)),
                 ],
             });
-
-            liked_nodes.push(Node::from_url(&Url::from(site)).into_host());
         }
 
-        for site in self.disliked {
+        for site in &self.disliked {
             instructions.push(Instruction {
                 patterns: Vec::new(),
                 options: vec![
@@ -63,27 +55,40 @@ impl SiteRankings {
                     PatternOption::Action(Action::Downrank(5)),
                 ],
             });
-
-            disliked_nodes.push(Node::from_url(&Url::from(site)).into_host());
         }
 
-        aggregator.personal_harmonic.push(Arc::new(
-            approx_harmonic.scorer(&liked_nodes, &disliked_nodes),
-        ));
-
-        for site in self.blocked {
+        for site in &self.blocked {
             instructions.push(Instruction {
                 patterns: Vec::new(),
                 options: vec![
-                    PatternOption::Site(site),
+                    PatternOption::Site(site.clone()),
                     PatternOption::Action(Action::Discard),
                 ],
             });
         }
 
+        instructions
+    }
+
+    pub fn centrality_scorer(&self, approx_harmonic: &ApproximatedHarmonicCentrality) -> Scorer {
+        let mut liked_nodes = Vec::new();
+        let mut disliked_nodes = Vec::new();
+
+        for site in &self.liked {
+            liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+        }
+
+        for site in &self.disliked {
+            disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+        }
+
+        approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
+    }
+
+    pub fn into_goggle(self) -> Goggle {
         Goggle {
-            aggregator,
-            instructions,
+            site_rankings: self,
+            ..Default::default()
         }
     }
 }

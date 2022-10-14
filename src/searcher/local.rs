@@ -47,13 +47,6 @@ impl From<Index> for LocalSearcher {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
-    pub websites: inverted_index::InitialSearchResult,
-    pub entity: Option<StoredEntity>,
-}
-
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         LocalSearcher {
@@ -87,14 +80,22 @@ impl LocalSearcher {
             .as_ref()
             .and_then(|program| goggles::parse(program).ok());
 
+        let query_aggregator = goggle
+            .as_ref()
+            .map(|goggle| {
+                goggle.aggregator(
+                    self.centrality_store
+                        .as_ref()
+                        .map(|centrality_store| &centrality_store.approx_harmonic),
+                )
+            })
+            .unwrap_or_default();
+
         let mut parsed_query = Query::parse(
             &query.original,
             self.index.schema(),
             self.index.tokenizers(),
-            goggle
-                .as_ref()
-                .map(|goggle| &goggle.aggregator)
-                .unwrap_or(&SignalAggregator::default()),
+            &query_aggregator,
         )?;
 
         if parsed_query.is_empty() {
@@ -114,13 +115,7 @@ impl LocalSearcher {
         }
 
         if let Some(site_rankings) = &query.site_rankings {
-            if let Some(centrality_store) = self.centrality_store.as_ref() {
-                goggles.push(
-                    site_rankings
-                        .clone()
-                        .into_goggle(&centrality_store.approx_harmonic),
-                )
-            }
+            goggles.push(site_rankings.clone().into_goggle())
         }
 
         let goggle = goggles
@@ -131,7 +126,11 @@ impl LocalSearcher {
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
-            goggle.aggregator,
+            goggle.aggregator(
+                self.centrality_store
+                    .as_ref()
+                    .map(|centrality_store| &centrality_store.approx_harmonic),
+            ),
             self.index.inverted_index.fastfield_cache(),
         );
 
@@ -232,6 +231,14 @@ impl LocalSearcher {
             .and_then(|index| index.get_attribute_occurrence(attribute))
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<String>,
+    pub websites: inverted_index::InitialSearchResult,
+    pub entity: Option<StoredEntity>,
+}
+
 impl SearchResult {
     #[cfg(test)]
     pub fn into_websites(self) -> Option<WebsitesResult> {

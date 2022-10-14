@@ -143,10 +143,17 @@ impl Signal {
         }
     }
 
-    fn from_string(name: String) -> Option<Signal> {
+    pub fn from_string(name: String) -> Option<Signal> {
         match name.as_str() {
             "bm25" => Some(Signal::Bm25),
             "host_centrality" => Some(Signal::HostCentrality),
+            "page_centrality" => Some(Signal::PageCentrality),
+            "is_homepage" => Some(Signal::IsHomepage),
+            "fetch_time_ms" => Some(Signal::FetchTimeMs),
+            "update_timestamp" => Some(Signal::UpdateTimestamp),
+            "num_trackers" => Some(Signal::NumTrackers),
+            "region" => Some(Signal::Region),
+            "personal_centrality" => Some(Signal::PersonalCentrality),
             _ => None,
         }
     }
@@ -381,34 +388,5 @@ impl TryFrom<RawAlteration> for Alteration {
             target: raw.target,
             score: raw.score.parse()?,
         })
-    }
-}
-
-impl TryFrom<Vec<RawAlteration>> for SignalAggregator {
-    type Error = crate::Error;
-
-    fn try_from(alterations: Vec<RawAlteration>) -> Result<Self> {
-        let mut coefficients = Vec::new();
-        let mut boosts = Vec::new();
-
-        for alteration in alterations {
-            let alteration = Alteration::try_from(alteration)?;
-            match alteration.target {
-                Target::Signal(name) => {
-                    if let Some(signal) = Signal::from_string(name) {
-                        coefficients.push((signal, alteration.score));
-                    }
-                }
-                Target::Field(name) => {
-                    if let Some(field) = Field::from_name(name) {
-                        if let Some(text_field) = field.as_text() {
-                            boosts.push((text_field, alteration.score));
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(Self::new(coefficients.into_iter(), boosts.into_iter()))
     }
 }

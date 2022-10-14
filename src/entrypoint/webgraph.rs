@@ -94,10 +94,10 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
             }
         }
 
-        std::fs::remove_file(path).ok();
-    }
+        graph.flush();
 
-    graph.flush();
+        std::fs::remove_file(path).unwrap();
+    }
 
     info!("{} done", name);
 

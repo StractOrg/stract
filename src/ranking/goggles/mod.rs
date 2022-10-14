@@ -20,11 +20,12 @@ pub mod ast;
 mod const_query;
 mod pattern_query;
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use crate::{
     query::union::UnionQuery,
     schema::{Field, TextField},
+    webgraph::centrality::approximate_harmonic::ApproximatedHarmonicCentrality,
     Result,
 };
 use itertools::Itertools;
@@ -34,12 +35,12 @@ use tantivy::{
 };
 
 use self::{
-    ast::{RawAction, RawGoggle, RawInstruction, RawPatternOption, RawPatternPart},
+    ast::{RawAction, RawGoggle, RawInstruction, RawPatternOption, RawPatternPart, Target},
     const_query::ConstQuery,
     pattern_query::PatternQuery,
 };
 
-use super::signal::SignalAggregator;
+use super::{signal::SignalAggregator, site_rankings::SiteRankings, Alteration, Signal};
 
 pub fn parse(goggle: &str) -> Result<Goggle> {
     let raw_goggle = ast::parse(goggle)?;
@@ -57,9 +58,46 @@ impl TryFrom<RawGoggle> for Goggle {
             instructions.push(Instruction::try_from(inst)?);
         }
 
+        let mut boosts = HashMap::new();
+        let mut coefficients = HashMap::new();
+
+        for alteration in raw.alterations {
+            let alteration = Alteration::try_from(alteration)?;
+            match alteration.target {
+                Target::Signal(name) => {
+                    if let Some(signal) = Signal::from_string(name) {
+                        coefficients.insert(signal, alteration.score);
+                    }
+                }
+                Target::Field(name) => {
+                    if let Some(field) = Field::from_name(name) {
+                        if let Some(text_field) = field.as_text() {
+                            boosts.insert(text_field, alteration.score);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut liked_sites = Vec::new();
+        let mut disliked_sites = Vec::new();
+
+        for pref in raw.site_preferences {
+            match pref {
+                ast::RawSitePreference::Liked(mut sites) => liked_sites.append(&mut sites),
+                ast::RawSitePreference::Disliked(mut sites) => disliked_sites.append(&mut sites),
+            }
+        }
+
         Ok(Self {
-            aggregator: SignalAggregator::try_from(raw.alterations)?,
             instructions,
+            coefficients,
+            boosts,
+            site_rankings: SiteRankings {
+                liked: liked_sites,
+                disliked: disliked_sites,
+                blocked: Vec::new(), // blocked sites are handled by `$discard` syntax.
+            },
         })
     }
 }
@@ -158,7 +196,9 @@ pub enum Action {
 
 #[derive(Debug, Default, Clone)]
 pub struct Goggle {
-    pub aggregator: SignalAggregator,
+    pub coefficients: HashMap<Signal, f64>,
+    pub boosts: HashMap<TextField, f64>,
+    pub site_rankings: SiteRankings,
     pub instructions: Vec<Instruction>,
 }
 
@@ -174,6 +214,7 @@ impl Goggle {
                 UnionQuery::from(
                     self.instructions
                         .iter()
+                        .chain(self.site_rankings.instructions().iter())
                         .filter_map(|instruction| instruction.as_tantivy(schema))
                         .map(|query| BooleanQuery::from(vec![query]).box_clone())
                         .collect_vec(),
@@ -183,6 +224,7 @@ impl Goggle {
         } else {
             self.instructions
                 .iter()
+                .chain(self.site_rankings.instructions().iter())
                 .filter_map(|instruction| instruction.as_tantivy(schema))
                 .collect()
         }
@@ -190,11 +232,37 @@ impl Goggle {
 
     pub fn merge(mut self, mut other: Self) -> Self {
         self.instructions.append(&mut other.instructions);
-        self.aggregator
-            .personal_harmonic
-            .append(&mut other.aggregator.personal_harmonic);
+        self.coefficients.extend(other.coefficients.into_iter());
+        self.boosts.extend(other.boosts.into_iter());
+
+        self.site_rankings
+            .liked
+            .append(&mut other.site_rankings.liked);
+
+        self.site_rankings
+            .disliked
+            .append(&mut other.site_rankings.disliked);
+
+        self.site_rankings
+            .blocked
+            .append(&mut other.site_rankings.blocked);
 
         self
+    }
+
+    pub fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator {
+        let mut aggregator = SignalAggregator::new(
+            self.coefficients.clone().into_iter(),
+            self.boosts.clone().into_iter(),
+        );
+
+        if let Some(approx) = approx {
+            aggregator
+                .personal_harmonic
+                .push(Arc::new(self.site_rankings.centrality_scorer(approx)));
+        }
+
+        aggregator
     }
 }
 
