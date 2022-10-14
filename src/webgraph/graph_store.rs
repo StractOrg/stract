@@ -63,8 +63,6 @@ where
         let block_id = key / self.block_size;
 
         if let Some(block) = self.inner.get_mut(&block_id) {
-            // block.entry(key).or_default().push(value);
-            // block.insert(key, value);
             mutate_block(block);
             return;
         }

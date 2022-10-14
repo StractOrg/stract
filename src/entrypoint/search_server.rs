@@ -36,9 +36,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
         .entity_index_path
         .map(|path| EntityIndex::open(path).unwrap());
     let bangs = config.bangs_path.map(Bangs::from_path);
-    let centrality_store = config
-        .centrality_store_path
-        .map(|path| CentralityStore::open(path));
+    let centrality_store = config.centrality_store_path.map(CentralityStore::open);
     let search_index = Index::open(config.index_path)?;
 
     let mut local_searcher = LocalSearcher::new(search_index);

@@ -83,7 +83,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
                     .into_iter()
                     .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
                     .filter(|link| link.source.domain() != link.destination.domain())
-                    .filter(|link| !link.matches_url_regex())
+                    .filter(|link| link.matches_url_regex())
                 {
                     trace!("inserting link {:?}", link);
                     graph.insert(

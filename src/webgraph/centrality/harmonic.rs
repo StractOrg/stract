@@ -195,4 +195,31 @@ mod tests {
         assert_eq!(centrality.host.get(&Node::from("A.com")), Some(&1.0));
         assert_eq!(centrality.host.get(&Node::from("www.A.com")), None);
     }
+
+    #[test]
+    fn additional_edges_ignored() {
+        let mut graph = test_graph();
+
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+
+        graph.flush();
+        let centrality = HarmonicCentrality::calculate(&graph);
+
+        assert_eq!(centrality.full.get(&Node::from("C")).unwrap(), &1.0);
+        assert_eq!(centrality.full.get(&Node::from("D")), None);
+        assert_eq!(
+            (*centrality.full.get(&Node::from("A")).unwrap() * 100.0).round() / 100.0,
+            0.67
+        );
+        assert_eq!(
+            (*centrality.full.get(&Node::from("B")).unwrap() * 100.0).round() / 100.0,
+            0.61
+        );
+    }
 }

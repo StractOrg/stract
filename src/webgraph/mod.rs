@@ -447,6 +447,26 @@ impl<S: Store> Webgraph<S> {
             Vec::new()
         }
     }
+
+    pub fn ingoing_edges_host(&self, node: Node) -> Vec<FullEdge> {
+        if let Some(graph) = &self.host {
+            if let Some(node_id) = graph.node2id(&node) {
+                graph
+                    .ingoing_edges(node_id)
+                    .into_iter()
+                    .map(|edge| FullEdge {
+                        from: graph.id2node(&edge.from).unwrap(),
+                        to: graph.id2node(&edge.to).unwrap(),
+                        label: edge.label,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 impl From<FrozenWebgraph> for Webgraph {
