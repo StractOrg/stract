@@ -71,22 +71,20 @@ impl From<String> for Node {
 impl From<&Url> for Node {
     fn from(url: &Url) -> Self {
         Self {
-            name: url.raw().to_string(),
+            name: url.without_protocol().to_lowercase(),
         }
     }
 }
 
 impl From<&str> for Node {
     fn from(name: &str) -> Self {
-        Self::from(name.to_string())
+        Self::from(name.to_lowercase())
     }
 }
 
 impl From<Url> for Node {
     fn from(url: Url) -> Self {
-        Self {
-            name: url.to_string(),
-        }
+        Self::from(&url)
     }
 }
 

@@ -222,6 +222,12 @@ impl Url {
     pub fn matches_url_regex(&self) -> bool {
         URL_REGEX.is_match(&self.full())
     }
+
+    pub fn without_protocol(&self) -> &str {
+        self.0[self.find_protocol_end()..]
+            .strip_prefix("://")
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -321,5 +327,12 @@ mod tests {
         let url: Url = "https://test.example.com#id".to_string().into();
 
         assert_eq!(&url.full_without_id_tags(), "https://test.example.com");
+    }
+
+    #[test]
+    fn url_without_protocol() {
+        let url: Url = "https://test.example.com/test/test".to_string().into();
+
+        assert_eq!(url.without_protocol(), "test.example.com/test/test");
     }
 }

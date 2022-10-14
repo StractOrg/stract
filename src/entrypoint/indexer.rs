@@ -145,7 +145,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .centrality_store
                     .harmonic
                     .full
-                    .get(&html.url().raw().to_string())
+                    .get(&html.url().without_protocol().to_lowercase())
                     .unwrap_or_default();
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;
