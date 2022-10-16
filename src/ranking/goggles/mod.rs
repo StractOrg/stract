@@ -401,9 +401,12 @@ impl Instruction {
 #[cfg(test)]
 mod tests {
     use crate::{
+        gen_temp_path,
         index::Index,
+        ranking::centrality_store::CentralityStore,
         schema::create_schema,
         searcher::{LocalSearcher, SearchQuery},
+        webgraph::{Node, WebgraphBuilder},
         webpage::{Html, Webpage},
     };
 
@@ -762,5 +765,164 @@ mod tests {
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].url, "https://www.a.com/this/is/a/pattern");
+    }
+
+    #[test]
+    fn liked_sites() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut graph = WebgraphBuilder::new_memory()
+            .with_full_graph()
+            .with_host_graph()
+            .open();
+
+        graph.insert(
+            Node::from("https://www.a.com").into_host(),
+            Node::from("https://www.b.com").into_host(),
+            String::new(),
+        );
+
+        graph.insert(
+            Node::from("https://www.c.com").into_host(),
+            Node::from("https://www.c.com").into_host(),
+            String::new(),
+        );
+
+        graph.flush();
+
+        let centrality_store = CentralityStore::build(&graph, gen_temp_path());
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                            example example example
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.a.com/this/is/a/pattern",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                primary_image: None,
+                node_id: Some(
+                    *centrality_store
+                        .approx_harmonic
+                        .node2id
+                        .get(&Node::from("www.a.com").into_host())
+                        .unwrap(),
+                ),
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.b.com/this/is/b/pattern",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0001,
+                page_centrality: 0.0,
+                primary_image: None,
+                pre_computed_score: 0.0,
+                fetch_time_ms: 500,
+                node_id: Some(
+                    *centrality_store
+                        .approx_harmonic
+                        .node2id
+                        .get(&Node::from("www.b.com").into_host())
+                        .unwrap(),
+                ),
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.c.com/this/is/c/pattern",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0002,
+                page_centrality: 0.0,
+                primary_image: None,
+                pre_computed_score: 0.0,
+                fetch_time_ms: 500,
+                node_id: Some(
+                    *centrality_store
+                        .approx_harmonic
+                        .node2id
+                        .get(&Node::from("www.c.com").into_host())
+                        .unwrap(),
+                ),
+            })
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+        let mut searcher = LocalSearcher::from(index);
+
+        searcher.set_centrality_store(centrality_store);
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                goggle_program: Some(
+                    r#"
+                    liked = [
+                        www.a.com,
+                        www.b.com,
+                    ]
+                    disliked = [
+                        www.c.com,
+                    ]
+                "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].url, "https://www.b.com/this/is/b/pattern");
+        assert_eq!(res[1].url, "https://www.a.com/this/is/a/pattern");
+        assert_eq!(res[2].url, "https://www.c.com/this/is/c/pattern");
     }
 }

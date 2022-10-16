@@ -153,23 +153,26 @@ impl Scorer {
                 return *cached;
             }
 
-            let res = ((self
-                .liked_nodes
-                .iter()
-                .filter_map(|liked_node| liked_node.best_dist(&node).map(|dist| (dist, liked_node)))
-                .map(|(dist, liked_node)| liked_node.weight as f64 / dist as f64)
-                .sum::<f64>()
-                - self
-                    .disliked_nodes
+            let res = (1.0
+                + (self
+                    .liked_nodes
                     .iter()
-                    .filter_map(|disliked_node| {
-                        disliked_node
-                            .best_dist(&node)
-                            .map(|dist| (dist, disliked_node))
+                    .filter_map(|liked_node| {
+                        liked_node.best_dist(&node).map(|dist| (dist, liked_node))
                     })
-                    .map(|(dist, disliked_node)| disliked_node.weight as f64 / dist as f64)
-                    .sum::<f64>())
-                / self.num_liked_nodes as f64)
+                    .map(|(dist, liked_node)| liked_node.weight as f64 / dist as f64)
+                    .sum::<f64>()
+                    - self
+                        .disliked_nodes
+                        .iter()
+                        .filter_map(|disliked_node| {
+                            disliked_node
+                                .best_dist(&node)
+                                .map(|dist| (dist, disliked_node))
+                        })
+                        .map(|(dist, disliked_node)| disliked_node.weight as f64 / dist as f64)
+                        .sum::<f64>())
+                    / self.num_liked_nodes as f64)
                 .max(0.0);
 
             self.cache.lock().unwrap().insert(node, res);
@@ -308,7 +311,7 @@ impl ApproximatedHarmonicCentrality {
 
         let fixed_scores: HashMap<_, _> = liked_nodes
             .iter()
-            .map(|node| (*node, 1.0))
+            .map(|node| (*node, 2.0))
             .chain(disliked_nodes.iter().map(|node| (*node, 0.0)))
             .collect();
 
@@ -422,7 +425,7 @@ mod tests {
         let scorer = centrality.scorer(&liked_nodes, &[]);
 
         for node in &liked_nodes {
-            assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 1.0);
+            assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 2.0);
         }
     }
 

@@ -139,7 +139,7 @@ impl Signal {
             Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
-            Signal::PersonalCentrality => 1024.0,
+            Signal::PersonalCentrality => 2048.0,
         }
     }
 
