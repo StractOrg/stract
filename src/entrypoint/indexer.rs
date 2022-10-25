@@ -50,6 +50,7 @@ struct Job {
     warc_paths: Vec<String>,
     base_path: String,
     host_centrality_threshold: Option<f64>,
+    max_num_segments: u32,
 }
 
 struct IndexingWorker {
@@ -191,6 +192,11 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
         std::fs::remove_file(path).unwrap();
     }
 
+    index
+        .inverted_index
+        .merge_into_segments(job.max_num_segments)
+        .unwrap();
+
     info!("{} done", name);
 
     index
@@ -292,6 +298,7 @@ impl Indexer {
                                 .index_base_path
                                 .clone()
                                 .unwrap_or_else(|| "data/index".to_string()),
+                            max_num_segments: config.final_num_segments.unwrap_or(20),
                         })
                         .collect_vec()
                         .into_iter(),
@@ -365,6 +372,7 @@ impl Indexer {
                     .output_path
                     .clone()
                     .unwrap_or_else(|| "data/index".to_string()),
+                max_num_segments: config.final_num_segments.unwrap_or(20),
             })
             .collect_vec()
             .into_par_iter()
@@ -386,9 +394,8 @@ impl Indexer {
             index = index.merge(other);
 
             std::fs::remove_dir_all(other_path)?;
+            index.inverted_index.merge_into_segments(num_segments)?;
         }
-
-        index.inverted_index.merge_into_segments(num_segments)?;
 
         Ok(())
     }

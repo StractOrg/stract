@@ -263,7 +263,7 @@ impl InvertedIndex {
             .into_iter()
             .collect();
 
-        if segments.len() > 1 {
+        if segments.len() > num_segments as usize {
             segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
 
             for segment in segments {
