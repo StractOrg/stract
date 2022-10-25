@@ -17,6 +17,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::Extension;
+use axum_macros::debug_handler;
 
 use crate::{
     ranking::site_rankings::SiteRankings,
@@ -38,7 +39,7 @@ use axum::{
 };
 
 #[derive(Template)]
-#[template(path = "search/index.html", escape = "none")]
+#[template(path = "search/index.html")]
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
@@ -61,6 +62,7 @@ enum RegionSelection {
 
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
+#[debug_handler]
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,

@@ -70,7 +70,7 @@ import { askama } from "../askama";
                 class="title-link font-medium"
                 href="/search?q={{ correction.raw|urlencode }}"
               >
-                {askama`correction.highlighted $ {{lorem.sentence}}`}
+                {askama`correction.highlighted|safe $ {{lorem.sentence}}`}
               </a>
             </div>
           ))
