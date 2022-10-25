@@ -20,7 +20,9 @@ use axum::Extension;
 
 use crate::{
     ranking::site_rankings::SiteRankings,
-    search_prettifier::{thousand_sep_number, DisplayedEntity, DisplayedWebpage},
+    search_prettifier::{
+        thousand_sep_number, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection,
+    },
     searcher::{self, PrettifiedSearchResult, SearchQuery},
     webpage::region::{Region, ALL_REGIONS},
 };
@@ -41,7 +43,7 @@ struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
     entity: Option<DisplayedEntity>,
-    spell_correction: Option<String>,
+    spell_correction: Option<HighlightedSpellCorrection>,
     num_matches: String,
     search_duration_sec: String,
     all_regions: Vec<RegionSelection>,

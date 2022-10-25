@@ -78,7 +78,7 @@ where
     fn flush(&self) {}
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
-        todo!();
+        unimplemented!()
     }
 
     fn get(&self, key: &K) -> Option<V> {

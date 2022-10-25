@@ -28,6 +28,7 @@ use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::goggles::{self, Goggle};
 use crate::ranking::{Ranker, SignalAggregator};
+use crate::spell::Correction;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
@@ -234,7 +235,7 @@ impl LocalSearcher {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
+    pub spell_corrected_query: Option<Correction>,
     pub websites: inverted_index::InitialSearchResult,
     pub entity: Option<StoredEntity>,
 }

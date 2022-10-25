@@ -20,7 +20,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
@@ -32,7 +31,9 @@ use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{self, InitialSearchResult, InvertedIndex, SearchResult};
 use crate::query::Query;
-use crate::spell::{Dictionary, LogarithmicEdit, SpellChecker, TermSplitter};
+use crate::spell::{
+    Correction, CorrectionTerm, Dictionary, LogarithmicEdit, SpellChecker, TermSplitter,
+};
 use crate::subdomain_count::SubdomainCounter;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::{Url, Webpage};
@@ -222,58 +223,68 @@ impl Index {
             .download(&mut self.primary_image_store);
     }
 
-    fn spell_check(&self, terms: &[String]) -> Option<String> {
+    fn spell_check(&self, terms: &[String]) -> Option<Correction> {
         let spellchecker = SpellChecker::new(&self.spell_dictionary, LogarithmicEdit::new(4));
-        let mut corrections: Vec<String> = Vec::new();
+
+        let mut original = String::new();
+
+        for term in terms {
+            original.push_str(term);
+            original.push(' ');
+        }
+        original = original.trim_end().to_string();
+
+        let mut possible_correction = Correction::empty(original);
 
         for term in terms {
             match spellchecker.correct(term.to_ascii_lowercase().as_str()) {
-                Some(correction) => corrections.push(correction.to_ascii_lowercase()),
-                None => corrections.push(term.to_ascii_lowercase()),
+                Some(correction) => possible_correction
+                    .push(CorrectionTerm::Corrected(correction.to_ascii_lowercase())),
+                None => possible_correction
+                    .push(CorrectionTerm::NotCorrected(term.to_ascii_lowercase())),
             }
         }
 
-        if corrections
-            .iter()
-            .cloned()
-            .zip(terms.iter().map(|term| term.to_ascii_lowercase()))
-            .all(|(correction, term)| correction == term)
-        {
+        if possible_correction.is_all_orig() {
             None
         } else {
-            Some(intersperse(corrections.into_iter(), " ".to_string()).collect())
+            Some(possible_correction)
         }
     }
 
-    fn split_words(&self, terms: &[String]) -> Option<String> {
+    fn split_words(&self, terms: &[String]) -> Option<Correction> {
         let splitter = TermSplitter::new(&self.spell_dictionary);
-        let mut corrections: Vec<String> = Vec::new();
+
+        let mut original = String::new();
+
+        for term in terms {
+            original.push_str(term);
+            original.push(' ');
+        }
+        original = original.trim_end().to_string();
+
+        let mut possible_correction = Correction::empty(original);
 
         for term in terms {
             let t = term.to_ascii_lowercase();
             let split = splitter.split(t.as_str());
             if split.is_empty() {
-                corrections.push(t);
+                possible_correction.push(CorrectionTerm::NotCorrected(t));
             } else {
                 for s in split {
-                    corrections.push(s.to_string())
+                    possible_correction.push(CorrectionTerm::Corrected(s.to_string()))
                 }
             }
         }
 
-        if corrections
-            .iter()
-            .map(|s| s.to_ascii_lowercase())
-            .zip(terms.iter().map(|term| term.to_ascii_lowercase()))
-            .all(|(correction, term)| correction == term)
-        {
+        if possible_correction.is_all_orig() {
             None
         } else {
-            Some(intersperse(corrections.into_iter(), " ".to_string()).collect())
+            Some(possible_correction)
         }
     }
 
-    pub fn spell_correction(&self, terms: &[String]) -> Option<String> {
+    pub fn spell_correction(&self, terms: &[String]) -> Option<Correction> {
         self.spell_check(terms).or_else(|| self.split_words(terms))
     }
 
@@ -380,8 +391,8 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.example.com");
 
         assert_eq!(
-            index.spell_correction(&["thiss".to_string()]),
-            Some("this".to_string())
+            String::from(index.spell_correction(&["thiss".to_string()]).unwrap()),
+            "this".to_string()
         );
     }
 
@@ -410,8 +421,12 @@ mod tests {
         index.commit().unwrap();
 
         assert_eq!(
-            index.spell_correction(&["th".to_string(), "best".to_string()]),
-            Some("the best".to_string())
+            String::from(
+                index
+                    .spell_correction(&["th".to_string(), "best".to_string()])
+                    .unwrap()
+            ),
+            "the best".to_string()
         );
         assert_eq!(
             index.spell_correction(&["the".to_string(), "best".to_string()]),

@@ -67,10 +67,10 @@ import { askama } from "../askama";
             <div>
               Did you mean:{" "}
               <a
-                class="title-link font-bold italic"
-                href="/search?q={{ correction|urlencode }}"
+                class="title-link font-medium"
+                href="/search?q={{ correction.raw|urlencode }}"
               >
-                {askama`correction $ {{lorem.sentence}}`}
+                {askama`correction.highlighted $ {{lorem.sentence}}`}
               </a>
             </div>
           ))

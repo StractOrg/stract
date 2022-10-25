@@ -79,7 +79,7 @@ struct Snippet {
     highlighted: Vec<Range<usize>>,
 }
 
-const HIGHLIGHTEN_PREFIX: &str = "<b>";
+const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 500;\">";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
 impl Snippet {
@@ -381,7 +381,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, "<b>Rust</b> is a systems programming <b>language</b> sponsored by Mozilla which describes it as a \"safe, concurrent, practical <b>language</b>\", supporting functional and imperative-procedural paradigms. <b>Rust</b> is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string());
+        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
     }
 
     #[test]
@@ -424,7 +424,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, "Rust is a systems programming language sponsored by Mozilla which <b>describes</b> it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string());
+        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
     }
 
     #[test]
@@ -448,8 +448,8 @@ Survey in 2016, 2017, and 2018."#;
         );
         assert_eq!(
             snippet.to_html(),
-            "<b>Rust</b> is a systems programming <b>language</b> sponsored by\nMozilla which \
-             describes it as a \"safe"
+            format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by\nMozilla which \
+             describes it as a \"safe")
         )
     }
 
@@ -467,7 +467,10 @@ Survey in 2016, 2017, and 2018."#;
                 assert_eq!(first.stop_offset, 17);
             }
             let snippet = select_best_fragment_combination(&fragments[..], TEST_TEXT);
-            assert_eq!(snippet.to_html(), "<b>Rust</b> is a systems")
+            assert_eq!(
+                snippet.to_html(),
+                format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems")
+            )
         }
         {
             let terms = btreemap! {
@@ -482,7 +485,10 @@ Survey in 2016, 2017, and 2018."#;
                 assert_eq!(first.stop_offset, 17);
             }
             let snippet = select_best_fragment_combination(&fragments[..], TEST_TEXT);
-            assert_eq!(snippet.to_html(), "programming <b>language</b>")
+            assert_eq!(
+                snippet.to_html(),
+                format!("programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}")
+            )
         }
     }
 
@@ -505,7 +511,10 @@ Survey in 2016, 2017, and 2018."#;
 
         let snippet = select_best_fragment_combination(&fragments[..], text);
         assert_eq!(snippet.fragment, "c d");
-        assert_eq!(snippet.to_html(), "<b>c</b> d");
+        assert_eq!(
+            snippet.to_html(),
+            format!("{HIGHLIGHTEN_PREFIX}c{HIGHLIGHTEN_POSTFIX} d")
+        );
     }
 
     #[test]
@@ -527,7 +536,10 @@ Survey in 2016, 2017, and 2018."#;
 
         let snippet = select_best_fragment_combination(&fragments[..], text);
         assert_eq!(snippet.fragment, "e f");
-        assert_eq!(snippet.to_html(), "e <b>f</b>");
+        assert_eq!(
+            snippet.to_html(),
+            format!("e {HIGHLIGHTEN_PREFIX}f{HIGHLIGHTEN_POSTFIX}")
+        );
     }
 
     #[test]
@@ -550,7 +562,10 @@ Survey in 2016, 2017, and 2018."#;
 
         let snippet = select_best_fragment_combination(&fragments[..], text);
         assert_eq!(snippet.fragment, "e f g");
-        assert_eq!(snippet.to_html(), "e <b>f</b> g");
+        assert_eq!(
+            snippet.to_html(),
+            format!("e {HIGHLIGHTEN_PREFIX}f{HIGHLIGHTEN_POSTFIX} g")
+        );
     }
 
     #[test]
@@ -624,7 +639,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.webpages.documents.len(), 1);
         assert_eq!(
             result.webpages.documents[0].snippet,
-            "Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural <b>paradigms</b>. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...".to_string()
+            format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...")
         );
     }
 }

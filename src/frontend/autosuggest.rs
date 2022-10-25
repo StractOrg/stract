@@ -21,6 +21,9 @@ use serde::Serialize;
 
 use super::State;
 
+const HIGHLIGHTED_PREFIX: &str = "<b style=\"font-weight: 500;\">";
+const HIGHLIGHTED_POSTFIX: &str = "</b>";
+
 fn highlight(query: &str, suggestion: &str) -> String {
     let idx = suggestion
         .chars()
@@ -29,9 +32,9 @@ fn highlight(query: &str, suggestion: &str) -> String {
         .unwrap_or(query.len());
 
     let mut new_suggestion: String = suggestion.chars().take(idx).collect();
-    new_suggestion += "<b>";
+    new_suggestion += HIGHLIGHTED_PREFIX;
     new_suggestion += suggestion.chars().skip(idx).collect::<String>().as_str();
-    new_suggestion += "</b>";
+    new_suggestion += HIGHLIGHTED_POSTFIX;
     new_suggestion
 }
 
@@ -81,10 +84,25 @@ mod tests {
 
     #[test]
     fn suffix_highlight() {
-        assert_eq!(&highlight("", "test"), "<b>test</b>");
-        assert_eq!(&highlight("t", "test"), "t<b>est</b>");
-        assert_eq!(&highlight("te", "test"), "te<b>st</b>");
-        assert_eq!(&highlight("tes", "test"), "tes<b>t</b>");
-        assert_eq!(&highlight("test", "test"), "test<b></b>");
+        assert_eq!(
+            highlight("", "test"),
+            format!("{HIGHLIGHTED_PREFIX}test{HIGHLIGHTED_POSTFIX}")
+        );
+        assert_eq!(
+            highlight("t", "test"),
+            format!("t{HIGHLIGHTED_PREFIX}est{HIGHLIGHTED_POSTFIX}")
+        );
+        assert_eq!(
+            highlight("te", "test"),
+            format!("te{HIGHLIGHTED_PREFIX}st{HIGHLIGHTED_POSTFIX}")
+        );
+        assert_eq!(
+            highlight("tes", "test"),
+            format!("tes{HIGHLIGHTED_PREFIX}t{HIGHLIGHTED_POSTFIX}")
+        );
+        assert_eq!(
+            highlight("test", "test"),
+            format!("test{HIGHLIGHTED_PREFIX}{HIGHLIGHTED_POSTFIX}")
+        );
     }
 }

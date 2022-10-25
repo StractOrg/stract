@@ -26,7 +26,8 @@ use crate::{
     entity_index::StoredEntity,
     inverted_index,
     ranking::site_rankings::SiteRankings,
-    search_prettifier::{self, DisplayedEntity, DisplayedWebpage},
+    search_prettifier::{self, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection},
+    spell::Correction,
     webpage::region::Region,
 };
 
@@ -34,7 +35,7 @@ pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
 #[derive(Debug, Serialize)]
 pub struct WebsitesResult {
-    pub spell_corrected_query: Option<String>,
+    pub spell_corrected_query: Option<Correction>,
     pub webpages: inverted_index::SearchResult,
     pub entity: Option<StoredEntity>,
     pub search_duration_ms: u128,
@@ -54,7 +55,7 @@ pub enum PrettifiedSearchResult {
 
 #[derive(Debug, Serialize)]
 pub struct PrettifiedWebsitesResult {
-    pub spell_corrected_query: Option<String>,
+    pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
     pub num_docs: usize,
     pub entity: Option<DisplayedEntity>,

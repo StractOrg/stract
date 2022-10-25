@@ -18,6 +18,53 @@ pub mod distance;
 pub mod spell_checker;
 pub mod splitter;
 
+use itertools::intersperse;
+use serde::{Deserialize, Serialize};
+
 pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit};
 pub use self::spell_checker::SpellChecker;
 pub use self::splitter::TermSplitter;
+
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize, Clone)]
+pub struct Correction {
+    original: String,
+    pub terms: Vec<CorrectionTerm>,
+}
+
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize, Clone)]
+pub enum CorrectionTerm {
+    Corrected(String),
+    NotCorrected(String),
+}
+
+impl From<Correction> for String {
+    fn from(correction: Correction) -> Self {
+        intersperse(
+            correction.terms.into_iter().map(|term| match term {
+                CorrectionTerm::Corrected(correction) => correction,
+                CorrectionTerm::NotCorrected(orig) => orig,
+            }),
+            " ".to_string(),
+        )
+        .collect()
+    }
+}
+
+impl Correction {
+    pub fn empty(original: String) -> Self {
+        Self {
+            original,
+            terms: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, term: CorrectionTerm) {
+        self.terms.push(term);
+    }
+
+    pub fn is_all_orig(&self) -> bool {
+        self.terms
+            .iter()
+            .all(|term| matches!(term, CorrectionTerm::NotCorrected(_)))
+    }
+}

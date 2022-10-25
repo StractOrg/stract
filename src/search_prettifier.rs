@@ -24,6 +24,7 @@ use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::{self, RetrievedWebpage},
     searcher::{self, LocalSearcher},
+    spell::CorrectionTerm,
     webpage::Url,
 };
 
@@ -35,8 +36,34 @@ pub fn initial(
         .entity
         .map(|entity| DisplayedEntity::from(entity, local_searcher));
 
+    let spell_corrected_query = result.spell_corrected_query.map(|correction| {
+        let mut highlighted = String::new();
+        let mut raw = String::new();
+
+        for term in correction.terms {
+            match term {
+                CorrectionTerm::Corrected(correction) => {
+                    highlighted.push_str(&("<b><i>".to_string() + &correction + "</i></b>"));
+                    raw.push_str(&correction);
+                }
+                CorrectionTerm::NotCorrected(orig) => {
+                    highlighted.push_str(&orig);
+                    raw.push_str(&orig);
+                }
+            }
+
+            raw.push(' ');
+            highlighted.push(' ');
+        }
+
+        raw = raw.trim_end().to_string();
+        highlighted = highlighted.trim_end().to_string();
+
+        HighlightedSpellCorrection { raw, highlighted }
+    });
+
     InitialWebsiteResult {
-        spell_corrected_query: result.spell_corrected_query,
+        spell_corrected_query,
         websites: result.websites,
         entity,
     }
@@ -65,9 +92,15 @@ pub fn retrieve(result: Vec<RetrievedWebpage>, searcher: &LocalSearcher) -> Vec<
         .collect()
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HighlightedSpellCorrection {
+    pub raw: String,
+    pub highlighted: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<String>,
+    pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub websites: inverted_index::InitialSearchResult,
     pub entity: Option<DisplayedEntity>,
 }
