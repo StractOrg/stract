@@ -58,6 +58,11 @@ impl Node {
     pub fn from_url(url: &Url) -> Self {
         Node::from(url.full())
     }
+
+    fn remove_protocol(&mut self) {
+        let url = Url::from(self.name.clone());
+        self.name = url.without_protocol().to_string();
+    }
 }
 
 impl From<String> for Node {
@@ -248,7 +253,10 @@ pub struct Webgraph<S: Store = RocksDbStore> {
 }
 
 impl<S: Store> Webgraph<S> {
-    pub fn insert(&mut self, from: Node, to: Node, label: String) {
+    pub fn insert(&mut self, mut from: Node, mut to: Node, label: String) {
+        from.remove_protocol();
+        to.remove_protocol();
+
         if let Some(full_graph) = &mut self.full {
             full_graph.insert(from.clone(), to.clone(), label.clone());
         }
@@ -644,5 +652,32 @@ mod test {
     fn host_node_cleanup() {
         let n = Node::from("https://www.example.com?test").into_host();
         assert_eq!(&n.name, "example.com");
+    }
+
+    #[test]
+    fn remove_protocol() {
+        let mut n = Node::from("https://www.example.com?test");
+        n.remove_protocol();
+
+        assert_eq!(&n.name, "www.example.com?test");
+
+        let mut graph = WebgraphBuilder::new_memory()
+            .with_full_graph()
+            .with_host_graph()
+            .open();
+
+        graph.insert(
+            Node::from("http://A"),
+            Node::from("https://B"),
+            String::new(),
+        );
+
+        graph.flush();
+
+        let distances = graph.distances(Node::from("A"));
+        assert_eq!(distances.get(&Node::from("B")), Some(&1));
+
+        let distances = graph.distances(Node::from("http://A"));
+        assert!(distances.is_empty());
     }
 }

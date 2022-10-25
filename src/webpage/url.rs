@@ -226,7 +226,7 @@ impl Url {
     pub fn without_protocol(&self) -> &str {
         self.0[self.find_protocol_end()..]
             .strip_prefix("://")
-            .unwrap_or_default()
+            .unwrap_or(&self.0)
     }
 }
 
@@ -332,7 +332,9 @@ mod tests {
     #[test]
     fn url_without_protocol() {
         let url: Url = "https://test.example.com/test/test".to_string().into();
+        assert_eq!(url.without_protocol(), "test.example.com/test/test");
 
+        let url: Url = "test.example.com/test/test".to_string().into();
         assert_eq!(url.without_protocol(), "test.example.com/test/test");
     }
 }
