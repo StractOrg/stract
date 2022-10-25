@@ -16,7 +16,7 @@
 mod centrality;
 mod entity;
 pub mod frontend;
-mod indexer;
+pub mod indexer;
 pub mod search_server;
 mod webgraph;
 

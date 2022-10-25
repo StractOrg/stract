@@ -205,7 +205,13 @@ fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct IndexPointer(String);
+pub struct IndexPointer(String);
+
+impl From<String> for IndexPointer {
+    fn from(path: String) -> Self {
+        IndexPointer(path)
+    }
+}
 
 impl Worker for IndexingWorker {}
 
@@ -234,20 +240,6 @@ impl Reduce<FrozenIndex> for Index {
         std::fs::remove_dir_all(other_path).unwrap();
 
         res
-    }
-}
-
-impl Reduce<IndexPointer> for IndexPointer {
-    fn reduce(self, element: IndexPointer) -> Self {
-        let index = Index::open(self.0).unwrap();
-        let other_path = element.0;
-        let other = Index::open(&other_path).unwrap();
-
-        let res = index.merge(other);
-
-        std::fs::remove_dir_all(other_path).unwrap();
-
-        IndexPointer(res.path)
     }
 }
 
@@ -359,7 +351,7 @@ impl Indexer {
             config.webgraph_path.clone(),
         );
 
-        let index = warc_paths
+        let indexes: Vec<_> = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -375,32 +367,25 @@ impl Indexer {
                     .unwrap_or_else(|| "data/index".to_string()),
             })
             .collect_vec()
-            // .into_iter()
-            // .map(|job| job.map(&worker))
-            // .fold(None, |acc: Option<Index>, elem: FrozenIndex| match acc {
-            //     Some(acc) => Some(acc.reduce(elem)),
-            //     None => Some(elem.into()),
-            // });
             .into_par_iter()
             .panic_fuse()
             .map(|job| -> IndexPointer { job.map(&worker) })
-            .map(Some)
-            .reduce(
-                || None,
-                |a, b| match (a, b) {
-                    (Some(a), Some(b)) => Some(a.reduce(b)),
-                    (Some(graph), None) | (None, Some(graph)) => Some(graph),
-                    (None, None) => None,
-                },
-            );
+            .collect();
 
-        if let Some(pointer) = index {
-            let mut index = Index::open(pointer.0).unwrap();
+        Self::merge(indexes, config.final_num_segments.unwrap_or(20))?;
+        Ok(())
+    }
 
-            index
-                .inverted_index
-                .merge_into_segments(config.final_num_segments.unwrap_or(20))?;
+    pub fn merge(indexes: Vec<IndexPointer>, num_segments: u32) -> Result<()> {
+        let mut it = indexes.into_iter();
+        let mut index = Index::open(it.next().unwrap().0)?;
+
+        for other in it {
+            let other = Index::open(other.0)?;
+            index = index.merge(other);
         }
+
+        index.inverted_index.merge_into_segments(num_segments)?;
 
         Ok(())
     }

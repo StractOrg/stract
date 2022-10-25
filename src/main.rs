@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use cuely::entrypoint::indexer::IndexPointer;
 use cuely::entrypoint::{self, frontend, search_server};
 use cuely::{FrontendConfig, SearchServerConfig};
 use serde::de::DeserializeOwned;
@@ -77,6 +78,10 @@ enum IndexingOptions {
         wikipedia_dump_path: String,
         output_path: String,
     },
+    Merge {
+        num_segments: u32,
+        indexes: Vec<String>,
+    },
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
@@ -113,6 +118,13 @@ fn main() -> Result<()> {
                 wikipedia_dump_path,
                 output_path,
             } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
+            IndexingOptions::Merge {
+                num_segments,
+                indexes,
+            } => entrypoint::Indexer::merge(
+                indexes.into_iter().map(IndexPointer::from).collect(),
+                num_segments,
+            )?,
         },
         Commands::Centrality {
             webgraph_path,
