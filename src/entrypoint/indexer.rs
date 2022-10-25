@@ -381,8 +381,11 @@ impl Indexer {
         let mut index = Index::open(it.next().unwrap().0)?;
 
         for other in it {
-            let other = Index::open(other.0)?;
+            let other_path = other.0;
+            let other = Index::open(&other_path)?;
             index = index.merge(other);
+
+            std::fs::remove_dir_all(other_path)?;
         }
 
         index.inverted_index.merge_into_segments(num_segments)?;
