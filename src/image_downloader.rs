@@ -44,7 +44,7 @@ where
                 continue;
             }
 
-            for duration in ExponentialBackoff::from_millis(10).take(5) {
+            for duration in ExponentialBackoff::from_millis(10).take(4) {
                 if let Some(image) = url
                     .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
                     .await

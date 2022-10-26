@@ -16,6 +16,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use cuely::entrypoint::autosuggest_scrape::{self, Gl};
+#[cfg(feature = "dev")]
+use cuely::entrypoint::configure;
 use cuely::entrypoint::indexer::IndexPointer;
 use cuely::entrypoint::{self, frontend, search_server};
 use cuely::{FrontendConfig, SearchServerConfig};
@@ -59,6 +61,8 @@ enum Commands {
         ms_sleep_between_req: u64,
         output_dir: String,
     },
+    #[cfg(feature = "dev")]
+    Configure,
 }
 
 #[derive(Subcommand)]
@@ -178,6 +182,8 @@ fn main() -> Result<()> {
         } => {
             autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
+        #[cfg(feature = "dev")]
+        Commands::Configure => configure::run()?,
     }
 
     Ok(())

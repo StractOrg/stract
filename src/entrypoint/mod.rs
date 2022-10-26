@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod autosuggest_scrape;
 mod centrality;
+#[cfg(feature = "dev")]
+pub mod configure;
 mod entity;
 pub mod frontend;
 pub mod indexer;

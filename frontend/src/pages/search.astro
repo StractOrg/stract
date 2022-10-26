@@ -112,7 +112,7 @@ import { askama } from "../askama";
                     </span>
                   ))}
                   <span class="[&:nth-child(2)]:before:content-['—']">
-                    {askama`item.snippet $ {{lorem.lines}}`}
+                    {askama`item.snippet|safe $ {{lorem.lines}}`}
                   </span>
                 </div>
               </div>

@@ -38,28 +38,28 @@ use crate::{
 pub struct Indexer {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum JobConfig {
+pub enum JobConfig {
     Http(HttpConfig),
     Local(LocalConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Job {
-    source_config: JobConfig,
-    download_images: bool,
-    warc_paths: Vec<String>,
-    base_path: String,
-    host_centrality_threshold: Option<f64>,
-    max_num_segments: u32,
+pub struct Job {
+    pub source_config: JobConfig,
+    pub download_images: bool,
+    pub warc_paths: Vec<String>,
+    pub base_path: String,
+    pub host_centrality_threshold: Option<f64>,
+    pub max_num_segments: u32,
 }
 
-struct IndexingWorker {
+pub struct IndexingWorker {
     centrality_store: CentralityStore,
     webgraph: Option<Webgraph>,
 }
 
 impl IndexingWorker {
-    fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
+    pub fn new(centrality_store_path: String, webgraph_path: Option<String>) -> Self {
         Self {
             centrality_store: CentralityStore::open(centrality_store_path),
             webgraph: webgraph_path.map(|path| {
@@ -202,7 +202,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
     index
 }
 
-fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
+pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

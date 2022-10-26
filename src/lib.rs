@@ -132,8 +132,8 @@ impl WarcSource {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalConfig {
-    folder: String,
-    names: Vec<String>,
+    pub folder: String,
+    pub names: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

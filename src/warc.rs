@@ -25,7 +25,7 @@ use std::time::Duration;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use tokio::time::sleep;
-use tracing::debug;
+use tracing::{debug, trace};
 
 pub(crate) struct WarcFile {
     bytes: Vec<u8>,
@@ -108,6 +108,8 @@ impl WarcFile {
 
             if res.is_ok() {
                 return Ok(());
+            } else {
+                trace!("Error {:?}", res);
             }
 
             debug!("warc download failed: {:?}", res.err().unwrap());
