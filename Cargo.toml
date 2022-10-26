@@ -60,6 +60,7 @@ base64 = "0.13.0"
 async-trait = "0.1.57"
 boomphf = { version = "0.5.9", features = ["serde"] }
 axum-macros = "0.2.3"
+urlencoding = "2.1.2"
 
 [dev-dependencies]
 criterion = "0.3.6"

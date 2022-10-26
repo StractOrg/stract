@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use cuely::entrypoint::autosuggest_scrape::{self, Gl};
 use cuely::entrypoint::indexer::IndexPointer;
 use cuely::entrypoint::{self, frontend, search_server};
 use cuely::{FrontendConfig, SearchServerConfig};
@@ -51,6 +52,12 @@ enum Commands {
     },
     Frontend {
         config_path: String,
+    },
+    AutosuggestScrape {
+        num_queries: usize,
+        gl: Gl,
+        ms_sleep_between_req: u64,
+        output_dir: String,
     },
 }
 
@@ -162,6 +169,14 @@ fn main() -> Result<()> {
                 .enable_all()
                 .build()?
                 .block_on(search_server::run(config))?
+        }
+        Commands::AutosuggestScrape {
+            num_queries: queries_to_scrape,
+            gl,
+            ms_sleep_between_req,
+            output_dir,
+        } => {
+            autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
     }
 
