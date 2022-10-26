@@ -83,6 +83,21 @@ impl FromStr for Gl {
     }
 }
 
+fn save_queries<P: AsRef<Path>>(queries: &HashSet<String>, path: P) -> Result<()> {
+    let mut wtr = Writer::from_path(&path)?;
+
+    let mut queries: Vec<_> = queries.iter().collect();
+    queries.sort();
+
+    for query in queries {
+        wtr.write_record([query])?;
+    }
+
+    wtr.flush()?;
+
+    Ok(())
+}
+
 pub fn run<P: AsRef<Path>>(
     queries_to_scrape: usize,
     gl: Gl,
@@ -103,6 +118,12 @@ pub fn run<P: AsRef<Path>>(
         queue.push_back(c.to_string());
     }
 
+    let path = output_dir
+        .as_ref()
+        .join(format!("queries_{:}.csv", gl.to_string().as_str()));
+
+    let mut queries_since_last_save = 0;
+
     while let Some(query) = queue.pop_front() {
         let res = suggestions(&query, gl.to_string().as_str());
 
@@ -111,6 +132,7 @@ pub fn run<P: AsRef<Path>>(
         }
 
         let res = res.unwrap();
+        let mut new_queries = 0;
 
         for next_query in res {
             if queries.contains(&next_query) {
@@ -134,6 +156,7 @@ pub fn run<P: AsRef<Path>>(
                 }
             }
 
+            new_queries += 1;
             queries.insert(next_query);
             pb.tick();
             pb.set_position(queries.len() as u64);
@@ -143,25 +166,19 @@ pub fn run<P: AsRef<Path>>(
             break;
         }
 
+        queries_since_last_save += new_queries;
+
+        if queries_since_last_save > 1_000 {
+            save_queries(&queries, &path)?;
+            queries_since_last_save = 0;
+        }
+
         std::thread::sleep(std::time::Duration::from_millis(ms_sleep_between_req));
     }
 
     pb.finish();
 
-    let path = output_dir
-        .as_ref()
-        .join(format!("queries_{:}.csv", gl.to_string().as_str()));
-
-    let mut wtr = Writer::from_path(path)?;
-
-    let mut queries: Vec<_> = queries.into_iter().collect();
-    queries.sort();
-
-    for query in queries {
-        wtr.write_record(&[query])?;
-    }
-
-    wtr.flush()?;
+    save_queries(&queries, &path)?;
 
     Ok(())
 }

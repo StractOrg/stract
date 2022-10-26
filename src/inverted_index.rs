@@ -34,6 +34,7 @@ use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Weak};
@@ -306,50 +307,60 @@ impl InvertedIndex {
     }
 
     pub fn merge(mut self, mut other: InvertedIndex) -> Self {
-        other.commit().expect("failed to commit index");
-        self.commit().expect("failed to commit index");
-
-        let other_meta = other
-            .tantivy_index
-            .load_metas()
-            .expect("failed to laod tantivy metadata for index");
-
-        let mut meta = self
-            .tantivy_index
-            .load_metas()
-            .expect("failed to laod tantivy metadata for index");
-
-        let x = other.path.clone();
-        let other_path = Path::new(x.as_str());
-        other.writer.wait_merging_threads().unwrap();
-
         let path = self.path.clone();
-        let self_path = Path::new(path.as_str());
-        self.writer.wait_merging_threads().unwrap();
 
-        for segment in other_meta.segments {
-            // TODO: handle case where current index has segment with same name
-            for file in segment.list_files() {
-                let p = other_path.join(&file);
-                if p.exists() {
-                    fs::rename(p, self_path.join(&file)).unwrap();
+        {
+            other.commit().expect("failed to commit index");
+            self.commit().expect("failed to commit index");
+
+            let other_meta = other
+                .tantivy_index
+                .load_metas()
+                .expect("failed to load tantivy metadata for index");
+
+            let mut meta = self
+                .tantivy_index
+                .load_metas()
+                .expect("failed to load tantivy metadata for index");
+
+            let x = other.path.clone();
+            let other_path = Path::new(x.as_str());
+            other.writer.wait_merging_threads().unwrap();
+
+            let path = self.path.clone();
+            let self_path = Path::new(path.as_str());
+            self.writer.wait_merging_threads().unwrap();
+
+            let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
+
+            for segment in other_meta.segments {
+                if ids.contains(&segment.id()) {
+                    continue;
                 }
+
+                // TODO: handle case where current index has segment with same name
+                for file in segment.list_files() {
+                    let p = other_path.join(&file);
+                    if p.exists() {
+                        fs::rename(p, self_path.join(&file)).unwrap();
+                    }
+                }
+                meta.segments.push(segment);
             }
-            meta.segments.push(segment);
+
+            meta.segments
+                .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
+
+            fs::remove_dir_all(other_path).unwrap();
+
+            let self_path = Path::new(&path);
+
+            std::fs::write(
+                self_path.join("meta.json"),
+                serde_json::to_string_pretty(&meta).unwrap(),
+            )
+            .unwrap();
         }
-
-        meta.segments
-            .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
-
-        fs::remove_dir_all(other_path).unwrap();
-
-        let self_path = Path::new(&path);
-
-        std::fs::write(
-            self_path.join("meta.json"),
-            serde_json::to_string_pretty(&meta).unwrap(),
-        )
-        .unwrap();
 
         Self::open(path).expect("failed to open index")
     }
