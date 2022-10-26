@@ -123,17 +123,25 @@ where
     }
 
     async fn download_pending_images_async(&mut self, store: &mut impl ImageStore<K>) {
-        let results = futures::stream::iter(
+        let mut stream = futures::stream::iter(
             self.image_download_jobs
                 .drain()
                 .map(|job| async move { job.download().await }),
         )
-        .buffer_unordered(20)
-        .collect::<Vec<Option<DownloadedImage<K>>>>()
-        .await;
+        .buffer_unordered(20);
 
-        for result in results.into_iter().flatten() {
-            store.insert(result.key, result.image);
+        let mut inserts_since_flush = 0;
+
+        while let Some(result) = stream.next().await {
+            if let Some(result) = result {
+                store.insert(result.key, result.image);
+                inserts_since_flush += 1;
+            }
+
+            if inserts_since_flush > 1_000 {
+                store.flush();
+                inserts_since_flush = 0;
+            }
         }
 
         store.flush();
