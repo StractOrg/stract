@@ -1,16 +1,6 @@
-@unpack-data:
-    rm -rf data
-    tar -zxvf data.tar.gz
-
 @profile-indexer:
     sudo rm -rf data/index
     cargo flamegraph --root -- indexer local configs/indexer/profile.toml
-
-@worker:
-    cargo run --release -- webgraph worker configs/webgraph/worker.toml
-
-@master:
-    cargo run --release -- webgraph master configs/webgraph/master.toml
 
 @webgraph:
     rm -rf data/webgraph
@@ -30,17 +20,10 @@
 @astro:
     cd frontend; npm run dev
 
-@local:
-    cd frontend; npm install
-    rm -rf data/index/
-    cargo run --release -- indexer local configs/indexer/local.toml
-    mv data/index/CC-MAIN-*/* data/index/
-    just frontend
+@configure:
+    cd frontend; npm install; npm run build
+    cargo run --release --all-features -- configure
 
 @entity:
     rm -rf data/entity
-    cargo run --release -- indexer entity data/enwiki-20220801-pages-articles-multistream.xml.bz2 data/entity
-
-@pack-data:
-    rm -f data.tar.gz
-    tar --exclude="data/enwiki*" --exclude="data/warc_files" --exclude="data/webgraph" -zcvf  data.tar.gz data
+    cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity

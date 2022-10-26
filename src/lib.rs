@@ -132,8 +132,8 @@ impl WarcSource {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalConfig {
-    folder: String,
-    names: Vec<String>,
+    pub folder: String,
+    pub names: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -222,6 +222,12 @@ pub enum Error {
 
     #[error("Could not open inverted-index directory")]
     Directory(#[from] tantivy::directory::error::OpenDirectoryError),
+
+    #[error("Could not convert to/from JSON")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Unknown CLI option")]
+    UnknownCLIOption,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

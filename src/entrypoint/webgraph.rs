@@ -34,16 +34,16 @@ use tracing::{info, trace};
 struct GraphPointer(String);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum JobConfig {
+pub enum JobConfig {
     Http(HttpConfig),
     Local(LocalConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Job {
-    config: JobConfig,
-    warc_paths: Vec<String>,
-    graph_base_path: String,
+pub struct Job {
+    pub config: JobConfig,
+    pub warc_paths: Vec<String>,
+    pub graph_base_path: String,
 }
 
 fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
@@ -105,7 +105,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
     graph
 }
 
-fn process_job(job: &Job) -> webgraph::Webgraph {
+pub fn process_job(job: &Job) -> webgraph::Webgraph {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

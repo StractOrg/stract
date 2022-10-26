@@ -127,7 +127,7 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
     }
 
     if let Some(pb) = &pb {
-        pb.finish();
+        pb.finish_and_clear();
     }
 
     let n = n as f64;
