@@ -757,6 +757,8 @@ mod tests {
         );
 
         for _ in 0..100 {
+            let dedup_s = crate::rand_words(100);
+
             index
                 .insert(Webpage::new(
                     &format!(
@@ -766,7 +768,7 @@ mod tests {
                             <title>Website for runners</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {dedup_s}
                         </body>
                     </html>
                     "#
@@ -839,10 +841,11 @@ mod tests {
                     <title>Test website</title>
                 </head>
                 <body>
-                    {CONTENT}
+                    {CONTENT} {}
                 </body>
             </html>
-            "#
+            "#,
+                    crate::rand_words(100)
                 ),
                 "https://www.example.com",
             ))
@@ -859,10 +862,11 @@ mod tests {
                     <title>Test website</title>
                 </head>
                 <body>
-                    {CONTENT}
+                    {CONTENT} {}
                 </body>
             </html>
-            "#
+            "#,
+                    crate::rand_words(100)
                 ),
                 "https://www.example.com",
             ))
@@ -1064,5 +1068,66 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn remove_duplicates() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let query = Query::parse(
+            "dr",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.dr.xyz",
+            ))
+            .expect("failed to insert webpage");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                        </head>
+                        <body>
+                            {CONTENT} dr
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.dr.dk",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
 }

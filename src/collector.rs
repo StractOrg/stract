@@ -28,6 +28,7 @@ use crate::{
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, Prehashed},
     schema::FastField,
+    simhash,
 };
 
 // lower scale -> higher penalty
@@ -46,6 +47,7 @@ pub struct Hashes {
     site: Prehashed,
     title: Prehashed,
     url: Prehashed,
+    simhash: simhash::HashType,
 }
 
 pub trait Doc: Clone {
@@ -198,6 +200,11 @@ impl SegmentCollector for TopSegmentCollector {
                 site: self.get_hash(&doc, &FastField::SiteHash),
                 title: self.get_hash(&doc, &FastField::TitleHash),
                 url: self.get_hash(&doc, &FastField::UrlHash),
+                simhash: self
+                    .fastfield_segment_cache
+                    .get_doc_cache(&FastField::SimHash)
+                    .get_u64(&doc)
+                    .unwrap(),
             },
             id: doc,
             segment: self.segment_ord,
@@ -325,8 +332,18 @@ impl<T: Doc> BucketCollector<T> {
 
     pub fn into_sorted_vec(mut self, de_rank_similar: bool) -> Vec<T> {
         let mut res = Vec::new();
+        let mut simhash = simhash::Table::default();
 
         while let Some(best_doc) = self.documents.pop_max() {
+            let hashes = best_doc.doc.hashes();
+
+            if hashes.simhash != 0 {
+                if simhash.contains(&hashes.simhash) {
+                    continue;
+                }
+                simhash.insert(hashes.simhash);
+            }
+
             if de_rank_similar {
                 self.count.update_counts(&best_doc);
                 self.update_best_doc();
@@ -476,6 +493,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        simhash: 12,
                     },
                     123,
                     1.0,
@@ -485,6 +503,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        simhash: 123,
                     },
                     124,
                     2.0,
@@ -494,6 +513,7 @@ mod tests {
                         site: 3.into(),
                         title: 3.into(),
                         url: 3.into(),
+                        simhash: 1234,
                     },
                     125,
                     3.0,
@@ -503,6 +523,7 @@ mod tests {
                         site: 4.into(),
                         title: 4.into(),
                         url: 4.into(),
+                        simhash: 12345,
                     },
                     126,
                     4.0,
@@ -512,6 +533,7 @@ mod tests {
                         site: 5.into(),
                         title: 5.into(),
                         url: 5.into(),
+                        simhash: 123456,
                     },
                     127,
                     5.0,
@@ -531,6 +553,7 @@ mod tests {
                         site: 3.into(),
                         title: 3.into(),
                         url: 3.into(),
+                        simhash: 12,
                     },
                     125,
                     3.0,
@@ -540,6 +563,7 @@ mod tests {
                         site: 4.into(),
                         title: 4.into(),
                         url: 4.into(),
+                        simhash: 123,
                     },
                     126,
                     4.0,
@@ -549,6 +573,7 @@ mod tests {
                         site: 5.into(),
                         title: 5.into(),
                         url: 5.into(),
+                        simhash: 1234,
                     },
                     127,
                     5.0,
@@ -568,6 +593,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        simhash: 12,
                     },
                     125,
                     3.0,
@@ -577,6 +603,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        simhash: 123,
                     },
                     126,
                     3.1,
@@ -586,6 +613,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        simhash: 1234,
                     },
                     127,
                     5.0,
@@ -602,6 +630,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        simhash: 12,
                     },
                     125,
                     3.0,
@@ -611,6 +640,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        simhash: 123,
                     },
                     126,
                     3.1,
@@ -620,12 +650,53 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        simhash: 1234,
                     },
                     127,
                     5.0,
                 ),
             ],
             &[(5.0, 127), (3.0, 125)],
+        );
+    }
+
+    #[test]
+    fn simhash_dedup() {
+        test(
+            10,
+            &[
+                (
+                    Hashes {
+                        site: 1.into(),
+                        title: 1.into(),
+                        url: 1.into(),
+                        simhash: 1234,
+                    },
+                    125,
+                    3.0,
+                ),
+                (
+                    Hashes {
+                        site: 2.into(),
+                        title: 2.into(),
+                        url: 2.into(),
+                        simhash: 1234,
+                    },
+                    126,
+                    3.1,
+                ),
+                (
+                    Hashes {
+                        site: 3.into(),
+                        title: 3.into(),
+                        url: 3.into(),
+                        simhash: 1,
+                    },
+                    127,
+                    5.0,
+                ),
+            ],
+            &[(5.0, 127), (3.1, 126)],
         );
     }
 }

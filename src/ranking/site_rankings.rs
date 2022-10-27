@@ -137,10 +137,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT}
+                                {CONTENT} {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.first.com",
                 ),
@@ -170,10 +171,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT}
+                                {CONTENT} {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.second.com",
                 ),
@@ -203,10 +205,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT}
+                                {CONTENT} {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.third.com",
                 ),

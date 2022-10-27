@@ -1,3 +1,5 @@
+// Cuely is an open source web search engine.
+// Copyright (C) 2022 Cuely ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -12,10 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    hash::{BuildHasher, Hash, Hasher},
-};
+use std::hash::{BuildHasher, Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
@@ -79,52 +78,6 @@ pub fn split_u128(num: u128) -> [u64; 2] {
 
 pub fn combine_u64s(nums: [u64; 2]) -> u128 {
     ((nums[0] as u128) << 64) | (nums[1] as u128)
-}
-
-pub struct PrehashMap<T> {
-    map: HashMap<Prehashed, T>,
-}
-
-impl<T> PrehashMap<T> {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, key: Prehashed, val: T) {
-        self.map.insert(key, val);
-    }
-
-    pub fn remove(&mut self, key: &Prehashed) {
-        self.map.remove(key);
-    }
-
-    pub fn get_mut(&mut self, key: &Prehashed) -> Option<&mut T> {
-        self.map.get_mut(key)
-    }
-
-    pub fn get(&self, key: &Prehashed) -> Option<&T> {
-        self.map.get(key)
-    }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn iter(&self) -> std::collections::hash_map::Iter<Prehashed, T> {
-        self.map.iter()
-    }
-}
-
-impl<T> Default for PrehashMap<T> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 #[cfg(test)]

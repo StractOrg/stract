@@ -427,11 +427,12 @@ mod tests {
                             <title>Website A</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                             example example example
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.a.com",
                 ),
@@ -454,10 +455,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com",
                 ),
@@ -669,11 +671,12 @@ mod tests {
                             <title>Website A</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                             example example example
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
                 ),
@@ -696,10 +699,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
                 ),
@@ -722,10 +726,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
                 ),
@@ -802,11 +807,12 @@ mod tests {
                             <title>Website A</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                             example example example
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
                 ),
@@ -835,10 +841,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
                 ),
@@ -867,10 +874,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
                 ),

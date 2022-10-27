@@ -136,11 +136,12 @@ mod tests {
                             <title>Website A</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                             example example example
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.a.com",
                 ),
@@ -163,10 +164,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com",
                 ),
@@ -212,11 +214,12 @@ mod tests {
                             <title>Website A</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                             example example example
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.a.com",
                 ),
@@ -239,10 +242,11 @@ mod tests {
                             <title>Website B</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com",
                 ),
@@ -288,10 +292,11 @@ mod tests {
                             <title>DR Homepage</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.dr.dk",
                 ),
@@ -314,10 +319,11 @@ mod tests {
                             <title>Subsite dr</title>
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.dr.dk/whatever",
                 ),
@@ -339,9 +345,10 @@ mod tests {
                         <head>
                             <title>Website B</title>
                         </head>
-                        dr and some other text {CONTENT} dk
+                        dr and some other text {CONTENT} dk {}
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.b.com",
                 ),
@@ -767,10 +774,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT} termA termB d d d d d d d d d
+                                {CONTENT} termA termB d d d d d d d d d {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.first.com",
                 ),
@@ -793,10 +801,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT} termA d d d d d d d d d termB
+                                {CONTENT} termA d d d d d d d d d termB {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.third.com",
                 ),
@@ -819,10 +828,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT} termA d d d d termB d d d d d
+                                {CONTENT} termA d d d d termB d d d d d {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.second.com",
                 ),
@@ -872,10 +882,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT}
+                                {CONTENT} {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.first.com",
                 ),
@@ -898,10 +909,11 @@ mod tests {
                                 <title>Test website</title>
                             </head>
                             <body>
-                                {CONTENT}
+                                {CONTENT} {}
                             </body>
                         </html>
-                    "#
+                    "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.second.com",
                 ),

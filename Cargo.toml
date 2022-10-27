@@ -70,6 +70,7 @@ rusoto_core = { version = "0.48.0", default-features = false, features = ["rustl
 [dev-dependencies]
 criterion = "0.3.6"
 maplit = "1.0.2"
+rand = "0.8.5"
 
 [build-dependencies]
 lalrpop = { version = "0.19.8", features = ["lexer"] }

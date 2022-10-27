@@ -760,6 +760,7 @@ dependencies = [
  "once_cell",
  "parse_wiki_text",
  "quick-xml",
+ "rand 0.8.5",
  "rayon",
  "regex",
  "reqwest",

@@ -17,7 +17,7 @@ use crate::{
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
     schema_org::SchemaOrg,
-    tokenizer, Error, Result,
+    simhash, tokenizer, Error, Result,
 };
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
@@ -699,6 +699,14 @@ impl Html {
                     let u64s = split_u128(hash);
                     doc.add_u64(tantivy_field, u64s[0]);
                     doc.add_u64(tantivy_field, u64s[1]);
+                }
+                Field::Fast(FastField::SimHash) => {
+                    let hash = if !clean_text.text.is_empty() {
+                        simhash::hash(&clean_text.text)
+                    } else {
+                        0
+                    };
+                    doc.add_u64(tantivy_field, hash);
                 }
                 Field::Text(TextField::BacklinkText)
                 | Field::Fast(FastField::HostCentrality)

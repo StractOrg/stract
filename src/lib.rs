@@ -51,6 +51,7 @@ mod schema;
 mod schema_org;
 mod search_prettifier;
 pub mod searcher;
+mod simhash;
 mod snippet;
 mod sonic;
 mod spell;
@@ -233,7 +234,6 @@ pub enum Error {
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-#[allow(unused)]
 fn gen_temp_path() -> PathBuf {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::SystemTime;
@@ -258,4 +258,24 @@ fn gen_temp_path() -> PathBuf {
     } else {
         std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
     }
+}
+
+#[cfg(test)]
+fn rand_words(num_words: usize) -> String {
+    use rand::{distributions::Alphanumeric, Rng};
+    let mut res = String::new();
+
+    for _ in 0..num_words {
+        res.push_str(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect::<String>()
+                .as_str(),
+        );
+        res.push(' ');
+    }
+
+    res.trim().to_string()
 }

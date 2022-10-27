@@ -33,7 +33,7 @@ use crate::{
 
 use crate::ranking::goggles::ast::{RawAlteration, Target};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
     Bm25,
     HostCentrality,

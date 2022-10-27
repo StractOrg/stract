@@ -65,6 +65,7 @@ pub enum FastField {
     DomainHash,
     PreComputedScore,
     HostNodeID,
+    SimHash,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -73,7 +74,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 34] = [
+pub static ALL_FIELDS: [Field; 35] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -109,6 +110,7 @@ pub static ALL_FIELDS: [Field; 34] = [
     Field::Fast(FastField::DomainHash),
     Field::Fast(FastField::PreComputedScore),
     Field::Fast(FastField::HostNodeID),
+    Field::Fast(FastField::SimHash),
 ];
 
 impl Field {
@@ -256,6 +258,12 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
+            Field::Fast(FastField::SimHash) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed()
+                    .set_stored(),
+            ),
         }
     }
 
@@ -297,6 +305,7 @@ impl Field {
             Field::Fast(FastField::UrlHash) => "url_hash",
             Field::Fast(FastField::DomainHash) => "domain_hash",
             Field::Fast(FastField::HostNodeID) => "host_node_id",
+            Field::Fast(FastField::SimHash) => "sim_hash",
         }
     }
 
@@ -366,6 +375,7 @@ impl Field {
             "domain_hash" => Some(Field::Fast(FastField::DomainHash)),
             "title_hash" => Some(Field::Fast(FastField::TitleHash)),
             "host_node_id" => Some(Field::Fast(FastField::HostNodeID)),
+            "sim_hash" => Some(Field::Fast(FastField::SimHash)),
             _ => None,
         }
     }
@@ -434,6 +444,7 @@ impl FastField {
             FastField::DomainHash => DataType::U64s,
             FastField::PreComputedScore => DataType::F64,
             FastField::HostNodeID => DataType::U64,
+            FastField::SimHash => DataType::U64,
         }
     }
 }
