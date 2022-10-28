@@ -150,6 +150,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -177,6 +178,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -228,6 +230,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -255,6 +258,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 5.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -305,6 +309,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -332,6 +337,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -357,6 +363,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -407,6 +414,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -433,6 +441,7 @@ mod tests {
                 host_centrality: 0.09,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -480,6 +489,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -516,6 +526,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
     })
@@ -567,6 +578,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -590,6 +602,7 @@ mod tests {
                 host_centrality: 0.00003,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -637,6 +650,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -663,6 +677,7 @@ mod tests {
                 fetch_time_ms: 20,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -689,6 +704,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -785,6 +801,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 1.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 primary_image: None,
@@ -813,6 +830,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -840,6 +858,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -894,6 +913,7 @@ mod tests {
                 host_centrality: 1.0,
                 fetch_time_ms: 0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
                 node_id: None,
@@ -922,6 +942,89 @@ mod tests {
                 fetch_time_ms: 5000,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::new(index);
+
+        let result = searcher
+            .search(&SearchQuery {
+                original: "test".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.first.com");
+        assert_eq!(result.documents[1].url, "https://www.second.com");
+    }
+
+    #[test]
+    fn crawl_stability() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.first.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 1000,
+                pre_computed_score: 0.0,
+                crawl_stability: 1.0,
+                page_centrality: 0.0,
+                primary_image: None,
+                node_id: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.second.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 0,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })

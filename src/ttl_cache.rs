@@ -100,21 +100,21 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(5), 5);
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), 5);
 
         cache.insert(0, 0);
-        std::thread::sleep(Duration::from_millis(3));
+        std::thread::sleep(Duration::from_millis(30));
         cache.insert(1, 1);
 
         assert_eq!(cache.get(&0), Some(&0));
         assert_eq!(cache.get(&1), Some(&1));
 
-        std::thread::sleep(Duration::from_millis(3));
+        std::thread::sleep(Duration::from_millis(30));
 
         assert_eq!(cache.get(&0), None);
         assert_eq!(cache.get(&1), Some(&1));
 
-        std::thread::sleep(Duration::from_millis(3));
+        std::thread::sleep(Duration::from_millis(30));
 
         assert_eq!(cache.get(&0), None);
         assert_eq!(cache.get(&1), None);
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn max_size() {
-        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(5), 1);
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), 1);
 
         cache.insert(0, 0);
         cache.insert(1, 1);

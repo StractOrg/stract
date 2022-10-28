@@ -27,7 +27,7 @@ use chrono::Utc;
 use tantivy::{DocId, Score};
 
 use crate::{
-    schema::{Field, CENTRALITY_SCALING},
+    schema::{Field, FLOAT_SCALING},
     webpage::region::{Region, RegionCount},
 };
 
@@ -44,9 +44,10 @@ pub enum Signal {
     NumTrackers,
     Region,
     PersonalCentrality,
+    CrawlStability,
 }
 
-pub const ALL_SIGNALS: [Signal; 9] = [
+pub const ALL_SIGNALS: [Signal; 10] = [
     Signal::Bm25,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -56,6 +57,7 @@ pub const ALL_SIGNALS: [Signal; 9] = [
     Signal::NumTrackers,
     Signal::Region,
     Signal::PersonalCentrality,
+    Signal::CrawlStability,
 ];
 
 struct SignalValue {
@@ -80,7 +82,7 @@ impl Signal {
         match self {
             Signal::Bm25 => value.bm25 as f64,
             Signal::HostCentrality | Signal::PageCentrality => {
-                value.fastfield_value.unwrap() as f64 / CENTRALITY_SCALING as f64
+                value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64
             }
             Signal::PersonalCentrality => value.personal_centrality,
             Signal::IsHomepage => value.fastfield_value.unwrap() as f64,
@@ -126,6 +128,7 @@ impl Signal {
 
                 boost + region_count.score(&webpage_region)
             }
+            Signal::CrawlStability => value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64,
         }
     }
 
@@ -135,11 +138,12 @@ impl Signal {
             Signal::HostCentrality => 2048.0,
             Signal::PageCentrality => 4096.0,
             Signal::IsHomepage => 0.1,
-            Signal::FetchTimeMs => 0.1,
+            Signal::FetchTimeMs => 0.01,
             Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
             Signal::PersonalCentrality => 2048.0,
+            Signal::CrawlStability => 20.0,
         }
     }
 
@@ -168,6 +172,7 @@ impl Signal {
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),
             Signal::NumTrackers => Some(FastField::NumTrackers),
             Signal::Region => Some(FastField::Region),
+            Signal::CrawlStability => Some(FastField::CrawlStability),
             Signal::PersonalCentrality => None,
         }
     }
@@ -331,10 +336,10 @@ impl SignalAggregator {
             .map(|signal| {
                 let fastfield_value = match &signal {
                     Signal::HostCentrality => {
-                        (webpage.host_centrality * (CENTRALITY_SCALING as f64)) as u64
+                        (webpage.host_centrality * (FLOAT_SCALING as f64)) as u64
                     }
                     Signal::PageCentrality => {
-                        (webpage.page_centrality * (CENTRALITY_SCALING as f64)) as u64
+                        (webpage.page_centrality * (FLOAT_SCALING as f64)) as u64
                     }
                     Signal::IsHomepage => webpage.html.url().is_homepage().into(),
                     Signal::FetchTimeMs => webpage.fetch_time_ms,

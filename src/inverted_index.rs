@@ -723,6 +723,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 primary_image: None,
                 node_id: None,
+                crawl_stability: 0.0,
             })
             .expect("failed to insert webpage");
 

@@ -441,6 +441,7 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -468,6 +469,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
             })
@@ -574,6 +576,7 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -600,6 +603,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
             })
@@ -685,6 +689,7 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
             })
@@ -712,6 +717,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
             })
@@ -739,6 +745,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
             })
@@ -821,6 +828,7 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 primary_image: None,
                 node_id: Some(
                     *centrality_store
@@ -854,6 +862,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: Some(
                     *centrality_store
@@ -887,6 +896,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
+                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: Some(
                     *centrality_store

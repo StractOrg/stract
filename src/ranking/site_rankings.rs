@@ -151,6 +151,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                crawl_stability: 0.0,
                 node_id: Some(
                     graph
                         .host
@@ -185,6 +186,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                crawl_stability: 0.0,
                 node_id: Some(
                     graph
                         .host
@@ -219,6 +221,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 primary_image: None,
+                crawl_stability: 0.0,
                 node_id: Some(
                     graph
                         .host

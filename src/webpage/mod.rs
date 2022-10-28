@@ -37,7 +37,7 @@ mod just_text;
 pub mod region;
 mod url;
 
-use crate::schema::{Field, ALL_FIELDS, CENTRALITY_SCALING};
+use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
 
 pub use self::url::Url;
 use self::{
@@ -129,6 +129,7 @@ pub struct Webpage {
     pub pre_computed_score: f64,
     pub primary_image: Option<StoredPrimaryImage>,
     pub node_id: Option<u64>,
+    pub crawl_stability: f64,
 }
 
 impl Webpage {
@@ -145,6 +146,7 @@ impl Webpage {
             pre_computed_score: 0.0,
             primary_image: None,
             node_id: None,
+            crawl_stability: 0.0,
         }
     }
 
@@ -186,14 +188,14 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::HostCentrality).name())
                 .expect("Failed to get host_centrality field"),
-            (self.host_centrality * CENTRALITY_SCALING as f64) as u64,
+            (self.host_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
                 .get_field(Field::Fast(FastField::PageCentrality).name())
                 .expect("Failed to get page_centrality field"),
-            (self.page_centrality * CENTRALITY_SCALING as f64) as u64,
+            (self.page_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
@@ -223,6 +225,13 @@ impl Webpage {
                 .get_field(Field::Fast(FastField::HostNodeID).name())
                 .expect("Failed to get node_id field"),
             self.node_id.unwrap_or(u64::MAX),
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::Fast(FastField::CrawlStability).name())
+                .expect("failed to get crawl_stability field"),
+            (self.crawl_stability * FLOAT_SCALING as f64) as u64,
         );
 
         Ok(doc)
@@ -715,6 +724,7 @@ impl Html {
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
+                | Field::Fast(FastField::CrawlStability)
                 | Field::Text(TextField::PrimaryImage) => {}
             }
         }

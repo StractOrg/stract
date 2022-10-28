@@ -20,7 +20,7 @@ use tantivy::schema::{
 
 use crate::tokenizer::{Identity, Normal, Stemmed};
 
-pub const CENTRALITY_SCALING: u64 = 1_000_000_000;
+pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TextField {
@@ -66,6 +66,7 @@ pub enum FastField {
     PreComputedScore,
     HostNodeID,
     SimHash,
+    CrawlStability,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,7 +75,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 35] = [
+pub static ALL_FIELDS: [Field; 36] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -111,6 +112,7 @@ pub static ALL_FIELDS: [Field; 35] = [
     Field::Fast(FastField::PreComputedScore),
     Field::Fast(FastField::HostNodeID),
     Field::Fast(FastField::SimHash),
+    Field::Fast(FastField::CrawlStability),
 ];
 
 impl Field {
@@ -264,6 +266,9 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
+            Field::Fast(FastField::CrawlStability) => IndexingOption::Integer(
+                NumericOptions::default().set_fast(Cardinality::SingleValue),
+            ),
         }
     }
 
@@ -306,6 +311,7 @@ impl Field {
             Field::Fast(FastField::DomainHash) => "domain_hash",
             Field::Fast(FastField::HostNodeID) => "host_node_id",
             Field::Fast(FastField::SimHash) => "sim_hash",
+            Field::Fast(FastField::CrawlStability) => "crawl_stability",
         }
     }
 
@@ -376,6 +382,7 @@ impl Field {
             "title_hash" => Some(Field::Fast(FastField::TitleHash)),
             "host_node_id" => Some(Field::Fast(FastField::HostNodeID)),
             "sim_hash" => Some(Field::Fast(FastField::SimHash)),
+            "crawl_stability" => Some(Field::Fast(FastField::CrawlStability)),
             _ => None,
         }
     }
@@ -445,6 +452,7 @@ impl FastField {
             FastField::PreComputedScore => DataType::F64,
             FastField::HostNodeID => DataType::U64,
             FastField::SimHash => DataType::U64,
+            FastField::CrawlStability => DataType::U64,
         }
     }
 }

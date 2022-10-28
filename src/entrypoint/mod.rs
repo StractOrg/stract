@@ -17,6 +17,7 @@ pub mod autosuggest_scrape;
 mod centrality;
 #[cfg(feature = "dev")]
 pub mod configure;
+pub mod crawl_stability;
 mod entity;
 pub mod frontend;
 pub mod indexer;
