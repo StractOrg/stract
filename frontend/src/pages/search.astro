@@ -16,7 +16,7 @@ import { askama } from "../askama";
     </div>
 
     <div
-      class="grid sm:px-5 md:pl-20 lg:px-32 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3 search-content"
+      class="grid sm:px-5 md:pl-20 lg:px-36 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3 search-content"
     >
       <!-- Stats and settings -->
       <div class="flex w-full justify-between mx-auto">
@@ -79,17 +79,10 @@ import { askama } from "../askama";
         {
           askama.for_("item in search_result", () => (
             <div class="flex w-full">
-              <div class="flex grow min-w-0 flex-col space-y-1.5">
+              <div class="flex grow min-w-0 flex-col space-y-1">
                 <div class="flex min-w-0">
-                  <div class="flex flex-col space-y-1.5 grow min-w-0">
-                    <div class="flex items-center space-x-2 text-sm">
-                      <img
-                          src={askama.fake(
-                            "data:image/png;base64, {{ item.favicon_base64 }}",
-                            "{{image.avatar}}"
-                          )}
-                          width="13px"
-                        />
+                  <div class="flex flex-col space-y-1 grow min-w-0">
+                    <div class="flex items-center text-sm">
                       <a
                         class="text-gray-600 hover:no-underline truncate url"
                         href="{{ item.url }}"
@@ -97,7 +90,7 @@ import { askama } from "../askama";
                         {askama`item.pretty_url $ {{internet.url}}`}
                       </a>
                     </div>
-                    <a class="title-link truncate text-lg font-medium" title="{{ item.title }}" href="{{ item.url }}">
+                    <a class="title-link truncate text-xl font-medium" title="{{ item.title }}" href="{{ item.url }}">
                       {askama`item.title $ {{lorem.sentence}}`}
                     </a>
                   </div>
@@ -105,7 +98,7 @@ import { askama } from "../askama";
                     <Hero class="w-6" icon="adjustments" />
                   </div>
                 </div>
-                <div class="text-sm">
+                <div class="text-sm text-snippet">
                   {askama.if_("let Some(val) = item.last_updated", () => (
                     <span class="text-gray-500">
                       {askama`val $ 2. May 2022`}

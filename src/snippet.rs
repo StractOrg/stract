@@ -31,7 +31,7 @@ use whatlang::Lang;
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
 
-const DEFAULT_MAX_NUM_CHARS: usize = 280;
+const DEFAULT_MAX_NUM_CHARS: usize = 250;
 
 #[derive(Debug)]
 struct FragmentCandidate {
@@ -79,7 +79,7 @@ struct Snippet {
     highlighted: Vec<Range<usize>>,
 }
 
-const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 500;\">";
+const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 700;\">";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
 impl Snippet {
@@ -381,7 +381,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
+        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -424,7 +424,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
+        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -639,7 +639,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.webpages.documents.len(), 1);
         assert_eq!(
             result.webpages.documents[0].snippet,
-            format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...")
+            format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its...")
         );
     }
 }

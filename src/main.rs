@@ -49,6 +49,10 @@ enum Commands {
         output_path: String,
         host_rank_paths: Vec<String>,
     },
+    DmozParser {
+        dmoz_file: String,
+        output_path: String,
+    },
     Webgraph {
         #[clap(subcommand)]
         options: WebgraphOptions,
@@ -202,6 +206,10 @@ fn main() -> Result<()> {
             entrypoint::crawl_stability::CrawlStability::build(host_rank_paths, output_path)
                 .unwrap();
         }
+        Commands::DmozParser {
+            dmoz_file,
+            output_path,
+        } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
     }
 
     Ok(())

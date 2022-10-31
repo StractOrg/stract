@@ -40,6 +40,7 @@ mod entity_index;
 mod exponential_backoff;
 mod fastfield_cache;
 mod frontend;
+mod human_website_annotations;
 mod image_downloader;
 mod image_store;
 pub mod index;

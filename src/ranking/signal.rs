@@ -350,7 +350,12 @@ impl SignalAggregator {
                         .unwrap_or(0),
                     Signal::NumTrackers => webpage.html.trackers().len() as u64,
                     Signal::Region => Region::guess_from(webpage).unwrap_or(Region::All).id(),
-                    _ => panic!("signal cannot be determined from webpage"),
+                    Signal::CrawlStability => {
+                        (webpage.crawl_stability * (FLOAT_SCALING as f64)) as u64
+                    }
+                    Signal::Bm25 | Signal::PersonalCentrality => {
+                        panic!("signal cannot be determined from webpage")
+                    }
                 };
 
                 let current_timestamp = Utc::now().timestamp() as usize;
