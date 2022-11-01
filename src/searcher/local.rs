@@ -287,7 +287,9 @@ mod tests {
                     pre_computed_score: 0.0,
                     primary_image: None,
                     node_id: None,
+                    host_topic: None,
                     crawl_stability: 0.0,
+                    dmoz_description: None,
                 })
                 .expect("failed to insert webpage");
         }

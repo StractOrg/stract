@@ -70,7 +70,10 @@ enum Commands {
         output_dir: String,
     },
     #[cfg(feature = "dev")]
-    Configure,
+    Configure {
+        #[clap(long, takes_value = false)]
+        skip_download: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -90,6 +93,7 @@ enum IndexingOptions {
         centrality_store_path: String,
         webgraph_path: Option<String>,
         crawl_stability_path: Option<String>,
+        topics_path: Option<String>,
     },
     Local {
         config_path: String,
@@ -128,12 +132,14 @@ fn main() -> Result<()> {
                 centrality_store_path,
                 webgraph_path,
                 crawl_stability_path,
+                topics_path,
             } => {
                 entrypoint::Indexer::run_worker(
                     address,
                     centrality_store_path,
                     webgraph_path,
                     crawl_stability_path,
+                    topics_path,
                 )?;
             }
             IndexingOptions::Local { config_path } => {
@@ -198,7 +204,7 @@ fn main() -> Result<()> {
             autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
         #[cfg(feature = "dev")]
-        Commands::Configure => configure::run()?,
+        Commands::Configure { skip_download } => configure::run(skip_download)?,
         Commands::CrawlStability {
             output_path,
             host_rank_paths,

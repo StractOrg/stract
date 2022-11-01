@@ -25,6 +25,7 @@ use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
 use crate::fastfield_cache::FastFieldCache;
+use crate::human_website_annotations::Topic;
 use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
@@ -395,6 +396,7 @@ pub struct RetrievedWebpage {
     pub favicon: Option<Image>,
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
+    pub host_topic: Option<Topic>,
     pub region: Region,
 }
 
@@ -465,6 +467,13 @@ impl From<Document> for RetrievedWebpage {
                     webpage.region = {
                         let id = value.value.as_u64().unwrap();
                         Region::from_id(id)
+                    }
+                }
+                Field::Text(TextField::HostTopic) => {
+                    let facet = value.value.as_facet().unwrap();
+
+                    if !facet.is_root() {
+                        webpage.host_topic = Some(facet.clone().into())
                     }
                 }
                 _ => {}
@@ -723,7 +732,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 primary_image: None,
                 node_id: None,
+                host_topic: None,
                 crawl_stability: 0.0,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 

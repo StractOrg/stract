@@ -32,7 +32,8 @@ use crate::warc::WarcFile;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
 use crate::{
-    HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig, Result, WarcSource,
+    human_website_annotations, HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig,
+    Result, WarcSource,
 };
 
 use super::crawl_stability::CrawlStability;
@@ -59,6 +60,7 @@ pub struct IndexingWorker {
     centrality_store: CentralityStore,
     webgraph: Option<Webgraph>,
     crawl_stabilty: Option<CrawlStability>,
+    topics: Option<human_website_annotations::Mapper>,
 }
 
 impl IndexingWorker {
@@ -66,6 +68,7 @@ impl IndexingWorker {
         centrality_store_path: String,
         webgraph_path: Option<String>,
         crawl_stability_path: Option<String>,
+        topics_path: Option<String>,
     ) -> Self {
         Self {
             centrality_store: CentralityStore::open(centrality_store_path),
@@ -77,6 +80,7 @@ impl IndexingWorker {
                     .open()
             }),
             crawl_stabilty: crawl_stability_path.map(CrawlStability::open),
+            topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
     }
 }
@@ -177,6 +181,16 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .get(&Node::from_url(html.url()).into_host())
                     .copied();
 
+                let mut host_topic = None;
+                let mut dmoz_description = None;
+
+                if let Some(mapper) = worker.topics.as_ref() {
+                    if let Some(info) = mapper.get(&html.url().site().to_string()) {
+                        host_topic = Some(info.topic.clone());
+                        dmoz_description = Some(info.description.clone())
+                    }
+                }
+
                 let mut webpage = Webpage {
                     html,
                     backlinks,
@@ -187,6 +201,8 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     pre_computed_score: 0.0,
                     node_id,
                     crawl_stability,
+                    host_topic,
+                    dmoz_description,
                 };
 
                 webpage.pre_computed_score =
@@ -343,20 +359,26 @@ impl Indexer {
         centrality_store_path: String,
         webgraph_path: Option<String>,
         crawl_stability_path: Option<String>,
+        topics_path: Option<String>,
     ) -> Result<()> {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap()
             .block_on(async {
-                IndexingWorker::new(centrality_store_path, webgraph_path, crawl_stability_path)
-                    .run::<Job, FrozenIndex>(
-                        worker_addr
-                            .parse::<SocketAddr>()
-                            .expect("Could not parse worker address"),
-                    )
-                    .await
-                    .unwrap();
+                IndexingWorker::new(
+                    centrality_store_path,
+                    webgraph_path,
+                    crawl_stability_path,
+                    topics_path,
+                )
+                .run::<Job, FrozenIndex>(
+                    worker_addr
+                        .parse::<SocketAddr>()
+                        .expect("Could not parse worker address"),
+                )
+                .await
+                .unwrap();
             });
         Ok(())
     }
@@ -373,6 +395,7 @@ impl Indexer {
             config.centrality_store_path.clone(),
             config.webgraph_path.clone(),
             config.crawl_stability_path.clone(),
+            config.topics_path.clone(),
         );
 
         let indexes: Vec<_> = warc_paths

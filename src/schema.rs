@@ -43,6 +43,8 @@ pub enum TextField {
     BacklinkText,
     PrimaryImage,
     Description,
+    HostTopic,
+    DmozDescription,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -75,7 +77,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 36] = [
+pub static ALL_FIELDS: [Field; 38] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -92,6 +94,8 @@ pub static ALL_FIELDS: [Field; 36] = [
     Field::Text(TextField::BacklinkText),
     Field::Text(TextField::PrimaryImage),
     Field::Text(TextField::Description),
+    Field::Text(TextField::HostTopic),
+    Field::Text(TextField::DmozDescription),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -174,6 +178,12 @@ impl Field {
                 IndexingOption::Bytes(BytesOptions::default().set_stored())
             }
             Field::Text(TextField::Description) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Text(TextField::HostTopic) => {
+                IndexingOption::Facet(tantivy::schema::FacetOptions::default())
+            }
+            Field::Text(TextField::DmozDescription) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
@@ -292,6 +302,8 @@ impl Field {
             Field::Text(TextField::PrimaryImage) => "primary_image_uuid",
             Field::Text(TextField::TitleIfHomepage) => "title_if_homepage",
             Field::Text(TextField::AllBody) => "all_body",
+            Field::Text(TextField::HostTopic) => "host_topic",
+            Field::Text(TextField::DmozDescription) => "dmoz_description",
             Field::Fast(FastField::HostCentrality) => "host_centrality",
             Field::Fast(FastField::PageCentrality) => "page_centrality",
             Field::Fast(FastField::IsHomepage) => "is_homepage",
@@ -318,17 +330,19 @@ impl Field {
     pub fn boost(&self) -> Option<f32> {
         match self {
             Field::Text(TextField::Site) => Some(3.0),
-            Field::Text(TextField::TitleIfHomepage) => Some(2.0),
-            Field::Text(TextField::DomainIfHomepage) => Some(10.0),
+            Field::Text(TextField::TitleIfHomepage) => Some(3.0),
+            Field::Text(TextField::DomainIfHomepage) => Some(6.0),
             Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => Some(30.0),
             Field::Text(TextField::StemmedCleanBody) | Field::Text(TextField::StemmedTitle) => {
-                Some(0.1)
+                Some(0.5)
             }
             Field::Text(TextField::CleanBody) => Some(4.0),
+            Field::Text(TextField::DmozDescription) => Some(3.0),
             Field::Text(TextField::Title) => Some(10.0),
             Field::Text(TextField::Url) => Some(1.0),
             Field::Text(TextField::Domain) => Some(1.0),
             Field::Text(TextField::AllBody) => Some(0.01),
+            Field::Text(TextField::HostTopic) => Some(1.0),
             Field::Text(TextField::BacklinkText) => Some(4.0),
             Field::Text(TextField::SiteNoTokenizer)
             | Field::Text(TextField::DomainNoTokenizer)
@@ -367,6 +381,8 @@ impl Field {
             "description" => Some(Field::Text(TextField::Description)),
             "all_body" => Some(Field::Text(TextField::AllBody)),
             "title_if_homepage" => Some(Field::Text(TextField::TitleIfHomepage)),
+            "host_topic" => Some(Field::Text(TextField::HostTopic)),
+            "dmoz_description" => Some(Field::Text(TextField::DmozDescription)),
             "host_centrality" => Some(Field::Fast(FastField::HostCentrality)),
             "page_centrality" => Some(Field::Fast(FastField::PageCentrality)),
             "is_homepage" => Some(Field::Fast(FastField::IsHomepage)),
@@ -411,6 +427,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
             IndexingOption::Float(options) => builder.add_f64_field(field.name(), options),
             IndexingOption::Bytes(options) => builder.add_bytes_field(field.name(), options),
+            IndexingOption::Facet(options) => builder.add_facet_field(field.name(), options),
         };
     }
 
@@ -422,6 +439,7 @@ pub enum IndexingOption {
     Integer(tantivy::schema::NumericOptions),
     Float(tantivy::schema::NumericOptions),
     Bytes(tantivy::schema::BytesOptions),
+    Facet(tantivy::schema::FacetOptions),
 }
 
 pub enum DataType {

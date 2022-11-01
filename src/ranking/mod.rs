@@ -152,7 +152,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -180,7 +182,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -232,7 +236,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -260,7 +266,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -311,7 +319,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -339,7 +349,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -365,7 +377,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -416,7 +430,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -444,7 +460,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -491,7 +509,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -528,8 +548,10 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
-    })
+                dmoz_description: None,
+        })
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
@@ -580,7 +602,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -605,7 +629,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -653,7 +679,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -679,7 +707,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -706,7 +736,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -805,7 +837,9 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -833,7 +867,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -861,7 +897,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -916,7 +954,9 @@ mod tests {
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -944,7 +984,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -998,7 +1040,9 @@ mod tests {
                 crawl_stability: 1.0,
                 page_centrality: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -1026,7 +1070,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
                 node_id: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

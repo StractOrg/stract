@@ -133,7 +133,12 @@ pub fn parse<P: AsRef<Path>>(dmoz_file: P) -> Result<human_website_annotations::
             continue;
         }
 
+        if page.topic.contains("World") {
+            continue;
+        }
+
         let topic = Topic::from_string("/".to_string() + page.topic.as_str());
+
         let info = Info {
             description: page.description,
             topic,

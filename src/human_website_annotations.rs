@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tantivy::schema::Facet;
 
 use crate::Result;
 use std::{
@@ -25,8 +27,21 @@ use std::{
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct Topic<const N: usize = 3> {
+pub struct Topic<const N: usize = 2> {
     detailed_topics: Vec<String>,
+}
+
+impl<const N: usize> From<Facet> for Topic<N> {
+    fn from(facet: Facet) -> Self {
+        Self {
+            detailed_topics: facet
+                .to_path()
+                .into_iter()
+                .take(N)
+                .map(String::from)
+                .collect(),
+        }
+    }
 }
 
 impl<const N: usize> Topic<N> {
@@ -39,6 +54,10 @@ impl<const N: usize> Topic<N> {
                 .map(String::from)
                 .collect::<Vec<_>>(),
         }
+    }
+
+    pub(crate) fn as_facet(&self) -> Facet {
+        Facet::from_path(self.detailed_topics.clone().into_iter())
     }
 }
 
@@ -80,7 +99,27 @@ impl Mapper {
         Ok(bincode::deserialize(&bytes)?)
     }
 
+    pub fn get(&self, host: &String) -> Option<&Info> {
+        self.0.get(host)
+    }
+
     pub fn all_topics(&self) -> HashSet<Topic> {
         self.0.iter().map(|(_, info)| info.topic.clone()).collect()
+    }
+
+    pub fn top_topics(&self, top_n: usize) -> Vec<Topic> {
+        let mut topics: HashMap<Topic, usize> = HashMap::new();
+
+        for topic in self.0.iter().map(|(_, info)| info.topic.clone()) {
+            *topics.entry(topic).or_default() += 1;
+        }
+
+        topics
+            .into_iter()
+            .sorted_by_key(|(_, count)| *count)
+            .rev()
+            .map(|(topic, _)| topic)
+            .take(top_n)
+            .collect()
     }
 }

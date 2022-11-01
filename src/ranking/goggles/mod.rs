@@ -444,6 +444,8 @@ mod tests {
                 crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -472,6 +474,8 @@ mod tests {
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -579,6 +583,8 @@ mod tests {
                 crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -606,6 +612,8 @@ mod tests {
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -692,6 +700,8 @@ mod tests {
                 crawl_stability: 0.0,
                 primary_image: None,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
         index
@@ -720,6 +730,8 @@ mod tests {
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
+                dmoz_description: None,
+                host_topic: None,
             })
             .expect("failed to insert webpage");
         index
@@ -748,6 +760,8 @@ mod tests {
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
+                host_topic: None,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 
@@ -830,6 +844,8 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 primary_image: None,
+                host_topic: None,
+                dmoz_description: None,
                 node_id: Some(
                     *centrality_store
                         .approx_harmonic
@@ -864,6 +880,8 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
+                dmoz_description: None,
+                host_topic: None,
                 node_id: Some(
                     *centrality_store
                         .approx_harmonic
@@ -898,6 +916,8 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
+                host_topic: None,
+                dmoz_description: None,
                 node_id: Some(
                     *centrality_store
                         .approx_harmonic
