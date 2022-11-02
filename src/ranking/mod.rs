@@ -17,7 +17,7 @@
 mod bm25;
 pub mod centrality_store;
 pub mod goggles;
-mod initial;
+pub mod initial;
 pub mod signal;
 pub mod site_rankings;
 

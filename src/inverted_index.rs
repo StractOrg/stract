@@ -86,8 +86,8 @@ pub struct InvertedIndex {
     pub path: String,
     tantivy_index: tantivy::Index,
     writer: IndexWriter,
-    reader: IndexReader,
-    fastfield_cache: Arc<FastFieldCache>,
+    pub(crate) reader: IndexReader,
+    pub(crate) fastfield_cache: Arc<FastFieldCache>,
     schema: Arc<Schema>,
 }
 

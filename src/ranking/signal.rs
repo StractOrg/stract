@@ -135,14 +135,14 @@ impl Signal {
     fn default_coefficient(&self) -> f64 {
         match self {
             Signal::Bm25 => 1.0,
-            Signal::HostCentrality => 2048.0,
-            Signal::PageCentrality => 4096.0,
+            Signal::HostCentrality => 2500.0,
+            Signal::PageCentrality => 4500.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.01,
             Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
-            Signal::PersonalCentrality => 2048.0,
+            Signal::PersonalCentrality => 2500.0,
             Signal::CrawlStability => 20.0,
         }
     }

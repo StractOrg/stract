@@ -69,6 +69,13 @@ enum Commands {
         ms_sleep_between_req: u64,
         output_dir: String,
     },
+    TopicCentrality {
+        index_path: String,
+        topics_path: String,
+        webgraph_path: String,
+        approximate_harmonic_path: String,
+        output_path: String,
+    },
     #[cfg(feature = "dev")]
     Configure {
         #[clap(long, takes_value = false)]
@@ -216,6 +223,19 @@ fn main() -> Result<()> {
             dmoz_file,
             output_path,
         } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
+        Commands::TopicCentrality {
+            index_path,
+            topics_path,
+            webgraph_path,
+            approximate_harmonic_path,
+            output_path,
+        } => entrypoint::topic_centrality::run(
+            index_path,
+            topics_path,
+            webgraph_path,
+            approximate_harmonic_path,
+            output_path,
+        ),
     }
 
     Ok(())

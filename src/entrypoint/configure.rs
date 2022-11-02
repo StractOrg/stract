@@ -179,11 +179,49 @@ fn parse_topics() -> Result<()> {
     topics.save(Path::new(DATA_PATH).join("human_annotations"))
 }
 
+fn create_topic_centrality() {
+    let index_path = Path::new(DATA_PATH)
+        .join("index")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let topics_path = Path::new(DATA_PATH)
+        .join("human_annotations")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let webgraph_path = Path::new(DATA_PATH)
+        .join("webgraph")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let approximate_harmonic_path = Path::new(DATA_PATH)
+        .join("centrality")
+        .join("approx_harmonic")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let output_path = Path::new(DATA_PATH)
+        .join("topic_centrality")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    super::topic_centrality::run(
+        index_path,
+        topics_path,
+        webgraph_path,
+        approximate_harmonic_path,
+        output_path,
+    );
+}
+
 fn index_files() -> Result<()> {
     create_webgraph()?;
     calculate_centrality();
     parse_topics()?;
     create_inverted_index()?;
+    create_topic_centrality();
     create_entity_index()?;
 
     Ok(())
