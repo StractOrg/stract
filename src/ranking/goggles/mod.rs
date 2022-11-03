@@ -25,9 +25,7 @@ use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use crate::{
     query::union::UnionQuery,
     schema::{Field, TextField},
-    webgraph::centrality::{
-        approximate_harmonic::ApproximatedHarmonicCentrality, topic::TopicCentrality,
-    },
+    webgraph::centrality::approximate_harmonic::ApproximatedHarmonicCentrality,
     Result,
 };
 use itertools::Itertools;

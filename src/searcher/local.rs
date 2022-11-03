@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -42,7 +41,7 @@ pub struct LocalSearcher {
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
-    topic: Option<Arc<TopicCentrality>>,
+    topic_centrality: Option<TopicCentrality>,
 }
 
 impl From<Index> for LocalSearcher {
@@ -58,7 +57,7 @@ impl LocalSearcher {
             entity_index: None,
             bangs: None,
             centrality_store: None,
-            topic: None,
+            topic_centrality: None,
         }
     }
 
@@ -72,6 +71,10 @@ impl LocalSearcher {
 
     pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
         self.centrality_store = Some(centrality_store);
+    }
+
+    pub fn set_topic_centrality(&mut self, topic_centrality: TopicCentrality) {
+        self.topic_centrality = Some(topic_centrality);
     }
 
     pub fn search_initial(
@@ -147,6 +150,11 @@ impl LocalSearcher {
             if region != Region::All {
                 ranker = ranker.with_region(region);
             }
+        }
+
+        if let Some(topic_centrality) = self.topic_centrality.as_ref() {
+            let topic_scorer = topic_centrality.scorer(&parsed_query);
+            ranker.set_topic_scorer(topic_scorer);
         }
 
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());

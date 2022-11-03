@@ -31,6 +31,7 @@ use crate::{
     fastfield_cache::FastFieldCache,
     inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
+    webgraph::centrality::topic,
     webpage::region::{Region, RegionCount},
 };
 
@@ -44,6 +45,7 @@ pub struct Ranker {
     aggregator: SignalAggregator,
     fastfield_cache: Arc<FastFieldCache>,
     de_rank_similar: bool,
+    topic_scorer: Option<topic::Scorer>,
 }
 
 impl Ranker {
@@ -60,6 +62,7 @@ impl Ranker {
             max_docs: None,
             de_rank_similar: true,
             fastfield_cache,
+            topic_scorer: None,
         }
     }
 
@@ -86,10 +89,16 @@ impl Ranker {
     }
 
     pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
+        let mut aggregator = self.aggregator.clone();
+
+        if let Some(topic_scorer) = self.topic_scorer.clone() {
+            aggregator.register_topic_scorer(topic_scorer);
+        }
+
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
             self.selected_region,
-            self.aggregator.clone(),
+            aggregator,
             Arc::clone(&self.fastfield_cache),
         );
 
@@ -110,17 +119,31 @@ impl Ranker {
 
         collector.tweak_score(score_tweaker)
     }
+
+    pub(crate) fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
+        self.topic_scorer = Some(topic_scorer);
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{
+        human_website_annotations::{self, Info, Topic},
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
+        webgraph::{
+            centrality::{
+                approximate_harmonic::ApproximatedHarmonicCentrality, topic::TopicCentrality,
+            },
+            Node, WebgraphBuilder,
+        },
         webpage::{Html, Link, Webpage},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
+    const CONTENT_2: &str = "what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text";
 
     #[test]
     fn host_centrality_ranking() {
@@ -1095,5 +1118,196 @@ mod tests {
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.first.com");
         assert_eq!(result.documents[1].url, "https://www.second.com");
+    }
+
+    #[test]
+    fn topic_score() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let topic_a = Topic::from_string("/root/topic_a".to_string());
+        let topic_b = Topic::from_string("/root/topic_b".to_string());
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                <div>
+                                    {CONTENT} topic_a
+                                </div>
+                                <div>
+                                    {}
+                                </div>
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.a.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 1000,
+                pre_computed_score: 0.0,
+                crawl_stability: 1.0,
+                page_centrality: 0.0,
+                primary_image: None,
+                host_topic: Some(topic_a.clone()),
+                node_id: Some(1),
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                <div>
+                                    {CONTENT} topic_b
+                                </div>
+                                <div>
+                                    {}
+                                </div>
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.b.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 1000,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                host_topic: Some(topic_b.clone()),
+                node_id: Some(2),
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                <div>
+                                    {CONTENT_2} topic_a topic_b
+                                </div>
+                                <div>
+                                    {}
+                                </div>
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.wrong.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.01,
+                fetch_time_ms: 0,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                host_topic: None,
+                node_id: Some(0),
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let mut mapper = HashMap::new();
+        mapper.insert(
+            "www.a.com".to_string(),
+            Info {
+                description: String::new(),
+                topic: topic_a,
+            },
+        );
+        mapper.insert(
+            "www.b.com".to_string(),
+            Info {
+                description: String::new(),
+                topic: topic_b,
+            },
+        );
+        let topics = human_website_annotations::Mapper::from(mapper);
+
+        let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path())
+            .with_host_graph()
+            .open();
+
+        webgraph.insert(
+            Node::from("www.wrong.com"),
+            Node::from("www.a.com"),
+            String::new(),
+        );
+        webgraph.insert(
+            Node::from("www.wrong.com"),
+            Node::from("www.b.com"),
+            String::new(),
+        );
+
+        webgraph.flush();
+
+        let approx = ApproximatedHarmonicCentrality::new(&webgraph);
+
+        let topic_centrality = TopicCentrality::build(&index, topics, webgraph, approx);
+
+        let mut searcher = LocalSearcher::new(index);
+        searcher.set_topic_centrality(topic_centrality);
+
+        let result = searcher
+            .search(&SearchQuery {
+                original: "topic_a".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.a.com");
+        assert_eq!(result.documents[1].url, "https://www.wrong.com");
+
+        let result = searcher
+            .search(&SearchQuery {
+                original: "topic_b".to_string(),
+                selected_region: None,
+                goggle_program: None,
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
+        assert_eq!(result.num_docs, 2);
+        assert_eq!(result.documents.len(), 2);
+        assert_eq!(result.documents[0].url, "https://www.b.com");
+        assert_eq!(result.documents[1].url, "https://www.wrong.com");
     }
 }

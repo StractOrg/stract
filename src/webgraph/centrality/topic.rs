@@ -31,7 +31,6 @@ use tantivy::{
     schema::IndexRecordOption,
 };
 
-use crate::Result;
 use crate::{
     human_website_annotations::Mapper,
     index::Index,
@@ -39,60 +38,41 @@ use crate::{
     schema::{FastField, Field, TextField},
     webgraph::{centrality::approximate_harmonic::SHIFT, Webgraph},
 };
+use crate::{query::Query, Result};
 
 use super::approximate_harmonic::ApproximatedHarmonicCentrality;
 
-// const TOP_TERMS: usize = 1_000_000;
-const TOP_TERMS: usize = 10;
+const TOP_TERMS: usize = 1_000_000;
+pub const NUM_TOPICS: usize = 50;
+
+#[derive(Clone)]
+pub struct Scorer {
+    term_weights: Vec<f64>,
+    host_centrality: Arc<Vec<Vec<f64>>>,
+}
+
+impl Scorer {
+    pub fn score(&self, host: u64) -> f64 {
+        match self.host_centrality.get(host as usize) {
+            Some(host_score) => host_score
+                .iter()
+                .zip_eq(self.term_weights.iter())
+                .map(|(h, t)| h * t)
+                .sum(),
+            None => 0.0,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize)]
-struct SerializableTopicCentrality {
+pub struct TopicCentrality {
     terms: HashMap<String, Vec<f64>>,
-    host_centrality: Vec<Vec<f64>>, // host_idx => [f64; N]
+    host_centrality: Arc<Vec<Vec<f64>>>, // host_idx => [f64; N]
 }
 
-impl<const N: usize> From<TopicCentrality<N>> for SerializableTopicCentrality {
-    fn from(topic_centrality: TopicCentrality<N>) -> Self {
-        Self {
-            terms: topic_centrality
-                .terms
-                .into_iter()
-                .map(|(s, v)| (s, v.to_vec()))
-                .collect(),
-            host_centrality: topic_centrality
-                .host_centrality
-                .into_iter()
-                .map(|v| v.to_vec())
-                .collect(),
-        }
-    }
-}
-
-impl<const N: usize> From<SerializableTopicCentrality> for TopicCentrality<N> {
-    fn from(serialized: SerializableTopicCentrality) -> Self {
-        Self {
-            terms: serialized
-                .terms
-                .into_iter()
-                .map(|(s, v)| (s, v.try_into().unwrap()))
-                .collect(),
-            host_centrality: serialized
-                .host_centrality
-                .into_iter()
-                .map(|v| v.try_into().unwrap())
-                .collect(),
-        }
-    }
-}
-
-pub struct TopicCentrality<const N: usize = 50> {
-    terms: HashMap<String, [f64; N]>,
-    host_centrality: Vec<[f64; N]>, // host_idx => [f64; N]
-}
-
-impl<const N: usize> TopicCentrality<N> {
+impl TopicCentrality {
     pub fn build(
-        index: Index,
+        index: &Index,
         topics: Mapper,
         webgraph: Webgraph,
         approx: ApproximatedHarmonicCentrality,
@@ -118,14 +98,14 @@ impl<const N: usize> TopicCentrality<N> {
             }
         }
 
-        let top_topics = topics.top_topics(N);
+        let top_topics = topics.top_topics(NUM_TOPICS);
         let topic_field = searcher
             .schema()
             .get_field(Field::Text(TextField::HostTopic).name())
             .unwrap();
         let collector = tantivy::collector::Count;
 
-        let term_scores: HashMap<String, [f64; N]> = term_count
+        let term_scores: HashMap<String, Vec<f64>> = term_count
             .into_iter()
             .sorted_by_key(|(_, count)| *count)
             .rev()
@@ -133,8 +113,8 @@ impl<const N: usize> TopicCentrality<N> {
             .progress()
             .par_bridge()
             .map(|(term, total_doc_freq)| {
-                let mut scores = Vec::with_capacity(top_topics.len());
-                for topic in &top_topics {
+                let mut scores = vec![0.0; NUM_TOPICS];
+                for (i, topic) in top_topics.iter().enumerate() {
                     let facet = topic.as_facet();
                     let topic = tantivy::Term::from_facet(topic_field, &facet);
                     let topic = TermQuery::new(topic, IndexRecordOption::Basic).box_clone();
@@ -145,10 +125,10 @@ impl<const N: usize> TopicCentrality<N> {
                     let query = BooleanQuery::new(vec![(Occur::Must, topic), (Occur::Must, term)]);
 
                     let topic_freq = searcher.search(&query, &collector).unwrap();
-                    scores.push(topic_freq as f64 / total_doc_freq as f64);
+                    scores[i] = topic_freq as f64 / total_doc_freq as f64;
                 }
 
-                (term, scores.try_into().unwrap())
+                (term, scores)
             })
             .collect();
 
@@ -169,9 +149,9 @@ impl<const N: usize> TopicCentrality<N> {
         let mut nodes: Vec<_> = webgraph.host.as_ref().unwrap().nodes().collect();
         nodes.sort();
 
-        let mut node_scores = vec![Vec::new(); nodes.len()];
+        let mut node_scores = vec![vec![0.0; NUM_TOPICS]; nodes.len()];
 
-        for topic in &top_topics {
+        for (i, topic) in top_topics.iter().enumerate() {
             let facet = topic.as_facet();
             let topic = tantivy::Term::from_facet(topic_field, &facet);
             let query = TermQuery::new(topic, IndexRecordOption::Basic).box_clone();
@@ -198,18 +178,13 @@ impl<const N: usize> TopicCentrality<N> {
             let scorer = approx.scorer_without_fixed(&top_sites, &[]);
 
             for node in &nodes {
-                node_scores[*node as usize].push(scorer.score(*node) - SHIFT);
+                node_scores[*node as usize][i] = scorer.score(*node) - SHIFT;
             }
         }
 
-        let node_scores: Vec<_> = node_scores
-            .into_iter()
-            .map(|scores| scores.try_into().unwrap())
-            .collect();
-
         Self {
             terms: term_scores,
-            host_centrality: node_scores,
+            host_centrality: Arc::new(node_scores),
         }
     }
 
@@ -220,9 +195,7 @@ impl<const N: usize> TopicCentrality<N> {
             .write(true)
             .open(path)?;
 
-        let serializable = SerializableTopicCentrality::from(self);
-
-        let bytes = bincode::serialize(&serializable)?;
+        let bytes = bincode::serialize(&self)?;
         file.write_all(&bytes)?;
 
         Ok(())
@@ -234,7 +207,25 @@ impl<const N: usize> TopicCentrality<N> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes)?;
 
-        let serializable: SerializableTopicCentrality = bincode::deserialize(&bytes)?;
-        Ok(Self::from(serializable))
+        Ok(bincode::deserialize(&bytes)?)
+    }
+
+    pub fn scorer(&self, query: &Query) -> Scorer {
+        let terms = query.simple_terms();
+        let mut term_weights = [0.0; NUM_TOPICS];
+
+        for term in terms {
+            if let Some(score) = self.terms.get(&term) {
+                term_weights
+                    .iter_mut()
+                    .zip_eq(score.iter())
+                    .for_each(|(acc, score)| *acc += score)
+            }
+        }
+
+        Scorer {
+            term_weights: term_weights.to_vec(),
+            host_centrality: Arc::clone(&self.host_centrality),
+        }
     }
 }

@@ -355,7 +355,9 @@ impl Field {
     pub fn is_searchable(&self) -> bool {
         !matches!(
             self,
-            Field::Text(TextField::PrimaryImage) | Field::Text(TextField::BacklinkText)
+            Field::Text(TextField::PrimaryImage)
+                | Field::Text(TextField::BacklinkText)
+                | Field::Text(TextField::HostTopic)
         ) && !self.is_fast()
     }
 

@@ -37,7 +37,7 @@ pub fn run(
     let webgraph = WebgraphBuilder::new(webgraph_path).with_host_graph().open();
     let approx = ApproximatedHarmonicCentrality::open(approximate_harmonic_path).unwrap();
 
-    let centrality: TopicCentrality<50> = TopicCentrality::build(index, topics, webgraph, approx);
+    let centrality: TopicCentrality = TopicCentrality::build(&index, topics, webgraph, approx);
 
     centrality.save(output_path).unwrap();
 }
