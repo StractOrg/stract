@@ -1,11 +1,18 @@
-limit_warc_files = 4
+limit_warc_files = 10
 graph_base_path = "data/webgraph"
-batch_size = 2
+batch_size = 1
 
 [warc_source]
-type = "HTTP"
-base_url = "https://data.commoncrawl.org/"
-warc_paths_file = "warc.paths"
-# type = "Local"
-# folder = "./data/warc_files"
-# names = ["CC-MAIN-20220116093137-20220116123137-00049.warc.gz"]
+# type = "HTTP"
+# base_url = "https://data.commoncrawl.org/"
+# warc_paths_file = "warc.paths"
+type = "Local"
+folder = "./data/warc_files"
+names = [
+    "CC-MAIN-20220116093137-20220116123137-00044.warc.gz",
+    "CC-MAIN-20220116093137-20220116123137-00045.warc.gz",
+    "CC-MAIN-20220116093137-20220116123137-00046.warc.gz",
+    "CC-MAIN-20220116093137-20220116123137-00047.warc.gz",
+    "CC-MAIN-20220116093137-20220116123137-00048.warc.gz",
+    "CC-MAIN-20220116093137-20220116123137-00049.warc.gz",
+    ]

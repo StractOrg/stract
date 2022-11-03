@@ -262,6 +262,7 @@ pub fn generate(
     text: &str,
     dirty_text: &str,
     description: &Option<String>,
+    dmoz_description: &Option<String>,
     region: &Region,
     searcher: &tantivy::Searcher,
 ) -> Result<String> {
@@ -277,7 +278,7 @@ pub fn generate(
 
     if snippet.fragment.is_empty() {
         if text.is_empty() {
-            match description {
+            match dmoz_description {
                 Some(desc) => {
                     let lang = match region.lang() {
                         Some(lang) => lang,
@@ -292,21 +293,38 @@ pub fn generate(
                         snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
                     }
                 }
-                None => {
-                    let lang = match region.lang() {
-                        Some(lang) => lang,
-                        None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
-                    };
+                None => match description {
+                    Some(desc) => {
+                        let lang = match region.lang() {
+                            Some(lang) => lang,
+                            None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
+                        };
 
-                    let tokenizer = Stemmed::with_forced_language(lang).into();
-                    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
+                        let tokenizer = Stemmed::with_forced_language(lang).into();
+                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
 
-                    snippet = generator.snippet(dirty_text);
-
-                    if snippet.fragment.is_empty() {
-                        snippet.fragment = dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        snippet = generator.snippet(desc);
+                        if snippet.fragment.is_empty() {
+                            snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        }
                     }
-                }
+                    None => {
+                        let lang = match region.lang() {
+                            Some(lang) => lang,
+                            None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
+                        };
+
+                        let tokenizer = Stemmed::with_forced_language(lang).into();
+                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
+
+                        snippet = generator.snippet(dirty_text);
+
+                        if snippet.fragment.is_empty() {
+                            snippet.fragment =
+                                dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        }
+                    }
+                },
             }
         } else {
             snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();

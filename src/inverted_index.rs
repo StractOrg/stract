@@ -225,6 +225,7 @@ impl InvertedIndex {
                 &page.body,
                 &page.dirty_body,
                 &page.description,
+                &page.dmoz_description,
                 &page.region,
                 &searcher,
             )?;
@@ -393,6 +394,7 @@ pub struct RetrievedWebpage {
     pub body: String,
     pub dirty_body: String,
     pub description: Option<String>,
+    pub dmoz_description: Option<String>,
     pub favicon: Option<Image>,
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
@@ -475,6 +477,15 @@ impl From<Document> for RetrievedWebpage {
                     if !facet.is_root() {
                         webpage.host_topic = Some(facet.clone().into())
                     }
+                }
+                Field::Text(TextField::DmozDescription) => {
+                    let desc = value
+                        .value
+                        .as_text()
+                        .expect("Dmoz description field should be text")
+                        .to_string();
+
+                    webpage.dmoz_description = if desc.is_empty() { None } else { Some(desc) }
                 }
                 _ => {}
             }

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::goggles::{self, Goggle};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::spell::Correction;
+use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
@@ -40,6 +42,7 @@ pub struct LocalSearcher {
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
+    topic: Option<Arc<TopicCentrality>>,
 }
 
 impl From<Index> for LocalSearcher {
@@ -55,6 +58,7 @@ impl LocalSearcher {
             entity_index: None,
             bangs: None,
             centrality_store: None,
+            topic: None,
         }
     }
 

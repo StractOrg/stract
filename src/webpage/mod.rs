@@ -366,14 +366,8 @@ impl Html {
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         let mut open_links = Vec::new();
-        let mut preprocessor = Preprocessor::new(["script", "style", "head", "noscript"]);
 
         for edge in self.root.traverse() {
-            preprocessor.update(&edge);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
             match edge {
                 NodeEdge::Start(node) => {
                     if let Some(element) = node.as_element() {
@@ -409,6 +403,16 @@ impl Html {
                         }
                     }
                 }
+            }
+        }
+
+        while let Some((text, attributes)) = open_links.pop() {
+            if let Some(dest) = attributes.borrow().get("href") {
+                links.push(Link {
+                    source: self.url.clone(),
+                    destination: dest.to_string().into(),
+                    text: text.trim().to_string(),
+                });
             }
         }
 

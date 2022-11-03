@@ -42,7 +42,8 @@ use crate::{
 
 use super::approximate_harmonic::ApproximatedHarmonicCentrality;
 
-const TOP_TERMS: usize = 1_000_000;
+// const TOP_TERMS: usize = 1_000_000;
+const TOP_TERMS: usize = 10;
 
 #[derive(Serialize, Deserialize)]
 struct SerializableTopicCentrality {
@@ -84,7 +85,7 @@ impl<const N: usize> From<SerializableTopicCentrality> for TopicCentrality<N> {
     }
 }
 
-pub struct TopicCentrality<const N: usize> {
+pub struct TopicCentrality<const N: usize = 50> {
     terms: HashMap<String, [f64; N]>,
     host_centrality: Vec<[f64; N]>, // host_idx => [f64; N]
 }
@@ -182,7 +183,11 @@ impl<const N: usize> TopicCentrality<N> {
                 .filter_map(|(_, doc_address)| {
                     let doc = searcher.doc(doc_address).unwrap();
                     let id = doc.get_first(graph_node_id).unwrap().as_u64().unwrap();
-                    webgraph.host.as_ref().unwrap().id2node(&id)
+                    if id == u64::MAX {
+                        None
+                    } else {
+                        Some(webgraph.host.as_ref().unwrap().id2node(&id).unwrap())
+                    }
                 })
                 .collect();
 

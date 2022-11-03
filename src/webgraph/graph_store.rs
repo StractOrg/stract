@@ -84,8 +84,8 @@ where
     K: Hash + Eq + Serialize + DeserializeOwned + Clone,
     V: Serialize + DeserializeOwned + Clone,
 {
-    pub(crate) store: Box<dyn Kv<K, V> + Send + Sync>,
-    pub(crate) cache: LruCache<K, V>,
+    store: Box<dyn Kv<K, V> + Send + Sync>,
+    cache: LruCache<K, V>,
 }
 
 impl<K, V> CachedTree<K, V>
@@ -121,6 +121,8 @@ where
     }
 
     fn insert(&mut self, key: K, value: V) {
+        self.cache.push(key, value);
+
         if self.cache.len() == self.cache.cap() {
             while self.cache.len() > self.cache.cap() / 2 {
                 if let Some((key, value)) = self.cache.pop_lru() {
@@ -130,19 +132,17 @@ where
 
             self.store.flush();
         }
-
-        self.cache.push(key, value);
     }
 
-    fn flush(&mut self) {
-        for (key, value) in self.cache.iter() {
-            self.store.insert(key.clone(), value.clone());
+    pub(crate) fn flush(&mut self) {
+        while let Some((key, value)) = self.cache.pop_lru() {
+            self.store.insert(key, value);
         }
 
         self.store.flush();
     }
 
-    fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.store.iter()
     }
 }
@@ -292,6 +292,8 @@ impl<S: Store> GraphStore<S> {
 
             self.insert(from, to, edge.label);
         }
+
+        self.flush();
     }
 }
 
