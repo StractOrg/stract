@@ -49,6 +49,10 @@ enum Commands {
         output_path: String,
         host_rank_paths: Vec<String>,
     },
+    DmozParser {
+        dmoz_file: String,
+        output_path: String,
+    },
     Webgraph {
         #[clap(subcommand)]
         options: WebgraphOptions,
@@ -65,8 +69,18 @@ enum Commands {
         ms_sleep_between_req: u64,
         output_dir: String,
     },
+    TopicCentrality {
+        index_path: String,
+        topics_path: String,
+        webgraph_path: String,
+        approximate_harmonic_path: String,
+        output_path: String,
+    },
     #[cfg(feature = "dev")]
-    Configure,
+    Configure {
+        #[clap(long, takes_value = false)]
+        skip_download: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -86,6 +100,7 @@ enum IndexingOptions {
         centrality_store_path: String,
         webgraph_path: Option<String>,
         crawl_stability_path: Option<String>,
+        topics_path: Option<String>,
     },
     Local {
         config_path: String,
@@ -124,12 +139,14 @@ fn main() -> Result<()> {
                 centrality_store_path,
                 webgraph_path,
                 crawl_stability_path,
+                topics_path,
             } => {
                 entrypoint::Indexer::run_worker(
                     address,
                     centrality_store_path,
                     webgraph_path,
                     crawl_stability_path,
+                    topics_path,
                 )?;
             }
             IndexingOptions::Local { config_path } => {
@@ -194,7 +211,7 @@ fn main() -> Result<()> {
             autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
         #[cfg(feature = "dev")]
-        Commands::Configure => configure::run()?,
+        Commands::Configure { skip_download } => configure::run(skip_download)?,
         Commands::CrawlStability {
             output_path,
             host_rank_paths,
@@ -202,6 +219,23 @@ fn main() -> Result<()> {
             entrypoint::crawl_stability::CrawlStability::build(host_rank_paths, output_path)
                 .unwrap();
         }
+        Commands::DmozParser {
+            dmoz_file,
+            output_path,
+        } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
+        Commands::TopicCentrality {
+            index_path,
+            topics_path,
+            webgraph_path,
+            approximate_harmonic_path,
+            output_path,
+        } => entrypoint::topic_centrality::run(
+            index_path,
+            topics_path,
+            webgraph_path,
+            approximate_harmonic_path,
+            output_path,
+        ),
     }
 
     Ok(())

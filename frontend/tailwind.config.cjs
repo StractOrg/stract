@@ -7,11 +7,15 @@ module.exports = {
     extend: {
       colors: {
         brand: "rgb(11 123 255 / <alpha-value>)",
+        snippet: "#4d5156",
       },
       fontFamily: {
         sans: [
-          "MontserratVariable",
-          "Montserrat",
+          // "MontserratVariable",
+          // "Montserrat",
+          "Helvetica",
+          "Arial",
+          "sans-serif",
           ...defaultTheme.fontFamily.sans,
         ],
       },

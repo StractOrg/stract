@@ -17,3 +17,4 @@
 pub mod approximate_harmonic;
 pub mod betweenness;
 pub mod harmonic;
+pub mod topic;

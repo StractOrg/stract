@@ -25,6 +25,7 @@ use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
 use crate::fastfield_cache::FastFieldCache;
+use crate::human_website_annotations::Topic;
 use crate::image_store::Image;
 use crate::query::Query;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
@@ -85,8 +86,8 @@ pub struct InvertedIndex {
     pub path: String,
     tantivy_index: tantivy::Index,
     writer: IndexWriter,
-    reader: IndexReader,
-    fastfield_cache: Arc<FastFieldCache>,
+    pub(crate) reader: IndexReader,
+    pub(crate) fastfield_cache: Arc<FastFieldCache>,
     schema: Arc<Schema>,
 }
 
@@ -224,6 +225,7 @@ impl InvertedIndex {
                 &page.body,
                 &page.dirty_body,
                 &page.description,
+                &page.dmoz_description,
                 &page.region,
                 &searcher,
             )?;
@@ -392,9 +394,11 @@ pub struct RetrievedWebpage {
     pub body: String,
     pub dirty_body: String,
     pub description: Option<String>,
+    pub dmoz_description: Option<String>,
     pub favicon: Option<Image>,
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
+    pub host_topic: Option<Topic>,
     pub region: Region,
 }
 
@@ -466,6 +470,22 @@ impl From<Document> for RetrievedWebpage {
                         let id = value.value.as_u64().unwrap();
                         Region::from_id(id)
                     }
+                }
+                Field::Text(TextField::HostTopic) => {
+                    let facet = value.value.as_facet().unwrap();
+
+                    if !facet.is_root() {
+                        webpage.host_topic = Some(facet.clone().into())
+                    }
+                }
+                Field::Text(TextField::DmozDescription) => {
+                    let desc = value
+                        .value
+                        .as_text()
+                        .expect("Dmoz description field should be text")
+                        .to_string();
+
+                    webpage.dmoz_description = if desc.is_empty() { None } else { Some(desc) }
                 }
                 _ => {}
             }
@@ -723,7 +743,9 @@ mod tests {
                 pre_computed_score: 0.0,
                 primary_image: None,
                 node_id: None,
+                host_topic: None,
                 crawl_stability: 0.0,
+                dmoz_description: None,
             })
             .expect("failed to insert webpage");
 

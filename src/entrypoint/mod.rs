@@ -18,10 +18,12 @@ mod centrality;
 #[cfg(feature = "dev")]
 pub mod configure;
 pub mod crawl_stability;
+pub mod dmoz_parser;
 mod entity;
 pub mod frontend;
 pub mod indexer;
 pub mod search_server;
+pub mod topic_centrality;
 mod webgraph;
 
 use std::{fs::File, path::Path};

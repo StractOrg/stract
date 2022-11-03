@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
+    human_website_annotations::Topic,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
     schema_org::SchemaOrg,
@@ -130,6 +131,8 @@ pub struct Webpage {
     pub primary_image: Option<StoredPrimaryImage>,
     pub node_id: Option<u64>,
     pub crawl_stability: f64,
+    pub host_topic: Option<Topic>,
+    pub dmoz_description: Option<String>,
 }
 
 impl Webpage {
@@ -146,12 +149,32 @@ impl Webpage {
             pre_computed_score: 0.0,
             primary_image: None,
             node_id: None,
+            host_topic: None,
             crawl_stability: 0.0,
+            dmoz_description: None,
         }
+    }
+
+    fn dmoz_description(&self) -> Option<String> {
+        self.dmoz_description.as_ref().and_then(|desc| {
+            if !self.html.metadata().iter().any(|metadata| {
+                if let Some(content) = metadata.get(&"content".to_string()) {
+                    content.contains("noodp")
+                } else {
+                    false
+                }
+            }) {
+                Some(desc.clone())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
         let region = Region::guess_from(&self);
+
+        let dmoz_description = self.dmoz_description();
 
         let mut doc = self.html.into_tantivy(schema)?;
 
@@ -232,6 +255,25 @@ impl Webpage {
                 .get_field(Field::Fast(FastField::CrawlStability).name())
                 .expect("failed to get crawl_stability field"),
             (self.crawl_stability * FLOAT_SCALING as f64) as u64,
+        );
+
+        let facet = self
+            .host_topic
+            .map(|topic| topic.as_facet())
+            .unwrap_or_default();
+
+        doc.add_facet(
+            schema
+                .get_field(Field::Text(TextField::HostTopic).name())
+                .expect("failed to get host_topic field"),
+            facet,
+        );
+
+        doc.add_text(
+            schema
+                .get_field(Field::Text(TextField::DmozDescription).name())
+                .expect("failed to get host_topic field"),
+            dmoz_description.unwrap_or_default(),
         );
 
         Ok(doc)
@@ -324,14 +366,8 @@ impl Html {
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         let mut open_links = Vec::new();
-        let mut preprocessor = Preprocessor::new(["script", "style", "head", "noscript"]);
 
         for edge in self.root.traverse() {
-            preprocessor.update(&edge);
-            if preprocessor.is_inside_removed() {
-                continue;
-            }
-
             match edge {
                 NodeEdge::Start(node) => {
                     if let Some(element) = node.as_element() {
@@ -367,6 +403,16 @@ impl Html {
                         }
                     }
                 }
+            }
+        }
+
+        while let Some((text, attributes)) = open_links.pop() {
+            if let Some(dest) = attributes.borrow().get("href") {
+                links.push(Link {
+                    source: self.url.clone(),
+                    destination: dest.to_string().into(),
+                    text: text.trim().to_string(),
+                });
             }
         }
 
@@ -718,6 +764,7 @@ impl Html {
                     doc.add_u64(tantivy_field, hash);
                 }
                 Field::Text(TextField::BacklinkText)
+                | Field::Text(TextField::HostTopic)
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::PageCentrality)
                 | Field::Fast(FastField::FetchTimeMs)
@@ -725,6 +772,7 @@ impl Html {
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
                 | Field::Fast(FastField::CrawlStability)
+                | Field::Text(TextField::DmozDescription)
                 | Field::Text(TextField::PrimaryImage) => {}
             }
         }
@@ -1644,5 +1692,74 @@ mod tests {
 
         assert_eq!(html.title(), Some("Test site".to_string()));
         assert_eq!(html.all_text(), Some("test".to_string()));
+    }
+
+    #[test]
+    fn dmoz_description() {
+        let html = Html::parse(
+            r#"
+                    <html>
+                        <head>
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+            "example.com",
+        );
+
+        let webpage = Webpage {
+            html,
+            backlinks: Vec::new(),
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            primary_image: None,
+            node_id: None,
+            crawl_stability: 0.0,
+            host_topic: None,
+            dmoz_description: Some("dmoz description".to_string()),
+        };
+
+        assert_eq!(
+            webpage.dmoz_description(),
+            Some("dmoz description".to_string())
+        )
+    }
+
+    #[test]
+    fn noodp_ignores_dmoz() {
+        let html = Html::parse(
+            r#"
+                    <html>
+                        <head>
+                            <meta name="robots" content="noodp" />
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+            "example.com",
+        );
+        let webpage = Webpage {
+            html,
+            backlinks: Vec::new(),
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            primary_image: None,
+            node_id: None,
+            crawl_stability: 0.0,
+            host_topic: None,
+            dmoz_description: Some("dmoz description".to_string()),
+        };
+
+        assert_eq!(webpage.dmoz_description(), None)
     }
 }

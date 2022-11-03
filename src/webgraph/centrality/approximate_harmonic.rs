@@ -40,7 +40,8 @@ use crate::Result;
 
 const NUM_PROXY_NODES: usize = 10_000;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
-const USER_NODES_LIMIT: usize = 20; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
+const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
+pub const SHIFT: f64 = 1.0;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
@@ -153,14 +154,14 @@ impl Scorer {
                 return *cached;
             }
 
-            let res = (1.0
+            let res = (SHIFT
                 + (self
                     .liked_nodes
                     .iter()
                     .filter_map(|liked_node| {
                         liked_node.best_dist(&node).map(|dist| (dist, liked_node))
                     })
-                    .map(|(dist, liked_node)| liked_node.weight as f64 / dist as f64)
+                    .map(|(dist, liked_node)| liked_node.weight as f64 / (dist as f64 + 1.0))
                     .sum::<f64>()
                     - self
                         .disliked_nodes
@@ -170,7 +171,9 @@ impl Scorer {
                                 .best_dist(&node)
                                 .map(|dist| (dist, disliked_node))
                         })
-                        .map(|(dist, disliked_node)| disliked_node.weight as f64 / dist as f64)
+                        .map(|(dist, disliked_node)| {
+                            disliked_node.weight as f64 / (dist as f64 + 1.0)
+                        })
                         .sum::<f64>())
                     / self.num_liked_nodes as f64)
                 .max(0.0);
@@ -324,6 +327,28 @@ impl ApproximatedHarmonicCentrality {
         )
     }
 
+    pub fn scorer_without_fixed(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer {
+        let liked_nodes = liked_nodes
+            .iter()
+            .map(|node| node.clone().into_host())
+            .filter_map(|node| self.node2id.get(&node).copied())
+            .collect_vec();
+
+        let disliked_nodes = disliked_nodes
+            .iter()
+            .map(|node| node.clone().into_host())
+            .filter_map(|node| self.node2id.get(&node).copied())
+            .collect_vec();
+
+        Scorer::new(
+            &self.proxy_nodes,
+            &liked_nodes,
+            &disliked_nodes,
+            HashMap::new(),
+            &self.betweenness,
+        )
+    }
+
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let mut file = File::options()
             .create(true)
@@ -337,7 +362,7 @@ impl ApproximatedHarmonicCentrality {
         Ok(())
     }
 
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
@@ -544,6 +569,26 @@ mod tests {
                     .get(&Node::from("A".to_string()))
                     .unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn liked_nodes_centrality_without_fix() {
+        let graph = test_graph();
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+
+        let liked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
+
+        let scorer = centrality.scorer_without_fixed(&liked_nodes, &[]);
+
+        assert_eq!(
+            scorer.score(*centrality.node2id.get(&liked_nodes[0]).unwrap()),
+            1.625
+        );
+
+        assert_eq!(
+            scorer.score(*centrality.node2id.get(&liked_nodes[1]).unwrap()),
+            1.75
         );
     }
 }

@@ -30,14 +30,14 @@ use crate::{
 
 use bzip2::bufread::MultiBzDecoder;
 use parse_wiki_text::Node;
-use quick_xml::{events::Event, Reader};
+use quick_xml::events::Event;
 
 struct EntityIterator<R: BufRead> {
     inside_title: bool,
     inside_text: bool,
     buf: Vec<u8>,
     current_entity: Option<EntityBuilder>,
-    reader: Reader<R>,
+    reader: quick_xml::Reader<R>,
 }
 
 impl<R: BufRead> From<R> for EntityIterator<R> {
@@ -47,7 +47,7 @@ impl<R: BufRead> From<R> for EntityIterator<R> {
             inside_text: false,
             buf: Vec::new(),
             current_entity: None,
-            reader: Reader::from_reader(reader),
+            reader: quick_xml::Reader::from_reader(reader),
         }
     }
 }

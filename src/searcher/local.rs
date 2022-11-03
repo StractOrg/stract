@@ -29,6 +29,7 @@ use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::goggles::{self, Goggle};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::spell::Correction;
+use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
@@ -40,6 +41,7 @@ pub struct LocalSearcher {
     entity_index: Option<EntityIndex>,
     bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
+    topic_centrality: Option<TopicCentrality>,
 }
 
 impl From<Index> for LocalSearcher {
@@ -55,6 +57,7 @@ impl LocalSearcher {
             entity_index: None,
             bangs: None,
             centrality_store: None,
+            topic_centrality: None,
         }
     }
 
@@ -68,6 +71,10 @@ impl LocalSearcher {
 
     pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
         self.centrality_store = Some(centrality_store);
+    }
+
+    pub fn set_topic_centrality(&mut self, topic_centrality: TopicCentrality) {
+        self.topic_centrality = Some(topic_centrality);
     }
 
     pub fn search_initial(
@@ -143,6 +150,11 @@ impl LocalSearcher {
             if region != Region::All {
                 ranker = ranker.with_region(region);
             }
+        }
+
+        if let Some(topic_centrality) = self.topic_centrality.as_ref() {
+            let topic_scorer = topic_centrality.scorer(&parsed_query);
+            ranker.set_topic_scorer(topic_scorer);
         }
 
         ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
@@ -287,7 +299,9 @@ mod tests {
                     pre_computed_score: 0.0,
                     primary_image: None,
                     node_id: None,
+                    host_topic: None,
                     crawl_stability: 0.0,
+                    dmoz_description: None,
                 })
                 .expect("failed to insert webpage");
         }

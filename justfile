@@ -20,9 +20,9 @@
 @astro:
     cd frontend; npm run dev
 
-@configure:
+@configure *ARGS:
     cd frontend; npm install; npm run build
-    cargo run --release --all-features -- configure
+    cargo run --release --all-features -- configure {{ARGS}}
 
 @entity:
     rm -rf data/entity

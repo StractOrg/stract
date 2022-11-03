@@ -31,7 +31,7 @@ use whatlang::Lang;
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
 
-const DEFAULT_MAX_NUM_CHARS: usize = 280;
+const DEFAULT_MAX_NUM_CHARS: usize = 250;
 
 #[derive(Debug)]
 struct FragmentCandidate {
@@ -79,7 +79,7 @@ struct Snippet {
     highlighted: Vec<Range<usize>>,
 }
 
-const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 500;\">";
+const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 700;\">";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
 impl Snippet {
@@ -262,6 +262,7 @@ pub fn generate(
     text: &str,
     dirty_text: &str,
     description: &Option<String>,
+    dmoz_description: &Option<String>,
     region: &Region,
     searcher: &tantivy::Searcher,
 ) -> Result<String> {
@@ -277,7 +278,7 @@ pub fn generate(
 
     if snippet.fragment.is_empty() {
         if text.is_empty() {
-            match description {
+            match dmoz_description {
                 Some(desc) => {
                     let lang = match region.lang() {
                         Some(lang) => lang,
@@ -292,21 +293,38 @@ pub fn generate(
                         snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
                     }
                 }
-                None => {
-                    let lang = match region.lang() {
-                        Some(lang) => lang,
-                        None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
-                    };
+                None => match description {
+                    Some(desc) => {
+                        let lang = match region.lang() {
+                            Some(lang) => lang,
+                            None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
+                        };
 
-                    let tokenizer = Stemmed::with_forced_language(lang).into();
-                    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
+                        let tokenizer = Stemmed::with_forced_language(lang).into();
+                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
 
-                    snippet = generator.snippet(dirty_text);
-
-                    if snippet.fragment.is_empty() {
-                        snippet.fragment = dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        snippet = generator.snippet(desc);
+                        if snippet.fragment.is_empty() {
+                            snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        }
                     }
-                }
+                    None => {
+                        let lang = match region.lang() {
+                            Some(lang) => lang,
+                            None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
+                        };
+
+                        let tokenizer = Stemmed::with_forced_language(lang).into();
+                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
+
+                        snippet = generator.snippet(dirty_text);
+
+                        if snippet.fragment.is_empty() {
+                            snippet.fragment =
+                                dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+                        }
+                    }
+                },
             }
         } else {
             snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
@@ -381,7 +399,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
+        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -424,7 +442,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.webpages.num_docs, 1);
         assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide..."));
+        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -639,7 +657,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.webpages.documents.len(), 1);
         assert_eq!(
             result.webpages.documents[0].snippet,
-            format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its designers intend it to provide...")
+            format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its...")
         );
     }
 }

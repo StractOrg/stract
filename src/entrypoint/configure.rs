@@ -21,7 +21,7 @@ use tokio::fs::File;
 use tokio::io;
 use tracing::{debug, info};
 
-use crate::entrypoint::indexer;
+use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
 use std::fs::{self};
 use std::path::Path;
@@ -49,6 +49,7 @@ fn download_files() {
                 "queries_us.csv",
                 "sample.warc.gz",
                 "bangs.json",
+                "content.rdf.u8.gz",
             ] {
                 info!("Downloading {}", name);
                 let mut object = client
@@ -138,6 +139,14 @@ fn create_inverted_index() -> Result<()> {
     let worker = indexer::IndexingWorker::new(
         centrality_path.to_str().unwrap().to_string(),
         Some(webgraph_path.to_str().unwrap().to_string()),
+        None,
+        Some(
+            Path::new(DATA_PATH)
+                .join("human_annotations")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        ),
     );
 
     let index = indexer::process_job(&job, &worker);
@@ -163,23 +172,72 @@ fn create_entity_index() -> Result<()> {
     Ok(())
 }
 
+fn parse_topics() -> Result<()> {
+    let dmoz_path = Path::new(DATA_PATH).join("content.rdf.u8.gz");
+
+    let topics = dmoz_parser::parse(dmoz_path)?;
+    topics.save(Path::new(DATA_PATH).join("human_annotations"))
+}
+
+fn create_topic_centrality() {
+    let index_path = Path::new(DATA_PATH)
+        .join("index")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let topics_path = Path::new(DATA_PATH)
+        .join("human_annotations")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let webgraph_path = Path::new(DATA_PATH)
+        .join("webgraph")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let approximate_harmonic_path = Path::new(DATA_PATH)
+        .join("centrality")
+        .join("approx_harmonic")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let output_path = Path::new(DATA_PATH)
+        .join("topic_centrality")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    super::topic_centrality::run(
+        index_path,
+        topics_path,
+        webgraph_path,
+        approximate_harmonic_path,
+        output_path,
+    );
+}
+
 fn index_files() -> Result<()> {
     create_webgraph()?;
     calculate_centrality();
+    parse_topics()?;
     create_inverted_index()?;
+    create_topic_centrality();
     create_entity_index()?;
 
     Ok(())
 }
 
-pub fn run() -> Result<()> {
+pub fn run(skip_download: bool) -> Result<()> {
     let p = Path::new(DATA_PATH);
 
     if !p.exists() {
         fs::create_dir_all(p)?;
     }
 
-    download_files();
+    if !skip_download {
+        download_files();
+    }
+
     index_files()?;
 
     Ok(())

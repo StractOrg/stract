@@ -55,7 +55,7 @@ impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
-            approx_harmonic: ApproximatedHarmonicCentrality::load(
+            approx_harmonic: ApproximatedHarmonicCentrality::open(
                 path.as_ref().join("approx_harmonic"),
             )
             .ok()

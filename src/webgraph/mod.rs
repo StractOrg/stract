@@ -97,52 +97,66 @@ pub struct EdgeIterator<'a> {
     current_block_idx: usize,
     blocks: Vec<u64>,
     adjacency: &'a Mutex<Adjacency>,
-    current_block: Option<Box<dyn Iterator<Item = Edge>>>,
+    current_block: Box<dyn Iterator<Item = Edge>>,
 }
 
 impl<'a> EdgeIterator<'a> {
     fn new(adjacency: &'a Mutex<Adjacency>) -> EdgeIterator<'a> {
+        adjacency.lock().unwrap().tree.inner.flush();
+
         let blocks: Vec<_> = adjacency
             .lock()
             .unwrap()
             .tree
             .inner
-            .store
             .iter()
             .map(|(key, _)| key)
             .collect();
+
+        let first_block = adjacency
+            .lock()
+            .unwrap()
+            .tree
+            .inner
+            .get(&blocks[0])
+            .unwrap()
+            .clone();
 
         EdgeIterator {
             current_block_idx: 0,
             blocks,
             adjacency,
-            current_block: None,
-        }
-    }
-
-    fn load_next_block(&mut self) {
-        if self.current_block_idx < self.blocks.len() {
-            let block_id = self.blocks[self.current_block_idx];
-            let block = self
-                .adjacency
-                .lock()
-                .unwrap()
-                .tree
-                .inner
-                .get(&block_id)
-                .unwrap()
-                .clone();
-
-            self.current_block = Some(Box::new(block.into_iter().flat_map(|(node_id, edges)| {
+            current_block: Box::new(first_block.into_iter().flat_map(|(node_id, edges)| {
                 edges.into_iter().map(move |edge| Edge {
                     from: node_id,
                     to: edge.other,
                     label: edge.label,
                 })
-            })));
-
-            self.current_block_idx += 1;
+            })),
         }
+    }
+
+    fn load_next_block(&mut self) {
+        let block_id = self.blocks[self.current_block_idx];
+        let block = self
+            .adjacency
+            .lock()
+            .unwrap()
+            .tree
+            .inner
+            .get(&block_id)
+            .unwrap()
+            .clone();
+
+        self.current_block = Box::new(block.into_iter().flat_map(|(node_id, edges)| {
+            edges.into_iter().map(move |edge| Edge {
+                from: node_id,
+                to: edge.other,
+                label: edge.label,
+            })
+        }));
+
+        self.current_block_idx += 1;
     }
 }
 
@@ -150,15 +164,14 @@ impl<'a> Iterator for EdgeIterator<'a> {
     type Item = Edge;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(res) = self.current_block.as_mut().and_then(|it| it.next()) {
-            return Some(res);
-        }
+        let mut res = self.current_block.next();
 
-        if self.current_block.is_none() {
+        while self.current_block_idx < self.blocks.len() && res.is_none() {
             self.load_next_block();
+            res = self.current_block.next();
         }
 
-        self.current_block.as_mut().and_then(|it| it.next())
+        res
     }
 }
 
