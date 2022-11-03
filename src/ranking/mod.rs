@@ -31,7 +31,7 @@ use crate::{
     fastfield_cache::FastFieldCache,
     inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
-    webgraph::centrality::topic,
+    webgraph::centrality::{approximate_harmonic, topic},
     webpage::region::{Region, RegionCount},
 };
 
@@ -46,6 +46,7 @@ pub struct Ranker {
     fastfield_cache: Arc<FastFieldCache>,
     de_rank_similar: bool,
     topic_scorer: Option<topic::Scorer>,
+    num_results: Option<usize>,
 }
 
 impl Ranker {
@@ -63,6 +64,7 @@ impl Ranker {
             de_rank_similar: true,
             fastfield_cache,
             topic_scorer: None,
+            num_results: None,
         }
     }
 
@@ -84,6 +86,11 @@ impl Ranker {
         self
     }
 
+    pub fn with_num_results(mut self, num_results: usize) -> Self {
+        self.num_results = Some(num_results);
+        self
+    }
+
     pub fn de_rank_similar(&mut self, de_rank_similar: bool) {
         self.de_rank_similar = de_rank_similar;
     }
@@ -92,7 +99,7 @@ impl Ranker {
         let mut aggregator = self.aggregator.clone();
 
         if let Some(topic_scorer) = self.topic_scorer.clone() {
-            aggregator.register_topic_scorer(topic_scorer);
+            aggregator.set_topic_scorer(topic_scorer);
         }
 
         let score_tweaker = InitialScoreTweaker::new(
@@ -102,8 +109,10 @@ impl Ranker {
             Arc::clone(&self.fastfield_cache),
         );
 
-        let mut collector =
-            TopDocs::with_limit(NUM_RESULTS_PER_PAGE, Arc::clone(&self.fastfield_cache));
+        let mut collector = TopDocs::with_limit(
+            self.num_results.unwrap_or(NUM_RESULTS_PER_PAGE),
+            Arc::clone(&self.fastfield_cache),
+        );
 
         if self.de_rank_similar {
             collector = collector.and_de_rank_similar()
@@ -120,8 +129,12 @@ impl Ranker {
         collector.tweak_score(score_tweaker)
     }
 
-    pub(crate) fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
+    pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
         self.topic_scorer = Some(topic_scorer);
+    }
+
+    pub fn set_query_centrality(&mut self, approx: approximate_harmonic::Scorer) {
+        self.aggregator.set_query_centrality(approx);
     }
 }
 

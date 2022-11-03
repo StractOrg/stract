@@ -340,10 +340,18 @@ impl ApproximatedHarmonicCentrality {
             .filter_map(|node| self.node2id.get(&node).copied())
             .collect_vec();
 
+        self.scorer_without_fixed_from_ids(&liked_nodes, &disliked_nodes)
+    }
+
+    pub fn scorer_without_fixed_from_ids(
+        &self,
+        liked_nodes: &[NodeID],
+        disliked_nodes: &[NodeID],
+    ) -> Scorer {
         Scorer::new(
             &self.proxy_nodes,
-            &liked_nodes,
-            &disliked_nodes,
+            liked_nodes,
+            disliked_nodes,
             HashMap::new(),
             &self.betweenness,
         )

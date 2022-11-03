@@ -62,15 +62,10 @@ impl<'a, T: EditStrategy, const DICT_N: usize> SpellChecker<'a, T, DICT_N> {
     }
 
     pub fn correct(&self, term: &str) -> Option<String> {
-        if let Some(correction) = self.correct_top(term, 1).into_iter().next() {
-            if correction.to_ascii_lowercase() == term.to_ascii_lowercase() {
-                None
-            } else {
-                Some(correction)
-            }
-        } else {
-            None
-        }
+        self.correct_top(term, 1)
+            .into_iter()
+            .next()
+            .filter(|correction| correction.to_ascii_lowercase() != term.to_ascii_lowercase())
     }
 }
 

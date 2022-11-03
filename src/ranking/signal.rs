@@ -17,7 +17,10 @@
 use crate::{
     fastfield_cache,
     schema::{FastField, TextField},
-    webgraph::centrality::{approximate_harmonic, topic},
+    webgraph::centrality::{
+        approximate_harmonic::{self, SHIFT},
+        topic,
+    },
     webpage::Webpage,
     Result,
 };
@@ -46,9 +49,10 @@ pub enum Signal {
     PersonalCentrality,
     CrawlStability,
     TopicCentrality,
+    QueryCentrality,
 }
 
-pub const ALL_SIGNALS: [Signal; 11] = [
+pub const ALL_SIGNALS: [Signal; 12] = [
     Signal::Bm25,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -60,6 +64,7 @@ pub const ALL_SIGNALS: [Signal; 11] = [
     Signal::PersonalCentrality,
     Signal::CrawlStability,
     Signal::TopicCentrality,
+    Signal::QueryCentrality,
 ];
 
 struct SignalValue {
@@ -69,6 +74,7 @@ struct SignalValue {
     selected_region: Option<Region>,
     personal_centrality: f64,
     topic_score: Option<f64>,
+    query_centrality: Option<f64>,
 }
 
 impl Signal {
@@ -133,6 +139,7 @@ impl Signal {
             }
             Signal::CrawlStability => value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64,
             Signal::TopicCentrality => value.topic_score.unwrap_or_default(),
+            Signal::QueryCentrality => value.query_centrality.unwrap_or_default(),
         }
     }
 
@@ -142,12 +149,13 @@ impl Signal {
             Signal::HostCentrality => 2500.0,
             Signal::PageCentrality => 4500.0,
             Signal::TopicCentrality => 2500.0,
+            Signal::PersonalCentrality => 4500.0,
+            Signal::QueryCentrality => 2500.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.01,
             Signal::UpdateTimestamp => 80.0,
             Signal::NumTrackers => 20.0,
             Signal::Region => 60.0,
-            Signal::PersonalCentrality => 2500.0,
             Signal::CrawlStability => 20.0,
         }
     }
@@ -164,6 +172,7 @@ impl Signal {
             "region" => Some(Signal::Region),
             "personal_centrality" => Some(Signal::PersonalCentrality),
             "topic_centrality" => Some(Signal::TopicCentrality),
+            "query_centrality" => Some(Signal::QueryCentrality),
             _ => None,
         }
     }
@@ -181,6 +190,7 @@ impl Signal {
             Signal::CrawlStability => Some(FastField::CrawlStability),
             Signal::PersonalCentrality => None,
             Signal::TopicCentrality => None,
+            Signal::QueryCentrality => None,
         }
     }
 }
@@ -248,11 +258,12 @@ impl FieldBoost {
 pub struct SignalAggregator {
     fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
     signal_coefficients: SignalCoefficient,
-    pub personal_harmonic: Vec<Arc<approximate_harmonic::Scorer>>,
+    personal_centrality: Vec<Arc<approximate_harmonic::Scorer>>,
     field_boost: FieldBoost,
     fetch_time_ms_cache: [f64; 1000],
     update_time_cache: Vec<f64>,
     topic_scorer: Option<topic::Scorer>,
+    query_centrality: Option<Arc<approximate_harmonic::Scorer>>,
 }
 
 impl std::fmt::Debug for SignalAggregator {
@@ -286,12 +297,13 @@ impl SignalAggregator {
 
         Self {
             fastfield_cache: None,
-            personal_harmonic: Vec::new(),
+            personal_centrality: Vec::new(),
             signal_coefficients,
             field_boost,
             fetch_time_ms_cache,
             update_time_cache,
             topic_scorer: None,
+            query_centrality: None,
         }
     }
 
@@ -299,8 +311,16 @@ impl SignalAggregator {
         self.fastfield_cache = Some(cache);
     }
 
-    pub fn register_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
+    pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
         self.topic_scorer = Some(topic_scorer);
+    }
+
+    pub fn set_query_centrality(&mut self, query_centrality: approximate_harmonic::Scorer) {
+        self.query_centrality = Some(Arc::new(query_centrality));
+    }
+
+    pub fn add_personal_harmonic(&mut self, personal_centrality: approximate_harmonic::Scorer) {
+        self.personal_centrality.push(Arc::new(personal_centrality))
     }
 
     pub fn score(
@@ -311,20 +331,20 @@ impl SignalAggregator {
         current_timestamp: usize,
         selected_region: Option<Region>,
     ) -> f64 {
-        let topic_score = self.topic_scorer.as_ref().and_then(|scorer| {
-            self.fastfield_cache.as_ref().and_then(|cache| {
-                cache
-                    .get_doc_cache(&FastField::HostNodeID)
-                    .get_u64(&doc)
-                    .and_then(|host| {
-                        if host == u64::MAX {
-                            None
-                        } else {
-                            Some(scorer.score(host))
-                        }
-                    })
-            })
-        });
+        let host_id = self
+            .fastfield_cache
+            .as_ref()
+            .and_then(|cache| cache.get_doc_cache(&FastField::HostNodeID).get_u64(&doc));
+
+        let topic_score = self
+            .topic_scorer
+            .as_ref()
+            .and_then(|scorer| host_id.map(|host| scorer.score(host)));
+
+        let query_centrality = self
+            .query_centrality
+            .as_ref()
+            .and_then(|scorer| host_id.map(|host| scorer.score(host) - SHIFT));
 
         ALL_SIGNALS
             .into_iter()
@@ -336,7 +356,7 @@ impl SignalAggregator {
                 });
 
                 let personal_centrality = self
-                    .personal_harmonic
+                    .personal_centrality
                     .iter()
                     .map(|scorer| scorer.score(doc as u64))
                     .sum();
@@ -352,6 +372,7 @@ impl SignalAggregator {
                             selected_region,
                             personal_centrality,
                             topic_score,
+                            query_centrality,
                         },
                     )
             })
@@ -382,7 +403,10 @@ impl SignalAggregator {
                     Signal::CrawlStability => {
                         (webpage.crawl_stability * (FLOAT_SCALING as f64)) as u64
                     }
-                    Signal::Bm25 | Signal::PersonalCentrality | Signal::TopicCentrality => {
+                    Signal::Bm25
+                    | Signal::PersonalCentrality
+                    | Signal::TopicCentrality
+                    | Signal::QueryCentrality => {
                         panic!("signal cannot be determined from webpage")
                     }
                 };
@@ -400,6 +424,7 @@ impl SignalAggregator {
                             selected_region: None,
                             personal_centrality: 0.0,
                             topic_score: None,
+                            query_centrality: None,
                         },
                     )
             })

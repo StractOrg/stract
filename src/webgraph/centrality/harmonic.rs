@@ -51,11 +51,7 @@ where
                 .map(|(other_node, dist)| (other_node, 1f64 / dist as f64))
                 .collect();
 
-            let centrality = centrality_values
-                .into_iter()
-                .map(|(_, val)| val)
-                .sum::<f64>()
-                / norm_factor;
+            let centrality = centrality_values.into_values().sum::<f64>() / norm_factor;
 
             (node, centrality)
         })

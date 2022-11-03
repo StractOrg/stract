@@ -20,7 +20,7 @@ pub mod ast;
 mod const_query;
 mod pattern_query;
 
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom};
 
 use crate::{
     query::union::UnionQuery,
@@ -257,9 +257,7 @@ impl Goggle {
         );
 
         if let Some(approx) = approx {
-            aggregator
-                .personal_harmonic
-                .push(Arc::new(self.site_rankings.centrality_scorer(approx)));
+            aggregator.add_personal_harmonic(self.site_rankings.centrality_scorer(approx));
         }
 
         aggregator

@@ -183,14 +183,14 @@ impl Webpage {
                 schema
                     .get_field(Field::Fast(FastField::Region).name())
                     .expect("Failed to get region field"),
-                region.id() as u64,
+                region.id(),
             );
         } else {
             doc.add_u64(
                 schema
                     .get_field(Field::Fast(FastField::Region).name())
                     .expect("Failed to get region field"),
-                Region::All.id() as u64,
+                Region::All.id(),
             );
         }
 

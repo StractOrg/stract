@@ -31,7 +31,7 @@ use crate::kv::rocksdb_store::RocksDbStore;
 
 pub mod centrality;
 
-type NodeID = u64;
+pub type NodeID = u64;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct StoredEdge {

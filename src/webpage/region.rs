@@ -156,7 +156,7 @@ impl RegionCount {
         }
 
         RegionCount {
-            total_counts: map.iter().map(|(_, count)| count).sum(),
+            total_counts: map.values().sum(),
             map,
             fast_count,
             path: path.as_ref().to_str().unwrap().to_string(),
@@ -173,7 +173,7 @@ impl RegionCount {
         let json = serde_json::to_string(&self.map).unwrap();
         let mut file = File::options().write(true).open(&self.path).unwrap();
         file.write_all(json.as_bytes()).unwrap();
-        self.total_counts = self.map.iter().map(|(_, count)| count).sum();
+        self.total_counts = self.map.values().sum();
 
         let mut fast_count = Vec::new();
 

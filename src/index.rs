@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -35,6 +36,7 @@ use crate::spell::{
     Correction, CorrectionTerm, Dictionary, LogarithmicEdit, SpellChecker, TermSplitter,
 };
 use crate::subdomain_count::SubdomainCounter;
+use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::{Url, Webpage};
 use crate::Result;
@@ -132,6 +134,24 @@ impl Index {
         C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
     {
         self.inverted_index.search_initial(query, collector)
+    }
+
+    pub fn top_nodes<C>(&self, query: &Query, collector: C) -> Result<Vec<NodeID>>
+    where
+        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
+    {
+        let pointers = self
+            .inverted_index
+            .search_initial(query, collector)?
+            .top_websites;
+
+        let mut hosts = HashSet::with_capacity(pointers.len());
+        for pointer in &pointers {
+            if let Some(id) = self.inverted_index.website_host_node(pointer)? {
+                hosts.insert(id);
+            }
+        }
+        Ok(hosts.into_iter().collect())
     }
 
     pub fn retrieve_websites(

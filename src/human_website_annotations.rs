@@ -104,13 +104,13 @@ impl Mapper {
     }
 
     pub fn all_topics(&self) -> HashSet<Topic> {
-        self.0.iter().map(|(_, info)| info.topic.clone()).collect()
+        self.0.values().map(|info| info.topic.clone()).collect()
     }
 
     pub fn top_topics(&self, top_n: usize) -> Vec<Topic> {
         let mut topics: HashMap<Topic, usize> = HashMap::new();
 
-        for topic in self.0.iter().map(|(_, info)| info.topic.clone()) {
+        for topic in self.0.values().map(|info| info.topic.clone()) {
             *topics.entry(topic).or_default() += 1;
         }
 

@@ -131,7 +131,7 @@ fn main() -> Result<()> {
     match args.command {
         Commands::Indexer { options } => match options {
             IndexingOptions::Master { config_path } => {
-                let config = load_toml_config(&config_path);
+                let config = load_toml_config(config_path);
                 entrypoint::Indexer::run_master(&config)?;
             }
             IndexingOptions::Worker {
@@ -150,7 +150,7 @@ fn main() -> Result<()> {
                 )?;
             }
             IndexingOptions::Local { config_path } => {
-                let config = load_toml_config(&config_path);
+                let config = load_toml_config(config_path);
                 entrypoint::Indexer::run_locally(&config)?;
             }
             IndexingOptions::Entity {
@@ -183,7 +183,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Frontend { config_path } => {
-            let config: FrontendConfig = load_toml_config(&config_path);
+            let config: FrontendConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -195,7 +195,7 @@ fn main() -> Result<()> {
                 ))?
         }
         Commands::SearchServer { config_path } => {
-            let config: SearchServerConfig = load_toml_config(&config_path);
+            let config: SearchServerConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()

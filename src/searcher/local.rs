@@ -142,10 +142,6 @@ impl LocalSearcher {
             self.index.inverted_index.fastfield_cache(),
         );
 
-        if let Some(skip_pages) = query.skip_pages {
-            ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
-        }
-
         if let Some(region) = query.selected_region {
             if region != Region::All {
                 ranker = ranker.with_region(region);
@@ -157,8 +153,29 @@ impl LocalSearcher {
             ranker.set_topic_scorer(topic_scorer);
         }
 
-        ranker = ranker.with_max_docs(10_000_000, self.index.num_segments());
         ranker.de_rank_similar(de_rank_similar);
+
+        if let Some(centrality_store) = self.centrality_store.as_ref() {
+            ranker = ranker
+                .with_max_docs(10_000, self.index.num_segments())
+                .with_num_results(100);
+
+            let top_host_nodes = self.index.top_nodes(&parsed_query, ranker.collector())?;
+            if !top_host_nodes.is_empty() {
+                let approx = centrality_store
+                    .approx_harmonic
+                    .scorer_without_fixed_from_ids(&top_host_nodes, &[]);
+                ranker.set_query_centrality(approx);
+            }
+        }
+
+        ranker = ranker
+            .with_max_docs(10_000_000, self.index.num_segments())
+            .with_num_results(NUM_RESULTS_PER_PAGE);
+
+        if let Some(skip_pages) = query.skip_pages {
+            ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
+        }
 
         let webpages = self
             .index

@@ -31,6 +31,7 @@ use crate::query::Query;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::snippet;
 use crate::tokenizer::Identity;
+use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{StoredPrimaryImage, Webpage};
 use crate::Result;
@@ -189,6 +190,22 @@ impl InvertedIndex {
             num_websites: count,
             top_websites: docs,
         })
+    }
+
+    pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
+        let searcher = self.reader.searcher();
+        let doc = searcher.doc(website.address.into())?;
+        let field = self
+            .schema()
+            .get_field(Field::Fast(FastField::HostNodeID).name())
+            .unwrap();
+
+        let id = doc.get_first(field).unwrap().as_u64().unwrap();
+        if id == u64::MAX {
+            Ok(None)
+        } else {
+            Ok(Some(id))
+        }
     }
 
     pub fn retrieve_websites(
