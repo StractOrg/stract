@@ -58,7 +58,7 @@ impl<R: BufRead> Iterator for PageIterator<R> {
                 Event::Start(ref e) if e.name() == b"ExternalPage" => {
                     let url_attr = e
                         .attributes()
-                        .filter(|attr| attr.is_ok())
+                        .filter(std::result::Result::is_ok)
                         .find(|attr| attr.as_ref().unwrap().key == b"about")
                         .unwrap()
                         .unwrap();
@@ -72,13 +72,13 @@ impl<R: BufRead> Iterator for PageIterator<R> {
                     inside_topic = true;
                 }
                 Event::End(ref e) if e.name() == b"topic" && current_page.is_some() => {
-                    inside_topic = false
+                    inside_topic = false;
                 }
                 Event::Start(ref e) if e.name() == b"d:Description" && current_page.is_some() => {
                     inside_desc = true;
                 }
                 Event::End(ref e) if e.name() == b"d:Description" && current_page.is_some() => {
-                    inside_desc = false
+                    inside_desc = false;
                 }
                 Event::Text(ref e) => {
                     if inside_topic {

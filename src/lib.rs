@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // #![warn(clippy::pedantic)]
-
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
@@ -257,9 +256,9 @@ fn gen_temp_path() -> PathBuf {
 
     if cfg!(target_os = "linux") {
         // use shared memory for temporary linux files
-        format!("/dev/shm/pagecache.tmp.{}", salt).into()
+        format!("/dev/shm/pagecache.tmp.{salt}").into()
     } else {
-        std::env::temp_dir().join(format!("pagecache.tmp.{}", salt))
+        std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
     }
 }
 

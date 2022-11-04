@@ -16,7 +16,7 @@
 
 use crate::schema::TextField;
 use crate::search_prettifier::html_escape;
-use crate::tokenizer::Stemmed;
+use crate::tokenizer::{Stemmed, Tokenizer};
 use crate::webpage::region::Region;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
@@ -201,16 +201,14 @@ impl SnippetGenerator {
         searcher: &Searcher,
         query: &dyn tantivy::query::Query,
         tokenizer: tantivy::tokenizer::TextAnalyzer,
+        field: Field,
     ) -> crate::Result<SnippetGenerator> {
         let clean_field = searcher
             .schema()
             .get_field(Field::Text(TextField::CleanBody).name())
             .unwrap();
 
-        let stemmed_field = searcher
-            .schema()
-            .get_field(Field::Text(TextField::StemmedCleanBody).name())
-            .unwrap();
+        let field = searcher.schema().get_field(field.name()).unwrap();
 
         let mut terms: BTreeSet<&tantivy::Term> = BTreeSet::new();
         query.query_terms(&mut |term, _| {
@@ -232,7 +230,7 @@ impl SnippetGenerator {
                 continue;
             };
 
-            let term = tantivy::Term::from_field_text(stemmed_field, &term_string);
+            let term = tantivy::Term::from_field_text(field, &term_string);
             let doc_freq = searcher.doc_freq(&term)?;
             if doc_freq > 0 {
                 let score = 1.0 / (1.0 + doc_freq as Score);
@@ -272,7 +270,12 @@ pub fn generate(
     };
 
     let tokenizer = Stemmed::with_forced_language(lang).into();
-    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
+    let generator = SnippetGenerator::create(
+        searcher,
+        query,
+        tokenizer,
+        Field::Text(TextField::StemmedCleanBody),
+    )?;
 
     let mut snippet = generator.snippet(text);
 
@@ -280,49 +283,29 @@ pub fn generate(
         if text.is_empty() {
             match dmoz_description {
                 Some(desc) => {
-                    let lang = match region.lang() {
-                        Some(lang) => lang,
-                        None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
-                    };
-
-                    let tokenizer = Stemmed::with_forced_language(lang).into();
-                    let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
-
-                    snippet = generator.snippet(desc);
-                    if snippet.fragment.is_empty() {
-                        snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
-                    }
+                    snippet = generate_snippet_without_stem(
+                        desc,
+                        searcher,
+                        query,
+                        Field::Text(TextField::DmozDescription),
+                    )?;
                 }
                 None => match description {
                     Some(desc) => {
-                        let lang = match region.lang() {
-                            Some(lang) => lang,
-                            None => whatlang::detect_lang(desc).unwrap_or(Lang::Eng),
-                        };
-
-                        let tokenizer = Stemmed::with_forced_language(lang).into();
-                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
-
-                        snippet = generator.snippet(desc);
-                        if snippet.fragment.is_empty() {
-                            snippet.fragment = desc.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
-                        }
+                        snippet = generate_snippet_without_stem(
+                            desc,
+                            searcher,
+                            query,
+                            Field::Text(TextField::Description),
+                        )?;
                     }
                     None => {
-                        let lang = match region.lang() {
-                            Some(lang) => lang,
-                            None => whatlang::detect_lang(dirty_text).unwrap_or(Lang::Eng),
-                        };
-
-                        let tokenizer = Stemmed::with_forced_language(lang).into();
-                        let generator = SnippetGenerator::create(searcher, query, tokenizer)?;
-
-                        snippet = generator.snippet(dirty_text);
-
-                        if snippet.fragment.is_empty() {
-                            snippet.fragment =
-                                dirty_text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
-                        }
+                        snippet = generate_snippet_without_stem(
+                            dirty_text,
+                            searcher,
+                            query,
+                            Field::Text(TextField::AllBody),
+                        )?;
                     }
                 },
             }
@@ -334,6 +317,24 @@ pub fn generate(
     let highlighted = snippet.to_html() + "...";
 
     Ok(highlighted)
+}
+
+fn generate_snippet_without_stem(
+    text: &str,
+    searcher: &Searcher,
+    query: &Query,
+    field: Field,
+) -> Result<Snippet> {
+    let tokenizer = Tokenizer::default().into();
+    let generator = SnippetGenerator::create(searcher, query, tokenizer, field)?;
+
+    let mut snippet = generator.snippet(text);
+
+    if snippet.fragment.is_empty() {
+        snippet.fragment = text.chars().take(DEFAULT_MAX_NUM_CHARS).collect();
+    }
+
+    Ok(snippet)
 }
 
 #[cfg(test)]

@@ -37,7 +37,7 @@ fn download_files() {
         .build()
         .unwrap()
         .block_on(async {
-            let creds = StaticProvider::new("".to_string(), "".to_string(), None, None);
+            let creds = StaticProvider::new(String::new(), String::new(), None, None);
             let client = S3Client::new_with(
                 HttpClient::new().unwrap(),
                 creds,
