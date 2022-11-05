@@ -29,11 +29,11 @@ use std::io::{BufReader, Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use boomphf::hashmap::BoomHashMap;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::intmap::IntMap;
 use crate::webgraph::Node;
 use crate::webgraph::{centrality::betweenness::Betweenness, NodeID, Webgraph};
 use crate::Result;
@@ -46,8 +46,8 @@ pub const SHIFT: f64 = 1.0;
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
     pub id: NodeID,
-    dist_from_node: BoomHashMap<NodeID, usize>, // from node to proxy node
-    dist_to_node: BoomHashMap<NodeID, usize>,   // from proxy node to other node
+    dist_from_node: IntMap<usize>, // from node to proxy node
+    dist_to_node: IntMap<usize>,   // from proxy node to other node
 }
 
 impl ProxyNode {
@@ -274,16 +274,16 @@ impl ApproximatedHarmonicCentrality {
             .map(|(node, _)| node)
             .filter(|node| node2id.contains_key(node))
             .map(|node| {
-                let (ids, dist) = graph.raw_host_distances(node.clone()).into_iter().unzip();
-                let (rev_ids, rev_dist) = graph
+                let dist_to_node = graph.raw_host_distances(node.clone()).into_iter().collect();
+                let dist_from_node = graph
                     .raw_host_reversed_distances(node.clone())
                     .into_iter()
-                    .unzip();
+                    .collect();
 
                 Arc::new(ProxyNode {
                     id: *node2id.get(node).unwrap(),
-                    dist_to_node: BoomHashMap::new(ids, dist),
-                    dist_from_node: BoomHashMap::new(rev_ids, rev_dist),
+                    dist_to_node,
+                    dist_from_node,
                 })
             })
             .collect();

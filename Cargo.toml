@@ -61,7 +61,6 @@ rust-stemmers = "1.2.0"
 min-max-heap = "1.3.0"
 base64 = "0.13.0"
 async-trait = "0.1.57"
-boomphf = { version = "0.5.9", features = ["serde"] }
 axum-macros = "0.2.3"
 urlencoding = "2.1.2"
 rusoto_s3 = { version = "0.48.0", features = ["rustls"], default-features = false, optional = true }
