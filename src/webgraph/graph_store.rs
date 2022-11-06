@@ -280,12 +280,12 @@ impl<S: Store> GraphStore<S> {
     }
 
     pub fn edges(&self) -> EdgeIterator<'_> {
-        self.flush();
-
         EdgeIterator::new(&self.adjacency)
     }
 
     pub fn append(&mut self, other: GraphStore<S>) {
+        other.flush();
+
         for edge in other.edges() {
             let from = other.id2node(&edge.from).expect("node not found");
             let to = other.id2node(&edge.to).expect("node not found");

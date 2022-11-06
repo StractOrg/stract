@@ -102,8 +102,6 @@ pub struct EdgeIterator<'a> {
 
 impl<'a> EdgeIterator<'a> {
     fn new(adjacency: &'a Mutex<Adjacency>) -> EdgeIterator<'a> {
-        adjacency.lock().unwrap().tree.inner.flush();
-
         let blocks: Vec<_> = adjacency
             .lock()
             .unwrap()
