@@ -24,6 +24,15 @@ pub struct IntMap<V> {
     len: usize,
 }
 
+impl<V: Clone> Clone for IntMap<V> {
+    fn clone(&self) -> Self {
+        Self {
+            bins: self.bins.clone(),
+            len: self.len,
+        }
+    }
+}
+
 impl<V> IntMap<V> {
     pub fn new() -> Self {
         let bins = vec![Vec::new(), Vec::new()];
@@ -76,6 +85,26 @@ impl<V> IntMap<V> {
             .iter()
             .find(|(stored_key, _)| stored_key == key)
             .map(|(_, val)| val)
+    }
+
+    pub fn get_mut(&mut self, key: &Key) -> Option<&mut V> {
+        let bin = self.bin_idx(key);
+        self.bins[bin]
+            .iter_mut()
+            .find(|(stored_key, _)| stored_key == key)
+            .map(|(_, val)| val)
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = (Key, V)> {
+        self.bins.into_iter().flat_map(|bin| bin.into_iter())
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (Key, V)> {
+        self.bins.iter_mut().flat_map(|bin| bin.iter_mut())
     }
 }
 
