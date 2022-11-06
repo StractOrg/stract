@@ -329,12 +329,9 @@ impl Store for RocksDbStore {
     }
 
     fn open_read_only<P: AsRef<Path>>(path: P) -> GraphStore<Self> {
-        let adjacency = Box::new(
-            RocksDbStore::open_read_only(path.as_ref().join("adjacency")).load_in_memory(),
-        );
-        let reversed_adjacency = Box::new(
-            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency")).load_in_memory(),
-        );
+        let adjacency = RocksDbStore::open_read_only(path.as_ref().join("adjacency"));
+        let reversed_adjacency =
+            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency"));
         let node2id = RocksDbStore::open_read_only(path.as_ref().join("node2id"));
         let id2node = RocksDbStore::open_read_only(path.as_ref().join("id2node"));
         let meta = RocksDbStore::open_read_only(path.as_ref().join("meta"));

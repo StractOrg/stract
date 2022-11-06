@@ -60,17 +60,18 @@ where
         let mut new_counters: IntMap<HyperLogLog<16>> = counters.clone();
 
         for edge in graph.edges() {
-            let counter_to = new_counters.get_mut(&edge.to).unwrap();
-            let counter_from = counters.get(&edge.from).unwrap();
-
-            if counter_to
-                .registers()
-                .iter()
-                .zip(counter_from.registers().iter())
-                .any(|(to, from)| *from > *to)
+            if let (Some(counter_to), Some(counter_from)) =
+                (new_counters.get_mut(&edge.to), counters.get(&edge.from))
             {
-                counter_to.merge(counter_from);
-                counter_changes += 1;
+                if counter_to
+                    .registers()
+                    .iter()
+                    .zip(counter_from.registers().iter())
+                    .any(|(to, from)| *from > *to)
+                {
+                    counter_to.merge(counter_from);
+                    counter_changes += 1;
+                }
             }
         }
 

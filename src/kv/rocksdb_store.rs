@@ -70,7 +70,12 @@ where
     }
 
     fn flush(&self) {
-        self.flush().expect("failed to flush");
+        if let Err(err) = self.flush() {
+            match err.kind() {
+                rocksdb::ErrorKind::NotSupported => {}
+                _ => panic!("failed to flush: {:?}", err),
+            }
+        }
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
