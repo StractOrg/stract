@@ -63,14 +63,19 @@ where
             break;
         }
 
-        let new_counters = Mutex::new(counters.clone());
+        let new_counters: IntMap<_> = counters
+            .clone()
+            .into_iter()
+            .map(|(node, counter)| (node, Mutex::new(counter)))
+            .collect();
+
         counter_changes.store(0, Ordering::SeqCst);
         nodes.par_iter().for_each(|node| {
             for edge in graph.ingoing_edges(*node) {
-                if let (Some(counter_to), Some(counter_from)) = (
-                    new_counters.lock().unwrap().get_mut(&edge.to),
-                    counters.get(&edge.from),
-                ) {
+                if let (Some(counter_to), Some(counter_from)) =
+                    (new_counters.get(&edge.to), counters.get(&edge.from))
+                {
+                    let mut counter_to = counter_to.lock().unwrap();
                     if counter_to
                         .registers()
                         .iter()
@@ -86,10 +91,8 @@ where
 
         for (node, score) in centralities.iter_mut() {
             *score += new_counters
-                .lock()
-                .unwrap()
                 .get(node)
-                .map(|counter| counter.size())
+                .map(|counter| counter.lock().unwrap().size())
                 .unwrap_or_default()
                 .checked_sub(
                     counters
@@ -101,7 +104,10 @@ where
                 / (t + 1) as f64;
         }
 
-        counters = new_counters.into_inner().unwrap();
+        counters = new_counters
+            .into_iter()
+            .map(|(node, counter)| (node, counter.into_inner().unwrap()))
+            .collect();
         t += 1;
     }
 
