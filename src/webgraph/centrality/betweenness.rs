@@ -22,14 +22,17 @@ use std::collections::{HashMap, VecDeque};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 
-use crate::webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph};
+use crate::{
+    intmap::IntMap,
+    webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph},
+};
 
 fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
     let mut n = 0;
     let mut max_dist = 0;
 
-    let nodes: Vec<_> = store.nodes().collect();
+    let nodes: Vec<_> = store.nodes().take(100_000).collect();
 
     let pb =
         if with_progress {
@@ -53,21 +56,14 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
         centrality.entry(s).or_default();
 
         let mut stack = Vec::new();
-        let mut predecessors: Vec<Vec<u64>> = Vec::new();
+        let mut predecessors: IntMap<Vec<u64>> = IntMap::new();
 
-        let mut sigma = Vec::new();
+        let mut sigma = IntMap::new();
 
-        while s as usize >= sigma.len() {
-            sigma.push(0);
-        }
+        sigma.insert(s, 1);
 
-        sigma[s as usize] = 1;
-
-        let mut distances = Vec::new();
-        while s as usize >= distances.len() {
-            distances.push(-1);
-        }
-        distances[s as usize] = 0;
+        let mut distances = IntMap::new();
+        distances.insert(s, 0);
 
         let mut q = VecDeque::new();
         q.push_back(s);
@@ -77,51 +73,47 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
             for edge in store.outgoing_edges(v) {
                 let w = edge.to;
 
-                while w as usize >= distances.len() {
-                    distances.push(-1);
-                }
-
-                if distances[w as usize] == -1 {
-                    let dist_v = distances[v as usize];
+                if !distances.contains(&w) {
+                    let dist_v = distances.get(&v).unwrap();
                     q.push_back(w);
-                    distances[w as usize] = dist_v + 1;
+                    distances.insert(w, dist_v + 1);
                 }
 
-                if distances[w as usize] == distances[v as usize] + 1 {
-                    let sigma_v = *sigma.get(v as usize).unwrap_or(&0);
+                if *distances.get(&w).unwrap() == distances.get(&v).unwrap() + 1 {
+                    let sigma_v = *sigma.get(&v).unwrap_or(&0);
 
-                    while w as usize >= sigma.len() {
-                        sigma.push(0);
+                    if !sigma.contains(&w) {
+                        sigma.insert(w, 0);
+                    }
+                    *sigma.get_mut(&w).unwrap() += sigma_v;
+
+                    if !predecessors.contains(&w) {
+                        predecessors.insert(w, Vec::new());
                     }
 
-                    sigma[w as usize] += sigma_v;
-
-                    while w as usize >= predecessors.len() {
-                        predecessors.push(Vec::new());
-                    }
-
-                    predecessors[w as usize].push(v);
+                    predecessors.get_mut(&w).unwrap().push(v);
                 }
             }
         }
 
-        max_dist = max_dist.max(*distances.iter().max().unwrap_or(&0));
+        max_dist = max_dist.max(*distances.iter().map(|(_, dist)| dist).max().unwrap_or(&0));
 
-        let mut delta = Vec::new();
+        let mut delta = IntMap::new();
         while let Some(w) = stack.pop() {
-            if let Some(pred) = predecessors.get(w as usize) {
+            if let Some(pred) = predecessors.get(&w) {
                 for v in pred {
-                    while *v as usize >= delta.len() {
-                        delta.push(0.0);
-                    }
+                    let dv = delta.get(v).copied().unwrap_or(0.0);
 
-                    delta[*v as usize] += (sigma[*v as usize] as f64 / sigma[w as usize] as f64)
-                        * (1.0 + delta.get(w as usize).unwrap_or(&0.0));
+                    delta.insert(
+                        *v,
+                        dv + (*sigma.get(v).unwrap() as f64 / *sigma.get(&w).unwrap() as f64)
+                            * (1.0 + delta.get(&w).unwrap_or(&0.0)),
+                    );
                 }
             }
 
             if w != s {
-                *centrality.entry(w).or_insert(0.0) += *delta.get(w as usize).unwrap_or(&0.0);
+                *centrality.entry(w).or_insert(0.0) += *delta.get(&w).unwrap_or(&0.0);
             }
         }
     }

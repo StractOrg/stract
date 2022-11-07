@@ -106,6 +106,14 @@ impl<V> IntMap<V> {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (Key, V)> {
         self.bins.iter_mut().flat_map(|bin| bin.iter_mut())
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &(Key, V)> {
+        self.bins.iter().flat_map(|bin| bin.iter())
+    }
+
+    pub fn contains(&self, key: &Key) -> bool {
+        self.get(key).is_some()
+    }
 }
 
 impl<V> std::iter::FromIterator<(u64, V)> for IntMap<V> {
