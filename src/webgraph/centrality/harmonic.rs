@@ -14,8 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
+};
 
+use rayon::prelude::*;
 use tracing::info;
 
 use crate::{
@@ -31,7 +38,7 @@ pub struct HarmonicCentrality {
 
 fn calculate_centrality<S>(graph: &GraphStore<S>) -> HashMap<Node, f64>
 where
-    S: Store,
+    S: Store + Sync,
 {
     let nodes: Vec<_> = graph.nodes().collect();
     info!("Found {} nodes in the graph", nodes.len());
@@ -47,36 +54,40 @@ where
         })
         .collect();
 
-    let mut counter_changes = counters.len();
+    let counter_changes = AtomicU64::new(counters.len() as u64);
     let mut t = 0;
     let mut centralities: IntMap<f64> = nodes.iter().map(|node| (*node, 0.0)).collect();
 
     loop {
-        if counter_changes == 0 {
+        if counter_changes.load(Ordering::SeqCst) == 0 {
             break;
         }
 
-        counter_changes = 0;
-        let mut new_counters: IntMap<HyperLogLog<16>> = counters.clone();
-
-        for edge in graph.edges() {
-            if let (Some(counter_to), Some(counter_from)) =
-                (new_counters.get_mut(&edge.to), counters.get(&edge.from))
-            {
-                if counter_to
-                    .registers()
-                    .iter()
-                    .zip(counter_from.registers().iter())
-                    .any(|(to, from)| *from > *to)
-                {
-                    counter_to.merge(counter_from);
-                    counter_changes += 1;
+        let new_counters = Mutex::new(counters.clone());
+        counter_changes.store(0, Ordering::SeqCst);
+        nodes.par_iter().for_each(|node| {
+            for edge in graph.ingoing_edges(*node) {
+                if let (Some(counter_to), Some(counter_from)) = (
+                    new_counters.lock().unwrap().get_mut(&edge.to),
+                    counters.get(&edge.from),
+                ) {
+                    if counter_to
+                        .registers()
+                        .iter()
+                        .zip(counter_from.registers().iter())
+                        .any(|(to, from)| *from > *to)
+                    {
+                        counter_to.merge(counter_from);
+                        counter_changes.fetch_add(1, Ordering::SeqCst);
+                    }
                 }
             }
-        }
+        });
 
         for (node, score) in centralities.iter_mut() {
             *score += new_counters
+                .lock()
+                .unwrap()
                 .get(node)
                 .map(|counter| counter.size())
                 .unwrap_or_default()
@@ -90,7 +101,7 @@ where
                 / (t + 1) as f64;
         }
 
-        counters = new_counters;
+        counters = new_counters.into_inner().unwrap();
         t += 1;
     }
 
