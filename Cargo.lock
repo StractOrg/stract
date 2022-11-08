@@ -738,7 +738,6 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
- "lru",
  "maplit",
  "md5",
  "memmap",

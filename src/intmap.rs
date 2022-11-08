@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 type Key = u64;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IntMap<V> {
     bins: Vec<Vec<(Key, V)>>,
     len: usize,

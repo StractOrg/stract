@@ -18,7 +18,6 @@ mod graph_store;
 use serde::{Deserialize, Serialize};
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
-use std::sync::Mutex;
 use std::{cmp, fs};
 
 use graph_store::GraphStore;
@@ -96,35 +95,26 @@ impl From<Url> for Node {
 pub struct EdgeIterator<'a> {
     current_block_idx: usize,
     blocks: Vec<u64>,
-    adjacency: &'a Mutex<Adjacency>,
+    adjacency: &'a Adjacency,
     current_block: Box<dyn Iterator<Item = Edge>>,
 }
 
 impl<'a> EdgeIterator<'a> {
-    fn new(adjacency: &'a Mutex<Adjacency>) -> EdgeIterator<'a> {
-        let blocks: Vec<_> = adjacency
-            .lock()
-            .unwrap()
-            .tree
-            .inner
-            .iter()
-            .map(|(key, _)| key)
-            .collect();
+    fn new(adjacency: &'a Adjacency) -> EdgeIterator<'a> {
+        let blocks: Vec<_> = adjacency.tree.inner.iter().map(|(key, _)| key).collect();
 
-        let first_block = adjacency
-            .lock()
-            .unwrap()
+        let block = adjacency
             .tree
             .inner
             .get(&blocks[0])
-            .unwrap()
-            .clone();
+            .map(|arc| arc.read().unwrap().clone())
+            .unwrap();
 
         EdgeIterator {
             current_block_idx: 0,
             blocks,
             adjacency,
-            current_block: Box::new(first_block.into_iter().flat_map(|(node_id, edges)| {
+            current_block: Box::new(block.into_iter().flat_map(|(node_id, edges)| {
                 edges.into_iter().map(move |edge| Edge {
                     from: node_id,
                     to: edge.other,
@@ -138,13 +128,11 @@ impl<'a> EdgeIterator<'a> {
         let block_id = self.blocks[self.current_block_idx];
         let block = self
             .adjacency
-            .lock()
-            .unwrap()
             .tree
             .inner
             .get(&block_id)
-            .unwrap()
-            .clone();
+            .map(|arc| arc.read().unwrap().clone())
+            .unwrap();
 
         self.current_block = Box::new(block.into_iter().flat_map(|(node_id, edges)| {
             edges.into_iter().map(move |edge| Edge {
@@ -438,11 +426,11 @@ impl<S: Store> Webgraph<S> {
             .unwrap_or_default()
     }
 
-    pub fn flush(&self) {
-        if let Some(full_graph) = &self.full {
+    pub fn flush(&mut self) {
+        if let Some(full_graph) = &mut self.full {
             full_graph.flush();
         }
-        if let Some(host_graph) = &self.host {
+        if let Some(host_graph) = &mut self.host {
             host_graph.flush();
         }
     }
@@ -521,7 +509,7 @@ impl From<FrozenWebgraph> for Webgraph {
 }
 
 impl From<Webgraph> for FrozenWebgraph {
-    fn from(graph: Webgraph) -> Self {
+    fn from(mut graph: Webgraph) -> Self {
         graph.flush();
         let path = graph.path.clone();
         let has_full = graph.full.is_some();

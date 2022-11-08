@@ -20,7 +20,6 @@ encoding_rs = "0.8.31"
 flate2 = "1.0.23"
 indicatif = { version = "0.16.2", features = ["rayon"] }
 itertools = "0.10.3"
-lru = "0.7.6"
 rayon = "1.5.3"
 reqwest = { version = "0.11.10", features = ["blocking", "stream"] }
 serde = { version = "1.0.137", features = ["rc"] }
