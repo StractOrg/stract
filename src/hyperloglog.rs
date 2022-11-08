@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn size_estimate_within_bounds() {
-        let mut set: HyperLogLog<16> = HyperLogLog::default();
+        let mut set: HyperLogLog<128> = HyperLogLog::default();
 
         for item in 0..10_000_000 {
             set.add(item);
@@ -109,10 +109,10 @@ mod tests {
 
     #[test]
     fn merge() {
-        let mut without_merge: HyperLogLog<16> = HyperLogLog::default();
+        let mut without_merge: HyperLogLog<128> = HyperLogLog::default();
 
-        let mut a: HyperLogLog<16> = HyperLogLog::default();
-        let mut b: HyperLogLog<16> = HyperLogLog::default();
+        let mut a: HyperLogLog<128> = HyperLogLog::default();
+        let mut b: HyperLogLog<128> = HyperLogLog::default();
 
         for item in 0..10_000 {
             without_merge.add(item);

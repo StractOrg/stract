@@ -45,6 +45,7 @@ mod image_downloader;
 mod image_store;
 pub mod index;
 mod intmap;
+mod kahan_sum;
 mod kv;
 pub mod prehashed;
 mod query;

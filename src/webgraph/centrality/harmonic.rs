@@ -22,14 +22,52 @@ use std::{
     },
 };
 
+use bitvec::vec::BitVec;
 use rayon::prelude::*;
 use tracing::info;
 
 use crate::{
     hyperloglog::HyperLogLog,
     intmap::IntMap,
+    kahan_sum::KahanSum,
     webgraph::{graph_store::GraphStore, Node, Store, Webgraph},
 };
+
+const HYPERLOGLOG_COUNTERS: usize = 16;
+
+#[derive(Clone)]
+struct JankyBloomFilter {
+    bit_vec: BitVec,
+    num_bits: u64,
+}
+
+impl JankyBloomFilter {
+    pub fn new(estimated_items: u64, fp: f64) -> Self {
+        let num_bits = Self::num_bits(estimated_items, fp);
+        Self {
+            bit_vec: BitVec::repeat(false, num_bits as usize),
+            num_bits,
+        }
+    }
+
+    fn num_bits(estimated_items: u64, fp: f64) -> u64 {
+        ((estimated_items as f64) * fp.ln() / (-8.0 * 2.0_f64.ln().powi(2))).ceil() as u64
+    }
+
+    fn hash(item: &u64) -> usize {
+        item.wrapping_mul(11400714819323198549) as usize
+    }
+
+    pub fn insert(&mut self, item: u64) {
+        let h = Self::hash(&item);
+        self.bit_vec.set(h % self.num_bits as usize, true);
+    }
+
+    pub fn contains(&self, item: &u64) -> bool {
+        let h = Self::hash(item);
+        self.bit_vec[h % self.num_bits as usize]
+    }
+}
 
 pub struct HarmonicCentrality {
     pub full: HashMap<Node, f64>,
@@ -44,7 +82,7 @@ where
     info!("Found {} nodes in the graph", nodes.len());
     let norm_factor = (nodes.len() - 1) as f64;
 
-    let mut counters: IntMap<HyperLogLog<16>> = nodes
+    let mut counters: IntMap<HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
         .iter()
         .map(|node| {
             let mut counter = HyperLogLog::default();
@@ -56,7 +94,15 @@ where
 
     let counter_changes = AtomicU64::new(counters.len() as u64);
     let mut t = 0;
-    let mut centralities: IntMap<f64> = nodes.iter().map(|node| (*node, 0.0)).collect();
+    let mut centralities: IntMap<KahanSum> = nodes
+        .iter()
+        .map(|node| (*node, KahanSum::default()))
+        .collect();
+
+    let mut changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
+    for node in &nodes {
+        changed_nodes.insert(*node);
+    }
 
     loop {
         if counter_changes.load(Ordering::SeqCst) == 0 {
@@ -70,8 +116,14 @@ where
             .collect();
 
         counter_changes.store(0, Ordering::SeqCst);
+        let new_changed_nodes = Mutex::new(JankyBloomFilter::new(nodes.len() as u64, 0.05));
+
         nodes.par_iter().for_each(|node| {
             for edge in graph.ingoing_edges(*node) {
+                if !changed_nodes.contains(&edge.from) {
+                    continue;
+                }
+
                 if let (Some(counter_to), Some(counter_from)) =
                     (new_counters.get(&edge.to), counters.get(&edge.from))
                 {
@@ -83,6 +135,7 @@ where
                         .any(|(to, from)| *from > *to)
                     {
                         counter_to.merge(counter_from);
+                        new_changed_nodes.lock().unwrap().insert(edge.to);
                         counter_changes.fetch_add(1, Ordering::SeqCst);
                     }
                 }
@@ -108,11 +161,13 @@ where
             .into_iter()
             .map(|(node, counter)| (node, counter.into_inner().unwrap()))
             .collect();
+        changed_nodes = new_changed_nodes.into_inner().unwrap();
         t += 1;
     }
 
     centralities
         .into_iter()
+        .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
         .map(|(node_id, centrality)| (graph.id2node(&node_id).unwrap(), centrality / norm_factor))
         .collect()
@@ -217,6 +272,7 @@ mod tests {
         let graph = test_graph();
 
         let centrality = HarmonicCentrality::calculate(&graph);
+        dbg!(&centrality.full);
 
         assert!(
             centrality.full.get(&Node::from("C")).unwrap()

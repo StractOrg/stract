@@ -64,6 +64,7 @@ axum-macros = "0.2.3"
 urlencoding = "2.1.2"
 rusoto_s3 = { version = "0.48.0", features = ["rustls"], default-features = false, optional = true }
 rusoto_core = { version = "0.48.0", default-features = false, features = ["rustls"], optional = true }
+bitvec = "1.0.1"
 
 [dev-dependencies]
 criterion = "0.3.6"
