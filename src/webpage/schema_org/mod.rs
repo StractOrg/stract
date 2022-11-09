@@ -16,6 +16,8 @@
 
 use serde::{Deserialize, Serialize};
 
+mod microdata;
+
 #[non_exhaustive]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(tag = "@type")]

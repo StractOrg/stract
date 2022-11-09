@@ -17,7 +17,6 @@ use crate::{
     human_website_annotations::Topic,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
-    schema_org::SchemaOrg,
     simhash, tokenizer, Error, Result,
 };
 use chrono::{DateTime, FixedOffset, Utc};
@@ -36,6 +35,7 @@ use whatlang::Lang;
 
 mod just_text;
 pub mod region;
+mod schema_org;
 mod url;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
@@ -44,6 +44,7 @@ pub use self::url::Url;
 use self::{
     just_text::{JustText, Paragraph},
     region::Region,
+    schema_org::SchemaOrg,
 };
 
 pub static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
@@ -1034,7 +1035,8 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::{schema::create_schema, schema_org::ImageObject};
+    use crate::schema::create_schema;
+    use crate::webpage::schema_org::ImageObject;
 
     use super::*;
 
