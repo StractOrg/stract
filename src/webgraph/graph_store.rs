@@ -139,7 +139,7 @@ where
 
         cache.insert(key, Arc::new(RwLock::new(value)));
 
-        if cache.len() == self.cache_size {
+        if cache.len() >= self.cache_size {
             while cache.len() > self.cache_size / 2 {
                 if let Some((key, value)) = cache.pop_first() {
                     self.store.insert(key, value.write().unwrap().clone());
