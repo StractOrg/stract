@@ -14,12 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use kuchiki::NodeRef;
 use serde::{Deserialize, Serialize};
 
+mod json_ld;
 mod microdata;
 
 type Text = String;
 type Wrapper<T> = Option<OneOrMany<Box<T>>>;
+
+pub fn parse(root: NodeRef) -> Vec<SchemaOrg> {
+    let mut res = self::json_ld::parse(root.clone());
+    res.append(&mut self::microdata::parse_schema(root));
+
+    res
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 #[serde(untagged)]

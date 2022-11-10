@@ -809,20 +809,7 @@ impl Html {
     }
 
     pub fn schema_org(&self) -> Vec<SchemaOrg> {
-        let mut schemas = Vec::new();
-
-        for schema in self.scripts().into_iter().filter(|script| {
-            matches!(
-                script.attributes.get("type").map(String::as_str),
-                Some("application/ld+json")
-            )
-        }) {
-            if let Ok(schema) = serde_json::from_str(&schema.content) {
-                schemas.push(schema);
-            }
-        }
-
-        schemas
+        schema_org::parse(self.root.clone())
     }
 
     pub fn trackers(&self) -> Vec<Url> {
@@ -1038,7 +1025,6 @@ mod tests {
     // TODO: make test macro to test both dom parsers
 
     use crate::schema::create_schema;
-    use crate::webpage::schema_org::{ImageObject, OneOrMany, PersonOrOrganization, Thing};
 
     use super::*;
 
@@ -1353,88 +1339,6 @@ mod tests {
     fn domain_from_domain_url() {
         let url: Url = "example.com".to_string().into();
         assert_eq!(url.domain(), "example.com");
-    }
-
-    #[test]
-    fn schema_dot_org_json_ld() {
-        let html = r#"
-    <html>
-        <head>
-            <script type="application/ld+json">
-                {
-                "@context": "https://schema.org",
-                "@type": "ImageObject",
-                "author": "Jane Doe",
-                "contentLocation": "Puerto Vallarta, Mexico",
-                "contentUrl": "mexico-beach.jpg",
-                "datePublished": "2008-01-25",
-                "description": "I took this picture while on vacation last year.",
-                "name": "Beach in Mexico"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert_eq!(
-            html.schema_org(),
-            vec![SchemaOrg::ImageObject(ImageObject {
-                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
-                    "Jane Doe".to_string()
-                )))),
-                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
-                thing: Thing {
-                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
-                    description: Some(OneOrMany::One(Box::new(
-                        "I took this picture while on vacation last year.".to_string()
-                    ))),
-                    ..Default::default()
-                }
-            })]
-        );
-    }
-
-    #[test]
-    fn no_schema_dot_org_json_ld() {
-        let html = r#"
-    <html>
-        <head>
-            <script>
-                {
-                "invalid": "schema"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert!(html.schema_org().is_empty());
-
-        let html = r#"
-    <html>
-        <head>
-            <script type="application/ld+json">
-                {
-                "invalid": "schema"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert!(html.schema_org().is_empty());
     }
 
     #[test]
