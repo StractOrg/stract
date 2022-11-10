@@ -18,20 +18,145 @@ use serde::{Deserialize, Serialize};
 
 mod microdata;
 
+type Text = String;
+type Wrapper<T> = Option<OneOrMany<Box<T>>>;
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> OneOrMany<T> {
+    pub fn one(self) -> Option<T> {
+        match self {
+            OneOrMany::One(one) => Some(one),
+            OneOrMany::Many(many) => many.into_iter().next(),
+        }
+    }
+
+    pub fn many(self) -> Vec<T> {
+        match self {
+            OneOrMany::One(one) => vec![one],
+            OneOrMany::Many(many) => many,
+        }
+    }
+}
+
+impl From<String> for OneOrMany<String> {
+    fn from(value: String) -> Self {
+        Self::One(value)
+    }
+}
+
+/// https://schema.org/Thing
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Thing {
+    pub name: Wrapper<Text>,
+    pub description: Wrapper<Text>,
+    pub disambiguating_description: Wrapper<Text>,
+    pub alternate_name: Wrapper<Text>,
+    pub additional_type: Wrapper<Text>,
+    pub image: Wrapper<Text>,
+}
+
+/// https://schema.org/Person
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Person {
+    #[serde(flatten)]
+    pub thing: Thing,
+    pub image: Wrapper<Text>,
+    pub name: Wrapper<Text>,
+    pub same_as: Wrapper<Text>,
+}
+
+/// https://schema.org/Country
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Country {
+    #[serde(flatten)]
+    pub thing: Thing,
+    #[serde(flatten)]
+    pub place: Place,
+}
+
+/// https://schema.org/Place
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Place {
+    #[serde(flatten)]
+    pub thing: Thing,
+    pub address: Wrapper<PostalAddressOrText>,
+    pub telephone: Wrapper<Text>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum CountryOrText {
+    Country(Country),
+    Text(Text),
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum PostalAddressOrText {
+    PostalAddress(PostalAddress),
+    Text(Text),
+}
+
+/// https://schema.org/PostalAddress
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PostalAddress {
+    pub address_country: Wrapper<CountryOrText>,
+    pub address_locality: Wrapper<Text>,
+}
+/// https://schema.org/Intangible
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Intangible {
+    #[serde(flatten)]
+    pub thing: Thing,
+}
+
+/// https://schema.org/Organization
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Organization {
+    #[serde(flatten)]
+    pub thing: Thing,
+    pub name: Wrapper<Text>,
+    pub legal_name: Wrapper<Text>,
+    pub email: Wrapper<Text>,
+    pub keywords: Wrapper<Text>,
+    pub address: Wrapper<PostalAddressOrText>,
+    pub url: Wrapper<Text>,
+}
+
 #[non_exhaustive]
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 #[serde(tag = "@type")]
 pub enum SchemaOrg {
     ImageObject(ImageObject),
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum PersonOrOrganization {
+    Person(Box<Person>),
+    Name(Text),
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ImageObject {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub author: Option<String>,
-    #[serde(rename = "contentUrl")]
-    pub content_url: Option<String>,
+    #[serde(flatten)]
+    pub thing: Thing,
+    pub author: Wrapper<PersonOrOrganization>,
+    pub content_url: Wrapper<Text>,
 }
 
 #[cfg(test)]
@@ -58,10 +183,17 @@ mod tests {
         assert_eq!(
             parsed,
             SchemaOrg::ImageObject(ImageObject {
-                name: Some("Beach in Mexico".to_string()),
-                description: Some("I took this picture while on vacation last year.".to_string()),
-                author: Some("Jane Doe".to_string()),
-                content_url: Some("mexico-beach.jpg".to_string()),
+                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
+                    "Jane Doe".to_string()
+                )))),
+                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
+                thing: Thing {
+                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
+                    description: Some(OneOrMany::One(Box::new(
+                        "I took this picture while on vacation last year.".to_string()
+                    ))),
+                    ..Default::default()
+                }
             }),
         );
     }

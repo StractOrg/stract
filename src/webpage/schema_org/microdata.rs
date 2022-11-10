@@ -18,20 +18,33 @@
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use kuchiki::NodeRef;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::webpage::Url;
 
+use super::{OneOrMany, SchemaOrg};
+
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("Html node was expected to have an itemscope attribute, but did not have one.")]
     ExpectedItemScope,
+
+    #[error("Error while serializing/deserializing to/from bytes")]
+    Serialization(#[from] bincode::Error),
+
+    #[error("Could not convert to/from JSON")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Expected itemtype to be a different format")]
+    MalformedItemType,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
 enum Property {
     String(String),
     DateTime(NaiveDateTime),
@@ -39,10 +52,12 @@ enum Property {
     Item(Item),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Item {
-    itemtype: Option<Vec<String>>,
-    properties: HashMap<String, Vec<Property>>,
+    #[serde(rename = "@type")]
+    itemtype: Option<OneOrMany<String>>,
+    #[serde(flatten)]
+    properties: HashMap<String, OneOrMany<Property>>,
 }
 
 /// implementation of https://html.spec.whatwg.org/multipage/microdata.html#associating-names-with-items
@@ -64,7 +79,15 @@ fn parse_item(root: NodeRef) -> Result<Item> {
         .attributes
         .borrow()
         .get("itemtype")
-        .map(|s| s.split_ascii_whitespace().map(String::from).collect());
+        .map(|s| {
+            let itemtype: Vec<_> = s.split_ascii_whitespace().map(String::from).collect();
+
+            if itemtype.len() == 1 {
+                OneOrMany::One(itemtype.into_iter().next().unwrap())
+            } else {
+                OneOrMany::Many(itemtype)
+            }
+        });
 
     let mut properties: HashMap<String, Vec<Property>> = HashMap::new();
     let mut pending: Vec<_> = root.children().collect();
@@ -175,7 +198,16 @@ fn parse_item(root: NodeRef) -> Result<Item> {
 
     Ok(Item {
         itemtype,
-        properties,
+        properties: properties
+            .into_iter()
+            .map(|(name, properties)| {
+                if properties.len() == 1 {
+                    (name, OneOrMany::One(properties.into_iter().next().unwrap()))
+                } else {
+                    (name, OneOrMany::Many(properties))
+                }
+            })
+            .collect(),
     })
 }
 
@@ -199,12 +231,41 @@ fn parse(root: NodeRef) -> Vec<Item> {
     res
 }
 
-struct Parser {}
+impl TryFrom<Item> for SchemaOrg {
+    type Error = Error;
+
+    fn try_from(mut item: Item) -> std::result::Result<Self, Self::Error> {
+        match &item.itemtype {
+            Some(OneOrMany::One(itemtype)) => {
+                item.itemtype = Some(OneOrMany::One(
+                    itemtype
+                        .split('/')
+                        .last()
+                        .map(String::from)
+                        .ok_or(Error::MalformedItemType)?,
+                ));
+
+                let json = serde_json::to_string(&item)?;
+                Ok(serde_json::from_str(&json)?)
+            }
+            _ => Err(Error::MalformedItemType),
+        }
+    }
+}
+
+pub fn parse_schema(root: NodeRef) -> Vec<SchemaOrg> {
+    parse(root)
+        .into_iter()
+        .filter_map(|item| SchemaOrg::try_from(item).ok())
+        .collect()
+}
 
 #[cfg(test)]
 mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
+
+    use crate::webpage::schema_org::{ImageObject, OneOrMany, PersonOrOrganization, Thing};
 
     use super::*;
 
@@ -225,14 +286,14 @@ mod tests {
             .clone();
 
         assert_eq!(
-            parse_item(root),
-            Ok(Item {
-                itemtype: Some(vec![String::from("http://n.whatwg.org/work")]),
+            parse_item(root).unwrap(),
+            Item {
+                itemtype: Some(OneOrMany::One(String::from("http://n.whatwg.org/work"))),
                 properties: hashmap! {
-                    "work".to_string() => vec![Property::Url("images/house.jpeg".into())],
-                    "title".to_string() => vec![Property::String("The house I found.".to_string())],
+                    "work".to_string() => OneOrMany::One(Property::Url("images/house.jpeg".into())),
+                    "title".to_string() => OneOrMany::One(Property::String("The house I found.".to_string())),
                 }
-            })
+            }
         );
     }
 
@@ -263,30 +324,32 @@ mod tests {
             .as_node()
             .clone();
 
-        let expected = Ok(Item {
-            itemtype: Some(vec![String::from("http://schema.org/BlogPosting")]),
+        let expected = Item {
+            itemtype: Some(OneOrMany::One(String::from(
+                "http://schema.org/BlogPosting",
+            ))),
             properties: hashmap! {
-                "comment".to_string() => vec![
+                "comment".to_string() => OneOrMany::One(
                     Property::Item(
                         Item {
-                            itemtype: Some(vec!["http://schema.org/UserComments".to_string()]),
+                            itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
                             properties: hashmap! {
-                                "url".to_string() => vec![Property::Url("#c1".into())],
-                                "creator".to_string() =>  vec![
+                                "url".to_string() => OneOrMany::One(Property::Url("#c1".into())),
+                                "creator".to_string() =>  OneOrMany::One(
                                     Property::Item(Item {
-                                        itemtype: Some(vec!["http://schema.org/Person".to_string()]),
+                                        itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
                                         properties: hashmap! {
-                                            "name".to_string() => vec![Property::String("Greg".to_string())]
+                                            "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
                                         }
-                                    })],
-                                "commentTime".to_string() => vec![Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))]
+                                    })),
+                                "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
                             }
-                })],
+                })),
             },
-        });
+        };
 
-        assert_eq!(parse_item(root.clone()), expected);
-        assert_eq!(parse(root), vec![expected.unwrap()]);
+        assert_eq!(parse_item(root.clone()).unwrap(), expected);
+        assert_eq!(parse(root), vec![expected]);
     }
 
     #[test]
@@ -369,43 +432,45 @@ mod tests {
         assert_eq!(res.len(), 2);
 
         let expected_article = Item {
-            itemtype: Some(vec![String::from("http://schema.org/BlogPosting")]),
+            itemtype: Some(OneOrMany::One(String::from(
+                "http://schema.org/BlogPosting",
+            ))),
             properties: hashmap! {
-                "headline".to_string() => vec![Property::String(String::from("Progress report"))],
-                "datePublished".to_string() => vec![Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))],
-                "url".to_string() => vec![Property::Url(Url::from("?comments=0"))],
-                "comment".to_string() => vec![
+                "headline".to_string() => OneOrMany::One(Property::String(String::from("Progress report"))),
+                "datePublished".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))),
+                "url".to_string() => OneOrMany::One(Property::Url(Url::from("?comments=0"))),
+                "comment".to_string() => OneOrMany::Many(vec![
                     Property::Item(
                             Item {
-                                itemtype: Some(vec!["http://schema.org/UserComments".to_string()]),
+                                itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
                                 properties: hashmap! {
-                                    "url".to_string() => vec![Property::Url("#c2".into())],
-                                    "creator".to_string() =>  vec![
+                                    "url".to_string() => OneOrMany::One(Property::Url("#c2".into())),
+                                    "creator".to_string() =>  OneOrMany::One(
                                         Property::Item(Item {
-                                            itemtype: Some(vec!["http://schema.org/Person".to_string()]),
+                                            itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
                                             properties: hashmap! {
-                                                "name".to_string() => vec![Property::String("Charlotte".to_string())]
+                                                "name".to_string() => OneOrMany::One(Property::String("Charlotte".to_string()))
                                             }
-                                        })],
-                                    "commentTime".to_string() => vec![Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))]
+                                        })),
+                                    "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
                                 }
                     }),
                     Property::Item(
                         Item {
-                            itemtype: Some(vec!["http://schema.org/UserComments".to_string()]),
+                            itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
                             properties: hashmap! {
-                                "url".to_string() => vec![Property::Url("#c1".into())],
-                                "creator".to_string() =>  vec![
+                                "url".to_string() => OneOrMany::One(Property::Url("#c1".into())),
+                                "creator".to_string() =>  OneOrMany::One(
                                     Property::Item(Item {
-                                        itemtype: Some(vec!["http://schema.org/Person".to_string()]),
+                                        itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
                                         properties: hashmap! {
-                                            "name".to_string() => vec![Property::String("Greg".to_string())]
+                                            "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
                                         }
-                                    })],
-                                "commentTime".to_string() => vec![Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))]
+                                    })),
+                                "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
                             }
                 })
-                ],
+                ]),
             },
         };
 
@@ -459,5 +524,46 @@ mod tests {
             );
 
         assert_eq!(parse(root).len(), 0);
+    }
+
+    #[test]
+    fn schema_image_object_example() {
+        let root = kuchiki::parse_html().one(
+            r##"
+            <html>
+                <div itemscope itemtype="https://schema.org/ImageObject">
+                <h2 itemprop="name">Beach in Mexico</h2>
+                <img src="mexico-beach.jpg"
+                alt="Sunny, sandy beach."
+                itemprop="contentUrl" />
+        
+                By <span itemprop="author">Jane Doe</span>
+                Photographed in
+                <span itemprop="contentLocation">Puerto Vallarta, Mexico</span>
+                Date uploaded:
+                <meta itemprop="datePublished" content="2008-01-25">Jan 25, 2008
+        
+                <span itemprop="description">I took this picture while on vacation last year.</span>
+                </div>
+            </html>
+            "##,
+        );
+
+        assert_eq!(
+            parse_schema(root),
+            vec![SchemaOrg::ImageObject(ImageObject {
+                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
+                    "Jane Doe".to_string()
+                )))),
+                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
+                thing: Thing {
+                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
+                    description: Some(OneOrMany::One(Box::new(
+                        "I took this picture while on vacation last year.".to_string()
+                    ))),
+                    ..Default::default()
+                }
+            })]
+        );
     }
 }

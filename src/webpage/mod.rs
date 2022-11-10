@@ -911,7 +911,9 @@ impl Html {
             .filter(|schema| matches!(schema, SchemaOrg::ImageObject(_)))
             .filter_map(|schema| {
                 match schema {
-                    SchemaOrg::ImageObject(image) => image.content_url.map(Url::from),
+                    SchemaOrg::ImageObject(image) => image
+                        .content_url
+                        .and_then(|url| url.one().map(|url| Url::from(*url))),
                     _ => None, // has been filtered, so only image is possible
                 }
             })
@@ -1036,7 +1038,7 @@ mod tests {
     // TODO: make test macro to test both dom parsers
 
     use crate::schema::create_schema;
-    use crate::webpage::schema_org::ImageObject;
+    use crate::webpage::schema_org::{ImageObject, OneOrMany, PersonOrOrganization, Thing};
 
     use super::*;
 
@@ -1381,10 +1383,17 @@ mod tests {
         assert_eq!(
             html.schema_org(),
             vec![SchemaOrg::ImageObject(ImageObject {
-                name: Some("Beach in Mexico".to_string()),
-                description: Some("I took this picture while on vacation last year.".to_string()),
-                author: Some("Jane Doe".to_string()),
-                content_url: Some("mexico-beach.jpg".to_string()),
+                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
+                    "Jane Doe".to_string()
+                )))),
+                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
+                thing: Thing {
+                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
+                    description: Some(OneOrMany::One(Box::new(
+                        "I took this picture while on vacation last year.".to_string()
+                    ))),
+                    ..Default::default()
+                }
             })]
         );
     }
