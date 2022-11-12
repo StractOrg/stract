@@ -42,7 +42,9 @@ pub fn parse(root: NodeRef) -> Vec<SchemaOrg> {
 mod tests {
     use kuchiki::traits::TendrilSink;
 
-    use crate::webpage::schema_org::{ImageObject, OneOrMany, PersonOrOrganization, Thing};
+    use crate::webpage::schema_org::{
+        CreativeWork, ImageObject, MediaObject, OneOrMany, PersonOrOrganization, Thing,
+    };
 
     use super::*;
 
@@ -78,18 +80,22 @@ mod tests {
         assert_eq!(
             res,
             vec![SchemaOrg::ImageObject(ImageObject {
-                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
-                    "Jane Doe".to_string()
-                )))),
-                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
-                thing: Thing {
-                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
-                    description: Some(OneOrMany::One(Box::new(
-                        "I took this picture while on vacation last year.".to_string()
-                    ))),
-                    ..Default::default()
+                media_object: MediaObject {
+                    creative_work: CreativeWork {
+                        thing: Thing {
+                            name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
+                            description: Some(OneOrMany::One(Box::new(
+                                "I took this picture while on vacation last year.".to_string()
+                            ))),
+                            ..Default::default()
+                        },
+                        author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
+                            "Jane Doe".to_string()
+                        )))),
+                    },
+                    content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
                 }
-            })]
+            })],
         );
     }
 

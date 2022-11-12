@@ -38,9 +38,6 @@ pub enum Error {
 
     #[error("Could not convert to/from JSON")]
     Json(#[from] serde_json::Error),
-
-    #[error("Expected itemtype to be a different format")]
-    MalformedItemType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,7 +181,10 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                                 Property::String(time)
                             }
                         }
-                        _ => Property::String(current.text_contents()),
+                        _ => Property::String(
+                            itertools::intersperse(current.text_contents().split_whitespace(), " ")
+                                .collect(),
+                        ),
                     }
                 };
 
@@ -231,25 +231,57 @@ fn parse(root: NodeRef) -> Vec<Item> {
     res
 }
 
+fn fix_type_for_schema(mut item: Item) -> Item {
+    if let Some(OneOrMany::One(itemtype)) = &item.itemtype {
+        if let Some(last) = itemtype.split('/').last() {
+            item.itemtype = Some(OneOrMany::One(last.to_string()));
+        }
+    }
+
+    item.properties = item
+        .properties
+        .into_iter()
+        .map(|(key, properties)| match properties {
+            OneOrMany::One(property) => {
+                if let Property::Item(subitem) = property {
+                    (
+                        key,
+                        OneOrMany::One(Property::Item(fix_type_for_schema(subitem))),
+                    )
+                } else {
+                    (key, OneOrMany::One(property))
+                }
+            }
+            OneOrMany::Many(properties) => (
+                key,
+                OneOrMany::Many(
+                    properties
+                        .into_iter()
+                        .map(|property| {
+                            if let Property::Item(subitem) = property {
+                                Property::Item(fix_type_for_schema(subitem))
+                            } else {
+                                property
+                            }
+                        })
+                        .collect(),
+                ),
+            ),
+        })
+        .collect();
+
+    item
+}
+
 impl TryFrom<Item> for SchemaOrg {
     type Error = Error;
 
     fn try_from(mut item: Item) -> std::result::Result<Self, Self::Error> {
-        match &item.itemtype {
-            Some(OneOrMany::One(itemtype)) => {
-                item.itemtype = Some(OneOrMany::One(
-                    itemtype
-                        .split('/')
-                        .last()
-                        .map(String::from)
-                        .ok_or(Error::MalformedItemType)?,
-                ));
+        item = fix_type_for_schema(item);
+        let json = serde_json::to_string_pretty(&item)?;
+        println!("{}", json);
 
-                let json = serde_json::to_string(&item)?;
-                Ok(serde_json::from_str(&json)?)
-            }
-            _ => Err(Error::MalformedItemType),
-        }
+        Ok(dbg!(serde_json::from_str(&json))?)
     }
 }
 
@@ -265,7 +297,9 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::{ImageObject, OneOrMany, PersonOrOrganization, Thing};
+    use crate::webpage::schema_org::{
+        CreativeWork, ImageObject, MediaObject, OneOrMany, PersonOrOrganization, Thing,
+    };
 
     use super::*;
 
@@ -474,9 +508,6 @@ mod tests {
             },
         };
 
-        dbg!(&res[0]);
-        dbg!(&expected_article);
-
         assert_eq!(res, vec![expected_article.clone(), expected_article])
     }
 
@@ -552,18 +583,84 @@ mod tests {
         assert_eq!(
             parse_schema(root),
             vec![SchemaOrg::ImageObject(ImageObject {
-                author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
-                    "Jane Doe".to_string()
-                )))),
-                content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
-                thing: Thing {
-                    name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
-                    description: Some(OneOrMany::One(Box::new(
-                        "I took this picture while on vacation last year.".to_string()
-                    ))),
-                    ..Default::default()
+                media_object: MediaObject {
+                    creative_work: CreativeWork {
+                        thing: Thing {
+                            name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
+                            description: Some(OneOrMany::One(Box::new(
+                                "I took this picture while on vacation last year.".to_string()
+                            ))),
+                            ..Default::default()
+                        },
+                        author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
+                            "Jane Doe".to_string()
+                        )))),
+                    },
+                    content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
                 }
-            })]
+            })],
         );
+    }
+
+    #[test]
+    fn schema_person_example() {
+        let root = kuchiki::parse_html().one(
+            r##"
+            <div itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">Jane Doe</span>
+            <img src="janedoe.jpg" itemprop="image" alt="Photo of Jane Doe"/>
+      
+            <span itemprop="jobTitle">Professor</span>
+            <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+              <span itemprop="streetAddress">
+                20341 Whitworth Institute
+                405 N. Whitworth
+              </span>
+              <span itemprop="addressLocality">Seattle</span>,
+              <span itemprop="addressRegion">WA</span>
+              <span itemprop="postalCode">98052</span>
+            </div>
+            <span itemprop="telephone">(425) 123-4567</span>
+            <a href="mailto:jane-doe@xyz.edu" itemprop="email">
+              jane-doe@xyz.edu</a>
+      
+            Jane's home page:
+            <a href="http://www.janedoe.com" itemprop="url">janedoe.com</a>
+      
+            Graduate students:
+            <a href="http://www.xyz.edu/students/alicejones.html" itemprop="colleague">
+              Alice Jones</a>
+            <a href="http://www.xyz.edu/students/bobsmith.html" itemprop="colleague">
+              Bob Smith</a>
+          </div>
+            "##,
+        );
+        let expected_json = r#"
+        {
+            "@type": "Person",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Seattle",
+              "addressRegion": "WA",
+              "postalCode": "98052",
+              "streetAddress": "20341 Whitworth Institute 405 N. Whitworth"
+            },
+            "colleague": [
+              "http://www.xyz.edu/students/alicejones.html",
+              "http://www.xyz.edu/students/bobsmith.html"
+            ],
+            "email": "mailto:jane-doe@xyz.edu",
+            "image": "janedoe.jpg",
+            "jobTitle": "Professor",
+            "name": "Jane Doe",
+            "telephone": "(425) 123-4567",
+            "url": "http://www.janedoe.com"
+          }
+        "#;
+
+        let res = parse_schema(root);
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res, vec![serde_json::from_str(expected_json).unwrap()]);
     }
 }

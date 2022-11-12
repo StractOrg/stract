@@ -899,6 +899,7 @@ impl Html {
             .filter_map(|schema| {
                 match schema {
                     SchemaOrg::ImageObject(image) => image
+                        .media_object
                         .content_url
                         .and_then(|url| url.one().map(|url| Url::from(*url))),
                     _ => None, // has been filtered, so only image is possible
