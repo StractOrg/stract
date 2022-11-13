@@ -44,7 +44,6 @@ pub use self::url::Url;
 use self::{
     just_text::{JustText, Paragraph},
     region::Region,
-    schema_org::SchemaOrg,
 };
 
 pub static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
@@ -808,7 +807,7 @@ impl Html {
         scripts
     }
 
-    pub fn schema_org(&self) -> Vec<SchemaOrg> {
+    pub fn schema_org(&self) -> Vec<schema_org::Item> {
         schema_org::parse(self.root.clone())
     }
 
@@ -895,16 +894,18 @@ impl Html {
     fn schema_org_images(&self) -> Vec<Url> {
         self.schema_org()
             .into_iter()
-            .filter(|schema| matches!(schema, SchemaOrg::ImageObject(_)))
-            .filter_map(|schema| {
-                match schema {
-                    SchemaOrg::ImageObject(image) => image
-                        .media_object
-                        .content_url
-                        .and_then(|url| url.one().map(|url| Url::from(*url))),
-                    _ => None, // has been filtered, so only image is possible
-                }
+            .filter(|item| item.types_contains("ImageObject"))
+            .filter_map(|item| {
+                item.properties.get("contentUrl").map(|content_url| {
+                    content_url
+                        .clone()
+                        .many()
+                        .into_iter()
+                        .filter_map(|url| url.try_into_string())
+                        .map(|url| url.into())
+                })
             })
+            .flatten()
             .collect()
     }
 

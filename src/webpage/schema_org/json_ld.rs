@@ -16,9 +16,9 @@
 
 use kuchiki::NodeRef;
 
-use super::SchemaOrg;
+use super::Item;
 
-pub fn parse(root: NodeRef) -> Vec<SchemaOrg> {
+pub fn parse(root: NodeRef) -> Vec<Item> {
     let mut res = Vec::new();
 
     for node in root.select("script").unwrap().filter(|node| {
@@ -41,10 +41,9 @@ pub fn parse(root: NodeRef) -> Vec<SchemaOrg> {
 #[cfg(test)]
 mod tests {
     use kuchiki::traits::TendrilSink;
+    use maplit::hashmap;
 
-    use crate::webpage::schema_org::{
-        CreativeWork, ImageObject, MediaObject, OneOrMany, PersonOrOrganization, Thing,
-    };
+    use crate::webpage::schema_org::{OneOrMany, Property};
 
     use super::*;
 
@@ -79,23 +78,18 @@ mod tests {
 
         assert_eq!(
             res,
-            vec![SchemaOrg::ImageObject(ImageObject {
-                media_object: MediaObject {
-                    creative_work: CreativeWork {
-                        thing: Thing {
-                            name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
-                            description: Some(OneOrMany::One(Box::new(
-                                "I took this picture while on vacation last year.".to_string()
-                            ))),
-                            ..Default::default()
-                        },
-                        author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
-                            "Jane Doe".to_string()
-                        )))),
-                    },
-                    content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
+            vec![Item {
+                itemtype: Some(OneOrMany::One("ImageObject".to_string())),
+                properties: hashmap! {
+                    "@context".to_string() => OneOrMany::One(Property::String("https://schema.org".to_string())),
+                    "author".to_string() => OneOrMany::One(Property::String("Jane Doe".to_string())),
+                    "contentLocation".to_string() => OneOrMany::One(Property::String("Puerto Vallarta, Mexico".to_string())),
+                    "contentUrl".to_string() => OneOrMany::One(Property::String("mexico-beach.jpg".to_string())),
+                    "datePublished".to_string() => OneOrMany::One(Property::String("2008-01-25".to_string())),
+                    "description".to_string() => OneOrMany::One(Property::String("I took this picture while on vacation last year.".to_string())),
+                    "name".to_string() => OneOrMany::One(Property::String("Beach in Mexico".to_string())),
                 }
-            })],
+            }]
         );
     }
 

@@ -16,15 +16,11 @@
 
 //! Almost spec compliant microdata parser: https://html.spec.whatwg.org/multipage/microdata.htm
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use kuchiki::NodeRef;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::webpage::Url;
-
-use super::{OneOrMany, SchemaOrg};
+use super::{Item, OneOrMany, Property};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -38,23 +34,6 @@ pub enum Error {
 
     #[error("Could not convert to/from JSON")]
     Json(#[from] serde_json::Error),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-enum Property {
-    String(String),
-    DateTime(NaiveDateTime),
-    Url(Url),
-    Item(Item),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct Item {
-    #[serde(rename = "@type")]
-    itemtype: Option<OneOrMany<String>>,
-    #[serde(flatten)]
-    properties: HashMap<String, OneOrMany<Property>>,
 }
 
 /// implementation of https://html.spec.whatwg.org/multipage/microdata.html#associating-names-with-items
@@ -109,14 +88,14 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                         ),
                         "audio" | "embed" | "iframe" | "img" | "source" | "track" | "video" => {
                             if let Some(url) = elem.attributes.borrow().get("src") {
-                                Property::Url(url.into())
+                                Property::String(url.to_string())
                             } else {
                                 Property::String(String::new())
                             }
                         }
                         "a" | "area" | "link" => {
                             if let Some(url) = elem.attributes.borrow().get("href") {
-                                Property::Url(url.into())
+                                Property::String(url.to_string())
                             } else {
                                 Property::String(String::new())
                             }
@@ -143,43 +122,7 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                                 .map(String::from)
                                 .unwrap_or_else(|| current.text_contents());
 
-                            if let Ok(time) = DateTime::parse_from_rfc2822(&time) {
-                                Property::DateTime(time.naive_utc())
-                            } else if let Ok(time) = DateTime::parse_from_rfc3339(&time) {
-                                Property::DateTime(time.naive_utc())
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%dT%H:%M")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%dT%H:%M:%S")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%dT%H:%M:%S%.3f")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%d %H:%M")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%d %H:%M:%S")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(time) =
-                                NaiveDateTime::parse_from_str(&time, "%Y-%m-%d %H:%M:%S%.3f")
-                            {
-                                Property::DateTime(time)
-                            } else if let Ok(date) = NaiveDate::parse_from_str(&time, "%Y-%m") {
-                                Property::DateTime(date.and_hms(0, 0, 0))
-                            } else if let Ok(date) = NaiveDate::parse_from_str(&time, "%Y-%m-%d") {
-                                Property::DateTime(date.and_hms(0, 0, 0))
-                            } else if let Ok(date) = NaiveDate::parse_from_str(&time, "%m-%d") {
-                                Property::DateTime(date.and_hms(0, 0, 0))
-                            } else {
-                                Property::String(time)
-                            }
+                            Property::String(time)
                         }
                         _ => Property::String(
                             itertools::intersperse(current.text_contents().split_whitespace(), " ")
@@ -200,7 +143,9 @@ fn parse_item(root: NodeRef) -> Result<Item> {
         itemtype,
         properties: properties
             .into_iter()
-            .map(|(name, properties)| {
+            .map(|(name, mut properties)| {
+                properties.reverse();
+
                 if properties.len() == 1 {
                     (name, OneOrMany::One(properties.into_iter().next().unwrap()))
                 } else {
@@ -273,23 +218,8 @@ fn fix_type_for_schema(mut item: Item) -> Item {
     item
 }
 
-impl TryFrom<Item> for SchemaOrg {
-    type Error = Error;
-
-    fn try_from(mut item: Item) -> std::result::Result<Self, Self::Error> {
-        item = fix_type_for_schema(item);
-        let json = serde_json::to_string_pretty(&item)?;
-        println!("{}", json);
-
-        Ok(dbg!(serde_json::from_str(&json))?)
-    }
-}
-
-pub fn parse_schema(root: NodeRef) -> Vec<SchemaOrg> {
-    parse(root)
-        .into_iter()
-        .filter_map(|item| SchemaOrg::try_from(item).ok())
-        .collect()
+pub fn parse_schema(root: NodeRef) -> Vec<Item> {
+    parse(root).into_iter().map(fix_type_for_schema).collect()
 }
 
 #[cfg(test)]
@@ -297,9 +227,7 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::{
-        CreativeWork, ImageObject, MediaObject, OneOrMany, PersonOrOrganization, Thing,
-    };
+    use crate::webpage::schema_org::OneOrMany;
 
     use super::*;
 
@@ -324,7 +252,7 @@ mod tests {
             Item {
                 itemtype: Some(OneOrMany::One(String::from("http://n.whatwg.org/work"))),
                 properties: hashmap! {
-                    "work".to_string() => OneOrMany::One(Property::Url("images/house.jpeg".into())),
+                    "work".to_string() => OneOrMany::One(Property::String("images/house.jpeg".to_string())),
                     "title".to_string() => OneOrMany::One(Property::String("The house I found.".to_string())),
                 }
             }
@@ -368,7 +296,7 @@ mod tests {
                         Item {
                             itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
                             properties: hashmap! {
-                                "url".to_string() => OneOrMany::One(Property::Url("#c1".into())),
+                                "url".to_string() => OneOrMany::One(Property::String("#c1".to_string())),
                                 "creator".to_string() =>  OneOrMany::One(
                                     Property::Item(Item {
                                         itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
@@ -376,7 +304,7 @@ mod tests {
                                             "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
                                         }
                                     })),
-                                "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
+                                "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
                             }
                 })),
             },
@@ -471,14 +399,29 @@ mod tests {
             ))),
             properties: hashmap! {
                 "headline".to_string() => OneOrMany::One(Property::String(String::from("Progress report"))),
-                "datePublished".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0))),
-                "url".to_string() => OneOrMany::One(Property::Url(Url::from("?comments=0"))),
+                "datePublished".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string())),
+                "url".to_string() => OneOrMany::One(Property::String("?comments=0".to_string())),
                 "comment".to_string() => OneOrMany::Many(vec![
+                        Property::Item(
+                            Item {
+                                itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
+                                properties: hashmap! {
+                                    "url".to_string() => OneOrMany::One(Property::String("#c1".to_string())),
+                                    "creator".to_string() =>  OneOrMany::One(
+                                        Property::Item(Item {
+                                            itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
+                                            properties: hashmap! {
+                                                "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
+                                            }
+                                        })),
+                                    "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
+                                }
+                    }),
                     Property::Item(
                             Item {
                                 itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
                                 properties: hashmap! {
-                                    "url".to_string() => OneOrMany::One(Property::Url("#c2".into())),
+                                    "url".to_string() => OneOrMany::One(Property::String("#c2".to_string())),
                                     "creator".to_string() =>  OneOrMany::One(
                                         Property::Item(Item {
                                             itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
@@ -486,24 +429,9 @@ mod tests {
                                                 "name".to_string() => OneOrMany::One(Property::String("Charlotte".to_string()))
                                             }
                                         })),
-                                    "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
+                                    "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
                                 }
-                    }),
-                    Property::Item(
-                        Item {
-                            itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
-                            properties: hashmap! {
-                                "url".to_string() => OneOrMany::One(Property::Url("#c1".into())),
-                                "creator".to_string() =>  OneOrMany::One(
-                                    Property::Item(Item {
-                                        itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
-                                        properties: hashmap! {
-                                            "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
-                                        }
-                                    })),
-                                "commentTime".to_string() => OneOrMany::One(Property::DateTime(NaiveDate::parse_from_str("2013-08-29", "%Y-%m-%d").unwrap().and_hms(0, 0, 0)))
-                            }
-                })
+                    })
                 ]),
             },
         };
@@ -580,25 +508,21 @@ mod tests {
             "##,
         );
 
+        let res = parse_schema(root);
+
         assert_eq!(
-            parse_schema(root),
-            vec![SchemaOrg::ImageObject(ImageObject {
-                media_object: MediaObject {
-                    creative_work: CreativeWork {
-                        thing: Thing {
-                            name: Some(OneOrMany::One(Box::new("Beach in Mexico".to_string()))),
-                            description: Some(OneOrMany::One(Box::new(
-                                "I took this picture while on vacation last year.".to_string()
-                            ))),
-                            ..Default::default()
-                        },
-                        author: Some(OneOrMany::One(Box::new(PersonOrOrganization::Name(
-                            "Jane Doe".to_string()
-                        )))),
-                    },
-                    content_url: Some(OneOrMany::One(Box::new("mexico-beach.jpg".to_string()))),
+            res,
+            vec![Item {
+                itemtype: Some(OneOrMany::One("ImageObject".to_string())),
+                properties: hashmap! {
+                    "author".to_string() => OneOrMany::One(Property::String("Jane Doe".to_string())),
+                    "contentLocation".to_string() => OneOrMany::One(Property::String("Puerto Vallarta, Mexico".to_string())),
+                    "contentUrl".to_string() => OneOrMany::One(Property::String("mexico-beach.jpg".to_string())),
+                    "datePublished".to_string() => OneOrMany::One(Property::String("2008-01-25".to_string())),
+                    "description".to_string() => OneOrMany::One(Property::String("I took this picture while on vacation last year.".to_string())),
+                    "name".to_string() => OneOrMany::One(Property::String("Beach in Mexico".to_string())),
                 }
-            })],
+            }]
         );
     }
 

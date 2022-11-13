@@ -272,7 +272,6 @@ mod tests {
         let graph = test_graph();
 
         let centrality = HarmonicCentrality::calculate(&graph);
-        dbg!(&centrality.full);
 
         assert!(
             centrality.full.get(&Node::from("C")).unwrap()
