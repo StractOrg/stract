@@ -36,6 +36,108 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 }
 
+fn rec_text_contents(node: NodeRef) -> Vec<Property> {
+    let mut res = Vec::new();
+
+    for child in node.children() {
+        match child.data() {
+            kuchiki::NodeData::Element(elem) => {
+                if elem.name.local.to_string().as_str() == "code" {
+                    let mut properties = HashMap::new();
+                    properties.insert(
+                        "text".to_string(),
+                        OneOrMany::One(Property::String(child.text_contents())),
+                    );
+
+                    res.push(Property::Item(Item {
+                        itemtype: Some(OneOrMany::One("SourceCode".to_string())),
+                        properties,
+                    }))
+                } else {
+                    res.append(&mut rec_text_contents(child));
+                }
+            }
+            kuchiki::NodeData::Text(text) => {
+                let had_line_ending = text.borrow().ends_with('\n');
+                let mut s: String =
+                    itertools::intersperse(text.borrow().split_whitespace(), " ").collect();
+
+                if had_line_ending {
+                    s.push('\n');
+                }
+                res.push(Property::String(s));
+            }
+            _ => {}
+        }
+    }
+
+    res
+}
+
+fn text_contents(node: NodeRef) -> Vec<Property> {
+    let properties = rec_text_contents(node);
+
+    // merge consecutive strings
+    let mut res = Vec::new();
+    let mut current = None;
+
+    for prop in properties {
+        match &prop {
+            Property::String(s) => {
+                current = match current {
+                    Some(current) => match current {
+                        Property::String(mut current_str) => {
+                            current_str.push(' ');
+                            current_str.push_str(s);
+                            Some(Property::String(current_str))
+                        }
+                        Property::Item(_) => {
+                            res.push(current);
+                            Some(prop)
+                        }
+                    },
+                    None => Some(prop),
+                }
+            }
+            Property::Item(_) => {
+                if let Some(current) = current {
+                    res.push(current);
+                }
+
+                current = Some(prop)
+            }
+        }
+    }
+
+    if let Some(current) = current {
+        res.push(current)
+    }
+
+    // trim strings
+    for prop in &mut res {
+        if let Property::String(s) = prop {
+            let had_line_ending = s.ends_with('\n');
+
+            *s = itertools::intersperse(
+                s.lines()
+                    .map(|l| itertools::intersperse(l.split_whitespace(), " ").collect::<String>())
+                    .filter(|s| !s.is_empty()),
+                "\n".to_string(),
+            )
+            .collect::<String>()
+            .to_string();
+
+            if had_line_ending {
+                s.push('\n');
+            }
+        }
+    }
+
+    res.reverse();
+
+    res
+}
+
 /// implementation of https://html.spec.whatwg.org/multipage/microdata.html#associating-names-with-items
 /// TODO: handle itemrefs
 fn parse_item(root: NodeRef) -> Result<Item> {
@@ -75,45 +177,45 @@ fn parse_item(root: NodeRef) -> Result<Item> {
             }
 
             if let Some(itemprop) = elem.attributes.borrow().get("itemprop") {
-                let property = if elem.attributes.borrow().contains("itemscope") {
-                    Property::Item(parse_item(current)?)
+                let properties_for_prop = if elem.attributes.borrow().contains("itemscope") {
+                    vec![Property::Item(parse_item(current)?)]
                 } else {
                     match elem.name.local.to_string().as_str() {
-                        "meta" => Property::String(
+                        "meta" => vec![Property::String(
                             elem.attributes
                                 .borrow()
                                 .get("content")
                                 .map(String::from)
                                 .unwrap_or_default(),
-                        ),
+                        )],
                         "audio" | "embed" | "iframe" | "img" | "source" | "track" | "video" => {
                             if let Some(url) = elem.attributes.borrow().get("src") {
-                                Property::String(url.to_string())
+                                vec![Property::String(url.to_string())]
                             } else {
-                                Property::String(String::new())
+                                vec![Property::String(String::new())]
                             }
                         }
                         "a" | "area" | "link" => {
                             if let Some(url) = elem.attributes.borrow().get("href") {
-                                Property::String(url.to_string())
+                                vec![Property::String(url.to_string())]
                             } else {
-                                Property::String(String::new())
+                                vec![Property::String(String::new())]
                             }
                         }
-                        "object" => Property::String(
+                        "object" => vec![Property::String(
                             elem.attributes
                                 .borrow()
                                 .get("data")
                                 .map(String::from)
                                 .unwrap_or_default(),
-                        ),
-                        "data" | "meter" => Property::String(
+                        )],
+                        "data" | "meter" => vec![Property::String(
                             elem.attributes
                                 .borrow()
                                 .get("value")
                                 .map(String::from)
                                 .unwrap_or_default(),
-                        ),
+                        )],
                         "time" => {
                             let time = elem
                                 .attributes
@@ -122,19 +224,18 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                                 .map(String::from)
                                 .unwrap_or_else(|| current.text_contents());
 
-                            Property::String(time)
+                            vec![Property::String(time)]
                         }
-                        _ => Property::String(
-                            itertools::intersperse(current.text_contents().split_whitespace(), " ")
-                                .collect(),
-                        ),
+                        _ => text_contents(current.clone()),
                     }
                 };
 
-                properties
-                    .entry(itemprop.to_string())
-                    .or_default()
-                    .push(property);
+                for itemprop in itemprop.split_ascii_whitespace() {
+                    properties
+                        .entry(itemprop.to_string())
+                        .or_default()
+                        .append(&mut properties_for_prop.clone());
+                }
             }
         }
     }
@@ -143,13 +244,15 @@ fn parse_item(root: NodeRef) -> Result<Item> {
         itemtype,
         properties: properties
             .into_iter()
-            .map(|(name, mut properties)| {
+            .filter_map(|(name, mut properties)| {
                 properties.reverse();
 
-                if properties.len() == 1 {
-                    (name, OneOrMany::One(properties.into_iter().next().unwrap()))
+                if properties.is_empty() {
+                    None
+                } else if properties.len() == 1 {
+                    Some((name, OneOrMany::One(properties.into_iter().next().unwrap())))
                 } else {
-                    (name, OneOrMany::Many(properties))
+                    Some((name, OneOrMany::Many(properties)))
                 }
             })
             .collect(),
@@ -158,20 +261,19 @@ fn parse_item(root: NodeRef) -> Result<Item> {
 
 fn parse(root: NodeRef) -> Vec<Item> {
     let mut res = Vec::new();
-    let mut pending = Vec::new();
-    pending.push(root);
+    let mut pending: Vec<_> = root.inclusive_descendants().collect();
 
     while let Some(current) = pending.pop() {
         if let Some(elem) = current.as_element() {
-            if elem.attributes.borrow().contains("itemscope") {
+            if elem.attributes.borrow().contains("itemscope")
+                && !elem.attributes.borrow().contains("itemprop")
+            {
                 res.push(parse_item(current).unwrap());
-            } else {
-                pending.extend(current.children())
             }
-        } else {
-            pending.extend(current.children())
         }
     }
+
+    res.reverse();
 
     res
 }
