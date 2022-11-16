@@ -45,6 +45,7 @@ pub enum TextField {
     Description,
     HostTopic,
     DmozDescription,
+    SchemaOrgJson,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,7 +78,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 38] = [
+pub static ALL_FIELDS: [Field; 39] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -96,6 +97,7 @@ pub static ALL_FIELDS: [Field; 38] = [
     Field::Text(TextField::Description),
     Field::Text(TextField::HostTopic),
     Field::Text(TextField::DmozDescription),
+    Field::Text(TextField::SchemaOrgJson),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -186,6 +188,13 @@ impl Field {
             Field::Text(TextField::DmozDescription) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
+            Field::Text(TextField::SchemaOrgJson) => IndexingOption::Text(
+                TextOptions::default()
+                    .set_indexing_options(
+                        TextFieldIndexing::default().set_tokenizer(Identity::as_str()),
+                    )
+                    .set_stored(),
+            ),
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -304,6 +313,8 @@ impl Field {
             Field::Text(TextField::AllBody) => "all_body",
             Field::Text(TextField::HostTopic) => "host_topic",
             Field::Text(TextField::DmozDescription) => "dmoz_description",
+            Field::Text(TextField::SchemaOrgJson) => "schema_org_json",
+            // FAST FIELDS
             Field::Fast(FastField::HostCentrality) => "host_centrality",
             Field::Fast(FastField::PageCentrality) => "page_centrality",
             Field::Fast(FastField::IsHomepage) => "is_homepage",
@@ -347,6 +358,7 @@ impl Field {
             Field::Text(TextField::SiteNoTokenizer)
             | Field::Text(TextField::DomainNoTokenizer)
             | Field::Text(TextField::Description)
+            | Field::Text(TextField::SchemaOrgJson)
             | Field::Text(TextField::PrimaryImage) => None,
             Field::Fast(_) => None,
         }
@@ -358,6 +370,7 @@ impl Field {
             Field::Text(TextField::PrimaryImage)
                 | Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::HostTopic)
+                | Field::Text(TextField::SchemaOrgJson)
         ) && !self.is_fast()
     }
 
@@ -385,6 +398,7 @@ impl Field {
             "title_if_homepage" => Some(Field::Text(TextField::TitleIfHomepage)),
             "host_topic" => Some(Field::Text(TextField::HostTopic)),
             "dmoz_description" => Some(Field::Text(TextField::DmozDescription)),
+            "schema_org_json" => Some(Field::Text(TextField::SchemaOrgJson)),
             "host_centrality" => Some(Field::Fast(FastField::HostCentrality)),
             "page_centrality" => Some(Field::Fast(FastField::PageCentrality)),
             "is_homepage" => Some(Field::Fast(FastField::IsHomepage)),

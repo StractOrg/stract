@@ -18,6 +18,26 @@ use kuchiki::NodeRef;
 
 use super::Item;
 
+pub fn convert_all_ints_to_strings(json: &str) -> Result<String, serde_json::Error> {
+    use serde_json::Value;
+
+    fn convert_recursively(json: &mut Value) {
+        match json {
+            Value::Number(n) if n.is_u64() || n.is_i64() => {
+                *json = Value::String(n.to_string());
+            }
+            Value::Array(a) => a.iter_mut().for_each(convert_recursively),
+            Value::Object(o) => o.values_mut().for_each(convert_recursively),
+            _ => (),
+        }
+    }
+
+    serde_json::from_str(json).map(|mut v: Value| {
+        convert_recursively(&mut v);
+        v.to_string()
+    })
+}
+
 pub fn parse(root: NodeRef) -> Vec<Item> {
     let mut res = Vec::new();
 
@@ -30,8 +50,10 @@ pub fn parse(root: NodeRef) -> Vec<Item> {
         let text_contens = node.text_contents();
         let content = text_contens.trim();
 
-        if let Ok(schema) = serde_json::from_str(content) {
-            res.push(schema);
+        if let Ok(schema) = convert_all_ints_to_strings(content) {
+            if let Ok(schema) = serde_json::from_str(&schema) {
+                res.push(schema);
+            }
         }
     }
 
@@ -112,5 +134,41 @@ mod tests {
         let root = kuchiki::parse_html().one(html);
         let res = parse(root);
         assert!(res.is_empty());
+    }
+
+    #[test]
+    fn numbers_as_strings() {
+        let root = kuchiki::parse_html().one(
+            r#"
+    <html>
+        <head>
+            <script type="application/ld+json">
+                {
+                "@context": "https://schema.org",
+                "@type": "test",
+                "cost": 123
+                }
+            </script>
+        </head>
+        <body>
+        </body>
+    </html>
+        "#,
+        );
+
+        let res = parse(root);
+
+        assert_eq!(res.len(), 1);
+
+        assert_eq!(
+            res,
+            vec![Item {
+                itemtype: Some(OneOrMany::One("test".to_string())),
+                properties: hashmap! {
+                    "@context".to_string() => OneOrMany::One(Property::String("https://schema.org".to_string())),
+                    "cost".to_string() => OneOrMany::One(Property::String("123".to_string())),
+                }
+            }]
+        );
     }
 }

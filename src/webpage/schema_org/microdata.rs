@@ -53,7 +53,9 @@ fn rec_text_contents(node: NodeRef) -> Vec<Property> {
                         itemtype: Some(OneOrMany::One("SourceCode".to_string())),
                         properties,
                     }))
-                } else {
+                } else if !elem.attributes.borrow().contains("itemprop")
+                    && !elem.attributes.borrow().contains("itemscope")
+                {
                     res.append(&mut rec_text_contents(child));
                 }
             }

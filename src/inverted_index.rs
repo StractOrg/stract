@@ -33,7 +33,7 @@ use crate::snippet;
 use crate::tokenizer::Identity;
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
-use crate::webpage::{StoredPrimaryImage, Webpage};
+use crate::webpage::{schema_org, StoredPrimaryImage, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
@@ -416,6 +416,7 @@ pub struct RetrievedWebpage {
     pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
     pub host_topic: Option<Topic>,
+    pub schema_org: Vec<schema_org::Item>,
     pub region: Region,
 }
 
@@ -504,6 +505,15 @@ impl From<Document> for RetrievedWebpage {
 
                     webpage.dmoz_description = if desc.is_empty() { None } else { Some(desc) }
                 }
+                Field::Text(TextField::SchemaOrgJson) => {
+                    let json = value
+                        .value
+                        .as_text()
+                        .expect("Schema.org json field should be stored as text")
+                        .to_string();
+
+                    webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
+                }
                 _ => {}
             }
         }
@@ -514,7 +524,7 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
-    use maplit::hashset;
+    use maplit::{hashmap, hashset};
 
     use crate::{
         ranking::{Ranker, SignalAggregator},
@@ -1169,5 +1179,81 @@ mod tests {
             .expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
+    }
+
+    #[test]
+    fn schema_org_stored() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let query = Query::parse(
+            "test",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_cache(),
+        );
+
+        index
+            .insert(Webpage::new(
+                &dbg!(format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                            <script type="application/ld+json">{{"@context":"http://schema.org","@type":"LiveBlogPosting","coverageStartTime":"2022-11-14T23:45:00+00:00","coverageEndTime":"2022-11-15T23:45:00.000Z","datePublished":"2022-11-14T23:45:00+00:00","articleBody":"","author":[{{"name":"DR"}}],"copyrightYear":2022}}</script>
+                        </head>
+                        <body>
+                            {CONTENT} test
+                            <article itemscope="" itemType="http://schema.org/NewsArticle">
+                                <div itemProp="publisher" itemscope="" itemType="https://schema.org/Organization"><meta itemProp="name" content="DR"/>
+                                </div>
+                            </article>
+                        </body>
+                    </html>
+                "#
+                )),
+                "https://www.example.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let result = index
+            .search(&query, ranker.collector())
+            .expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        let schema = dbg!(result.documents[0].schema_org.clone());
+
+        assert_eq!(schema.len(), 2);
+
+        assert_eq!(
+            schema[0].itemtype,
+            Some(schema_org::OneOrMany::One("LiveBlogPosting".to_string()))
+        );
+        assert_eq!(
+            schema[0].properties.get("coverageStartTime"),
+            Some(&schema_org::OneOrMany::One(schema_org::Property::String(
+                "2022-11-14T23:45:00+00:00".to_string()
+            )))
+        );
+        assert_eq!(
+            schema[1].itemtype,
+            Some(schema_org::OneOrMany::One("NewsArticle".to_string()))
+        );
+        assert_eq!(
+            schema[1].properties.get("publisher"),
+            Some(&schema_org::OneOrMany::One(schema_org::Property::Item(
+                schema_org::Item {
+                    itemtype: Some(schema_org::OneOrMany::One("Organization".to_string())),
+                    properties: hashmap! {
+                        "name".to_string() => schema_org::OneOrMany::One(schema_org::Property::String("DR".to_string()))
+                    }
+                }
+            )))
+        );
     }
 }

@@ -35,7 +35,7 @@ use whatlang::Lang;
 
 mod just_text;
 pub mod region;
-mod schema_org;
+pub mod schema_org;
 mod url;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
@@ -587,6 +587,16 @@ impl Html {
         PreTokenizedString { text, tokens }
     }
 
+    fn schema_org_json(&self) -> Option<String> {
+        let schemas = self.schema_org();
+
+        if schemas.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&schemas).ok()
+        }
+    }
+
     pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
         let mut doc = tantivy::Document::new();
 
@@ -701,6 +711,9 @@ impl Html {
                 }
                 Field::Text(TextField::AllBody) => {
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
+                }
+                Field::Text(TextField::SchemaOrgJson) => {
+                    doc.add_text(tantivy_field, self.schema_org_json().unwrap_or_default());
                 }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, self.url().is_homepage().into());
