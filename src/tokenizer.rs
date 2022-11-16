@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::str::CharIndices;
+
 use logos::{Lexer, Logos};
 use tantivy::tokenizer::{
     BoxTokenStream, Language, LowerCaser, Stemmer, StopWordFilter, TextAnalyzer,
@@ -57,6 +59,7 @@ impl Tokenizer {
     pub fn new_stemmed() -> Self {
         Self::Stemmed(Stemmed::default())
     }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Tokenizer::Normal(_) => Normal::as_str(),
@@ -258,15 +261,162 @@ impl<'a> tantivy::tokenizer::TokenStream for SimpleTokenStream<'a> {
     }
 }
 
+pub struct FlattenedJson {
+    flattened_json: String,
+}
+
+fn rec_flatten(val: serde_json::Value) -> Vec<String> {
+    match val {
+        serde_json::Value::Null => vec![],
+        serde_json::Value::Bool(b) => vec![format!("=\"{b}\"")],
+        serde_json::Value::Number(n) => vec![format!("=\"{n}\"")],
+        serde_json::Value::String(s) => vec![format!("=\"{}\"", s.replace('"', "\\\""))],
+        serde_json::Value::Array(arr) => arr
+            .into_iter()
+            .flat_map(|val| rec_flatten(val).into_iter())
+            .collect(),
+        serde_json::Value::Object(map) => {
+            let mut res = Vec::new();
+            for (key, value) in map {
+                let mut k = ".".to_string();
+                k.push_str(&key);
+
+                for val in rec_flatten(value) {
+                    let mut k = k.clone();
+                    k.push_str(&val);
+                    res.push(k)
+                }
+            }
+
+            res
+        }
+    }
+}
+
+impl FlattenedJson {
+    pub fn new<T>(value: &T) -> crate::Result<Self>
+    where
+        T: serde::Serialize,
+    {
+        let json = serde_json::to_string(value)?;
+        let val: serde_json::Value = serde_json::from_str(&json)?;
+
+        let flattened_json = itertools::intersperse(
+            rec_flatten(val)
+                .into_iter()
+                .map(|l| l.strip_prefix('.').unwrap().to_string()),
+            "\n".to_string(),
+        )
+        .collect();
+
+        Ok(Self { flattened_json })
+    }
+
+    pub fn token_stream(&self) -> BoxTokenStream {
+        tantivy::tokenizer::Tokenizer::token_stream(&JsonField, &self.flattened_json)
+    }
+}
+
+#[derive(Clone)]
+pub struct JsonField;
+
+impl tantivy::tokenizer::Tokenizer for JsonField {
+    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+        BoxTokenStream::from(JsonFieldTokenStream {
+            text,
+            chars: text.char_indices(),
+            token: tantivy::tokenizer::Token::default(),
+        })
+    }
+}
+
+pub struct JsonFieldTokenStream<'a> {
+    text: &'a str,
+    chars: CharIndices<'a>,
+    token: tantivy::tokenizer::Token,
+}
+
+impl<'a> JsonFieldTokenStream<'a> {
+    // search for the end of the current token.
+    fn search_token_end(&mut self, is_quote: bool) -> usize {
+        let mut escaped = false;
+        for (offset, c) in self.chars.by_ref() {
+            if is_quote {
+                if c == '\\' {
+                    escaped = true;
+                } else {
+                    if c == '"' && !escaped {
+                        return offset;
+                    }
+
+                    escaped = false;
+                }
+            } else if !c.is_alphanumeric() {
+                return offset;
+            }
+        }
+
+        self.text.len()
+    }
+}
+
+impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
+    fn advance(&mut self) -> bool {
+        self.token.text.clear();
+        self.token.position = self.token.position.wrapping_add(1);
+        let mut prev_was_quote = false;
+
+        while let Some((offset_from, c)) = self.chars.next() {
+            if c.is_alphanumeric() {
+                let offset_to = self.search_token_end(prev_was_quote);
+                self.token.offset_from = offset_from;
+                self.token.offset_to = offset_to;
+
+                if prev_was_quote {
+                    self.token.offset_from -= 1;
+                    self.token.offset_to += 1;
+                }
+
+                self.token
+                    .text
+                    .push_str(&self.text[self.token.offset_from..self.token.offset_to]);
+                return true;
+            }
+
+            prev_was_quote = c == '"';
+        }
+        false
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        &self.token
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        &mut self.token
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tantivy::tokenizer::Tokenizer;
 
     use super::*;
 
-    fn tokenize(s: &str) -> Vec<String> {
+    fn tokenize_simple(s: &str) -> Vec<String> {
         let mut res = Vec::new();
         let mut stream = Normal::default().token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
+    fn tokenize_json(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut stream = JsonField.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -278,7 +428,7 @@ mod tests {
     #[test]
     fn simple_tokenization() {
         assert_eq!(
-            tokenize("this is a relatively simple123 test    string"),
+            tokenize_simple("this is a relatively simple123 test    string"),
             vec![
                 "this".to_string(),
                 "is".to_string(),
@@ -294,20 +444,20 @@ mod tests {
     #[test]
     fn special_character_tokenization() {
         assert_eq!(
-            tokenize("example.com"),
+            tokenize_simple("example.com"),
             vec!["example".to_string(), ".".to_string(), "com".to_string(),]
         );
         assert_eq!(
-            tokenize("example. com"),
+            tokenize_simple("example. com"),
             vec!["example".to_string(), ".".to_string(), "com".to_string(),]
         );
         assert_eq!(
-            tokenize("example . com"),
+            tokenize_simple("example . com"),
             vec!["example".to_string(), ".".to_string(), "com".to_string(),]
         );
 
         assert_eq!(
-            tokenize("a c++ blog post"),
+            tokenize_simple("a c++ blog post"),
             vec![
                 "a".to_string(),
                 "c".to_string(),
@@ -318,15 +468,158 @@ mod tests {
             ]
         );
         assert_eq!(
-            tokenize("path/test"),
+            tokenize_simple("path/test"),
             vec!["path".to_string(), "/".to_string(), "test".to_string(),]
         );
     }
 
     #[test]
+    fn tokenize_json_field() {
+        assert_eq!(
+            tokenize_json(
+                r#"
+                Test.field="value"
+            "#
+            ),
+            vec![
+                "Test".to_string(),
+                "field".to_string(),
+                "\"value\"".to_string(),
+            ]
+        );
+        assert_eq!(
+            tokenize_json(
+                r#"
+                Test.field="this is the value"
+            "#
+            ),
+            vec![
+                "Test".to_string(),
+                "field".to_string(),
+                "\"this is the value\"".to_string(),
+            ]
+        );
+        assert_eq!(
+            tokenize_json(
+                r#"
+                Test.field="this is\" the value"
+            "#
+            ),
+            vec![
+                "Test".to_string(),
+                "field".to_string(),
+                "\"this is\\\" the value\"".to_string(),
+            ]
+        );
+        assert_eq!(
+            tokenize_json(
+                r#"
+                Test.field="this*@# is\" the\" 
+value"
+            "#
+            ),
+            vec![
+                "Test".to_string(),
+                "field".to_string(),
+                "\"this*@# is\\\" the\\\" \nvalue\"".to_string(),
+            ]
+        );
+    }
+
+    fn flattened_json_helper(json: &str, expected: &str) {
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let flat = &FlattenedJson::new(&parsed).unwrap().flattened_json;
+
+        assert_eq!(flat, expected);
+    }
+
+    #[test]
+    fn flatten_json_object() {
+        let json = r#"
+        {
+            "key1": "val1",
+            "key2": "val2"
+        }
+        "#;
+        let expected = r#"key1="val1"
+key2="val2""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "key1": 1,
+            "key2": 2
+        }
+        "#;
+        let expected = r#"key1="1"
+key2="2""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "key1": {
+                "key2": "value1",
+                "key3": "value2"
+            }
+        }
+        "#;
+        let expected = r#"key1.key2="value1"
+key1.key3="value2""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "key1": [
+                "value1",
+                "value2"
+            ]
+        }
+        "#;
+        let expected = r#"key1="value1"
+key1="value2""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "key1": [
+                "value1",
+                {
+                    "key2": "value2",
+                    "key3": 123
+                }
+            ]
+        }
+        "#;
+        let expected = r#"key1="value1"
+key1.key2="value2"
+key1.key3="123""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "key1": [
+                "value1",
+                {
+                    "key2": "this\" is @ a # test"
+                }
+            ]
+        }
+        "#;
+        let expected = r#"key1="value1"
+key1.key2="this\" is @ a # test""#;
+
+        flattened_json_helper(json, expected);
+    }
+
+    #[test]
     fn han() {
         assert_eq!(
-            tokenize("test 漢.com"),
+            tokenize_simple("test 漢.com"),
             vec![
                 "test".to_string(),
                 "漢".to_string(),
@@ -339,7 +632,7 @@ mod tests {
     #[test]
     fn hiragana() {
         assert_eq!(
-            tokenize("test あ.com"),
+            tokenize_simple("test あ.com"),
             vec![
                 "test".to_string(),
                 "あ".to_string(),
@@ -352,7 +645,7 @@ mod tests {
     #[test]
     fn katakana() {
         assert_eq!(
-            tokenize("test ダ.com"),
+            tokenize_simple("test ダ.com"),
             vec![
                 "test".to_string(),
                 "ダ".to_string(),
@@ -365,7 +658,7 @@ mod tests {
     #[test]
     fn cyrillic() {
         assert_eq!(
-            tokenize("test б.com"),
+            tokenize_simple("test б.com"),
             vec![
                 "test".to_string(),
                 "б".to_string(),
@@ -378,7 +671,7 @@ mod tests {
     #[test]
     fn arabic() {
         assert_eq!(
-            tokenize("test ب.com"),
+            tokenize_simple("test ب.com"),
             vec![
                 "test".to_string(),
                 "ب".to_string(),
