@@ -36,6 +36,12 @@ impl From<String> for Url {
     }
 }
 
+impl From<&str> for Url {
+    fn from(url: &str) -> Self {
+        Self::from(url.to_string())
+    }
+}
+
 impl Url {
     pub fn strip_protocol(&self) -> &str {
         let mut start_host = 0;

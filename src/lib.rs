@@ -51,7 +51,6 @@ pub mod prehashed;
 mod query;
 pub mod ranking;
 mod schema;
-mod schema_org;
 mod search_prettifier;
 pub mod searcher;
 mod simhash;

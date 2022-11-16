@@ -17,7 +17,6 @@ use crate::{
     human_website_annotations::Topic,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
-    schema_org::SchemaOrg,
     simhash, tokenizer, Error, Result,
 };
 use chrono::{DateTime, FixedOffset, Utc};
@@ -36,6 +35,7 @@ use whatlang::Lang;
 
 mod just_text;
 pub mod region;
+mod schema_org;
 mod url;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
@@ -807,21 +807,8 @@ impl Html {
         scripts
     }
 
-    pub fn schema_org(&self) -> Vec<SchemaOrg> {
-        let mut schemas = Vec::new();
-
-        for schema in self.scripts().into_iter().filter(|script| {
-            matches!(
-                script.attributes.get("type").map(String::as_str),
-                Some("application/ld+json")
-            )
-        }) {
-            if let Ok(schema) = serde_json::from_str(&schema.content) {
-                schemas.push(schema);
-            }
-        }
-
-        schemas
+    pub fn schema_org(&self) -> Vec<schema_org::Item> {
+        schema_org::parse(self.root.clone())
     }
 
     pub fn trackers(&self) -> Vec<Url> {
@@ -907,13 +894,18 @@ impl Html {
     fn schema_org_images(&self) -> Vec<Url> {
         self.schema_org()
             .into_iter()
-            .filter(|schema| matches!(schema, SchemaOrg::ImageObject(_)))
-            .filter_map(|schema| {
-                match schema {
-                    SchemaOrg::ImageObject(image) => image.content_url.map(Url::from),
-                    _ => None, // has been filtered, so only image is possible
-                }
+            .filter(|item| item.types_contains("ImageObject"))
+            .filter_map(|item| {
+                item.properties.get("contentUrl").map(|content_url| {
+                    content_url
+                        .clone()
+                        .many()
+                        .into_iter()
+                        .filter_map(|url| url.try_into_string())
+                        .map(|url| url.into())
+                })
             })
+            .flatten()
             .collect()
     }
 
@@ -1034,7 +1026,7 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::{schema::create_schema, schema_org::ImageObject};
+    use crate::schema::create_schema;
 
     use super::*;
 
@@ -1349,81 +1341,6 @@ mod tests {
     fn domain_from_domain_url() {
         let url: Url = "example.com".to_string().into();
         assert_eq!(url.domain(), "example.com");
-    }
-
-    #[test]
-    fn schema_dot_org_json_ld() {
-        let html = r#"
-    <html>
-        <head>
-            <script type="application/ld+json">
-                {
-                "@context": "https://schema.org",
-                "@type": "ImageObject",
-                "author": "Jane Doe",
-                "contentLocation": "Puerto Vallarta, Mexico",
-                "contentUrl": "mexico-beach.jpg",
-                "datePublished": "2008-01-25",
-                "description": "I took this picture while on vacation last year.",
-                "name": "Beach in Mexico"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert_eq!(
-            html.schema_org(),
-            vec![SchemaOrg::ImageObject(ImageObject {
-                name: Some("Beach in Mexico".to_string()),
-                description: Some("I took this picture while on vacation last year.".to_string()),
-                author: Some("Jane Doe".to_string()),
-                content_url: Some("mexico-beach.jpg".to_string()),
-            })]
-        );
-    }
-
-    #[test]
-    fn no_schema_dot_org_json_ld() {
-        let html = r#"
-    <html>
-        <head>
-            <script>
-                {
-                "invalid": "schema"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert!(html.schema_org().is_empty());
-
-        let html = r#"
-    <html>
-        <head>
-            <script type="application/ld+json">
-                {
-                "invalid": "schema"
-                }
-            </script>
-        </head>
-        <body>
-        </body>
-    </html>
-        "#;
-
-        let html = Html::parse(html, "example.com");
-
-        assert!(html.schema_org().is_empty());
     }
 
     #[test]
