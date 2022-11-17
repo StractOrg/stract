@@ -78,7 +78,7 @@ pub enum InitialPrettifiedSearchResult {
 pub struct SearchQuery {
     pub original: String,
     pub selected_region: Option<Region>,
-    pub goggle_program: Option<String>,
+    pub optic_program: Option<String>,
     pub skip_pages: Option<usize>,
     pub site_rankings: Option<SiteRankings>,
 }

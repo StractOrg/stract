@@ -18,33 +18,33 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
-pub const DEFAULT_GOGGLES: [GoggleLink; 2] = [
-    GoggleLink {
+pub const DEFAULT_OPTICS: [OpticLink; 2] = [
+    OpticLink {
         name: "Copycats removal",
-        url: "https://raw.githubusercontent.com/Cuely/sample-goggles/main/copycats_removal.goggle",
+        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/copycats_removal.optic",
     },
-    GoggleLink {
+    OpticLink {
         name: "Hacker News",
-        url: "https://raw.githubusercontent.com/Cuely/sample-goggles/main/hacker_news.goggle",
+        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/hacker_news.optic",
     },
 ];
 
 #[derive(Debug, Clone)]
-pub struct GoggleLink {
+pub struct OpticLink {
     pub name: &'static str,
     pub url: &'static str,
 }
 
 #[allow(clippy::unused_async)]
 pub async fn route() -> impl IntoResponse {
-    let template = GogglesTemplate {
-        default_goggles: DEFAULT_GOGGLES.to_vec(),
+    let template = OpticsTemplate {
+        default_optics: DEFAULT_OPTICS.to_vec(),
     };
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
 #[template(path = "settings/index.html")]
-struct GogglesTemplate {
-    default_goggles: Vec<GoggleLink>,
+struct OpticsTemplate {
+    default_optics: Vec<OpticLink>,
 }

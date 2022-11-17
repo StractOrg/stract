@@ -16,8 +16,8 @@
 
 mod bm25;
 pub mod centrality_store;
-pub mod goggles;
 pub mod initial;
+pub mod optics;
 pub mod signal;
 pub mod site_rankings;
 
@@ -230,7 +230,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "example".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -314,7 +314,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "example".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -425,7 +425,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "dr dk".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -508,7 +508,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "title".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -596,7 +596,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -677,7 +677,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -786,7 +786,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "example".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                         @field_title = 20000000
                         @host_centrality = 0
@@ -807,7 +807,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "example".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                         @field_all_body = 20000000
                         @host_centrality = 0
@@ -828,7 +828,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "example".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                         @host_centrality = 2000000
                     "#
@@ -945,7 +945,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "termA termB".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -1032,7 +1032,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -1118,7 +1118,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -1291,7 +1291,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "topic_a".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -1309,7 +1309,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "topic_b".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })

@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    goggles::{GoggleLink, DEFAULT_GOGGLES},
+    optics::{OpticLink, DEFAULT_OPTICS},
     HtmlTemplate, State,
 };
 use askama::Template;
@@ -51,8 +51,8 @@ struct SearchTemplate {
     current_page: usize,
     next_page_url: String,
     prev_page_url: Option<String>,
-    default_goggles: Vec<GoggleLink>,
-    current_goggle_url: Option<String>,
+    default_optics: Vec<OpticLink>,
+    current_optic_url: Option<String>,
 }
 
 enum RegionSelection {
@@ -72,15 +72,15 @@ pub async fn route(
 
     let skip_pages = params.get("p").and_then(|p| p.parse().ok());
 
-    let mut goggle = None;
-    let mut current_goggle_url = None;
+    let mut optic = None;
+    let mut current_optic_url = None;
 
-    if let Some(url) = params.get("goggle") {
+    if let Some(url) = params.get("optic") {
         if !url.is_empty() {
             if let Ok(res) = reqwest::get(url).await {
                 if let Ok(text) = res.text().await {
-                    goggle = Some(text);
-                    current_goggle_url = Some(url.to_string());
+                    optic = Some(text);
+                    current_optic_url = Some(url.to_string());
                 }
             }
         }
@@ -118,7 +118,7 @@ pub async fn route(
         .search_prettified(&SearchQuery {
             original: query.clone(),
             selected_region,
-            goggle_program: goggle,
+            optic_program: optic,
             skip_pages,
             site_rankings,
         })
@@ -185,8 +185,8 @@ pub async fn route(
                     current_page,
                     next_page_url,
                     prev_page_url,
-                    default_goggles: DEFAULT_GOGGLES.to_vec(),
-                    current_goggle_url,
+                    default_optics: DEFAULT_OPTICS.to_vec(),
+                    current_optic_url,
                 };
 
                 HtmlTemplate(template).into_response()

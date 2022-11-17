@@ -34,7 +34,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use crate::ranking::goggles::ast::{RawAlteration, Target};
+use crate::ranking::optics::ast::{RawAlteration, Target};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {

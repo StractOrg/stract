@@ -1,28 +1,28 @@
 ! name: Quickstart
-! description: A quick tour of Goggles
+! description: A quick tour of Optics
 ! public: false
-! author: Goggles 101
+! author: Optics 101
 
-! Goggles are simple, self-contained text files which can be hosted in Github or
+! Optics are simple, self-contained text files which can be hosted in Github or
 ! Gitlab. These files contain instructions allowing you to tell the search engine how
 ! you'd like your results to be ranked. You can target specific URL patterns
 ! (and, soon, website titles and other aspects of Web pages) and indicate how
 ! their ranking should be altered (e.g. boosted, downranked, or completely
 ! discarded from the results).
 
-! A Goggle source file consists of instructions, one per line. Empty lines, or
+! A Optic source file consists of instructions, one per line. Empty lines, or
 ! comments (starting with an exclamation mark: '!') are ignored.
 
 ! You probably already noticed the header of this file which contains some
-! metadata about your Goggle, such as: name, description, public and author.
+! metadata about your Optic, such as: name, description, public and author.
 ! These are *mandatory*.
 
 ! Additionally, you can specify the following optional metadata attributes:
-! * homepage — specifies a homepage URL displayed on your Goggle's profile.
-! * issues — specifies a URL where users can report issues for your Goggle.
-! * transferred_to — Allows to transfer ownership of a Goggle.
-! * avatar —  specifies a *valid* HEX color code for your Goggle.
-! * license — specifies the license of a Goggle's instructions.
+! * homepage — specifies a homepage URL displayed on your Optic's profile.
+! * issues — specifies a URL where users can report issues for your Optic.
+! * transferred_to — Allows to transfer ownership of a Optic.
+! * avatar —  specifies a *valid* HEX color code for your Optic.
+! * license — specifies the license of a Optic's instructions.
 
 ! The simplest instruction is a plain-text pattern which can be found in URLs.
 ! The following would match any search result whose URL contains the pattern
@@ -82,7 +82,7 @@ $site=example.com
 ! The value associated with the option indicate the 'strength' with which you
 ! want to alter the ranking (note: that it is currently limited to a maximum
 ! value of 10). It can be used to boost results differently, even inside of the
-! same Goggle (e.g. some results should be favored more than others).
+! same Optic (e.g. some results should be favored more than others).
 !
 ! You can also downrank results:
 /r/google/$downrank
@@ -136,6 +136,6 @@ disliked = [
 ! set of results. In combination, hundreds or more instructions can allow you to
 ! express complex reranking functions.
 
-! Although the Goggles language could express instructions to search through a
-! small set of websites or act as a blocklist, Goggles really shine when used to
+! Although the Optics language could express instructions to search through a
+! small set of websites or act as a blocklist, Optics really shine when used to
 ! express boosting and downranking across many domains and pages.

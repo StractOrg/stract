@@ -19,7 +19,7 @@ use crate::Result as CrateResult;
 use lalrpop_util::lalrpop_mod;
 use regex::Regex;
 
-lalrpop_mod!(pub parser, "/ranking/goggles/parser.rs");
+lalrpop_mod!(pub parser, "/ranking/optics/parser.rs");
 
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
@@ -37,15 +37,15 @@ pub struct RawAlteration {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct RawGoggle {
+pub struct RawOptic {
     pub comments: Vec<Comment>,
     pub instructions: Vec<RawInstruction>,
     pub alterations: Vec<RawAlteration>,
     pub site_preferences: Vec<RawSitePreference>,
 }
 
-impl From<Vec<GoggleBlock>> for RawGoggle {
-    fn from(blocks: Vec<GoggleBlock>) -> Self {
+impl From<Vec<OpticBlock>> for RawOptic {
+    fn from(blocks: Vec<OpticBlock>) -> Self {
         let mut alterations = Vec::new();
         let mut comments = Vec::new();
         let mut instructions = Vec::new();
@@ -53,14 +53,14 @@ impl From<Vec<GoggleBlock>> for RawGoggle {
 
         for block in blocks {
             match block {
-                GoggleBlock::Comment(comment) => comments.push(comment),
-                GoggleBlock::Instruction(instruction) => instructions.push(instruction),
-                GoggleBlock::Alteration(alteration) => alterations.push(alteration),
-                GoggleBlock::SitePreference(pref) => site_preferences.push(pref),
+                OpticBlock::Comment(comment) => comments.push(comment),
+                OpticBlock::Instruction(instruction) => instructions.push(instruction),
+                OpticBlock::Alteration(alteration) => alterations.push(alteration),
+                OpticBlock::SitePreference(pref) => site_preferences.push(pref),
             }
         }
 
-        RawGoggle {
+        RawOptic {
             comments,
             instructions,
             alterations,
@@ -70,7 +70,7 @@ impl From<Vec<GoggleBlock>> for RawGoggle {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum GoggleBlock {
+pub enum OpticBlock {
     Comment(Comment),
     Instruction(RawInstruction),
     Alteration(RawAlteration),
@@ -120,13 +120,13 @@ pub enum RawAction {
     Discard,
 }
 
-pub fn parse(goggle: &str) -> CrateResult<RawGoggle> {
+pub fn parse(optic: &str) -> CrateResult<RawOptic> {
     let newlines = Regex::new(r"[\n]+").unwrap();
-    let clean = newlines.replace_all(goggle.trim(), "\n").to_string();
+    let clean = newlines.replace_all(optic.trim(), "\n").to_string();
     let clean = clean.trim().replace(['\n', '\r'], ";");
 
     match PARSER.parse(clean.as_str()) {
-        Ok(blocks) => Ok(RawGoggle::from(blocks)),
+        Ok(blocks) => Ok(RawOptic::from(blocks)),
         Err(_) => Err(Error::Parse),
     }
 }
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let goggle = parse(
+        let optic = parse(
             r#"
             ! name: test
             ! this is a normal comment
@@ -152,7 +152,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            goggle.alterations,
+            optic.alterations,
             vec![
                 RawAlteration {
                     target: Target::Signal("host_centrality".to_string()),
@@ -170,7 +170,7 @@ mod tests {
         );
 
         assert_eq!(
-            goggle.comments,
+            optic.comments,
             vec![
                 Comment::Header {
                     key: "name".to_string(),
@@ -182,7 +182,7 @@ mod tests {
         );
 
         assert_eq!(
-            goggle.instructions,
+            optic.instructions,
             vec![
                 RawInstruction {
                     patterns: vec![
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn advanced_urls() {
-        let goggle = parse(
+        let optic = parse(
             r#"
             https://www.example.com?@hej
         "#,
@@ -210,7 +210,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            goggle.instructions,
+            optic.instructions,
             vec![RawInstruction {
                 patterns: vec![RawPatternPart::Raw(
                     "https://www.example.com?@hej".to_string()
@@ -219,7 +219,7 @@ mod tests {
             },]
         );
 
-        let goggle = parse(
+        let optic = parse(
             r#"
             https://www.example.com?@hej$site=https://www.example.com
         "#,
@@ -227,7 +227,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            goggle.instructions,
+            optic.instructions,
             vec![RawInstruction {
                 patterns: vec![RawPatternPart::Raw(
                     "https://www.example.com?@hej".to_string()
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn ignore_consecutive_newlines() {
-        let goggle = parse(
+        let optic = parse(
             r#"
             |pattern1|
 
@@ -253,7 +253,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            goggle.instructions,
+            optic.instructions,
             vec![
                 RawInstruction {
                     patterns: vec![
@@ -276,21 +276,18 @@ mod tests {
 
     #[test]
     fn quickstart_parse() {
-        assert!(parse(include_str!("../../../testcases/goggles/quickstart.goggle")).is_ok());
+        assert!(parse(include_str!("../../../testcases/optics/quickstart.optic")).is_ok());
     }
 
     #[test]
     fn hacker_news_parse() {
-        assert!(parse(include_str!(
-            "../../../testcases/goggles/hacker_news.goggle"
-        ))
-        .is_ok());
+        assert!(parse(include_str!("../../../testcases/optics/hacker_news.optic")).is_ok());
     }
 
     #[test]
     fn copycats_parse() {
         assert!(parse(include_str!(
-            "../../../testcases/goggles/copycats_removal.goggle"
+            "../../../testcases/optics/copycats_removal.optic"
         ))
         .is_ok());
     }

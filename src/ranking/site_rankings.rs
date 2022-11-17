@@ -24,7 +24,7 @@ use crate::{
     webpage::Url,
 };
 
-use super::goggles::{Action, Goggle, Instruction, PatternOption};
+use super::optics::{Action, Instruction, Optic, PatternOption};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct SiteRankings {
@@ -85,8 +85,8 @@ impl SiteRankings {
         approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
     }
 
-    pub fn into_goggle(self) -> Goggle {
-        Goggle {
+    pub fn into_optic(self) -> Optic {
+        Optic {
             site_rankings: self,
             ..Default::default()
         }
@@ -247,7 +247,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec!["first.com".to_string()],
@@ -270,7 +270,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec!["first.com".to_string()],
@@ -293,7 +293,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "test".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec![],

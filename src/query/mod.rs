@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    ranking::goggles::Goggle,
+    ranking::optics::Optic,
     ranking::SignalAggregator,
     schema::{Field, TextField},
     Result,
@@ -150,10 +150,10 @@ impl Query {
         })
     }
 
-    pub fn set_goggle(&mut self, goggle: &Goggle, schema: &Schema) {
+    pub fn set_optic(&mut self, optic: &Optic, schema: &Schema) {
         let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
 
-        subqueries.append(&mut goggle.as_tantivy(schema));
+        subqueries.append(&mut optic.as_tantivy(schema));
 
         self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
     }

@@ -1,4 +1,4 @@
-use crate::ranking::goggles::ast::*;
+use crate::ranking::optics::ast::*;
 
 grammar;
 
@@ -19,13 +19,13 @@ SepNewline<S, T>: Vec<T> = {
     }
 };
 
-pub Blocks: Vec<GoggleBlock> = <Sep<";", Block>>;
+pub Blocks: Vec<OpticBlock> = <Sep<";", Block>>;
 
-Block: GoggleBlock = {
-    <RawAlteration> => GoggleBlock::Alteration(<>),
-    <Comment> => GoggleBlock::Comment(<>),
-    <RawInstruction> => GoggleBlock::Instruction(<>),
-    <RawSitePreference> => GoggleBlock::SitePreference(<>),
+Block: OpticBlock = {
+    <RawAlteration> => OpticBlock::Alteration(<>),
+    <Comment> => OpticBlock::Comment(<>),
+    <RawInstruction> => OpticBlock::Instruction(<>),
+    <RawSitePreference> => OpticBlock::SitePreference(<>),
 }
 
 RawSitePreference: RawSitePreference = {

@@ -21,7 +21,7 @@ macro_rules! bench {
                     .search(&SearchQuery {
                         original: $query.to_string(),
                         selected_region: None,
-                        goggle_program: None,
+                        optic_program: None,
                         skip_pages: None,
                         site_rankings: None,
                     })

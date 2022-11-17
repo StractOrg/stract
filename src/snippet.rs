@@ -390,7 +390,7 @@ Survey in 2016, 2017, and 2018."#;
             .search(&SearchQuery {
                 original: "rust language".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -433,7 +433,7 @@ Survey in 2016, 2017, and 2018."#;
             .search(&SearchQuery {
                 original: "describe".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -646,7 +646,7 @@ Survey in 2016, 2017, and 2018."#;
             .search(&SearchQuery {
                 original: "paradigms".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })

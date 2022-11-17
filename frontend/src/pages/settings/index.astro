@@ -13,27 +13,27 @@ import { askama } from "../../askama";
     <div class="flex w-full h-fit justify-center pt-10">
       <SettingsMenu />
       <div class="flex flex-col max-w-2xl">
-        <h1 class="font-medium text-2xl">Manage Goggles</h1>
+        <h1 class="font-medium text-2xl">Manage Optics</h1>
         <div class="text-sm mt-5">
-          Goggles lets you control almost everything about which search results
+          Optics lets you control almost everything about which search results
           that gets returned to you. You can discard results from specific
           sites, boost results from other sites and much more.
         </div>
         <div class="text-sm mt-3">
           See our <a
-            href="https://github.com/Cuely/sample-goggles/blob/main/quickstart.goggle"
+            href="https://github.com/Cuely/sample-optics/blob/main/quickstart.optic"
             >quickstart</a
-          > for how to get started. Once you have developed your goggle, you can
+          > for how to get started. Once you have developed your optic, you can
           add it here to be used during your search.
         </div>
         <div class="text-sm mt-3">
-          Simply host the goggle on a url that returns a plain-text HTTP
-          response with the goggle. We use raw.githubusercontent.com, but you
+          Simply host the optic on a url that returns a plain-text HTTP
+          response with the optic. We use raw.githubusercontent.com, but you
           are free to host them elsewhere.
         </div>
         <div
           class="mt-16"
-          x-data="{ items: $persist([]).as('goggles'), name: '', url: '' }"
+          x-data="{ items: $persist([]).as('optics'), name: '', url: '' }"
         >
           <div class="w-full flex justify-between pl-5 pr-5">
             <input id="name" type="text" placeholder="Name" x-model="name" />
@@ -45,20 +45,20 @@ import { askama } from "../../askama";
             >
           </div>
           <div class="mt-5">
-            <div class="grid w-full space-y-5" id="goggles-list">
+            <div class="grid w-full space-y-5" id="optics-list">
               <div class="flex">
                 <div class="w-10"></div>
                 <div class="font-medium flex-1">Name</div>
                 <div class="font-medium flex-1">Url</div>
               </div>
               {
-                askama.for_("goggle in default_goggles", () => (
+                askama.for_("optic in default_optics", () => (
                   <div class="flex">
                     <div class="mr-5 w-5">
                       <img src="/images/disabled-delete.svg" class="h-5 w-5" />
                     </div>
-                    <div class="flex-1 text-sm">{askama`goggle.name $ {{random.words}}`}</div>
-                    <div class="flex-1 text-sm">{askama`goggle.url $ {{internet.url}}`}</div>
+                    <div class="flex-1 text-sm">{askama`optic.name $ {{random.words}}`}</div>
+                    <div class="flex-1 text-sm">{askama`optic.url $ {{internet.url}}`}</div>
                   </div>
                 ))
               }
@@ -71,9 +71,9 @@ import { askama } from "../../askama";
                       x-on:click="items.splice(index, 1)"
                     />
                   </div>
-                  <div class="user-goggle flex-1 text-sm" x-text="item.name">
+                  <div class="user-optic flex-1 text-sm" x-text="item.name">
                   </div>
-                  <div class="user-goggle flex-1 text-sm" x-text="item.url">
+                  <div class="user-optic flex-1 text-sm" x-text="item.url">
                   </div>
                 </div>
               </template>

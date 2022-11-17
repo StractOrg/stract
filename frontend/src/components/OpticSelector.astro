@@ -1,7 +1,7 @@
 ---
 export interface Props {
-  current_goggle_url: string;
-  default_goggles: string;
+  current_optic_url: string;
+  default_optics: string;
 }
 
 import { askama } from "$/askama";
@@ -10,29 +10,29 @@ import { askama } from "$/askama";
 <div class="h-full flex flex-col justify-center p-0 m-0">
   <select
     form="searchbar-form"
-    id="goggles-selector"
-    name="goggle"
+    id="optics-selector"
+    name="optic"
     onchange="document.getElementById('searchbar-form').submit()"
     class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
-    x-data="{ items: $persist([]).as('goggles') }"
+    x-data="{ items: $persist([]).as('optics') }"
   >
-    <option value="">Goggle</option>
+    <option value="">Optic</option>
     {
       askama.for_(
-        "goggle in default_goggles",
-        askama.match("current_goggle_url", {
-          "Some(current_goggle)": askama.if_(
-            "current_goggle == goggle.url",
+        "optic in default_optics",
+        askama.match("current_optic_url", {
+          "Some(current_optic)": askama.if_(
+            "current_optic == optic.url",
             () => (
-              <option selected value="{{ goggle.url }}">
-                {askama`goggle.name`}
+              <option selected value="{{ optic.url }}">
+                {askama`optic.name`}
               </option>
             ),
             () => (
-              <option value="{{ goggle.url }}">{askama`goggle.name`}</option>
+              <option value="{{ optic.url }}">{askama`optic.name`}</option>
             )
           ),
-          None: <option value="{{ goggle.url }}">{askama`goggle.name`}</option>,
+          None: <option value="{{ optic.url }}">{askama`optic.name`}</option>,
         })
       )
     }

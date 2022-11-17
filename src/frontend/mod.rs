@@ -34,9 +34,9 @@ use axum::{
 mod about;
 mod api;
 mod autosuggest;
-mod goggles;
 mod index;
 mod opensearch;
+mod optics;
 mod privacy;
 pub mod search;
 mod sites;
@@ -96,8 +96,8 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
         .route("/about", get(about::route))
-        .route("/settings", get(goggles::route))
-        .route("/settings/goggles", get(goggles::route))
+        .route("/settings", get(optics::route))
+        .route("/settings/optics", get(optics::route))
         .route("/settings/sites", get(sites::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/api/beta/search", get(api::search))

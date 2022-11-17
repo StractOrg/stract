@@ -26,7 +26,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
-use crate::ranking::goggles::{self, Goggle};
+use crate::ranking::optics::{self, Optic};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
@@ -83,15 +83,15 @@ impl LocalSearcher {
         de_rank_similar: bool,
     ) -> Result<InitialSearchResult> {
         let raw_query = query.original.clone();
-        let goggle = query
-            .goggle_program
+        let optic = query
+            .optic_program
             .as_ref()
-            .and_then(|program| goggles::parse(program).ok());
+            .and_then(|program| optics::parse(program).ok());
 
-        let query_aggregator = goggle
+        let query_aggregator = optic
             .as_ref()
-            .map(|goggle| {
-                goggle.aggregator(
+            .map(|optic| {
+                optic.aggregator(
                     self.centrality_store
                         .as_ref()
                         .map(|centrality_store| &centrality_store.approx_harmonic),
@@ -116,25 +116,25 @@ impl LocalSearcher {
             }
         }
 
-        let mut goggles = Vec::new();
+        let mut optics = Vec::new();
 
-        if let Some(goggle) = &goggle {
-            goggles.push(goggle.clone());
+        if let Some(optic) = &optic {
+            optics.push(optic.clone());
         }
 
         if let Some(site_rankings) = &query.site_rankings {
-            goggles.push(site_rankings.clone().into_goggle())
+            optics.push(site_rankings.clone().into_optic())
         }
 
-        let goggle = goggles
+        let optic = optics
             .into_iter()
-            .fold(Goggle::default(), |acc, elem| acc.merge(elem));
+            .fold(Optic::default(), |acc, elem| acc.merge(elem));
 
-        parsed_query.set_goggle(&goggle, &self.index.schema());
+        parsed_query.set_optic(&optic, &self.index.schema());
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
-            goggle.aggregator(
+            optic.aggregator(
                 self.centrality_store
                     .as_ref()
                     .map(|centrality_store| &centrality_store.approx_harmonic),
@@ -332,7 +332,7 @@ mod tests {
                 .search(&SearchQuery {
                     original: "test".to_string(),
                     selected_region: None,
-                    goggle_program: None,
+                    optic_program: None,
                     skip_pages: Some(p),
                     site_rankings: None,
                 })

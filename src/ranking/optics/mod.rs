@@ -35,23 +35,23 @@ use tantivy::{
 };
 
 use self::{
-    ast::{RawAction, RawGoggle, RawInstruction, RawPatternOption, RawPatternPart, Target},
+    ast::{RawAction, RawInstruction, RawOptic, RawPatternOption, RawPatternPart, Target},
     const_query::ConstQuery,
     pattern_query::PatternQuery,
 };
 
 use super::{signal::SignalAggregator, site_rankings::SiteRankings, Alteration, Signal};
 
-pub fn parse(goggle: &str) -> Result<Goggle> {
-    let raw_goggle = ast::parse(goggle)?;
+pub fn parse(optic: &str) -> Result<Optic> {
+    let raw_optic = ast::parse(optic)?;
 
-    Goggle::try_from(raw_goggle)
+    Optic::try_from(raw_optic)
 }
 
-impl TryFrom<RawGoggle> for Goggle {
+impl TryFrom<RawOptic> for Optic {
     type Error = crate::Error;
 
-    fn try_from(raw: RawGoggle) -> Result<Self> {
+    fn try_from(raw: RawOptic) -> Result<Self> {
         let mut instructions = Vec::new();
 
         for inst in raw.instructions {
@@ -195,14 +195,14 @@ pub enum Action {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Goggle {
+pub struct Optic {
     pub coefficients: HashMap<Signal, f64>,
     pub boosts: HashMap<TextField, f64>,
     pub site_rankings: SiteRankings,
     pub instructions: Vec<Instruction>,
 }
 
-impl Goggle {
+impl Optic {
     pub fn as_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         if self
             .instructions
@@ -484,7 +484,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: None,
+                optic_program: None,
                 skip_pages: None,
                 site_rankings: None,
             })
@@ -502,7 +502,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                         $discard,site=b.com
                     "#
@@ -524,7 +524,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                         $boost=10,site=a.com
                     "#
@@ -546,13 +546,13 @@ mod tests {
 
     #[test]
     fn quickstart_as_query() {
-        parse(include_str!("../../../testcases/goggles/quickstart.goggle"))
+        parse(include_str!("../../../testcases/optics/quickstart.optic"))
             .unwrap()
             .as_tantivy(&create_schema());
     }
 
     #[test]
-    fn example_goggles_dont_crash() {
+    fn example_optics_dont_crash() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
@@ -622,8 +622,8 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
-                    include_str!("../../../testcases/goggles/quickstart.goggle").to_string(),
+                optic_program: Some(
+                    include_str!("../../../testcases/optics/quickstart.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,
@@ -638,8 +638,8 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
-                    include_str!("../../../testcases/goggles/hacker_news.goggle").to_string(),
+                optic_program: Some(
+                    include_str!("../../../testcases/optics/hacker_news.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,
@@ -654,8 +654,8 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
-                    include_str!("../../../testcases/goggles/copycats_removal.goggle").to_string(),
+                optic_program: Some(
+                    include_str!("../../../testcases/optics/copycats_removal.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,
@@ -770,7 +770,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                 $discard
                 $site=a.com,boost=6
@@ -935,7 +935,7 @@ mod tests {
             .search(&SearchQuery {
                 original: "website".to_string(),
                 selected_region: None,
-                goggle_program: Some(
+                optic_program: Some(
                     r#"
                     liked = [
                         www.a.com,

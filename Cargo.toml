@@ -82,5 +82,5 @@ name = "search-preindexed"
 harness = false
 
 [[bench]]
-name = "search-preindexed-goggle"
+name = "search-preindexed-optic"
 harness = false

@@ -1,6 +1,6 @@
 ! name: Hacker News / 1k short
 ! description: Prioritizes domains popular with the Hacker News community, minus those that would rank among the top 1000 most-viewed websites.
-! author: Goggles 101
+! author: Optics 101
 ! public: true
 ! avatar: #ff6600
 

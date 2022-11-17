@@ -43,7 +43,7 @@ pub async fn search(
         .search_api(&SearchQuery {
             original: query.to_string(),
             selected_region,
-            goggle_program: None,
+            optic_program: None,
             site_rankings: None,
             skip_pages,
         })
