@@ -1,101 +1,129 @@
 use crate::ranking::optics::ast::*;
+use crate::ranking::optics::lexer::Token;
+use lalrpop_util::ParseError;
 
-grammar;
+grammar<'input>;
 
 Sep<S, T>: Vec<T> = {
-    <mut xs:(<T> S)*> <x:T> => {
-        xs.push(x);
-        xs
-    }
-};
-
-SepNewline<S, T>: Vec<T> = {
-    <mut xs:(<T> S ";"?)*> <x:T?> => match x {
-        Some(x) => {
-            xs.push(x);
-            xs
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
         }
-        None => xs
     }
 };
 
-pub Blocks: Vec<OpticBlock> = <Sep<";", Block>>;
+pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
 
-Block: OpticBlock = {
-    <RawAlteration> => OpticBlock::Alteration(<>),
-    <Comment> => OpticBlock::Comment(<>),
-    <RawInstruction> => OpticBlock::Instruction(<>),
-    <RawSitePreference> => OpticBlock::SitePreference(<>),
+Block: RawOpticBlock = {
+    <Rule> => RawOpticBlock::Rule(<>),
+    <Ranking> => RawOpticBlock::Ranking(<>),
+    <SitePreference> => RawOpticBlock::SitePreference(<>),
+    "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
 }
 
-RawSitePreference: RawSitePreference = {
-    "liked" "=" "[" ";"? <SepNewline<",", Ident>> "]" => RawSitePreference::Liked(<>),
-    "disliked" "=" "[" ";"?  <SepNewline<",", Ident>> "]" => RawSitePreference::Disliked(<>),
+Rule: RawRule = {
+    "Rule" "{" <matches:RawMatchBlock> <action:RawAction?> "}" => RawRule {
+        matches,
+        action
+    }
 }
 
-
-RawAlteration: RawAlteration = {
-    "@" <target:Target> "=" <score:Ident> => RawAlteration {<>}
+RawMatchBlock: RawMatchBlock = {
+    "Matches" "{" <Sep<",", RawMatchPart>> "}" ","? => RawMatchBlock(<>)
 }
 
-Target: Target = {
-    <Name> => {
-        if let Some(name) = <>.strip_prefix("field_") {
-            Target::Field(name.to_string())
-        } else {
-            Target::Signal(<>)
+RawMatchPart: RawMatchPart = {
+    "Site" "(" <StringLiteral> ")" => RawMatchPart::Site(<>.to_string()),
+    "Url" "(" <StringLiteral> ")" => RawMatchPart::Url(<>.to_string()),
+    "Domain" "(" <StringLiteral> ")" => RawMatchPart::Domain(<>.to_string()),
+    "Title" "(" <StringLiteral> ")" => RawMatchPart::Title(<>.to_string()),
+    "Description" "(" <StringLiteral> ")" => RawMatchPart::Description(<>.to_string()),
+    "Content" "(" <StringLiteral> ")" => RawMatchPart::Content(<>.to_string()),
+}
+
+RawAction: RawAction= {
+    "Action" "(" <InnerAction> ")" => <>
+}
+
+InnerAction: RawAction= {
+    "Boost" "(" <Number>  ")" =>? {
+        match <>.parse() {
+            Ok(n) => Ok(RawAction::Boost(n)),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::Parse
+            })
         }
     },
-}
-
-Name: String = Ident;
-
-Comment: Comment = r"![^;]*" => {
-    if let Some((key, value)) = <>.split_once(':') {
-        let key = key.strip_prefix("!").unwrap_or(key).trim();
-        let value = value.trim();
-
-        if matches!(key, "name" | "description" | "public" | "author" | "homepage" | "issues" | "transferred_to" | "avatar" | "license") {
-            Comment::Header { key: key.to_string(), value: value.to_string() }
-        } else {
-            Comment::Basic(<>.to_string())
+    "Downrank" "(" <Number>  ")" =>? {
+        match <>.parse() {
+            Ok(n) => Ok(RawAction::Downrank(n)),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::Parse
+            })
         }
-    } else {
-            Comment::Basic(<>.to_string())
+    },
+    "Discard" => RawAction::Discard,
+}
+
+
+Ranking: RankingCoeff = {
+    "Ranking" "(" <target:RankingTarget> "," <score:Number> ")" =>? {
+        match score.parse() {
+            Ok(score) => Ok(RankingCoeff {
+                target,
+                score
+            }),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::Parse
+            })
+        }
     }
-};
-
-RawInstruction: RawInstruction = {
-    <patterns:RawPatterns> "$" <options:RawPatternOptions> => RawInstruction { <> },
-    <patterns:RawPatterns> => RawInstruction { <>, options: Vec::new() },
 }
 
-RawPatterns: Vec<RawPatternPart> = <RawPatternPart*> => <>;
-
-RawPatternPart: RawPatternPart = {
-    "*" => RawPatternPart::Wildcard,
-    "^" => RawPatternPart::Delimeter,
-    "|" => RawPatternPart::Anchor,
-    Ident => RawPatternPart::Raw(<>.to_string()),
+RankingTarget: RankingTarget = {
+    "Signal" "(" <StringLiteral> ")" => RankingTarget::Signal(<>.to_string()),
+    "Field" "(" <StringLiteral> ")" => RankingTarget::Field(<>.to_string()),
 }
 
-RawPatternOptions: Vec<RawPatternOption> = <Sep<",", RawPatternOption>> => <>;
-
-RawPatternOption: RawPatternOption = {
-    "site=" <site:Ident> => RawPatternOption::Site(site.to_string()),
-    "inurl" => RawPatternOption::InUrl,
-    "intitle" => RawPatternOption::InTitle,
-    "indescription" => RawPatternOption::InDescription,
-    "incontent" => RawPatternOption::InContent,
-    <RawAction> => RawPatternOption::Action(<>),
+SitePreference: RawSitePreference = {
+    "Like" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Like(<>.to_string()),
+    "Dislike" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Dislike(<>.to_string())
 }
 
-RawAction: RawAction = {
-    "boost=" <Ident> => RawAction::Boost(<>),
-    "boost" => RawAction::Boost("1".to_string()),
-    "downrank=" <Ident> => RawAction::Downrank(<>),
-    "downrank" => RawAction::Downrank("1".to_string()),
-    "discard" => RawAction::Discard,
-}
+extern {
+    type Location = usize;
+    type Error = crate::Error;
+    
+    enum Token<'input> {
+        ";" => Token::SemiColon,
+        "," => Token::Comma,
+        "{" => Token::OpenBracket,
+        "}" => Token::CloseBracket,
+        "(" => Token::OpenParenthesis,
+        ")" => Token::CloseParenthesis,
 
-Ident: String = <r"[a-zA-Z0-9_/][a-zA-Z_/:\.\?@0-9&\-]*"> => <>.to_string();
+        "DiscardNonMatching" => Token::DiscardNonMatching,
+        "Rule" => Token::Rule,
+        "Ranking" => Token::Ranking,
+        "Signal" => Token::Signal,
+        "Field" => Token::Field,
+        "Matches" => Token::Matches,
+        "Site" => Token::Site,
+        "Url" => Token::Url,
+        "Domain" => Token::Domain,
+        "Title" => Token::Title,
+        "Description" => Token::Description,
+        "Content" => Token::Content,
+        "Action" => Token::Action,
+        "Boost" => Token::Boost,
+        "Downrank" => Token::Downrank,
+        "Discard" => Token::Discard,
+        "Like" => Token::Like,
+        "Dislike" => Token::Dislike,
+
+        StringLiteral => Token::String(<&'input str>),
+        Number => Token::Number(<&'input str>),
+    }
+}

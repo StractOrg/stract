@@ -22,9 +22,8 @@ use crate::{
         topic,
     },
     webpage::Webpage,
-    Result,
 };
-use std::{array, convert::TryFrom, ops::Deref, sync::Arc};
+use std::{array, ops::Deref, sync::Arc};
 
 use chrono::Utc;
 use tantivy::{DocId, Score};
@@ -33,8 +32,6 @@ use crate::{
     schema::{Field, FLOAT_SCALING},
     webpage::region::{Region, RegionCount},
 };
-
-use crate::ranking::optics::ast::{RawAlteration, Target};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
@@ -437,21 +434,5 @@ impl SignalAggregator {
 
     pub fn field_boosts(&self) -> &FieldBoost {
         &self.field_boost
-    }
-}
-#[derive(Debug, PartialEq)]
-pub struct Alteration {
-    pub target: Target,
-    pub score: f64,
-}
-
-impl TryFrom<RawAlteration> for Alteration {
-    type Error = crate::Error;
-
-    fn try_from(raw: RawAlteration) -> Result<Self> {
-        Ok(Alteration {
-            target: raw.target,
-            score: raw.score.parse()?,
-        })
     }
 }

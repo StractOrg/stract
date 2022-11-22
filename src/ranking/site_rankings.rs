@@ -24,7 +24,7 @@ use crate::{
     webpage::Url,
 };
 
-use super::optics::{Action, Instruction, Optic, PatternOption};
+use super::optics::{Action, MatchLocation, Matching, Optic, PatternPart, Rule};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct SiteRankings {
@@ -34,36 +34,36 @@ pub struct SiteRankings {
 }
 
 impl SiteRankings {
-    pub fn instructions(&self) -> Vec<Instruction> {
+    pub fn rules(&self) -> Vec<Rule> {
         let mut instructions = Vec::new();
 
         for site in &self.liked {
-            instructions.push(Instruction {
-                patterns: Vec::new(),
-                options: vec![
-                    PatternOption::Site(site.clone()),
-                    PatternOption::Action(Action::Boost(5)),
-                ],
+            instructions.push(Rule {
+                matches: vec![Matching {
+                    pattern: vec![PatternPart::Raw(site.clone())],
+                    location: MatchLocation::Site,
+                }],
+                action: Action::Boost(5),
             });
         }
 
         for site in &self.disliked {
-            instructions.push(Instruction {
-                patterns: Vec::new(),
-                options: vec![
-                    PatternOption::Site(site.clone()),
-                    PatternOption::Action(Action::Downrank(5)),
-                ],
+            instructions.push(Rule {
+                matches: vec![Matching {
+                    pattern: vec![PatternPart::Raw(site.clone())],
+                    location: MatchLocation::Site,
+                }],
+                action: Action::Downrank(5),
             });
         }
 
         for site in &self.blocked {
-            instructions.push(Instruction {
-                patterns: Vec::new(),
-                options: vec![
-                    PatternOption::Site(site.clone()),
-                    PatternOption::Action(Action::Discard),
-                ],
+            instructions.push(Rule {
+                matches: vec![Matching {
+                    pattern: vec![PatternPart::Raw(site.clone())],
+                    location: MatchLocation::Site,
+                }],
+                action: Action::Discard,
             });
         }
 
@@ -250,8 +250,8 @@ mod tests {
                 optic_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
-                    liked: vec!["first.com".to_string()],
-                    disliked: vec!["third.com".to_string()],
+                    liked: vec!["www.first.com".to_string()],
+                    disliked: vec!["www.third.com".to_string()],
                     blocked: vec![],
                 }),
             })
@@ -273,7 +273,7 @@ mod tests {
                 optic_program: None,
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
-                    liked: vec!["first.com".to_string()],
+                    liked: vec!["www.first.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],
                 }),
@@ -297,8 +297,8 @@ mod tests {
                 skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec![],
-                    disliked: vec!["second.com".to_string()],
-                    blocked: vec!["first.com".to_string()],
+                    disliked: vec!["www.second.com".to_string()],
+                    blocked: vec!["www.first.com".to_string()],
                 }),
             })
             .expect("Search failed")

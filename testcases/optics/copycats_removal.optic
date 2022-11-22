@@ -1,272 +1,1563 @@
-! name: Copycat removal
-! description: Remove stackoverflow+github copycats
-! public: true
-! author: Cuely
+// Github translations
+// source: https://raw.githubusercontent.com/arosh/ublacklist-github-translation/master/uBlacklist.txt
+Rule {
+	Matches {
+		Site("bleepcoder.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubja.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("gitmemory.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("giters.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubmemory.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubmate.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("wenyanet.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("issueexplorer.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("opensourcelibs.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("awesomeopensource.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("findbestopensource.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubhelp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("golangrepo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("gitmemory.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pythonissues.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("reposhub.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("openprojectrepo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("gitanswer.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubplus.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pythonrepo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("bestofcpp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("github.innominds.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("higithub.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githublab.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("githubhot.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("issuehint.com")
+	},
+	Action(Discard)
+};
 
-! Github translations
-! source: https://raw.githubusercontent.com/arosh/ublacklist-github-translation/master/uBlacklist.txt
-$discard,site=bleepcoder.com
-$discard,site=githubja.com
-$discard,site=gitmemory.com
-$discard,site=giters.com
-$discard,site=githubmemory.com
-$discard,site=githubmate.com
-$discard,site=wenyanet.com
-$discard,site=issueexplorer.com
-$discard,site=opensourcelibs.com
-$discard,site=awesomeopensource.com
-$discard,site=findbestopensource.com
-$discard,site=githubhelp.com
-$discard,site=golangrepo.com
-$discard,site=gitmemory.cn
-$discard,site=pythonissues.com
-$discard,site=reposhub.com
-$discard,site=openprojectrepo.com
-$discard,site=gitanswer.com
-$discard,site=githubplus.com
-$discard,site=pythonrepo.com
-$discard,site=bestofcpp.com
-$discard,site=github.innominds.com
-$discard,site=higithub.com
-$discard,site=githublab.com
-$discard,site=githubhot.com
-$discard,site=issuehint.com
+// Stackoverflow translations
+// source: https://raw.githubusercontent.com/arosh/ublacklist-stackoverflow-translation/master/uBlacklist.txt
+Rule {
+	Matches {
+		Site("code-examples.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("kotaeta.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("answer-id.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("de-vraag.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("code.i-harness.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("living-sun.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.jp")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.it")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.mx")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.com.br")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.info.tr")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.in.th")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.com.de")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.fr")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.com.ua")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.co.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.kr")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.vn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.net.bd")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qa-stack.pl")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qastack.id")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coder.work")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("it-swarm-ja.tech")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("it-swarm.jp.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("it-swarm-ja.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("webdevqa.jp.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("web-dev-qa-db-ja.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("it-swarm-fr.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("web-dev-qa-db-fr.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codeflow.site")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codeguides.site")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("overcoder.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coderoad.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("javaer101.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("voidcc.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("siwib.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("fluffyfables.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("fixes.pub")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("knews.vip")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("isolution.pro")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("uwenku.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("athabasca-foto.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("zsharp.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("projectbackpack.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("waymanamechurch.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("sunflowercreations.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("cfadnc.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("fitforlearning.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("panaindustrial.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("sierrasummit2005.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("theshuggahpies.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pcbconline.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("nuomiphp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ubuntu.buildwebhost.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ubuntuaa.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("debugcn.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("sch22.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("gupgallery.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("amuddycup.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ecnf2016.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("softwareuser.asklobster.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("domainelespailles.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ec-europe.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pakostnici.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("try2explore.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("itectec.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackovergo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("faithcov.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("noblenaz.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("culinarydegree.info")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qapicks.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("narkive.jp")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ourladylakes.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("intellipaat.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("newbedev.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codenong.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("routinepanic.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tousu.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tutorialmore.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("titanwolf.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coderedirect.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("fullstackuser.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ostack.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("wujigu.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("webdevdesigner.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ghcc.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("developreference.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("semicolonworld.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tipsfordev.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qi-u.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("xsprogram.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackoom.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("cndgn.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("generacodice.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackfinder.jp.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("uebu-kaihatsu.jp.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("sqlite.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackguides.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("younggeeks.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("answerlib.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("edupro.id")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackfinder.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("desenv-web-rp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("web-dev-qa-db-pt.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jscodetips.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("5axxw.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("question-it.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codefaq.info")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codefaq.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("mediatagtw.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("progi.pro")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("elfishgene.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("sysadminde.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("answacode.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ask-dev.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("arip-photo.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jablogs.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jpdebug.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("askcodez.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("iquestion.pro")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ntcdoon.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("programmierfrage.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("microeducate.tech")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("debugko.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("devdreamz.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("catwolf.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("1r1g.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("string.quest")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("reddit.fun")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qa.icopy.site")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("errorsfixing.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("syntaxfix.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codegrepr.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("quabr.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("serveanswer.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("safehavenpetrescue.org")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("cainiaojiaocheng.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("linuxfixes.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("it-roy-ru.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("web-dev-qa.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("flutterhq.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("dailydevsblog.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("711web.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("binarydevelop.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("so.muouseo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coder-solution-es.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("peaku.co")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("learnfk.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("solveforum.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("edureka.co")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("itecnote.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tagsqa.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("faqcode4u.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("digitrain.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("prograide.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("dovov.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("oomake.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ajaxhispano.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codebaoku.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("daplus.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("questu.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("itranslater.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("doraprojects.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("iteramos.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("faqcodes.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("mejorcodigo.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("anycodings.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("javafixing.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("xstack.us")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("shenghuobao.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("overstack.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("zaizhele.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("zaizhele.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("xstack.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("mlink.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jonic.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jike.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("16892.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("vigges.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("55276.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ogeek.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("shenzhenjia.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("shenzhenjia.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("9ishenzhen.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("vigge.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("vigge.cn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("web-dev-qa-db-fra.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("ape-ask.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("yaoply.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("techhelpnotes.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("wp-qa.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("querythreads.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("appsloveworld.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("dtuto.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("qatop.pythonwood.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("webdevask.com")
+	},
+	Action(Discard)
+};
 
-! Stackoverflow translations
-! source: https://raw.githubusercontent.com/arosh/ublacklist-stackoverflow-translation/master/uBlacklist.txt
-$discard,site=code-examples.net
-$discard,site=kotaeta.com
-$discard,site=answer-id.com
-$discard,site=de-vraag.com
-$discard,site=code.i-harness.com
-$discard,site=living-sun.com
-$discard,site=qastack.jp
-$discard,site=qastack.ru
-$discard,site=qastack.it
-$discard,site=qastack.mx
-$discard,site=qastack.com.br
-$discard,site=qastack.info.tr
-$discard,site=qastack.in.th
-$discard,site=qastack.com.de
-$discard,site=qastack.fr
-$discard,site=qastack.cn
-$discard,site=qastack.com.ua
-$discard,site=qastack.co.in
-$discard,site=qastack.kr
-$discard,site=qastack.vn
-$discard,site=qastack.net.bd
-$discard,site=qa-stack.pl
-$discard,site=qastack.id
-$discard,site=coder.work
-$discard,site=it-swarm-ja.tech
-$discard,site=it-swarm.jp.net
-$discard,site=it-swarm-ja.com
-$discard,site=webdevqa.jp.net
-$discard,site=web-dev-qa-db-ja.com
-$discard,site=it-swarm-fr.com
-$discard,site=web-dev-qa-db-fr.com
-$discard,site=codeflow.site
-$discard,site=codeguides.site
-$discard,site=overcoder.net
-$discard,site=coderoad.ru
-$discard,site=javaer101.com
-$discard,site=voidcc.com
-$discard,site=siwib.org
-$discard,site=fluffyfables.com
-$discard,site=fixes.pub
-$discard,site=knews.vip
-$discard,site=isolution.pro
-$discard,site=uwenku.com
-$discard,site=athabasca-foto.com
-$discard,site=zsharp.org
-$discard,site=projectbackpack.org
-$discard,site=waymanamechurch.org
-$discard,site=sunflowercreations.org
-$discard,site=cfadnc.org
-$discard,site=fitforlearning.org
-$discard,site=panaindustrial.com
-$discard,site=sierrasummit2005.org
-$discard,site=theshuggahpies.com
-$discard,site=pcbconline.org
-$discard,site=nuomiphp.com
-$discard,site=ubuntu.buildwebhost.com
-$discard,site=ubuntuaa.com
-$discard,site=debugcn.com
-$discard,site=sch22.org
-$discard,site=gupgallery.com
-$discard,site=amuddycup.com
-$discard,site=ecnf2016.org
-$discard,site=softwareuser.asklobster.com
-$discard,site=domainelespailles.net
-$discard,site=ec-europe.org
-$discard,site=pakostnici.com
-$discard,site=try2explore.com
-$discard,site=itectec.com
-$discard,site=stackovergo.com
-$discard,site=faithcov.org
-$discard,site=noblenaz.org
-$discard,site=culinarydegree.info
-$discard,site=qapicks.com
-$discard,site=narkive.jp
-$discard,site=ourladylakes.org
-$discard,site=intellipaat.com
-$discard,site=newbedev.com
-$discard,site=codenong.com
-$discard,site=routinepanic.com
-$discard,site=tousu.in
-$discard,site=tutorialmore.com
-$discard,site=titanwolf.org
-$discard,site=coderedirect.com
-$discard,site=fullstackuser.com
-$discard,site=ostack.cn
-$discard,site=wujigu.com
-$discard,site=webdevdesigner.com
-$discard,site=ghcc.net
-$discard,site=developreference.com
-$discard,site=semicolonworld.com
-$discard,site=tipsfordev.com
-$discard,site=qi-u.com
-$discard,site=xsprogram.com
-$discard,site=stackoom.com
-$discard,site=cndgn.com
-$discard,site=generacodice.com
-$discard,site=stackfinder.jp.net
-$discard,site=uebu-kaihatsu.jp.net
-$discard,site=sqlite.in
-$discard,site=stackguides.com
-$discard,site=younggeeks.in
-$discard,site=answerlib.com
-$discard,site=edupro.id
-$discard,site=stackfinder.ru
-$discard,site=desenv-web-rp.com
-$discard,site=web-dev-qa-db-pt.com
-$discard,site=jscodetips.com
-$discard,site=5axxw.com
-$discard,site=question-it.com
-$discard,site=codefaq.info
-$discard,site=codefaq.ru
-$discard,site=mediatagtw.com
-$discard,site=progi.pro
-$discard,site=elfishgene.com
-$discard,site=sysadminde.com
-$discard,site=answacode.com
-$discard,site=ask-dev.ru
-$discard,site=arip-photo.org
-$discard,site=jablogs.com
-$discard,site=jpdebug.com
-$discard,site=askcodez.com
-$discard,site=iquestion.pro
-$discard,site=ntcdoon.org
-$discard,site=programmierfrage.com
-$discard,site=microeducate.tech
-$discard,site=debugko.com
-$discard,site=devdreamz.com
-$discard,site=catwolf.org
-$discard,site=1r1g.com
-$discard,site=string.quest
-$discard,site=reddit.fun
-$discard,site=qa.icopy.site
-$discard,site=errorsfixing.com
-$discard,site=syntaxfix.com
-$discard,site=codegrepr.com
-$discard,site=quabr.com
-$discard,site=serveanswer.com
-$discard,site=safehavenpetrescue.org
-$discard,site=cainiaojiaocheng.com
-$discard,site=linuxfixes.com
-$discard,site=it-roy-ru.com
-$discard,site=web-dev-qa.com
-$discard,site=flutterhq.com
-$discard,site=dailydevsblog.com
-$discard,site=711web.com
-$discard,site=binarydevelop.com
-$discard,site=so.muouseo.com
-$discard,site=coder-solution-es.com
-$discard,site=peaku.co
-$discard,site=learnfk.com
-$discard,site=solveforum.com
-$discard,site=edureka.co
-$discard,site=itecnote.com
-$discard,site=tagsqa.com
-$discard,site=faqcode4u.com
-$discard,site=digitrain.ru
-$discard,site=prograide.com
-$discard,site=dovov.com
-$discard,site=oomake.com
-$discard,site=ajaxhispano.com
-$discard,site=codebaoku.com
-$discard,site=daplus.net
-$discard,site=questu.ru
-$discard,site=itranslater.com
-$discard,site=doraprojects.net
-$discard,site=iteramos.com
-$discard,site=faqcodes.com
-$discard,site=mejorcodigo.com
-$discard,site=anycodings.com
-$discard,site=javafixing.com
-$discard,site=xstack.us
-$discard,site=shenghuobao.net
-$discard,site=overstack.in
-$discard,site=zaizhele.cn
-$discard,site=zaizhele.net
-$discard,site=xstack.ru
-$discard,site=mlink.in
-$discard,site=jonic.cn
-$discard,site=jike.in
-$discard,site=16892.net
-$discard,site=vigges.net
-$discard,site=55276.net
-$discard,site=ogeek.cn
-$discard,site=shenzhenjia.net
-$discard,site=shenzhenjia.cn
-$discard,site=9ishenzhen.com
-$discard,site=vigge.net
-$discard,site=vigge.cn
-$discard,site=web-dev-qa-db-fra.com
-$discard,site=ape-ask.com
-$discard,site=yaoply.com
-$discard,site=techhelpnotes.com
-$discard,site=wp-qa.com
-$discard,site=querythreads.com
-$discard,site=appsloveworld.com
-$discard,site=dtuto.com
-$discard,site=qatop.pythonwood.com
-$discard,site=webdevask.com
 
-! Shitty Copy-Paste websites
-! source: https://raw.githubusercontent.com/stroobants-dev/ublock-origin-shitty-copies-filter/main/combined-list.txt
-$discard,site=laravelquestions.com
-$discard,site=py4u.net
-$discard,site=issues-world.com
-$discard,site=article.docway.net
-$discard,site=xiu2.net
-$discard,site=codehero.jp
-$discard,site=quabr.com
-$discard,site=webdevqa.jp.net
-$discard,site=exceptionshub.com
-$discard,site=pythonwd.com
-$discard,site=alwaysemmyhope.com
-$discard,site=pretagteam.com
-$discard,site=easysavecode.com
-$discard,site=stackqna.com
-$discard,site=imtqy.com
-$discard,site=christfever.in
-$discard,site=codersatellite.com
-$discard,site=coredump.biz
-$discard,site=farath.com
-$discard,site=devbugfix.com
-$discard,site=tech.wayne-chu.com
-$discard,site=stackify.dev
-$discard,site=webknox.com
-$discard,site=coder-solution-jp.com
-$discard,site=jpndev.com
-$discard,site=python-stack.de
-$discard,site=stackfault.net
-$discard,site=howtofix.io
-$discard,site=buzzphp.com
-$discard,site=askdev.vn
-$discard,site=quares.ru
-$discard,site=examplefiles.net
-$discard,site=codewdw.com
-$discard,site=jpcodeqa.com
-$discard,site=tutorialguruji.com
+// Shitty Copy-Paste websites
+// source: https://raw.githubusercontent.com/stroobants-dev/ublock-origin-shitty-copies-filter/main/combined-list.txt
+Rule {
+	Matches {
+		Site("laravelquestions.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("py4u.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("issues-world.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("article.docway.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("xiu2.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codehero.jp")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("quabr.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("webdevqa.jp.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("exceptionshub.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pythonwd.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("alwaysemmyhope.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("pretagteam.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("easysavecode.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackqna.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("imtqy.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("christfever.in")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codersatellite.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coredump.biz")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("farath.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("devbugfix.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tech.wayne-chu.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackify.dev")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("webknox.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("coder-solution-jp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jpndev.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("python-stack.de")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("stackfault.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("howtofix.io")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("buzzphp.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("askdev.vn")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("quares.ru")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("examplefiles.net")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("codewdw.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("jpcodeqa.com")
+	},
+	Action(Discard)
+};
+Rule {
+	Matches {
+		Site("tutorialguruji.com")
+	},
+	Action(Discard)
+}

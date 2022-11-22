@@ -83,10 +83,10 @@ impl LocalSearcher {
         de_rank_similar: bool,
     ) -> Result<InitialSearchResult> {
         let raw_query = query.original.clone();
-        let optic = query
-            .optic_program
-            .as_ref()
-            .and_then(|program| optics::parse(program).ok());
+        let optic = match query.optic_program.as_ref() {
+            Some(program) => Some(optics::parse(program)?),
+            None => None,
+        };
 
         let query_aggregator = optic
             .as_ref()

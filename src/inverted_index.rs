@@ -1199,7 +1199,7 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                &dbg!(format!(
+                &format!(
                     r#"
                     <html>
                         <head>
@@ -1215,7 +1215,7 @@ mod tests {
                         </body>
                     </html>
                 "#
-                )),
+                ),
                 "https://www.example.com",
             ))
             .expect("failed to insert webpage");
@@ -1226,7 +1226,7 @@ mod tests {
             .search(&query, ranker.collector())
             .expect("Search failed");
         assert_eq!(result.documents.len(), 1);
-        let schema = dbg!(result.documents[0].schema_org.clone());
+        let schema = result.documents[0].schema_org.clone();
 
         assert_eq!(schema.len(), 2);
 

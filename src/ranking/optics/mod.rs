@@ -18,6 +18,7 @@ const SCALE: f32 = 500.0;
 
 pub mod ast;
 mod const_query;
+mod lexer;
 mod pattern_query;
 
 use std::{collections::HashMap, convert::TryFrom};
@@ -29,18 +30,19 @@ use crate::{
     Result,
 };
 use itertools::Itertools;
+use logos::Logos;
 use tantivy::{
-    query::{BooleanQuery, BoostQuery, Occur, QueryClone, TermQuery},
-    schema::{IndexRecordOption, Schema},
+    query::{BooleanQuery, BoostQuery, Occur, QueryClone},
+    schema::Schema,
 };
 
 use self::{
-    ast::{RawAction, RawInstruction, RawOptic, RawPatternOption, RawPatternPart, Target},
+    ast::{RankingTarget, RawAction, RawMatchPart, RawOptic, RawRule},
     const_query::ConstQuery,
     pattern_query::PatternQuery,
 };
 
-use super::{signal::SignalAggregator, site_rankings::SiteRankings, Alteration, Signal};
+use super::{signal::SignalAggregator, site_rankings::SiteRankings, Signal};
 
 pub fn parse(optic: &str) -> Result<Optic> {
     let raw_optic = ast::parse(optic)?;
@@ -52,27 +54,26 @@ impl TryFrom<RawOptic> for Optic {
     type Error = crate::Error;
 
     fn try_from(raw: RawOptic) -> Result<Self> {
-        let mut instructions = Vec::new();
+        let mut rules = Vec::new();
 
-        for inst in raw.instructions {
-            instructions.push(Instruction::try_from(inst)?);
+        for rule in raw.rules {
+            rules.push(Rule::try_from(rule)?);
         }
 
         let mut boosts = HashMap::new();
         let mut coefficients = HashMap::new();
 
-        for alteration in raw.alterations {
-            let alteration = Alteration::try_from(alteration)?;
-            match alteration.target {
-                Target::Signal(name) => {
+        for ranking in raw.rankings {
+            match ranking.target {
+                RankingTarget::Signal(name) => {
                     if let Some(signal) = Signal::from_string(name) {
-                        coefficients.insert(signal, alteration.score);
+                        coefficients.insert(signal, ranking.score);
                     }
                 }
-                Target::Field(name) => {
+                RankingTarget::Field(name) => {
                     if let Some(field) = Field::from_name(name) {
                         if let Some(text_field) = field.as_text() {
-                            boosts.insert(text_field, alteration.score);
+                            boosts.insert(text_field, ranking.score);
                         }
                     }
                 }
@@ -84,15 +85,16 @@ impl TryFrom<RawOptic> for Optic {
 
         for pref in raw.site_preferences {
             match pref {
-                ast::RawSitePreference::Liked(mut sites) => liked_sites.append(&mut sites),
-                ast::RawSitePreference::Disliked(mut sites) => disliked_sites.append(&mut sites),
+                ast::RawSitePreference::Like(site) => liked_sites.push(site),
+                ast::RawSitePreference::Dislike(site) => disliked_sites.push(site),
             }
         }
 
         Ok(Self {
-            instructions,
+            rules,
             coefficients,
             boosts,
+            discard_non_matching: raw.discard_non_matching,
             site_rankings: SiteRankings {
                 liked: liked_sites,
                 disliked: disliked_sites,
@@ -102,89 +104,157 @@ impl TryFrom<RawOptic> for Optic {
     }
 }
 
-impl TryFrom<RawInstruction> for Instruction {
+impl TryFrom<RawRule> for Rule {
     type Error = crate::Error;
 
-    fn try_from(value: RawInstruction) -> Result<Self> {
-        let mut patterns = Vec::new();
+    fn try_from(raw: RawRule) -> Result<Self> {
+        let mut matches = Vec::new();
 
-        for pattern in value.patterns {
-            patterns.push(pattern.into());
+        for matching in raw.matches.0 {
+            matches.push(matching.try_into()?);
         }
 
-        let mut options = Vec::new();
-
-        for option in value.options {
-            options.push(option.try_into()?);
-        }
-
-        Ok(Instruction { patterns, options })
+        Ok(Rule {
+            matches,
+            action: raw.action.map(Action::from).unwrap_or(Action::Boost(1)),
+        })
     }
 }
 
-impl From<RawPatternPart> for PatternPart {
-    fn from(value: RawPatternPart) -> Self {
+impl From<RawAction> for Action {
+    fn from(value: RawAction) -> Self {
         match value {
-            RawPatternPart::Raw(text) => PatternPart::Raw(text),
-            RawPatternPart::Wildcard => PatternPart::Wildcard,
-            RawPatternPart::Delimeter => PatternPart::Delimeter,
-            RawPatternPart::Anchor => PatternPart::Anchor,
-        }
-    }
-}
-impl TryFrom<RawPatternOption> for PatternOption {
-    type Error = crate::Error;
-
-    fn try_from(value: RawPatternOption) -> Result<Self> {
-        let res = match value {
-            RawPatternOption::Site(site) => PatternOption::Site(site),
-            RawPatternOption::InUrl => PatternOption::InUrl,
-            RawPatternOption::InTitle => PatternOption::InTitle,
-            RawPatternOption::InDescription => PatternOption::InDescription,
-            RawPatternOption::InContent => PatternOption::InContent,
-            RawPatternOption::Action(action) => PatternOption::Action(action.try_into()?),
-        };
-
-        Ok(res)
-    }
-}
-
-impl TryFrom<RawAction> for Action {
-    type Error = crate::Error;
-
-    fn try_from(value: RawAction) -> Result<Self> {
-        let res = match value {
-            RawAction::Boost(boost) => Action::Boost(boost.parse()?),
-            RawAction::Downrank(down_boost) => Action::Downrank(down_boost.parse()?),
+            RawAction::Boost(boost) => Action::Boost(boost),
+            RawAction::Downrank(down_boost) => Action::Downrank(down_boost),
             RawAction::Discard => Action::Discard,
-        };
-
-        Ok(res)
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Instruction {
-    pub patterns: Vec<PatternPart>,
-    pub options: Vec<PatternOption>,
+pub struct Matching {
+    pub pattern: Vec<PatternPart>,
+    pub location: MatchLocation,
+}
+
+impl Matching {
+    fn pattern_query(&self, schema: &tantivy::schema::Schema) -> Box<dyn tantivy::query::Query> {
+        match &self.location {
+            MatchLocation::Site => {
+                let site_field = schema
+                    .get_field(Field::Text(TextField::Site).name())
+                    .unwrap();
+
+                PatternQuery::new(self.pattern.clone(), site_field).box_clone()
+            }
+            MatchLocation::Url => {
+                let field = schema
+                    .get_field(Field::Text(TextField::Url).name())
+                    .unwrap();
+
+                PatternQuery::new(self.pattern.clone(), field).box_clone()
+            }
+            MatchLocation::Domain => {
+                let field = schema
+                    .get_field(Field::Text(TextField::Domain).name())
+                    .unwrap();
+
+                PatternQuery::new(self.pattern.clone(), field).box_clone()
+            }
+            MatchLocation::Title => {
+                let field = schema
+                    .get_field(Field::Text(TextField::Title).name())
+                    .unwrap();
+
+                PatternQuery::new(self.pattern.clone(), field).box_clone()
+            }
+            MatchLocation::Description => {
+                let desc_field = schema
+                    .get_field(Field::Text(TextField::Description).name())
+                    .unwrap();
+
+                let dmoz_desc_field = schema
+                    .get_field(Field::Text(TextField::DmozDescription).name())
+                    .unwrap();
+
+                UnionQuery::from(vec![
+                    PatternQuery::new(self.pattern.clone(), desc_field).box_clone(),
+                    PatternQuery::new(self.pattern.clone(), dmoz_desc_field).box_clone(),
+                ])
+                .box_clone()
+            }
+            MatchLocation::Content => {
+                let field = schema
+                    .get_field(Field::Text(TextField::CleanBody).name())
+                    .unwrap();
+
+                PatternQuery::new(self.pattern.clone(), field).box_clone()
+            }
+        }
+    }
+}
+
+impl TryFrom<RawMatchPart> for Matching {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawMatchPart) -> Result<Self> {
+        let (s, loc) = match raw {
+            RawMatchPart::Site(s) => (s, MatchLocation::Site),
+            RawMatchPart::Url(s) => (s, MatchLocation::Url),
+            RawMatchPart::Domain(s) => (s, MatchLocation::Domain),
+            RawMatchPart::Title(s) => (s, MatchLocation::Title),
+            RawMatchPart::Description(s) => (s, MatchLocation::Description),
+            RawMatchPart::Content(s) => (s, MatchLocation::Content),
+        };
+
+        let mut pattern = Vec::new();
+
+        for tok in PatternToken::lexer(&s) {
+            match tok {
+                PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
+                PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
+                PatternToken::Anchor => pattern.push(PatternPart::Anchor),
+                PatternToken::Error => return Err(crate::Error::Parse),
+            }
+        }
+
+        Ok(Self {
+            location: loc,
+            pattern,
+        })
+    }
+}
+
+#[derive(Logos, Debug)]
+enum PatternToken {
+    #[regex(".*", |lex| lex.slice().to_string())]
+    Raw(String),
+
+    #[token("*")]
+    Wildcard,
+
+    #[token("|")]
+    Anchor,
+
+    #[error]
+    Error,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PatternPart {
     Raw(String),
     Wildcard,
-    Delimeter,
     Anchor,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum PatternOption {
-    Site(String),
-    InUrl,
-    InTitle,
-    InDescription,
-    InContent,
-    Action(Action),
+pub enum MatchLocation {
+    Site,
+    Url,
+    Domain,
+    Title,
+    Description,
+    Content,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -199,41 +269,40 @@ pub struct Optic {
     pub coefficients: HashMap<Signal, f64>,
     pub boosts: HashMap<TextField, f64>,
     pub site_rankings: SiteRankings,
-    pub instructions: Vec<Instruction>,
+    pub rules: Vec<Rule>,
+    pub discard_non_matching: bool,
 }
 
 impl Optic {
     pub fn as_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
-        if self
-            .instructions
-            .iter()
-            .any(|instruction| instruction.is_empty_discard())
-        {
+        if self.discard_non_matching {
             vec![(
                 Occur::Must,
                 UnionQuery::from(
-                    self.instructions
+                    self.rules
                         .iter()
-                        .chain(self.site_rankings.instructions().iter())
-                        .filter_map(|instruction| instruction.as_tantivy(schema))
+                        .chain(self.site_rankings.rules().iter())
+                        .filter_map(|rule| rule.as_tantivy(schema))
                         .map(|query| BooleanQuery::from(vec![query]).box_clone())
                         .collect_vec(),
                 )
                 .box_clone(),
             )]
         } else {
-            self.instructions
+            self.rules
                 .iter()
-                .chain(self.site_rankings.instructions().iter())
-                .filter_map(|instruction| instruction.as_tantivy(schema))
+                .chain(self.site_rankings.rules().iter())
+                .filter_map(|rule| rule.as_tantivy(schema))
                 .collect()
         }
     }
 
     pub fn merge(mut self, mut other: Self) -> Self {
-        self.instructions.append(&mut other.instructions);
+        self.rules.append(&mut other.rules);
         self.coefficients.extend(other.coefficients.into_iter());
         self.boosts.extend(other.boosts.into_iter());
+
+        self.discard_non_matching |= other.discard_non_matching;
 
         self.site_rankings
             .liked
@@ -264,92 +333,19 @@ impl Optic {
     }
 }
 
-fn process_site(site: &str, field: tantivy::schema::Field) -> Box<dyn tantivy::query::Query> {
-    let term = tantivy::Term::from_field_text(field, site);
-    Box::new(TermQuery::new(
-        term,
-        IndexRecordOption::WithFreqsAndPositions,
-    ))
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Rule {
+    pub matches: Vec<Matching>,
+    pub action: Action,
 }
 
-impl Instruction {
+impl Rule {
     pub fn as_tantivy(&self, schema: &Schema) -> Option<(Occur, Box<dyn tantivy::query::Query>)> {
-        let mut subqueries = Vec::new();
-
-        let mut field = None;
-        let mut action = None;
-
-        for option in &self.options {
-            match option {
-                PatternOption::Site(site) if field.is_none() => {
-                    field = Some(
-                        schema
-                            .get_field(Field::Text(TextField::Site).name())
-                            .unwrap(),
-                    );
-
-                    let domain_field = schema
-                        .get_field(Field::Text(TextField::DomainNoTokenizer).name())
-                        .unwrap();
-                    let site_field = schema
-                        .get_field(Field::Text(TextField::SiteNoTokenizer).name())
-                        .unwrap();
-
-                    subqueries.push((
-                        Occur::Must,
-                        UnionQuery::from(vec![
-                            process_site(site, domain_field),
-                            process_site(site, site_field),
-                        ])
-                        .box_clone(),
-                    ));
-                }
-                PatternOption::InUrl if field.is_none() => {
-                    field = Some(
-                        schema
-                            .get_field(Field::Text(TextField::Url).name())
-                            .unwrap(),
-                    )
-                }
-                PatternOption::InTitle if field.is_none() => {
-                    field = Some(
-                        schema
-                            .get_field(Field::Text(TextField::Title).name())
-                            .unwrap(),
-                    )
-                }
-                PatternOption::InDescription if field.is_none() => {
-                    field = Some(
-                        schema
-                            .get_field(Field::Text(TextField::Description).name())
-                            .unwrap(),
-                    )
-                }
-                PatternOption::InContent if field.is_none() => {
-                    field = Some(
-                        schema
-                            .get_field(Field::Text(TextField::CleanBody).name())
-                            .unwrap(),
-                    )
-                }
-                PatternOption::Action(pattern_action) if action.is_none() => {
-                    action = Some(*pattern_action)
-                }
-                _ => {}
-            }
-        }
-
-        let action = action.unwrap_or(Action::Boost(1));
-        let field = field.unwrap_or_else(|| {
-            schema
-                .get_field(Field::Text(TextField::Url).name())
-                .unwrap()
-        });
-
-        if !self.patterns.is_empty() {
-            let query = self.pattern_query(field);
-            subqueries.push((Occur::Must, query));
-        }
+        let mut subqueries: Vec<_> = self
+            .matches
+            .iter()
+            .map(|matching| (Occur::Must, matching.pattern_query(schema)))
+            .collect();
 
         if subqueries.is_empty() {
             return None;
@@ -361,12 +357,12 @@ impl Instruction {
             BooleanQuery::from(subqueries).box_clone()
         };
 
-        match action {
+        match &self.action {
             Action::Boost(boost) => Some((
                 Occur::Should,
                 BoostQuery::new(
                     ConstQuery::new(subquery, 1.0).box_clone(),
-                    boost as f32 * SCALE,
+                    *boost as f32 * SCALE,
                 )
                 .box_clone(),
             )),
@@ -374,25 +370,12 @@ impl Instruction {
                 Occur::Should,
                 BoostQuery::new(
                     ConstQuery::new(subquery, 1.0).box_clone(),
-                    boost as f32 * -SCALE,
+                    *boost as f32 * -SCALE,
                 )
                 .box_clone(),
             )),
             Action::Discard => Some((Occur::MustNot, subquery)),
         }
-    }
-
-    fn pattern_query(&self, field: tantivy::schema::Field) -> Box<dyn tantivy::query::Query> {
-        PatternQuery::new(self.patterns.clone(), field).box_clone()
-    }
-
-    fn is_empty_discard(&self) -> bool {
-        self.patterns.is_empty()
-            && self.options.len() == 1
-            && matches!(
-                self.options.first(),
-                Some(PatternOption::Action(Action::Discard))
-            )
     }
 }
 
@@ -465,7 +448,7 @@ mod tests {
                     "https://www.b.com",
                 ),
                 backlinks: vec![],
-                host_centrality: 0.0001,
+                host_centrality: 0.01,
                 page_centrality: 0.0,
                 primary_image: None,
                 pre_computed_score: 0.0,
@@ -504,7 +487,12 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        $discard,site=b.com
+                        Rule {
+                            Matches {
+                                Domain("b.com")
+                            },
+                            Action(Discard)
+                        }
                     "#
                     .to_string(),
                 ),
@@ -526,7 +514,12 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        $boost=10,site=a.com
+                        Rule {
+                            Matches {
+                                Domain("a.com")
+                            },
+                            Action(Boost(10))
+                        }
                     "#
                     .to_string(),
                 ),
@@ -772,9 +765,19 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                $discard
-                $site=a.com,boost=6
-                $site=b.com,boost=1
+                    DiscardNonMatching;
+                    Rule {
+                        Matches {
+                            Domain("a.com")
+                        },
+                        Action(Boost(6))
+                    };
+                    Rule {
+                        Matches {
+                            Domain("b.com")
+                        },
+                        Action(Boost(1))
+                    };
                 "#
                     .to_string(),
                 ),
@@ -937,13 +940,9 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                    liked = [
-                        www.a.com,
-                        www.b.com,
-                    ]
-                    disliked = [
-                        www.c.com,
-                    ]
+                    Like(Site("www.a.com"));
+                    Like(Site("www.b.com"));
+                    Dislike(Site("www.c.com"));
                 "#
                     .to_string(),
                 ),

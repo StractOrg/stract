@@ -17,115 +17,109 @@
 use crate::Error;
 use crate::Result as CrateResult;
 use lalrpop_util::lalrpop_mod;
-use regex::Regex;
+
+use super::lexer;
 
 lalrpop_mod!(pub parser, "/ranking/optics/parser.rs");
 
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Target {
+#[derive(Debug, PartialEq)]
+pub enum RankingTarget {
     Signal(String),
     Field(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct RawAlteration {
-    pub target: Target,
-    pub score: String,
+#[derive(Debug, PartialEq)]
+pub struct RankingCoeff {
+    pub target: RankingTarget,
+    pub score: f64,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct RawOptic {
-    pub comments: Vec<Comment>,
-    pub instructions: Vec<RawInstruction>,
-    pub alterations: Vec<RawAlteration>,
+    pub rules: Vec<RawRule>,
+    pub rankings: Vec<RankingCoeff>,
     pub site_preferences: Vec<RawSitePreference>,
+    pub discard_non_matching: bool,
 }
 
-impl From<Vec<OpticBlock>> for RawOptic {
-    fn from(blocks: Vec<OpticBlock>) -> Self {
-        let mut alterations = Vec::new();
-        let mut comments = Vec::new();
-        let mut instructions = Vec::new();
+impl From<Vec<RawOpticBlock>> for RawOptic {
+    fn from(blocks: Vec<RawOpticBlock>) -> Self {
+        let mut rules = Vec::new();
+        let mut rankings = Vec::new();
         let mut site_preferences = Vec::new();
+        let mut discard_non_matching = false;
 
         for block in blocks {
             match block {
-                OpticBlock::Comment(comment) => comments.push(comment),
-                OpticBlock::Instruction(instruction) => instructions.push(instruction),
-                OpticBlock::Alteration(alteration) => alterations.push(alteration),
-                OpticBlock::SitePreference(pref) => site_preferences.push(pref),
+                RawOpticBlock::Ranking(ranking) => rankings.push(ranking),
+                RawOpticBlock::Rule(rule) => rules.push(rule),
+                RawOpticBlock::SitePreference(pref) => site_preferences.push(pref),
+                RawOpticBlock::DiscardNonMatching => discard_non_matching = true,
             }
         }
 
         RawOptic {
-            comments,
-            instructions,
-            alterations,
+            rankings,
+            rules,
             site_preferences,
+            discard_non_matching,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum OpticBlock {
-    Comment(Comment),
-    Instruction(RawInstruction),
-    Alteration(RawAlteration),
+#[derive(Debug)]
+pub enum RawOpticBlock {
+    Rule(RawRule),
     SitePreference(RawSitePreference),
+    Ranking(RankingCoeff),
+    DiscardNonMatching,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Comment {
-    Basic(String),
-    Header { key: String, value: String },
+#[derive(Debug, PartialEq)]
+pub struct RawRule {
+    pub matches: RawMatchBlock,
+    pub action: Option<RawAction>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct RawInstruction {
-    pub patterns: Vec<RawPatternPart>,
-    pub options: Vec<RawPatternOption>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum RawSitePreference {
-    Liked(Vec<String>),
-    Disliked(Vec<String>),
+    Like(String),
+    Dislike(String),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RawPatternPart {
-    Raw(String),
-    Wildcard,
-    Delimeter,
-    Anchor,
-}
+#[derive(Debug, PartialEq, Clone)]
+pub struct RawMatchBlock(pub Vec<RawMatchPart>);
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum RawPatternOption {
+#[derive(Debug, PartialEq, Clone)]
+pub enum RawMatchPart {
     Site(String),
-    InUrl,
-    InTitle,
-    InDescription,
-    InContent,
-    Action(RawAction),
+    Url(String),
+    Domain(String),
+    Title(String),
+    Description(String),
+    Content(String),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+// #[derive(Debug, Clone)]
+// pub enum RawStringMatchPattern {
+//     Raw(String),
+//     Wildcard,
+//     Delimeter,
+//     Anchor,
+// }
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum RawAction {
-    Boost(String),
-    Downrank(String),
+    Boost(u64),
+    Downrank(u64),
     Discard,
 }
 
 pub fn parse(optic: &str) -> CrateResult<RawOptic> {
-    let newlines = Regex::new(r"[\n]+").unwrap();
-    let clean = newlines.replace_all(optic.trim(), "\n").to_string();
-    let clean = clean.trim().replace(['\n', '\r'], ";");
-
-    match PARSER.parse(clean.as_str()) {
+    match PARSER.parse(lexer::lex(optic)) {
         Ok(blocks) => Ok(RawOptic::from(blocks)),
         Err(_) => Err(Error::Parse),
     }
@@ -139,139 +133,149 @@ mod tests {
     fn simple() {
         let optic = parse(
             r#"
-            ! name: test
-            ! this is a normal comment
-            @host_centrality = 3
-            ! this is a normal comment
-            @bm25 = 100
-            @field_url = 2
-            /this/is/*/pattern
-            /blog/$site=example.com
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            optic.alterations,
-            vec![
-                RawAlteration {
-                    target: Target::Signal("host_centrality".to_string()),
-                    score: "3".to_string(),
-                },
-                RawAlteration {
-                    target: Target::Signal("bm25".to_string()),
-                    score: "100".to_string()
-                },
-                RawAlteration {
-                    target: Target::Field("url".to_string()),
-                    score: "2".to_string()
+            // this is a normal comment
+            Ranking(Signal("host_centrality"), 3);
+            /*
+                this is a block comment
+             */
+            Ranking(Signal("bm25"), 100);
+            Ranking(Field("url"), 2);
+            Rule {
+                Matches {
+                    Url("/this/is/a/*/pattern")
                 }
-            ]
-        );
-
-        assert_eq!(
-            optic.comments,
-            vec![
-                Comment::Header {
-                    key: "name".to_string(),
-                    value: "test".to_string()
-                },
-                Comment::Basic("! this is a normal comment".to_string()),
-                Comment::Basic("! this is a normal comment".to_string()),
-            ]
-        );
-
-        assert_eq!(
-            optic.instructions,
-            vec![
-                RawInstruction {
-                    patterns: vec![
-                        RawPatternPart::Raw("/this/is/".to_string()),
-                        RawPatternPart::Wildcard,
-                        RawPatternPart::Raw("/pattern".to_string())
-                    ],
-                    options: vec![]
-                },
-                RawInstruction {
-                    patterns: vec![RawPatternPart::Raw("/blog/".to_string()),],
-                    options: vec![RawPatternOption::Site("example.com".to_string())]
-                },
-            ]
-        )
-    }
-
-    #[test]
-    fn advanced_urls() {
-        let optic = parse(
-            r#"
-            https://www.example.com?@hej
+            };
+            Rule {
+                Matches {
+                    Url("/this/is/a/pattern"),
+                    Site("example.com")
+                }
+            }
         "#,
         )
         .unwrap();
 
         assert_eq!(
-            optic.instructions,
-            vec![RawInstruction {
-                patterns: vec![RawPatternPart::Raw(
-                    "https://www.example.com?@hej".to_string()
-                ),],
-                options: vec![]
-            },]
-        );
-
-        let optic = parse(
-            r#"
-            https://www.example.com?@hej$site=https://www.example.com
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            optic.instructions,
-            vec![RawInstruction {
-                patterns: vec![RawPatternPart::Raw(
-                    "https://www.example.com?@hej".to_string()
-                ),],
-                options: vec![RawPatternOption::Site(
-                    "https://www.example.com".to_string()
-                )]
-            },]
+            optic,
+            RawOptic {
+                rules: vec![
+                    RawRule {
+                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                            "/this/is/a/*/pattern".to_string()
+                        )]),
+                        action: None,
+                    },
+                    RawRule {
+                        matches: RawMatchBlock(vec![
+                            RawMatchPart::Url("/this/is/a/pattern".to_string()),
+                            RawMatchPart::Site("example.com".to_string()),
+                        ],),
+                        action: None,
+                    },
+                ],
+                rankings: vec![
+                    RankingCoeff {
+                        target: RankingTarget::Signal("host_centrality".to_string()),
+                        score: 3.0,
+                    },
+                    RankingCoeff {
+                        target: RankingTarget::Signal("bm25".to_string()),
+                        score: 100.0,
+                    },
+                    RankingCoeff {
+                        target: RankingTarget::Field("url".to_string()),
+                        score: 2.0,
+                    },
+                ],
+                site_preferences: vec![],
+                discard_non_matching: false,
+            }
         );
     }
 
     #[test]
-    fn ignore_consecutive_newlines() {
+    fn actions() {
         let optic = parse(
             r#"
-            |pattern1|
-
-
-
-
-            pattern2^
+            Rule {
+                Matches {
+                    Url("/this/is/a/*/pattern")
+                },
+                Action(Boost(2))
+            };
+            Rule {
+                Matches {
+                    Site("example.com"),
+                },
+                Action(Downrank(4))
+            };
         "#,
         )
         .unwrap();
+
         assert_eq!(
-            optic.instructions,
-            vec![
-                RawInstruction {
-                    patterns: vec![
-                        RawPatternPart::Anchor,
-                        RawPatternPart::Raw("pattern1".to_string()),
-                        RawPatternPart::Anchor,
-                    ],
-                    options: vec![]
+            optic,
+            RawOptic {
+                rules: vec![
+                    RawRule {
+                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                            "/this/is/a/*/pattern".to_string()
+                        )]),
+                        action: Some(RawAction::Boost(2)),
+                    },
+                    RawRule {
+                        matches: RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())],),
+                        action: Some(RawAction::Downrank(4)),
+                    },
+                ],
+                rankings: vec![],
+                site_preferences: vec![],
+                discard_non_matching: false,
+            }
+        );
+    }
+
+    #[test]
+    fn discard_non_matching() {
+        let optic = parse(
+            r#"
+            DiscardNonMatching;
+            Rule {
+                Matches {
+                    Url("/this/is/a/*/pattern")
                 },
-                RawInstruction {
-                    patterns: vec![
-                        RawPatternPart::Raw("pattern2".to_string()),
-                        RawPatternPart::Delimeter,
-                    ],
-                    options: vec![]
+                Action(Boost(2))
+            };
+            Rule {
+                Matches {
+                    Site("example.com"),
                 },
-            ]
+                Action(Downrank(4))
+            };
+        "#,
         )
+        .unwrap();
+
+        assert_eq!(
+            optic,
+            RawOptic {
+                rules: vec![
+                    RawRule {
+                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                            "/this/is/a/*/pattern".to_string()
+                        )]),
+                        action: Some(RawAction::Boost(2)),
+                    },
+                    RawRule {
+                        matches: RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())],),
+                        action: Some(RawAction::Downrank(4)),
+                    },
+                ],
+                rankings: vec![],
+                site_preferences: vec![],
+                discard_non_matching: true,
+            }
+        );
     }
 
     #[test]

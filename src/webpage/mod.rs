@@ -568,6 +568,16 @@ impl Html {
         self.pretokenize_string(url)
     }
 
+    fn pretokenize_domain(&self) -> PreTokenizedString {
+        let domain = self.url().domain().to_string();
+        self.pretokenize_string(domain)
+    }
+
+    fn pretokenize_site(&self) -> PreTokenizedString {
+        let site = self.url().site().to_string();
+        self.pretokenize_string(site)
+    }
+
     fn pretokenize_description(&self) -> PreTokenizedString {
         let text = self.description().unwrap_or_default();
 
@@ -604,6 +614,8 @@ impl Html {
         let all_text = self.pretokenize_all_text()?;
         let clean_text = self.pretokenize_clean_text();
         let url = self.pretokenize_url();
+        let domain = self.pretokenize_domain();
+        let site = self.pretokenize_site();
         let description = self.pretokenize_description();
 
         for field in &ALL_FIELDS {
@@ -648,8 +660,12 @@ impl Html {
                 Field::Text(TextField::Url) => {
                     doc.add_pre_tokenized_text(tantivy_field, url.clone())
                 }
-                Field::Text(TextField::Site) => doc.add_text(tantivy_field, self.url().site()),
-                Field::Text(TextField::Domain) => doc.add_text(tantivy_field, self.url().domain()),
+                Field::Text(TextField::Site) => {
+                    doc.add_pre_tokenized_text(tantivy_field, site.clone())
+                }
+                Field::Text(TextField::Domain) => {
+                    doc.add_pre_tokenized_text(tantivy_field, domain.clone())
+                }
                 Field::Text(TextField::SiteNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
@@ -737,6 +753,12 @@ impl Html {
                 }
                 Field::Fast(FastField::NumDescriptionTokens) => {
                     doc.add_u64(tantivy_field, description.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumSiteTokens) => {
+                    doc.add_u64(tantivy_field, site.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumDomainTokens) => {
+                    doc.add_u64(tantivy_field, domain.tokens.len() as u64)
                 }
                 Field::Fast(FastField::SiteHash) => {
                     let hash = hash(self.url().site()).0;

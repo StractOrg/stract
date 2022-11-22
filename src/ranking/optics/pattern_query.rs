@@ -55,7 +55,6 @@ impl PatternQuery {
                     }
                 }
                 PatternPart::Wildcard => {}
-                PatternPart::Delimeter => {}
                 PatternPart::Anchor => {}
             }
         }
@@ -95,7 +94,6 @@ impl tantivy::query::Query for PatternQuery {
 enum SmallPatternPart {
     Term,
     Wildcard,
-    Delimeter,
     Anchor,
 }
 
@@ -143,7 +141,6 @@ impl PatternWeight {
             .map(|pattern| match pattern {
                 PatternPart::Raw(_) => SmallPatternPart::Term,
                 PatternPart::Wildcard => SmallPatternPart::Wildcard,
-                PatternPart::Delimeter => SmallPatternPart::Delimeter,
                 PatternPart::Anchor => SmallPatternPart::Anchor,
             })
             .collect();
@@ -165,6 +162,18 @@ impl PatternWeight {
                 reader
                     .schema()
                     .get_field(Field::Fast(FastField::NumUrlTokens).name())
+                    .unwrap(),
+            ),
+            Field::Text(TextField::Domain) => reader.fast_fields().u64(
+                reader
+                    .schema()
+                    .get_field(Field::Fast(FastField::NumDomainTokens).name())
+                    .unwrap(),
+            ),
+            Field::Text(TextField::Site) => reader.fast_fields().u64(
+                reader
+                    .schema()
+                    .get_field(Field::Fast(FastField::NumSiteTokens).name())
                     .unwrap(),
             ),
             Field::Text(TextField::Description) => reader.fast_fields().u64(
@@ -313,7 +322,6 @@ impl PatternScorer {
                 SmallPatternPart::Wildcard => {
                     slop = u32::MAX;
                 }
-                SmallPatternPart::Delimeter => {}
                 SmallPatternPart::Anchor if i == 0 => {
                     if let Some(pos) = self.left.first() {
                         if *pos != 0 {

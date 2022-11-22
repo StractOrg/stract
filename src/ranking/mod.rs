@@ -788,8 +788,8 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        @field_title = 20000000
-                        @host_centrality = 0
+                        Ranking(Field("title"), 20000000);
+                        Ranking(Signal("host_centrality"), 0);
                     "#
                     .to_string(),
                 ),
@@ -809,28 +809,7 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        @field_all_body = 20000000
-                        @host_centrality = 0
-                    "#
-                    .to_string(),
-                ),
-                skip_pages: None,
-                site_rankings: None,
-            })
-            .unwrap()
-            .into_websites()
-            .unwrap();
-
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.body.com");
-
-        let res = searcher
-            .search(&SearchQuery {
-                original: "example".to_string(),
-                selected_region: None,
-                optic_program: Some(
-                    r#"
-                        @host_centrality = 2000000
+                        Ranking(Signal("host_centrality"), 2000000);
                     "#
                     .to_string(),
                 ),
