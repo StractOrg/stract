@@ -1,0 +1,472 @@
+{
+  "index_settings": {
+    "sort_by_field": {
+      "field": "pre_computed_score",
+      "order": "Desc"
+    },
+    "docstore_compression": "lz4",
+    "docstore_blocksize": 16384
+  },
+  "segments": [],
+  "schema": [
+    {
+      "name": "title",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "body",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "stemmed_title",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "stemmed_tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "stemmed_body",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "stemmed_tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "all_body",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "url",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "site",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "domain",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "site_no_tokenizer",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "identity_tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "domain_no_tokenizer",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "identity_tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "domain_if_homepage",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "domain_name_if_homepage_no_tokenizer",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "identity_tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "title_if_homepage",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "backlink_text",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": false,
+        "fast": false
+      }
+    },
+    {
+      "name": "primary_image_uuid",
+      "type": "bytes",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": false,
+        "stored": true
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "host_topic",
+      "type": "facet",
+      "options": {
+        "stored": false
+      }
+    },
+    {
+      "name": "dmoz_description",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "schema_org_json",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "basic",
+          "fieldnorms": true,
+          "tokenizer": "identity_tokenizer"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "is_homepage",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "host_centrality",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "page_centrality",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "fetch_time_ms",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "last_updated",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": true
+      }
+    },
+    {
+      "name": "num_trackers",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "region",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": true
+      }
+    },
+    {
+      "name": "num_url_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "num_title_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "num_clean_body_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "num_description_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "num_domain_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "num_site_tokens",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    },
+    {
+      "name": "site_hash",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "multi",
+        "stored": false
+      }
+    },
+    {
+      "name": "url_without_query_hash",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "multi",
+        "stored": false
+      }
+    },
+    {
+      "name": "title_hash",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "multi",
+        "stored": false
+      }
+    },
+    {
+      "name": "url_hash",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "multi",
+        "stored": false
+      }
+    },
+    {
+      "name": "domain_hash",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "multi",
+        "stored": false
+      }
+    },
+    {
+      "name": "pre_computed_score",
+      "type": "f64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": true
+      }
+    },
+    {
+      "name": "host_node_id",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": true
+      }
+    },
+    {
+      "name": "sim_hash",
+      "type": "u64",
+      "options": {
+        "indexed": true,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": true
+      }
+    },
+    {
+      "name": "crawl_stability",
+      "type": "u64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": "single",
+        "stored": false
+      }
+    }
+  ],
+  "opstamp": 0
+}

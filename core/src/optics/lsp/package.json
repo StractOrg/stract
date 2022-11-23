@@ -1,0 +1,48 @@
+{
+    "name": "optic",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.73.0"
+    },
+    "publisher": "Cuely",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -b"
+    },
+    "main": "target/extension",
+    "activationEvents": [
+        "onLanguage:optic"
+    ],
+    "dependencies": {
+        "vscode-languageclient": "^7.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^17.0.35",
+        "@types/vscode": "^1.63.0",
+        "typescript": "^4.7.2"
+    },
+    "contributes": {
+        "languages": [
+            {
+                "id": "optic",
+                "aliases": [
+                    "Optic",
+                    "optic",
+                    "Optics",
+                    "optics"
+                ],
+                "extensions": [
+                    ".optic"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "optic",
+                "scopeName": "source.optic",
+                "path": "./optic.tmLanguage.json"
+            }
+        ]
+    }
+}

@@ -7,9 +7,6 @@
     cargo run --release -- webgraph local configs/webgraph/local.toml
 
 @frontend-rerun:
-    # To inspect timings use the commands below instead:
-    # time ((cd frontend; npm run build) && cargo build)
-    # cargo run -- frontend data/index data/queries_us.csv data/entity data/bangs.json
     cd frontend; npm run build
     bash scripts/run_frontend.sh
 

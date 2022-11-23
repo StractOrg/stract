@@ -1,0 +1,81 @@
+{
+  "scopeName": "source.optic",
+  "patterns": [
+    {
+      "include": "#expression"
+    }
+  ],
+  "repository": {
+    "expression": {
+      "patterns": [
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#control"
+        },
+        {
+          "include": "#punctuation"
+        },
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        }
+      ]
+    },
+    "keywords": {
+      "match": "\\b(Matches|Signal|Field|Site|Url|Domain|Title|Description|Content|Action|Boost|Downrank|Discard)\\b",
+      "name": "entity.name.function"
+    },
+    "control": {
+      "match": "\\b(DiscardNonMatching|Rule|Ranking|Like|Dislike)\\b",
+      "name": "keyword.control"
+    },
+    "punctuation": {
+      "match": ",|;",
+      "name": "punctuation.separator"
+    },
+    "strings": {
+      "name": "string.quoted.double.optic",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.optic",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block",
+          "begin": "(\\/\\*)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.comment"
+            }
+          },
+          "end": "(\\*\\/)",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.comment"
+            }
+          }
+        },
+        {
+          "name": "comment.line.double-slash",
+          "begin": "(\\/\\/)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.comment"
+            }
+          },
+          "end": "(?:\\n|$)"
+        }
+      ]
+    }
+  }
+}
