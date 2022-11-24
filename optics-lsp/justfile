@@ -1,0 +1,4 @@
+@build:
+    rm -rf out
+    wasm-pack build --release --target nodejs --out-dir out
+    rm -f out/package.json

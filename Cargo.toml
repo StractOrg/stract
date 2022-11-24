@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "core"
+    "core",
+    "optics-lsp"
 ]
 
 [profile.release]
@@ -59,10 +60,11 @@ urlencoding = "2.1.2"
 rusoto_s3 = { version = "0.48.0", features = ["rustls"], default-features = false }
 rusoto_core = { version = "0.48.0", default-features = false, features = ["rustls"] }
 bitvec = "1.0.1"
-miette = "5.4.1"
-tower-lsp = "0.17.0"
 wasm-bindgen = "0.2.83"
-wasm-bindgen-futures = "0.4.33"
 criterion = "0.3.6"
 maplit = "1.0.2"
 rand = "0.8.5"
+lsp-types = "0.93.2"
+js-sys = "0.3.60"
+console_error_panic_hook = "0.1.7"
+serde-wasm-bindgen = "0.4.5"

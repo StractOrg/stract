@@ -148,18 +148,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "auto_impl"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7862e21c893d65a1650125d157eaeec691439379a1cee17ee49031b79236ada4"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -537,6 +525,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,7 +764,6 @@ dependencies = [
  "maplit",
  "md5",
  "memmap",
- "miette",
  "min-max-heap",
  "once_cell",
  "parse_wiki_text",
@@ -787,26 +784,11 @@ dependencies = [
  "tokio",
  "toml",
  "tower-http",
- "tower-lsp",
  "tracing",
  "tracing-subscriber",
  "urlencoding",
  "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "whatlang",
-]
-
-[[package]]
-name = "dashmap"
-version = "5.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3495912c9c1ccf2e18976439f4443f3fee0fd61f424ff99fde6a66b15ecb448f"
-dependencies = [
- "cfg-if",
- "hashbrown 0.12.1",
- "lock_api",
- "parking_lot_core",
 ]
 
 [[package]]
@@ -1857,29 +1839,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miette"
-version = "5.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a24c4b4063c21e037dffb4de388ee85e400bff299803aba9513d9c52de8116b"
-dependencies = [
- "miette-derive",
- "once_cell",
- "thiserror",
- "unicode-width",
-]
-
-[[package]]
-name = "miette-derive"
-version = "5.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "827d18edee5d43dc309eb0ac565f2b8e2fdc89b986b2d929e924a0f6e7f23835"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2111,6 +2070,18 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "optics-lsp"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "lsp-types",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2917,6 +2888,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_cbor"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3532,40 +3514,6 @@ name = "tower-layer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343bc9466d3fe6b0f960ef45960509f84480bf4fd96f92901afe7ff3df9d3a62"
-
-[[package]]
-name = "tower-lsp"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43e094780b4447366c59f79acfd65b1375ecaa84e61dddbde1421aa506334024"
-dependencies = [
- "async-trait",
- "auto_impl",
- "bytes",
- "dashmap",
- "futures",
- "httparse",
- "log",
- "lsp-types",
- "memchr",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util 0.7.3",
- "tower",
- "tower-lsp-macros",
-]
-
-[[package]]
-name = "tower-lsp-macros"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebd99eec668d0a450c177acbc4d05e0d0d13b1f8d3db13cd706c52cbec4ac04"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "tower-service"

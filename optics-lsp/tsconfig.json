@@ -5,12 +5,16 @@
         "lib": [
             "es2020"
         ],
-        "outDir": "target",
-        "rootDir": "./",
+        "outDir": "out",
+        "rootDirs": [
+            ".",
+            "out"
+        ],
+        "baseUrl": ".",
         "sourceMap": true,
         "strict": true
     },
     "include": [
-        "./"
+        "./",
     ]
 }

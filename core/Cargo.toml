@@ -55,7 +55,6 @@ once_cell = { workspace = true }
 regex = { workspace = true }
 http = { workspace = true }
 kuchiki = { workspace = true }
-tower-http = { workspace = true }
 lalrpop-util = { workspace = true }
 serde_urlencoded = { workspace = true }
 rust-stemmers = { workspace = true }
@@ -67,10 +66,7 @@ urlencoding = { workspace = true }
 rusoto_s3 = { workspace = true, optional = true }
 rusoto_core = { workspace = true, optional = true }
 bitvec = { workspace = true }
-miette = { workspace = true }
-tower-lsp = { workspace = true }
-wasm-bindgen = { workspace = true }
-wasm-bindgen-futures = { workspace = true }
+tower-http = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

@@ -13,12 +13,21 @@
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ],
             "outFiles": [
-                "${workspaceRoot}/target/**/*.js"
+                "${workspaceRoot}/out/**/*.js"
             ],
             "preLaunchTask": {
                 "type": "npm",
                 "script": "compile"
             }
-        }
+        },
+        {
+            "name": "Attach",
+            "port": 6009,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node"
+        },
     ]
 }

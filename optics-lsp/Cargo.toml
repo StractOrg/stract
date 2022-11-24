@@ -1,0 +1,15 @@
+[package]
+name = "optics-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = { workspace = true }
+lsp-types = { workspace = true }
+js-sys = { workspace = true }
+console_error_panic_hook = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
