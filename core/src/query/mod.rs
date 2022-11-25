@@ -15,11 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    optics::Optic,
     ranking::SignalAggregator,
     schema::{Field, TextField},
     Result,
 };
+use optics::Optic;
 use std::{collections::HashMap, sync::Arc};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
@@ -27,10 +27,16 @@ use tantivy::{
     tokenizer::TokenizerManager,
 };
 
+mod const_query;
 pub mod intersection;
+pub mod optic;
 pub mod parser;
+mod pattern_query;
 pub mod union;
+
 use parser::Term;
+
+use self::optic::AsMultipleTantivyQuery;
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -153,7 +159,7 @@ impl Query {
     pub fn set_optic(&mut self, optic: &Optic, schema: &Schema) {
         let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
 
-        subqueries.append(&mut optic.as_tantivy(schema));
+        subqueries.append(&mut optic.as_multiple_tantivy(schema));
 
         self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
     }

@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use optics::SiteRankings;
 use std::{collections::HashMap, sync::Arc};
 
 use axum::Extension;
 use axum_macros::debug_handler;
 
 use crate::{
-    ranking::site_rankings::SiteRankings,
     search_prettifier::{
         thousand_sep_number, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection,
     },

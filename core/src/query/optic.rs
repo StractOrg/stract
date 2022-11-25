@@ -14,131 +14,103 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-const SCALE: f32 = 500.0;
-
-pub mod ast;
-mod const_query;
-mod lexer;
-mod pattern_query;
-
-use std::{collections::HashMap, convert::TryFrom};
-
-use crate::{
-    query::union::UnionQuery,
-    schema::{Field, TextField},
-    webgraph::centrality::approximate_harmonic::ApproximatedHarmonicCentrality,
-    Result,
-};
 use itertools::Itertools;
-use logos::Logos;
+use optics::{Action, MatchLocation, Matching, Optic, Rule};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, QueryClone},
     schema::Schema,
 };
 
-use self::{
-    ast::{RankingTarget, RawAction, RawMatchPart, RawOptic, RawRule},
-    const_query::ConstQuery,
-    pattern_query::PatternQuery,
+use crate::{
+    ranking::optics::SCALE,
+    schema::{Field, TextField},
 };
 
-use crate::ranking::{signal::SignalAggregator, site_rankings::SiteRankings, Signal};
+use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
-pub fn parse(optic: &str) -> Result<Optic> {
-    let raw_optic = ast::parse(optic)?;
-
-    Optic::try_from(raw_optic)
+pub trait AsTantivyQuery {
+    fn as_tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query>;
 }
 
-impl TryFrom<RawOptic> for Optic {
-    type Error = crate::Error;
-
-    fn try_from(raw: RawOptic) -> Result<Self> {
-        let mut rules = Vec::new();
-
-        for rule in raw.rules {
-            rules.push(Rule::try_from(rule)?);
-        }
-
-        let mut boosts = HashMap::new();
-        let mut coefficients = HashMap::new();
-
-        for ranking in raw.rankings {
-            match ranking.target {
-                RankingTarget::Signal(name) => {
-                    if let Some(signal) = Signal::from_string(name) {
-                        coefficients.insert(signal, ranking.score);
-                    }
-                }
-                RankingTarget::Field(name) => {
-                    if let Some(field) = Field::from_name(name) {
-                        if let Some(text_field) = field.as_text() {
-                            boosts.insert(text_field, ranking.score);
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut liked_sites = Vec::new();
-        let mut disliked_sites = Vec::new();
-
-        for pref in raw.site_preferences {
-            match pref {
-                ast::RawSitePreference::Like(site) => liked_sites.push(site),
-                ast::RawSitePreference::Dislike(site) => disliked_sites.push(site),
-            }
-        }
-
-        Ok(Self {
-            rules,
-            coefficients,
-            boosts,
-            discard_non_matching: raw.discard_non_matching,
-            site_rankings: SiteRankings {
-                liked: liked_sites,
-                disliked: disliked_sites,
-                blocked: Vec::new(), // blocked sites are handled by `$discard` syntax.
-            },
-        })
-    }
+pub trait AsMultipleTantivyQuery {
+    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)>;
 }
 
-impl TryFrom<RawRule> for Rule {
-    type Error = crate::Error;
+impl AsMultipleTantivyQuery for Optic {
+    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
+        if self.discard_non_matching {
+            vec![(
+                Occur::Must,
+                UnionQuery::from(
+                    self.rules
+                        .iter()
+                        .chain(self.site_rankings.rules().iter())
+                        .filter_map(|rule| {
+                            let queries = rule.as_multiple_tantivy(schema);
 
-    fn try_from(raw: RawRule) -> Result<Self> {
-        let mut matches = Vec::new();
-
-        for matching in raw.matches.0 {
-            matches.push(matching.try_into()?);
-        }
-
-        Ok(Rule {
-            matches,
-            action: raw.action.map(Action::from).unwrap_or(Action::Boost(1)),
-        })
-    }
-}
-
-impl From<RawAction> for Action {
-    fn from(value: RawAction) -> Self {
-        match value {
-            RawAction::Boost(boost) => Action::Boost(boost),
-            RawAction::Downrank(down_boost) => Action::Downrank(down_boost),
-            RawAction::Discard => Action::Discard,
+                            if queries.is_empty() {
+                                None
+                            } else {
+                                Some(queries)
+                            }
+                        })
+                        .map(|queries| BooleanQuery::from(queries).box_clone())
+                        .collect_vec(),
+                )
+                .box_clone(),
+            )]
+        } else {
+            self.rules
+                .iter()
+                .chain(self.site_rankings.rules().iter())
+                .filter_map(|rule| rule.as_multiple_tantivy(schema).pop())
+                .collect()
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Matching {
-    pub pattern: Vec<PatternPart>,
-    pub location: MatchLocation,
+impl AsMultipleTantivyQuery for Rule {
+    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
+        let mut subqueries: Vec<_> = self
+            .matches
+            .iter()
+            .map(|matching| (Occur::Must, matching.as_tantivy(schema)))
+            .collect();
+
+        if subqueries.is_empty() {
+            return vec![];
+        }
+
+        let subquery = if subqueries.len() == 1 {
+            subqueries.pop().unwrap().1
+        } else {
+            BooleanQuery::from(subqueries).box_clone()
+        };
+
+        match &self.action {
+            Action::Boost(boost) => vec![(
+                Occur::Should,
+                BoostQuery::new(
+                    ConstQuery::new(subquery, 1.0).box_clone(),
+                    *boost as f32 * SCALE,
+                )
+                .box_clone(),
+            )],
+            Action::Downrank(boost) => vec![(
+                Occur::Should,
+                BoostQuery::new(
+                    ConstQuery::new(subquery, 1.0).box_clone(),
+                    *boost as f32 * -SCALE,
+                )
+                .box_clone(),
+            )],
+            Action::Discard => vec![(Occur::MustNot, subquery)],
+        }
+    }
 }
 
-impl Matching {
-    fn pattern_query(&self, schema: &tantivy::schema::Schema) -> Box<dyn tantivy::query::Query> {
+impl AsTantivyQuery for Matching {
+    fn as_tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query> {
         match &self.location {
             MatchLocation::Site => {
                 let site_field = schema
@@ -190,191 +162,6 @@ impl Matching {
 
                 PatternQuery::new(self.pattern.clone(), field).box_clone()
             }
-        }
-    }
-}
-
-impl TryFrom<RawMatchPart> for Matching {
-    type Error = crate::Error;
-
-    fn try_from(raw: RawMatchPart) -> Result<Self> {
-        let (s, loc) = match raw {
-            RawMatchPart::Site(s) => (s, MatchLocation::Site),
-            RawMatchPart::Url(s) => (s, MatchLocation::Url),
-            RawMatchPart::Domain(s) => (s, MatchLocation::Domain),
-            RawMatchPart::Title(s) => (s, MatchLocation::Title),
-            RawMatchPart::Description(s) => (s, MatchLocation::Description),
-            RawMatchPart::Content(s) => (s, MatchLocation::Content),
-        };
-
-        let mut pattern = Vec::new();
-
-        for tok in PatternToken::lexer(&s) {
-            match tok {
-                PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
-                PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
-                PatternToken::Anchor => pattern.push(PatternPart::Anchor),
-                PatternToken::Error => return Err(crate::Error::Parse),
-            }
-        }
-
-        Ok(Self {
-            location: loc,
-            pattern,
-        })
-    }
-}
-
-#[derive(Logos, Debug)]
-enum PatternToken {
-    #[regex(".*", |lex| lex.slice().to_string())]
-    Raw(String),
-
-    #[token("*")]
-    Wildcard,
-
-    #[token("|")]
-    Anchor,
-
-    #[error]
-    Error,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum PatternPart {
-    Raw(String),
-    Wildcard,
-    Anchor,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum MatchLocation {
-    Site,
-    Url,
-    Domain,
-    Title,
-    Description,
-    Content,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Action {
-    Boost(u64),
-    Downrank(u64),
-    Discard,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Optic {
-    pub coefficients: HashMap<Signal, f64>,
-    pub boosts: HashMap<TextField, f64>,
-    pub site_rankings: SiteRankings,
-    pub rules: Vec<Rule>,
-    pub discard_non_matching: bool,
-}
-
-impl Optic {
-    pub fn as_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
-        if self.discard_non_matching {
-            vec![(
-                Occur::Must,
-                UnionQuery::from(
-                    self.rules
-                        .iter()
-                        .chain(self.site_rankings.rules().iter())
-                        .filter_map(|rule| rule.as_tantivy(schema))
-                        .map(|query| BooleanQuery::from(vec![query]).box_clone())
-                        .collect_vec(),
-                )
-                .box_clone(),
-            )]
-        } else {
-            self.rules
-                .iter()
-                .chain(self.site_rankings.rules().iter())
-                .filter_map(|rule| rule.as_tantivy(schema))
-                .collect()
-        }
-    }
-
-    pub fn merge(mut self, mut other: Self) -> Self {
-        self.rules.append(&mut other.rules);
-        self.coefficients.extend(other.coefficients.into_iter());
-        self.boosts.extend(other.boosts.into_iter());
-
-        self.discard_non_matching |= other.discard_non_matching;
-
-        self.site_rankings
-            .liked
-            .append(&mut other.site_rankings.liked);
-
-        self.site_rankings
-            .disliked
-            .append(&mut other.site_rankings.disliked);
-
-        self.site_rankings
-            .blocked
-            .append(&mut other.site_rankings.blocked);
-
-        self
-    }
-
-    pub fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator {
-        let mut aggregator = SignalAggregator::new(
-            self.coefficients.clone().into_iter(),
-            self.boosts.clone().into_iter(),
-        );
-
-        if let Some(approx) = approx {
-            aggregator.add_personal_harmonic(self.site_rankings.centrality_scorer(approx));
-        }
-
-        aggregator
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Rule {
-    pub matches: Vec<Matching>,
-    pub action: Action,
-}
-
-impl Rule {
-    pub fn as_tantivy(&self, schema: &Schema) -> Option<(Occur, Box<dyn tantivy::query::Query>)> {
-        let mut subqueries: Vec<_> = self
-            .matches
-            .iter()
-            .map(|matching| (Occur::Must, matching.pattern_query(schema)))
-            .collect();
-
-        if subqueries.is_empty() {
-            return None;
-        }
-
-        let subquery = if subqueries.len() == 1 {
-            subqueries.pop().unwrap().1
-        } else {
-            BooleanQuery::from(subqueries).box_clone()
-        };
-
-        match &self.action {
-            Action::Boost(boost) => Some((
-                Occur::Should,
-                BoostQuery::new(
-                    ConstQuery::new(subquery, 1.0).box_clone(),
-                    *boost as f32 * SCALE,
-                )
-                .box_clone(),
-            )),
-            Action::Downrank(boost) => Some((
-                Occur::Should,
-                BoostQuery::new(
-                    ConstQuery::new(subquery, 1.0).box_clone(),
-                    *boost as f32 * -SCALE,
-                )
-                .box_clone(),
-            )),
-            Action::Discard => Some((Occur::MustNot, subquery)),
         }
     }
 }
@@ -539,9 +326,9 @@ mod tests {
 
     #[test]
     fn quickstart_as_query() {
-        parse(include_str!("../../testcases/optics/quickstart.optic"))
+        optics::parse(include_str!("../../../optics/testcases/quickstart.optic"))
             .unwrap()
-            .as_tantivy(&create_schema());
+            .as_multiple_tantivy(&create_schema());
     }
 
     #[test]
@@ -616,7 +403,7 @@ mod tests {
                 original: "website".to_string(),
                 selected_region: None,
                 optic_program: Some(
-                    include_str!("../../testcases/optics/quickstart.optic").to_string(),
+                    include_str!("../../../optics/testcases/quickstart.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,
@@ -632,7 +419,7 @@ mod tests {
                 original: "website".to_string(),
                 selected_region: None,
                 optic_program: Some(
-                    include_str!("../../testcases/optics/hacker_news.optic").to_string(),
+                    include_str!("../../../optics/testcases/hacker_news.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,
@@ -648,7 +435,7 @@ mod tests {
                 original: "website".to_string(),
                 selected_region: None,
                 optic_program: Some(
-                    include_str!("../../testcases/optics/copycats_removal.optic").to_string(),
+                    include_str!("../../../optics/testcases/copycats_removal.optic").to_string(),
                 ),
                 skip_pages: None,
                 site_rankings: None,

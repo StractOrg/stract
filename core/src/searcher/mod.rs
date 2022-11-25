@@ -19,13 +19,13 @@ pub mod local;
 
 pub use distributed::*;
 pub use local::*;
+use optics::SiteRankings;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bangs::BangHit,
     entity_index::StoredEntity,
     inverted_index,
-    ranking::site_rankings::SiteRankings,
     search_prettifier::{self, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection},
     spell::Correction,
     webpage::region::Region,

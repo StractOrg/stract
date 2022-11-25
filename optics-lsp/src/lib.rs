@@ -14,7 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
+// use cuely::optics::ast::RawOptic;
+use lsp_types::{
+    notification::{DidChangeTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification},
+    Hover, HoverContents, MarkedString, Url,
+};
+use thiserror::Error;
 use wasm_bindgen::prelude::*;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console, js_name = log)]
@@ -22,27 +31,61 @@ extern "C" {
 }
 
 fn log(s: &str) {
-    unsafe { console_log(&("[optics] ".to_owned() + s)) }
+    console_log(&("[optics_lsp] ".to_owned() + s))
+}
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to serialize")]
+    Serialization(#[from] serde_wasm_bindgen::Error),
+}
+
+impl From<Error> for JsValue {
+    fn from(val: Error) -> Self {
+        JsValue::from_str(&format!("{:?}", val))
+    }
+}
+
+struct File {
+    source: String,
+    // raw_optic: RawOptic,
 }
 
 #[wasm_bindgen]
-pub struct OpticsBackend {}
+pub struct OpticsBackend {
+    diagnostic_callback: js_sys::Function,
+    files: HashMap<Url, File>,
+}
 
 #[wasm_bindgen]
 impl OpticsBackend {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        // console_error_panic_hook::set_once();
-        log("WHUT");
+    pub fn new(diagnostic_callback: &js_sys::Function) -> Self {
+        console_error_panic_hook::set_once();
 
-        Self {}
+        Self {
+            diagnostic_callback: diagnostic_callback.clone(),
+            files: HashMap::new(),
+        }
     }
 
-    // #[wasm_bindgen(js_name = onNotification)]
-    // pub fn on_notification(&mut self, method: &str, params: JsValue) {
-    //     println!("KAGE");
-    //     match method {
-    //         _ => println!("on_notification {} {:?}", method, params),
-    //     }
-    // }
+    #[wasm_bindgen(js_name = onNotification)]
+    pub fn on_notification(&mut self, method: &str, params: JsValue) {
+        match method {
+            DidOpenTextDocument::METHOD => log("OPEN"),
+            DidChangeTextDocument::METHOD => log("CHANGE"),
+            DidSaveTextDocument::METHOD => log("SAVE"),
+            _ => log(&format!("on_notification {} {:?}", method, params)),
+        }
+    }
+
+    #[wasm_bindgen(js_name = onHover)]
+    pub fn on_hover(&mut self, params: JsValue) -> Result<JsValue, Error> {
+        log(&format!("on_hover {:?}", params));
+
+        Ok(serde_wasm_bindgen::to_value(&Hover {
+            contents: HoverContents::Scalar(MarkedString::String("You're hovering!".to_string())),
+            range: None,
+        })?)
+    }
 }

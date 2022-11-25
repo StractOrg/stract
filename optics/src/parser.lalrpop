@@ -1,5 +1,5 @@
-use crate::optics::ast::*;
-use crate::optics::lexer::Token;
+use crate::ast::*;
+use crate::lexer::Token;
 use lalrpop_util::ParseError;
 
 grammar<'input>;
@@ -52,7 +52,7 @@ InnerAction: RawAction= {
         match <>.parse() {
             Ok(n) => Ok(RawAction::Boost(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Parse
+                error: crate::Error::Unknown
             })
         }
     },
@@ -60,7 +60,7 @@ InnerAction: RawAction= {
         match <>.parse() {
             Ok(n) => Ok(RawAction::Downrank(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Parse
+                error: crate::Error::Unknown
             })
         }
     },
@@ -76,7 +76,7 @@ Ranking: RankingCoeff = {
                 score
             }),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Parse
+                error: crate::Error::Unknown
             })
         }
     }

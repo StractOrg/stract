@@ -47,7 +47,6 @@ pub mod index;
 mod intmap;
 mod kahan_sum;
 mod kv;
-mod optics;
 pub mod prehashed;
 mod query;
 pub mod ranking;
@@ -214,8 +213,8 @@ pub enum Error {
     #[error("Spell dictionary error")]
     Spell(#[from] crate::spell::dictionary::DictionaryError),
 
-    #[error("Parser error")]
-    Parse,
+    #[error("Could not parse optic")]
+    Optics(#[from] optics::Error),
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,

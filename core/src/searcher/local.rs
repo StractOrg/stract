@@ -17,6 +17,7 @@
 use std::str::FromStr;
 use std::time::Instant;
 
+use optics::Optic;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -24,9 +25,9 @@ use crate::bangs::Bangs;
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::optics::{self, Optic};
 use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::optics::CreateAggregator;
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;

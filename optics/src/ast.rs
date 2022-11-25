@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Error;
-use crate::Result as CrateResult;
+use super::Error;
+use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
 
 use super::lexer;
 
-lalrpop_mod!(pub parser, "/optics/parser.rs");
+lalrpop_mod!(pub parser, "/parser.rs");
 
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
@@ -103,14 +103,6 @@ pub enum RawMatchPart {
     Content(String),
 }
 
-// #[derive(Debug, Clone)]
-// pub enum RawStringMatchPattern {
-//     Raw(String),
-//     Wildcard,
-//     Delimeter,
-//     Anchor,
-// }
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum RawAction {
     Boost(u64),
@@ -118,10 +110,31 @@ pub enum RawAction {
     Discard,
 }
 
-pub fn parse(optic: &str) -> CrateResult<RawOptic> {
+pub fn parse(optic: &str) -> ModResult<RawOptic> {
     match PARSER.parse(lexer::lex(optic)) {
         Ok(blocks) => Ok(RawOptic::from(blocks)),
-        Err(_) => Err(Error::Parse),
+        Err(error) => match error {
+            lalrpop_util::ParseError::InvalidToken { location: _ } => unreachable!(
+                "this is a lexing error, which should be caught earlier since we use logos"
+            ),
+            lalrpop_util::ParseError::UnrecognizedEOF {
+                location: _,
+                expected,
+            } => Err(Error::UnexpectedEOF { expected }),
+            lalrpop_util::ParseError::UnrecognizedToken {
+                token: (start, tok, end),
+                expected,
+            } => Err(Error::UnrecognizedToken {
+                token: (start, tok.to_string(), end),
+                expected,
+            }),
+            lalrpop_util::ParseError::ExtraToken {
+                token: (start, tok, end),
+            } => Err(Error::UnexpectedToken {
+                token: (start, tok.to_string(), end),
+            }),
+            lalrpop_util::ParseError::User { error } => Err(error),
+        },
     }
 }
 
@@ -280,19 +293,16 @@ mod tests {
 
     #[test]
     fn quickstart_parse() {
-        assert!(parse(include_str!("../../testcases/optics/quickstart.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/quickstart.optic")).is_ok());
     }
 
     #[test]
     fn hacker_news_parse() {
-        assert!(parse(include_str!("../../testcases/optics/hacker_news.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/hacker_news.optic")).is_ok());
     }
 
     #[test]
     fn copycats_parse() {
-        assert!(parse(include_str!(
-            "../../testcases/optics/copycats_removal.optic"
-        ))
-        .is_ok());
+        assert!(parse(include_str!("../testcases/copycats_removal.optic")).is_ok());
     }
 }

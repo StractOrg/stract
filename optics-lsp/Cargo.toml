@@ -13,3 +13,5 @@ js-sys = { workspace = true }
 console_error_panic_hook = { workspace = true }
 serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
+thiserror = { workspace = true }
+# optics = { path = "../optics" }

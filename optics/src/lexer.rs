@@ -16,7 +16,7 @@
 
 use logos::{Lexer, Logos};
 
-use crate::{Error, Result};
+use super::{Error, Result};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
@@ -48,6 +48,39 @@ pub enum Token<'a> {
 
     String(&'a str),
     Number(&'a str),
+}
+
+impl<'a> ToString for Token<'a> {
+    fn to_string(&self) -> String {
+        match self {
+            Token::SemiColon => ";".to_string(),
+            Token::Comma => ",".to_string(),
+            Token::OpenBracket => "{".to_string(),
+            Token::CloseBracket => "}".to_string(),
+            Token::OpenParenthesis => "(".to_string(),
+            Token::CloseParenthesis => ")".to_string(),
+            Token::DiscardNonMatching => "DiscardNonMatching".to_string(),
+            Token::Rule => "Rule".to_string(),
+            Token::Ranking => "Ranking".to_string(),
+            Token::Signal => "Signal".to_string(),
+            Token::Field => "Field".to_string(),
+            Token::Matches => "Matches".to_string(),
+            Token::Site => "Site".to_string(),
+            Token::Url => "Url".to_string(),
+            Token::Domain => "Domain".to_string(),
+            Token::Title => "Title".to_string(),
+            Token::Description => "Description".to_string(),
+            Token::Content => "Content".to_string(),
+            Token::Action => "Action".to_string(),
+            Token::Boost => "Boost".to_string(),
+            Token::Downrank => "Downrank".to_string(),
+            Token::Discard => "Discard".to_string(),
+            Token::Like => "Like".to_string(),
+            Token::Dislike => "Dislike".to_string(),
+            Token::String(s) => format!("\"{s}\""),
+            Token::Number(n) => n.to_string(),
+        }
+    }
 }
 
 #[derive(Logos, Debug, PartialEq, Clone)]
@@ -214,7 +247,7 @@ impl<'source> Iterator for LexerBridge<'source> {
             let mut res = String::new();
             for tok in inner.by_ref() {
                 match tok {
-                    QuotedString::Error => return Some(Err(Error::Parse)),
+                    QuotedString::Error => return Some(Err(Error::Unknown)),
                     QuotedString::Text(t) => res.push_str(t),
                     QuotedString::EscapedQuote => res.push('"'),
                     QuotedString::EndString => break,
@@ -230,10 +263,10 @@ impl<'source> Iterator for LexerBridge<'source> {
             let s = self.lexer.span();
 
             match tok {
-                Outer::Error => Some(Err(Error::Parse)),
-                Outer::StartString => Some(Err(Error::Parse)),
-                Outer::StartBlockComment => Some(Err(Error::Parse)),
-                Outer::StartLineComment => Some(Err(Error::Parse)),
+                Outer::Error => Some(Err(Error::Unknown)),
+                Outer::StartString => Some(Err(Error::Unknown)),
+                Outer::StartBlockComment => Some(Err(Error::Unknown)),
+                Outer::StartLineComment => Some(Err(Error::Unknown)),
                 Outer::SemiColon => Some(Ok((s.start, Token::SemiColon, s.end))),
                 Outer::Comma => Some(Ok((s.start, Token::Comma, s.end))),
                 Outer::OpenBracket => Some(Ok((s.start, Token::OpenBracket, s.end))),

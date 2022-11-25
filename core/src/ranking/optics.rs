@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
+use optics::{Optic, SiteRankings};
 
 use crate::{
-    optics::{Action, MatchLocation, Matching, Optic, PatternPart, Rule},
+    schema::Field,
     webgraph::{
         centrality::approximate_harmonic::{ApproximatedHarmonicCentrality, Scorer},
         Node,
@@ -25,79 +25,65 @@ use crate::{
     webpage::Url,
 };
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct SiteRankings {
-    pub liked: Vec<String>,
-    pub disliked: Vec<String>,
-    pub blocked: Vec<String>,
+use super::{Signal, SignalAggregator};
+
+pub const SCALE: f32 = 500.0;
+
+pub trait CreateAggregator {
+    fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator;
 }
 
-impl SiteRankings {
-    pub fn rules(&self) -> Vec<Rule> {
-        let mut instructions = Vec::new();
+fn centrality_scorer(
+    site_rankings: &SiteRankings,
+    approx_harmonic: &ApproximatedHarmonicCentrality,
+) -> Scorer {
+    let mut liked_nodes = Vec::new();
+    let mut disliked_nodes = Vec::new();
 
-        for site in &self.liked {
-            instructions.push(Rule {
-                matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
-                    location: MatchLocation::Site,
-                }],
-                action: Action::Boost(5),
-            });
-        }
-
-        for site in &self.disliked {
-            instructions.push(Rule {
-                matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
-                    location: MatchLocation::Site,
-                }],
-                action: Action::Downrank(5),
-            });
-        }
-
-        for site in &self.blocked {
-            instructions.push(Rule {
-                matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
-                    location: MatchLocation::Site,
-                }],
-                action: Action::Discard,
-            });
-        }
-
-        instructions
+    for site in &site_rankings.liked {
+        liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
     }
 
-    pub fn centrality_scorer(&self, approx_harmonic: &ApproximatedHarmonicCentrality) -> Scorer {
-        let mut liked_nodes = Vec::new();
-        let mut disliked_nodes = Vec::new();
-
-        for site in &self.liked {
-            liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
-        }
-
-        for site in &self.disliked {
-            disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
-        }
-
-        approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
+    for site in &site_rankings.disliked {
+        disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
     }
 
-    pub fn into_optic(self) -> Optic {
-        Optic {
-            site_rankings: self,
-            ..Default::default()
+    approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
+}
+
+impl CreateAggregator for Optic {
+    fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator {
+        let mut aggregator = SignalAggregator::new(
+            self.coefficients
+                .clone()
+                .into_iter()
+                .filter_map(|(name, coeff)| {
+                    Signal::from_string(name).map(|signal| (signal, coeff))
+                }),
+            self.boosts.clone().into_iter().filter_map(|(name, boost)| {
+                match Field::from_name(name) {
+                    Some(field) => field.as_text().map(|text_field| (text_field, boost)),
+                    _ => None,
+                }
+            }),
+        );
+
+        if let Some(approx) = approx {
+            aggregator.add_personal_harmonic(centrality_scorer(&self.site_rankings, approx));
         }
+
+        aggregator
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use optics::SiteRankings;
+
     use crate::{
         gen_temp_path,
         index::Index,
-        ranking::{centrality_store::CentralityStore, site_rankings::SiteRankings},
+        ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{Node, WebgraphBuilder},
         webpage::{Html, Webpage},

@@ -17,8 +17,8 @@
 pub mod bm25;
 pub mod centrality_store;
 pub mod initial;
+pub mod optics;
 pub mod signal;
-pub mod site_rankings;
 
 use std::sync::Arc;
 

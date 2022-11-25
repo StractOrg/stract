@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "core",
-    "optics-lsp"
+    "optics-lsp",
+    "optics"
 ]
 
 [profile.release]
@@ -16,7 +17,7 @@ indicatif = { version = "0.16.2", features = ["rayon"] }
 itertools = "0.10.3"
 rayon = "1.5.3"
 reqwest = { version = "0.11.10", features = ["blocking", "stream"] }
-serde = { version = "1.0.137", features = ["rc"] }
+serde = { version = "1.0.137", features = ["rc", "derive"] }
 serde_json = "1.0.81"
 tantivy = { git = "https://github.com/quickwit-oss/tantivy.git", rev = "a451f6d60dc4cb751457d11a3cc9d038d9b63713" }
 thiserror = "1.0.31"
