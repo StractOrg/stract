@@ -124,13 +124,13 @@ pub fn parse(optic: &str) -> ModResult<RawOptic> {
             lalrpop_util::ParseError::UnrecognizedToken {
                 token: (start, tok, end),
                 expected,
-            } => Err(Error::UnrecognizedToken {
+            } => Err(Error::UnexpectedToken {
                 token: (start, tok.to_string(), end),
                 expected,
             }),
             lalrpop_util::ParseError::ExtraToken {
                 token: (start, tok, end),
-            } => Err(Error::UnexpectedToken {
+            } => Err(Error::UnrecognizedToken {
                 token: (start, tok.to_string(), end),
             }),
             lalrpop_util::ParseError::User { error } => Err(error),

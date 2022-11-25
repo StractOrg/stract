@@ -16,11 +16,13 @@
 
 use std::collections::HashMap;
 
-// use cuely::optics::ast::RawOptic;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification},
-    Hover, HoverContents, MarkedString, Url,
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, Hover, HoverContents, HoverParams, MarkedString, Position,
+    PublishDiagnosticsParams, Range, Url,
 };
+use optics::Optic;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -46,9 +48,35 @@ impl From<Error> for JsValue {
     }
 }
 
+#[derive(Debug)]
 struct File {
     source: String,
-    // raw_optic: RawOptic,
+    optic: Result<Optic, optics::Error>,
+}
+impl File {
+    fn new(source: String) -> Self {
+        File {
+            optic: optics::parse(&source),
+            source,
+        }
+    }
+
+    fn error(&self) -> Option<optics::Error> {
+        if let Err(err) = &self.optic {
+            Some(err.clone())
+        } else {
+            None
+        }
+    }
+
+    fn tokens(&self) -> impl Iterator<Item = (usize, optics::Token<'_>, usize)> {
+        optics::lex(&self.source).filter_map(|elem| elem.ok())
+    }
+
+    fn token_at_offset(&self, offset: usize) -> Option<(usize, optics::Token<'_>, usize)> {
+        self.tokens()
+            .find(|(start, _, end)| offset >= *start && offset <= *end)
+    }
 }
 
 #[wasm_bindgen]
@@ -72,9 +100,28 @@ impl OpticsBackend {
     #[wasm_bindgen(js_name = onNotification)]
     pub fn on_notification(&mut self, method: &str, params: JsValue) {
         match method {
-            DidOpenTextDocument::METHOD => log("OPEN"),
-            DidChangeTextDocument::METHOD => log("CHANGE"),
-            DidSaveTextDocument::METHOD => log("SAVE"),
+            DidOpenTextDocument::METHOD => {
+                let DidOpenTextDocumentParams { text_document } =
+                    serde_wasm_bindgen::from_value(params).unwrap();
+
+                self.handle_change(text_document.uri.clone(), text_document.text);
+                self.send_diagnostics(text_document.uri);
+            }
+            DidChangeTextDocument::METHOD => {
+                let params: DidChangeTextDocumentParams =
+                    serde_wasm_bindgen::from_value(params).unwrap();
+
+                self.handle_change(
+                    params.text_document.uri,
+                    params.content_changes[0].text.clone(),
+                )
+            }
+            DidSaveTextDocument::METHOD => {
+                let params: DidSaveTextDocumentParams =
+                    serde_wasm_bindgen::from_value(params).unwrap();
+
+                self.send_diagnostics(params.text_document.uri);
+            }
             _ => log(&format!("on_notification {} {:?}", method, params)),
         }
     }
@@ -82,10 +129,220 @@ impl OpticsBackend {
     #[wasm_bindgen(js_name = onHover)]
     pub fn on_hover(&mut self, params: JsValue) -> Result<JsValue, Error> {
         log(&format!("on_hover {:?}", params));
+        let params: HoverParams = serde_wasm_bindgen::from_value(params).unwrap();
 
-        Ok(serde_wasm_bindgen::to_value(&Hover {
-            contents: HoverContents::Scalar(MarkedString::String("You're hovering!".to_string())),
-            range: None,
-        })?)
+        Ok(serde_wasm_bindgen::to_value(&self.handle_hover(params))?)
     }
+}
+
+impl OpticsBackend {
+    fn handle_hover(&self, params: HoverParams) -> Option<Hover> {
+        self.files
+            .get(&params.text_document_position_params.text_document.uri)
+            .and_then(|file| {
+                position_to_byte_offset(
+                    &params.text_document_position_params.position,
+                    &file.source,
+                )
+                .and_then(|offset| {
+                    file.token_at_offset(offset)
+                        .and_then(|(start, token, end)| {
+                            let msg = match token {
+                                optics::Token::DiscardNonMatching => {
+                                    Some("All results that does not match any of the specified rules will be discarded.".to_string())
+                                }
+                                optics::Token::Rule => Some("Rule".to_string()),
+                                optics::Token::Matches => Some("Matches".to_string()),
+                                optics::Token::Ranking => Some("Ranking".to_string()),
+                                optics::Token::Signal => Some("Signal".to_string()),
+                                optics::Token::Field => Some("Field".to_string()),
+                                optics::Token::Site => Some("Site".to_string()),
+                                optics::Token::Url => Some("Url".to_string()),
+                                optics::Token::Domain => Some("Domain".to_string()),
+                                optics::Token::Title => Some("Title".to_string()),
+                                optics::Token::Description => Some("Description".to_string()),
+                                optics::Token::Content => Some("Content".to_string()),
+                                optics::Token::Action => Some("Action".to_string()),
+                                optics::Token::Boost => Some("Boost".to_string()),
+                                optics::Token::Downrank => Some("Downrank".to_string()),
+                                optics::Token::Discard => Some("Discard".to_string()),
+                                optics::Token::Like => Some("Like".to_string()),
+                                optics::Token::Dislike => Some("Dislike".to_string()),
+                                _ => None,
+                            };
+
+                            msg.map(|msg| Hover {
+                                contents: HoverContents::Scalar(MarkedString::String(msg)),
+                                range: Some(Range {
+                                    start: offset_to_pos(start, &file.source),
+                                    end: offset_to_pos(end, &file.source),
+                                }),
+                            })
+                        })
+                })
+            })
+    }
+
+    fn handle_change(&mut self, url: Url, source: String) {
+        self.files.insert(url, File::new(source));
+    }
+
+    fn send_diagnostics(&self, url: Url) {
+        if let Some(f) = self.files.get(&url) {
+            self.send_diagnostic(url, f.error().map(|err| err_to_diagnostic(err, &f.source)));
+        }
+    }
+
+    fn send_diagnostic(&self, url: Url, diagnostic: Option<Diagnostic>) {
+        let this = &JsValue::null();
+
+        let params = PublishDiagnosticsParams {
+            uri: url,
+            diagnostics: diagnostic
+                .map(|diagnostic| vec![diagnostic])
+                .unwrap_or_default(),
+            version: None,
+        };
+        log(&format!("Sending diagnostic {:?}", params));
+
+        let params = &serde_wasm_bindgen::to_value(&params).unwrap();
+        if let Err(e) = self.diagnostic_callback.call1(this, params) {
+            log(&format!(
+                "send_diagnostics params:\n\t{:?}\n\tJS error: {:?}",
+                params, e
+            ));
+        }
+    }
+}
+
+fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
+    match err {
+        optics::Error::UnexpectedEOF { expected } => {
+            let mut message = String::new();
+
+            message.push_str("Unexpected EOF.\n");
+            message.push_str("Expected one of the following tokens:");
+
+            for ex in expected {
+                message.push('\n');
+                message.push_str(" - ");
+                message.push_str(ex.as_str());
+            }
+
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: source.lines().count() as u32,
+                        character: source.lines().last().map(|l| l.len()).unwrap_or_default()
+                            as u32,
+                    },
+                    end: Position {
+                        line: source.lines().count() as u32,
+                        character: source.lines().last().map(|l| l.len()).unwrap_or_default()
+                            as u32,
+                    },
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        }
+        optics::Error::UnexpectedToken {
+            token: (start, tok, end),
+            expected,
+        } => {
+            let mut message = String::new();
+            message.push_str(&format!("Unexpected token \"{tok}\"\n"));
+            message.push_str("Expected one of the following tokens:");
+
+            for ex in expected {
+                message.push('\n');
+                message.push_str(" - ");
+                message.push_str(ex.as_str());
+            }
+
+            Diagnostic {
+                range: Range {
+                    start: offset_to_pos(start, source),
+                    end: offset_to_pos(end, source),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        }
+        optics::Error::UnrecognizedToken {
+            token: (start, tok, end),
+        } => {
+            let message = format!("Unrecognized token \"{tok}\"");
+            Diagnostic {
+                range: Range {
+                    start: offset_to_pos(start, source),
+                    end: offset_to_pos(end, source),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        }
+        optics::Error::NumberParse {
+            token: (start, tok, end),
+        } => {
+            let message = format!("Failed to parse token \"{tok}\" as a number");
+            Diagnostic {
+                range: Range {
+                    start: offset_to_pos(start, source),
+                    end: offset_to_pos(end, source),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        }
+        optics::Error::Unknown(start, end) => {
+            let message = "We encountered an unknown error".to_string();
+            Diagnostic {
+                range: Range {
+                    start: offset_to_pos(start, source),
+                    end: offset_to_pos(end, source),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        }
+    }
+}
+
+fn offset_to_pos(offset: usize, src: &str) -> Position {
+    if src[..offset].is_empty() {
+        return Position::new(0, 0);
+    }
+
+    if src[..offset].ends_with('\n') {
+        let l = src[..offset].lines().count();
+        Position::new(l as _, 0)
+    } else {
+        let l = src[..offset].lines().count() - 1;
+        let c = src[..offset].lines().last().unwrap().len();
+        Position::new(l as _, c as _)
+    }
+}
+fn position_to_byte_offset(pos: &Position, src: &str) -> Option<usize> {
+    let mut lines = pos.line;
+    let mut columns = pos.character;
+    src.char_indices()
+        .find(|&(_, c)| {
+            if lines == 0 {
+                if columns == 0 {
+                    return true;
+                } else {
+                    columns -= 1
+                }
+            } else if c == '\n' {
+                lines -= 1;
+            }
+            false
+        })
+        .map(|(idx, _)| idx)
 }

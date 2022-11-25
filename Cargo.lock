@@ -2090,6 +2090,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "lsp-types",
+ "optics",
  "serde",
  "serde-wasm-bindgen",
  "thiserror",

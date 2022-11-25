@@ -24,28 +24,16 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use self::ast::{RankingTarget, RawAction, RawMatchPart, RawOptic, RawRule};
+pub use lexer::lex;
+pub use lexer::Token;
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum Error {
-    #[error("Invalid token")]
-    InvalidToken,
-
-    #[error("Invalid pattern")]
-    Pattern,
-
     #[error("Unexpected EOF")]
     UnexpectedEOF {
         /// expected one of these tokens but got EOF
-        expected: Vec<String>,
-    },
-
-    #[error("Unrecognized token")]
-    UnrecognizedToken {
-        /// got this token
-        token: (usize, String, usize),
-        /// expected one of these tokens
         expected: Vec<String>,
     },
 
@@ -53,10 +41,21 @@ pub enum Error {
     UnexpectedToken {
         /// got this token
         token: (usize, String, usize),
+        /// expected one of these tokens
+        expected: Vec<String>,
     },
 
+    #[error("Unrecognized token")]
+    UnrecognizedToken {
+        /// got this token
+        token: (usize, String, usize),
+    },
+
+    #[error("Could not parse as a number")]
+    NumberParse { token: (usize, String, usize) },
+
     #[error("Unknown parse error")]
-    Unknown,
+    Unknown(usize, usize),
 }
 
 pub fn parse(optic: &str) -> Result<Optic> {
@@ -166,7 +165,7 @@ impl TryFrom<RawMatchPart> for Matching {
                 PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
                 PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
                 PatternToken::Anchor => pattern.push(PatternPart::Anchor),
-                PatternToken::Error => return Err(Error::Pattern),
+                PatternToken::Error => unreachable!("no patterns should fail lexing"),
             }
         }
 

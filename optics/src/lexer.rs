@@ -247,13 +247,24 @@ impl<'source> Iterator for LexerBridge<'source> {
             let mut res = String::new();
             for tok in inner.by_ref() {
                 match tok {
-                    QuotedString::Error => return Some(Err(Error::Unknown)),
+                    QuotedString::Error => {
+                        return Some(Err(Error::UnexpectedEOF {
+                            expected: vec!["\"".to_string()],
+                        }))
+                    }
                     QuotedString::Text(t) => res.push_str(t),
                     QuotedString::EscapedQuote => res.push('"'),
                     QuotedString::EndString => break,
                 }
             }
             let end = inner.span().end - 1;
+
+            if start > end {
+                return Some(Err(Error::UnexpectedEOF {
+                    expected: vec!["\"".to_string()],
+                }));
+            }
+
             self.lexer = inner.morph();
 
             return Some(Ok((start, Token::String(&self.source[start..end]), end)));
@@ -263,10 +274,15 @@ impl<'source> Iterator for LexerBridge<'source> {
             let s = self.lexer.span();
 
             match tok {
-                Outer::Error => Some(Err(Error::Unknown)),
-                Outer::StartString => Some(Err(Error::Unknown)),
-                Outer::StartBlockComment => Some(Err(Error::Unknown)),
-                Outer::StartLineComment => Some(Err(Error::Unknown)),
+                Outer::Error => {
+                    let tok = self.lexer.slice().to_string();
+                    Some(Err(Error::UnrecognizedToken {
+                        token: (s.start, tok, s.end),
+                    }))
+                }
+                Outer::StartString => Some(Err(Error::Unknown(s.start, s.end))),
+                Outer::StartBlockComment => Some(Err(Error::Unknown(s.start, s.end))),
+                Outer::StartLineComment => Some(Err(Error::Unknown(s.start, s.end))),
                 Outer::SemiColon => Some(Ok((s.start, Token::SemiColon, s.end))),
                 Outer::Comma => Some(Ok((s.start, Token::Comma, s.end))),
                 Outer::OpenBracket => Some(Ok((s.start, Token::OpenBracket, s.end))),

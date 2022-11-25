@@ -48,19 +48,19 @@ RawAction: RawAction= {
 }
 
 InnerAction: RawAction= {
-    "Boost" "(" <Number>  ")" =>? {
-        match <>.parse() {
+    "Boost" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
+        match score.parse() {
             Ok(n) => Ok(RawAction::Boost(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Unknown
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
             })
         }
     },
-    "Downrank" "(" <Number>  ")" =>? {
-        match <>.parse() {
+    "Downrank" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
+        match score.parse() {
             Ok(n) => Ok(RawAction::Downrank(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Unknown
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
             })
         }
     },
@@ -69,14 +69,14 @@ InnerAction: RawAction= {
 
 
 Ranking: RankingCoeff = {
-    "Ranking" "(" <target:RankingTarget> "," <score:Number> ")" =>? {
+    "Ranking" "(" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> ")" =>? {
         match score.parse() {
             Ok(score) => Ok(RankingCoeff {
                 target,
                 score
             }),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::Unknown
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
             })
         }
     }
