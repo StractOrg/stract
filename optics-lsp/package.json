@@ -1,5 +1,5 @@
 {
-  "name": "optic",
+  "name": "Optics",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.73.0"
@@ -7,7 +7,9 @@
   "publisher": "Cuely",
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "just build && tsc -b"
+    "compile": "just build && tsc -b",
+    "package": "vsce package --githubBranch main --out optic.vsix",
+    "publish": "vsce publish --githubBranch main --packagePath optic.vsix"
   },
   "main": "out/extension",
   "activationEvents": [
@@ -20,8 +22,17 @@
   "devDependencies": {
     "@types/node": "^17.0.35",
     "@types/vscode": "^1.63.0",
-    "typescript": "^4.7.2"
+    "typescript": "^4.7.2",
+    "vsce": "^2.14.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cuely/cuely"
+  },
+  "icon": "optics_logo.png",
+  "categories": [
+    "Programming Languages"
+  ],
   "contributes": {
     "languages": [
       {

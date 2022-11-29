@@ -2,3 +2,10 @@
     rm -rf out
     wasm-pack build --release --target nodejs --out-dir out
     rm -f out/package.json
+
+@package:
+    npm run compile
+    npm run package
+
+@publish:
+    npm run publish

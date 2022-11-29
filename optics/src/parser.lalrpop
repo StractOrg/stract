@@ -69,7 +69,7 @@ InnerAction: RawAction= {
 
 
 Ranking: RankingCoeff = {
-    "Ranking" "(" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> ")" =>? {
+    "Ranking" "{" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> "}" =>? {
         match score.parse() {
             Ok(score) => Ok(RankingCoeff {
                 target,
