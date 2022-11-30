@@ -47,6 +47,8 @@ impl Property {
     }
 }
 
+pub type SingleMap = HashMap<OneOrMany<String>, HashMap<String, OneOrMany<Property>>>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
     #[serde(rename = "@type")]
@@ -54,6 +56,7 @@ pub struct Item {
     #[serde(flatten)]
     pub properties: HashMap<String, OneOrMany<Property>>,
 }
+
 impl Item {
     pub fn types_contains(&self, itemtype: &str) -> bool {
         match &self.itemtype {
@@ -64,9 +67,85 @@ impl Item {
             None => false,
         }
     }
+
+    pub fn into_single_map(self) -> Option<SingleMap> {
+        self.itemtype.map(|tt| {
+            let mut res = HashMap::new();
+
+            let properties = self
+                .properties
+                .into_iter()
+                .filter_map(|(key, prop)| {
+                    let new_prop = match prop {
+                        OneOrMany::One(one) => match one {
+                            Property::String(s) => Some(vec![Property::String(s)]),
+                            Property::Item(item) => item.into_single_map().map(|item| {
+                                let mut items = Vec::new();
+
+                                for (tt, item) in item.into_iter() {
+                                    res.entry(tt).or_insert_with(HashMap::new);
+                                    if !item.is_empty() {
+                                        items.push(Property::Item(Item {
+                                            properties: item,
+                                            itemtype: None,
+                                        }));
+                                    }
+                                }
+
+                                items
+                            }),
+                        },
+                        OneOrMany::Many(many) => {
+                            if many.is_empty() {
+                                None
+                            } else {
+                                Some(
+                                    many.into_iter()
+                                        .filter_map(|prop| match prop {
+                                            Property::String(s) => Some(vec![Property::String(s)]),
+                                            Property::Item(item) => {
+                                                item.into_single_map().map(|item| {
+                                                    let mut items = Vec::new();
+
+                                                    for (tt, item) in item.into_iter() {
+                                                        res.entry(tt).or_insert_with(HashMap::new);
+                                                        if !item.is_empty() {
+                                                            items.push(Property::Item(Item {
+                                                                properties: item,
+                                                                itemtype: None,
+                                                            }));
+                                                        }
+                                                    }
+
+                                                    items
+                                                })
+                                            }
+                                        })
+                                        .flatten()
+                                        .collect(),
+                                )
+                            }
+                        }
+                    };
+
+                    new_prop.map(|mut new_prop| {
+                        if new_prop.len() == 1 {
+                            (key, OneOrMany::One(new_prop.pop().unwrap()))
+                        } else {
+                            (key, OneOrMany::Many(new_prop))
+                        }
+                    })
+                })
+                .collect();
+
+            res.insert(tt, properties);
+
+            res
+        })
+    }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Hash)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),

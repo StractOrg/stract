@@ -721,4 +721,209 @@ mod tests {
         assert_eq!(res[1].url, "https://www.a.com/this/is/a/pattern");
         assert_eq!(res[2].url, "https://www.c.com/this/is/c/pattern");
     }
+
+    #[test]
+    fn schema_org_search() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                            <script type="application/ld+json">
+                                {{
+                                "@context": "https://schema.org",
+                                "@type": "ImageObject",
+                                "author": "Jane Doe",
+                                "contentLocation": "Puerto Vallarta, Mexico",
+                                "contentUrl": "mexico-beach.jpg",
+                                "datePublished": "2008-01-25",
+                                "description": "I took this picture while on vacation last year.",
+                                "name": "Beach in Mexico"
+                                }}
+                            </script>
+                        </head>
+                        <body>
+                            {CONTENT} {}
+                            example example example
+                        </body>
+                    </html>
+                "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.a.com/",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r##"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            <article itemscope itemtype="http://schema.org/BlogPosting">
+                                <section>
+                                <h1>Comments</h1>
+                                <article itemprop="comment" itemscope itemtype="http://schema.org/UserComments" id="c1">
+                                <link itemprop="url" href="#c1">
+                                <footer>
+                                    <p>Posted by: <span itemprop="creator" itemscope itemtype="http://schema.org/Person">
+                                    <span itemprop="name">Greg</span>
+                                    </span></p>
+                                    <p><time itemprop="commentTime" datetime="2013-08-29">15 minutes ago</time></p>
+                                </footer>
+                                <p>Ha!</p>
+                                </article>
+                                </section>
+                            </article>
+                            {CONTENT} {}
+                        </body>
+                    </html>
+                "##,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.b.com/",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0001,
+                page_centrality: 0.0,
+                primary_image: None,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                fetch_time_ms: 500,
+                node_id: None,
+                dmoz_description: None,
+                host_topic: None,
+            })
+            .expect("failed to insert webpage");
+
+        index.commit().unwrap();
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                optic_program: Some(
+                    r#"
+                        DiscardNonMatching;
+                        Rule {
+                            Matches {
+                                Schema("BlogPosting")
+                            }
+                        }
+                    "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://www.b.com/");
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                optic_program: Some(
+                    r#"
+                        DiscardNonMatching;
+                        Rule {
+                            Matches {
+                                Schema("BlogPosting.comment")
+                            }
+                        }
+                    "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://www.b.com/");
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                optic_program: Some(
+                    r#"
+                        DiscardNonMatching;
+                        Rule {
+                            Matches {
+                                Schema("ImageObject")
+                            }
+                        }
+                    "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://www.a.com/");
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                selected_region: None,
+                optic_program: Some(
+                    r#"
+                        DiscardNonMatching;
+                        Rule {
+                            Matches {
+                                Schema("Person")
+                            }
+                        }
+                    "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://www.b.com/");
+    }
 }

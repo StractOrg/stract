@@ -100,6 +100,7 @@ pub enum FastField {
     HostNodeID,
     SimHash,
     CrawlStability,
+    NumFlattenedSchemaTokens,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -108,7 +109,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 42] = [
+pub static ALL_FIELDS: [Field; 43] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -143,6 +144,7 @@ pub static ALL_FIELDS: [Field; 42] = [
     Field::Fast(FastField::NumDescriptionTokens),
     Field::Fast(FastField::NumDomainTokens),
     Field::Fast(FastField::NumSiteTokens),
+    Field::Fast(FastField::NumFlattenedSchemaTokens),
     Field::Fast(FastField::SiteHash),
     Field::Fast(FastField::UrlWithoutQueryHash),
     Field::Fast(FastField::TitleHash),
@@ -287,6 +289,11 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
+            Field::Fast(FastField::NumFlattenedSchemaTokens) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
             Field::Fast(FastField::SiteHash) => IndexingOption::Integer(
                 NumericOptions::default().set_fast(Cardinality::MultiValues),
             ),
@@ -364,6 +371,7 @@ impl Field {
             Field::Fast(FastField::NumDescriptionTokens) => "num_description_tokens",
             Field::Fast(FastField::NumDomainTokens) => "num_domain_tokens",
             Field::Fast(FastField::NumSiteTokens) => "num_site_tokens",
+            Field::Fast(FastField::NumFlattenedSchemaTokens) => "num_flattened_schema_tokens",
             Field::Fast(FastField::SiteHash) => "site_hash",
             Field::Fast(FastField::UrlWithoutQueryHash) => "url_without_query_hash",
             Field::Fast(FastField::PreComputedScore) => "pre_computed_score",
@@ -520,6 +528,7 @@ impl FastField {
             FastField::NumDescriptionTokens => DataType::U64,
             FastField::NumDomainTokens => DataType::U64,
             FastField::NumSiteTokens => DataType::U64,
+            FastField::NumFlattenedSchemaTokens => DataType::U64,
             FastField::SiteHash => DataType::U64s,
             FastField::UrlWithoutQueryHash => DataType::U64s,
             FastField::TitleHash => DataType::U64s,

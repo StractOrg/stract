@@ -15,13 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::query::Scorer;
-use tantivy::{DocId, DocSet, Score};
+use tantivy::{DocId, DocSet, Score, TERMINATED};
 
 /// Creates a `DocSet` that iterate through the intersection of two or more `DocSet`s.
-pub struct Intersection<TDocSet: DocSet, TOtherDocSet: DocSet = Box<dyn Scorer>> {
-    left: TDocSet,
-    right: TDocSet,
-    others: Vec<TOtherDocSet>,
+pub struct Intersection<TDocSet: DocSet = Box<dyn Scorer>> {
+    docsets: Vec<TDocSet>,
 }
 
 fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
@@ -39,94 +37,75 @@ fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
     }
 }
 
-impl<TDocSet: DocSet> Intersection<TDocSet, TDocSet> {
-    pub(crate) fn new(mut docsets: Vec<TDocSet>) -> Intersection<TDocSet, TDocSet> {
-        let num_docsets = docsets.len();
-        assert!(num_docsets >= 2);
+impl<TDocSet: DocSet> Intersection<TDocSet> {
+    pub(crate) fn new(mut docsets: Vec<TDocSet>) -> Intersection<TDocSet> {
         docsets.sort_by_key(|docset| docset.size_hint());
         go_to_first_doc(&mut docsets);
-        let left = docsets.remove(0);
-        let right = docsets.remove(0);
-        Intersection {
-            left,
-            right,
-            others: docsets,
-        }
+        Intersection { docsets }
     }
 }
 
-impl<TDocSet: DocSet, TOtherDocSet: DocSet> DocSet for Intersection<TDocSet, TOtherDocSet> {
+impl<TDocSet: DocSet> DocSet for Intersection<TDocSet> {
     fn advance(&mut self) -> DocId {
-        let (left, right) = (&mut self.left, &mut self.right);
-        let mut candidate = left.advance();
+        if self.docsets.is_empty() {
+            return TERMINATED;
+        }
 
+        let (first, rest) = self.docsets.split_at_mut(1);
+        let rarest_docset = &mut first[0];
+        let mut candidate = rarest_docset.advance();
         'outer: loop {
-            // In the first part we look for a document in the intersection
-            // of the two rarest `DocSet` in the intersection.
-
-            loop {
-                let right_doc = right.seek(candidate);
-                candidate = left.seek(right_doc);
-                if candidate == right_doc {
-                    break;
-                }
-            }
-
-            debug_assert_eq!(left.doc(), right.doc());
-            // test the remaining scorers;
-            for docset in self.others.iter_mut() {
+            for docset in rest.iter_mut() {
                 let seek_doc = docset.seek(candidate);
                 if seek_doc > candidate {
-                    candidate = left.seek(seek_doc);
+                    candidate = rarest_docset.seek(seek_doc);
                     continue 'outer;
                 }
             }
-            debug_assert_eq!(candidate, self.left.doc());
-            debug_assert_eq!(candidate, self.right.doc());
-            debug_assert!(self.others.iter().all(|docset| docset.doc() == candidate));
+            debug_assert!(self.docsets.iter().all(|docset| docset.doc() == candidate));
             return candidate;
         }
     }
 
     fn seek(&mut self, target: DocId) -> DocId {
-        self.left.seek(target);
-        let mut docsets: Vec<&mut dyn DocSet> = vec![&mut self.left, &mut self.right];
-        for docset in &mut self.others {
-            docsets.push(docset);
+        match self.docsets.first_mut() {
+            Some(docset) => {
+                docset.seek(target);
+                let doc = go_to_first_doc(&mut self.docsets[..]);
+                debug_assert!(self.docsets.iter().all(|docset| docset.doc() == doc));
+                debug_assert!(doc >= target);
+                doc
+            }
+            None => TERMINATED,
         }
-        let doc = go_to_first_doc(&mut docsets[..]);
-        debug_assert!(docsets.iter().all(|docset| docset.doc() == doc));
-        debug_assert!(doc >= target);
-        doc
     }
 
     fn doc(&self) -> DocId {
-        self.left.doc()
+        self.docsets
+            .first()
+            .map(|docset| docset.doc())
+            .unwrap_or(TERMINATED)
     }
 
     fn size_hint(&self) -> u32 {
-        self.left.size_hint()
+        self.docsets
+            .first()
+            .map(|docset| docset.size_hint())
+            .unwrap_or(0)
     }
 }
 
-impl<TScorer, TOtherScorer> Scorer for Intersection<TScorer, TOtherScorer>
+impl<TScorer> Scorer for Intersection<TScorer>
 where
     TScorer: Scorer,
-    TOtherScorer: Scorer,
 {
     fn score(&mut self) -> Score {
-        self.left.score()
-            + self.right.score()
-            + self.others.iter_mut().map(Scorer::score).sum::<Score>()
+        self.docsets.iter_mut().map(Scorer::score).sum::<Score>()
     }
 }
 
-impl<TDocSet: DocSet> Intersection<TDocSet, TDocSet> {
+impl<TDocSet: DocSet> Intersection<TDocSet> {
     pub(crate) fn docset_mut_specialized(&mut self, ord: usize) -> &mut TDocSet {
-        match ord {
-            0 => &mut self.left,
-            1 => &mut self.right,
-            n => &mut self.others[n - 2],
-        }
+        &mut self.docsets[ord]
     }
 }

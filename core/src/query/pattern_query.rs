@@ -186,6 +186,12 @@ impl PatternWeight {
                     .get_field(Field::Fast(FastField::NumDescriptionTokens).name())
                     .unwrap(),
             ),
+            Field::Text(TextField::FlattenedSchemaOrgJson) => reader.fast_fields().u64(
+                reader
+                    .schema()
+                    .get_field(Field::Fast(FastField::NumFlattenedSchemaTokens).name())
+                    .unwrap(),
+            ),
             field => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",
                 field.name()
@@ -246,7 +252,7 @@ impl tantivy::query::Weight for PatternWeight {
 struct PatternScorer {
     similarity_weight: Bm25Weight,
     fieldnorm_reader: FieldNormReader,
-    intersection_docset: Intersection<SegmentPostings, SegmentPostings>,
+    intersection_docset: Intersection<SegmentPostings>,
     pattern: Vec<SmallPatternPart>,
     num_query_terms: usize,
     left: Vec<u32>,

@@ -610,12 +610,35 @@ impl Html {
         let site = self.pretokenize_site();
         let description = self.pretokenize_description();
 
-        let schemas = self.schema_org();
+        let schemas: Vec<_> = self
+            .schema_org()
+            .into_iter()
+            .filter_map(|schema| schema.into_single_map())
+            .collect();
 
-        let schema_json = if schemas.is_empty() {
-            String::new()
-        } else {
-            serde_json::to_string(&schemas).ok().unwrap_or_default()
+        let schema_json = serde_json::to_string(&self.schema_org())
+            .ok()
+            .unwrap_or_default();
+
+        let pretokenized_schema_json = match FlattenedJson::new(&schemas) {
+            Ok(f) => {
+                let mut tokens = Vec::new();
+
+                let mut stream = f.token_stream();
+
+                while let Some(token) = stream.next() {
+                    tokens.push(token.clone());
+                }
+
+                PreTokenizedString {
+                    text: f.text().to_string(),
+                    tokens,
+                }
+            }
+            Err(_) => PreTokenizedString {
+                text: String::new(),
+                tokens: Vec::new(),
+            },
         };
 
         for field in &ALL_FIELDS {
@@ -732,32 +755,7 @@ impl Html {
                     doc.add_text(tantivy_field, schema_json.clone());
                 }
                 Field::Text(TextField::FlattenedSchemaOrgJson) => {
-                    match FlattenedJson::new(&schemas) {
-                        Ok(f) => {
-                            let mut tokens = Vec::new();
-
-                            let mut stream = f.token_stream();
-
-                            while let Some(token) = stream.next() {
-                                tokens.push(token.clone());
-                            }
-
-                            doc.add_pre_tokenized_text(
-                                tantivy_field,
-                                PreTokenizedString {
-                                    text: f.text().to_string(),
-                                    tokens,
-                                },
-                            )
-                        }
-                        Err(_) => doc.add_pre_tokenized_text(
-                            tantivy_field,
-                            PreTokenizedString {
-                                text: String::new(),
-                                tokens: Vec::new(),
-                            },
-                        ),
-                    }
+                    doc.add_pre_tokenized_text(tantivy_field, pretokenized_schema_json.clone());
                 }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, self.url().is_homepage().into());
@@ -787,6 +785,9 @@ impl Html {
                 }
                 Field::Fast(FastField::NumDomainTokens) => {
                     doc.add_u64(tantivy_field, domain.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumFlattenedSchemaTokens) => {
+                    doc.add_u64(tantivy_field, pretokenized_schema_json.tokens.len() as u64)
                 }
                 Field::Fast(FastField::SiteHash) => {
                     let hash = hash(self.url().site()).0;

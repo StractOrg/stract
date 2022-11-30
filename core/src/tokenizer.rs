@@ -284,10 +284,15 @@ fn rec_flatten(val: serde_json::Value) -> Vec<String> {
                 let mut k = ".".to_string();
                 k.push_str(&key);
 
-                for val in rec_flatten(value) {
-                    let mut k = k.clone();
-                    k.push_str(&val);
-                    res.push(k)
+                let rec = rec_flatten(value);
+                if rec.is_empty() {
+                    res.push(k);
+                } else {
+                    for val in rec {
+                        let mut k = k.clone();
+                        k.push_str(&val);
+                        res.push(k)
+                    }
                 }
             }
 
