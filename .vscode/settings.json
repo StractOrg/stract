@@ -7,5 +7,9 @@
   "tailwindCSS.experimental.configFile": "frontend/tailwind.config.cjs",
   "[astro]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  "rust-analyzer.linkedProjects": [
+    "Cargo.toml",
+    "optics-lsp/Cargo.toml"
+  ]
 }
