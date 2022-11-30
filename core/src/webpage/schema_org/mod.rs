@@ -47,7 +47,41 @@ impl Property {
     }
 }
 
-pub type SingleMap = HashMap<OneOrMany<String>, HashMap<String, OneOrMany<Property>>>;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SingleMap {
+    Leaf(String),
+    Node(HashMap<OneOrMany<String>, HashMap<String, OneOrMany<SingleMap>>>),
+}
+
+impl From<Property> for SingleMap {
+    fn from(value: Property) -> Self {
+        match value {
+            Property::String(s) => SingleMap::Leaf(s),
+            Property::Item(item) => {
+                let mut res = HashMap::new();
+
+                if let Some(tt) = item.itemtype {
+                    let recursive = item
+                        .properties
+                        .into_iter()
+                        .map(|(key, val)| match val {
+                            OneOrMany::One(one) => (key, OneOrMany::One(SingleMap::from(one))),
+                            OneOrMany::Many(many) => (
+                                key,
+                                OneOrMany::Many(many.into_iter().map(SingleMap::from).collect()),
+                            ),
+                        })
+                        .collect();
+
+                    res.insert(tt, recursive);
+                }
+
+                SingleMap::Node(res)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
@@ -68,80 +102,8 @@ impl Item {
         }
     }
 
-    pub fn into_single_map(self) -> Option<SingleMap> {
-        self.itemtype.map(|tt| {
-            let mut res = HashMap::new();
-
-            let properties = self
-                .properties
-                .into_iter()
-                .filter_map(|(key, prop)| {
-                    let new_prop = match prop {
-                        OneOrMany::One(one) => match one {
-                            Property::String(s) => Some(vec![Property::String(s)]),
-                            Property::Item(item) => item.into_single_map().map(|item| {
-                                let mut items = Vec::new();
-
-                                for (tt, item) in item.into_iter() {
-                                    res.entry(tt).or_insert_with(HashMap::new);
-                                    if !item.is_empty() {
-                                        items.push(Property::Item(Item {
-                                            properties: item,
-                                            itemtype: None,
-                                        }));
-                                    }
-                                }
-
-                                items
-                            }),
-                        },
-                        OneOrMany::Many(many) => {
-                            if many.is_empty() {
-                                None
-                            } else {
-                                Some(
-                                    many.into_iter()
-                                        .filter_map(|prop| match prop {
-                                            Property::String(s) => Some(vec![Property::String(s)]),
-                                            Property::Item(item) => {
-                                                item.into_single_map().map(|item| {
-                                                    let mut items = Vec::new();
-
-                                                    for (tt, item) in item.into_iter() {
-                                                        res.entry(tt).or_insert_with(HashMap::new);
-                                                        if !item.is_empty() {
-                                                            items.push(Property::Item(Item {
-                                                                properties: item,
-                                                                itemtype: None,
-                                                            }));
-                                                        }
-                                                    }
-
-                                                    items
-                                                })
-                                            }
-                                        })
-                                        .flatten()
-                                        .collect(),
-                                )
-                            }
-                        }
-                    };
-
-                    new_prop.map(|mut new_prop| {
-                        if new_prop.len() == 1 {
-                            (key, OneOrMany::One(new_prop.pop().unwrap()))
-                        } else {
-                            (key, OneOrMany::Many(new_prop))
-                        }
-                    })
-                })
-                .collect();
-
-            res.insert(tt, properties);
-
-            res
-        })
+    pub fn into_single_map(self) -> SingleMap {
+        SingleMap::from(Property::Item(self))
     }
 }
 

@@ -613,7 +613,7 @@ impl Html {
         let schemas: Vec<_> = self
             .schema_org()
             .into_iter()
-            .filter_map(|schema| schema.into_single_map())
+            .map(|schema| schema.into_single_map())
             .collect();
 
         let schema_json = serde_json::to_string(&self.schema_org())
