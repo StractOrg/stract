@@ -731,6 +731,9 @@ impl Html {
                 Field::Text(TextField::SchemaOrgJson) => {
                     doc.add_text(tantivy_field, self.schema_org_json().unwrap_or_default());
                 }
+                Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                    todo!();
+                }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, self.url().is_homepage().into());
                 }
@@ -739,7 +742,7 @@ impl Html {
                     self.updated_time()
                         .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
-                Field::Fast(FastField::NumTrackers) => {
+                Field::Fast(FastField::TrackerScore) => {
                     doc.add_u64(tantivy_field, self.trackers().len() as u64)
                 }
                 Field::Fast(FastField::NumUrlTokens) => {

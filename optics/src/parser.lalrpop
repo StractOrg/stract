@@ -41,6 +41,7 @@ RawMatchPart: RawMatchPart = {
     "Title" "(" <StringLiteral> ")" => RawMatchPart::Title(<>.to_string()),
     "Description" "(" <StringLiteral> ")" => RawMatchPart::Description(<>.to_string()),
     "Content" "(" <StringLiteral> ")" => RawMatchPart::Content(<>.to_string()),
+    "Schema" "(" <StringLiteral> ")" => RawMatchPart::Schema(<>.to_string()),
 }
 
 RawAction: RawAction= {
@@ -116,6 +117,7 @@ extern {
         "Title" => Token::Title,
         "Description" => Token::Description,
         "Content" => Token::Content,
+        "Schema" => Token::Schema,
         "Action" => Token::Action,
         "Boost" => Token::Boost,
         "Downrank" => Token::Downrank,

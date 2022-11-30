@@ -315,6 +315,10 @@ impl FlattenedJson {
     pub fn token_stream(&self) -> BoxTokenStream {
         tantivy::tokenizer::Tokenizer::token_stream(&JsonField, &self.flattened_json)
     }
+
+    pub fn as_str() -> &'static str {
+        "flattened_json_tokenizer"
+    }
 }
 
 #[derive(Clone)]

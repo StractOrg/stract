@@ -101,6 +101,7 @@ pub enum RawMatchPart {
     Title(String),
     Description(String),
     Content(String),
+    Schema(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]

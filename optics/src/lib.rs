@@ -56,6 +56,9 @@ pub enum Error {
 
     #[error("Unknown parse error")]
     Unknown(usize, usize),
+
+    #[error("Unsupported pattern")]
+    Pattern,
 }
 
 pub fn parse(optic: &str) -> Result<Optic> {
@@ -156,16 +159,28 @@ impl TryFrom<RawMatchPart> for Matching {
             RawMatchPart::Title(s) => (s, MatchLocation::Title),
             RawMatchPart::Description(s) => (s, MatchLocation::Description),
             RawMatchPart::Content(s) => (s, MatchLocation::Content),
+            RawMatchPart::Schema(s) => (s, MatchLocation::Schema),
         };
 
         let mut pattern = Vec::new();
 
-        for tok in PatternToken::lexer(&s) {
-            match tok {
-                PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
-                PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
-                PatternToken::Anchor => pattern.push(PatternPart::Anchor),
-                PatternToken::Error => unreachable!("no patterns should fail lexing"),
+        if matches!(&loc, MatchLocation::Schema) {
+            for tok in PatternToken::lexer(&s) {
+                match tok {
+                    PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
+                    PatternToken::Wildcard => return Err(Error::Pattern),
+                    PatternToken::Anchor => return Err(Error::Pattern),
+                    PatternToken::Error => unreachable!("no patterns should fail lexing"),
+                }
+            }
+        } else {
+            for tok in PatternToken::lexer(&s) {
+                match tok {
+                    PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
+                    PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
+                    PatternToken::Anchor => pattern.push(PatternPart::Anchor),
+                    PatternToken::Error => unreachable!("no patterns should fail lexing"),
+                }
             }
         }
 
@@ -206,6 +221,7 @@ pub enum MatchLocation {
     Title,
     Description,
     Content,
+    Schema,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

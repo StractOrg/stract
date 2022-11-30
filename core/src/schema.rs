@@ -18,7 +18,7 @@ use tantivy::schema::{
     BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{Identity, Normal, Stemmed};
+use crate::tokenizer::{FlattenedJson, Identity, Normal, Stemmed};
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
@@ -46,6 +46,7 @@ pub enum TextField {
     HostTopic,
     DmozDescription,
     SchemaOrgJson,
+    FlattenedSchemaOrgJson,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -55,7 +56,7 @@ pub enum FastField {
     PageCentrality,
     FetchTimeMs,
     LastUpdated,
-    NumTrackers,
+    TrackerScore,
     Region,
     NumUrlTokens,
     NumTitleTokens,
@@ -80,7 +81,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 41] = [
+pub static ALL_FIELDS: [Field; 42] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -100,13 +101,14 @@ pub static ALL_FIELDS: [Field; 41] = [
     Field::Text(TextField::HostTopic),
     Field::Text(TextField::DmozDescription),
     Field::Text(TextField::SchemaOrgJson),
+    Field::Text(TextField::FlattenedSchemaOrgJson),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
     Field::Fast(FastField::PageCentrality),
     Field::Fast(FastField::FetchTimeMs),
     Field::Fast(FastField::LastUpdated),
-    Field::Fast(FastField::NumTrackers),
+    Field::Fast(FastField::TrackerScore),
     Field::Fast(FastField::Region),
     Field::Fast(FastField::NumUrlTokens),
     Field::Fast(FastField::NumTitleTokens),
@@ -199,6 +201,13 @@ impl Field {
                     )
                     .set_stored(),
             ),
+            Field::Text(TextField::FlattenedSchemaOrgJson) => IndexingOption::Text(
+                TextOptions::default()
+                    .set_indexing_options(
+                        TextFieldIndexing::default().set_tokenizer(FlattenedJson::as_str()),
+                    )
+                    .set_stored(),
+            ),
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -219,7 +228,7 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::Fast(FastField::NumTrackers) => IndexingOption::Integer(
+            Field::Fast(FastField::TrackerScore) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -328,13 +337,14 @@ impl Field {
             Field::Text(TextField::HostTopic) => "host_topic",
             Field::Text(TextField::DmozDescription) => "dmoz_description",
             Field::Text(TextField::SchemaOrgJson) => "schema_org_json",
+            Field::Text(TextField::FlattenedSchemaOrgJson) => "flattened_schema_org_json",
             // FAST FIELDS
             Field::Fast(FastField::HostCentrality) => "host_centrality",
             Field::Fast(FastField::PageCentrality) => "page_centrality",
             Field::Fast(FastField::IsHomepage) => "is_homepage",
             Field::Fast(FastField::FetchTimeMs) => "fetch_time_ms",
             Field::Fast(FastField::LastUpdated) => "last_updated",
-            Field::Fast(FastField::NumTrackers) => "num_trackers",
+            Field::Fast(FastField::TrackerScore) => "tracker_score",
             Field::Fast(FastField::Region) => "region",
             Field::Fast(FastField::NumUrlTokens) => "num_url_tokens",
             Field::Fast(FastField::NumTitleTokens) => "num_title_tokens",
@@ -374,6 +384,7 @@ impl Field {
             Field::Text(TextField::SiteNoTokenizer)
             | Field::Text(TextField::DomainNoTokenizer)
             | Field::Text(TextField::Description)
+            | Field::Text(TextField::FlattenedSchemaOrgJson)
             | Field::Text(TextField::SchemaOrgJson)
             | Field::Text(TextField::PrimaryImage) => None,
             Field::Fast(_) => None,
@@ -415,12 +426,13 @@ impl Field {
             "host_topic" => Some(Field::Text(TextField::HostTopic)),
             "dmoz_description" => Some(Field::Text(TextField::DmozDescription)),
             "schema_org_json" => Some(Field::Text(TextField::SchemaOrgJson)),
+            "flattened_schema_org_json" => Some(Field::Text(TextField::FlattenedSchemaOrgJson)),
             "host_centrality" => Some(Field::Fast(FastField::HostCentrality)),
             "page_centrality" => Some(Field::Fast(FastField::PageCentrality)),
             "is_homepage" => Some(Field::Fast(FastField::IsHomepage)),
             "fetch_time_ms" => Some(Field::Fast(FastField::FetchTimeMs)),
             "last_updated" => Some(Field::Fast(FastField::LastUpdated)),
-            "num_trackers" => Some(Field::Fast(FastField::NumTrackers)),
+            "tracker_score" => Some(Field::Fast(FastField::TrackerScore)),
             "region" => Some(Field::Fast(FastField::Region)),
             "site_hash" => Some(Field::Fast(FastField::SiteHash)),
             "url_without_query_hash" => Some(Field::Fast(FastField::UrlWithoutQueryHash)),
@@ -488,7 +500,7 @@ impl FastField {
             FastField::PageCentrality => DataType::U64,
             FastField::FetchTimeMs => DataType::U64,
             FastField::LastUpdated => DataType::U64,
-            FastField::NumTrackers => DataType::U64,
+            FastField::TrackerScore => DataType::U64,
             FastField::Region => DataType::U64,
             FastField::NumUrlTokens => DataType::U64,
             FastField::NumTitleTokens => DataType::U64,

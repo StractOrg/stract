@@ -17,9 +17,9 @@
 use std::collections::HashMap;
 
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification},
+    notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, Hover, HoverContents, HoverParams, MarkedString, Position,
+     Hover, HoverContents, HoverParams, MarkedString, Position,
     PublishDiagnosticsParams, Range, Url,
 };
 use optics::Optic;
@@ -112,14 +112,9 @@ impl OpticsBackend {
                     serde_wasm_bindgen::from_value(params).unwrap();
 
                 self.handle_change(
-                    params.text_document.uri,
+                    params.text_document.uri.clone(),
                     params.content_changes[0].text.clone(),
-                )
-            }
-            DidSaveTextDocument::METHOD => {
-                let params: DidSaveTextDocumentParams =
-                    serde_wasm_bindgen::from_value(params).unwrap();
-
+                );
                 self.send_diagnostics(params.text_document.uri);
             }
             _ => log(&format!("on_notification {} {:?}", method, params)),
@@ -200,13 +195,17 @@ impl OpticsBackend {
                                 Consider the pattern `\"Best * ever\"`. This will match any result where the description starts with `Best` followed by any term(s) and then followed by the term `ever`. \
                                 Note that the pattern will only match full terms (no substring matching) and the modifier `|` can only be used at the end or beggining of the pattern.".to_string()),
 
+                                optics::Token::Schema => todo!(),
+
                                 optics::Token::Ranking => Some("When results are ranked we take a weighted sum of various signals to give each webpage a score for the specific query. \
                                 The top scored results are then presented to the user. `Ranking` allows you to alter the weight of all the `Signal`s and text `Field`s.".to_string()),
 
                                 optics::Token::Signal => Some("During ranking of the search results, a number of signals are combined in a weighted sum to create the final score for each search result. \
-                                `Signal` allows you to change the coefficient used for each signal, and thereby alter the search result ranking. A complete list of the available signals can be found in the code (https://github.com/Cuely/Cuely/blob/main/src/ranking/signal.rs)".to_string()),
+                                `Signal` allows you to change the coefficient used for each signal, and thereby alter the search result ranking. Some supported signals are e.g. \"harmonic_centrality\", \"bm25\" and \"tracker_score\". \
+                                A complete list of the available signals can be found in the code (https://github.com/Cuely/Cuely/blob/main/src/ranking/signal.rs)".to_string()),
 
                                 optics::Token::Field => Some("`Field` lets you change how the various text fields are prioritized during ranking (e.g. a search result matching text in the title is probably more relevant than a result where only the body matches). \
+                                Some supported fields are e.g. \"title\", \"body\", \"backlink_text\" and \"site\". \
                                 A complete list of available fields can be seen in the code (https://github.com/Cuely/Cuely/blob/main/src/schema.rs)".to_string()),
 
                                 optics::Token::Action => Some("`Action` defines which action should be applied to the matching search result. The result can either be boosted, downranked or discarded.".to_string()),
@@ -368,6 +367,18 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
                 ..Default::default()
             }
         }
+        optics::Error::Pattern => {
+            let message = "One of your patterns are unsupported".to_string();
+            Diagnostic {
+                range: Range {
+                    start: offset_to_pos(0, source),
+                    end: offset_to_pos(source.len(), source),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message,
+                ..Default::default()
+            }
+        },
     }
 }
 

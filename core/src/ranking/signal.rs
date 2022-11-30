@@ -41,7 +41,7 @@ pub enum Signal {
     IsHomepage,
     FetchTimeMs,
     UpdateTimestamp,
-    NumTrackers,
+    TrackerScore,
     Region,
     PersonalCentrality,
     CrawlStability,
@@ -56,7 +56,7 @@ pub const ALL_SIGNALS: [Signal; 12] = [
     Signal::IsHomepage,
     Signal::FetchTimeMs,
     Signal::UpdateTimestamp,
-    Signal::NumTrackers,
+    Signal::TrackerScore,
     Signal::Region,
     Signal::PersonalCentrality,
     Signal::CrawlStability,
@@ -117,9 +117,9 @@ impl Signal {
                     0.0
                 }
             }
-            Signal::NumTrackers => {
-                let num_trackers = value.fastfield_value.unwrap() as f64;
-                1.0 / (num_trackers + 1.0)
+            Signal::TrackerScore => {
+                let tracker_score = value.fastfield_value.unwrap() as f64;
+                1.0 / (tracker_score + 1.0)
             }
             Signal::Region => {
                 let webpage_region = Region::from_id(value.fastfield_value.unwrap());
@@ -151,7 +151,7 @@ impl Signal {
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.01,
             Signal::UpdateTimestamp => 80.0,
-            Signal::NumTrackers => 20.0,
+            Signal::TrackerScore => 20.0,
             Signal::Region => 60.0,
             Signal::CrawlStability => 20.0,
         }
@@ -165,7 +165,7 @@ impl Signal {
             "is_homepage" => Some(Signal::IsHomepage),
             "fetch_time_ms" => Some(Signal::FetchTimeMs),
             "update_timestamp" => Some(Signal::UpdateTimestamp),
-            "num_trackers" => Some(Signal::NumTrackers),
+            "tracker_score" => Some(Signal::TrackerScore),
             "region" => Some(Signal::Region),
             "personal_centrality" => Some(Signal::PersonalCentrality),
             "topic_centrality" => Some(Signal::TopicCentrality),
@@ -182,7 +182,7 @@ impl Signal {
             Signal::IsHomepage => Some(FastField::IsHomepage),
             Signal::FetchTimeMs => Some(FastField::FetchTimeMs),
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),
-            Signal::NumTrackers => Some(FastField::NumTrackers),
+            Signal::TrackerScore => Some(FastField::TrackerScore),
             Signal::Region => Some(FastField::Region),
             Signal::CrawlStability => Some(FastField::CrawlStability),
             Signal::PersonalCentrality => None,
@@ -395,7 +395,7 @@ impl SignalAggregator {
                         .updated_time()
                         .map(|date| date.timestamp().max(0) as u64)
                         .unwrap_or(0),
-                    Signal::NumTrackers => webpage.html.trackers().len() as u64,
+                    Signal::TrackerScore => webpage.html.trackers().len() as u64,
                     Signal::Region => Region::guess_from(webpage).unwrap_or(Region::All).id(),
                     Signal::CrawlStability => {
                         (webpage.crawl_stability * (FLOAT_SCALING as f64)) as u64

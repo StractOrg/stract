@@ -162,6 +162,9 @@ impl AsTantivyQuery for Matching {
 
                 PatternQuery::new(self.pattern.clone(), field).box_clone()
             }
+            MatchLocation::Schema => {
+                todo!()
+            }
         }
     }
 }

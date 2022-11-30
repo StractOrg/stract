@@ -787,8 +787,8 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        Ranking(Field("title"), 20000000);
-                        Ranking(Signal("host_centrality"), 0);
+                        Ranking{Field("title"), 20000000};
+                        Ranking{Signal("host_centrality"), 0};
                     "#
                     .to_string(),
                 ),
@@ -808,7 +808,7 @@ mod tests {
                 selected_region: None,
                 optic_program: Some(
                     r#"
-                        Ranking(Signal("host_centrality"), 2000000);
+                        Ranking{Signal("host_centrality"), 2000000};
                     "#
                     .to_string(),
                 ),

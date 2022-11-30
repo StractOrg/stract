@@ -8,13 +8,13 @@ Rule {
 };
 Rule {
 	Matches {
-		Schema(DiscussionForumPosting),
+		Schema("DiscussionForumPosting"),
 	},
 	Action(Boost(8))
 };
 Rule {
 	Matches {
-		Schema(QAPage),
+		Schema("QAPage"),
 	},
 	Action(Boost(5))
 };
