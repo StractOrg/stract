@@ -148,12 +148,12 @@ mod tests {
         let optic = parse(
             r#"
             // this is a normal comment
-            Ranking(Signal("host_centrality"), 3);
+            Ranking{Signal("host_centrality"), 3};
             /*
                 this is a block comment
              */
-            Ranking(Signal("bm25"), 100);
-            Ranking(Field("url"), 2);
+            Ranking{Signal("bm25"), 100};
+            Ranking{Field("url"), 2};
             Rule {
                 Matches {
                     Url("/this/is/a/*/pattern")

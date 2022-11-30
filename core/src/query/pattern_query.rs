@@ -29,7 +29,6 @@ use crate::{
     query::intersection::Intersection,
     ranking::bm25::Bm25Weight,
     schema::{FastField, Field, TextField, ALL_FIELDS},
-    tokenizer,
 };
 
 #[derive(Debug, Clone)]
@@ -40,16 +39,22 @@ pub struct PatternQuery {
 }
 
 impl PatternQuery {
-    pub fn new(patterns: Vec<PatternPart>, field: tantivy::schema::Field) -> Self {
+    pub fn new(
+        patterns: Vec<PatternPart>,
+        field: TextField,
+        schema: &tantivy::schema::Schema,
+    ) -> Self {
         let mut raw_terms = Vec::new();
+
+        let tv_field = schema.get_field(Field::Text(field).name()).unwrap();
 
         for pattern in &patterns {
             match pattern {
                 PatternPart::Raw(text) => {
-                    let mut stream = tokenizer::Normal::default().token_stream(text);
+                    let mut stream = field.tokenizer().token_stream(text);
 
                     while let Some(token) = stream.next() {
-                        let term = tantivy::Term::from_field_text(field, &token.text);
+                        let term = tantivy::Term::from_field_text(tv_field, &token.text);
                         raw_terms.push(term);
                     }
                 }
@@ -60,7 +65,7 @@ impl PatternQuery {
 
         Self {
             patterns,
-            field,
+            field: tv_field,
             raw_terms,
         }
     }

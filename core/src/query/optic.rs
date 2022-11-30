@@ -21,10 +21,7 @@ use tantivy::{
     schema::Schema,
 };
 
-use crate::{
-    ranking::optics::SCALE,
-    schema::{Field, TextField},
-};
+use crate::{ranking::optics::SCALE, schema::TextField};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -113,58 +110,32 @@ impl AsTantivyQuery for Matching {
     fn as_tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query> {
         match &self.location {
             MatchLocation::Site => {
-                let site_field = schema
-                    .get_field(Field::Text(TextField::Site).name())
-                    .unwrap();
-
-                PatternQuery::new(self.pattern.clone(), site_field).box_clone()
+                PatternQuery::new(self.pattern.clone(), TextField::Site, schema).box_clone()
             }
             MatchLocation::Url => {
-                let field = schema
-                    .get_field(Field::Text(TextField::Url).name())
-                    .unwrap();
-
-                PatternQuery::new(self.pattern.clone(), field).box_clone()
+                PatternQuery::new(self.pattern.clone(), TextField::Url, schema).box_clone()
             }
             MatchLocation::Domain => {
-                let field = schema
-                    .get_field(Field::Text(TextField::Domain).name())
-                    .unwrap();
-
-                PatternQuery::new(self.pattern.clone(), field).box_clone()
+                PatternQuery::new(self.pattern.clone(), TextField::Domain, schema).box_clone()
             }
             MatchLocation::Title => {
-                let field = schema
-                    .get_field(Field::Text(TextField::Title).name())
-                    .unwrap();
-
-                PatternQuery::new(self.pattern.clone(), field).box_clone()
+                PatternQuery::new(self.pattern.clone(), TextField::Title, schema).box_clone()
             }
-            MatchLocation::Description => {
-                let desc_field = schema
-                    .get_field(Field::Text(TextField::Description).name())
-                    .unwrap();
-
-                let dmoz_desc_field = schema
-                    .get_field(Field::Text(TextField::DmozDescription).name())
-                    .unwrap();
-
-                UnionQuery::from(vec![
-                    PatternQuery::new(self.pattern.clone(), desc_field).box_clone(),
-                    PatternQuery::new(self.pattern.clone(), dmoz_desc_field).box_clone(),
-                ])
-                .box_clone()
-            }
+            MatchLocation::Description => UnionQuery::from(vec![
+                PatternQuery::new(self.pattern.clone(), TextField::Description, schema).box_clone(),
+                PatternQuery::new(self.pattern.clone(), TextField::DmozDescription, schema)
+                    .box_clone(),
+            ])
+            .box_clone(),
             MatchLocation::Content => {
-                let field = schema
-                    .get_field(Field::Text(TextField::CleanBody).name())
-                    .unwrap();
-
-                PatternQuery::new(self.pattern.clone(), field).box_clone()
+                PatternQuery::new(self.pattern.clone(), TextField::CleanBody, schema).box_clone()
             }
-            MatchLocation::Schema => {
-                todo!()
-            }
+            MatchLocation::Schema => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::FlattenedSchemaOrgJson,
+                schema,
+            )
+            .box_clone(),
         }
     }
 }

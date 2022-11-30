@@ -18,7 +18,7 @@ use tantivy::schema::{
     BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{FlattenedJson, Identity, Normal, Stemmed};
+use crate::tokenizer::{Identity, JsonField, Tokenizer};
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
@@ -47,6 +47,33 @@ pub enum TextField {
     DmozDescription,
     SchemaOrgJson,
     FlattenedSchemaOrgJson,
+}
+
+impl TextField {
+    pub fn tokenizer(&self) -> Tokenizer {
+        match self {
+            TextField::Title => Tokenizer::default(),
+            TextField::CleanBody => Tokenizer::default(),
+            TextField::StemmedTitle => Tokenizer::new_stemmed(),
+            TextField::StemmedCleanBody => Tokenizer::new_stemmed(),
+            TextField::AllBody => Tokenizer::default(),
+            TextField::Url => Tokenizer::default(),
+            TextField::Site => Tokenizer::default(),
+            TextField::Domain => Tokenizer::default(),
+            TextField::SiteNoTokenizer => Tokenizer::Identity(Identity {}),
+            TextField::DomainNoTokenizer => Tokenizer::Identity(Identity {}),
+            TextField::DomainIfHomepage => Tokenizer::default(),
+            TextField::DomainNameIfHomepageNoTokenizer => Tokenizer::Identity(Identity {}),
+            TextField::TitleIfHomepage => Tokenizer::default(),
+            TextField::BacklinkText => Tokenizer::default(),
+            TextField::PrimaryImage => Tokenizer::Identity(Identity {}),
+            TextField::Description => Tokenizer::default(),
+            TextField::HostTopic => Tokenizer::default(),
+            TextField::DmozDescription => Tokenizer::default(),
+            TextField::SchemaOrgJson => Tokenizer::Identity(Identity {}),
+            TextField::FlattenedSchemaOrgJson => Tokenizer::Json(JsonField),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -128,19 +155,13 @@ pub static ALL_FIELDS: [Field; 42] = [
 ];
 
 impl Field {
-    fn default_text_options_with_tokenizer(
-        &self,
-        tokenizer_name: &str,
-    ) -> tantivy::schema::TextOptions {
+    fn default_text_options(&self) -> tantivy::schema::TextOptions {
+        let tokenizer = self.as_text().unwrap().tokenizer();
         TextOptions::default().set_indexing_options(
             TextFieldIndexing::default()
-                .set_tokenizer(tokenizer_name)
+                .set_tokenizer(tokenizer.as_str())
                 .set_index_option(IndexRecordOption::WithFreqsAndPositions),
         )
-    }
-
-    fn default_text_options(&self) -> tantivy::schema::TextOptions {
-        self.default_text_options_with_tokenizer(Normal::as_str())
     }
 
     pub fn options(&self) -> IndexingOption {
@@ -155,10 +176,10 @@ impl Field {
             Field::Text(TextField::Site) => IndexingOption::Text(self.default_text_options()),
             Field::Text(TextField::Domain) => IndexingOption::Text(self.default_text_options()),
             Field::Text(TextField::SiteNoTokenizer) => {
-                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+                IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::DomainNoTokenizer) => {
-                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+                IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::AllBody) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
@@ -170,18 +191,17 @@ impl Field {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
-                IndexingOption::Text(self.default_text_options_with_tokenizer(Identity::as_str()))
+                IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::BacklinkText) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::StemmedTitle) => {
-                IndexingOption::Text(self.default_text_options_with_tokenizer(Stemmed::as_str()))
+                IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::StemmedCleanBody) => IndexingOption::Text(
-                self.default_text_options_with_tokenizer(Stemmed::as_str())
-                    .set_stored(),
-            ),
+            Field::Text(TextField::StemmedCleanBody) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
             Field::Text(TextField::PrimaryImage) => {
                 IndexingOption::Bytes(BytesOptions::default().set_stored())
             }
@@ -194,20 +214,12 @@ impl Field {
             Field::Text(TextField::DmozDescription) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::SchemaOrgJson) => IndexingOption::Text(
-                TextOptions::default()
-                    .set_indexing_options(
-                        TextFieldIndexing::default().set_tokenizer(Identity::as_str()),
-                    )
-                    .set_stored(),
-            ),
-            Field::Text(TextField::FlattenedSchemaOrgJson) => IndexingOption::Text(
-                TextOptions::default()
-                    .set_indexing_options(
-                        TextFieldIndexing::default().set_tokenizer(FlattenedJson::as_str()),
-                    )
-                    .set_stored(),
-            ),
+            Field::Text(TextField::SchemaOrgJson) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
+            Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)

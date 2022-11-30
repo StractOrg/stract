@@ -33,7 +33,10 @@ extern "C" {
 }
 
 fn log(s: &str) {
-    console_log(&("[optics_lsp] ".to_owned() + s))
+    #[allow(unused_unsafe)]
+    unsafe {
+        console_log(&("[optics_lsp] ".to_owned() + s))
+    }
 }
 
 #[derive(Error, Debug)]

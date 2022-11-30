@@ -53,6 +53,7 @@ pub enum Tokenizer {
     Normal(Normal),
     Identity(Identity),
     Stemmed(Stemmed),
+    Json(JsonField),
 }
 
 impl Tokenizer {
@@ -65,6 +66,7 @@ impl Tokenizer {
             Tokenizer::Normal(_) => Normal::as_str(),
             Tokenizer::Stemmed(_) => Stemmed::as_str(),
             Tokenizer::Identity(_) => Identity::as_str(),
+            Tokenizer::Json(_) => JsonField::as_str(),
         }
     }
 }
@@ -123,6 +125,7 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
             Tokenizer::Normal(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Stemmed(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Identity(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Json(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }
@@ -316,13 +319,19 @@ impl FlattenedJson {
         tantivy::tokenizer::Tokenizer::token_stream(&JsonField, &self.flattened_json)
     }
 
-    pub fn as_str() -> &'static str {
-        "flattened_json_tokenizer"
+    pub fn text(&self) -> &str {
+        &self.flattened_json
     }
 }
 
 #[derive(Clone)]
 pub struct JsonField;
+
+impl JsonField {
+    pub fn as_str() -> &'static str {
+        "json_tokenizer"
+    }
+}
 
 impl tantivy::tokenizer::Tokenizer for JsonField {
     fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
