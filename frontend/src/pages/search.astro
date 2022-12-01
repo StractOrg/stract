@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
 import Hero from "../components/Hero.astro";
-import GoggleSelector from "../components/GoggleSelector.astro";
+import OpticSelector from "../components/OpticSelector.astro";
 import Header from "../components/Header.astro";
 import RankingModal from "../components/RankingModal.astro";
 import { askama } from "../askama";
@@ -28,9 +28,9 @@ import { askama } from "../askama";
           </p>
         </div>
         <div class="flex">
-          <GoggleSelector
-            current_goggle_url="current_goggle_url"
-            default_goggles="default_goggles"
+          <OpticSelector
+            current_optic_url="current_optic_url"
+            default_optics="default_optics"
           />
           <div class="select-region h-full flex flex-col justify-center">
             <select

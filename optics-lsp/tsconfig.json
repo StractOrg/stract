@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2020",
+        "lib": [
+            "es2020"
+        ],
+        "outDir": "out",
+        "rootDirs": [
+            ".",
+            "out"
+        ],
+        "baseUrl": ".",
+        "sourceMap": true,
+        "strict": true
+    },
+    "include": [
+        "./",
+    ]
+}

@@ -1,4 +1,5 @@
-/target
+**/target
+**/out
 .DS_Store
 flamegraph.svg
 static/**/*.css

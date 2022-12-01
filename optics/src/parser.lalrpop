@@ -1,0 +1,131 @@
+use crate::ast::*;
+use crate::lexer::Token;
+use lalrpop_util::ParseError;
+
+grammar<'input>;
+
+Sep<S, T>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
+
+Block: RawOpticBlock = {
+    <Rule> => RawOpticBlock::Rule(<>),
+    <Ranking> => RawOpticBlock::Ranking(<>),
+    <SitePreference> => RawOpticBlock::SitePreference(<>),
+    "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
+}
+
+Rule: RawRule = {
+    "Rule" "{" <matches:RawMatchBlock> <action:RawAction?> "}" => RawRule {
+        matches,
+        action
+    }
+}
+
+RawMatchBlock: RawMatchBlock = {
+    "Matches" "{" <Sep<",", RawMatchPart>> "}" ","? => RawMatchBlock(<>)
+}
+
+RawMatchPart: RawMatchPart = {
+    "Site" "(" <StringLiteral> ")" => RawMatchPart::Site(<>.to_string()),
+    "Url" "(" <StringLiteral> ")" => RawMatchPart::Url(<>.to_string()),
+    "Domain" "(" <StringLiteral> ")" => RawMatchPart::Domain(<>.to_string()),
+    "Title" "(" <StringLiteral> ")" => RawMatchPart::Title(<>.to_string()),
+    "Description" "(" <StringLiteral> ")" => RawMatchPart::Description(<>.to_string()),
+    "Content" "(" <StringLiteral> ")" => RawMatchPart::Content(<>.to_string()),
+    "Schema" "(" <StringLiteral> ")" => RawMatchPart::Schema(<>.to_string()),
+}
+
+RawAction: RawAction= {
+    "Action" "(" <InnerAction> ")" => <>
+}
+
+InnerAction: RawAction= {
+    "Boost" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
+        match score.parse() {
+            Ok(n) => Ok(RawAction::Boost(n)),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+            })
+        }
+    },
+    "Downrank" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
+        match score.parse() {
+            Ok(n) => Ok(RawAction::Downrank(n)),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+            })
+        }
+    },
+    "Discard" => RawAction::Discard,
+}
+
+
+Ranking: RankingCoeff = {
+    "Ranking" "{" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> "}" =>? {
+        match score.parse() {
+            Ok(score) => Ok(RankingCoeff {
+                target,
+                score
+            }),
+            Err(_) => Err(ParseError::User {
+                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+            })
+        }
+    }
+}
+
+RankingTarget: RankingTarget = {
+    "Signal" "(" <StringLiteral> ")" => RankingTarget::Signal(<>.to_string()),
+    "Field" "(" <StringLiteral> ")" => RankingTarget::Field(<>.to_string()),
+}
+
+SitePreference: RawSitePreference = {
+    "Like" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Like(<>.to_string()),
+    "Dislike" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Dislike(<>.to_string())
+}
+
+extern {
+    type Location = usize;
+    type Error = crate::Error;
+    
+    enum Token<'input> {
+        ";" => Token::SemiColon,
+        "," => Token::Comma,
+        "{" => Token::OpenBracket,
+        "}" => Token::CloseBracket,
+        "(" => Token::OpenParenthesis,
+        ")" => Token::CloseParenthesis,
+
+        "DiscardNonMatching" => Token::DiscardNonMatching,
+        "Rule" => Token::Rule,
+        "Ranking" => Token::Ranking,
+        "Signal" => Token::Signal,
+        "Field" => Token::Field,
+        "Matches" => Token::Matches,
+        "Site" => Token::Site,
+        "Url" => Token::Url,
+        "Domain" => Token::Domain,
+        "Title" => Token::Title,
+        "Description" => Token::Description,
+        "Content" => Token::Content,
+        "Schema" => Token::Schema,
+        "Action" => Token::Action,
+        "Boost" => Token::Boost,
+        "Downrank" => Token::Downrank,
+        "Discard" => Token::Discard,
+        "Like" => Token::Like,
+        "Dislike" => Token::Dislike,
+
+        StringLiteral => Token::String(<&'input str>),
+        Number => Token::Number(<&'input str>),
+    }
+}

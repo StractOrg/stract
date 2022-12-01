@@ -1,0 +1,47 @@
+---
+export interface Props {
+  current_optic_url: string;
+  default_optics: string;
+}
+
+import { askama } from "$/askama";
+---
+
+<div class="h-full flex flex-col justify-center p-0 m-0">
+  <select
+    form="searchbar-form"
+    id="optics-selector"
+    name="optic"
+    onchange="document.getElementById('searchbar-form').submit()"
+    class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+    x-data="{ items: $persist([]).as('optics') }"
+  >
+    <option value="">Optic</option>
+    {
+      askama.for_(
+        "optic in default_optics",
+        askama.match("current_optic_url", {
+          "Some(current_optic)": askama.if_(
+            "current_optic == optic.url",
+            () => (
+              <option selected value="{{ optic.url }}">
+                {askama`optic.name`}
+              </option>
+            ),
+            () => (
+              <option value="{{ optic.url }}">{askama`optic.name`}</option>
+            )
+          ),
+          None: <option value="{{ optic.url }}">{askama`optic.name`}</option>,
+        })
+      )
+    }
+    <template x-for="item in items">
+      <option x-value="item.url" x-text="item.name"></option>
+    </template>
+  </select>
+</div>
+
+<script>
+  import "$/alpine";
+</script>
