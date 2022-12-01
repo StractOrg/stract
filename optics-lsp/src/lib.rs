@@ -198,13 +198,15 @@ impl OpticsBackend {
                                 Consider the pattern `\"Best * ever\"`. This will match any result where the description starts with `Best` followed by any term(s) and then followed by the term `ever`. \
                                 Note that the pattern will only match full terms (no substring matching) and the modifier `|` can only be used at the end or beggining of the pattern.".to_string()),
 
-                                optics::Token::Schema => todo!(),
+                                optics::Token::Schema => Some("`Schema(\"...\")` matches any search result that contains the https://schema.org entity defined in `\"...\"`. \
+                                As an example, `Schema(\"BlogPosting\")` matches all pages that contains the https://schema.org/BlogPosting entity. Note that `Schema` \
+                                does not support the pattern syntax, but only simple strings.".to_string()),
 
                                 optics::Token::Ranking => Some("When results are ranked we take a weighted sum of various signals to give each webpage a score for the specific query. \
                                 The top scored results are then presented to the user. `Ranking` allows you to alter the weight of all the `Signal`s and text `Field`s.".to_string()),
 
                                 optics::Token::Signal => Some("During ranking of the search results, a number of signals are combined in a weighted sum to create the final score for each search result. \
-                                `Signal` allows you to change the coefficient used for each signal, and thereby alter the search result ranking. Some supported signals are e.g. \"harmonic_centrality\", \"bm25\" and \"tracker_score\". \
+                                `Signal` allows you to change the coefficient used for each signal, and thereby alter the search result ranking. Some supported signals are e.g. \"host_centrality\", \"bm25\" and \"tracker_score\". \
                                 A complete list of the available signals can be found in the code (https://github.com/Cuely/Cuely/blob/main/src/ranking/signal.rs)".to_string()),
 
                                 optics::Token::Field => Some("`Field` lets you change how the various text fields are prioritized during ranking (e.g. a search result matching text in the title is probably more relevant than a result where only the body matches). \

@@ -1,187 +1,163 @@
-DiscardNonMatching;
+// You can get syntax highlighting for this file with the following vscode extension: https://marketplace.visualstudio.com/items?itemName=Cuely.Optics
 
+// Optics is a domain-specific language that lets you write small programs to
+// influence the search results that gets returned to you from Cuely or other supported search engines.
+// The goal is to give you very fine grained control over your own search experience.
+// Let's see how this is done.
+
+
+// As you might have guessed, comments can either be line-comments with "//" or block-comments "/* ... */".
+// Most optics contains a sequence of rules that defines how a particular search result should be altered
+// given it matches the specific rule.
 Rule {
 	Matches {
-		Url("reddit.com/r/*/comments"),
+		Title("Top * of 2022")
 	},
-	Action(Boost(10))
+	Action(Downrank(3))
 };
 Rule {
 	Matches {
-		Schema("DiscussionForumPosting"),
+		Url("reddit.com/r/*/comments")
 	},
-	Action(Boost(8))
+	Action(Boost(3))
 };
+
+// Let's unwrap what happens in the first two rules.
+// The first rule matches all search results where some pattern occurs in the title of the search result.
+// The pattern "Top * of 2022" indicates that a matching search result must contain the term "top" (non-case-sensitive) followed 
+// by any number of wildcard terms, which is then followed by the terms "of" and "2022" in sequence. This will e.g. match the titles
+// "Top movies of 2022" and "See the top tourist attractions of 2022 in Paris". Note that the wildcard can match more than one term
+// and that the pattern does not have to be at the beggining or end of the title.
+// You can use the special token "|" in a pattern to indicate the beggining or end of the title, so the pattern "|Top * of 2022" would only match
+// "Top movies of 2022" but not "See the top tourist attractions of 2022 in Paris". Patterns also only match entire terms
+// so the pattern "an*how" would not match the term "anyhow" but instead "an <wildcard> how".
+
+// The second rule matches search results where the pattern matches the url of the result. Both rules specify an action that will be applied to
+// the matching results: the first rule downranks these types of listicles whereas the second rule boosts reddit comments.
+// The action can either be `Action(Boost(<int>))`, `Action(Downrank(<int>))` or `Action(Discard)` to completely discard the result.
+// If no action is specified in a rule it is equivalent to `Action(Boost(1))` which will slightly boost a result.
+
+// You can specify any number of patterns in a `Matches` block. A result will only match if it matches all the patterns.
+// As an example, this rule will only discard listicles from "esquire.com" but other results from the same domain will not be discarded.
 Rule {
 	Matches {
-		Schema("QAPage"),
+		Title("Top * of 2022"),
+		Domain("esquire.com")
+	},
+	Action(Discard)
+};
+
+// Currently we support the following match-locations in the `Matches` block:
+// - Site
+// - Url
+// - Domain
+// - Title
+// - Description
+// - Content
+// - Schema
+
+// The most special of these is probably the `Schema` location. This allows you to match results that contains specific https://schema.org entities.
+// This is also the only match-location where you cannot use the special pattern characters "*" and "|". `Schema` only supports simple patterns.
+// The following rule boosts all pages that contains the https://schema.org/DiscussionForumPosting entity
+Rule {
+	Matches {
+		Schema("DiscussionForumPosting")
 	},
 	Action(Boost(5))
 };
 
+// By default, any search result that does not match the optic would simply not have any special action applied to it
+// and the search result's score would be unaltered. This behaviour can be changed by specifying `DiscardNonMatching`
+DiscardNonMatching;
+// Now all search resuts that does not match any of the specified rules will be discarded.
 
 
+// The `Rule` block we have looked at so far only alters search results that matches the specific rules and leaves other
+// results intact. To explain the next part, it will be helpful to know a little bit about how most web search engines
+// rank their results.
+
+// Back in the days when Google launched, it completely disrupted the existing search engines by having a lot of
+// technical advantages. One of the most ground breaking things they did was the introduction of their core ranking
+// algorithm called PageRank. The idea is, that websites that have links from other trustworthy websites must themselves be
+// trustworthy. The idea to analyze website links and use this for ranking gave Google way better search results than their
+// competitors. However, websites quickly realized this and started actively building links to their own website, which skews
+// the PageRank metric. In essense, websites with a high PageRank are no longer guaranteed to be trustworthy but might
+// just be the best websites at link building.
+
+// At Cuely we use a similar link based metric called Harmonic Centrality. It is calculated by taking the sum of the inverse distances
+// from all other websites to a particular website. Imagine site A links to B that then links to C. This gives the following normalized centralities
+// 		A ---> B ---> C
+// 		0 	  0.33   0.5
+
+// While harmonic centrality is believed to be more resistant to link building than page rank, it is still susceptible to it.
+// Let's now get back from our detour and see what this means for our optics.
+
+// In optics you have the ability to like and dislike sites. We then calculate a harmonic centrality score from all your liked sites,
+// and subtract the harmonic centrality from your disliked sites. What this means is, that sites that has a short distance from your liked sites
+// and a long distance from your disliked sites will be heavily prioritized in your search results.
+// This is the same thing that happens whenever you like a search result directly in Cuely.
+Like(Site("news.ycombinator.com"));
+Dislike(Site("w3schools.com"));
+
+// One thing to note here is that only simple patterns can be used inside `Like(Site("..."))` and `Dislike(Site("..."))`.
+// The special tokens "*" and "|" will not work here.
 
 
-// // Write about what optics are used for
-// 
-// // Simple example matching url pattern and title text (also combined)
-// 
-// // List all matching locations currently supported
-// 
-// // Pattern language (*, |) [this only matches terms, not sub-strings]
-// 
-// // Different actions (boost, downrank and discard)
-// 
-// // discard non matching
-// 
-// // like and dislike sites
-// // highlight how this impacts the score of non-matching websites as well
-// 
-// // show how field and signal coefficients can be changed to produce wildly different results
-// 
-// 
-// 
-// 
-// 
-// // name: Quickstart
-// // description: A quick tour of Optics
-// // public: false
-// // author: Optics 101
-// 
-// // Optics are simple, self-contained text files which can be hosted in Github or
-// // Gitlab. These files contain instructions allowing you to tell the search engine how
-// // you'd like your results to be ranked. You can target specific URL patterns
-// // (and, soon, website titles and other aspects of Web pages) and indicate how
-// // their ranking should be altered (e.g. boosted, downranked, or completely
-// // discarded from the results).
-// 
-// // A Optic source file consists of instructions, one per line. Empty lines, or
-// // comments (starting with an exclamation mark: '//') are ignored.
-// 
-// // You probably already noticed the header of this file which contains some
-// // metadata about your Optic, such as: name, description, public and author.
-// // These are *mandatory*.
-// 
-// // Additionally, you can specify the following optional metadata attributes:
-// // * homepage — specifies a homepage URL displayed on your Optic's profile.
-// // * issues — specifies a URL where users can report issues for your Optic.
-// // * transferred_to — Allows to transfer ownership of a Optic.
-// // * avatar —  specifies a *valid* HEX color code for your Optic.
-// // * license — specifies the license of a Optic's instructions.
-// 
-// // The simplest instruction is a plain-text pattern which can be found in URLs.
-// // The following would match any search result whose URL contains the pattern
-// // as-is:
-// /this/is/a/pattern
-// 
-// // It is also possible to use some limited "globbing" capabilities such as the
-// // '*' character which will match zero, one or more characters (note: the number
-// // of wildcards allowed in a given instruction is limited):
-// /this/is/*/pattern
-// 
-// // By default, a pattern can match anywhere in the URL, but there are specific
-// // characters which can be used to indicate prefix or suffix matches: we call them
-// // "anchors".
-// //
-// // The '|' character can be used at the beginning or end of an instruction to
-// // indicate anchoring. The following instruction will match a prefix of the URL:
-// |https://en.
-// 
-// // The following will match a suffix of the URL:
-// /some/path.html|
-// 
-// // Both can be used at the same time:
-// |https://example.com|
-// 
-// // Additionally, each instruction can specify a list of options, following the
-// // '$' character and separated by commas (','). Options can be used to more finely
-// // target specific search results, or to indicate how a matched result's ranking
-// // should be altered.
-// 
-// // The most basic option is 'site=', which can be used to limit a instruction to
-// // a specific website, based on its domain. Options can be specified on their own
-// // (e.g. if you want to target any page of a site) or in conjunction with a
-// // pattern:
-// $site=example.com
-// /blog/$site=example.com
-// 
-// // Another set of options can be used to indicate what you want your instruction
-// // to target. By default any instruction will apply to a URL, but we will add the
-// // ability to match other aspects of a page too, in the future:
-// //
-// // web3$inurl
-// // web3$intitle
-// // web3$indescription
-// // web3$incontent
-// 
-// // You can specify an 'action', which indicates how the ranking of a
-// // matched result should be changed by your instruction. This is the mechanism
-// // through which you can customize the ranking of results to your liking. You can
-// // use one of three possible actions in your instructions, and by default, any
-// // instruction without an action will be considered as 'boost':
-// /r/rust/
-// /r/rust/$boost
-// /r/rust/$boost=2
-// /r/rust/$boost=3
-// 
-// // The value associated with the option indicate the 'strength' with which you
-// // want to alter the ranking (note: that it is currently limited to a maximum
-// // value of 10). It can be used to boost results differently, even inside of the
-// // same Optic (e.g. some results should be favored more than others).
-// //
-// // You can also downrank results:
-// /r/google/$downrank
-// /r/google/$downrank=2
-// /r/google/$downrank=3
-// 
-// // You can also discard results completely:
-// $discard,site=idontwanttobepartoftheresults.com
-// /this/is/spam/$discard
-// 
-// // Most search engines analyze how websites link to eachother to figure out, which
-// // sites are better than others. Google popularized this with their
-// // [PageRank](https://en.wikipedia.org/wiki/PageRank) algorithm which is often 
-// // credited for their great search results when they launched. At Cuely we 
-// // calculate the [Harmonic Centrality](https://en.wikipedia.org/wiki/Centrality#Harmonic_centrality)
-// // and use this to rank websites (along with many other signals).
-// // The thing is, people tend to like and dislike different websites. What
-// // Harmonic Centrality (or PageRank for that matter) finds to be good websites might not
-// // be what you think of as good websites. You should be able to personalize this value.
-// // You can therefore specify a set of sites that you like, and a set of sites that you
-// // dislike. A Harmonic Centrality value is then approxmiated from the sites you choose
-// // during search and used in the ranking.
-// 
-// // The liked and disliked sites are specified as follows
-// liked = [
-//     ilikethissite.com,
-//     example.com,
-// ]
-// 
-// disliked = [
-//     evilwebsite.com,
-//     githubspam.com,
-// ]
-// 
-// // It is important to note, that the sites you like and dislike here adjusts the ranking for all
-// // sites, not just the ones specified. We calculate the distance from your specified sites
-// // to all sites in the search results, and essentially prioritize sites that are closely
-// // linked with your liked sites while not being closely linked to your disliked sites.
-// 
-// 
-// // Last but not least, you can control exactly how the signals gets prioritized for
-// // the final ranking. We countinously add more signals used during ranking,
-// // but you can e.g. heavily prioritize webpages with a high centrality by specifying
-// @host_centrality = 2048
-// 
-// // Or you can boost matches with a specific field with the 'field' prefix e.g
-// @field_title = 50
-// 
-// // Individually, each instruction can either target a very narrow set of pages (or
-// // even a single page), or a wider range of them, to apply reranking to a bigger
-// // set of results. In combination, hundreds or more instructions can allow you to
-// // express complex reranking functions.
-// 
-// // Although the Optics language could express instructions to search through a
-// // small set of websites or act as a blocklist, Optics really shine when used to
-// // express boosting and downranking across many domains and pages.
+// We have now covered how you can alter the scores of specific search results and indicate which sites you like more than others.
+// While harmonic centrality plays a large role in the final score of a search result, in reality it is actually a weighted
+// sum of a number of signals where harmonic centrality is simply one of them.
+// You can change the coefficient for each of these signals as follows
+Ranking {
+	Signal("bm25"),
+	3
+};
+Ranking {
+	Signal("personal_centrality"),
+	10000
+};
+
+// Note that different signals might be scaled differently based on the nature of how they are calculated, so a higher coefficient does
+// not necesarrily result in a larger influence on the final score.
+// Currently we support the following signals, but since this list is highly dynamic we encourage you to consult the source code for the
+// most up-to-date list:
+// - bm25
+// - host_centrality
+// - page_centrality
+// - is_homepage
+// - fetch_time_ms
+// - update_timestamp
+// - tracker_score
+// - region
+// - personal_centrality
+// - topic_centrality
+// - query_centrality
+
+
+// You can also boost text-matches at different parts of a page
+Ranking {
+	Field("title"),
+	10
+}
+
+// The current list of supported fields is listed here, but again we encourage you to consult the code for the most up-to-date list:
+// - title
+// - body
+// - url
+// - site,
+// - backlink_text,
+// - stemmed_title
+// - stemmed_body
+// - domain
+// - domain_if_homepage
+// - primary_image_uuid
+// - domain_name_if_homepage_no_tokenizer
+// - description
+// - all_body
+// - title_if_homepage
+// - host_topic
+// - dmoz_description
+
+
+// Last but not least, when you have developed your optic it can be installed in Cuely by hosting it somewhere
+// that returns a simple plain-text HTTP response and is publicly available. The optic url can then be added
+// to https://cuely.io/optics and you should be able to use it during search.
