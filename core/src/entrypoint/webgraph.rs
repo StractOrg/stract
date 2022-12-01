@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    directory::DirEntry,
     entrypoint::async_download_all_warc_files,
     mapreduce::{Manager, Map, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
@@ -128,20 +127,9 @@ impl Map<StatelessWorker, GraphPointer> for Job {
 }
 
 impl Reduce<FrozenWebgraph> for webgraph::Webgraph {
-    fn reduce(mut self, other: FrozenWebgraph) -> webgraph::Webgraph {
-        let other_path = match &other.root {
-            DirEntry::Folder { name, entries: _ } | DirEntry::File { name, content: _ } => {
-                name.clone()
-            }
-        };
-
-        let other = other.into();
-
-        self.merge(other);
-
-        std::fs::remove_dir_all(other_path).unwrap();
-
-        self
+    fn reduce(self, other: FrozenWebgraph) -> webgraph::Webgraph {
+        let other: webgraph::Webgraph = other.into();
+        self.reduce(other)
     }
 }
 
@@ -158,19 +146,23 @@ impl Reduce<webgraph::Webgraph> for webgraph::Webgraph {
 
 impl Reduce<GraphPointer> for GraphPointer {
     fn reduce(self, other: GraphPointer) -> Self {
-        let other_path = other.0.clone();
         let self_path = self.0.clone();
 
         {
-            let mut graph = open_graph(self.0);
+            let graph = open_graph(self.0);
             let other_graph = open_graph(other.0);
 
-            graph.merge(other_graph);
+            let _ = graph.reduce(other_graph);
         }
 
-        std::fs::remove_dir_all(other_path).unwrap();
-
         GraphPointer(self_path)
+    }
+}
+
+impl Reduce<GraphPointer> for webgraph::Webgraph {
+    fn reduce(self, other: GraphPointer) -> Self {
+        let other = open_graph(other.0);
+        self.reduce(other)
     }
 }
 
@@ -258,7 +250,7 @@ impl Webgraph {
         };
         let worker = StatelessWorker::default();
 
-        warc_paths
+        let mut graphs: Vec<_> = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -274,15 +266,14 @@ impl Webgraph {
             .collect_vec()
             .into_par_iter()
             .map(|job| -> GraphPointer { job.map(&worker) })
-            .map(Some)
-            .reduce(
-                || None,
-                |a, b| match (a, b) {
-                    (Some(a), Some(b)) => Some(a.reduce(b)),
-                    (Some(graph), None) | (None, Some(graph)) => Some(graph),
-                    (None, None) => None,
-                },
-            );
+            .collect();
+
+        if graphs.len() > 1 {
+            let mut graph = open_graph(graphs.pop().unwrap().0);
+            for other in graphs {
+                graph = graph.reduce(other);
+            }
+        }
 
         Ok(())
     }
