@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::Debug,
     marker::PhantomData,
     path::Path,
@@ -24,71 +24,32 @@ use std::{
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{Edge, EdgeIterator, Node, NodeID, Store, StoredEdge};
-use crate::{
-    intmap::IntMap,
-    kv::{rocksdb_store::RocksDbStore, Kv},
-};
+use super::{Edge, Node, NodeID, Store, StoredEdge};
+use crate::kv::{rocksdb_store::RocksDbStore, Kv};
 pub(crate) struct Adjacency {
-    pub(crate) tree: BlockedCachedTree<Vec<StoredEdge>>,
+    pub(crate) tree: CachedTree<NodeID, HashSet<StoredEdge>>,
 }
 
 impl Adjacency {
     fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
-        self.tree.insert(from, &mut |block| {
-            if !block.contains(&from) {
-                block.insert(from, Vec::new());
-            }
+        let edge = StoredEdge { other: to, label };
 
-            block.get_mut(&from).unwrap().push(StoredEdge {
-                other: to,
-                label: label.clone(),
-            })
-        });
+        if let Some(existing) = self.tree.get(&from) {
+            existing.write().unwrap().insert(edge);
+        } else {
+            let mut set = HashSet::new();
+            set.insert(edge);
+            self.tree.insert(from, set);
+        }
     }
 
     fn edges(&self, node: NodeID) -> Vec<StoredEdge> {
-        self.tree.get(&node).unwrap_or_default()
-    }
-}
-
-pub(crate) struct BlockedCachedTree<V>
-where
-    V: Serialize + DeserializeOwned + Clone + Debug,
-{
-    pub(crate) inner: CachedTree<u64, IntMap<V>>,
-    pub(crate) block_size: u64,
-}
-
-impl<V> BlockedCachedTree<V>
-where
-    V: Serialize + DeserializeOwned + Clone + Debug,
-{
-    fn insert<B>(&mut self, key: NodeID, mutate_block: &mut B)
-    where
-        B: FnMut(&mut IntMap<V>),
-    {
-        let block_id = key / self.block_size;
-
-        {
-            if let Some(block) = self.inner.get(&block_id) {
-                let mut block = block.write().unwrap();
-                mutate_block(&mut block);
-                return;
-            }
-        }
-
-        let mut new_block = IntMap::new();
-        mutate_block(&mut new_block);
-
-        self.inner.insert(block_id, new_block);
-    }
-
-    fn get(&self, key: &NodeID) -> Option<V> {
-        let block_id = key / self.block_size;
-        self.inner
-            .get(&block_id)
-            .and_then(|block| block.read().unwrap().get(key).cloned())
+        self.tree
+            .get(&node)
+            .map(|r| r.read().unwrap().clone())
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
     }
 }
 
@@ -169,7 +130,7 @@ pub struct GraphStore<S> {
     pub(crate) adjacency: Adjacency,
     pub(crate) reversed_adjacency: Adjacency,
     pub(crate) node2id: CachedTree<Node, NodeID>,
-    pub(crate) id2node: BlockedCachedTree<Node>,
+    pub(crate) id2node: CachedTree<NodeID, Node>,
     pub(crate) meta: CachedTree<String, u64>,
     pub(crate) store: PhantomData<S>,
 }
@@ -210,9 +171,7 @@ impl<S: Store> GraphStore<S> {
 
     fn assign_id(&mut self, node: Node, id: NodeID) {
         self.node2id.insert(node.clone(), id);
-        self.id2node.insert(id, &mut |block| {
-            block.insert(id, node.clone());
-        });
+        self.id2node.insert(id, node);
     }
 
     fn id_or_assign(&mut self, node: Node) -> NodeID {
@@ -270,19 +229,25 @@ impl<S: Store> GraphStore<S> {
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node.get(id)
+        self.id2node.get(id).map(|r| r.read().unwrap().clone())
     }
 
     pub fn flush(&mut self) {
-        self.adjacency.tree.inner.flush();
-        self.reversed_adjacency.tree.inner.flush();
+        self.adjacency.tree.flush();
+        self.reversed_adjacency.tree.flush();
         self.node2id.flush();
-        self.id2node.inner.flush();
+        self.id2node.flush();
         self.meta.flush();
     }
 
-    pub fn edges(&self) -> EdgeIterator<'_> {
-        EdgeIterator::new(&self.adjacency)
+    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.adjacency.tree.iter().flat_map(|(node_id, edges)| {
+            edges.into_iter().map(move |stored_edge| Edge {
+                from: node_id,
+                to: stored_edge.other,
+                label: stored_edge.label,
+            })
+        })
     }
 
     pub fn append(&mut self, mut other: GraphStore<S>) {
@@ -309,22 +274,13 @@ impl Store for RocksDbStore {
 
         GraphStore {
             adjacency: Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(adjacency, 10_000),
-                    block_size: 1_024,
-                },
+                tree: CachedTree::new(adjacency, 50_000),
             },
             reversed_adjacency: Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(reversed_adjacency, 10_000),
-                    block_size: 1_024,
-                },
+                tree: CachedTree::new(reversed_adjacency, 50_000),
             },
             node2id: CachedTree::new(node2id, 100_000),
-            id2node: BlockedCachedTree {
-                inner: CachedTree::new(id2node, 100_000),
-                block_size: 1_024,
-            },
+            id2node: CachedTree::new(id2node, 100_000),
             meta: CachedTree::new(meta, 1_000),
             store: Default::default(),
         }
@@ -340,22 +296,13 @@ impl Store for RocksDbStore {
 
         GraphStore {
             adjacency: Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(adjacency, 10_000),
-                    block_size: 1_024,
-                },
+                tree: CachedTree::new(adjacency, 50_000),
             },
             reversed_adjacency: Adjacency {
-                tree: BlockedCachedTree {
-                    inner: CachedTree::new(reversed_adjacency, 10_000),
-                    block_size: 1_024,
-                },
+                tree: CachedTree::new(reversed_adjacency, 50_000),
             },
             node2id: CachedTree::new(node2id, 100_000),
-            id2node: BlockedCachedTree {
-                inner: CachedTree::new(id2node, 100_000),
-                block_size: 1_024,
-            },
+            id2node: CachedTree::new(id2node, 100_000),
             meta: CachedTree::new(meta, 1_000),
             store: Default::default(),
         }
@@ -404,8 +351,11 @@ mod test {
         let b_id = store.node2id(&b).unwrap();
         let c_id = store.node2id(&c).unwrap();
 
+        let mut out = store.outgoing_edges(a_id);
+        out.sort();
+
         assert_eq!(
-            store.outgoing_edges(a_id),
+            out,
             vec![
                 Edge {
                     from: a_id,
@@ -420,8 +370,10 @@ mod test {
             ]
         );
 
+        let mut out = store.outgoing_edges(b_id);
+        out.sort();
         assert_eq!(
-            store.outgoing_edges(b_id),
+            out,
             vec![Edge {
                 from: b_id,
                 to: c_id,
@@ -429,16 +381,18 @@ mod test {
             },]
         );
 
+        let mut out = store.ingoing_edges(c_id);
+        out.sort();
         assert_eq!(
-            store.ingoing_edges(c_id),
+            out,
             vec![
                 Edge {
-                    from: b_id,
+                    from: a_id,
                     to: c_id,
                     label: String::new()
                 },
                 Edge {
-                    from: a_id,
+                    from: b_id,
                     to: c_id,
                     label: String::new()
                 },

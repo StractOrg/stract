@@ -25,14 +25,13 @@ use graph_store::GraphStore;
 use crate::directory::{self, DirEntry};
 use crate::webpage::Url;
 
-use self::graph_store::Adjacency;
 use crate::kv::rocksdb_store::RocksDbStore;
 
 pub mod centrality;
 
 pub type NodeID = u64;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct StoredEdge {
     other: NodeID,
     label: String,
@@ -92,76 +91,7 @@ impl From<Url> for Node {
     }
 }
 
-pub struct EdgeIterator<'a> {
-    current_block_idx: usize,
-    blocks: Vec<u64>,
-    adjacency: &'a Adjacency,
-    current_block: Box<dyn Iterator<Item = Edge>>,
-}
-
-impl<'a> EdgeIterator<'a> {
-    fn new(adjacency: &'a Adjacency) -> EdgeIterator<'a> {
-        let blocks: Vec<_> = adjacency.tree.inner.iter().map(|(key, _)| key).collect();
-
-        let block = adjacency
-            .tree
-            .inner
-            .get(&blocks[0])
-            .map(|arc| arc.read().unwrap().clone())
-            .unwrap();
-
-        EdgeIterator {
-            current_block_idx: 0,
-            blocks,
-            adjacency,
-            current_block: Box::new(block.into_iter().flat_map(|(node_id, edges)| {
-                edges.into_iter().map(move |edge| Edge {
-                    from: node_id,
-                    to: edge.other,
-                    label: edge.label,
-                })
-            })),
-        }
-    }
-
-    fn load_next_block(&mut self) {
-        let block_id = self.blocks[self.current_block_idx];
-        let block = self
-            .adjacency
-            .tree
-            .inner
-            .get(&block_id)
-            .map(|arc| arc.read().unwrap().clone())
-            .unwrap();
-
-        self.current_block = Box::new(block.into_iter().flat_map(|(node_id, edges)| {
-            edges.into_iter().map(move |edge| Edge {
-                from: node_id,
-                to: edge.other,
-                label: edge.label,
-            })
-        }));
-
-        self.current_block_idx += 1;
-    }
-}
-
-impl<'a> Iterator for EdgeIterator<'a> {
-    type Item = Edge;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut res = self.current_block.next();
-
-        while self.current_block_idx < self.blocks.len() && res.is_none() {
-            self.load_next_block();
-            res = self.current_block.next();
-        }
-
-        res
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Edge {
     from: NodeID,
     to: NodeID,
