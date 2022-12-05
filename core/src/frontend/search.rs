@@ -22,7 +22,8 @@ use axum_macros::debug_handler;
 
 use crate::{
     search_prettifier::{
-        thousand_sep_number, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection,
+        thousand_sep_number, CodeOrText, DisplayedEntity, DisplayedWebpage,
+        HighlightedSpellCorrection, Snippet,
     },
     searcher::{self, PrettifiedSearchResult, SearchQuery},
     webpage::region::{Region, ALL_REGIONS},

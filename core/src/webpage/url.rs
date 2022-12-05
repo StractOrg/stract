@@ -153,9 +153,23 @@ impl Url {
 
     pub fn prefix_with(&mut self, url: &Url) {
         self.0 = match (url.0.ends_with('/'), self.0.starts_with('/')) {
-            (true, true) => url.protocol().to_string() + "://" + url.site() + &self.0,
+            (true, true) => {
+                let prot = url.protocol().to_string();
+                if prot.is_empty() {
+                    url.full() + self.0.strip_prefix('/').unwrap()
+                } else {
+                    prot + "://" + url.site() + &self.0
+                }
+            }
             (true, false) => url.full() + &self.0,
-            (false, true) => url.protocol().to_string() + "://" + url.site() + &self.0,
+            (false, true) => {
+                let prot = url.protocol().to_string();
+                if prot.is_empty() {
+                    url.full() + &self.0
+                } else {
+                    prot + "://" + url.site() + &self.0
+                }
+            }
             (false, false) => url.full() + "/" + &self.0,
         };
     }

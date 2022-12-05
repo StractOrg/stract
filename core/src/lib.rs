@@ -233,6 +233,9 @@ pub enum Error {
 
     #[error("Unknown CLI option")]
     UnknownCLIOption,
+
+    #[error("The stackoverflow schema was not structured as expected")]
+    InvalidStackoverflowSchema,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

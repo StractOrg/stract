@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import Footer from "../components/Footer.astro";
 import Entity from "../components/Entity.astro";
+import Snippet from "../components/Snippet.astro";
 import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
 import Header from "../components/Header.astro";
@@ -84,7 +85,7 @@ import { askama } from "../askama";
                   <div class="flex flex-col space-y-1 grow min-w-0">
                     <div class="flex items-center text-sm">
                       <a
-                        class="text-gray-600 hover:no-underline truncate url"
+                        class="text-gray-800 hover:no-underline truncate url"
                         href="{{ item.url }}"
                       >
                         {askama`item.pretty_url $ {{internet.url}}`}
@@ -99,14 +100,7 @@ import { askama } from "../askama";
                   </div>
                 </div>
                 <div class="text-sm text-snippet">
-                  {askama.if_("let Some(val) = item.last_updated", () => (
-                    <span class="text-gray-500">
-                      {askama`val $ 2. May 2022`}
-                    </span>
-                  ))}
-                  <span class="[&:nth-child(2)]:before:content-['—']">
-                    {askama`item.snippet|safe $ {{lorem.lines}}`}
-                  </span>
+                  <Snippet snippet={askama `item.snippet`} />
                 </div>
               </div>
               <div class="flex h-full w-20 items-center">
@@ -196,6 +190,10 @@ import { askama } from "../askama";
     text-rendering: optimizeLegibility;
     font-smooth: grayscale;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  .text-snippet {
+    font-weight: 400;
   }
 </style>
 

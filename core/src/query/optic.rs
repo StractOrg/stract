@@ -926,4 +926,83 @@ mod tests {
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.b.com/");
     }
+
+    #[test]
+    fn pattern_same_phrase() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        <body>
+                            {CONTENT} {}
+                            example example example
+                        </body>
+                    </html>
+                "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://chat.stackoverflow.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "site:stackoverflow.com".to_string(),
+                selected_region: None,
+                optic_program: Some(
+                    r#"
+                    DiscardNonMatching;
+                    Rule {
+                        Matches {
+                            Site("a.com")
+                        },
+                        Action(Boost(6))
+                    };
+                    Rule {
+                        Matches {
+                            Site("stackoverflow.blog")
+                        },
+                        Action(Boost(1))
+                    };
+                    Rule {
+                        Matches {
+                            Site("chat.b.eu")
+                        },
+                        Action(Boost(1))
+                    };
+                "#
+                    .to_string(),
+                ),
+                skip_pages: None,
+                site_rankings: None,
+            })
+            .unwrap()
+            .into_websites()
+            .unwrap()
+            .webpages
+            .documents;
+
+        assert_eq!(res.len(), 0);
+    }
 }

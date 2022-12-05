@@ -370,7 +370,7 @@ impl InvertedIndex {
             meta.segments
                 .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
 
-            fs::remove_dir_all(other_path).unwrap();
+            fs::remove_dir_all(other_path).ok();
 
             let self_path = Path::new(&path);
 

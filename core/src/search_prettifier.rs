@@ -25,7 +25,11 @@ use crate::{
     inverted_index::{self, RetrievedWebpage},
     searcher::{self, LocalSearcher},
     spell::CorrectionTerm,
-    webpage::Url,
+    webpage::{
+        schema_org::{OneOrMany, Property},
+        Url,
+    },
+    Error, Result,
 };
 
 pub fn initial(
@@ -112,20 +116,6 @@ pub fn html_escape(s: &str) -> String {
         .collect()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DisplayedWebpage {
-    pub title: String,
-    pub url: String,
-    pub site: String,
-    pub favicon_base64: String,
-    pub domain: String,
-    pub pretty_url: String,
-    pub snippet: String,
-    pub body: String,
-    pub primary_image_uuid: Option<String>,
-    pub last_updated: Option<String>,
-}
-
 fn prettify_url(url: &Url) -> String {
     let mut pretty_url = url.strip_query().to_string();
 
@@ -167,9 +157,228 @@ fn prettify_date(date: NaiveDateTime) -> String {
     format!("{}", date.format("%d. %b. %Y"))
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum CodeOrText {
+    Code(String),
+    Text(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StackOverflowAnswer {
+    pub body: Vec<CodeOrText>,
+    pub date: String,
+    pub url: String,
+    pub upvotes: u32,
+    pub accepted: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StackOverflowQuestion {
+    pub body: Vec<CodeOrText>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Snippet {
+    Normal {
+        date: Option<String>,
+        text: String,
+    },
+    StackOverflowQA {
+        question: StackOverflowQuestion,
+        answers: Vec<StackOverflowAnswer>,
+    },
+}
+
+fn parse_so_answer(
+    text: OneOrMany<Property>,
+    date: OneOrMany<Property>,
+    upvotes: OneOrMany<Property>,
+    url: OneOrMany<Property>,
+    webpage_url: Url,
+    accepted: bool,
+) -> Option<StackOverflowAnswer> {
+    let text: Vec<_> = text
+        .many()
+        .into_iter()
+        .map(|prop| match prop {
+            Property::String(s) => CodeOrText::Text(s),
+            Property::Item(item) => CodeOrText::Code(
+                item.properties
+                    .get("text")
+                    .and_then(|p| p.clone().one())
+                    .and_then(|prop| prop.try_into_string())
+                    .unwrap_or_default(),
+            ),
+        })
+        .collect();
+
+    let date = chrono::NaiveDateTime::parse_from_str(
+        date.one()
+            .and_then(|prop| prop.try_into_string())
+            .unwrap_or_default()
+            .as_str(),
+        "%Y-%m-%dT%H:%M:%S",
+    )
+    .ok()?;
+
+    let upvotes = upvotes
+        .one()
+        .and_then(|prop| prop.try_into_string())
+        .and_then(|s| s.parse().ok())?;
+
+    let url = url
+        .one()
+        .and_then(|prop| prop.try_into_string())
+        .map(Url::from)
+        .map(|mut url| {
+            url.prefix_with(&Url::from(webpage_url.site()));
+            url
+        })?;
+
+    Some(StackOverflowAnswer {
+        body: text,
+        date: format!("{}", date.date().format("%b %d, %Y")),
+        upvotes,
+        url: url.full(),
+        accepted,
+    })
+}
+
+fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
+    match webpage
+        .schema_org
+        .iter()
+        .find(|item| item.types_contains("QAPage"))
+        .and_then(|item| item.properties.get("mainEntity"))
+        .and_then(|properties| properties.clone().one())
+        .and_then(|property| property.try_into_item())
+    {
+        Some(item) => {
+            let question: Vec<CodeOrText> = item
+                .properties
+                .get("text")
+                .map(|item| item.clone().many())
+                .unwrap_or_default()
+                .into_iter()
+                .map(|prop| match prop {
+                    Property::String(s) => CodeOrText::Text(s),
+                    Property::Item(item) => CodeOrText::Code(
+                        item.properties
+                            .get("text")
+                            .and_then(|p| p.clone().one())
+                            .and_then(|prop| prop.try_into_string())
+                            .unwrap_or_default(),
+                    ),
+                })
+                .collect();
+
+            let mut answers = Vec::new();
+
+            if let Some(ans) = item
+                .properties
+                .get("acceptedAnswer")
+                .cloned()
+                .and_then(|ans| ans.one())
+                .and_then(|prop| prop.try_into_item())
+                .and_then(|item| {
+                    match (
+                        item.properties.get("text"),
+                        item.properties.get("dateCreated"),
+                        item.properties.get("upvoteCount"),
+                        item.properties.get("url"),
+                    ) {
+                        (Some(text), Some(date), Some(upvotes), Some(url)) => parse_so_answer(
+                            text.clone(),
+                            date.clone(),
+                            upvotes.clone(),
+                            url.clone(),
+                            Url::from(webpage.url.clone()),
+                            true,
+                        ),
+                        _ => None,
+                    }
+                })
+            {
+                answers.push(ans);
+            }
+
+            for answer in item
+                .properties
+                .get("suggestedAnswer")
+                .cloned()
+                .map(|answers| answers.many())
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|prop| prop.try_into_item())
+                .filter_map(|item| {
+                    match (
+                        item.properties.get("text"),
+                        item.properties.get("dateCreated"),
+                        item.properties.get("upvoteCount"),
+                        item.properties.get("url"),
+                    ) {
+                        (Some(text), Some(date), Some(upvotes), Some(url)) => parse_so_answer(
+                            text.clone(),
+                            date.clone(),
+                            upvotes.clone(),
+                            url.clone(),
+                            Url::from(webpage.url.clone()),
+                            false,
+                        ),
+                        _ => None,
+                    }
+                })
+            {
+                answers.push(answer);
+            }
+
+            Ok(Snippet::StackOverflowQA {
+                question: StackOverflowQuestion { body: question },
+                answers: answers.into_iter().take(3).collect(),
+            })
+        }
+        None => Err(Error::InvalidStackoverflowSchema),
+    }
+}
+
+fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
+    let last_updated = webpage.updated_time.map(prettify_date);
+
+    let url = Url::from(webpage.url.clone());
+
+    if url.domain() == "stackoverflow.com"
+        && webpage
+            .schema_org
+            .iter()
+            .any(|item| item.types_contains("QAPage"))
+    {
+        if let Ok(snippet) = stackoverflow_snippet(webpage) {
+            return snippet;
+        }
+    }
+
+    Snippet::Normal {
+        date: last_updated,
+        text: webpage.snippet.clone(),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DisplayedWebpage {
+    pub title: String,
+    pub url: String,
+    pub site: String,
+    pub favicon_base64: String,
+    pub domain: String,
+    pub pretty_url: String,
+    pub snippet: Snippet,
+    pub body: String,
+    pub primary_image_uuid: Option<String>,
+}
+
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
-        let last_updated = webpage.updated_time.map(prettify_date);
+        let snippet = generate_snippet(&webpage);
 
         let url: Url = webpage.url.clone().into();
         let domain = url.domain().to_string();
@@ -189,10 +398,9 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             pretty_url,
             domain,
             favicon_base64: base64::encode(favicon_bytes),
-            snippet: webpage.snippet, // snippet has already been html-escaped.
+            snippet,
             body: webpage.body,
             primary_image_uuid: webpage.primary_image.map(|image| image.uuid.to_string()),
-            last_updated,
         }
     }
 }
