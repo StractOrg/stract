@@ -21,8 +21,8 @@ use optics::Optic;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bangs::Bangs;
-use crate::entity_index::{EntityIndex, StoredEntity};
+use crate::bangs::{BangHit, Bangs};
+use crate::entity_index::EntityIndex;
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
@@ -35,7 +35,11 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{InitialSearchResult, SearchQuery, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE};
+use super::{
+    InitialSearchResult, SearchQuery, SearchResult, Sidebar, WebsitesResult, NUM_RESULTS_PER_PAGE,
+};
+
+const STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD: f64 = 250.0;
 
 pub struct LocalSearcher {
     index: Index,
@@ -78,17 +82,7 @@ impl LocalSearcher {
         self.topic_centrality = Some(topic_centrality);
     }
 
-    pub fn search_initial(
-        &self,
-        query: &SearchQuery,
-        de_rank_similar: bool,
-    ) -> Result<InitialSearchResult> {
-        let raw_query = query.original.clone();
-        let optic = match query.optic_program.as_ref() {
-            Some(program) => Some(optics::parse(program)?),
-            None => None,
-        };
-
+    fn parse_query(&self, query: &SearchQuery, optic: Option<&Optic>) -> Result<Query> {
         let query_aggregator = optic
             .as_ref()
             .map(|optic| {
@@ -107,15 +101,28 @@ impl LocalSearcher {
             &query_aggregator,
         )?;
 
-        if parsed_query.is_empty() {
-            return Err(Error::EmptyQuery);
+        if let Some(num_results) = query.custom_num_results {
+            parsed_query.set_num_results(num_results)
         }
 
-        if let Some(bangs) = self.bangs.as_ref() {
-            if let Some(bang) = bangs.get(&parsed_query) {
-                return Ok(InitialSearchResult::Bang(bang));
-            }
+        if parsed_query.is_empty() {
+            Err(Error::EmptyQuery)
+        } else {
+            Ok(parsed_query)
         }
+    }
+
+    fn search_inverted_index(
+        &self,
+        query: &SearchQuery,
+        de_rank_similar: bool,
+    ) -> Result<inverted_index::InitialSearchResult> {
+        let optic = match query.optic_program.as_ref() {
+            Some(program) => Some(optics::parse(program)?),
+            None => None,
+        };
+
+        let mut parsed_query = self.parse_query(query, optic.as_ref())?;
 
         let mut optics = Vec::new();
 
@@ -172,26 +179,88 @@ impl LocalSearcher {
 
         ranker = ranker
             .with_max_docs(10_000_000, self.index.num_segments())
-            .with_num_results(NUM_RESULTS_PER_PAGE);
+            .with_num_results(parsed_query.num_results());
 
         if let Some(skip_pages) = query.skip_pages {
             ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
         }
 
-        let webpages = self
-            .index
-            .search_initial(&parsed_query, ranker.collector())?;
-        let correction = self.index.spell_correction(&parsed_query.simple_terms());
+        self.index.search_initial(&parsed_query, ranker.collector())
+    }
 
-        let entity = self
-            .entity_index
+    fn spell_correction(&self, query: &SearchQuery) -> Result<Option<Correction>> {
+        let parsed_query = self.parse_query(query, None)?;
+        Ok(self.index.spell_correction(&parsed_query.simple_terms()))
+    }
+
+    fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
+        let parsed_query = self.parse_query(query, None)?;
+
+        if let Some(bangs) = self.bangs.as_ref() {
+            return Ok(bangs.get(&parsed_query));
+        }
+
+        Ok(None)
+    }
+
+    fn entity_sidebar(&self, query: &SearchQuery) -> Option<Sidebar> {
+        self.entity_index
             .as_ref()
-            .and_then(|index| index.search(&raw_query));
+            .and_then(|index| index.search(&query.original))
+            .map(Sidebar::Entity)
+    }
+
+    fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
+        let mut query = query.clone();
+        query.optic_program = Some(include_str!("stackoverflow.optic").to_string());
+        query.custom_num_results = Some(1);
+
+        let mut res = self.search_inverted_index(&query, false)?;
+
+        if res.num_websites > 0 && !res.top_websites.is_empty() {
+            let top = res.top_websites.remove(0);
+            if top.score > STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD {
+                let mut retrieved = self.retrieve_websites(&[top], &query.original)?;
+                let retrieved = retrieved.remove(0);
+                return Ok(Some(Sidebar::StackOverflow {
+                    schema_org: retrieved.schema_org,
+                    url: retrieved.url,
+                }));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
+        if let Some(entity) = self.entity_sidebar(query) {
+            return Ok(Some(entity));
+        }
+
+        if let Some(stackoverflow) = self.stackoverflow_sidebar(query)? {
+            return Ok(Some(stackoverflow));
+        }
+
+        Ok(None)
+    }
+
+    pub fn search_initial(
+        &self,
+        query: &SearchQuery,
+        de_rank_similar: bool,
+    ) -> Result<InitialSearchResult> {
+        if let Some(bang) = self.check_bangs(query)? {
+            return Ok(InitialSearchResult::Bang(bang));
+        }
+
+        let webpages = self.search_inverted_index(query, de_rank_similar)?;
+        let correction = self.spell_correction(query)?;
+        let sidebar = self.sidebar(query)?;
 
         Ok(InitialSearchResult::Websites(InitialWebsiteResult {
             spell_corrected_query: correction,
             websites: webpages,
-            entity,
+            sidebar,
         }))
     }
 
@@ -231,7 +300,7 @@ impl LocalSearcher {
                         num_docs: search_result.websites.num_websites,
                         documents: retrieved_sites,
                     },
-                    entity: search_result.entity,
+                    sidebar: search_result.sidebar,
                     search_duration_ms: start.elapsed().as_millis(),
                 }))
             }
@@ -267,7 +336,7 @@ impl LocalSearcher {
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
     pub websites: inverted_index::InitialSearchResult,
-    pub entity: Option<StoredEntity>,
+    pub sidebar: Option<Sidebar>,
 }
 
 impl SearchResult {
@@ -332,10 +401,8 @@ mod tests {
             let urls: Vec<_> = searcher
                 .search(&SearchQuery {
                     original: "test".to_string(),
-                    selected_region: None,
-                    optic_program: None,
                     skip_pages: Some(p),
-                    site_rankings: None,
+                    ..Default::default()
                 })
                 .unwrap()
                 .into_websites()

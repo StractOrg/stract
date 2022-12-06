@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Footer from "../components/Footer.astro";
-import Entity from "../components/Entity.astro";
+import Sidebar from "../components/Sidebar.astro";
 import Snippet from "../components/Snippet.astro";
 import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
@@ -142,12 +142,12 @@ import { askama } from "../askama";
         </div>
       </div>
 
-      <!-- Entity -->
+      <!-- Sidebar -->
       {
         askama.if_(
-          "let Some(entity) = entity",
+          "let Some(sidebar) = sidebar",
           <div class="row-start-2 flex justify-center pt-10 md:col-start-2 md:row-span-2 md:row-start-1">
-            <Entity entity="entity" />
+            <Sidebar sidebar="sidebar" />
           </div>
         )
       }
@@ -205,6 +205,8 @@ import { askama } from "../askama";
   </style>
 </noscript>
 
+<link rel="stylesheet" href="/css/highlightjs-default.min.css"/>
+<script is:inline src="/js/highlight.min.js" />
 <script is:inline>
   var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
   var rankingModal = document.getElementById("ranking-modal");
@@ -235,3 +237,4 @@ import { askama } from "../askama";
     })
   });
 </script>
+<script is:inline>hljs.highlightAll();</script>

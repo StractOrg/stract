@@ -17,10 +17,8 @@ macro_rules! bench {
                 $searcher
                     .search(&SearchQuery {
                         original: $query.to_string(),
-                        selected_region: None,
                         optic_program: Some($optic.to_string()),
-                        skip_pages: None,
-                        site_rankings: None,
+                        ..Default::default()
                     })
                     .unwrap()
             })

@@ -1,0 +1,21 @@
+---
+import { askama } from "../askama";
+import Entity from "../components/Entity.astro";
+import StackOverflow from "../components/StackOverflow.astro";
+
+export interface Props {
+    sidebar: string;
+}
+---
+<div>
+{
+    askama.match("sidebar", {
+        "DisplayedSidebar::Entity(entity)": (
+            <Entity entity = "entity" />
+        ),
+        "DisplayedSidebar::StackOverflow{title, answer}": (
+            <StackOverflow title = "title" answer = "answer" />
+        )
+    })
+}
+</div>

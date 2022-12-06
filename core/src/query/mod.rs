@@ -17,6 +17,7 @@
 use crate::{
     ranking::SignalAggregator,
     schema::{Field, TextField},
+    searcher::NUM_RESULTS_PER_PAGE,
     Result,
 };
 use optics::Optic;
@@ -46,6 +47,7 @@ pub struct Query {
     terms: Vec<Box<Term>>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
+    num_results: usize,
 }
 
 fn proximity_queries(
@@ -153,6 +155,7 @@ impl Query {
             terms,
             simple_terms_text,
             tantivy_query,
+            num_results: NUM_RESULTS_PER_PAGE,
         })
     }
 
@@ -168,12 +171,20 @@ impl Query {
         self.simple_terms_text.clone()
     }
 
+    pub fn set_num_results(&mut self, num_results: usize) {
+        self.num_results = num_results;
+    }
+
     pub fn terms(&self) -> &[Box<Term>] {
         &self.terms
     }
 
     pub fn is_empty(&self) -> bool {
         self.terms.is_empty()
+    }
+
+    pub fn num_results(&self) -> usize {
+        self.num_results
     }
 }
 

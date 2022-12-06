@@ -22,7 +22,7 @@ use axum_macros::debug_handler;
 
 use crate::{
     search_prettifier::{
-        thousand_sep_number, CodeOrText, DisplayedEntity, DisplayedWebpage,
+        thousand_sep_number, CodeOrText, DisplayedSidebar, DisplayedWebpage,
         HighlightedSpellCorrection, Snippet,
     },
     searcher::{self, PrettifiedSearchResult, SearchQuery},
@@ -44,7 +44,7 @@ use axum::{
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
-    entity: Option<DisplayedEntity>,
+    sidebar: Option<DisplayedSidebar>,
     spell_correction: Option<HighlightedSpellCorrection>,
     num_matches: String,
     search_duration_sec: String,
@@ -122,12 +122,13 @@ pub async fn route(
             optic_program: optic,
             skip_pages,
             site_rankings,
+            custom_num_results: None,
         })
         .await
     {
         Ok(result) => match result {
             PrettifiedSearchResult::Websites(result) => {
-                let entity = result.entity;
+                let sidebar = result.sidebar;
                 let spell_correction = result.spell_corrected_query;
 
                 let num_matches = thousand_sep_number(result.num_docs);
@@ -178,7 +179,7 @@ pub async fn route(
                 let template = SearchTemplate {
                     search_result: result.webpages,
                     query,
-                    entity,
+                    sidebar,
                     spell_correction,
                     num_matches,
                     search_duration_sec,

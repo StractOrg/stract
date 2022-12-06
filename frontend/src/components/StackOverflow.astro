@@ -1,0 +1,49 @@
+---
+import { askama } from "../askama";
+import Hero from "./Hero.astro";
+
+export interface Props {
+  title: string;
+  answer: string;
+}
+---
+<div class="flex flex-col space-y-5 border p-5 rounded-lg max-w-lg">
+  <div class="flex flex-col space-y-1">
+    <div class="flex justify-between space-x-2 grow">
+      <div>
+        <a class="text-lg font-medium" href={askama`answer.url`}>{askama`title`}</a>
+      </div>
+      <div class="flex space-x-1 items-center">
+          <span class="h-fit">
+            {askama`answer.upvotes`}
+          </span>
+          <div class="h-fit">
+            <Hero class="w-4" icon="thumb-up" />
+          </div>
+      </div>
+    </div>
+    <div class="flex justify-between space-x-2 grow">
+      <div><a href={askama`answer.url`}>{askama`answer.url`}</a></div>
+      <div>{askama`answer.date`}</div>
+    </div>
+  </div>
+  <hr />
+  <div class="flex flex-col space-y-3">
+    {
+    askama.for_("part in answer.body", () => (
+        <div>
+        {
+            askama.match("part", {
+                "CodeOrText::Text(text)": (
+                    <span>{askama`text`}</span>
+                ),
+                "CodeOrText::Code(code)": (
+                    <pre class="bg-slate-50 rounded-lg"><code style="background: none">{askama `code`}</code></pre>
+                )
+            })
+        }
+        </div>
+    ))
+    }
+  </div>
+</div>

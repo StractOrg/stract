@@ -320,9 +320,9 @@ impl DistributedSearcher {
             }
         });
 
-        let entity = initial_results.first().and_then(|result| {
+        let sidebar = initial_results.first().and_then(|result| {
             if let InitialSearchResult::Websites(result) = &result.local_result {
-                result.entity.clone()
+                result.sidebar.clone()
             } else {
                 None
             }
@@ -399,7 +399,7 @@ impl DistributedSearcher {
                 num_docs,
                 documents: retrieved_webpages,
             },
-            entity,
+            sidebar,
             search_duration_ms: start.elapsed().as_millis(),
         }))
     }
@@ -441,9 +441,9 @@ impl DistributedSearcher {
             }
         });
 
-        let entity = initial_results.first().and_then(|result| {
+        let sidebar = initial_results.first().and_then(|result| {
             if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                result.entity.clone()
+                result.sidebar.clone()
             } else {
                 None
             }
@@ -521,7 +521,7 @@ impl DistributedSearcher {
             spell_corrected_query,
             num_docs,
             webpages: retrieved_webpages,
-            entity,
+            sidebar,
             search_duration_ms: start.elapsed().as_millis(),
         }))
     }

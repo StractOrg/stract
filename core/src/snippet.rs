@@ -389,10 +389,7 @@ Survey in 2016, 2017, and 2018."#;
         let result = searcher
             .search(&SearchQuery {
                 original: "rust language".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -432,10 +429,7 @@ Survey in 2016, 2017, and 2018."#;
         let result = searcher
             .search(&SearchQuery {
                 original: "describe".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -645,10 +639,7 @@ Survey in 2016, 2017, and 2018."#;
         let result = searcher
             .search(&SearchQuery {
                 original: "paradigms".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()

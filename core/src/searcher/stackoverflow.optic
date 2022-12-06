@@ -1,0 +1,9 @@
+DiscardNonMatching;
+
+Rule {
+    Matches {
+        Domain("stackoverflow.com"),
+        Schema("QAPage"),
+        Schema("acceptedAnswer"),
+    }
+}

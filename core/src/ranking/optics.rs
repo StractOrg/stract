@@ -27,7 +27,7 @@ use crate::{
 
 use super::{Signal, SignalAggregator};
 
-pub const SCALE: f32 = 500.0;
+pub const SCALE: f32 = 200.0;
 
 pub trait CreateAggregator {
     fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator;
@@ -231,14 +231,12 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec!["www.third.com".to_string()],
                     blocked: vec![],
                 }),
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -254,14 +252,12 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],
                 }),
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -277,14 +273,12 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
                 site_rankings: Some(SiteRankings {
                     liked: vec![],
                     disliked: vec!["www.second.com".to_string()],
                     blocked: vec!["www.first.com".to_string()],
                 }),
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()

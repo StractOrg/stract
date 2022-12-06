@@ -228,10 +228,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "example".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -312,10 +309,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "example".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -423,10 +417,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "dr dk".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -506,10 +497,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "title".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -594,10 +582,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -675,10 +660,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -784,7 +766,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "example".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         Ranking{Field("title"), 20000000};
@@ -792,8 +773,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -805,15 +785,13 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "example".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         Ranking{Signal("host_centrality"), 2000000};
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -922,10 +900,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "termA termB".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -1009,10 +984,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -1095,10 +1067,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "test".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -1268,10 +1237,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "topic_a".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()
@@ -1286,10 +1252,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 original: "topic_b".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .expect("Search failed")
             .into_websites()

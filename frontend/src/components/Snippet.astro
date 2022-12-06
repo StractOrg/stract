@@ -6,8 +6,6 @@ export interface Props {
   snippet: string;
 }
 ---
-<link rel="stylesheet" href="/css/highlightjs-default.min.css"/>
-<script is:inline src="/js/highlight.min.js" />
 <div>
     {
     askama.match("item.snippet", {
@@ -53,11 +51,13 @@ export interface Props {
                             <div class="flex justify-between grow mb-2">
                                 <div>{askama`answer.date`}</div>
                                 <div class="flex space-x-2">
-                                    <div class="flex space-x-1">
-                                        <div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="h-fit">
                                             {askama`answer.upvotes`}
+                                        </span>
+                                        <div class="h-fit">
+                                            <Hero class="w-3" icon="thumb-up" />
                                         </div>
-                                        <Hero class="w-3" icon="thumb-up" />
                                     </div>
                                     {
                                         askama.if_("answer.accepted", () => (
@@ -96,4 +96,3 @@ export interface Props {
     })
     }
 </div>
-<script is:inline>hljs.highlightAll();</script>

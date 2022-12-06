@@ -227,10 +227,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
-                optic_program: None,
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -245,7 +242,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         Rule {
@@ -257,8 +253,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -272,7 +267,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         Rule {
@@ -284,8 +278,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -375,12 +368,10 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     include_str!("../../../optics/testcases/quickstart.optic").to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -391,12 +382,10 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     include_str!("../../../optics/testcases/hacker_news.optic").to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -407,12 +396,10 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     include_str!("../../../optics/testcases/copycats_removal.optic").to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -523,7 +510,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                     DiscardNonMatching;
@@ -542,8 +528,7 @@ mod tests {
                 "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -698,7 +683,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                     Like(Site("www.a.com"));
@@ -707,8 +691,7 @@ mod tests {
                 "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -821,7 +804,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -833,8 +815,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -848,7 +829,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -860,8 +840,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -875,7 +854,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -887,8 +865,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -902,7 +879,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "website".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -914,8 +890,7 @@ mod tests {
                     "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
@@ -969,7 +944,6 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 original: "site:stackoverflow.com".to_string(),
-                selected_region: None,
                 optic_program: Some(
                     r#"
                     DiscardNonMatching;
@@ -994,8 +968,7 @@ mod tests {
                 "#
                     .to_string(),
                 ),
-                skip_pages: None,
-                site_rankings: None,
+                ..Default::default()
             })
             .unwrap()
             .into_websites()
