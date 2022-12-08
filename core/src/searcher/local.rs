@@ -47,6 +47,7 @@ pub struct LocalSearcher {
     bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
     topic_centrality: Option<TopicCentrality>,
+    stackoverflow_sidebar_threshold: f64,
 }
 
 impl From<Index> for LocalSearcher {
@@ -63,6 +64,7 @@ impl LocalSearcher {
             bangs: None,
             centrality_store: None,
             topic_centrality: None,
+            stackoverflow_sidebar_threshold: STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD,
         }
     }
 
@@ -219,7 +221,7 @@ impl LocalSearcher {
 
         if res.num_websites > 0 && !res.top_websites.is_empty() {
             let top = res.top_websites.remove(0);
-            if top.score > STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD {
+            if top.score > self.stackoverflow_sidebar_threshold {
                 let mut retrieved = self.retrieve_websites(&[top], &query.original)?;
                 let retrieved = retrieved.remove(0);
                 return Ok(Some(Sidebar::StackOverflow {
@@ -422,5 +424,37 @@ mod tests {
                 )
             }
         }
+    }
+
+    #[test]
+    fn stackoverflow_sidebar() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                include_str!("../../testcases/schema_org/stackoverflow.html"),
+                "https://www.stackoverflow.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().unwrap();
+
+        let mut searcher = LocalSearcher::new(index);
+        searcher.stackoverflow_sidebar_threshold = 0.0;
+
+        let res = searcher
+            .search(&SearchQuery {
+                original: "regex parse html".to_string(),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert!(matches!(
+            res.into_websites().unwrap().sidebar.unwrap(),
+            Sidebar::StackOverflow {
+                schema_org: _,
+                url: _
+            }
+        ));
     }
 }
