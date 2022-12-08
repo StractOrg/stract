@@ -99,6 +99,7 @@ pub struct WebgraphMasterConfig {
     workers: Vec<String>,
     graph_base_path: Option<String>,
     batch_size: Option<usize>,
+    create_full_graph: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -107,6 +108,7 @@ pub struct WebgraphLocalConfig {
     warc_source: WarcSource,
     graph_base_path: Option<String>,
     batch_size: Option<usize>,
+    create_full_graph: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

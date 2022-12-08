@@ -29,8 +29,11 @@ use std::{net::SocketAddr, path::Path};
 use tokio::pin;
 use tracing::{info, trace};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GraphPointer(String);
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct GraphPointer {
+    path: String,
+    with_full_path: bool,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobConfig {
@@ -43,13 +46,17 @@ pub struct Job {
     pub config: JobConfig,
     pub warc_paths: Vec<String>,
     pub graph_base_path: String,
+    pub create_full_graph: bool,
 }
 
-fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
-    WebgraphBuilder::new(path)
-        .with_host_graph()
-        .with_full_graph()
-        .open()
+fn open_graph<P: AsRef<Path>>(path: P, with_full_graph: bool) -> webgraph::Webgraph {
+    let mut builder = WebgraphBuilder::new(path).with_host_graph();
+
+    if with_full_graph {
+        builder = builder.with_full_graph()
+    }
+
+    builder.open()
 }
 
 async fn async_process_job(job: &Job) -> webgraph::Webgraph {
@@ -57,7 +64,10 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
 
     info!("processing {}", name);
 
-    let mut graph = open_graph(Path::new(&job.graph_base_path).join(name));
+    let mut graph = open_graph(
+        Path::new(&job.graph_base_path).join(name),
+        job.create_full_graph,
+    );
 
     let source = match job.config.clone() {
         JobConfig::Http(config) => WarcSource::HTTP(config),
@@ -122,7 +132,10 @@ impl Map<StatelessWorker, FrozenWebgraph> for Job {
 impl Map<StatelessWorker, GraphPointer> for Job {
     fn map(&self, _worker: &StatelessWorker) -> GraphPointer {
         let graph = process_job(self);
-        GraphPointer(graph.path)
+        GraphPointer {
+            path: graph.path,
+            with_full_path: self.create_full_graph,
+        }
     }
 }
 
@@ -146,22 +159,22 @@ impl Reduce<webgraph::Webgraph> for webgraph::Webgraph {
 
 impl Reduce<GraphPointer> for GraphPointer {
     fn reduce(self, other: GraphPointer) -> Self {
-        let self_path = self.0.clone();
+        let self_clone = self.clone();
 
         {
-            let graph = open_graph(self.0);
-            let other_graph = open_graph(other.0);
+            let graph = open_graph(self.path, self.with_full_path);
+            let other_graph = open_graph(other.path, self.with_full_path);
 
             let _ = graph.reduce(other_graph);
         }
 
-        GraphPointer(self_path)
+        self_clone
     }
 }
 
 impl Reduce<GraphPointer> for webgraph::Webgraph {
     fn reduce(self, other: GraphPointer) -> Self {
-        let other = open_graph(other.0);
+        let other = open_graph(other.path, other.with_full_path);
         self.reduce(other)
     }
 }
@@ -202,6 +215,7 @@ impl Webgraph {
                                 .graph_base_path
                                 .clone()
                                 .unwrap_or_else(|| "data/webgraph".to_string()),
+                            create_full_graph: config.create_full_graph.unwrap_or(true),
                         })
                         .collect::<Vec<_>>()
                         .into_iter(),
@@ -262,6 +276,7 @@ impl Webgraph {
                     .graph_base_path
                     .clone()
                     .unwrap_or_else(|| "data/webgraph".to_string()),
+                create_full_graph: config.create_full_graph.unwrap_or(true),
             })
             .collect_vec()
             .into_par_iter()
@@ -269,7 +284,8 @@ impl Webgraph {
             .collect();
 
         if graphs.len() > 1 {
-            let mut graph = open_graph(graphs.pop().unwrap().0);
+            let pointer = graphs.pop().unwrap();
+            let mut graph = open_graph(pointer.path, pointer.with_full_path);
             for other in graphs {
                 graph = graph.reduce(other);
             }
