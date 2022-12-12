@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use optics::PatternPart;
 use tantivy::{
-    fastfield::{Column, DynamicFastFieldReader},
     fieldnorm::FieldNormReader,
     postings::SegmentPostings,
     query::{EmptyScorer, Explanation, Scorer},
@@ -26,16 +27,28 @@ use tantivy::{
 };
 
 use crate::{
+    fastfield_cache::FastFieldCache,
     query::intersection::Intersection,
     ranking::bm25::Bm25Weight,
     schema::{FastField, Field, TextField, ALL_FIELDS},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PatternQuery {
     patterns: Vec<PatternPart>,
     field: tantivy::schema::Field,
     raw_terms: Vec<tantivy::Term>,
+    fastfield_cache: Arc<FastFieldCache>,
+}
+
+impl std::fmt::Debug for PatternQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PatternQuery")
+            .field("patterns", &self.patterns)
+            .field("field", &self.field)
+            .field("raw_terms", &self.raw_terms)
+            .finish()
+    }
 }
 
 impl PatternQuery {
@@ -43,6 +56,7 @@ impl PatternQuery {
         patterns: Vec<PatternPart>,
         field: TextField,
         schema: &tantivy::schema::Schema,
+        fastfield_cache: Arc<FastFieldCache>,
     ) -> Self {
         let mut raw_terms = Vec::new();
 
@@ -67,6 +81,7 @@ impl PatternQuery {
             patterns,
             field: tv_field,
             raw_terms,
+            fastfield_cache,
         }
     }
 }
@@ -74,17 +89,21 @@ impl PatternQuery {
 impl tantivy::query::Query for PatternQuery {
     fn weight(
         &self,
-        searcher: &tantivy::Searcher,
-        scoring_enabled: bool,
+        scoring: tantivy::query::EnableScoring<'_>,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
-        let bm25_weight = Bm25Weight::for_terms(searcher, &self.raw_terms)?;
+        let bm25_weight = match scoring {
+            tantivy::query::EnableScoring::Enabled(searcher) => {
+                Some(Bm25Weight::for_terms(searcher, &self.raw_terms)?)
+            }
+            tantivy::query::EnableScoring::Disabled(_) => None,
+        };
 
         Ok(Box::new(PatternWeight {
             similarity_weight: bm25_weight,
-            scoring_enabled,
             raw_terms: self.raw_terms.clone(),
             patterns: self.patterns.clone(),
             field: self.field,
+            fastfield_cache: self.fastfield_cache.clone(),
         }))
     }
 
@@ -102,16 +121,16 @@ enum SmallPatternPart {
 }
 
 struct PatternWeight {
-    similarity_weight: Bm25Weight,
-    scoring_enabled: bool,
+    similarity_weight: Option<Bm25Weight>,
     patterns: Vec<PatternPart>,
     raw_terms: Vec<tantivy::Term>,
     field: tantivy::schema::Field,
+    fastfield_cache: Arc<FastFieldCache>,
 }
 
 impl PatternWeight {
     fn fieldnorm_reader(&self, reader: &SegmentReader) -> tantivy::Result<FieldNormReader> {
-        if self.scoring_enabled {
+        if self.similarity_weight.is_some() {
             if let Some(fieldnorm_reader) = reader.fieldnorms_readers().get_field(self.field)? {
                 return Ok(fieldnorm_reader);
             }
@@ -124,7 +143,12 @@ impl PatternWeight {
         reader: &SegmentReader,
         boost: Score,
     ) -> tantivy::Result<Option<PatternScorer>> {
-        let similarity_weight = self.similarity_weight.boost_by(boost);
+        let similarity_weight = if let Some(weight) = &self.similarity_weight {
+            weight.boost_by(boost)
+        } else {
+            return Ok(None);
+        };
+
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
         let mut term_postings_list = Vec::new();
 
@@ -149,49 +173,16 @@ impl PatternWeight {
             })
             .collect();
 
-        let num_tokens_reader = match &ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::Title) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumTitleTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::CleanBody) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumCleanBodyTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::Url) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumUrlTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::Domain) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumDomainTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::Site) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumSiteTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::Description) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumDescriptionTokens).name())
-                    .unwrap(),
-            ),
-            Field::Text(TextField::FlattenedSchemaOrgJson) => reader.fast_fields().u64(
-                reader
-                    .schema()
-                    .get_field(Field::Fast(FastField::NumFlattenedSchemaTokens).name())
-                    .unwrap(),
-            ),
+        let num_tokens_fastfield = match &ALL_FIELDS[self.field.field_id() as usize] {
+            Field::Text(TextField::Title) => Ok(FastField::NumTitleTokens),
+            Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
+            Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
+            Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
+            Field::Text(TextField::Site) => Ok(FastField::NumSiteTokens),
+            Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
+            Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                Ok(FastField::NumFlattenedSchemaTokens)
+            }
             field => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",
                 field.name()
@@ -203,7 +194,9 @@ impl PatternWeight {
             term_postings_list,
             fieldnorm_reader,
             small_patterns,
-            num_tokens_reader,
+            reader.segment_id(),
+            num_tokens_fastfield,
+            self.fastfield_cache.clone(),
         )))
     }
 }
@@ -244,7 +237,12 @@ impl tantivy::query::Weight for PatternWeight {
         let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
         let phrase_count = scorer.phrase_count();
         let mut explanation = Explanation::new("Pattern Scorer", scorer.score());
-        explanation.add_detail(self.similarity_weight.explain(fieldnorm_id, phrase_count));
+        explanation.add_detail(
+            self.similarity_weight
+                .as_ref()
+                .unwrap()
+                .explain(fieldnorm_id, phrase_count),
+        );
         Ok(explanation)
     }
 }
@@ -258,7 +256,9 @@ struct PatternScorer {
     left: Vec<u32>,
     right: Vec<u32>,
     phrase_count: u32,
-    num_tokens_reader: DynamicFastFieldReader<u64>,
+    segment: tantivy::SegmentId,
+    num_tokens_field: FastField,
+    fastfield_cache: Arc<FastFieldCache>,
 }
 
 impl PatternScorer {
@@ -267,7 +267,9 @@ impl PatternScorer {
         term_postings_list: Vec<SegmentPostings>,
         fieldnorm_reader: FieldNormReader,
         pattern: Vec<SmallPatternPart>,
-        num_tokens_reader: DynamicFastFieldReader<u64>,
+        segment: tantivy::SegmentId,
+        num_tokens_field: FastField,
+        fastfield_cache: Arc<FastFieldCache>,
     ) -> Self {
         let num_query_terms = term_postings_list.len();
 
@@ -280,7 +282,9 @@ impl PatternScorer {
             left: Vec::with_capacity(100),
             right: Vec::with_capacity(100),
             phrase_count: 0,
-            num_tokens_reader,
+            segment,
+            num_tokens_field,
+            fastfield_cache,
         }
     }
     fn phrase_count(&self) -> u32 {
@@ -305,7 +309,12 @@ impl PatternScorer {
 
         let mut current_right_term = 1;
         let mut slop = 1;
-        let num_tokens_doc = self.num_tokens_reader.get_val(self.doc() as u64);
+        let num_tokens_doc = self
+            .fastfield_cache
+            .get_segment(&self.segment)
+            .get_doc_cache(&self.num_tokens_field)
+            .get_u64(&self.doc())
+            .unwrap();
 
         for (i, pattern_part) in self.pattern.iter().enumerate().skip(1) {
             match pattern_part {

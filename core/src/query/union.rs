@@ -173,13 +173,12 @@ impl Clone for UnionQuery {
 impl tantivy::query::Query for UnionQuery {
     fn weight(
         &self,
-        searcher: &tantivy::Searcher,
-        scoring_enabled: bool,
+        enable_scoring: tantivy::query::EnableScoring,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
         let mut weights = Vec::new();
 
         for query in &self.subqueries {
-            weights.push(query.weight(searcher, scoring_enabled)?);
+            weights.push(query.weight(enable_scoring)?);
         }
 
         Ok(Box::new(UnionWeight { weights }))

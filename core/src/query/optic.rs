@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
 use tantivy::{
@@ -21,20 +23,32 @@ use tantivy::{
     schema::Schema,
 };
 
-use crate::{ranking::optics::SCALE, schema::TextField};
+use crate::{fastfield_cache::FastFieldCache, ranking::optics::SCALE, schema::TextField};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
 pub trait AsTantivyQuery {
-    fn as_tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query>;
+    fn as_tantivy(
+        &self,
+        schema: &Schema,
+        fastfield_cache: Arc<FastFieldCache>,
+    ) -> Box<dyn tantivy::query::Query>;
 }
 
 pub trait AsMultipleTantivyQuery {
-    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)>;
+    fn as_multiple_tantivy(
+        &self,
+        schema: &Schema,
+        fastfield_cache: Arc<FastFieldCache>,
+    ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)>;
 }
 
 impl AsMultipleTantivyQuery for Optic {
-    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
+    fn as_multiple_tantivy(
+        &self,
+        schema: &Schema,
+        fastfields: Arc<FastFieldCache>,
+    ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         if self.discard_non_matching {
             vec![(
                 Occur::Must,
@@ -43,7 +57,7 @@ impl AsMultipleTantivyQuery for Optic {
                         .iter()
                         .chain(self.site_rankings.rules().iter())
                         .filter_map(|rule| {
-                            let queries = rule.as_multiple_tantivy(schema);
+                            let queries = rule.as_multiple_tantivy(schema, fastfields.clone());
 
                             if queries.is_empty() {
                                 None
@@ -60,18 +74,27 @@ impl AsMultipleTantivyQuery for Optic {
             self.rules
                 .iter()
                 .chain(self.site_rankings.rules().iter())
-                .filter_map(|rule| rule.as_multiple_tantivy(schema).pop())
+                .filter_map(|rule| rule.as_multiple_tantivy(schema, fastfields.clone()).pop())
                 .collect()
         }
     }
 }
 
 impl AsMultipleTantivyQuery for Rule {
-    fn as_multiple_tantivy(&self, schema: &Schema) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
+    fn as_multiple_tantivy(
+        &self,
+        schema: &Schema,
+        fastfield_cache: Arc<FastFieldCache>,
+    ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         let mut subqueries: Vec<_> = self
             .matches
             .iter()
-            .map(|matching| (Occur::Must, matching.as_tantivy(schema)))
+            .map(|matching| {
+                (
+                    Occur::Must,
+                    matching.as_tantivy(schema, fastfield_cache.clone()),
+                )
+            })
             .collect();
 
         if subqueries.is_empty() {
@@ -107,33 +130,69 @@ impl AsMultipleTantivyQuery for Rule {
 }
 
 impl AsTantivyQuery for Matching {
-    fn as_tantivy(&self, schema: &Schema) -> Box<dyn tantivy::query::Query> {
+    fn as_tantivy(
+        &self,
+        schema: &Schema,
+        fastfield_cache: Arc<FastFieldCache>,
+    ) -> Box<dyn tantivy::query::Query> {
         match &self.location {
-            MatchLocation::Site => {
-                PatternQuery::new(self.pattern.clone(), TextField::Site, schema).box_clone()
-            }
-            MatchLocation::Url => {
-                PatternQuery::new(self.pattern.clone(), TextField::Url, schema).box_clone()
-            }
-            MatchLocation::Domain => {
-                PatternQuery::new(self.pattern.clone(), TextField::Domain, schema).box_clone()
-            }
-            MatchLocation::Title => {
-                PatternQuery::new(self.pattern.clone(), TextField::Title, schema).box_clone()
-            }
+            MatchLocation::Site => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::Site,
+                schema,
+                fastfield_cache,
+            )
+            .box_clone(),
+            MatchLocation::Url => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::Url,
+                schema,
+                fastfield_cache,
+            )
+            .box_clone(),
+            MatchLocation::Domain => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::Domain,
+                schema,
+                fastfield_cache,
+            )
+            .box_clone(),
+            MatchLocation::Title => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::Title,
+                schema,
+                fastfield_cache,
+            )
+            .box_clone(),
             MatchLocation::Description => UnionQuery::from(vec![
-                PatternQuery::new(self.pattern.clone(), TextField::Description, schema).box_clone(),
-                PatternQuery::new(self.pattern.clone(), TextField::DmozDescription, schema)
-                    .box_clone(),
+                PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::Description,
+                    schema,
+                    fastfield_cache.clone(),
+                )
+                .box_clone(),
+                PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::DmozDescription,
+                    schema,
+                    fastfield_cache,
+                )
+                .box_clone(),
             ])
             .box_clone(),
-            MatchLocation::Content => {
-                PatternQuery::new(self.pattern.clone(), TextField::CleanBody, schema).box_clone()
-            }
+            MatchLocation::Content => PatternQuery::new(
+                self.pattern.clone(),
+                TextField::CleanBody,
+                schema,
+                fastfield_cache,
+            )
+            .box_clone(),
             MatchLocation::Schema => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::FlattenedSchemaOrgJson,
                 schema,
+                fastfield_cache,
             )
             .box_clone(),
         }
@@ -146,13 +205,11 @@ mod tests {
         gen_temp_path,
         index::Index,
         ranking::centrality_store::CentralityStore,
-        schema::create_schema,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{Node, WebgraphBuilder},
         webpage::{Html, Webpage},
     };
 
-    use super::*;
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[test]
@@ -289,13 +346,6 @@ mod tests {
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].url, "https://www.a.com");
         assert_eq!(res[1].url, "https://www.b.com");
-    }
-
-    #[test]
-    fn quickstart_as_query() {
-        optics::parse(include_str!("../../../optics/testcases/quickstart.optic"))
-            .unwrap()
-            .as_multiple_tantivy(&create_schema());
     }
 
     #[test]

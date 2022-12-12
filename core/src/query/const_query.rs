@@ -16,7 +16,7 @@
 
 use tantivy::{
     query::{Explanation, Query, Scorer, Weight},
-    DocSet, Score, Searcher,
+    DocSet, Score,
 };
 
 #[derive(Debug)]
@@ -43,11 +43,10 @@ impl Clone for ConstQuery {
 impl Query for ConstQuery {
     fn weight(
         &self,
-        searcher: &Searcher,
-        scoring_enabled: bool,
+        enable_scoring: tantivy::query::EnableScoring,
     ) -> tantivy::Result<Box<dyn Weight>> {
         Ok(Box::new(ConstWeight {
-            subweight: self.subquery.weight(searcher, scoring_enabled)?,
+            subweight: self.subquery.weight(enable_scoring)?,
             score: self.score,
         }))
     }

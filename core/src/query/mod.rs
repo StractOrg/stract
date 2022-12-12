@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    index::Index,
     ranking::SignalAggregator,
     schema::{Field, TextField},
     searcher::NUM_RESULTS_PER_PAGE,
@@ -159,10 +160,12 @@ impl Query {
         })
     }
 
-    pub fn set_optic(&mut self, optic: &Optic, schema: &Schema) {
+    pub fn set_optic(&mut self, optic: &Optic, index: &Index) {
         let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
 
-        subqueries.append(&mut optic.as_multiple_tantivy(schema));
+        subqueries.append(
+            &mut optic.as_multiple_tantivy(&index.schema(), index.inverted_index.fastfield_cache()),
+        );
 
         self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
     }
@@ -191,10 +194,9 @@ impl Query {
 impl tantivy::query::Query for Query {
     fn weight(
         &self,
-        searcher: &tantivy::Searcher,
-        scoring_enabled: bool,
+        enable_scoring: tantivy::query::EnableScoring,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
-        self.tantivy_query.weight(searcher, scoring_enabled)
+        self.tantivy_query.weight(enable_scoring)
     }
 
     fn query_terms<'a>(&'a self, visitor: &mut dyn FnMut(&'a tantivy::Term, bool)) {

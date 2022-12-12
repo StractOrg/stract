@@ -19,7 +19,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use tantivy::{fastfield::Column, DocId, SegmentId};
+use tantivy::{DocId, SegmentId};
 
 use crate::schema::{DataType, FastField, Field, ALL_FIELDS};
 

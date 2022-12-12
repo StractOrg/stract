@@ -711,16 +711,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.1.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f877be4f7c9f246b183111634f75baa039715e3f46ce860677d3b19a69fb229c"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "cuely"
 version = "0.1.0"
 dependencies = [
@@ -924,9 +914,12 @@ checksum = "25c7df09945d65ea8d70b3321547ed414bbc540aad5bac6883d021b970f35b04"
 
 [[package]]
 name = "fastfield_codecs"
-version = "0.2.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.3.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 dependencies = [
+ "fastdivide",
+ "itertools",
+ "log",
  "ownedbytes",
  "tantivy-bitpacker",
  "tantivy-common",
@@ -1554,7 +1547,7 @@ dependencies = [
  "petgraph",
  "pico-args",
  "regex",
- "regex-syntax 0.6.27",
+ "regex-syntax",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -1674,7 +1667,7 @@ dependencies = [
  "fnv",
  "proc-macro2",
  "quote",
- "regex-syntax 0.6.27",
+ "regex-syntax",
  "syn",
 ]
 
@@ -1686,6 +1679,7 @@ checksum = "ff50ecb28bb86013e935fb6683ab1f6d3a20016f123c76fd4c27470076ac30f5"
 dependencies = [
  "cfg-if",
  "generator",
+ "pin-utils",
  "scoped-tls",
  "tracing",
  "tracing-subscriber",
@@ -1984,9 +1978,9 @@ checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
 
 [[package]]
 name = "oneshot"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3b8d98df258e762e901eb4349d66d5a5f5a7a994db8df82ff596011773be535"
+checksum = "fc22d22931513428ea6cc089e942d38600e3d00976eef8c86de6b8a3aadec6eb"
 dependencies = [
  "loom",
 ]
@@ -2067,18 +2061,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21326818e99cfe6ce1e524c2a805c189a99b5ae555a35d19f9a284b427d86afa"
 
 [[package]]
-name = "output_vt100"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "ownedbytes"
-version = "0.3.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.4.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 dependencies = [
  "stable_deref_trait",
 ]
@@ -2304,18 +2289,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
-name = "pretty_assertions"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c89f989ac94207d048d92db058e4f6ec7342b0971fc58d1271ca148b799b3563"
-dependencies = [
- "ansi_term",
- "ctor",
- "diff",
- "output_vt100",
-]
-
-[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2511,7 +2484,7 @@ checksum = "4c4eb3267174b8c6c2f654116623910a0fef09c4753f8dd83db29c48a0df988b"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax 0.6.27",
+ "regex-syntax",
 ]
 
 [[package]]
@@ -2520,14 +2493,8 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 dependencies = [
- "regex-syntax 0.6.27",
+ "regex-syntax",
 ]
-
-[[package]]
-name = "regex-syntax"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e931c58b93d86f080c734bfd2bce7dd0079ae2331235818133c8be7f422e20e"
 
 [[package]]
 name = "regex-syntax"
@@ -3060,9 +3027,10 @@ checksum = "20518fe4a4c9acf048008599e464deb21beeae3d3578418951a189c235a7a9a8"
 
 [[package]]
 name = "tantivy"
-version = "0.18.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.19.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 dependencies = [
+ "aho-corasick",
  "arc-swap",
  "async-trait",
  "base64",
@@ -3075,7 +3043,6 @@ dependencies = [
  "fail",
  "fastdivide",
  "fastfield_codecs",
- "fnv",
  "fs2",
  "htmlescape",
  "itertools",
@@ -3090,10 +3057,10 @@ dependencies = [
  "once_cell",
  "oneshot",
  "ownedbytes",
- "pretty_assertions",
  "rayon",
  "regex",
  "rust-stemmers",
+ "rustc-hash",
  "serde",
  "serde_json",
  "smallvec",
@@ -3111,13 +3078,13 @@ dependencies = [
 
 [[package]]
 name = "tantivy-bitpacker"
-version = "0.2.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.3.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 
 [[package]]
 name = "tantivy-common"
-version = "0.3.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.4.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 dependencies = [
  "byteorder",
  "ownedbytes",
@@ -3125,19 +3092,19 @@ dependencies = [
 
 [[package]]
 name = "tantivy-fst"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb20cdc0d83e9184560bdde9cd60142dbb4af2e0f770e88fce45770495224205"
+checksum = "fc3c506b1a8443a3a65352df6382a1fb6a7afe1a02e871cee0d25e2c3d5f3944"
 dependencies = [
  "byteorder",
- "regex-syntax 0.4.2",
+ "regex-syntax",
  "utf8-ranges",
 ]
 
 [[package]]
 name = "tantivy-query-grammar"
-version = "0.18.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=a451f6d60dc4cb751457d11a3cc9d038d9b63713#a451f6d60dc4cb751457d11a3cc9d038d9b63713"
+version = "0.19.0"
+source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
 dependencies = [
  "combine",
  "once_cell",

@@ -140,7 +140,7 @@ impl LocalSearcher {
             .into_iter()
             .fold(Optic::default(), |acc, elem| acc.merge(elem));
 
-        parsed_query.set_optic(&optic, &self.index.schema());
+        parsed_query.set_optic(&optic, &self.index);
 
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
