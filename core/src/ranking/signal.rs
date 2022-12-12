@@ -343,6 +343,12 @@ impl SignalAggregator {
             .as_ref()
             .and_then(|scorer| host_id.map(|host| scorer.score(host) - SHIFT));
 
+        let personal_centrality = self
+            .personal_centrality
+            .iter()
+            .map(|scorer| scorer.score(doc as u64))
+            .sum();
+
         ALL_SIGNALS
             .into_iter()
             .map(|signal| {
@@ -351,12 +357,6 @@ impl SignalAggregator {
                         .as_ref()
                         .and_then(|cache| cache.get_doc_cache(&field).get_u64(&doc))
                 });
-
-                let personal_centrality = self
-                    .personal_centrality
-                    .iter()
-                    .map(|scorer| scorer.score(doc as u64))
-                    .sum();
 
                 self.coefficients().get(&signal)
                     * signal.value(

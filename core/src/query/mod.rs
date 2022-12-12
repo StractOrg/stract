@@ -205,10 +205,10 @@ impl tantivy::query::Query for Query {
 #[cfg(test)]
 mod tests {
     use crate::{
-        inverted_index::InvertedIndex,
-        ranking::Ranker,
+        index::Index,
         schema::create_schema,
-        webpage::{region::RegionCount, Webpage},
+        searcher::{LocalSearcher, SearchQuery},
+        webpage::Webpage,
     };
 
     use super::*;
@@ -311,19 +311,11 @@ mod tests {
 
     #[test]
     fn not_query() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse(
-            "test -website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
+        let mut index = Index::temporary().expect("Unable to open index");
+        let query = SearchQuery {
+            original: "test -website".to_string(),
+            ..Default::default()
+        };
 
         index
             .insert(Webpage::new(
@@ -356,10 +348,14 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.second.com");
@@ -367,7 +363,7 @@ mod tests {
 
     #[test]
     fn site_query() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -400,60 +396,46 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
 
-        let query = Query::parse(
-            "test site:first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test site:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com");
 
-        let query = Query::parse(
-            "test site:www.first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test site:www.first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com");
 
-        let query = Query::parse(
-            "test -site:first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test -site:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.second.com");
@@ -461,7 +443,7 @@ mod tests {
 
     #[test]
     fn title_query() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -494,22 +476,18 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
 
-        let query = Query::parse(
-            "intitle:website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "intitle:website".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com");
@@ -517,7 +495,7 @@ mod tests {
 
     #[test]
     fn url_query() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -550,22 +528,18 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
 
-        let query = Query::parse(
-            "test inurl:forum",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test inurl:forum".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.first.com/forum");
@@ -588,7 +562,7 @@ mod tests {
 
     #[test]
     fn query_term_only_special_char() {
-        let index = InvertedIndex::temporary().expect("Unable to open index");
+        let index = Index::temporary().expect("Unable to open index");
 
         let query = Query::parse(
             "&",
@@ -603,7 +577,7 @@ mod tests {
 
     #[test]
     fn site_query_split_domain() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let mut index = Index::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -636,59 +610,45 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
 
-        let query = Query::parse(
-            "test site:first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test site:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 0);
         assert_eq!(result.documents.len(), 0);
 
-        let query = Query::parse(
-            "test site:the-first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test site:the-first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.the-first.com");
 
-        let query = Query::parse(
-            "test site:www.the-first.com",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let query = SearchQuery {
+            original: "test site:www.the-first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher
+            .search(&query)
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.the-first.com");

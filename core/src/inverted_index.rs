@@ -251,19 +251,6 @@ impl InvertedIndex {
         Ok(webpages)
     }
 
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
-    where
-        C: Collector<Fruit = Vec<WebsitePointer>>,
-    {
-        let initial_result = self.search_initial(query, collector)?;
-        let websites = self.retrieve_websites(&initial_result.top_websites, query)?;
-
-        Ok(SearchResult {
-            num_docs: initial_result.num_websites,
-            documents: websites,
-        })
-    }
-
     pub fn merge_into_segments(&mut self, num_segments: u32) -> Result<()> {
         assert!(num_segments > 0);
 
@@ -403,7 +390,7 @@ pub struct SearchResult {
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,
@@ -535,6 +522,19 @@ mod tests {
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
+    fn search<C>(index: &InvertedIndex, query: &Query, collector: C) -> Result<SearchResult>
+    where
+        C: Collector<Fruit = Vec<WebsitePointer>>,
+    {
+        let initial_result = index.search_initial(query, collector)?;
+        let websites = index.retrieve_websites(&initial_result.top_websites, query)?;
+
+        Ok(SearchResult {
+            num_docs: initial_result.num_websites,
+            documents: websites,
+        })
+    }
+
     #[test]
     fn simple_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
@@ -551,9 +551,7 @@ mod tests {
             index.fastfield_cache(),
         );
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -576,9 +574,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -619,9 +615,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
     }
@@ -661,9 +655,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
@@ -703,9 +695,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
@@ -778,9 +768,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let mut result = search(&index, &query, ranker.collector()).expect("Search failed");
 
         result
             .documents
@@ -830,9 +818,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 20);
     }
 
@@ -871,9 +857,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
@@ -938,9 +922,7 @@ mod tests {
             index.fastfield_cache(),
         );
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 2);
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -963,9 +945,7 @@ mod tests {
             index.fastfield_cache(),
         );
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -988,9 +968,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1037,9 +1015,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1061,9 +1037,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1087,9 +1061,7 @@ mod tests {
             index.fastfield_cache(),
         );
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -1112,9 +1084,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1174,9 +1144,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
@@ -1222,9 +1190,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = search(&index, &query, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         let schema = result.documents[0].schema_org.clone();
 

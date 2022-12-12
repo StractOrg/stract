@@ -30,7 +30,7 @@ use uuid::Uuid;
 use crate::directory::{self, DirEntry};
 use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
-use crate::inverted_index::{self, InitialSearchResult, InvertedIndex, SearchResult};
+use crate::inverted_index::{self, InitialSearchResult, InvertedIndex};
 use crate::query::Query;
 use crate::spell::{
     Correction, CorrectionTerm, Dictionary, LogarithmicEdit, SpellChecker, TermSplitter,
@@ -120,13 +120,6 @@ impl Index {
         self.region_count.commit();
         self.subdomain_counter.commit();
         Ok(())
-    }
-
-    pub fn search<C>(&self, query: &Query, collector: C) -> Result<SearchResult>
-    where
-        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
-    {
-        self.inverted_index.search(query, collector)
     }
 
     pub fn search_initial<C>(&self, query: &Query, collector: C) -> Result<InitialSearchResult>
@@ -352,7 +345,7 @@ impl From<Index> for FrozenIndex {
 
 #[cfg(test)]
 mod tests {
-    use crate::ranking::{Ranker, SignalAggregator};
+    use crate::searcher::{LocalSearcher, SearchQuery};
 
     use super::*;
 
@@ -390,30 +383,21 @@ mod tests {
 
         let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
         let index: Index = deserialized_frozen.into();
-        let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.inverted_index.fastfield_cache(),
-        );
+        let searcher = LocalSearcher::from(index);
 
-        let result = index
-            .search(&query, ranker.collector())
-            .expect("Search failed");
+        let result = searcher
+            .search(&SearchQuery {
+                original: "website".to_string(),
+                ..Default::default()
+            })
+            .expect("Search failed")
+            .into_websites()
+            .unwrap()
+            .webpages;
+
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
-
-        assert_eq!(
-            String::from(index.spell_correction(&["thiss".to_string()]).unwrap()),
-            "this".to_string()
-        );
     }
 
     #[test]

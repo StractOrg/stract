@@ -18,6 +18,7 @@ pub mod bm25;
 pub mod centrality_store;
 pub mod initial;
 pub mod optics;
+pub mod pipeline;
 pub mod signal;
 
 use std::sync::Arc;
