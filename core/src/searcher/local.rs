@@ -221,7 +221,7 @@ impl LocalSearcher {
 
         if res.num_websites > 0 && !res.top_websites.is_empty() {
             let top = res.top_websites.remove(0);
-            if top.score > self.stackoverflow_sidebar_threshold {
+            if top.score.total > self.stackoverflow_sidebar_threshold {
                 let mut retrieved = self.retrieve_websites(&[top], &query.original)?;
                 let retrieved = retrieved.remove(0);
                 return Ok(Some(Sidebar::StackOverflow {

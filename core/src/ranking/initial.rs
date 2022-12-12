@@ -19,8 +19,9 @@ use std::sync::Arc;
 use crate::fastfield_cache::FastFieldCache;
 use crate::webpage::region::{Region, RegionCount};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
-use tantivy::{DocId, Score, SegmentReader};
+use tantivy::{DocId, SegmentReader};
 
 use super::SignalAggregator;
 
@@ -54,7 +55,7 @@ pub(crate) struct InitialSegmentScoreTweaker {
     selected_region: Option<Region>,
 }
 
-impl ScoreTweaker<f64> for InitialScoreTweaker {
+impl ScoreTweaker<Score> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
@@ -77,8 +78,14 @@ impl ScoreTweaker<f64> for InitialScoreTweaker {
     }
 }
 
-impl ScoreSegmentTweaker<f64> for InitialSegmentScoreTweaker {
-    fn score(&mut self, doc: DocId, score: Score) -> f64 {
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Score {
+    pub bm25: tantivy::Score,
+    pub total: f64,
+}
+
+impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
+    fn score(&mut self, doc: DocId, score: tantivy::Score) -> Score {
         self.aggregator.score(
             doc,
             score,

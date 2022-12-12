@@ -20,13 +20,14 @@ use min_max_heap::MinMaxHeap;
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
-    DocId, Score, SegmentOrdinal, SegmentReader,
+    DocId, SegmentOrdinal, SegmentReader,
 };
 
 use crate::{
     fastfield_cache,
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, Prehashed},
+    ranking::initial::Score,
     schema::FastField,
     simhash,
 };
@@ -42,12 +43,12 @@ pub struct MaxDocsConsidered {
     pub segments: usize,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Hashes {
-    site: Prehashed,
-    title: Prehashed,
-    url: Prehashed,
-    simhash: simhash::HashType,
+    pub site: Prehashed,
+    pub title: Prehashed,
+    pub url: Prehashed,
+    pub simhash: simhash::HashType,
 }
 
 pub trait Doc: Clone {
@@ -97,23 +98,19 @@ impl TopDocs {
         score_tweaker: TScoreTweaker,
     ) -> impl Collector<Fruit = Vec<WebsitePointer>>
     where
-        TScoreSegmentTweaker: ScoreSegmentTweaker<f64> + 'static,
-        TScoreTweaker: ScoreTweaker<f64, Child = TScoreSegmentTweaker> + Send + Sync,
+        TScoreSegmentTweaker: ScoreSegmentTweaker<Score> + 'static,
+        TScoreTweaker: ScoreTweaker<Score, Child = TScoreSegmentTweaker> + Send + Sync,
     {
         TweakedScoreTopCollector::new(score_tweaker, self)
     }
 }
 
-impl Collector for TopDocs {
-    type Fruit = Vec<WebsitePointer>;
-
-    type Child = TopSegmentCollector;
-
+impl TopDocs {
     fn for_segment(
         &self,
         segment_local_id: tantivy::SegmentOrdinal,
         segment: &tantivy::SegmentReader,
-    ) -> tantivy::Result<Self::Child> {
+    ) -> tantivy::Result<TopSegmentCollector> {
         let max_docs = self
             .max_docs
             .as_ref()
@@ -126,37 +123,6 @@ impl Collector for TopDocs {
             segment_ord: segment_local_id,
             bucket_collector: BucketCollector::new(self.top_n + self.offset),
         })
-    }
-
-    fn requires_scoring(&self) -> bool {
-        true
-    }
-
-    fn merge_fruits(
-        &self,
-        segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
-    ) -> tantivy::Result<Self::Fruit> {
-        let mut collector = BucketCollector::new(self.top_n + self.offset);
-
-        for docs in segment_fruits {
-            for doc in docs {
-                collector.insert(doc);
-            }
-        }
-
-        Ok(collector
-            .into_sorted_vec(self.de_rank_similar)
-            .into_iter()
-            .skip(self.offset)
-            .map(|doc| WebsitePointer {
-                score: doc.score,
-                hashes: doc.hashes,
-                address: DocAddress {
-                    segment: doc.segment,
-                    doc_id: doc.id,
-                },
-            })
-            .collect())
     }
 }
 
@@ -183,9 +149,7 @@ impl TopSegmentCollector {
     }
 }
 
-impl SegmentCollector for TopSegmentCollector {
-    type Fruit = Vec<SegmentDoc>;
-
+impl TopSegmentCollector {
     fn collect(&mut self, doc: DocId, score: Score) {
         if let Some(max_docs) = &self.max_docs {
             if self.num_docs_taken >= *max_docs {
@@ -208,11 +172,11 @@ impl SegmentCollector for TopSegmentCollector {
             },
             id: doc,
             segment: self.segment_ord,
-            score: score as f64,
+            score,
         });
     }
 
-    fn harvest(self) -> Self::Fruit {
+    fn harvest(self) -> Vec<SegmentDoc> {
         self.bucket_collector.into_sorted_vec(false)
     }
 }
@@ -364,12 +328,12 @@ pub struct SegmentDoc {
     hashes: Hashes,
     id: DocId,
     segment: SegmentOrdinal,
-    score: f64,
+    score: Score,
 }
 
 impl Doc for SegmentDoc {
     fn score(&self) -> &f64 {
-        &self.score
+        &self.score.total
     }
 
     fn id(&self) -> &DocId {
@@ -383,24 +347,24 @@ impl Doc for SegmentDoc {
 
 pub(crate) struct TweakedScoreTopCollector<TScoreTweaker> {
     score_tweaker: TScoreTweaker,
-    collector: TopDocs,
+    top_docs: TopDocs,
 }
 
 impl<TScoreTweaker> TweakedScoreTopCollector<TScoreTweaker> {
     pub fn new(
         score_tweaker: TScoreTweaker,
-        collector: TopDocs,
+        top_docs: TopDocs,
     ) -> TweakedScoreTopCollector<TScoreTweaker> {
         TweakedScoreTopCollector {
             score_tweaker,
-            collector,
+            top_docs,
         }
     }
 }
 
 impl<TScoreTweaker> Collector for TweakedScoreTopCollector<TScoreTweaker>
 where
-    TScoreTweaker: ScoreTweaker<f64> + Send + Sync,
+    TScoreTweaker: ScoreTweaker<Score> + Send + Sync,
 {
     type Fruit = Vec<WebsitePointer>;
 
@@ -414,7 +378,7 @@ where
         let segment_scorer = self.score_tweaker.segment_tweaker(segment_reader)?;
 
         let segment_collector = self
-            .collector
+            .top_docs
             .for_segment(segment_local_id, segment_reader)?;
 
         Ok(TopTweakedScoreSegmentCollector {
@@ -431,13 +395,33 @@ where
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        self.collector.merge_fruits(segment_fruits)
+        let mut collector = BucketCollector::new(self.top_docs.top_n + self.top_docs.offset);
+
+        for docs in segment_fruits {
+            for doc in docs {
+                collector.insert(doc);
+            }
+        }
+
+        Ok(collector
+            .into_sorted_vec(self.top_docs.de_rank_similar)
+            .into_iter()
+            .skip(self.top_docs.offset)
+            .map(|doc| WebsitePointer {
+                score: doc.score,
+                hashes: doc.hashes,
+                address: DocAddress {
+                    segment: doc.segment,
+                    doc_id: doc.id,
+                },
+            })
+            .collect())
     }
 }
 
 pub struct TopTweakedScoreSegmentCollector<TSegmentScoreTweaker>
 where
-    TSegmentScoreTweaker: ScoreSegmentTweaker<f64>,
+    TSegmentScoreTweaker: ScoreSegmentTweaker<Score>,
 {
     segment_collector: TopSegmentCollector,
     segment_scorer: TSegmentScoreTweaker,
@@ -446,13 +430,13 @@ where
 impl<TSegmentScoreTweaker> SegmentCollector
     for TopTweakedScoreSegmentCollector<TSegmentScoreTweaker>
 where
-    TSegmentScoreTweaker: 'static + ScoreSegmentTweaker<f64>,
+    TSegmentScoreTweaker: 'static + ScoreSegmentTweaker<Score>,
 {
     type Fruit = Vec<SegmentDoc>;
 
-    fn collect(&mut self, doc: DocId, score: Score) {
+    fn collect(&mut self, doc: DocId, score: tantivy::Score) {
         let score = self.segment_scorer.score(doc, score);
-        self.segment_collector.collect(doc, score as f32);
+        self.segment_collector.collect(doc, score);
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -471,7 +455,10 @@ mod tests {
             collector.insert(SegmentDoc {
                 hashes: doc.0,
                 id: doc.1,
-                score: doc.2,
+                score: Score {
+                    bm25: 0.0,
+                    total: doc.2,
+                },
                 segment: 0,
             });
         }
@@ -479,7 +466,7 @@ mod tests {
         let res: Vec<(f64, DocId)> = collector
             .into_sorted_vec(true)
             .into_iter()
-            .map(|doc| (doc.score, doc.id))
+            .map(|doc| (doc.score.total, doc.id))
             .collect();
 
         assert_eq!(&res, expected);

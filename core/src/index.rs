@@ -133,14 +133,14 @@ impl Index {
     where
         C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
     {
-        let pointers = self
+        let websites = self
             .inverted_index
             .search_initial(query, collector)?
             .top_websites;
 
-        let mut hosts = HashSet::with_capacity(pointers.len());
-        for pointer in &pointers {
-            if let Some(id) = self.inverted_index.website_host_node(pointer)? {
+        let mut hosts = HashSet::with_capacity(websites.len());
+        for website in &websites {
+            if let Some(id) = self.inverted_index.website_host_node(website)? {
                 hosts.insert(id);
             }
         }

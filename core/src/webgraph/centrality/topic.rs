@@ -32,6 +32,7 @@ use tantivy::{
 };
 
 use crate::{
+    collector::TopDocs,
     human_website_annotations::Mapper,
     index::Index,
     ranking::{initial::InitialScoreTweaker, SignalAggregator},
@@ -144,7 +145,8 @@ impl TopicCentrality {
             .get_field(Field::Fast(FastField::HostNodeID).name())
             .unwrap();
 
-        let collector = tantivy::collector::TopDocs::with_limit(1000).tweak_score(score_tweaker);
+        let collector = TopDocs::with_limit(1000, index.inverted_index.fastfield_cache())
+            .tweak_score(score_tweaker);
 
         let mut nodes: Vec<_> = webgraph.host.as_ref().unwrap().nodes().collect();
         nodes.sort();
@@ -160,8 +162,8 @@ impl TopicCentrality {
                 .search(&query, &collector)
                 .unwrap()
                 .into_iter()
-                .filter_map(|(_, doc_address)| {
-                    let doc = searcher.doc(doc_address).unwrap();
+                .filter_map(|pointer| {
+                    let doc = searcher.doc(pointer.address.into()).unwrap();
                     let id = doc.get_first(graph_node_id).unwrap().as_u64().unwrap();
                     if id == u64::MAX {
                         None

@@ -26,12 +26,14 @@ use crate::{
 use std::{array, ops::Deref, sync::Arc};
 
 use chrono::Utc;
-use tantivy::{DocId, Score};
+use tantivy::DocId;
 
 use crate::{
     schema::{Field, FLOAT_SCALING},
     webpage::region::{Region, RegionCount},
 };
+
+use super::initial::Score;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
@@ -65,11 +67,11 @@ pub const ALL_SIGNALS: [Signal; 12] = [
 ];
 
 struct SignalValue {
-    bm25: Score,
+    bm25: tantivy::Score,
     fastfield_value: Option<u64>,
     current_timestamp: usize,
     selected_region: Option<Region>,
-    personal_centrality: f64,
+    personal_centrality: Option<f64>,
     topic_score: Option<f64>,
     query_centrality: Option<f64>,
 }
@@ -90,7 +92,7 @@ impl Signal {
             Signal::HostCentrality | Signal::PageCentrality => {
                 value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64
             }
-            Signal::PersonalCentrality => value.personal_centrality,
+            Signal::PersonalCentrality => value.personal_centrality.unwrap_or_default(),
             Signal::IsHomepage => value.fastfield_value.unwrap() as f64,
             Signal::FetchTimeMs => {
                 let fetch_time_ms = value.fastfield_value.unwrap() as usize;
@@ -320,36 +322,49 @@ impl SignalAggregator {
         self.personal_centrality.push(Arc::new(personal_centrality))
     }
 
+    pub fn topic_centrality(&self, host_id: u64) -> Option<f64> {
+        self.topic_scorer
+            .as_ref()
+            .map(|scorer| scorer.score(host_id))
+    }
+
+    pub fn query_centrality(&self, host_id: u64) -> Option<f64> {
+        self.query_centrality
+            .as_ref()
+            .map(|scorer| scorer.score(host_id) - SHIFT)
+    }
+
+    pub fn personal_centrality(&self, host_id: u64) -> f64 {
+        self.personal_centrality
+            .iter()
+            .map(|scorer| scorer.score(host_id))
+            .sum()
+    }
+
     pub fn score(
         &self,
         doc: DocId,
-        bm25: Score,
+        bm25: tantivy::Score,
         region_count: &Arc<RegionCount>,
         current_timestamp: usize,
         selected_region: Option<Region>,
-    ) -> f64 {
+    ) -> Score {
         let host_id = self
             .fastfield_cache
             .as_ref()
             .and_then(|cache| cache.get_doc_cache(&FastField::HostNodeID).get_u64(&doc));
 
-        let topic_score = self
-            .topic_scorer
-            .as_ref()
-            .and_then(|scorer| host_id.map(|host| scorer.score(host)));
+        let topic_score = host_id.and_then(|host_id| self.topic_centrality(host_id));
 
-        let query_centrality = self
-            .query_centrality
-            .as_ref()
-            .and_then(|scorer| host_id.map(|host| scorer.score(host) - SHIFT));
+        let query_centrality = host_id.and_then(|host_id| self.query_centrality(host_id));
 
-        let personal_centrality = self
-            .personal_centrality
-            .iter()
-            .map(|scorer| scorer.score(doc as u64))
-            .sum();
+        let personal_centrality = host_id.map(|host_id| self.personal_centrality(host_id));
 
-        ALL_SIGNALS
+        if personal_centrality.unwrap() > 1.0 {
+            dbg!(personal_centrality);
+        }
+
+        let score = ALL_SIGNALS
             .into_iter()
             .map(|signal| {
                 let fastfield_value = signal.as_fastfield().and_then(|field| {
@@ -373,7 +388,9 @@ impl SignalAggregator {
                         },
                     )
             })
-            .sum()
+            .sum();
+
+        Score { bm25, total: score }
     }
 
     pub fn precompute_score(&self, webpage: &Webpage, region_count: &RegionCount) -> f64 {
@@ -419,7 +436,7 @@ impl SignalAggregator {
                             fastfield_value: Some(fastfield_value),
                             current_timestamp,
                             selected_region: None,
-                            personal_centrality: 0.0,
+                            personal_centrality: None,
                             topic_score: None,
                             query_centrality: None,
                         },

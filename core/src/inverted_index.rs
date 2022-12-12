@@ -28,6 +28,9 @@ use crate::fastfield_cache::FastFieldCache;
 use crate::human_website_annotations::Topic;
 use crate::image_store::Image;
 use crate::query::Query;
+use crate::ranking::initial::Score;
+use crate::ranking::pipeline::RankingWebsite;
+use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::snippet;
 use crate::tokenizer::Identity;
@@ -47,14 +50,14 @@ pub struct InitialSearchResult {
     pub top_websites: Vec<WebsitePointer>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct WebsitePointer {
-    pub score: f64,
+    pub score: Score,
     pub hashes: Hashes,
     pub address: DocAddress,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct DocAddress {
     pub segment: u32,
     pub doc_id: u32,
@@ -185,11 +188,28 @@ impl InvertedIndex {
     {
         let searcher = self.reader.searcher();
 
-        let (count, docs) = searcher.search(query, &(Count, collector))?;
+        let (count, pointers) = searcher.search(query, &(Count, collector))?;
+
         Ok(InitialSearchResult {
             num_websites: count,
-            top_websites: docs,
+            top_websites: pointers,
         })
+    }
+
+    pub fn retrieve_ranking_websites(
+        &self,
+        pointers: Vec<WebsitePointer>,
+        aggregator: &SignalAggregator,
+    ) -> Result<Vec<RankingWebsite>> {
+        let searcher = self.reader.searcher();
+        let mut top_websites = Vec::new();
+
+        for pointer in pointers {
+            let doc = searcher.doc(pointer.address.into())?;
+            top_websites.push(RankingWebsite::new(doc, pointer, aggregator))
+        }
+
+        Ok(top_websites)
     }
 
     pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
@@ -527,7 +547,10 @@ mod tests {
         C: Collector<Fruit = Vec<WebsitePointer>>,
     {
         let initial_result = index.search_initial(query, collector)?;
-        let websites = index.retrieve_websites(&initial_result.top_websites, query)?;
+
+        let pointers: Vec<_> = initial_result.top_websites;
+
+        let websites = index.retrieve_websites(&pointers, query)?;
 
         Ok(SearchResult {
             num_docs: initial_result.num_websites,

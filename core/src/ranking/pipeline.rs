@@ -16,18 +16,75 @@
 
 use std::cmp::Ordering;
 
-#[derive(Clone, Debug)]
-struct RankingWebsite {
-    address: tantivy::DocAddress,
-    bm25: f64,
-    host_centrality: f64,
-    page_centrality: f64,
-    topic_centrality: f64,
-    personal_centrality: f64,
-    query_centrality: f64,
-    title: String,
-    clean_body: String,
-    score: f64,
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    inverted_index::WebsitePointer,
+    schema::{FastField, Field, TextField, ALL_FIELDS, FLOAT_SCALING},
+};
+
+use super::SignalAggregator;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RankingWebsite {
+    pub pointer: WebsitePointer,
+    pub host_centrality: f64,
+    pub page_centrality: f64,
+    pub topic_centrality: f64,
+    pub personal_centrality: f64,
+    pub query_centrality: f64,
+    pub title: String,
+    pub clean_body: String,
+    pub score: f64,
+}
+
+impl RankingWebsite {
+    pub fn new(
+        doc: tantivy::Document,
+        pointer: WebsitePointer,
+        aggregator: &SignalAggregator,
+    ) -> Self {
+        let mut res = RankingWebsite {
+            pointer,
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            topic_centrality: 0.0,
+            personal_centrality: 0.0,
+            query_centrality: 0.0,
+            title: String::new(),
+            clean_body: String::new(),
+            score: 0.0,
+        };
+
+        for value in doc.field_values() {
+            match ALL_FIELDS[value.field().field_id() as usize] {
+                Field::Fast(FastField::HostCentrality) => {
+                    res.host_centrality =
+                        value.value.as_u64().unwrap() as f64 / FLOAT_SCALING as f64
+                }
+                Field::Fast(FastField::PageCentrality) => {
+                    res.page_centrality =
+                        value.value.as_u64().unwrap() as f64 / FLOAT_SCALING as f64
+                }
+                Field::Fast(FastField::HostNodeID) => {
+                    let node = value.value.as_u64().unwrap();
+
+                    res.personal_centrality = dbg!(aggregator.personal_centrality(node));
+                    res.topic_centrality = aggregator.topic_centrality(node).unwrap_or_default();
+                    res.query_centrality = aggregator.query_centrality(node).unwrap_or_default();
+                }
+                Field::Text(TextField::Title) => {
+                    res.title = value.value.as_text().unwrap().to_string()
+                }
+                Field::Text(TextField::CleanBody) => {
+                    res.clean_body = value.value.as_text().unwrap().to_string()
+                }
+                _ => {}
+            }
+        }
+
+        res
+    }
 }
 
 trait Scorer {
@@ -131,17 +188,33 @@ impl Pipeline {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        collector::Hashes, inverted_index::DocAddress, prehashed::Prehashed,
+        ranking::initial::Score,
+    };
+
     use super::*;
 
     fn sample_websites(n: usize) -> Vec<RankingWebsite> {
         (0..n)
             .map(|i| -> RankingWebsite {
                 RankingWebsite {
-                    address: tantivy::DocAddress {
-                        segment_ord: 0,
-                        doc_id: i as u32,
+                    pointer: WebsitePointer {
+                        score: Score {
+                            bm25: 0.0,
+                            total: 0.0,
+                        },
+                        hashes: Hashes {
+                            site: Prehashed(0),
+                            title: Prehashed(0),
+                            url: Prehashed(0),
+                            simhash: 0,
+                        },
+                        address: DocAddress {
+                            segment: 0,
+                            doc_id: i as u32,
+                        },
                     },
-                    bm25: 0.0,
                     host_centrality: 0.0,
                     page_centrality: 0.0,
                     topic_centrality: 0.0,
@@ -149,7 +222,7 @@ mod tests {
                     query_centrality: 0.0,
                     title: String::new(),
                     clean_body: String::new(),
-                    score: i as f64,
+                    score: 0.0,
                 }
             })
             .collect()
@@ -164,14 +237,14 @@ mod tests {
         let res: Vec<_> = pipeline
             .apply(sample)
             .into_iter()
-            .map(|w| w.address)
+            .map(|w| w.pointer.address)
             .collect();
 
         let expected: Vec<_> = sample_websites(100)
             .into_iter()
             .rev()
             .take(20)
-            .map(|w| w.address)
+            .map(|w| w.pointer.address)
             .collect();
 
         assert_eq!(res, expected);

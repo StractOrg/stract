@@ -45,7 +45,6 @@ pub struct Ranker {
     aggregator: SignalAggregator,
     fastfield_cache: Arc<FastFieldCache>,
     de_rank_similar: bool,
-    topic_scorer: Option<topic::Scorer>,
     num_results: Option<usize>,
 }
 
@@ -63,7 +62,6 @@ impl Ranker {
             max_docs: None,
             de_rank_similar: true,
             fastfield_cache,
-            topic_scorer: None,
             num_results: None,
         }
     }
@@ -95,12 +93,12 @@ impl Ranker {
         self.de_rank_similar = de_rank_similar;
     }
 
-    pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
-        let mut aggregator = self.aggregator.clone();
+    pub fn aggregator(&self) -> SignalAggregator {
+        self.aggregator.clone()
+    }
 
-        if let Some(topic_scorer) = self.topic_scorer.clone() {
-            aggregator.set_topic_scorer(topic_scorer);
-        }
+    pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
+        let aggregator = self.aggregator();
 
         let score_tweaker = InitialScoreTweaker::new(
             Arc::clone(&self.region_count),
@@ -130,7 +128,7 @@ impl Ranker {
     }
 
     pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
-        self.topic_scorer = Some(topic_scorer);
+        self.aggregator.set_topic_scorer(topic_scorer);
     }
 
     pub fn set_query_centrality(&mut self, approx: approximate_harmonic::Scorer) {

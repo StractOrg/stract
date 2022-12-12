@@ -266,7 +266,7 @@ struct ScoredWebsitePointer {
 
 impl collector::Doc for ScoredWebsitePointer {
     fn score(&self) -> &f64 {
-        &self.local_pointer.score
+        &self.local_pointer.score.total
     }
 
     fn id(&self) -> &tantivy::DocId {
