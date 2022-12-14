@@ -360,10 +360,6 @@ impl SignalAggregator {
 
         let personal_centrality = host_id.map(|host_id| self.personal_centrality(host_id));
 
-        if personal_centrality.unwrap() > 1.0 {
-            dbg!(personal_centrality);
-        }
-
         let score = ALL_SIGNALS
             .into_iter()
             .map(|signal| {

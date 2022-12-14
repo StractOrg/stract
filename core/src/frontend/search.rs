@@ -25,7 +25,7 @@ use crate::{
         thousand_sep_number, CodeOrText, DisplayedSidebar, DisplayedWebpage,
         HighlightedSpellCorrection, Snippet,
     },
-    searcher::{self, PrettifiedSearchResult, SearchQuery},
+    searcher::{self, PrettifiedSearchResult, SearchQuery, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
 };
 
@@ -71,7 +71,11 @@ pub async fn route(
 ) -> impl IntoResponse {
     let query = params.get("q").cloned().unwrap_or_default();
 
-    let skip_pages = params.get("p").and_then(|p| p.parse().ok());
+    let skip_pages: usize = params
+        .get("p")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or_default();
+    let offset = skip_pages * NUM_RESULTS_PER_PAGE;
 
     let mut optic = None;
     let mut current_optic_url = None;
@@ -116,13 +120,13 @@ pub async fn route(
 
     match state
         .searcher
-        .search_prettified(&SearchQuery {
+        .search(&SearchQuery {
             original: query.clone(),
             selected_region,
             optic_program: optic,
-            skip_pages,
+            offset,
             site_rankings,
-            custom_num_results: None,
+            num_results: NUM_RESULTS_PER_PAGE,
         })
         .await
     {
@@ -151,10 +155,10 @@ pub async fn route(
                     })
                     .collect();
 
-                let current_page = skip_pages.unwrap_or(0) + 1;
+                let current_page = skip_pages + 1;
 
                 let mut next_page_params = params.clone();
-                next_page_params.insert("p".to_string(), (skip_pages.unwrap_or(0) + 1).to_string());
+                next_page_params.insert("p".to_string(), (skip_pages + 1).to_string());
                 let next_page_url = uri.path().to_string()
                     + "?"
                     + serde_urlencoded::to_string(&next_page_params)
@@ -163,8 +167,7 @@ pub async fn route(
 
                 let prev_page_url = if current_page > 1 {
                     let mut prev_page_params = params;
-                    prev_page_params
-                        .insert("p".to_string(), (skip_pages.unwrap_or(0) - 1).to_string());
+                    prev_page_params.insert("p".to_string(), (skip_pages - 1).to_string());
                     Some(
                         uri.path().to_string()
                             + "?"

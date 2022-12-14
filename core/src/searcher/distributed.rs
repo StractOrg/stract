@@ -17,9 +17,10 @@
 use crate::{
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
-    inverted_index::{self, RetrievedWebpage},
+    inverted_index::{self},
+    ranking::pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
     search_prettifier::DisplayedWebpage,
-    searcher::{PrettifiedWebsitesResult, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
+    searcher::PrettifiedWebsitesResult,
 };
 
 use std::{net::SocketAddr, time::Instant};
@@ -31,9 +32,7 @@ use thiserror::Error;
 
 use crate::sonic;
 
-use super::{
-    InitialPrettifiedSearchResult, InitialSearchResult, PrettifiedSearchResult, SearchQuery,
-};
+use super::{InitialPrettifiedSearchResult, PrettifiedSearchResult, SearchQuery};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -51,25 +50,7 @@ pub enum Error {
 }
 
 impl RemoteSearcher {
-    async fn search(&self, query: &SearchQuery) -> Result<InitialSearchResult> {
-        for timeout in ExponentialBackoff::from_millis(30).take(5) {
-            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
-            {
-                if let Ok(sonic::Response::Content(body)) =
-                    connection.send(Request::Search(query.clone())).await
-                {
-                    return Ok(body);
-                }
-            }
-        }
-
-        Err(Error::SearchFailed)
-    }
-
-    async fn search_prettified(
-        &self,
-        query: &SearchQuery,
-    ) -> Result<InitialPrettifiedSearchResult> {
+    async fn search(&self, query: &SearchQuery) -> Result<InitialPrettifiedSearchResult> {
         for timeout in ExponentialBackoff::from_millis(30).take(5) {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
@@ -86,29 +67,6 @@ impl RemoteSearcher {
     }
 
     async fn retrieve_websites(
-        &self,
-        pointers: &[inverted_index::WebsitePointer],
-        original_query: &str,
-    ) -> Result<Vec<RetrievedWebpage>> {
-        for timeout in ExponentialBackoff::from_millis(30).take(5) {
-            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
-            {
-                if let Ok(sonic::Response::Content(body)) = connection
-                    .send(Request::RetrieveWebites {
-                        websites: pointers.to_vec(),
-                        query: original_query.to_string(),
-                    })
-                    .await
-                {
-                    return Ok(body);
-                }
-            }
-        }
-
-        Err(Error::SearchFailed)
-    }
-
-    async fn retrieve_websites_prettified(
         &self,
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
@@ -173,31 +131,11 @@ impl Shard {
         }
     }
 
-    async fn search_prettified(
-        &self,
-        query: &SearchQuery,
-    ) -> Result<InitialPrettifiedSearchResultShard> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.search_prettified(query))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(result) => Ok(InitialPrettifiedSearchResultShard {
-                local_result: result?,
-                shard: self.id.clone(),
-            }),
-            None => Err(Error::SearchFailed),
-        }
-    }
-
     async fn retrieve_websites(
         &self,
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
-    ) -> Result<Vec<RetrievedWebpage>> {
+    ) -> Result<Vec<DisplayedWebpage>> {
         match self
             .replicas
             .iter()
@@ -210,32 +148,9 @@ impl Shard {
             _ => Err(Error::SearchFailed),
         }
     }
-
-    async fn retrieve_websites_prettified(
-        &self,
-        pointers: &[inverted_index::WebsitePointer],
-        original_query: &str,
-    ) -> Result<Vec<DisplayedWebpage>> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.retrieve_websites_prettified(pointers, original_query))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(Ok(websites)) => Ok(websites),
-            _ => Err(Error::SearchFailed),
-        }
-    }
 }
 
 struct InitialSearchResultShard {
-    local_result: InitialSearchResult,
-    shard: ShardId,
-}
-
-struct InitialPrettifiedSearchResultShard {
     local_result: InitialPrettifiedSearchResult,
     shard: ShardId,
 }
@@ -260,21 +175,27 @@ pub struct DistributedSearcher {
 
 #[derive(Clone)]
 struct ScoredWebsitePointer {
-    local_pointer: inverted_index::WebsitePointer,
+    website: RankingWebsite,
     shard: ShardId,
+}
+
+impl AsRankingWebsite for ScoredWebsitePointer {
+    fn as_ranking(&self) -> &RankingWebsite {
+        &self.website
+    }
 }
 
 impl collector::Doc for ScoredWebsitePointer {
     fn score(&self) -> &f64 {
-        &self.local_pointer.score.total
+        &self.website.pointer.score.total
     }
 
     fn id(&self) -> &tantivy::DocId {
-        &self.local_pointer.address.doc_id
+        &self.website.pointer.address.doc_id
     }
 
     fn hashes(&self) -> collector::Hashes {
-        self.local_pointer.hashes
+        self.website.pointer.hashes
     }
 }
 
@@ -283,139 +204,22 @@ impl DistributedSearcher {
         Self { shards }
     }
 
-    pub async fn search_api(&self, query: &SearchQuery) -> Result<SearchResult> {
+    pub async fn search(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
         let start = Instant::now();
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
         }
 
-        // search shards
-        let initial_results = self
-            .shards
-            .iter()
-            .map(|shard| shard.search(query))
-            .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .filter_map(|result| result.ok())
-            .collect::<Vec<_>>();
-
-        // check if any result has a bang hit
-        if let Some(result) = initial_results
-            .iter()
-            .find(|result| matches!(result.local_result, InitialSearchResult::Bang(_)))
-        {
-            if let InitialSearchResult::Bang(bang) = &result.local_result {
-                return Ok(SearchResult::Bang(bang.clone()));
-            }
-        }
-
-        let spell_corrected_query = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(result) = &result.local_result {
-                result.spell_corrected_query.clone()
-            } else {
-                None
-            }
-        });
-
-        let sidebar = initial_results.first().and_then(|result| {
-            if let InitialSearchResult::Websites(result) = &result.local_result {
-                result.sidebar.clone()
-            } else {
-                None
-            }
-        });
-
-        let num_docs = initial_results
-            .iter()
-            .map(|result| {
-                if let InitialSearchResult::Websites(result) = &result.local_result {
-                    result.websites.num_websites
-                } else {
-                    0
-                }
-            })
-            .sum();
-
-        // combine results
-        let top_n = NUM_RESULTS_PER_PAGE + query.skip_pages.unwrap_or(0);
-        let mut collector = BucketCollector::new(top_n);
-
-        for result in initial_results {
-            if let InitialSearchResult::Websites(local_result) = result.local_result {
-                for website in local_result.websites.top_websites {
-                    let pointer = ScoredWebsitePointer {
-                        local_pointer: website,
-                        shard: result.shard.clone(),
-                    };
-
-                    collector.insert(pointer);
-                }
-            }
-        }
-
-        let top_websites = collector
-            .into_sorted_vec(true)
-            .into_iter()
-            .skip(query.skip_pages.unwrap_or(0))
-            .take(NUM_RESULTS_PER_PAGE)
-            .collect::<Vec<_>>();
-
-        // retrieve webpages
-        let mut retrieved_webpages = Vec::new();
-
-        for _ in 0..top_websites.len() {
-            retrieved_webpages.push(None);
-        }
-
-        for shard in &self.shards {
-            let (indexes, pointers): (Vec<_>, Vec<_>) = top_websites
-                .iter()
-                .enumerate()
-                .filter(|(_, pointer)| pointer.shard == shard.id)
-                .map(|(idx, pointer)| (idx, pointer.local_pointer.clone()))
-                .unzip();
-
-            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.original).await {
-                for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
-                    retrieved_webpages[index] = Some(website);
-                }
-            }
-        }
-
-        let retrieved_webpages: Vec<_> = retrieved_webpages.into_iter().flatten().collect();
-
-        debug_assert_eq!(retrieved_webpages.len(), top_websites.len());
-
-        if retrieved_webpages.is_empty() && !top_websites.is_empty() {
-            return Err(Error::SearchFailed);
-        }
-
-        Ok(SearchResult::Websites(WebsitesResult {
-            spell_corrected_query,
-            webpages: inverted_index::SearchResult {
-                num_docs,
-                documents: retrieved_webpages,
-            },
-            sidebar,
-            search_duration_ms: start.elapsed().as_millis(),
-        }))
-    }
-
-    pub async fn search_prettified(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
-        let start = Instant::now();
-
-        if query.is_empty() {
-            return Err(Error::EmptyQuery);
-        }
+        let mut search_query = query.clone();
+        let pipeline: RankingPipeline<ScoredWebsitePointer> =
+            RankingPipeline::for_query(&mut search_query);
 
         // search shards
         let initial_results = self
             .shards
             .iter()
-            .map(|shard| shard.search_prettified(query))
+            .map(|shard| shard.search(&search_query))
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
             .await
@@ -453,7 +257,7 @@ impl DistributedSearcher {
             .iter()
             .map(|result| {
                 if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                    result.websites.num_websites
+                    result.num_websites
                 } else {
                     0
                 }
@@ -461,14 +265,14 @@ impl DistributedSearcher {
             .sum();
 
         // combine results
-        let top_n = NUM_RESULTS_PER_PAGE + query.skip_pages.unwrap_or(0);
-        let mut collector = BucketCollector::new(top_n);
+        let mut collector =
+            BucketCollector::new(pipeline.collector_top_n() + pipeline.collector_offset());
 
         for result in initial_results {
             if let InitialPrettifiedSearchResult::Websites(local_result) = result.local_result {
-                for website in local_result.websites.top_websites {
+                for website in local_result.websites {
                     let pointer = ScoredWebsitePointer {
-                        local_pointer: website,
+                        website,
                         shard: result.shard.clone(),
                     };
 
@@ -480,9 +284,11 @@ impl DistributedSearcher {
         let top_websites = collector
             .into_sorted_vec(true)
             .into_iter()
-            .skip(query.skip_pages.unwrap_or(0))
-            .take(NUM_RESULTS_PER_PAGE)
+            .skip(pipeline.collector_offset())
+            .take(pipeline.collector_top_n())
             .collect::<Vec<_>>();
+
+        let top_websites = pipeline.apply(top_websites);
 
         // retrieve webpages
         let mut retrieved_webpages = Vec::new();
@@ -496,13 +302,10 @@ impl DistributedSearcher {
                 .iter()
                 .enumerate()
                 .filter(|(_, pointer)| pointer.shard == shard.id)
-                .map(|(idx, pointer)| (idx, pointer.local_pointer.clone()))
+                .map(|(idx, pointer)| (idx, pointer.website.pointer.clone()))
                 .unzip();
 
-            if let Ok(websites) = shard
-                .retrieve_websites_prettified(&pointers, &query.original)
-                .await
-            {
+            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.original).await {
                 for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
                     retrieved_webpages[index] = Some(website);
                 }

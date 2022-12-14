@@ -32,7 +32,6 @@ use axum::{
 };
 
 mod about;
-mod api;
 mod autosuggest;
 mod index;
 mod opensearch;
@@ -100,7 +99,6 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .route("/settings/optics", get(optics::route))
         .route("/settings/sites", get(sites::route))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
-        .route("/api/beta/search", get(api::search))
         .route("/opensearch.xml", get(opensearch::route))
         .fallback(get_service(ServeDir::new("frontend/dist/")).handle_error(
             |error: std::io::Error| async move {

@@ -23,7 +23,8 @@ use tracing::log::debug;
 
 use crate::{
     entity_index::{entity::Span, StoredEntity},
-    inverted_index::{self, RetrievedWebpage},
+    inverted_index::RetrievedWebpage,
+    ranking::pipeline::RankingWebsite,
     searcher::{self, LocalSearcher, Sidebar},
     spell::CorrectionTerm,
     webpage::{
@@ -76,6 +77,7 @@ pub fn initial(
     InitialWebsiteResult {
         spell_corrected_query,
         websites: result.websites,
+        num_websites: result.num_websites,
         sidebar,
     }
 }
@@ -112,7 +114,8 @@ pub struct HighlightedSpellCorrection {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
-    pub websites: inverted_index::InitialSearchResult,
+    pub num_websites: usize,
+    pub websites: Vec<RankingWebsite>,
     pub sidebar: Option<DisplayedSidebar>,
 }
 

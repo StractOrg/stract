@@ -83,14 +83,27 @@ pub enum InitialPrettifiedSearchResult {
     Bang(BangHit),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchQuery {
     pub original: String,
+    pub offset: usize,
+    pub num_results: usize,
     pub selected_region: Option<Region>,
     pub optic_program: Option<String>,
-    pub skip_pages: Option<usize>,
     pub site_rankings: Option<SiteRankings>,
-    pub custom_num_results: Option<usize>,
+}
+
+impl Default for SearchQuery {
+    fn default() -> Self {
+        Self {
+            original: Default::default(),
+            offset: Default::default(),
+            num_results: NUM_RESULTS_PER_PAGE,
+            selected_region: Default::default(),
+            optic_program: Default::default(),
+            site_rankings: Default::default(),
+        }
+    }
 }
 
 impl SearchQuery {

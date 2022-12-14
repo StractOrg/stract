@@ -96,7 +96,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                             }
                             searcher::InitialSearchResult::Bang(bang) => {
                                 req.respond(sonic::Response::Content(
-                                    searcher::InitialPrettifiedSearchResult::Bang(bang),
+                                    searcher::InitialSearchResult::Bang(bang),
                                 ))
                                 .await
                                 .ok();

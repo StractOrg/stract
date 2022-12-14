@@ -16,14 +16,26 @@
 
 use std::cmp::Ordering;
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     inverted_index::WebsitePointer,
     schema::{FastField, Field, TextField, ALL_FIELDS, FLOAT_SCALING},
+    searcher::SearchQuery,
 };
 
 use super::SignalAggregator;
+
+pub trait AsRankingWebsite: Clone {
+    fn as_ranking(&self) -> &RankingWebsite;
+}
+
+impl AsRankingWebsite for RankingWebsite {
+    fn as_ranking(&self) -> &RankingWebsite {
+        self
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RankingWebsite {
@@ -45,7 +57,6 @@ impl RankingWebsite {
         aggregator: &SignalAggregator,
     ) -> Self {
         let mut res = RankingWebsite {
-            pointer,
             host_centrality: 0.0,
             page_centrality: 0.0,
             topic_centrality: 0.0,
@@ -53,7 +64,8 @@ impl RankingWebsite {
             query_centrality: 0.0,
             title: String::new(),
             clean_body: String::new(),
-            score: 0.0,
+            score: pointer.score.total,
+            pointer,
         };
 
         for value in doc.field_values() {
@@ -69,7 +81,7 @@ impl RankingWebsite {
                 Field::Fast(FastField::HostNodeID) => {
                     let node = value.value.as_u64().unwrap();
 
-                    res.personal_centrality = dbg!(aggregator.personal_centrality(node));
+                    res.personal_centrality = aggregator.personal_centrality(node);
                     res.topic_centrality = aggregator.topic_centrality(node).unwrap_or_default();
                     res.query_centrality = aggregator.query_centrality(node).unwrap_or_default();
                 }
@@ -87,14 +99,14 @@ impl RankingWebsite {
     }
 }
 
-trait Scorer {
-    fn score(&self, websites: &mut [RankingWebsite]);
+trait Scorer<T: AsRankingWebsite>: Send + Sync {
+    fn score(&self, websites: &mut [T]);
 }
 
 struct ReRanker {}
 
-impl Scorer for ReRanker {
-    fn score(&self, websites: &mut [RankingWebsite]) {
+impl<T: AsRankingWebsite> Scorer<T> for ReRanker {
+    fn score(&self, websites: &mut [T]) {
         // TODO: Implement actual scoring
         // todo!();
     }
@@ -102,26 +114,26 @@ impl Scorer for ReRanker {
 
 struct SignalFocusText {}
 
-impl Scorer for SignalFocusText {
-    fn score(&self, websites: &mut [RankingWebsite]) {
+impl<T: AsRankingWebsite> Scorer<T> for SignalFocusText {
+    fn score(&self, websites: &mut [T]) {
         // TODO: Implement actual scoring
         // todo!();
     }
 }
 
-enum Prev {
+enum Prev<T: AsRankingWebsite> {
     Initial,
-    Node(Box<RankingStage>),
+    Node(Box<RankingStage<T>>),
 }
 
-struct RankingStage {
-    scorer: Box<dyn Scorer>,
-    prev: Prev,
+struct RankingStage<T: AsRankingWebsite> {
+    scorer: Box<dyn Scorer<T>>,
+    prev: Prev<T>,
     top_n: usize,
-    memory: Option<Vec<RankingWebsite>>,
+    memory: Option<(Vec<T>, Vec<T>)>,
 }
 
-impl RankingStage {
+impl<T: AsRankingWebsite> RankingStage<T> {
     fn initial_top_n(&self) -> usize {
         match &self.prev {
             Prev::Initial => self.top_n,
@@ -129,32 +141,90 @@ impl RankingStage {
         }
     }
 
-    pub fn populate(&mut self, websites: Vec<RankingWebsite>) {
+    pub fn populate(&mut self, websites: Vec<T>) {
         match &mut self.prev {
-            Prev::Initial => self.memory = Some(websites),
+            Prev::Initial => {
+                let a: Vec<_> = websites.clone().into_iter().take(self.top_n).collect();
+                let b: Vec<_> = websites
+                    .into_iter()
+                    .skip(self.top_n)
+                    .take(self.top_n)
+                    .collect();
+
+                self.memory = Some((a, b));
+            }
             Prev::Node(n) => n.populate(websites),
         }
     }
 
-    fn apply(self, top_n: usize) -> Vec<RankingWebsite> {
-        let mut chunk = match self.prev {
-            Prev::Initial => self.memory.unwrap(),
-            Prev::Node(n) => n.apply(self.top_n),
-        };
+    fn apply(&self, top_n: usize, offset: usize) -> Vec<T> {
+        match &self.prev {
+            Prev::Initial => {
+                let (mut a, mut b) = self.memory.clone().unwrap();
 
-        self.scorer.score(&mut chunk);
-        chunk.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+                self.scorer.score(&mut a);
+                a.sort_by(|a, b| {
+                    b.as_ranking()
+                        .score
+                        .partial_cmp(&a.as_ranking().score)
+                        .unwrap_or(Ordering::Equal)
+                });
 
-        chunk.into_iter().take(top_n).collect()
+                self.scorer.score(&mut b);
+                b.sort_by(|a, b| {
+                    b.as_ranking()
+                        .score
+                        .partial_cmp(&a.as_ranking().score)
+                        .unwrap_or(Ordering::Equal)
+                });
+
+                a.into_iter()
+                    .chain(b.into_iter())
+                    .skip(offset % self.top_n)
+                    .take(top_n)
+                    .collect()
+            }
+            Prev::Node(n) => {
+                let k = offset / self.top_n;
+                let (mut a, mut b) = (
+                    n.apply(self.top_n, k * self.top_n),
+                    n.apply(self.top_n, (k + 1) * self.top_n),
+                );
+
+                self.scorer.score(&mut a);
+                self.scorer.score(&mut b);
+
+                a.sort_by(|a, b| {
+                    b.as_ranking()
+                        .score
+                        .partial_cmp(&a.as_ranking().score)
+                        .unwrap_or(Ordering::Equal)
+                });
+                b.sort_by(|a, b| {
+                    b.as_ranking()
+                        .score
+                        .partial_cmp(&a.as_ranking().score)
+                        .unwrap_or(Ordering::Equal)
+                });
+
+                a.into_iter()
+                    .chain(b.into_iter())
+                    .skip(offset % self.top_n)
+                    .take(top_n)
+                    .collect()
+            }
+        }
     }
 }
 
-struct Pipeline {
-    last_stage: RankingStage,
+pub struct RankingPipeline<T: AsRankingWebsite> {
+    last_stage: RankingStage<T>,
+    offset: usize,
+    top_n: usize,
 }
 
-impl Default for Pipeline {
-    fn default() -> Self {
+impl<T: AsRankingWebsite> RankingPipeline<T> {
+    fn create() -> Self {
         let last_stage = RankingStage {
             scorer: Box::new(ReRanker {}),
             prev: Prev::Node(Box::new(RankingStage {
@@ -166,23 +236,42 @@ impl Default for Pipeline {
             memory: None,
             top_n: 50,
         };
-        Self { last_stage }
-    }
-}
 
-impl Pipeline {
-    pub fn with_offset(&mut self, offset: usize) {
-        todo!();
+        Self {
+            last_stage,
+            offset: 0,
+            top_n: 0,
+        }
     }
 
-    pub fn apply(mut self, websites: Vec<RankingWebsite>) -> Vec<RankingWebsite> {
+    pub fn for_query(query: &mut SearchQuery) -> Self {
+        let mut pipeline = Self::create();
+
+        pipeline.offset = query.offset;
+        pipeline.top_n = query.num_results;
+
+        query.num_results = pipeline.collector_top_n();
+        query.offset = pipeline.collector_offset();
+
+        pipeline
+    }
+
+    pub fn apply(mut self, websites: Vec<T>) -> Vec<T> {
         self.last_stage.populate(websites);
 
-        self.last_stage.apply(20)
+        self.last_stage.apply(20, self.offset)
+    }
+
+    pub fn collector_top_n(&self) -> usize {
+        2 * self.initial_top_n()
     }
 
     pub fn initial_top_n(&self) -> usize {
         self.last_stage.initial_top_n()
+    }
+
+    pub fn collector_offset(&self) -> usize {
+        (self.offset / self.initial_top_n()) * self.initial_top_n()
     }
 }
 
@@ -222,7 +311,7 @@ mod tests {
                     query_centrality: 0.0,
                     title: String::new(),
                     clean_body: String::new(),
-                    score: 0.0,
+                    score: 1.0 / i as f64,
                 }
             })
             .collect()
@@ -230,10 +319,12 @@ mod tests {
 
     #[test]
     fn simple() {
-        let pipeline = Pipeline::default();
-        assert_eq!(pipeline.initial_top_n(), 100);
+        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+            ..Default::default()
+        });
+        assert_eq!(pipeline.collector_top_n(), 200);
 
-        let sample = sample_websites(pipeline.initial_top_n());
+        let sample = sample_websites(pipeline.collector_top_n());
         let res: Vec<_> = pipeline
             .apply(sample)
             .into_iter()
@@ -242,11 +333,93 @@ mod tests {
 
         let expected: Vec<_> = sample_websites(100)
             .into_iter()
-            .rev()
             .take(20)
             .map(|w| w.pointer.address)
             .collect();
 
         assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn offsets() {
+        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+            offset: 0,
+            ..Default::default()
+        });
+
+        let sample: Vec<_> =
+            sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
+                .into_iter()
+                .skip(pipeline.collector_offset())
+                .collect();
+        let mut prev: Vec<_> = pipeline.apply(sample);
+
+        for offset in 1..1_000 {
+            let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+                offset,
+                ..Default::default()
+            });
+
+            let sample: Vec<_> =
+                sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
+                    .into_iter()
+                    .skip(pipeline.collector_offset())
+                    .collect();
+            let res: Vec<_> = pipeline.apply(sample);
+
+            assert_eq!(res.len(), 20, "Every page should have 20 results");
+
+            if let Some(first) = prev.first() {
+                assert!(!res
+                    .iter()
+                    .any(|r| r.pointer.address.doc_id == first.pointer.address.doc_id));
+            }
+
+            // assert_eq!(
+            //     prev.iter()
+            //         .map(|p| usize::from(
+            //             res.iter()
+            //                 .any(|r| r.pointer.address.doc_id == p.pointer.address.doc_id)
+            //         ))
+            //         .sum::<usize>(),
+            //     19,
+            //     "Only the top result from previous offset should be removed in current ranking"
+            // );
+
+            prev = res;
+        }
+
+        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+            offset: 0,
+            ..Default::default()
+        });
+        let sample: Vec<_> =
+            sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
+                .into_iter()
+                .skip(pipeline.collector_offset())
+                .collect();
+        let mut prev: Vec<_> = pipeline.apply(sample);
+        for p in 1..100 {
+            let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+                offset: p * 20,
+                ..Default::default()
+            });
+
+            let sample: Vec<_> =
+                sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
+                    .into_iter()
+                    .skip(pipeline.collector_offset())
+                    .collect();
+            let res: Vec<_> = pipeline.apply(sample).into_iter().collect();
+
+            assert_eq!(res.len(), 20, "Every page should have 20 results");
+
+            assert!(prev
+                .iter()
+                .zip_eq(res.iter())
+                .all(|(p, r)| p.pointer.address.doc_id + 20 == r.pointer.address.doc_id));
+
+            prev = res;
+        }
     }
 }

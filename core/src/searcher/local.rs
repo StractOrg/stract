@@ -28,6 +28,7 @@ use crate::index::Index;
 use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
+use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{Ranker, SignalAggregator};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
@@ -35,9 +36,7 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{
-    InitialSearchResult, SearchQuery, SearchResult, Sidebar, WebsitesResult, NUM_RESULTS_PER_PAGE,
-};
+use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar, WebsitesResult};
 
 const STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD: f64 = 250.0;
 
@@ -103,9 +102,7 @@ impl LocalSearcher {
             &query_aggregator,
         )?;
 
-        if let Some(num_results) = query.custom_num_results {
-            parsed_query.set_num_results(num_results)
-        }
+        parsed_query.set_num_results(query.num_results);
 
         if parsed_query.is_empty() {
             Err(Error::EmptyQuery)
@@ -118,7 +115,7 @@ impl LocalSearcher {
         &self,
         query: &SearchQuery,
         de_rank_similar: bool,
-    ) -> Result<inverted_index::InitialSearchResult> {
+    ) -> Result<(Vec<RankingWebsite>, usize)> {
         let optic = match query.optic_program.as_ref() {
             Some(program) => Some(optics::parse(program)?),
             None => None,
@@ -181,13 +178,19 @@ impl LocalSearcher {
 
         ranker = ranker
             .with_max_docs(10_000_000, self.index.num_segments())
-            .with_num_results(parsed_query.num_results());
+            .with_num_results(parsed_query.num_results())
+            .with_offset(query.offset);
 
-        if let Some(skip_pages) = query.skip_pages {
-            ranker = ranker.with_offset(NUM_RESULTS_PER_PAGE * skip_pages);
-        }
+        let res = self
+            .index
+            .search_initial(&parsed_query, ranker.collector())?;
 
-        self.index.search_initial(&parsed_query, ranker.collector())
+        let ranking_websites = self
+            .index
+            .inverted_index
+            .retrieve_ranking_websites(res.top_websites, &ranker.aggregator())?;
+
+        Ok((ranking_websites, res.num_websites))
     }
 
     fn spell_correction(&self, query: &SearchQuery) -> Result<Option<Correction>> {
@@ -215,14 +218,14 @@ impl LocalSearcher {
     fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
         let mut query = query.clone();
         query.optic_program = Some(include_str!("stackoverflow.optic").to_string());
-        query.custom_num_results = Some(1);
+        query.num_results = 1;
 
-        let mut res = self.search_inverted_index(&query, false)?;
+        let (mut top_websites, num_websites) = self.search_inverted_index(&query, false)?;
 
-        if res.num_websites > 0 && !res.top_websites.is_empty() {
-            let top = res.top_websites.remove(0);
-            if top.score.total > self.stackoverflow_sidebar_threshold {
-                let mut retrieved = self.retrieve_websites(&[top], &query.original)?;
+        if num_websites > 0 && !top_websites.is_empty() {
+            let top = top_websites.remove(0);
+            if top.score > self.stackoverflow_sidebar_threshold {
+                let mut retrieved = self.retrieve_websites(&[top.pointer], &query.original)?;
                 let retrieved = retrieved.remove(0);
                 return Ok(Some(Sidebar::StackOverflow {
                     schema_org: retrieved.schema_org,
@@ -255,13 +258,14 @@ impl LocalSearcher {
             return Ok(InitialSearchResult::Bang(bang));
         }
 
-        let webpages = self.search_inverted_index(query, de_rank_similar)?;
+        let (websites, num_websites) = self.search_inverted_index(query, de_rank_similar)?;
         let correction = self.spell_correction(query)?;
         let sidebar = self.sidebar(query)?;
 
         Ok(InitialSearchResult::Websites(InitialWebsiteResult {
             spell_corrected_query: correction,
-            websites: webpages,
+            websites,
+            num_websites,
             sidebar,
         }))
     }
@@ -288,18 +292,25 @@ impl LocalSearcher {
     pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         let start = Instant::now();
 
-        let query_text = query.original.clone();
-        let initial_result = self.search_initial(query, true)?;
+        let mut search_query = query.clone();
+
+        let pipeline = RankingPipeline::for_query(&mut search_query);
+
+        let initial_result = self.search_initial(&search_query, true)?;
 
         match initial_result {
             InitialSearchResult::Websites(search_result) => {
-                let retrieved_sites =
-                    self.retrieve_websites(&search_result.websites.top_websites, &query_text)?;
+                let top_websites = pipeline.apply(search_result.websites);
+                let pointers: Vec<_> = top_websites
+                    .into_iter()
+                    .map(|website| website.pointer)
+                    .collect();
 
+                let retrieved_sites = self.retrieve_websites(&pointers, &search_query.original)?;
                 Ok(SearchResult::Websites(WebsitesResult {
                     spell_corrected_query: search_result.spell_corrected_query,
                     webpages: inverted_index::SearchResult {
-                        num_docs: search_result.websites.num_websites,
+                        num_docs: search_result.num_websites,
                         documents: retrieved_sites,
                     },
                     sidebar: search_result.sidebar,
@@ -337,7 +348,8 @@ impl LocalSearcher {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
-    pub websites: inverted_index::InitialSearchResult,
+    pub num_websites: usize,
+    pub websites: Vec<RankingWebsite>,
     pub sidebar: Option<Sidebar>,
 }
 
@@ -354,13 +366,16 @@ impl SearchResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::webpage::{Html, Webpage};
+    use crate::{
+        searcher::NUM_RESULTS_PER_PAGE,
+        webpage::{Html, Webpage},
+    };
 
     use super::*;
 
     #[test]
     fn offset_page() {
-        const NUM_PAGES: usize = 10;
+        const NUM_PAGES: usize = 50;
         const NUM_WEBSITES: usize = NUM_PAGES * NUM_RESULTS_PER_PAGE;
 
         let mut index = Index::temporary().expect("Unable to open index");
@@ -403,7 +418,7 @@ mod tests {
             let urls: Vec<_> = searcher
                 .search(&SearchQuery {
                     original: "test".to_string(),
-                    skip_pages: Some(p),
+                    offset: p * NUM_RESULTS_PER_PAGE,
                     ..Default::default()
                 })
                 .unwrap()
@@ -416,6 +431,8 @@ mod tests {
                 .collect();
 
             assert!(!urls.is_empty());
+
+            dbg!(&urls);
 
             for (i, url) in urls.into_iter().enumerate() {
                 assert_eq!(
