@@ -16,7 +16,6 @@
 
 use std::cmp::Ordering;
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -29,10 +28,15 @@ use super::SignalAggregator;
 
 pub trait AsRankingWebsite: Clone {
     fn as_ranking(&self) -> &RankingWebsite;
+    fn as_mut_ranking(&mut self) -> &mut RankingWebsite;
 }
 
 impl AsRankingWebsite for RankingWebsite {
     fn as_ranking(&self) -> &RankingWebsite {
+        self
+    }
+
+    fn as_mut_ranking(&mut self) -> &mut RankingWebsite {
         self
     }
 }
@@ -112,12 +116,14 @@ impl<T: AsRankingWebsite> Scorer<T> for ReRanker {
     }
 }
 
-struct SignalFocusText {}
+struct PrioritizeText {}
 
-impl<T: AsRankingWebsite> Scorer<T> for SignalFocusText {
+impl<T: AsRankingWebsite> Scorer<T> for PrioritizeText {
     fn score(&self, websites: &mut [T]) {
-        // TODO: Implement actual scoring
-        // todo!();
+        for website in websites {
+            let bm25 = website.as_ranking().pointer.score.bm25 as f64;
+            website.as_mut_ranking().score += bm25;
+        }
     }
 }
 
@@ -158,62 +164,38 @@ impl<T: AsRankingWebsite> RankingStage<T> {
     }
 
     fn apply(&self, top_n: usize, offset: usize) -> Vec<T> {
-        match &self.prev {
-            Prev::Initial => {
-                let (mut a, mut b) = self.memory.clone().unwrap();
-
-                self.scorer.score(&mut a);
-                a.sort_by(|a, b| {
-                    b.as_ranking()
-                        .score
-                        .partial_cmp(&a.as_ranking().score)
-                        .unwrap_or(Ordering::Equal)
-                });
-
-                self.scorer.score(&mut b);
-                b.sort_by(|a, b| {
-                    b.as_ranking()
-                        .score
-                        .partial_cmp(&a.as_ranking().score)
-                        .unwrap_or(Ordering::Equal)
-                });
-
-                a.into_iter()
-                    .chain(b.into_iter())
-                    .skip(offset % self.top_n)
-                    .take(top_n)
-                    .collect()
-            }
+        let (mut a, mut b) = match &self.prev {
+            Prev::Initial => self.memory.clone().unwrap(),
             Prev::Node(n) => {
                 let k = offset / self.top_n;
-                let (mut a, mut b) = (
+                (
                     n.apply(self.top_n, k * self.top_n),
                     n.apply(self.top_n, (k + 1) * self.top_n),
-                );
-
-                self.scorer.score(&mut a);
-                self.scorer.score(&mut b);
-
-                a.sort_by(|a, b| {
-                    b.as_ranking()
-                        .score
-                        .partial_cmp(&a.as_ranking().score)
-                        .unwrap_or(Ordering::Equal)
-                });
-                b.sort_by(|a, b| {
-                    b.as_ranking()
-                        .score
-                        .partial_cmp(&a.as_ranking().score)
-                        .unwrap_or(Ordering::Equal)
-                });
-
-                a.into_iter()
-                    .chain(b.into_iter())
-                    .skip(offset % self.top_n)
-                    .take(top_n)
-                    .collect()
+                )
             }
-        }
+        };
+
+        self.scorer.score(&mut a);
+        a.sort_by(|a, b| {
+            b.as_ranking()
+                .score
+                .partial_cmp(&a.as_ranking().score)
+                .unwrap_or(Ordering::Equal)
+        });
+
+        self.scorer.score(&mut b);
+        b.sort_by(|a, b| {
+            b.as_ranking()
+                .score
+                .partial_cmp(&a.as_ranking().score)
+                .unwrap_or(Ordering::Equal)
+        });
+
+        a.into_iter()
+            .chain(b.into_iter())
+            .skip(offset % self.top_n)
+            .take(top_n)
+            .collect()
     }
 }
 
@@ -228,7 +210,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         let last_stage = RankingStage {
             scorer: Box::new(ReRanker {}),
             prev: Prev::Node(Box::new(RankingStage {
-                scorer: Box::new(SignalFocusText {}),
+                scorer: Box::new(PrioritizeText {}),
                 prev: Prev::Initial,
                 memory: None,
                 top_n: 100,
@@ -277,6 +259,8 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use crate::{
         collector::Hashes, inverted_index::DocAddress, prehashed::Prehashed,
         ranking::initial::Score,

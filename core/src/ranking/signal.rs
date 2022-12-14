@@ -148,7 +148,7 @@ impl Signal {
             Signal::HostCentrality => 2500.0,
             Signal::PageCentrality => 4500.0,
             Signal::TopicCentrality => 2500.0,
-            Signal::PersonalCentrality => 4500.0,
+            Signal::PersonalCentrality => 1000.0,
             Signal::QueryCentrality => 2500.0,
             Signal::IsHomepage => 0.1,
             Signal::FetchTimeMs => 0.01,

@@ -183,6 +183,10 @@ impl AsRankingWebsite for ScoredWebsitePointer {
     fn as_ranking(&self) -> &RankingWebsite {
         &self.website
     }
+
+    fn as_mut_ranking(&mut self) -> &mut RankingWebsite {
+        &mut self.website
+    }
 }
 
 impl collector::Doc for ScoredWebsitePointer {

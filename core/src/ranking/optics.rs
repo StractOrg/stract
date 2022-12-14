@@ -27,7 +27,7 @@ use crate::{
 
 use super::{Signal, SignalAggregator};
 
-pub const SCALE: f32 = 200.0;
+pub const SCALE: f32 = 10.0;
 
 pub trait CreateAggregator {
     fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator;
@@ -132,7 +132,7 @@ mod tests {
                 ),
                 backlinks: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 5000,
+                fetch_time_ms: 50,
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 primary_image: None,
@@ -169,7 +169,7 @@ mod tests {
                 ),
                 backlinks: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 2000,
+                fetch_time_ms: 49,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 primary_image: None,
