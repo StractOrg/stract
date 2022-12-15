@@ -14,16 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Mutex,
-    },
-};
+use std::collections::HashMap;
 
 use bitvec::vec::BitVec;
-use rayon::prelude::*;
 use tracing::info;
 
 use crate::{
@@ -33,7 +26,7 @@ use crate::{
     webgraph::{graph_store::GraphStore, Node, Store, Webgraph},
 };
 
-const HYPERLOGLOG_COUNTERS: usize = 16;
+const HYPERLOGLOG_COUNTERS: usize = 64;
 
 #[derive(Clone)]
 struct JankyBloomFilter {
@@ -92,7 +85,7 @@ where
         })
         .collect();
 
-    let counter_changes = AtomicU64::new(counters.len() as u64);
+    let mut counter_changes = counters.len() as u64;
     let mut t = 0;
     let mut centralities: IntMap<KahanSum> = nodes
         .iter()
@@ -105,47 +98,64 @@ where
     }
 
     loop {
-        if counter_changes.load(Ordering::SeqCst) == 0 {
+        if counter_changes == 0 {
             break;
         }
 
-        let new_counters: IntMap<_> = counters
-            .clone()
-            .into_iter()
-            .map(|(node, counter)| (node, Mutex::new(counter)))
-            .collect();
+        let mut new_counters: IntMap<_> = counters.clone();
 
-        counter_changes.store(0, Ordering::SeqCst);
-        let new_changed_nodes = Mutex::new(JankyBloomFilter::new(nodes.len() as u64, 0.05));
+        counter_changes = 0;
+        let mut new_changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
 
-        nodes.par_iter().for_each(|node| {
-            for edge in graph.ingoing_edges(*node) {
-                if !changed_nodes.contains(&edge.from) {
-                    continue;
-                }
+        for edge in graph.edges() {
+            if !changed_nodes.contains(&edge.from) {
+                continue;
+            }
 
-                if let (Some(counter_to), Some(counter_from)) =
-                    (new_counters.get(&edge.to), counters.get(&edge.from))
+            if let (Some(counter_to), Some(counter_from)) =
+                (new_counters.get_mut(&edge.to), counters.get(&edge.from))
+            {
+                if counter_to
+                    .registers()
+                    .iter()
+                    .zip(counter_from.registers().iter())
+                    .any(|(to, from)| *from > *to)
                 {
-                    let mut counter_to = counter_to.lock().unwrap();
-                    if counter_to
-                        .registers()
-                        .iter()
-                        .zip(counter_from.registers().iter())
-                        .any(|(to, from)| *from > *to)
-                    {
-                        counter_to.merge(counter_from);
-                        new_changed_nodes.lock().unwrap().insert(edge.to);
-                        counter_changes.fetch_add(1, Ordering::SeqCst);
-                    }
+                    counter_to.merge(counter_from);
+                    new_changed_nodes.insert(edge.to);
+                    counter_changes += 1;
                 }
             }
-        });
+        }
+
+        // nodes.iter().for_each(|node| {
+        //     for edge in graph.ingoing_edges(*node) {
+        //         if !changed_nodes.contains(&edge.from) {
+        //             continue;
+        //         }
+
+        //         if let (Some(counter_to), Some(counter_from)) =
+        //             (new_counters.get(&edge.to), counters.get(&edge.from))
+        //         {
+        //             let mut counter_to = counter_to.lock().unwrap();
+        //             if counter_to
+        //                 .registers()
+        //                 .iter()
+        //                 .zip(counter_from.registers().iter())
+        //                 .any(|(to, from)| *from > *to)
+        //             {
+        //                 counter_to.merge(counter_from);
+        //                 new_changed_nodes.lock().unwrap().insert(edge.to);
+        //                 counter_changes.fetch_add(1, Ordering::SeqCst);
+        //             }
+        //         }
+        //     }
+        // });
 
         for (node, score) in centralities.iter_mut() {
             *score += new_counters
                 .get(node)
-                .map(|counter| counter.lock().unwrap().size())
+                .map(|counter| counter.size())
                 .unwrap_or_default()
                 .checked_sub(
                     counters
@@ -157,11 +167,8 @@ where
                 / (t + 1) as f64;
         }
 
-        counters = new_counters
-            .into_iter()
-            .map(|(node, counter)| (node, counter.into_inner().unwrap()))
-            .collect();
-        changed_nodes = new_changed_nodes.into_inner().unwrap();
+        counters = new_counters;
+        changed_nodes = new_changed_nodes;
         t += 1;
     }
 

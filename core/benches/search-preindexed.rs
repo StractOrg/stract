@@ -3,12 +3,10 @@ use cuely::{
     index::Index,
     ranking::centrality_store::CentralityStore,
     searcher::{LocalSearcher, SearchQuery},
-    webgraph::centrality::topic::TopicCentrality,
 };
 
 const INDEX_PATH: &str = "data/index";
 const CENTRALITY_PATH: &str = "data/centrality";
-const TOPIC_CENTRALITY_PATH: &str = "data/topic_centrality";
 
 macro_rules! bench {
     ($query:tt, $searcher:ident, $c:ident) => {
@@ -32,7 +30,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let mut searcher = LocalSearcher::new(index);
     searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH));
-    searcher.set_topic_centrality(TopicCentrality::open(TOPIC_CENTRALITY_PATH).unwrap());
 
     for _ in 0..100 {
         bench!("the", searcher, c);
