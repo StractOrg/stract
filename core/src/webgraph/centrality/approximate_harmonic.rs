@@ -35,10 +35,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;
 use crate::webgraph::Node;
-use crate::webgraph::{centrality::betweenness::Betweenness, NodeID, Webgraph};
+use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 10_000;
+const NUM_PROXY_NODES: usize = 100_000;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 pub const SHIFT: f64 = 1.0;
@@ -94,21 +94,10 @@ pub struct Scorer {
     num_liked_nodes: usize,
 }
 
-fn create_user_nodes(
-    nodes: &[NodeID],
-    proxy_nodes: &[Arc<ProxyNode>],
-    betweenness: &HashMap<NodeID, f64>,
-) -> Vec<UserNode> {
+fn create_user_nodes(nodes: &[NodeID], proxy_nodes: &[Arc<ProxyNode>]) -> Vec<UserNode> {
     let mut res = Vec::new();
 
-    let mut nodes = nodes.to_vec();
-    nodes.sort_by(|a, b| {
-        betweenness
-            .get(b)
-            .unwrap_or(&0.0)
-            .partial_cmp(betweenness.get(a).unwrap_or(&0.0))
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    let nodes = nodes.to_vec();
 
     for id in nodes {
         let user_node = UserNode::new(id, proxy_nodes);
@@ -133,15 +122,14 @@ impl Scorer {
         liked_nodes: &[NodeID],
         disliked_nodes: &[NodeID],
         fixed_scores: HashMap<NodeID, f64>,
-        betweenness: &HashMap<NodeID, f64>,
     ) -> Self {
         let num_liked_nodes = liked_nodes.len();
 
         Self {
             fixed_scores,
             num_liked_nodes,
-            liked_nodes: create_user_nodes(liked_nodes, proxy_nodes, betweenness),
-            disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes, betweenness),
+            liked_nodes: create_user_nodes(liked_nodes, proxy_nodes),
+            disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes),
             cache: Mutex::new(HashMap::new()),
         }
     }
@@ -244,7 +232,6 @@ impl UserNode {
 pub struct ApproximatedHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
     pub proxy_nodes: Vec<Arc<ProxyNode>>,
-    betweenness: HashMap<NodeID, f64>,
 }
 
 impl ApproximatedHarmonicCentrality {
@@ -253,16 +240,19 @@ impl ApproximatedHarmonicCentrality {
     }
 
     fn new_with_num_proxy(graph: &Webgraph, num_proxy_nodes: usize) -> Self {
-        let betweenness = Betweenness::calculate_with_progress(graph);
-
-        let mut nodes = betweenness.centrality.iter().collect_vec();
-        nodes.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
-
         let mut node2id: HashMap<Node, NodeID> = HashMap::new();
 
+        // we should probably choose the proxy nodes based on their
+        // betweenness centrality, but I don't know how we can approximate betweenness
+        // on a graph that cannot be in memory
+        let mut nodes = Vec::new();
         if let Some(store) = graph.host.as_ref() {
             for id in store.nodes() {
                 if let Some(node) = store.id2node(&id) {
+                    if nodes.len() < num_proxy_nodes {
+                        nodes.push(node.clone());
+                    }
+
                     node2id.insert(node, id);
                 }
             }
@@ -271,7 +261,6 @@ impl ApproximatedHarmonicCentrality {
         let proxy_nodes: Vec<_> = nodes
             .into_par_iter()
             .take(num_proxy_nodes)
-            .map(|(node, _)| node)
             .filter(|node| node2id.contains_key(node))
             .map(|node| {
                 let dist_to_node = graph.raw_host_distances(node.clone()).into_iter().collect();
@@ -281,7 +270,7 @@ impl ApproximatedHarmonicCentrality {
                     .collect();
 
                 Arc::new(ProxyNode {
-                    id: *node2id.get(node).unwrap(),
+                    id: *node2id.get(&node).unwrap(),
                     dist_to_node,
                     dist_from_node,
                 })
@@ -290,11 +279,6 @@ impl ApproximatedHarmonicCentrality {
 
         Self {
             proxy_nodes,
-            betweenness: betweenness
-                .centrality
-                .into_iter()
-                .filter_map(|(node, centrality)| node2id.get(&node).map(|id| (*id, centrality)))
-                .collect(),
             node2id,
         }
     }
@@ -312,48 +296,15 @@ impl ApproximatedHarmonicCentrality {
             .filter_map(|node| self.node2id.get(&node).copied())
             .collect_vec();
 
-        let fixed_scores: HashMap<_, _> = liked_nodes
-            .iter()
-            .map(|node| (*node, 2.0))
-            .chain(disliked_nodes.iter().map(|node| (*node, 0.0)))
-            .collect();
-
-        Scorer::new(
-            &self.proxy_nodes,
-            &liked_nodes,
-            &disliked_nodes,
-            fixed_scores,
-            &self.betweenness,
-        )
+        self.scorer_from_ids(&liked_nodes, &disliked_nodes)
     }
 
-    pub fn scorer_without_fixed(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer {
-        let liked_nodes = liked_nodes
-            .iter()
-            .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).copied())
-            .collect_vec();
-
-        let disliked_nodes = disliked_nodes
-            .iter()
-            .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).copied())
-            .collect_vec();
-
-        self.scorer_without_fixed_from_ids(&liked_nodes, &disliked_nodes)
-    }
-
-    pub fn scorer_without_fixed_from_ids(
-        &self,
-        liked_nodes: &[NodeID],
-        disliked_nodes: &[NodeID],
-    ) -> Scorer {
+    pub fn scorer_from_ids(&self, liked_nodes: &[NodeID], disliked_nodes: &[NodeID]) -> Scorer {
         Scorer::new(
             &self.proxy_nodes,
             liked_nodes,
             disliked_nodes,
             HashMap::new(),
-            &self.betweenness,
         )
     }
 
@@ -419,53 +370,9 @@ mod tests {
     }
 
     #[test]
-    fn proxy_nodes_selection() {
-        // Liked nodes: E, C
-        let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
-        let id2node: HashMap<NodeID, Node> = centrality
-            .node2id
-            .clone()
-            .into_iter()
-            .map(|(node, id)| (id, node))
-            .collect();
-
-        assert_eq!(centrality.proxy_nodes.len(), 3);
-        let mut proxy_nodes = centrality
-            .proxy_nodes
-            .iter()
-            .map(|node| id2node.get(&node.id).unwrap().clone())
-            .collect_vec();
-        proxy_nodes.sort();
-
-        assert_eq!(
-            proxy_nodes,
-            vec![
-                Node::from("D".to_string()),
-                Node::from("E".to_string()),
-                Node::from("H".to_string())
-            ]
-        );
-    }
-
-    #[test]
-    fn liked_nodes_centrality() {
-        let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
-
-        let liked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
-
-        let scorer = centrality.scorer(&liked_nodes, &[]);
-
-        for node in &liked_nodes {
-            assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 2.0);
-        }
-    }
-
-    #[test]
     fn ordering() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
@@ -516,7 +423,7 @@ mod tests {
     #[test]
     fn disliked_nodes_centrality() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let disliked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
 
@@ -530,7 +437,7 @@ mod tests {
     #[test]
     fn ordering_with_dislikes() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
+        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
         let disliked_nodes = vec![Node::from("F".to_string())];
@@ -577,26 +484,6 @@ mod tests {
                     .get(&Node::from("A".to_string()))
                     .unwrap()
             )
-        );
-    }
-
-    #[test]
-    fn liked_nodes_centrality_without_fix() {
-        let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 3);
-
-        let liked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
-
-        let scorer = centrality.scorer_without_fixed(&liked_nodes, &[]);
-
-        assert_eq!(
-            scorer.score(*centrality.node2id.get(&liked_nodes[0]).unwrap()),
-            1.625
-        );
-
-        assert_eq!(
-            scorer.score(*centrality.node2id.get(&liked_nodes[1]).unwrap()),
-            1.75
         );
     }
 }

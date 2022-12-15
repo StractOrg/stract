@@ -171,7 +171,7 @@ impl LocalSearcher {
             if !top_host_nodes.is_empty() {
                 let approx = centrality_store
                     .approx_harmonic
-                    .scorer_without_fixed_from_ids(&top_host_nodes, &[]);
+                    .scorer_from_ids(&top_host_nodes, &[]);
                 ranker.set_query_centrality(approx);
             }
         }

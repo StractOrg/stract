@@ -177,7 +177,7 @@ impl TopicCentrality {
 
             assert!(!top_sites.is_empty());
 
-            let scorer = approx.scorer_without_fixed(&top_sites, &[]);
+            let scorer = approx.scorer(&top_sites, &[]);
 
             for node in &nodes {
                 node_scores[*node as usize][i] = scorer.score(*node) - SHIFT;

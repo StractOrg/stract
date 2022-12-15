@@ -25,7 +25,6 @@ impl Centrality {
         let graph = WebgraphBuilder::new(webgraph_path)
             .read_only(true)
             .with_host_graph()
-            .with_full_graph()
             .open();
 
         CentralityStore::build(&graph, output_path);
