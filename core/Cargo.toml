@@ -84,3 +84,7 @@ harness = false
 [[bench]]
 name = "harmonic-centrality"
 harness = false
+
+[[bench]]
+name = "approximate-harmonic"
+harness = false

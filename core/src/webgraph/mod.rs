@@ -221,6 +221,7 @@ impl<S: Store> Webgraph<S> {
         F1: Fn(NodeID) -> Vec<Edge>,
         F2: Fn(&Edge) -> NodeID,
     {
+        const MAX_DIST: usize = 5;
         let source_id = store.node2id(&source);
         if source_id.is_none() {
             return HashMap::new();
@@ -236,6 +237,11 @@ impl<S: Store> Webgraph<S> {
 
         while let Some(state) = queue.pop() {
             let (cost, v) = state.0;
+
+            if cost >= MAX_DIST {
+                continue;
+            }
+
             let current_dist = distances.get(&v).unwrap_or(&usize::MAX);
 
             if cost > *current_dist {
@@ -244,9 +250,15 @@ impl<S: Store> Webgraph<S> {
 
             for edge in node_edges(v) {
                 if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&usize::MAX) {
-                    let next = cmp::Reverse((cost + 1, edge_node(&edge)));
+                    let d = cost + 1;
+
+                    if d > MAX_DIST {
+                        continue;
+                    }
+
+                    let next = cmp::Reverse((d, edge_node(&edge)));
                     queue.push(next);
-                    distances.insert(edge_node(&edge), cost + 1);
+                    distances.insert(edge_node(&edge), d);
                 }
             }
         }
