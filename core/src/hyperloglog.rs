@@ -4087,7 +4087,7 @@ impl<const N: usize> HyperLogLog<N> {
 
     pub fn estimate_bias(&self, e: f64, b: usize) -> f64 {
         // binary search first nearest neighbor
-        let lookup_array = RAW_ESTIMATE_DATA_VEC[b - RAW_ESTIMATE_DATA_OFFSET];
+        let lookup_array = RAW_ESTIMATE_DATA_VEC[b - 1 - RAW_ESTIMATE_DATA_OFFSET];
         let mut idx_left = match lookup_array.binary_search_by(|v| v.partial_cmp(&e).unwrap()) {
             Ok(i) => Some(i),  // exact match
             Err(i) => Some(i), // no match, i points to left neighbor
@@ -4105,10 +4105,10 @@ impl<const N: usize> HyperLogLog<N> {
         };
 
         // collect k nearest neighbors
-        let k = 6;
-        assert!(lookup_array.len() >= k);
-        let mut neighbors = vec![];
-        for _ in 0..k {
+        const K: usize = 6;
+        debug_assert!(lookup_array.len() >= K);
+        let mut neighbors = Vec::with_capacity(K);
+        for _ in 0..K {
             let (right_instead_left, idx) = match (idx_left, idx_right) {
                 (Some(i_left), Some(i_right)) => {
                     // 2 candidates, find better one
@@ -4144,7 +4144,7 @@ impl<const N: usize> HyperLogLog<N> {
 
         // calculate mean of neighbors
         let bias_data = BIAS_DATA_VEC[b - BIAS_DATA_OFFSET];
-        neighbors.iter().map(|&i| bias_data[i]).sum::<f64>() / (k as f64)
+        neighbors.iter().map(|&i| bias_data[i]).sum::<f64>() / (K as f64)
     }
 
     fn linear_counting(&self, v: usize) -> f64 {
