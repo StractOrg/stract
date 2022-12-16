@@ -128,30 +128,6 @@ where
             }
         }
 
-        // nodes.iter().for_each(|node| {
-        //     for edge in graph.ingoing_edges(*node) {
-        //         if !changed_nodes.contains(&edge.from) {
-        //             continue;
-        //         }
-
-        //         if let (Some(counter_to), Some(counter_from)) =
-        //             (new_counters.get(&edge.to), counters.get(&edge.from))
-        //         {
-        //             let mut counter_to = counter_to.lock().unwrap();
-        //             if counter_to
-        //                 .registers()
-        //                 .iter()
-        //                 .zip(counter_from.registers().iter())
-        //                 .any(|(to, from)| *from > *to)
-        //             {
-        //                 counter_to.merge(counter_from);
-        //                 new_changed_nodes.lock().unwrap().insert(edge.to);
-        //                 counter_changes.fetch_add(1, Ordering::SeqCst);
-        //             }
-        //         }
-        //     }
-        // });
-
         for (node, score) in centralities.iter_mut() {
             *score += new_counters
                 .get(node)
@@ -222,10 +198,7 @@ mod tests {
         //        │
         //        D
 
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
+        let mut graph = WebgraphBuilder::new_memory().with_host_graph().open();
 
         graph.insert(Node::from("A"), Node::from("B"), String::new());
         graph.insert(Node::from("B"), Node::from("C"), String::new());
@@ -281,14 +254,14 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
-            centrality.full.get(&Node::from("C")).unwrap()
-                > centrality.full.get(&Node::from("A")).unwrap()
+            centrality.host.get(&Node::from("C")).unwrap()
+                > centrality.host.get(&Node::from("A")).unwrap()
         );
         assert!(
-            centrality.full.get(&Node::from("A")).unwrap()
-                > centrality.full.get(&Node::from("B")).unwrap()
+            centrality.host.get(&Node::from("A")).unwrap()
+                > centrality.host.get(&Node::from("B")).unwrap()
         );
-        assert_eq!(centrality.full.get(&Node::from("D")), None);
+        assert_eq!(centrality.host.get(&Node::from("D")), None);
     }
 
     #[test]
@@ -314,6 +287,8 @@ mod tests {
     fn additional_edges_ignored() {
         let mut graph = test_graph();
 
+        let centrality = HarmonicCentrality::calculate(&graph);
+
         graph.insert(Node::from("A"), Node::from("B"), String::new());
         graph.insert(Node::from("A"), Node::from("B"), String::new());
         graph.insert(Node::from("A"), Node::from("B"), String::new());
@@ -323,16 +298,9 @@ mod tests {
         graph.insert(Node::from("A"), Node::from("B"), String::new());
 
         graph.flush();
-        let centrality = HarmonicCentrality::calculate(&graph);
 
-        assert!(
-            centrality.full.get(&Node::from("C")).unwrap()
-                > centrality.full.get(&Node::from("A")).unwrap()
-        );
-        assert!(
-            centrality.full.get(&Node::from("A")).unwrap()
-                > centrality.full.get(&Node::from("B")).unwrap()
-        );
-        assert_eq!(centrality.full.get(&Node::from("D")), None);
+        let centrality_extra = HarmonicCentrality::calculate(&graph);
+
+        assert_eq!(centrality.full, centrality_extra.full);
     }
 }
