@@ -289,13 +289,13 @@ mod tests {
 
         let centrality = HarmonicCentrality::calculate(&graph);
 
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.insert(Node::from("A"), Node::from("B"), "1".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "2".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "3".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "4".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "5".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "6".to_string());
+        graph.insert(Node::from("A"), Node::from("B"), "7".to_string());
 
         graph.flush();
 

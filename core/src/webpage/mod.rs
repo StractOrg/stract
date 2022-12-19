@@ -365,7 +365,7 @@ impl Html {
         self.clean_text = Html::calculate_clean_text(&paragraphs, &self.lang.unwrap_or(Lang::Eng));
     }
 
-    pub fn links(&self) -> Vec<Link> {
+    fn hyperlinks(&self) -> Vec<Link> {
         let mut links = Vec::new();
         let mut open_links = Vec::new();
 
@@ -417,6 +417,104 @@ impl Html {
                 });
             }
         }
+
+        links
+    }
+
+    fn links_tag(&self) -> Vec<Link> {
+        let mut links = Vec::new();
+
+        for node in self.root.select("link").unwrap() {
+            if let Some(element) = node.as_node().as_element() {
+                if let Some(href) = element.attributes.borrow().get("href") {
+                    links.push(Link {
+                        source: self.url.clone(),
+                        destination: Url::from(href),
+                        text: String::new(),
+                    })
+                }
+            }
+        }
+
+        links
+    }
+
+    fn metadata_links(&self) -> Vec<Link> {
+        self.metadata()
+            .into_iter()
+            .filter_map(|metadata| {
+                // https://github.com/commoncrawl/cc-pyspark/blob/54918e85cf87d47e1f7278965ac04a0fc8e414a0/wat_extract_links.py#L54
+
+                if let Some(prop) = metadata.get("property") {
+                    if matches!(
+                        prop.as_str(),
+                        "og:url"
+                            | "og:image"
+                            | "og:image:secure_url"
+                            | "og:video"
+                            | "og:video:url"
+                            | "og:video:secure_url"
+                            | "twitter:url"
+                            | "twitter:image:src"
+                    ) {
+                        if let Some(content) = metadata.get("content") {
+                            return Some(Link {
+                                source: self.url().clone(),
+                                destination: Url::from(content.as_str()),
+                                text: String::new(),
+                            });
+                        }
+                    }
+                }
+
+                if let Some(name) = metadata.get("name") {
+                    if matches!(
+                        name.as_str(),
+                        "twitter:image"
+                            | "thumbnail"
+                            | "application-url"
+                            | "msapplication-starturl"
+                            | "msapplication-TileImage"
+                            | "vb_meta_bburl"
+                    ) {
+                        if let Some(content) = metadata.get("content") {
+                            return Some(Link {
+                                source: self.url().clone(),
+                                destination: Url::from(content.as_str()),
+                                text: String::new(),
+                            });
+                        }
+                    }
+                }
+
+                None
+            })
+            .collect()
+    }
+
+    pub fn links(&self) -> Vec<Link> {
+        let mut links = self.hyperlinks();
+
+        links.extend(self.scripts().into_iter().filter_map(|script| {
+            match script.attributes.get("src") {
+                Some(url) => {
+                    let script_url = Url::from(url.as_str());
+                    if self.url().domain() != script_url.domain() {
+                        Some(Link {
+                            source: self.url.clone(),
+                            destination: script_url,
+                            text: String::new(),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            }
+        }));
+
+        links.extend(self.links_tag().into_iter());
+        links.extend(self.metadata_links().into_iter());
 
         links
     }
