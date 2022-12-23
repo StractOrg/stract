@@ -107,7 +107,19 @@ trait Scorer<T: AsRankingWebsite>: Send + Sync {
     fn score(&self, websites: &mut [T]);
 }
 
-struct ReRanker {}
+struct ReRanker {
+    crossencoder: f64,
+    prev_score: f64,
+}
+
+impl Default for ReRanker {
+    fn default() -> Self {
+        Self {
+            crossencoder: 1.0,
+            prev_score: 1.0,
+        }
+    }
+}
 
 impl<T: AsRankingWebsite> Scorer<T> for ReRanker {
     fn score(&self, websites: &mut [T]) {
@@ -116,13 +128,26 @@ impl<T: AsRankingWebsite> Scorer<T> for ReRanker {
     }
 }
 
-struct PrioritizeText {}
+struct PrioritizeText {
+    bm25: f64,
+    prev_score: f64,
+}
+
+impl Default for PrioritizeText {
+    fn default() -> Self {
+        Self {
+            bm25: 1.0,
+            prev_score: 1.0,
+        }
+    }
+}
 
 impl<T: AsRankingWebsite> Scorer<T> for PrioritizeText {
     fn score(&self, websites: &mut [T]) {
         for website in websites {
             let bm25 = website.as_ranking().pointer.score.bm25 as f64;
-            website.as_mut_ranking().score += bm25;
+            let prev_score = website.as_ranking().score;
+            website.as_mut_ranking().score = self.bm25 * bm25 + self.prev_score * prev_score;
         }
     }
 }
@@ -208,9 +233,9 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 impl<T: AsRankingWebsite> RankingPipeline<T> {
     fn create() -> Self {
         let last_stage = RankingStage {
-            scorer: Box::new(ReRanker {}),
+            scorer: Box::<ReRanker>::default(),
             prev: Prev::Node(Box::new(RankingStage {
-                scorer: Box::new(PrioritizeText {}),
+                scorer: Box::<PrioritizeText>::default(),
                 prev: Prev::Initial,
                 memory: None,
                 top_n: 100,
@@ -227,6 +252,8 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn for_query(query: &mut SearchQuery) -> Self {
+        dbg!(&query.optic_program);
+
         let mut pipeline = Self::create();
 
         pipeline.offset = query.offset;
@@ -404,6 +431,72 @@ mod tests {
                 .all(|(p, r)| p.pointer.address.doc_id + 20 == r.pointer.address.doc_id));
 
             prev = res;
+        }
+    }
+
+    #[test]
+    fn multistage_coefficients() {
+        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
+            optic_program: Some(
+                r#"
+            RankingPipeline {
+                Stage {},
+                Stage {
+                    Ranking {
+                        Signal("bm25", 3),
+                        Signal("prev_score", 2),
+                    },
+                },
+                Stage {
+                    Ranking {
+                        Signal("crossencoder", 4),
+                        Signal("prev_score", 3),
+                    },
+                },
+            }
+            "#
+                .to_string(),
+            ),
+            ..Default::default()
+        });
+
+        let w = RankingWebsite {
+            pointer: WebsitePointer {
+                score: Score {
+                    bm25: 1.0,
+                    total: 1.0,
+                },
+                hashes: Hashes {
+                    site: Prehashed(0),
+                    title: Prehashed(0),
+                    url: Prehashed(0),
+                    simhash: 0,
+                },
+                address: DocAddress {
+                    segment: 0,
+                    doc_id: 0,
+                },
+            },
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            topic_centrality: 0.0,
+            personal_centrality: 0.0,
+            query_centrality: 0.0,
+            title: String::new(),
+            clean_body: String::new(),
+            score: 1.0,
+        };
+
+        let mut test = [w.clone()];
+
+        pipeline.last_stage.scorer.score(&mut test);
+        assert_eq!(test[0].score, 5.0);
+
+        let mut test = [w];
+
+        if let Prev::Node(prev) = pipeline.last_stage.prev {
+            prev.scorer.score(&mut test);
+            assert_eq!(test[0].score, 3.0);
         }
     }
 }

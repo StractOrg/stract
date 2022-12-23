@@ -1841,4 +1841,49 @@ mod tests {
 
         assert_eq!(webpage.dmoz_description(), None)
     }
+
+    #[test]
+    fn links() {
+        let raw = format!(
+            r#"
+            <html>
+                <head>
+                    <title>Best website</title>
+                    <meta name="meta1" content="value">
+                    <link href="link.com" />
+                    <script src="test.com"></script>
+                </head>
+                <body>
+                    <a href="example.com">Link to example</a>
+                    <p>{CONTENT}</p>
+                </body>
+            </html>
+        "#
+        );
+
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+
+        assert_eq!(webpage.title(), Some("Best website".to_string()));
+
+        assert_eq!(
+            webpage.links(),
+            vec![
+                Link {
+                    source: "https://www.example.com/whatever".to_string().into(),
+                    destination: "example.com".to_string().into(),
+                    text: "Link to example".to_string()
+                },
+                Link {
+                    source: "https://www.example.com/whatever".to_string().into(),
+                    destination: "test.com".to_string().into(),
+                    text: String::new()
+                },
+                Link {
+                    source: "https://www.example.com/whatever".to_string().into(),
+                    destination: "link.com".to_string().into(),
+                    text: String::new()
+                },
+            ]
+        );
+    }
 }

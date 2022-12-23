@@ -23,6 +23,7 @@ pub mod signal;
 
 use std::sync::Arc;
 
+use ::optics::SiteRankings;
 use initial::InitialScoreTweaker;
 use tantivy::collector::Collector;
 
@@ -31,8 +32,17 @@ use crate::{
     fastfield_cache::FastFieldCache,
     inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
-    webgraph::centrality::{approximate_harmonic, topic},
-    webpage::region::{Region, RegionCount},
+    webgraph::{
+        centrality::{
+            approximate_harmonic::{self, ApproximatedHarmonicCentrality, Scorer},
+            topic,
+        },
+        Node,
+    },
+    webpage::{
+        region::{Region, RegionCount},
+        Url,
+    },
 };
 
 pub use self::signal::*;
@@ -134,6 +144,24 @@ impl Ranker {
     pub fn set_query_centrality(&mut self, approx: approximate_harmonic::Scorer) {
         self.aggregator.set_query_centrality(approx);
     }
+}
+
+pub fn online_centrality_scorer(
+    site_rankings: &SiteRankings,
+    approx_harmonic: &ApproximatedHarmonicCentrality,
+) -> Scorer {
+    let mut liked_nodes = Vec::new();
+    let mut disliked_nodes = Vec::new();
+
+    for site in &site_rankings.liked {
+        liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+    }
+
+    for site in &site_rankings.disliked {
+        disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+    }
+
+    approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
 }
 
 #[cfg(test)]
@@ -767,8 +795,12 @@ mod tests {
                 original: "example".to_string(),
                 optic_program: Some(
                     r#"
-                        Ranking{Field("title"), 20000000};
-                        Ranking{Signal("host_centrality"), 0};
+                        RankingPipeline {
+                            Stage {
+                                Ranking{Field("title"), 20000000},
+                                Ranking{Signal("host_centrality"), 0}
+                            }
+                        }
                     "#
                     .to_string(),
                 ),
@@ -786,7 +818,11 @@ mod tests {
                 original: "example".to_string(),
                 optic_program: Some(
                     r#"
-                        Ranking{Signal("host_centrality"), 2000000};
+                        RankingPipeline {
+                            Stage {
+                                Ranking{Signal("host_centrality"), 2000000}
+                            }
+                        }
                     "#
                     .to_string(),
                 ),

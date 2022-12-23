@@ -266,7 +266,6 @@ impl<S: Store> Webgraph<S> {
         distances
     }
 
-    #[allow(unused)]
     pub fn distances(&self, source: Node) -> HashMap<Node, usize> {
         self.full
             .as_ref()

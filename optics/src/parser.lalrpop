@@ -18,7 +18,7 @@ pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
 
 Block: RawOpticBlock = {
     <Rule> => RawOpticBlock::Rule(<>),
-    <Ranking> => RawOpticBlock::Ranking(<>),
+    <RankingPipeline> => RawOpticBlock::Ranking(<>),
     <SitePreference> => RawOpticBlock::SitePreference(<>),
     "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
 }
@@ -68,6 +68,18 @@ InnerAction: RawAction= {
     "Discard" => RawAction::Discard,
 }
 
+RankingPipeline: RankingPipeline = {
+    "RankingPipeline" "{" <Sep<",", RankingStage>> "}" => RankingPipeline {
+        stages: <>
+    }
+}
+
+RankingStage: RankingStage = {
+    "Stage" "{" <Sep<",", Ranking>> "}" => RankingStage {
+        coefficients: <>
+    }
+}
+
 
 Ranking: RankingCoeff = {
     "Ranking" "{" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> "}" =>? {
@@ -107,7 +119,9 @@ extern {
 
         "DiscardNonMatching" => Token::DiscardNonMatching,
         "Rule" => Token::Rule,
+        "RankingPipeline" => Token::RankingPipeline,
         "Ranking" => Token::Ranking,
+        "Stage" => Token::Stage,
         "Signal" => Token::Signal,
         "Field" => Token::Field,
         "Matches" => Token::Matches,

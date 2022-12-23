@@ -17,17 +17,18 @@
 pub mod ast;
 mod lexer;
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::convert::TryFrom;
 
+use ast::RankingPipeline;
 use logos::Logos;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use self::ast::{RankingTarget, RawAction, RawMatchPart, RawOptic, RawRule};
+use self::ast::{RawAction, RawMatchPart, RawOptic, RawRule};
 pub use lexer::lex;
 pub use lexer::Token;
 
-type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -57,6 +58,9 @@ pub enum Error {
     #[error("Unknown parse error")]
     Unknown(usize, usize),
 
+    #[error("Ranking stages mismatch")]
+    RankingStagesMismatch,
+
     #[error("Unsupported pattern")]
     Pattern,
 }
@@ -77,20 +81,6 @@ impl TryFrom<RawOptic> for Optic {
             rules.push(Rule::try_from(rule)?);
         }
 
-        let mut boosts = HashMap::new();
-        let mut coefficients = HashMap::new();
-
-        for ranking in raw.rankings {
-            match ranking.target {
-                RankingTarget::Signal(name) => {
-                    coefficients.insert(name, ranking.score);
-                }
-                RankingTarget::Field(name) => {
-                    boosts.insert(name, ranking.score);
-                }
-            }
-        }
-
         let mut liked_sites = Vec::new();
         let mut disliked_sites = Vec::new();
 
@@ -103,8 +93,7 @@ impl TryFrom<RawOptic> for Optic {
 
         Ok(Self {
             rules,
-            coefficients,
-            boosts,
+            pipeline: raw.rankings.into_iter().next(),
             discard_non_matching: raw.discard_non_matching,
             site_rankings: SiteRankings {
                 liked: liked_sites,
@@ -233,18 +222,25 @@ pub enum Action {
 
 #[derive(Debug, Default, Clone)]
 pub struct Optic {
-    pub coefficients: HashMap<String, f64>,
-    pub boosts: HashMap<String, f64>,
+    pub pipeline: Option<RankingPipeline>,
     pub site_rankings: SiteRankings,
     pub rules: Vec<Rule>,
     pub discard_non_matching: bool,
 }
 
 impl Optic {
-    pub fn merge(mut self, mut other: Self) -> Self {
+    pub fn try_merge(mut self, mut other: Self) -> Result<Self> {
         self.rules.append(&mut other.rules);
-        self.coefficients.extend(other.coefficients.into_iter());
-        self.boosts.extend(other.boosts.into_iter());
+
+        self.pipeline = match (self.pipeline, other.pipeline) {
+            (None, None) => None,
+            (None, Some(pipeline)) => Some(pipeline),
+            (Some(pipeline), None) => Some(pipeline),
+            (Some(mut self_pipeline), Some(other_pipeline)) => {
+                self_pipeline.try_merge(other_pipeline)?;
+                Some(self_pipeline)
+            }
+        };
 
         self.discard_non_matching |= other.discard_non_matching;
 
@@ -260,7 +256,7 @@ impl Optic {
             .blocked
             .append(&mut other.site_rankings.blocked);
 
-        self
+        Ok(self)
     }
 }
 

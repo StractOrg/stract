@@ -26,11 +26,11 @@
       ]
     },
     "keywords": {
-      "match": "\\b(Matches|Signal|Field|Site|Url|Domain|Title|Description|Content|Schema|Action|Boost|Downrank|Discard)\\b",
+      "match": "\\b(Matches|Signal|Field|Site|Url|Domain|Title|Description|Content|Schema|Action|Boost|Downrank|Discard|Ranking|Stage)\\b",
       "name": "entity.name.function"
     },
     "control": {
-      "match": "\\b(DiscardNonMatching|Rule|Ranking|Like|Dislike)\\b",
+      "match": "\\b(DiscardNonMatching|Rule|Like|Dislike|RankingPipeline)\\b",
       "name": "keyword.control"
     },
     "punctuation": {

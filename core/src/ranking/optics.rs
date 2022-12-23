@@ -14,63 +14,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use optics::{Optic, SiteRankings};
+use optics::ast::RankingStage;
 
-use crate::{
-    schema::Field,
-    webgraph::{
-        centrality::approximate_harmonic::{ApproximatedHarmonicCentrality, Scorer},
-        Node,
-    },
-    webpage::Url,
-};
+use crate::schema::Field;
 
 use super::{Signal, SignalAggregator};
 
 pub const SCALE: f32 = 10.0;
 
 pub trait CreateAggregator {
-    fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator;
+    fn aggregator(&self) -> SignalAggregator;
 }
 
-fn centrality_scorer(
-    site_rankings: &SiteRankings,
-    approx_harmonic: &ApproximatedHarmonicCentrality,
-) -> Scorer {
-    let mut liked_nodes = Vec::new();
-    let mut disliked_nodes = Vec::new();
-
-    for site in &site_rankings.liked {
-        liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
-    }
-
-    for site in &site_rankings.disliked {
-        disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
-    }
-
-    approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
-}
-
-impl CreateAggregator for Optic {
-    fn aggregator(&self, approx: Option<&ApproximatedHarmonicCentrality>) -> SignalAggregator {
-        let mut aggregator = SignalAggregator::new(
+impl CreateAggregator for RankingStage {
+    fn aggregator(&self) -> SignalAggregator {
+        let aggregator = SignalAggregator::new(
             self.coefficients
-                .clone()
-                .into_iter()
-                .filter_map(|(name, coeff)| {
-                    Signal::from_string(name).map(|signal| (signal, coeff))
+                .iter()
+                .filter_map(|coeff| match &coeff.target {
+                    optics::ast::RankingTarget::Signal(s) => {
+                        Signal::from_string(s.clone()).map(|s| (s, coeff.score))
+                    }
+                    optics::ast::RankingTarget::Field(_) => None,
                 }),
-            self.boosts.clone().into_iter().filter_map(|(name, boost)| {
-                match Field::from_name(name) {
-                    Some(field) => field.as_text().map(|text_field| (text_field, boost)),
-                    _ => None,
-                }
-            }),
+            self.coefficients
+                .iter()
+                .filter_map(|coeff| match &coeff.target {
+                    optics::ast::RankingTarget::Signal(_) => None,
+                    optics::ast::RankingTarget::Field(f) => Field::from_name(f.clone())
+                        .and_then(|f| f.as_text())
+                        .map(|f| (f, coeff.score)),
+                }),
         );
-
-        if let Some(approx) = approx {
-            aggregator.add_personal_harmonic(centrality_scorer(&self.site_rankings, approx));
-        }
 
         aggregator
     }

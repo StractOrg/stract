@@ -29,7 +29,9 @@ pub enum Token<'a> {
 
     DiscardNonMatching,
     Rule,
+    RankingPipeline,
     Ranking,
+    Stage,
     Signal,
     Field,
     Matches,
@@ -62,7 +64,9 @@ impl<'a> ToString for Token<'a> {
             Token::CloseParenthesis => ")".to_string(),
             Token::DiscardNonMatching => "DiscardNonMatching".to_string(),
             Token::Rule => "Rule".to_string(),
+            Token::RankingPipeline => "RankingPipeline".to_string(),
             Token::Ranking => "Ranking".to_string(),
+            Token::Stage => "Stage".to_string(),
             Token::Signal => "Signal".to_string(),
             Token::Field => "Field".to_string(),
             Token::Matches => "Matches".to_string(),
@@ -115,8 +119,12 @@ enum Outer<'a> {
     DiscardNonMatching,
     #[token("Rule")]
     Rule,
+    #[token("RankingPipeline")]
+    RankingPipeline,
     #[token("Ranking")]
     Ranking,
+    #[token("Stage")]
+    Stage,
     #[token("Signal")]
     Signal,
     #[token("Field")]
@@ -295,6 +303,8 @@ impl<'source> Iterator for LexerBridge<'source> {
                 Outer::CloseParenthesis => Some(Ok((s.start, Token::CloseParenthesis, s.end))),
                 Outer::Rule => Some(Ok((s.start, Token::Rule, s.end))),
                 Outer::Ranking => Some(Ok((s.start, Token::Ranking, s.end))),
+                Outer::Stage => Some(Ok((s.start, Token::Stage, s.end))),
+                Outer::RankingPipeline => Some(Ok((s.start, Token::RankingPipeline, s.end))),
                 Outer::Signal => Some(Ok((s.start, Token::Signal, s.end))),
                 Outer::Field => Some(Ok((s.start, Token::Field, s.end))),
                 Outer::Matches => Some(Ok((s.start, Token::Matches, s.end))),

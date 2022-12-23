@@ -29,7 +29,7 @@ use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
-use crate::ranking::{Ranker, SignalAggregator};
+use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webpage::region::Region;
@@ -84,16 +84,26 @@ impl LocalSearcher {
     }
 
     fn parse_query(&self, query: &SearchQuery, optic: Option<&Optic>) -> Result<Query> {
-        let query_aggregator = optic
-            .as_ref()
-            .map(|optic| {
-                optic.aggregator(
-                    self.centrality_store
-                        .as_ref()
-                        .map(|centrality_store| &centrality_store.approx_harmonic),
-                )
+        let mut query_aggregator = optic
+            .and_then(|optic| {
+                optic
+                    .pipeline
+                    .as_ref()
+                    .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
             })
             .unwrap_or_default();
+
+        if let (Some(optic), Some(approx_harmonic)) = (
+            optic,
+            self.centrality_store
+                .as_ref()
+                .map(|store| &store.approx_harmonic),
+        ) {
+            query_aggregator.add_personal_harmonic(online_centrality_scorer(
+                &optic.site_rankings,
+                approx_harmonic,
+            ));
+        }
 
         let mut parsed_query = Query::parse(
             &query.original,
@@ -133,19 +143,33 @@ impl LocalSearcher {
             optics.push(site_rankings.clone().into_optic())
         }
 
-        let optic = optics
-            .into_iter()
-            .fold(Optic::default(), |acc, elem| acc.merge(elem));
+        let mut optic = Optic::default();
+
+        for o in optics {
+            optic = optic.try_merge(o)?;
+        }
 
         parsed_query.set_optic(&optic, &self.index);
 
+        let mut aggregator = optic
+            .pipeline
+            .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
+            .unwrap_or_default();
+
+        if let Some(approx_harmonic) = self
+            .centrality_store
+            .as_ref()
+            .map(|store| &store.approx_harmonic)
+        {
+            aggregator.add_personal_harmonic(online_centrality_scorer(
+                &optic.site_rankings,
+                approx_harmonic,
+            ));
+        }
+
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
-            optic.aggregator(
-                self.centrality_store
-                    .as_ref()
-                    .map(|centrality_store| &centrality_store.approx_harmonic),
-            ),
+            aggregator,
             self.index.inverted_index.fastfield_cache(),
         );
 

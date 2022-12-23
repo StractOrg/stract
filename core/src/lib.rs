@@ -215,7 +215,7 @@ pub enum Error {
     #[error("Spell dictionary error")]
     Spell(#[from] crate::spell::dictionary::DictionaryError),
 
-    #[error("Could not parse optic")]
+    #[error("Optic")]
     Optics(#[from] optics::Error),
 
     #[error("Query cannot be completely empty")]
