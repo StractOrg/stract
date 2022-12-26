@@ -20,7 +20,7 @@ const icons = [
 ];
 ---
 
-<navbar class="hidden sm:flex items-center space-x-2 md:space-x-4 lg:space-x-8">
+<navbar class="hidden items-center space-x-2 sm:flex md:space-x-4 lg:space-x-8">
   {
     links.map((l) => (
       <a class="link rounded-full px-2 py-1" href={l.url}>
@@ -37,17 +37,17 @@ const icons = [
   }
 </navbar>
 
-<nav class="sm:hidden items-center flex group relative text-lg">
+<nav class="group relative flex items-center text-lg sm:hidden">
   <button
-    class="px-3 mx-1 text-gray-400 bg-transparent rounded-full transition aspect-square group-hover:text-brand/30"
+    class="mx-1 aspect-square rounded-full bg-transparent px-3 text-gray-400 transition group-hover:text-brand/30"
   >
     <Hero class="w-6" icon="menu" />
   </button>
   <div
-    class="absolute z-50 opacity-0 bottom-0 pt-1 right-0 translate-y-full pointer-events-none group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100 flex-col transition"
+    class="pointer-events-none absolute bottom-0 right-0 z-50 translate-y-full flex-col pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100"
   >
-    <div class="p-2 bg-white shadow-xl rounded-xl border">
-      <div class="pb-2 flex flex-col space-y-1">
+    <div class="rounded-xl border bg-white p-2 shadow-xl">
+      <div class="flex flex-col space-y-1 pb-2">
         {
           links.map((l) => (
             <a class="link rounded py-1 pl-2 pr-10" href={l.url}>
@@ -56,7 +56,7 @@ const icons = [
           ))
         }
       </div>
-      <div class="flex border-t pt-2 justify-around">
+      <div class="flex justify-around border-t pt-2">
         {
           icons.map((i) => (
             <a class="icon" href={i.url}>

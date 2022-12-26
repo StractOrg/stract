@@ -11,17 +11,17 @@ import { askama } from "../askama";
 ---
 
 <Layout title="{{ query }} - Cuely">
-  <main class="flex flex-col w-full">
+  <main class="flex w-full flex-col">
     <div class="border-b bg-neutral-50">
       <Header searchbar={{ query: askama`query` }} />
     </div>
 
     <div
-      class="grid sm:px-5 md:pl-20 lg:px-36 mx-1 lg:mx-0 md:gap-x-12 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] gap-y-6 pt-3 search-content"
+      class="search-content mx-1 grid gap-y-6 pt-3 sm:px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:mx-0 lg:px-36"
     >
       <!-- Stats and settings -->
-      <div class="flex w-full justify-between mx-auto">
-        <div class="flex flex-col h-full justify-center text-sm text-gray-600">
+      <div class="mx-auto flex w-full justify-between">
+        <div class="flex h-full flex-col justify-center text-sm text-gray-600">
           <p class="h-fit">
             Found {askama`num_matches $ 24`} results in {
               askama`search_duration_sec $ 0.42s`
@@ -33,12 +33,12 @@ import { askama } from "../askama";
             current_optic_url="current_optic_url"
             default_optics="default_optics"
           />
-          <div class="select-region h-full flex flex-col justify-center">
+          <div class="select-region flex h-full flex-col justify-center">
             <select
               form="searchbar-form"
               name="gl"
               onchange="document.getElementById('searchbar-form').submit()"
-              class="hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+              class="max-w-[100px] border-0 bg-transparent text-sm hover:cursor-pointer"
             >
               {
                 askama.for_("region_selection in all_regions", () =>
@@ -62,7 +62,7 @@ import { askama } from "../askama";
       </div>
 
       <!-- Search results -->
-      <div class="col-start-1 flex flex-col max-w-4xl min-w-0 space-y-10">
+      <div class="col-start-1 flex min-w-0 max-w-4xl flex-col space-y-10">
         {
           askama.if_("let Some(correction) = spell_correction", () => (
             <div>
@@ -80,27 +80,34 @@ import { askama } from "../askama";
         {
           askama.for_("item in search_result", () => (
             <div class="flex w-full">
-              <div class="flex grow min-w-0 flex-col space-y-1">
+              <div class="flex min-w-0 grow flex-col space-y-1">
                 <div class="flex min-w-0">
-                  <div class="flex flex-col space-y-1 grow min-w-0">
+                  <div class="flex min-w-0 grow flex-col space-y-1">
                     <div class="flex items-center text-sm">
                       <a
-                        class="text-gray-800 hover:no-underline truncate url"
+                        class="url truncate text-gray-800 hover:no-underline"
                         href="{{ item.url }}"
                       >
                         {askama`item.pretty_url $ {{internet.url}}`}
                       </a>
                     </div>
-                    <a class="title-link truncate text-xl font-medium" title="{{ item.title }}" href="{{ item.url }}">
+                    <a
+                      class="title-link truncate text-xl font-medium"
+                      title="{{ item.title }}"
+                      href="{{ item.url }}"
+                    >
                       {askama`item.title $ {{lorem.sentence}}`}
                     </a>
                   </div>
-                  <div class="adjust-btn min-w-fit hidden justify-center items-center md:flex" data-site="{{ item.site }}">
+                  <div
+                    class="adjust-btn hidden min-w-fit items-center justify-center md:flex"
+                    data-site="{{ item.site }}"
+                  >
                     <Hero class="w-6" icon="adjustments" />
                   </div>
                 </div>
                 <div class="text-sm text-snippet">
-                  <Snippet snippet={askama `item.snippet`} />
+                  <Snippet snippet={askama`item.snippet`} />
                 </div>
               </div>
               <div class="flex h-full w-20 items-center">
@@ -123,7 +130,7 @@ import { askama } from "../askama";
           ))
         }
 
-        <div class="flex w-full justify-center items-center">
+        <div class="flex w-full items-center justify-center">
           {
             askama.if_(
               "let Some(url) = prev_page_url",
@@ -179,7 +186,7 @@ import { askama } from "../askama";
   }
 
   .adjust-btn {
-    @apply text-gray-500/25 hover:text-gray-500 w-5 hover:cursor-pointer;
+    @apply w-5 text-gray-500/25 hover:cursor-pointer hover:text-gray-500;
   }
 
   .adjust-btn * {
@@ -205,20 +212,20 @@ import { askama } from "../askama";
   </style>
 </noscript>
 
-<link rel="stylesheet" href="/css/highlightjs-default.min.css"/>
-<script is:inline src="/js/highlight.min.js" />
+<link rel="stylesheet" href="/css/highlightjs-default.min.css" />
+<script is:inline src="/js/highlight.min.js"></script>
 <script is:inline>
   var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
   var rankingModal = document.getElementById("ranking-modal");
 
   document.addEventListener("click", (elem) => {
-      rankingModal.classList.remove("modal-open");
-      rankingModal.classList.add("modal-closed");
-  })
+    rankingModal.classList.remove("modal-open");
+    rankingModal.classList.add("modal-closed");
+  });
 
   var rankingModalHeight = rankingModal.clientHeight;
 
-  rankingAdjustButtons.forEach(btn => {
+  rankingAdjustButtons.forEach((btn) => {
     btn.addEventListener("click", (event) => {
       event.stopPropagation();
 
@@ -227,14 +234,20 @@ import { askama } from "../askama";
       updateModal(elem.dataset.site);
 
       const rect = elem.getBoundingClientRect();
-      rankingModal.style.left = rect.left + rect.width + 5 +"px";
-      rankingModal.style.top = (rect.top + document.documentElement.scrollTop - (rankingModalHeight/2)) + "px";
+      rankingModal.style.left = rect.left + rect.width + 5 + "px";
+      rankingModal.style.top =
+        rect.top +
+        document.documentElement.scrollTop -
+        rankingModalHeight / 2 +
+        "px";
 
       setTimeout(() => {
         rankingModal.classList.remove("modal-closed");
         rankingModal.classList.add("modal-open");
       }, 0);
-    })
+    });
   });
 </script>
-<script is:inline>hljs.highlightAll();</script>
+<script is:inline>
+  hljs.highlightAll();
+</script>
