@@ -7,7 +7,7 @@ export interface Props {
 ---
 
 <div class="flex justify-center">
-  <div class="max-w-md flex flex-col items-center">
+  <div class="flex max-w-md flex-col items-center">
     {
       askama.if_("let Some(image) = entity.image_base64", () => (
         <div class="w-lg mb-5">
@@ -23,7 +23,7 @@ export interface Props {
         </div>
       ))
     }
-    <div class="text-xl mb-5">
+    <div class="mb-5 text-xl">
       <a href="https://en.wikipedia.org/wiki/{{ entity.title }}"
         >{askama`entity.title $ {{name.fullName}}`}
       </a>

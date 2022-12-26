@@ -7,22 +7,25 @@ export interface Props {
   answer: string;
 }
 ---
-<div class="flex flex-col space-y-5 border p-5 rounded-lg max-w-lg">
+
+<div class="flex max-w-lg flex-col space-y-5 rounded-lg border p-5">
   <div class="flex flex-col space-y-1">
-    <div class="flex justify-between space-x-2 grow">
+    <div class="flex grow justify-between space-x-2">
       <div>
-        <a class="text-lg font-medium" href={askama`answer.url`}>{askama`title`}</a>
+        <a class="text-lg font-medium" href={askama`answer.url`}
+          >{askama`title`}</a
+        >
       </div>
-      <div class="flex space-x-1 items-center">
-          <span class="h-fit">
-            {askama`answer.upvotes`}
-          </span>
-          <div class="h-fit">
-            <Hero class="w-4" icon="thumb-up" />
-          </div>
+      <div class="flex items-center space-x-1">
+        <span class="h-fit">
+          {askama`answer.upvotes`}
+        </span>
+        <div class="h-fit">
+          <Hero class="w-4" icon="thumb-up" />
+        </div>
       </div>
     </div>
-    <div class="flex justify-between space-x-2 grow">
+    <div class="flex grow justify-between space-x-2">
       <div><a href={askama`answer.url`}>{askama`answer.url`}</a></div>
       <div>{askama`answer.date`}</div>
     </div>
@@ -30,20 +33,18 @@ export interface Props {
   <hr />
   <div class="flex flex-col space-y-3">
     {
-    askama.for_("part in answer.body", () => (
+      askama.for_("part in answer.body", () => (
         <div>
-        {
-            askama.match("part", {
-                "CodeOrText::Text(text)": (
-                    <span>{askama`text`}</span>
-                ),
-                "CodeOrText::Code(code)": (
-                    <pre class="bg-slate-50 rounded-lg"><code style="background: none">{askama `code`}</code></pre>
-                )
-            })
-        }
+          {askama.match("part", {
+            "CodeOrText::Text(text)": <span>{askama`text`}</span>,
+            "CodeOrText::Code(code)": (
+              <pre class="rounded-lg bg-slate-50">
+                <code style="background: none">{askama`code`}</code>
+              </pre>
+            ),
+          })}
         </div>
-    ))
+      ))
     }
   </div>
 </div>

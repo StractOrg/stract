@@ -7,13 +7,13 @@ export interface Props {
 import { askama } from "$/askama";
 ---
 
-<div class="h-full flex flex-col justify-center p-0 m-0">
+<div class="m-0 flex h-full flex-col justify-center p-0">
   <select
     form="searchbar-form"
     id="optics-selector"
     name="optic"
     onchange="document.getElementById('searchbar-form').submit()"
-    class="p-0 m-0 hover:cursor-pointer bg-transparent text-sm border-0 max-w-[100px]"
+    class="m-0 max-w-[100px] border-0 bg-transparent p-0 text-sm hover:cursor-pointer"
     x-data="{ items: $persist([]).as('optics') }"
   >
     <option value="">Optic</option>
@@ -28,9 +28,7 @@ import { askama } from "$/askama";
                 {askama`optic.name`}
               </option>
             ),
-            () => (
-              <option value="{{ optic.url }}">{askama`optic.name`}</option>
-            )
+            () => <option value="{{ optic.url }}">{askama`optic.name`}</option>
           ),
           None: <option value="{{ optic.url }}">{askama`optic.name`}</option>,
         })
