@@ -1,5 +1,5 @@
 <div
-  class="flex text-sm flex-col py-5 px-2 items-center h-fit w-52 overflow-hidden absolute border rounded-lg drop-shadow-md bg-white origin-left modal-closed"
+  class="modal-closed absolute flex h-fit w-52 origin-left flex-col items-center overflow-hidden rounded-lg border bg-white py-5 px-2 text-sm drop-shadow-md"
   id="ranking-modal"
 >
   <h2 class="w-fit text-center">
@@ -7,23 +7,23 @@
       EXAMPLE.com
     </span>?
   </h2>
-  <div class="flex flex-col w-fit pt-4 space-y-3">
+  <div class="flex w-fit flex-col space-y-3 pt-4">
     <button
-      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      class="rounded-full border bg-white px-4 py-1 hover:bg-slate-600 hover:text-white"
       onclick="preferMore()"
       id="prefer-more"
     >
       Like
     </button>
     <button
-      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      class="rounded-full border bg-white px-4 py-1 hover:bg-slate-600 hover:text-white"
       onclick="preferLess()"
       id="prefer-less"
     >
       Dislike
     </button>
     <button
-      class="bg-white border rounded-full px-4 py-1 hover:bg-slate-600 hover:text-white"
+      class="rounded-full border bg-white px-4 py-1 hover:bg-slate-600 hover:text-white"
       onclick="block()"
       id="prefer-block"
     >
