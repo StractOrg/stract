@@ -91,7 +91,6 @@ fn create_webgraph() -> Result<()> {
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         graph_base_path: out_path_tmp.to_str().unwrap().to_string(),
-        create_full_graph: true,
     };
 
     let graph = webgraph::process_job(&job);
@@ -196,9 +195,9 @@ fn create_topic_centrality() {
         .to_str()
         .unwrap()
         .to_string();
-    let approximate_harmonic_path = Path::new(DATA_PATH)
+    let online_harmonic_path = Path::new(DATA_PATH)
         .join("centrality")
-        .join("approx_harmonic")
+        .join("online_harmonic")
         .to_str()
         .unwrap()
         .to_string();
@@ -212,7 +211,7 @@ fn create_topic_centrality() {
         index_path,
         topics_path,
         webgraph_path,
-        approximate_harmonic_path,
+        online_harmonic_path,
         output_path,
     );
 }

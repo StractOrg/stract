@@ -73,7 +73,7 @@ enum Commands {
         index_path: String,
         topics_path: String,
         webgraph_path: String,
-        approximate_harmonic_path: String,
+        online_harmonic_path: String,
         output_path: String,
     },
     #[cfg(feature = "dev")]
@@ -227,13 +227,13 @@ fn main() -> Result<()> {
             index_path,
             topics_path,
             webgraph_path,
-            approximate_harmonic_path,
+            online_harmonic_path,
             output_path,
         } => entrypoint::topic_centrality::run(
             index_path,
             topics_path,
             webgraph_path,
-            approximate_harmonic_path,
+            online_harmonic_path,
             output_path,
         ),
     }

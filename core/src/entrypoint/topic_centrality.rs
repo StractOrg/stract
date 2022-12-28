@@ -18,9 +18,7 @@ use crate::{
     human_website_annotations,
     index::Index,
     webgraph::{
-        centrality::{
-            approximate_harmonic::ApproximatedHarmonicCentrality, topic::TopicCentrality,
-        },
+        centrality::{online_harmonic::OnlineHarmonicCentrality, topic::TopicCentrality},
         WebgraphBuilder,
     },
 };
@@ -29,15 +27,15 @@ pub fn run(
     index_path: String,
     topics_path: String,
     webgraph_path: String,
-    approximate_harmonic_path: String,
+    online_harmonic_path: String,
     output_path: String,
 ) {
     let index = Index::open(index_path).unwrap();
     let topics = human_website_annotations::Mapper::open(topics_path).unwrap();
-    let webgraph = WebgraphBuilder::new(webgraph_path).with_host_graph().open();
-    let approx = ApproximatedHarmonicCentrality::open(approximate_harmonic_path).unwrap();
+    let webgraph = WebgraphBuilder::new(webgraph_path).open();
+    let harmonic = OnlineHarmonicCentrality::open(online_harmonic_path).unwrap();
 
-    let centrality: TopicCentrality = TopicCentrality::build(&index, topics, webgraph, approx);
+    let centrality: TopicCentrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
 
     centrality.save(output_path).unwrap();
 }

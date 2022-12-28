@@ -22,10 +22,7 @@ pub struct Centrality {}
 
 impl Centrality {
     pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
-        let graph = WebgraphBuilder::new(webgraph_path)
-            .read_only(true)
-            .with_host_graph()
-            .open();
+        let graph = WebgraphBuilder::new(webgraph_path).read_only(true).open();
 
         CentralityStore::build(&graph, output_path);
     }

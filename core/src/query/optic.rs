@@ -594,10 +594,7 @@ mod tests {
     fn liked_sites() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
+        let mut graph = WebgraphBuilder::new_memory().open();
 
         graph.insert(
             Node::from("https://www.a.com").into_host(),
@@ -611,7 +608,7 @@ mod tests {
             String::new(),
         );
 
-        graph.flush();
+        graph.commit();
 
         let centrality_store = CentralityStore::build(&graph, gen_temp_path());
 
@@ -645,7 +642,7 @@ mod tests {
                 dmoz_description: None,
                 node_id: Some(
                     *centrality_store
-                        .approx_harmonic
+                        .online_harmonic
                         .node2id
                         .get(&Node::from("www.a.com").into_host())
                         .unwrap(),
@@ -681,7 +678,7 @@ mod tests {
                 host_topic: None,
                 node_id: Some(
                     *centrality_store
-                        .approx_harmonic
+                        .online_harmonic
                         .node2id
                         .get(&Node::from("www.b.com").into_host())
                         .unwrap(),
@@ -717,7 +714,7 @@ mod tests {
                 dmoz_description: None,
                 node_id: Some(
                     *centrality_store
-                        .approx_harmonic
+                        .online_harmonic
                         .node2id
                         .get(&Node::from("www.c.com").into_host())
                         .unwrap(),

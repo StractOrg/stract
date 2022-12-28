@@ -36,7 +36,13 @@ impl RocksDbStore {
             fs::create_dir_all(path.as_ref()).expect("faild to create dir");
         }
 
-        Box::new(DB::open_default(path).expect("unable to open rocks db"))
+        let mut options = Options::default();
+
+        options.create_if_missing(true);
+        options.set_max_open_files(1);
+        options.set_max_file_opening_threads(1);
+
+        Box::new(DB::open(&options, path).expect("unable to open rocks db"))
     }
 
     pub fn open_read_only<K, V, P>(path: P) -> Box<dyn Kv<K, V> + Send + Sync>
@@ -50,7 +56,10 @@ impl RocksDbStore {
         }
 
         let mut options = Options::default();
+
         options.create_if_missing(true);
+        options.set_max_open_files(1);
+        options.set_max_file_opening_threads(1);
 
         Box::new(DB::open_for_read_only(&options, path, false).expect("unable to open rocks db"))
     }
@@ -86,6 +95,10 @@ where
             key: PhantomData::default(),
             value: PhantomData::default(),
         })
+    }
+
+    fn delete_raw(&mut self, key: &[u8]) {
+        rocksdb::DB::delete(self, key).unwrap();
     }
 }
 

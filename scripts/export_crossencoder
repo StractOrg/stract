@@ -1,0 +1,4 @@
+#!/bin/bash
+pip3 install transformers[onnx] torch
+python3 -m transformers.onnx --model=cross-encoder/ms-marco-MiniLM-L-6-v2 data/
+mv data/model.onnx data/crossencoder.onnx

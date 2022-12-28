@@ -83,7 +83,7 @@ impl RankingWebsite {
                         value.value.as_u64().unwrap() as f64 / FLOAT_SCALING as f64
                 }
                 Field::Fast(FastField::HostNodeID) => {
-                    let node = value.value.as_u64().unwrap();
+                    let node = value.value.as_u64().unwrap().into();
 
                     res.personal_centrality = aggregator.personal_centrality(node);
                     res.topic_centrality = aggregator.topic_centrality(node).unwrap_or_default();

@@ -32,6 +32,14 @@ where
     fn flush(&self);
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a>;
 
+    fn delete_raw(&mut self, key: &[u8]);
+
+    fn delete(&mut self, key: &K) {
+        let key_bytes = bincode::serialize(key).expect("failed to serialize key");
+
+        self.delete_raw(&key_bytes);
+    }
+
     fn get(&self, key: &K) -> Option<V> {
         let key_bytes = bincode::serialize(key).expect("failed to serialize key");
 
@@ -75,6 +83,10 @@ where
         unimplemented!()
     }
 
+    fn delete_raw(&mut self, key: &[u8]) {
+        unimplemented!()
+    }
+
     fn flush(&self) {}
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
@@ -87,5 +99,9 @@ where
 
     fn insert(&self, key: K, val: V) {
         self.0.write().unwrap().insert(key, val);
+    }
+
+    fn delete(&mut self, key: &K) {
+        self.0.write().unwrap().remove(key);
     }
 }

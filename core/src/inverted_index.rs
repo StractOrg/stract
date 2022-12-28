@@ -224,7 +224,7 @@ impl InvertedIndex {
         if id == u64::MAX {
             Ok(None)
         } else {
-            Ok(Some(id))
+            Ok(Some(id.into()))
         }
     }
 

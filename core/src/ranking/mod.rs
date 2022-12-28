@@ -34,7 +34,7 @@ use crate::{
     searcher::NUM_RESULTS_PER_PAGE,
     webgraph::{
         centrality::{
-            approximate_harmonic::{self, ApproximatedHarmonicCentrality, Scorer},
+            online_harmonic::{self, OnlineHarmonicCentrality, Scorer},
             topic,
         },
         Node,
@@ -141,14 +141,14 @@ impl Ranker {
         self.aggregator.set_topic_scorer(topic_scorer);
     }
 
-    pub fn set_query_centrality(&mut self, approx: approximate_harmonic::Scorer) {
-        self.aggregator.set_query_centrality(approx);
+    pub fn set_query_centrality(&mut self, harmonic: online_harmonic::Scorer) {
+        self.aggregator.set_query_centrality(harmonic);
     }
 }
 
 pub fn online_centrality_scorer(
     site_rankings: &SiteRankings,
-    approx_harmonic: &ApproximatedHarmonicCentrality,
+    harmonic: &OnlineHarmonicCentrality,
 ) -> Scorer {
     let mut liked_nodes = Vec::new();
     let mut disliked_nodes = Vec::new();
@@ -161,7 +161,7 @@ pub fn online_centrality_scorer(
         disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
     }
 
-    approx_harmonic.scorer(&liked_nodes, &disliked_nodes)
+    harmonic.scorer(&liked_nodes, &disliked_nodes)
 }
 
 #[cfg(test)]
@@ -173,9 +173,7 @@ mod tests {
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{
-            centrality::{
-                approximate_harmonic::ApproximatedHarmonicCentrality, topic::TopicCentrality,
-            },
+            centrality::{online_harmonic::OnlineHarmonicCentrality, topic::TopicCentrality},
             Node, WebgraphBuilder,
         },
         webpage::{Html, Link, Webpage},
@@ -1152,7 +1150,7 @@ mod tests {
                 page_centrality: 0.0,
                 primary_image: None,
                 host_topic: Some(topic_a.clone()),
-                node_id: Some(1),
+                node_id: Some(1.into()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1187,7 +1185,7 @@ mod tests {
                 crawl_stability: 0.0,
                 primary_image: None,
                 host_topic: Some(topic_b.clone()),
-                node_id: Some(2),
+                node_id: Some(2.into()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1222,7 +1220,7 @@ mod tests {
                 crawl_stability: 0.0,
                 primary_image: None,
                 host_topic: None,
-                node_id: Some(0),
+                node_id: Some(0.into()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1245,9 +1243,7 @@ mod tests {
         );
         let topics = human_website_annotations::Mapper::from(mapper);
 
-        let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path())
-            .with_host_graph()
-            .open();
+        let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path()).open();
 
         webgraph.insert(
             Node::from("www.wrong.com"),
@@ -1260,11 +1256,11 @@ mod tests {
             String::new(),
         );
 
-        webgraph.flush();
+        webgraph.commit();
 
-        let approx = ApproximatedHarmonicCentrality::new(&webgraph);
+        let harmonic = OnlineHarmonicCentrality::new(&webgraph);
 
-        let topic_centrality = TopicCentrality::build(&index, topics, webgraph, approx);
+        let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
 
         let mut searcher = LocalSearcher::new(index);
         searcher.set_topic_centrality(topic_centrality);

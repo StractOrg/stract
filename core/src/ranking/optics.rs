@@ -69,10 +69,7 @@ mod tests {
     fn site_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
+        let mut graph = WebgraphBuilder::new_memory().open();
 
         graph.insert(
             Node::from("https://www.first.com").into_host(),
@@ -85,7 +82,7 @@ mod tests {
             String::new(),
         );
 
-        graph.flush();
+        graph.commit();
 
         index
             .insert(Webpage {
@@ -116,9 +113,6 @@ mod tests {
                 host_topic: None,
                 node_id: Some(
                     graph
-                        .host
-                        .as_ref()
-                        .unwrap()
                         .node2id(&Node::from("https://www.first.com").into_host())
                         .unwrap(),
                 ),
@@ -153,9 +147,6 @@ mod tests {
                 dmoz_description: None,
                 node_id: Some(
                     graph
-                        .host
-                        .as_ref()
-                        .unwrap()
                         .node2id(&Node::from("https://www.second.com").into_host())
                         .unwrap(),
                 ),
@@ -190,9 +181,6 @@ mod tests {
                 host_topic: None,
                 node_id: Some(
                     graph
-                        .host
-                        .as_ref()
-                        .unwrap()
                         .node2id(&Node::from("https://www.third.com").into_host())
                         .unwrap(),
                 ),

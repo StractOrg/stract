@@ -17,10 +17,7 @@
 use cuely::webgraph::{Node, WebgraphBuilder};
 
 pub fn main() {
-    let graph = WebgraphBuilder::new("data/webgraph")
-        .with_host_graph()
-        .read_only(true)
-        .open();
+    let graph = WebgraphBuilder::new("data/webgraph").read_only(true).open();
 
     for host in [
         "plapcatesq.ga",
@@ -29,7 +26,7 @@ pub fn main() {
         "GroomersNew.ga",
     ] {
         println!("{}:", host);
-        for edge in graph.ingoing_edges_host(Node::from(host)) {
+        for edge in graph.ingoing_edges(Node::from(host)) {
             println!("{} -> {} ({})", edge.from.name, edge.to.name, edge.label);
         }
         println!();

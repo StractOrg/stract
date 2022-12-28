@@ -24,15 +24,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     intmap::IntMap,
-    webgraph::{graph_store::GraphStore, Node, NodeID, Store, Webgraph},
+    webgraph::{Node, NodeID, Webgraph},
 };
 
-fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<Node, f64>, i32) {
+fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
     let mut n = 0;
     let mut max_dist = 0;
 
-    let nodes: Vec<_> = store.nodes().take(100_000).collect();
+    let nodes: Vec<_> = graph.nodes().take(100_000).collect();
 
     let pb =
         if with_progress {
@@ -60,38 +60,38 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
 
         let mut sigma = IntMap::new();
 
-        sigma.insert(s, 1);
+        sigma.insert(s.0, 1);
 
         let mut distances = IntMap::new();
-        distances.insert(s, 0);
+        distances.insert(s.0, 0);
 
         let mut q = VecDeque::new();
         q.push_back(s);
 
         while let Some(v) = q.pop_front() {
             stack.push(v);
-            for edge in store.outgoing_edges(v) {
+            for edge in graph.raw_outgoing_edges(&v) {
                 let w = edge.to;
 
-                if !distances.contains(&w) {
-                    let dist_v = distances.get(&v).unwrap();
+                if !distances.contains(&w.0) {
+                    let dist_v = distances.get(&v.0).unwrap();
                     q.push_back(w);
-                    distances.insert(w, dist_v + 1);
+                    distances.insert(w.0, dist_v + 1);
                 }
 
-                if *distances.get(&w).unwrap() == distances.get(&v).unwrap() + 1 {
-                    let sigma_v = *sigma.get(&v).unwrap_or(&0);
+                if *distances.get(&w.0).unwrap() == distances.get(&v.0).unwrap() + 1 {
+                    let sigma_v = *sigma.get(&v.0).unwrap_or(&0);
 
-                    if !sigma.contains(&w) {
-                        sigma.insert(w, 0);
+                    if !sigma.contains(&w.0) {
+                        sigma.insert(w.0, 0);
                     }
-                    *sigma.get_mut(&w).unwrap() += sigma_v;
+                    *sigma.get_mut(&w.0).unwrap() += sigma_v;
 
-                    if !predecessors.contains(&w) {
-                        predecessors.insert(w, Vec::new());
+                    if !predecessors.contains(&w.0) {
+                        predecessors.insert(w.0, Vec::new());
                     }
 
-                    predecessors.get_mut(&w).unwrap().push(v);
+                    predecessors.get_mut(&w.0).unwrap().push(v.0);
                 }
             }
         }
@@ -100,20 +100,20 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
 
         let mut delta = IntMap::new();
         while let Some(w) = stack.pop() {
-            if let Some(pred) = predecessors.get(&w) {
+            if let Some(pred) = predecessors.get(&w.0) {
                 for v in pred {
                     let dv = delta.get(v).copied().unwrap_or(0.0);
 
                     delta.insert(
                         *v,
-                        dv + (*sigma.get(v).unwrap() as f64 / *sigma.get(&w).unwrap() as f64)
-                            * (1.0 + delta.get(&w).unwrap_or(&0.0)),
+                        dv + (*sigma.get(v).unwrap() as f64 / *sigma.get(&w.0).unwrap() as f64)
+                            * (1.0 + delta.get(&w.0).unwrap_or(&0.0)),
                     );
                 }
             }
 
             if w != s {
-                *centrality.entry(w).or_insert(0.0) += *delta.get(&w).unwrap_or(&0.0);
+                *centrality.entry(w).or_insert(0.0) += *delta.get(&w.0).unwrap_or(&0.0);
             }
         }
     }
@@ -128,7 +128,7 @@ fn calculate<S: Store>(store: &GraphStore<S>, with_progress: bool) -> (HashMap<N
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (store.id2node(&id).unwrap(), centrality / norm))
+            .map(|(id, centrality)| (graph.id2node(&id).unwrap(), centrality / norm))
             .collect(),
         max_dist,
     )
@@ -143,34 +143,18 @@ pub struct Betweenness {
 impl Betweenness {
     #[allow(unused)]
     pub fn calculate(graph: &Webgraph) -> Self {
-        match &graph.host {
-            Some(store) => {
-                let (host, max_dist) = calculate(store, false);
-                Self {
-                    centrality: host,
-                    max_dist: max_dist.max(0) as usize,
-                }
-            }
-            None => Self {
-                centrality: HashMap::new(),
-                max_dist: 0,
-            },
+        let (host, max_dist) = calculate(graph, false);
+        Self {
+            centrality: host,
+            max_dist: max_dist.max(0) as usize,
         }
     }
 
     pub fn calculate_with_progress(graph: &Webgraph) -> Self {
-        match &graph.host {
-            Some(store) => {
-                let (host, max_dist) = calculate(store, true);
-                Self {
-                    centrality: host,
-                    max_dist: max_dist.max(0) as usize,
-                }
-            }
-            None => Self {
-                centrality: HashMap::new(),
-                max_dist: 0,
-            },
+        let (host, max_dist) = calculate(graph, true);
+        Self {
+            centrality: host,
+            max_dist: max_dist.max(0) as usize,
         }
     }
 }
@@ -195,10 +179,7 @@ mod tests {
         //        │
         //        D
 
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
+        let mut graph = WebgraphBuilder::new_memory().open();
 
         for i in 0..n - 1 {
             graph.insert(
@@ -208,7 +189,7 @@ mod tests {
             );
         }
 
-        graph.flush();
+        graph.commit();
 
         graph
     }

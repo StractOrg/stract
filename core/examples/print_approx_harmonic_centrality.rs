@@ -21,7 +21,7 @@ use std::{
 
 use cuely::{
     ranking::centrality_store::CentralityStore,
-    webgraph::{centrality::approximate_harmonic::Scorer, Node, WebgraphBuilder},
+    webgraph::{centrality::online_harmonic::Scorer, Node, NodeID, WebgraphBuilder},
     webpage::Url,
 };
 
@@ -50,13 +50,13 @@ impl Ord for ScoredNode {
 
 impl Eq for ScoredNode {}
 
-fn get_top_nodes(scorer: Scorer, top_n: usize, nodes: &[u64]) -> Vec<ScoredNode> {
+fn get_top_nodes(scorer: Scorer, top_n: usize, nodes: &[NodeID]) -> Vec<ScoredNode> {
     let mut top_nodes = BinaryHeap::with_capacity(top_n);
 
     for node in nodes {
         top_nodes.push(cmp::Reverse(ScoredNode {
             score: scorer.score(*node),
-            id: *node,
+            id: node.0,
         }));
 
         while top_nodes.len() > top_n {
@@ -72,12 +72,12 @@ fn get_top_nodes(scorer: Scorer, top_n: usize, nodes: &[u64]) -> Vec<ScoredNode>
     nodes
 }
 
-fn print_nodes(nodes: &[ScoredNode], id2node: &HashMap<u64, Node>) {
+fn print_nodes(nodes: &[ScoredNode], id2node: &HashMap<NodeID, Node>) {
     for (i, node) in nodes.iter().rev().enumerate() {
         println!(
             "{i} \t {:.3} \t {} ",
             node.score,
-            id2node.get(&node.id).unwrap().name
+            id2node.get(&(node.id.into())).unwrap().name
         );
     }
 }
@@ -86,15 +86,15 @@ fn print_top_nodes(
     liked_sites: &[&str],
     top_n: usize,
     store: &CentralityStore,
-    id2node: &HashMap<u64, Node>,
-    nodes: &[u64],
+    id2node: &HashMap<NodeID, Node>,
+    nodes: &[NodeID],
 ) {
     let liked_nodes: Vec<_> = liked_sites
         .iter()
         .map(|host| Node::from_url(&Url::from(host.to_string())))
         .collect();
 
-    let scorer = store.approx_harmonic.scorer(&liked_nodes, &[]);
+    let scorer = store.online_harmonic.scorer(&liked_nodes, &[]);
     let top_nodes = get_top_nodes(scorer, top_n, nodes);
     println!(
         "top {} sites for these liked sites {:?}",
@@ -108,20 +108,17 @@ fn print_top_nodes(
 
 pub fn main() {
     const TOP_N: usize = 50;
-    let graph = WebgraphBuilder::new("data/webgraph")
-        .with_host_graph()
-        .read_only(true)
-        .open();
-    let nodes: Vec<_> = graph.host.as_ref().unwrap().nodes().collect();
+    let graph = WebgraphBuilder::new("data/webgraph").read_only(true).open();
+    let nodes: Vec<_> = graph.nodes().collect();
     let id2node: HashMap<_, _> = nodes
         .iter()
-        .map(|id| (*id, graph.host.as_ref().unwrap().id2node(id).unwrap()))
+        .map(|id| (*id, graph.id2node(id).unwrap()))
         .collect();
 
     let store = CentralityStore::open("data/centrality");
 
     let mut proxy_nodes = Vec::new();
-    for node in &store.approx_harmonic.proxy_nodes {
+    for node in &store.online_harmonic.proxy_nodes {
         proxy_nodes.push(id2node.get(&node.id).unwrap().name.clone());
     }
 

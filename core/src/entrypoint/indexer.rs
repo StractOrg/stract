@@ -72,13 +72,7 @@ impl IndexingWorker {
     ) -> Self {
         Self {
             centrality_store: CentralityStore::open(centrality_store_path),
-            webgraph: webgraph_path.map(|path| {
-                WebgraphBuilder::new(path)
-                    .with_full_graph()
-                    .with_host_graph()
-                    .read_only(true)
-                    .open()
-            }),
+            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).read_only(true).open()),
             crawl_stabilty: crawl_stability_path.map(CrawlStability::open),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
@@ -176,10 +170,10 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
                 let node_id = worker
                     .centrality_store
-                    .approx_harmonic
+                    .online_harmonic
                     .node2id
                     .get(&Node::from_url(html.url()).into_host())
-                    .copied();
+                    .cloned();
 
                 let mut host_topic = None;
                 let mut dmoz_description = None;

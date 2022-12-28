@@ -19,9 +19,7 @@ use std::{fs::File, path::Path};
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{
-        centrality::{
-            approximate_harmonic::ApproximatedHarmonicCentrality, harmonic::HarmonicCentrality,
-        },
+        centrality::{harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality},
         Webgraph,
     },
 };
@@ -47,7 +45,7 @@ impl HarmonicCentralityStore {
 
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
-    pub approx_harmonic: ApproximatedHarmonicCentrality,
+    pub online_harmonic: OnlineHarmonicCentrality,
     pub base_path: String,
 }
 
@@ -55,37 +53,11 @@ impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
-            approx_harmonic: ApproximatedHarmonicCentrality::open(
-                path.as_ref().join("approx_harmonic"),
-            )
-            .ok()
-            .unwrap_or_default(),
+            online_harmonic: OnlineHarmonicCentrality::open(path.as_ref().join("online_harmonic"))
+                .ok()
+                .unwrap_or_default(),
             base_path: path.as_ref().to_str().unwrap().to_string(),
         }
-    }
-
-    fn store_full<P: AsRef<Path>>(
-        output_path: P,
-        store: &mut CentralityStore,
-        harmonic_centrality: &HarmonicCentrality,
-    ) {
-        let csv_file = File::options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(output_path.as_ref().join("harmonic_full.csv"))
-            .unwrap();
-        let mut wtr = csv::Writer::from_writer(csv_file);
-
-        let mut full: Vec<_> = harmonic_centrality.full.clone().into_iter().collect();
-        full.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        for (node, centrality) in full {
-            store.harmonic.full.insert(node.name.clone(), centrality);
-            wtr.write_record(&[node.name, centrality.to_string()])
-                .unwrap();
-        }
-
-        wtr.flush().unwrap();
     }
 
     fn store_host<P: AsRef<Path>>(
@@ -116,15 +88,9 @@ impl CentralityStore {
 
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
 
-        if graph.full.is_some() {
-            Self::store_full(&output_path, &mut store, &harmonic_centrality)
-        }
+        Self::store_host(&output_path, &mut store, &harmonic_centrality);
 
-        if graph.host.is_some() {
-            Self::store_host(&output_path, &mut store, &harmonic_centrality)
-        }
-
-        store.approx_harmonic = ApproximatedHarmonicCentrality::new(graph);
+        store.online_harmonic = OnlineHarmonicCentrality::new(graph);
 
         store.flush();
 
@@ -134,8 +100,8 @@ impl CentralityStore {
     pub fn flush(&self) {
         self.harmonic.flush();
 
-        self.approx_harmonic
-            .save(Path::new(&self.base_path).join("approx_harmonic"))
+        self.online_harmonic
+            .save(Path::new(&self.base_path).join("online_harmonic"))
             .unwrap();
     }
 }

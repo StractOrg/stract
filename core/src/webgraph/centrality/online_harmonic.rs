@@ -34,7 +34,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;
-use crate::webgraph::Node;
+use crate::webgraph::{Node, ShortestPaths};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
@@ -52,8 +52,8 @@ pub struct ProxyNode {
 
 impl ProxyNode {
     fn dist(&self, from: &NodeID, to: &NodeID) -> Option<usize> {
-        if let Some(from_node_to_proxy) = self.dist_from_node.get(from) {
-            if let Some(from_proxy_to_node) = self.dist_to_node.get(to) {
+        if let Some(from_node_to_proxy) = self.dist_from_node.get(&from.0) {
+            if let Some(from_proxy_to_node) = self.dist_to_node.get(&to.0) {
                 return Some(from_node_to_proxy + from_proxy_to_node);
             }
         }
@@ -183,7 +183,7 @@ impl UserNode {
     fn new(id: NodeID, proxy_nodes: &[Arc<ProxyNode>]) -> Self {
         let mut heap = BinaryHeap::with_capacity(BEST_PROXY_NODES_PER_USER_NODE);
         for proxy in proxy_nodes {
-            if let Some(dist_to_proxy) = proxy.dist_from_node.get(&id) {
+            if let Some(dist_to_proxy) = proxy.dist_from_node.get(&id.0) {
                 let weighted_node = WeightedProxyNode {
                     node: Arc::clone(proxy),
                     dist: *dist_to_proxy,
@@ -229,12 +229,12 @@ impl UserNode {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub struct ApproximatedHarmonicCentrality {
+pub struct OnlineHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
     pub proxy_nodes: Vec<Arc<ProxyNode>>,
 }
 
-impl ApproximatedHarmonicCentrality {
+impl OnlineHarmonicCentrality {
     pub fn new(graph: &Webgraph) -> Self {
         Self::new_with_num_proxy(graph, NUM_PROXY_NODES)
     }
@@ -246,15 +246,13 @@ impl ApproximatedHarmonicCentrality {
         // betweenness centrality, but I don't know how we can approximate betweenness
         // on a graph that cannot be in memory
         let mut nodes = Vec::new();
-        if let Some(store) = graph.host.as_ref() {
-            for id in store.nodes() {
-                if let Some(node) = store.id2node(&id) {
-                    if nodes.len() < num_proxy_nodes {
-                        nodes.push(node.clone());
-                    }
-
-                    node2id.insert(node, id);
+        for id in graph.nodes() {
+            if let Some(node) = graph.id2node(&id) {
+                if nodes.len() < num_proxy_nodes {
+                    nodes.push(node.clone());
                 }
+
+                node2id.insert(node, id);
             }
         }
 
@@ -263,10 +261,15 @@ impl ApproximatedHarmonicCentrality {
             .take(num_proxy_nodes)
             .filter(|node| node2id.contains_key(node))
             .map(|node| {
-                let dist_to_node = graph.raw_host_distances(node.clone()).into_iter().collect();
-                let dist_from_node = graph
-                    .raw_host_reversed_distances(node.clone())
+                let dist_to_node = graph
+                    .raw_distances(node.clone())
                     .into_iter()
+                    .map(|(n, v)| (n.0, v))
+                    .collect();
+                let dist_from_node = graph
+                    .raw_reversed_distances(node.clone())
+                    .into_iter()
+                    .map(|(n, v)| (n.0, v))
                     .collect();
 
                 Arc::new(ProxyNode {
@@ -287,13 +290,13 @@ impl ApproximatedHarmonicCentrality {
         let liked_nodes = liked_nodes
             .iter()
             .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).copied())
+            .filter_map(|node| self.node2id.get(&node).cloned())
             .collect_vec();
 
         let disliked_nodes = disliked_nodes
             .iter()
             .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).copied())
+            .filter_map(|node| self.node2id.get(&node).cloned())
             .collect_vec();
 
         self.scorer_from_ids(&liked_nodes, &disliked_nodes)
@@ -349,10 +352,7 @@ mod tests {
            B ----► D ◄------- C
         */
 
-        let mut graph = WebgraphBuilder::new_memory()
-            .with_full_graph()
-            .with_host_graph()
-            .open();
+        let mut graph = WebgraphBuilder::new_memory().open();
 
         graph.insert(Node::from("A"), Node::from("D"), String::new());
         graph.insert(Node::from("B"), Node::from("D"), String::new());
@@ -364,7 +364,7 @@ mod tests {
         graph.insert(Node::from("F"), Node::from("G"), String::new());
         graph.insert(Node::from("G"), Node::from("E"), String::new());
 
-        graph.flush();
+        graph.commit();
 
         graph
     }
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn ordering() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn disliked_nodes_centrality() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let disliked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
 
@@ -437,7 +437,7 @@ mod tests {
     #[test]
     fn ordering_with_dislikes() {
         let graph = test_graph();
-        let centrality = ApproximatedHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
         let disliked_nodes = vec![Node::from("F".to_string())];

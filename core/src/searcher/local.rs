@@ -93,16 +93,14 @@ impl LocalSearcher {
             })
             .unwrap_or_default();
 
-        if let (Some(optic), Some(approx_harmonic)) = (
+        if let (Some(optic), Some(harmonic)) = (
             optic,
             self.centrality_store
                 .as_ref()
-                .map(|store| &store.approx_harmonic),
+                .map(|store| &store.online_harmonic),
         ) {
-            query_aggregator.add_personal_harmonic(online_centrality_scorer(
-                &optic.site_rankings,
-                approx_harmonic,
-            ));
+            query_aggregator
+                .add_personal_harmonic(online_centrality_scorer(&optic.site_rankings, harmonic));
         }
 
         let mut parsed_query = Query::parse(
@@ -156,15 +154,13 @@ impl LocalSearcher {
             .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
             .unwrap_or_default();
 
-        if let Some(approx_harmonic) = self
+        if let Some(harmonic) = self
             .centrality_store
             .as_ref()
-            .map(|store| &store.approx_harmonic)
+            .map(|store| &store.online_harmonic)
         {
-            aggregator.add_personal_harmonic(online_centrality_scorer(
-                &optic.site_rankings,
-                approx_harmonic,
-            ));
+            aggregator
+                .add_personal_harmonic(online_centrality_scorer(&optic.site_rankings, harmonic));
         }
 
         let mut ranker = Ranker::new(
@@ -193,10 +189,10 @@ impl LocalSearcher {
 
             let top_host_nodes = self.index.top_nodes(&parsed_query, ranker.collector())?;
             if !top_host_nodes.is_empty() {
-                let approx = centrality_store
-                    .approx_harmonic
+                let harmonic = centrality_store
+                    .online_harmonic
                     .scorer_from_ids(&top_host_nodes, &[]);
-                ranker.set_query_centrality(approx);
+                ranker.set_query_centrality(harmonic);
             }
         }
 
@@ -455,8 +451,6 @@ mod tests {
                 .collect();
 
             assert!(!urls.is_empty());
-
-            dbg!(&urls);
 
             for (i, url) in urls.into_iter().enumerate() {
                 assert_eq!(

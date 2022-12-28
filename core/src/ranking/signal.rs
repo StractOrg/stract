@@ -17,9 +17,12 @@
 use crate::{
     fastfield_cache,
     schema::{FastField, TextField},
-    webgraph::centrality::{
-        approximate_harmonic::{self, SHIFT},
-        topic,
+    webgraph::{
+        centrality::{
+            online_harmonic::{self, SHIFT},
+            topic,
+        },
+        NodeID,
     },
     webpage::Webpage,
 };
@@ -257,12 +260,12 @@ impl FieldBoost {
 pub struct SignalAggregator {
     fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
     signal_coefficients: SignalCoefficient,
-    personal_centrality: Vec<Arc<approximate_harmonic::Scorer>>,
+    personal_centrality: Vec<Arc<online_harmonic::Scorer>>,
     field_boost: FieldBoost,
     fetch_time_ms_cache: [f64; 1000],
     update_time_cache: Vec<f64>,
     topic_scorer: Option<topic::Scorer>,
-    query_centrality: Option<Arc<approximate_harmonic::Scorer>>,
+    query_centrality: Option<Arc<online_harmonic::Scorer>>,
 }
 
 impl std::fmt::Debug for SignalAggregator {
@@ -314,27 +317,27 @@ impl SignalAggregator {
         self.topic_scorer = Some(topic_scorer);
     }
 
-    pub fn set_query_centrality(&mut self, query_centrality: approximate_harmonic::Scorer) {
+    pub fn set_query_centrality(&mut self, query_centrality: online_harmonic::Scorer) {
         self.query_centrality = Some(Arc::new(query_centrality));
     }
 
-    pub fn add_personal_harmonic(&mut self, personal_centrality: approximate_harmonic::Scorer) {
+    pub fn add_personal_harmonic(&mut self, personal_centrality: online_harmonic::Scorer) {
         self.personal_centrality.push(Arc::new(personal_centrality))
     }
 
-    pub fn topic_centrality(&self, host_id: u64) -> Option<f64> {
+    pub fn topic_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.topic_scorer
             .as_ref()
             .map(|scorer| scorer.score(host_id))
     }
 
-    pub fn query_centrality(&self, host_id: u64) -> Option<f64> {
+    pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.query_centrality
             .as_ref()
             .map(|scorer| scorer.score(host_id) - SHIFT)
     }
 
-    pub fn personal_centrality(&self, host_id: u64) -> f64 {
+    pub fn personal_centrality(&self, host_id: NodeID) -> f64 {
         self.personal_centrality
             .iter()
             .map(|scorer| scorer.score(host_id))
@@ -349,10 +352,12 @@ impl SignalAggregator {
         current_timestamp: usize,
         selected_region: Option<Region>,
     ) -> Score {
-        let host_id = self
-            .fastfield_cache
-            .as_ref()
-            .and_then(|cache| cache.get_doc_cache(&FastField::HostNodeID).get_u64(&doc));
+        let host_id = self.fastfield_cache.as_ref().and_then(|cache| {
+            cache
+                .get_doc_cache(&FastField::HostNodeID)
+                .get_u64(&doc)
+                .map(NodeID::from)
+        });
 
         let topic_score = host_id.and_then(|host_id| self.topic_centrality(host_id));
 

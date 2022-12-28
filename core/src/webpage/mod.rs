@@ -19,6 +19,7 @@ use crate::{
     schema::{FastField, TextField},
     simhash,
     tokenizer::{self, FlattenedJson},
+    webgraph::NodeID,
     Error, Result,
 };
 use chrono::{DateTime, FixedOffset, Utc};
@@ -131,7 +132,7 @@ pub struct Webpage {
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub primary_image: Option<StoredPrimaryImage>,
-    pub node_id: Option<u64>,
+    pub node_id: Option<NodeID>,
     pub crawl_stability: f64,
     pub host_topic: Option<Topic>,
     pub dmoz_description: Option<String>,
@@ -249,7 +250,7 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::HostNodeID).name())
                 .expect("Failed to get node_id field"),
-            self.node_id.unwrap_or(u64::MAX),
+            self.node_id.map(|n| n.0).unwrap_or(u64::MAX),
         );
 
         doc.add_u64(

@@ -37,11 +37,11 @@ use crate::{
     index::Index,
     ranking::{initial::InitialScoreTweaker, SignalAggregator},
     schema::{FastField, Field, TextField},
-    webgraph::{centrality::approximate_harmonic::SHIFT, Webgraph},
+    webgraph::{centrality::online_harmonic::SHIFT, NodeID, Webgraph},
 };
 use crate::{query::Query, Result};
 
-use super::approximate_harmonic::ApproximatedHarmonicCentrality;
+use super::online_harmonic::OnlineHarmonicCentrality;
 
 const TOP_TERMS: usize = 1_000_000;
 pub const NUM_TOPICS: usize = 50;
@@ -53,8 +53,8 @@ pub struct Scorer {
 }
 
 impl Scorer {
-    pub fn score(&self, host: u64) -> f64 {
-        match self.host_centrality.get(host as usize) {
+    pub fn score(&self, host: NodeID) -> f64 {
+        match self.host_centrality.get(host.0 as usize) {
             Some(host_score) => host_score
                 .iter()
                 .zip_eq(self.term_weights.iter())
@@ -76,7 +76,7 @@ impl TopicCentrality {
         index: &Index,
         topics: Mapper,
         webgraph: Webgraph,
-        approx: ApproximatedHarmonicCentrality,
+        harmonic: OnlineHarmonicCentrality,
     ) -> Self {
         let body_field = index
             .schema()
@@ -148,7 +148,7 @@ impl TopicCentrality {
         let collector = TopDocs::with_limit(1000, index.inverted_index.fastfield_cache())
             .tweak_score(score_tweaker);
 
-        let mut nodes: Vec<_> = webgraph.host.as_ref().unwrap().nodes().collect();
+        let mut nodes: Vec<_> = webgraph.nodes().collect();
         nodes.sort();
 
         let mut node_scores = vec![vec![0.0; NUM_TOPICS]; nodes.len()];
@@ -168,7 +168,8 @@ impl TopicCentrality {
                     if id == u64::MAX {
                         None
                     } else {
-                        Some(webgraph.host.as_ref().unwrap().id2node(&id).unwrap())
+                        let id = id.into();
+                        Some(webgraph.id2node(&id).unwrap())
                     }
                 })
                 .collect();
@@ -177,10 +178,10 @@ impl TopicCentrality {
 
             assert!(!top_sites.is_empty());
 
-            let scorer = approx.scorer(&top_sites, &[]);
+            let scorer = harmonic.scorer(&top_sites, &[]);
 
             for node in &nodes {
-                node_scores[*node as usize][i] = scorer.score(*node) - SHIFT;
+                node_scores[node.0 as usize][i] = scorer.score(*node) - SHIFT;
             }
         }
 

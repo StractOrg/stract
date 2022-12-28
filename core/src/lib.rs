@@ -99,7 +99,6 @@ pub struct WebgraphMasterConfig {
     workers: Vec<String>,
     graph_base_path: Option<String>,
     batch_size: Option<usize>,
-    create_full_graph: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -108,7 +107,6 @@ pub struct WebgraphLocalConfig {
     warc_source: WarcSource,
     graph_base_path: Option<String>,
     batch_size: Option<usize>,
-    create_full_graph: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -238,6 +236,12 @@ pub enum Error {
 
     #[error("The stackoverflow schema was not structured as expected")]
     InvalidStackoverflowSchema,
+
+    #[error("Rayong thread pool builder")]
+    RayonThreadPool(#[from] rayon::ThreadPoolBuildError),
+
+    #[error("Internal error")]
+    InternalError(String),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
