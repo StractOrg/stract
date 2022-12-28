@@ -83,7 +83,7 @@ where
         unimplemented!()
     }
 
-    fn delete_raw(&mut self, key: &[u8]) {
+    fn delete_raw(&mut self, _key: &[u8]) {
         unimplemented!()
     }
 

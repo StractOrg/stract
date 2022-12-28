@@ -193,7 +193,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 site_rankings: Some(SiteRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec!["www.third.com".to_string()],
@@ -214,7 +214,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 site_rankings: Some(SiteRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec![],
@@ -235,7 +235,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 site_rankings: Some(SiteRankings {
                     liked: vec![],
                     disliked: vec!["www.second.com".to_string()],

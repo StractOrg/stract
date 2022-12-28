@@ -17,7 +17,7 @@
 use optics::SiteRankings;
 use std::{collections::HashMap, sync::Arc};
 
-use axum::Extension;
+use axum::{Extension, Json};
 use axum_macros::debug_handler;
 
 use crate::{
@@ -121,7 +121,7 @@ pub async fn route(
     match state
         .searcher
         .search(&SearchQuery {
-            original: query.clone(),
+            query: query.clone(),
             selected_region,
             optic_program: optic,
             offset,
@@ -196,6 +196,27 @@ pub async fn route(
 
                 HtmlTemplate(template).into_response()
             }
+            PrettifiedSearchResult::Bang(result) => {
+                Redirect::to(&result.redirect_to.full()).into_response()
+            }
+        },
+        Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
+        Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
+    }
+}
+
+#[allow(clippy::unused_async)]
+#[allow(clippy::match_wild_err_arm)]
+#[debug_handler]
+pub async fn api(
+    extract::Json(mut query): extract::Json<SearchQuery>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    query.num_results = query.num_results.min(50 * NUM_RESULTS_PER_PAGE);
+
+    match state.searcher.search(&query).await {
+        Ok(result) => match result {
+            PrettifiedSearchResult::Websites(result) => Json(result).into_response(),
             PrettifiedSearchResult::Bang(result) => {
                 Redirect::to(&result.redirect_to.full()).into_response()
             }

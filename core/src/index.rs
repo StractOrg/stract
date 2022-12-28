@@ -387,7 +387,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")

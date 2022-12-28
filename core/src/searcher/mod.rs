@@ -85,7 +85,7 @@ pub enum InitialPrettifiedSearchResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchQuery {
-    pub original: String,
+    pub query: String,
     pub offset: usize,
     pub num_results: usize,
     pub selected_region: Option<Region>,
@@ -96,7 +96,7 @@ pub struct SearchQuery {
 impl Default for SearchQuery {
     fn default() -> Self {
         Self {
-            original: Default::default(),
+            query: Default::default(),
             offset: Default::default(),
             num_results: NUM_RESULTS_PER_PAGE,
             selected_region: Default::default(),
@@ -108,6 +108,6 @@ impl Default for SearchQuery {
 
 impl SearchQuery {
     pub fn is_empty(&self) -> bool {
-        self.original.is_empty()
+        self.query.is_empty()
     }
 }

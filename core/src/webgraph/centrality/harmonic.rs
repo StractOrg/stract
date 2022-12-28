@@ -158,7 +158,7 @@ fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
 }
 
 fn calculate_host(graph: &Webgraph) -> HashMap<Node, f64> {
-    calculate_centrality(&graph)
+    calculate_centrality(graph)
 }
 
 impl HarmonicCentrality {

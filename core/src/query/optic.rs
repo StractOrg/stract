@@ -283,7 +283,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 ..Default::default()
             })
             .unwrap()
@@ -298,7 +298,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         Rule {
@@ -323,7 +323,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         Rule {
@@ -417,7 +417,7 @@ mod tests {
 
         let _ = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     include_str!("../../../optics/testcases/quickstart.optic").to_string(),
                 ),
@@ -431,7 +431,7 @@ mod tests {
 
         let _ = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     include_str!("../../../optics/testcases/hacker_news.optic").to_string(),
                 ),
@@ -445,7 +445,7 @@ mod tests {
 
         let _ = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     include_str!("../../../optics/testcases/copycats_removal.optic").to_string(),
                 ),
@@ -559,7 +559,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                     DiscardNonMatching;
@@ -729,7 +729,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                     Like(Site("www.a.com"));
@@ -850,7 +850,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -875,7 +875,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -900,7 +900,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -925,7 +925,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "website".to_string(),
+                query: "website".to_string(),
                 optic_program: Some(
                     r#"
                         DiscardNonMatching;
@@ -990,7 +990,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "site:stackoverflow.com".to_string(),
+                query: "site:stackoverflow.com".to_string(),
                 optic_program: Some(
                     r#"
                     DiscardNonMatching;

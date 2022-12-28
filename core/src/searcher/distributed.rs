@@ -309,7 +309,7 @@ impl DistributedSearcher {
                 .map(|(idx, pointer)| (idx, pointer.website.pointer.clone()))
                 .unzip();
 
-            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.original).await {
+            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.query).await {
                 for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
                     retrieved_webpages[index] = Some(website);
                 }

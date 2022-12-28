@@ -388,7 +388,7 @@ Survey in 2016, 2017, and 2018."#;
 
         let result = searcher
             .search(&SearchQuery {
-                original: "rust language".to_string(),
+                query: "rust language".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -428,7 +428,7 @@ Survey in 2016, 2017, and 2018."#;
 
         let result = searcher
             .search(&SearchQuery {
-                original: "describe".to_string(),
+                query: "describe".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -638,7 +638,7 @@ Survey in 2016, 2017, and 2018."#;
 
         let result = searcher
             .search(&SearchQuery {
-                original: "paradigms".to_string(),
+                query: "paradigms".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")

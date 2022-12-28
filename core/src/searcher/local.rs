@@ -104,7 +104,7 @@ impl LocalSearcher {
         }
 
         let mut parsed_query = Query::parse(
-            &query.original,
+            &query.query,
             self.index.schema(),
             self.index.tokenizers(),
             &query_aggregator,
@@ -231,7 +231,7 @@ impl LocalSearcher {
     fn entity_sidebar(&self, query: &SearchQuery) -> Option<Sidebar> {
         self.entity_index
             .as_ref()
-            .and_then(|index| index.search(&query.original))
+            .and_then(|index| index.search(&query.query))
             .map(Sidebar::Entity)
     }
 
@@ -245,7 +245,7 @@ impl LocalSearcher {
         if num_websites > 0 && !top_websites.is_empty() {
             let top = top_websites.remove(0);
             if top.score > self.stackoverflow_sidebar_threshold {
-                let mut retrieved = self.retrieve_websites(&[top.pointer], &query.original)?;
+                let mut retrieved = self.retrieve_websites(&[top.pointer], &query.query)?;
                 let retrieved = retrieved.remove(0);
                 return Ok(Some(Sidebar::StackOverflow {
                     schema_org: retrieved.schema_org,
@@ -326,7 +326,7 @@ impl LocalSearcher {
                     .map(|website| website.pointer)
                     .collect();
 
-                let retrieved_sites = self.retrieve_websites(&pointers, &search_query.original)?;
+                let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
                 Ok(SearchResult::Websites(WebsitesResult {
                     spell_corrected_query: search_result.spell_corrected_query,
                     webpages: inverted_index::SearchResult {
@@ -437,7 +437,7 @@ mod tests {
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher
                 .search(&SearchQuery {
-                    original: "test".to_string(),
+                    query: "test".to_string(),
                     offset: p * NUM_RESULTS_PER_PAGE,
                     ..Default::default()
                 })
@@ -479,7 +479,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "regex parse html".to_string(),
+                query: "regex parse html".to_string(),
                 ..Default::default()
             })
             .unwrap();

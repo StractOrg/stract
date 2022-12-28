@@ -257,7 +257,7 @@ impl OnlineHarmonicCentrality {
         }
 
         let proxy_nodes: Vec<_> = nodes
-            .into_par_iter()
+            .into_iter()
             .take(num_proxy_nodes)
             .filter(|node| node2id.contains_key(node))
             .map(|node| {

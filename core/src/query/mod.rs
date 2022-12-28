@@ -315,7 +315,7 @@ mod tests {
     fn not_query() {
         let mut index = Index::temporary().expect("Unable to open index");
         let query = SearchQuery {
-            original: "test -website".to_string(),
+            query: "test -website".to_string(),
             ..Default::default()
         };
 
@@ -401,7 +401,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            original: "test site:first.com".to_string(),
+            query: "test site:first.com".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -415,7 +415,7 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.first.com");
 
         let query = SearchQuery {
-            original: "test site:www.first.com".to_string(),
+            query: "test site:www.first.com".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -429,7 +429,7 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.first.com");
 
         let query = SearchQuery {
-            original: "test -site:first.com".to_string(),
+            query: "test -site:first.com".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -481,7 +481,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            original: "intitle:website".to_string(),
+            query: "intitle:website".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -533,7 +533,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            original: "test inurl:forum".to_string(),
+            query: "test inurl:forum".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -615,7 +615,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            original: "test site:first.com".to_string(),
+            query: "test site:first.com".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -628,7 +628,7 @@ mod tests {
         assert_eq!(result.documents.len(), 0);
 
         let query = SearchQuery {
-            original: "test site:the-first.com".to_string(),
+            query: "test site:the-first.com".to_string(),
             ..Default::default()
         };
         let result = searcher
@@ -642,7 +642,7 @@ mod tests {
         assert_eq!(result.documents[0].url, "https://www.the-first.com");
 
         let query = SearchQuery {
-            original: "test site:www.the-first.com".to_string(),
+            query: "test site:www.the-first.com".to_string(),
             ..Default::default()
         };
         let result = searcher

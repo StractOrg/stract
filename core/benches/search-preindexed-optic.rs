@@ -16,7 +16,7 @@ macro_rules! bench {
             b.iter(|| {
                 $searcher
                     .search(&SearchQuery {
-                        original: $query.to_string(),
+                        query: $query.to_string(),
                         optic_program: Some($optic.to_string()),
                         ..Default::default()
                     })

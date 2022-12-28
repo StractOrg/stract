@@ -29,6 +29,7 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     routing::get,
+    routing::post,
 };
 
 mod about;
@@ -91,6 +92,7 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
     Ok(Router::new()
         .route("/", get(index::route))
         .route("/search", get(search::route))
+        .route("/beta/api/search", post(search::api))
         .route("/autosuggest", get(autosuggest::route))
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))

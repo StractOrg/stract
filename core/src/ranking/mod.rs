@@ -252,7 +252,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "example".to_string(),
+                query: "example".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -333,7 +333,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "example".to_string(),
+                query: "example".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -441,7 +441,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "dr dk".to_string(),
+                query: "dr dk".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -521,7 +521,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "title".to_string(),
+                query: "title".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -606,7 +606,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -684,7 +684,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -790,7 +790,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "example".to_string(),
+                query: "example".to_string(),
                 optic_program: Some(
                     r#"
                         RankingPipeline {
@@ -813,7 +813,7 @@ mod tests {
 
         let res = searcher
             .search(&SearchQuery {
-                original: "example".to_string(),
+                query: "example".to_string(),
                 optic_program: Some(
                     r#"
                         RankingPipeline {
@@ -932,7 +932,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "termA termB".to_string(),
+                query: "termA termB".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -1016,7 +1016,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -1099,7 +1099,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "test".to_string(),
+                query: "test".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -1267,7 +1267,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "topic_a".to_string(),
+                query: "topic_a".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
@@ -1282,7 +1282,7 @@ mod tests {
 
         let result = searcher
             .search(&SearchQuery {
-                original: "topic_b".to_string(),
+                query: "topic_b".to_string(),
                 ..Default::default()
             })
             .expect("Search failed")
