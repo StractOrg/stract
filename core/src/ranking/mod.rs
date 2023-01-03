@@ -17,6 +17,7 @@
 pub mod bm25;
 pub mod centrality_store;
 pub mod initial;
+pub mod models;
 pub mod optics;
 pub mod pipeline;
 pub mod signal;

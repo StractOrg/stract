@@ -14,17 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
+use optics::ast::{RankingCoeff, RankingTarget};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     inverted_index::WebsitePointer,
     schema::{FastField, Field, TextField, ALL_FIELDS, FLOAT_SCALING},
     searcher::SearchQuery,
+    Result,
 };
 
-use super::SignalAggregator;
+use super::{models::cross_encoder::CrossEncoder, SignalAggregator};
 
 pub trait AsRankingWebsite: Clone {
     fn as_ranking(&self) -> &RankingWebsite;
@@ -105,26 +107,51 @@ impl RankingWebsite {
 
 trait Scorer<T: AsRankingWebsite>: Send + Sync {
     fn score(&self, websites: &mut [T]);
+    fn set_coefficients(&mut self, coefficients: &[RankingCoeff]);
+    fn set_query_info(&mut self, _query: &SearchQuery) {}
 }
 
-struct ReRanker {
-    crossencoder: f64,
+struct ReRanker<M: CrossEncoder> {
+    coefficient: f64,
+    model: Arc<M>,
     prev_score: f64,
+    query: String,
 }
 
-impl Default for ReRanker {
-    fn default() -> Self {
+impl<M: CrossEncoder> ReRanker<M> {
+    fn new(model: Arc<M>) -> Self {
         Self {
-            crossencoder: 1.0,
+            coefficient: 1.0,
+            model,
             prev_score: 1.0,
+            query: String::new(),
         }
     }
 }
 
-impl<T: AsRankingWebsite> Scorer<T> for ReRanker {
+impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
     fn score(&self, websites: &mut [T]) {
-        // TODO: Implement actual scoring
-        // todo!();
+        for website in websites {
+            let mut website = website.as_mut_ranking();
+            website.score = self.prev_score * website.score
+                + self.coefficient * self.model.run(&self.query, &website.clean_body);
+        }
+    }
+
+    fn set_query_info(&mut self, query: &SearchQuery) {
+        self.query = query.query.clone();
+    }
+
+    fn set_coefficients(&mut self, coefficients: &[RankingCoeff]) {
+        for coeff in coefficients {
+            if let RankingTarget::Signal(signal) = &coeff.target {
+                match signal.as_str() {
+                    "prev_score" => self.prev_score = coeff.score,
+                    "crossencoder" => self.coefficient = coeff.score,
+                    _ => {}
+                }
+            }
+        }
     }
 }
 
@@ -148,6 +175,18 @@ impl<T: AsRankingWebsite> Scorer<T> for PrioritizeText {
             let bm25 = website.as_ranking().pointer.score.bm25 as f64;
             let prev_score = website.as_ranking().score;
             website.as_mut_ranking().score = self.bm25 * bm25 + self.prev_score * prev_score;
+        }
+    }
+
+    fn set_coefficients(&mut self, coefficients: &[RankingCoeff]) {
+        for coeff in coefficients {
+            if let RankingTarget::Signal(signal) = &coeff.target {
+                match signal.as_str() {
+                    "prev_score" => self.prev_score = coeff.score,
+                    "bm25" => self.bm25 = coeff.score,
+                    _ => {}
+                }
+            }
         }
     }
 }
@@ -222,6 +261,14 @@ impl<T: AsRankingWebsite> RankingStage<T> {
             .take(top_n)
             .collect()
     }
+
+    fn set_query_info(&mut self, query: &SearchQuery) {
+        self.scorer.set_query_info(query);
+        match &mut self.prev {
+            Prev::Initial => {}
+            Prev::Node(prev) => prev.set_query_info(query),
+        }
+    }
 }
 
 pub struct RankingPipeline<T: AsRankingWebsite> {
@@ -231,9 +278,9 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 }
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
-    fn create() -> Self {
+    fn create<M: CrossEncoder + 'static>(crossencoder: Arc<M>) -> Result<Self> {
         let last_stage = RankingStage {
-            scorer: Box::<ReRanker>::default(),
+            scorer: Box::new(ReRanker::new(crossencoder)),
             prev: Prev::Node(Box::new(RankingStage {
                 scorer: Box::<PrioritizeText>::default(),
                 prev: Prev::Initial,
@@ -244,17 +291,43 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
             top_n: 50,
         };
 
-        Self {
+        Ok(Self {
             last_stage,
             offset: 0,
             top_n: 0,
-        }
+        })
     }
 
-    pub fn for_query(query: &mut SearchQuery) -> Self {
-        dbg!(&query.optic_program);
+    pub fn for_query<M: CrossEncoder + 'static>(
+        query: &mut SearchQuery,
+        crossencoder: Arc<M>,
+    ) -> Result<Self> {
+        let mut pipeline = Self::create(crossencoder)?;
+        if let Some(optic) = &query.optic_program {
+            let optic = optics::parse(optic)?;
+            if let Some(optic_pipeline) = optic.pipeline {
+                let mut stage = Some(&mut pipeline.last_stage);
 
-        let mut pipeline = Self::create();
+                // skip(1) since first stage is collector
+                for optic_stage in optic_pipeline.stages.into_iter().skip(1).rev() {
+                    match stage {
+                        Some(inner_stage) => {
+                            inner_stage
+                                .scorer
+                                .set_coefficients(&optic_stage.coefficients);
+
+                            match &mut inner_stage.prev {
+                                Prev::Initial => stage = None,
+                                Prev::Node(next) => stage = Some(next),
+                            }
+                        }
+                        None => break,
+                    }
+                }
+            }
+        }
+
+        pipeline.last_stage.set_query_info(query);
 
         pipeline.offset = query.offset;
         pipeline.top_n = query.num_results;
@@ -262,7 +335,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         query.num_results = pipeline.collector_top_n();
         query.offset = pipeline.collector_offset();
 
-        pipeline
+        Ok(pipeline)
     }
 
     pub fn apply(mut self, websites: Vec<T>) -> Vec<T> {
@@ -288,6 +361,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 mod tests {
     use itertools::Itertools;
 
+    use crate::ranking::models::cross_encoder::DummyCrossEncoder;
     use crate::{
         collector::Hashes, inverted_index::DocAddress, prehashed::Prehashed,
         ranking::initial::Score,
@@ -330,9 +404,13 @@ mod tests {
 
     #[test]
     fn simple() {
-        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-            ..Default::default()
-        });
+        let pipeline = RankingPipeline::for_query(
+            &mut SearchQuery {
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+        )
+        .unwrap();
         assert_eq!(pipeline.collector_top_n(), 200);
 
         let sample = sample_websites(pipeline.collector_top_n());
@@ -353,10 +431,14 @@ mod tests {
 
     #[test]
     fn offsets() {
-        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-            offset: 0,
-            ..Default::default()
-        });
+        let pipeline = RankingPipeline::for_query(
+            &mut SearchQuery {
+                offset: 0,
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+        )
+        .unwrap();
 
         let sample: Vec<_> =
             sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
@@ -366,10 +448,14 @@ mod tests {
         let mut prev: Vec<_> = pipeline.apply(sample);
 
         for offset in 1..1_000 {
-            let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-                offset,
-                ..Default::default()
-            });
+            let pipeline = RankingPipeline::for_query(
+                &mut SearchQuery {
+                    offset,
+                    ..Default::default()
+                },
+                Arc::new(DummyCrossEncoder {}),
+            )
+            .unwrap();
 
             let sample: Vec<_> =
                 sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
@@ -386,24 +472,18 @@ mod tests {
                     .any(|r| r.pointer.address.doc_id == first.pointer.address.doc_id));
             }
 
-            // assert_eq!(
-            //     prev.iter()
-            //         .map(|p| usize::from(
-            //             res.iter()
-            //                 .any(|r| r.pointer.address.doc_id == p.pointer.address.doc_id)
-            //         ))
-            //         .sum::<usize>(),
-            //     19,
-            //     "Only the top result from previous offset should be removed in current ranking"
-            // );
-
             prev = res;
         }
 
-        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-            offset: 0,
-            ..Default::default()
-        });
+        let pipeline = RankingPipeline::for_query(
+            &mut SearchQuery {
+                offset: 0,
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+        )
+        .unwrap();
+
         let sample: Vec<_> =
             sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
                 .into_iter()
@@ -411,10 +491,14 @@ mod tests {
                 .collect();
         let mut prev: Vec<_> = pipeline.apply(sample);
         for p in 1..100 {
-            let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-                offset: p * 20,
-                ..Default::default()
-            });
+            let pipeline = RankingPipeline::for_query(
+                &mut SearchQuery {
+                    offset: p * 20,
+                    ..Default::default()
+                },
+                Arc::new(DummyCrossEncoder {}),
+            )
+            .unwrap();
 
             let sample: Vec<_> =
                 sample_websites(pipeline.collector_top_n() + pipeline.collector_offset())
@@ -436,29 +520,29 @@ mod tests {
 
     #[test]
     fn multistage_coefficients() {
-        let pipeline = RankingPipeline::for_query(&mut SearchQuery {
-            optic_program: Some(
-                r#"
+        let pipeline = RankingPipeline::for_query(
+            &mut SearchQuery {
+                optic_program: Some(
+                    r#"
             RankingPipeline {
                 Stage {},
                 Stage {
-                    Ranking {
-                        Signal("bm25", 3),
-                        Signal("prev_score", 2),
-                    },
+                    Ranking{Signal("bm25"), 3},
+                    Ranking{Signal("prev_score"), 2},
                 },
                 Stage {
-                    Ranking {
-                        Signal("crossencoder", 4),
-                        Signal("prev_score", 3),
-                    },
+                    Ranking{Signal("crossencoder"), 4},
+                    Ranking{Signal("prev_score"), 3},
                 },
             }
             "#
-                .to_string(),
-            ),
-            ..Default::default()
-        });
+                    .to_string(),
+                ),
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+        )
+        .unwrap();
 
         let w = RankingWebsite {
             pointer: WebsitePointer {
@@ -487,16 +571,43 @@ mod tests {
             score: 1.0,
         };
 
+        let res = pipeline.apply(vec![w.clone()]);
+        assert_eq!(res[0].score, 19.0);
+
+        let pipeline = RankingPipeline::for_query(
+            &mut SearchQuery {
+                optic_program: Some(
+                    r#"
+            RankingPipeline {
+                Stage {},
+                Stage {
+                    Ranking{Signal("bm25"), 3},
+                    Ranking{Signal("prev_score"), 2},
+                },
+                Stage {
+                    Ranking{Signal("crossencoder"), 4},
+                    Ranking{Signal("prev_score"), 3},
+                },
+            }
+            "#
+                    .to_string(),
+                ),
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+        )
+        .unwrap();
+
         let mut test = [w.clone()];
 
         pipeline.last_stage.scorer.score(&mut test);
-        assert_eq!(test[0].score, 5.0);
+        assert_eq!(test[0].score, 7.0);
 
         let mut test = [w];
 
         if let Prev::Node(prev) = pipeline.last_stage.prev {
             prev.scorer.score(&mut test);
-            assert_eq!(test[0].score, 3.0);
+            assert_eq!(test[0].score, 5.0);
         }
     }
 }

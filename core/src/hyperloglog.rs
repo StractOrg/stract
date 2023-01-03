@@ -4038,13 +4038,13 @@ use std::array;
 
 #[derive(Clone)]
 pub struct HyperLogLog<const N: usize> {
-    registers: [u8; N],
+    registers: Box<[u8; N]>,
 }
 
 impl<const N: usize> Default for HyperLogLog<N> {
     fn default() -> Self {
         Self {
-            registers: array::from_fn(|_| 0),
+            registers: Box::new(array::from_fn(|_| 0)),
         }
     }
 }
@@ -4202,7 +4202,7 @@ impl<const N: usize> HyperLogLog<N> {
     }
 
     pub fn registers(&self) -> &[u8] {
-        &self.registers
+        self.registers.as_ref()
     }
 }
 

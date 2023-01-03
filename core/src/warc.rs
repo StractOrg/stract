@@ -18,7 +18,7 @@ use crate::exponential_backoff::ExponentialBackoff;
 use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
 use std::path::Path;
 use std::time::Duration;
 
@@ -125,7 +125,7 @@ impl WarcFile {
         let f = File::open(Path::new(folder).join(name))?;
         let mut reader = BufReader::new(f);
 
-        buf.seek(SeekFrom::Start(0))?;
+        buf.rewind()?;
         std::io::copy(&mut reader, buf)?;
         Ok(())
     }
@@ -151,7 +151,7 @@ impl WarcFile {
 
         let mut stream = res.bytes_stream();
 
-        buf.seek(SeekFrom::Start(0))?;
+        buf.rewind()?;
         while let Some(chunk) = stream.next().await {
             std::io::copy(&mut &chunk?[..], buf)?;
         }

@@ -115,7 +115,7 @@ impl WorkerPool {
             .iter()
             .flat_map(|addr| {
                 addr.to_socket_addrs().unwrap_or_else(|_| {
-                    panic!("failed to transform {:?} into a socket address", addr)
+                    panic!("failed to transform {addr:?} into a socket address")
                 })
             })
             .map(|addr| Arc::new(RemoteWorker { addr }))

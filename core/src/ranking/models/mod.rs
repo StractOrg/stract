@@ -14,22 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use onnxruntime::{environment::Environment, LoggingLevel};
 
-use crate::frontend::router;
+pub mod cross_encoder;
 
-pub async fn run(
-    queries_csv_path: &str,
-    crossencoder_model_path: &str,
-    host: &str,
-    shards: Vec<Vec<String>>,
-) -> Result<()> {
-    let app = router(queries_csv_path, crossencoder_model_path, shards)?;
-    let addr = host.parse()?;
-    tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
-
-    Ok(())
-}
+pub static ONNX_ENVIRONMENT: once_cell::sync::Lazy<Environment> =
+    once_cell::sync::Lazy::new(|| {
+        Environment::builder()
+            .with_name("ranking")
+            .with_log_level(LoggingLevel::Info)
+            .build()
+            .unwrap()
+    });

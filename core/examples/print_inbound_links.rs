@@ -25,7 +25,7 @@ pub fn main() {
         "onlinester.ga",
         "GroomersNew.ga",
     ] {
-        println!("{}:", host);
+        println!("{host}:");
         for edge in graph.ingoing_edges(Node::from(host)) {
             println!("{} -> {} ({})", edge.from.name, edge.to.name, edge.label);
         }

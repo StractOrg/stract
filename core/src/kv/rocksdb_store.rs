@@ -82,7 +82,7 @@ where
         if let Err(err) = self.flush() {
             match err.kind() {
                 rocksdb::ErrorKind::NotSupported => {}
-                _ => panic!("failed to flush: {:?}", err),
+                _ => panic!("failed to flush: {err:?}"),
             }
         }
     }

@@ -96,10 +96,7 @@ fn print_top_nodes(
 
     let scorer = store.online_harmonic.scorer(&liked_nodes, &[]);
     let top_nodes = get_top_nodes(scorer, top_n, nodes);
-    println!(
-        "top {} sites for these liked sites {:?}",
-        top_n, liked_sites
-    );
+    println!("top {top_n} sites for these liked sites {liked_sites:?}");
     print_nodes(&top_nodes, id2node);
 
     println!();

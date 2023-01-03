@@ -1,4 +1,13 @@
-#!/bin/bash
-pip3 install transformers[onnx] torch
-python3 -m transformers.onnx --model=cross-encoder/ms-marco-MiniLM-L-6-v2 data/
-mv data/model.onnx data/crossencoder.onnx
+#!/usr/bin/env python3
+import os
+import transformers
+
+MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+os.system("pip3 install transformers[onnx] torch")
+os.system("mkdir data/cross_encoder")
+os.system(
+    f"python3 -m transformers.onnx --feature sequence-classification --model={MODEL} data/cross_encoder")
+
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
+tokenizer.save_pretrained("data/cross_encoder")

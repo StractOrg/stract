@@ -19,6 +19,7 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 
 use crate::{
     autosuggest::Autosuggest,
+    ranking::models::cross_encoder::CrossEncoderModel,
     searcher::{DistributedSearcher, Shard},
 };
 use anyhow::Result;
@@ -57,7 +58,7 @@ where
             Ok(html) => Html(html).into_response(),
             Err(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to render template. Error: {}", err),
+                format!("Failed to render template. Error: {err}"),
             )
                 .into_response(),
         }
@@ -74,7 +75,11 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router> {
+pub fn router(
+    queries_csv_path: &str,
+    crossencoder_model_path: &str,
+    shards: Vec<Vec<String>>,
+) -> Result<Router> {
     let shards: Vec<_> = shards
         .into_iter()
         .enumerate()
@@ -82,7 +87,8 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
         .collect();
 
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
-    let searcher = DistributedSearcher::new(shards);
+    let crossencoder = CrossEncoderModel::open(crossencoder_model_path)?;
+    let searcher = DistributedSearcher::new(shards, crossencoder);
 
     let state = Arc::new(State {
         searcher,
@@ -106,7 +112,7 @@ pub fn router(queries_csv_path: &str, shards: Vec<Vec<String>>) -> Result<Router
             |error: std::io::Error| async move {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled internal error: {}", error),
+                    format!("Unhandled internal error: {error}"),
                 )
             },
         ))

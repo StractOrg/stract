@@ -222,15 +222,13 @@ impl tantivy::query::Weight for PatternWeight {
         let scorer_opt = self.pattern_scorer(reader, 1.0)?;
         if scorer_opt.is_none() {
             return Err(TantivyError::InvalidArgument(format!(
-                "Document #({}) does not match",
-                doc
+                "Document #({doc}) does not match"
             )));
         }
         let mut scorer = scorer_opt.unwrap();
         if scorer.seek(doc) != doc {
             return Err(TantivyError::InvalidArgument(format!(
-                "Document #({}) does not match",
-                doc
+                "Document #({doc}) does not match"
             )));
         }
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;

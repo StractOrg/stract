@@ -20,7 +20,7 @@ use image::imageops::FilterType;
 use image::{DynamicImage, ImageOutputFormat};
 use serde::{de, ser::SerializeStruct, Serialize};
 use std::collections::HashSet;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 use uuid::Uuid;
 
@@ -295,7 +295,7 @@ impl Image {
         self.0
             .write_to(&mut cursor, ImageOutputFormat::Png)
             .unwrap();
-        cursor.seek(SeekFrom::Start(0)).unwrap();
+        cursor.rewind().unwrap();
 
         let mut bytes = Vec::new();
         cursor.read_to_end(&mut bytes).unwrap();

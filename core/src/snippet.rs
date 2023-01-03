@@ -127,9 +127,9 @@ impl Snippet {
 ///
 /// Fragments must be valid in the sense that `&text[fragment.start..fragment.stop]`\
 /// has to be a valid string.
-fn search_fragments<'a>(
+fn search_fragments(
     tokenizer: &TextAnalyzer,
-    text: &'a str,
+    text: &str,
     terms: &BTreeMap<String, Score>,
     max_num_chars: usize,
 ) -> Vec<FragmentCandidate> {
@@ -373,11 +373,10 @@ Survey in 2016, 2017, and 2018."#;
                                 <title>Website for runners</title>
                             </head>
                             <body>
-                                {}
+                                {TEST_TEXT}
                             </body>
                         </html>
-                    "#,
-                    TEST_TEXT
+                    "#
                 ),
                 "https://www.example.com",
             ))
@@ -413,11 +412,10 @@ Survey in 2016, 2017, and 2018."#;
                                 <title>Website for runners</title>
                             </head>
                             <body>
-                                {}
+                                {TEST_TEXT}
                             </body>
                         </html>
-                    "#,
-                    TEST_TEXT
+                    "#
                 ),
                 "https://www.example.com",
             ))
@@ -623,11 +621,10 @@ Survey in 2016, 2017, and 2018."#;
                                 <title>Website for runners</title>
                             </head>
                             <body>
-                                {}
+                                {TEST_TEXT}
                             </body>
                         </html>
-                    "#,
-                    TEST_TEXT
+                    "#
                 ),
                 "https://www.example.com",
             ))

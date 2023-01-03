@@ -151,6 +151,7 @@ pub struct HttpConfig {
 pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: String,
+    pub crossencoder_model_path: String,
     pub search_servers: Vec<Vec<String>>,
 }
 
@@ -242,6 +243,12 @@ pub enum Error {
 
     #[error("Internal error")]
     InternalError(String),
+
+    #[error("Huggingface tokenizer")]
+    HuggingfaceTokenizer(#[from] tokenizers::Error),
+
+    #[error("Onnx")]
+    Onnx(#[from] onnxruntime::OrtError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

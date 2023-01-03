@@ -30,7 +30,6 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;

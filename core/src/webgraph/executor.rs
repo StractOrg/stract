@@ -38,7 +38,7 @@ impl Executor {
     pub fn with_threads(num_threads: usize, prefix: &'static str) -> Result<Executor> {
         let pool = ThreadPoolBuilder::new()
             .num_threads(num_threads)
-            .thread_name(move |num| format!("{}{}", prefix, num))
+            .thread_name(move |num| format!("{prefix}{num}"))
             .build()?;
         Ok(Executor::ThreadPool(pool))
     }

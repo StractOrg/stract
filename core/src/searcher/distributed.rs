@@ -18,12 +18,15 @@ use crate::{
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self},
-    ranking::pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
+    ranking::{
+        models::cross_encoder::CrossEncoderModel,
+        pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
+    },
     search_prettifier::DisplayedWebpage,
     searcher::PrettifiedWebsitesResult,
 };
 
-use std::{net::SocketAddr, time::Instant};
+use std::{net::SocketAddr, sync::Arc, time::Instant};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -47,6 +50,9 @@ pub enum Error {
 
     #[error("Query cannot be empty")]
     EmptyQuery,
+
+    #[error("Internal error")]
+    InternalError(#[from] crate::Error),
 }
 
 impl RemoteSearcher {
@@ -171,6 +177,7 @@ pub enum Request {
 
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
+    cross_encoder: Arc<CrossEncoderModel>,
 }
 
 #[derive(Clone)]
@@ -204,8 +211,11 @@ impl collector::Doc for ScoredWebsitePointer {
 }
 
 impl DistributedSearcher {
-    pub fn new(shards: Vec<Shard>) -> Self {
-        Self { shards }
+    pub fn new(shards: Vec<Shard>, model: CrossEncoderModel) -> Self {
+        Self {
+            shards,
+            cross_encoder: Arc::new(model),
+        }
     }
 
     pub async fn search(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
@@ -217,7 +227,7 @@ impl DistributedSearcher {
 
         let mut search_query = query.clone();
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::for_query(&mut search_query);
+            RankingPipeline::for_query(&mut search_query, self.cross_encoder.clone())?;
 
         // search shards
         let initial_results = self

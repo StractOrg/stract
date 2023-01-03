@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::str::FromStr;
-use std::time::Instant;
 
 use optics::Optic;
 use serde::{Deserialize, Serialize};
@@ -28,7 +27,7 @@ use crate::index::Index;
 use crate::query::Query;
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
-use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
+use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
@@ -36,7 +35,10 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar, WebsitesResult};
+use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar};
+
+#[cfg(test)]
+use super::WebsitesResult;
 
 const STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD: f64 = 250.0;
 
@@ -309,12 +311,24 @@ impl LocalSearcher {
         self.index.retrieve_websites(websites, &query)
     }
 
+    #[cfg(test)]
     pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
-        let start = Instant::now();
+        use std::{sync::Arc, time::Instant};
 
+        use crate::ranking::{
+            models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
+            pipeline::RankingPipeline,
+        };
+
+        let start = Instant::now();
         let mut search_query = query.clone();
 
-        let pipeline = RankingPipeline::for_query(&mut search_query);
+        let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
+            Ok(model) => RankingPipeline::for_query(&mut search_query, Arc::new(model))?,
+            Err(_) => {
+                RankingPipeline::for_query(&mut search_query, Arc::new(DummyCrossEncoder {}))?
+            }
+        };
 
         let initial_result = self.search_initial(&search_query, true)?;
 

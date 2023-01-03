@@ -190,6 +190,7 @@ fn main() -> Result<()> {
                 .build()?
                 .block_on(frontend::run(
                     &config.queries_csv_path,
+                    &config.crossencoder_model_path,
                     &config.host,
                     config.search_servers,
                 ))?
