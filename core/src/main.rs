@@ -98,6 +98,7 @@ enum WebgraphOptions {
     Merge {
         path: String,
         other_path: Option<String>,
+        #[clap(long)]
         num_segments: Option<usize>,
     },
 }

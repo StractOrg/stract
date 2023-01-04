@@ -2277,7 +2277,7 @@ dependencies = [
 [[package]]
 name = "onnxruntime"
 version = "0.0.14"
-source = "git+https://github.com/Cuely/onnxruntime-rs#1bf6dedaddf7611a61d79e97105f0571251559fe"
+source = "git+https://github.com/Cuely/onnxruntime-rs#11cf02029e385e9034f53cb60d6fb5d20570ec7a"
 dependencies = [
  "lazy_static",
  "ndarray",
@@ -2289,7 +2289,7 @@ dependencies = [
 [[package]]
 name = "onnxruntime-sys"
 version = "0.0.14"
-source = "git+https://github.com/Cuely/onnxruntime-rs#1bf6dedaddf7611a61d79e97105f0571251559fe"
+source = "git+https://github.com/Cuely/onnxruntime-rs#11cf02029e385e9034f53cb60d6fb5d20570ec7a"
 dependencies = [
  "flate2",
  "tar",
