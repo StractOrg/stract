@@ -25,7 +25,7 @@
 
 use std::collections::{BinaryHeap, HashMap};
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, BufWriter, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -311,14 +311,15 @@ impl OnlineHarmonicCentrality {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let mut file = File::options()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)?;
+        let mut file = BufWriter::new(
+            File::options()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(path)?,
+        );
 
-        let buf = bincode::serialize(&self)?;
-        file.write_all(&buf)?;
+        bincode::serialize_into(&mut file, &self)?;
 
         Ok(())
     }
