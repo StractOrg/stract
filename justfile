@@ -18,6 +18,7 @@
     cd frontend; npm run dev
 
 @configure *ARGS:
+    ./scripts/export_crossencoder
     cd frontend; npm install; npm run build
     cargo run --release --all-features -- configure {{ARGS}}
 

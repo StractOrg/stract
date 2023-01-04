@@ -35,10 +35,8 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar};
-
-#[cfg(test)]
 use super::WebsitesResult;
+use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar};
 
 const STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD: f64 = 250.0;
 
@@ -311,7 +309,6 @@ impl LocalSearcher {
         self.index.retrieve_websites(websites, &query)
     }
 
-    #[cfg(test)]
     pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         use std::{sync::Arc, time::Instant};
 

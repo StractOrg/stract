@@ -20,6 +20,7 @@ use cuely::entrypoint::autosuggest_scrape::{self, Gl};
 use cuely::entrypoint::configure;
 use cuely::entrypoint::indexer::IndexPointer;
 use cuely::entrypoint::{self, frontend, search_server};
+use cuely::webgraph::WebgraphBuilder;
 use cuely::{FrontendConfig, SearchServerConfig};
 use serde::de::DeserializeOwned;
 use std::fs;
@@ -85,9 +86,20 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum WebgraphOptions {
-    Master { config_path: String },
-    Worker { address: String },
-    Local { config_path: String },
+    Master {
+        config_path: String,
+    },
+    Worker {
+        address: String,
+    },
+    Local {
+        config_path: String,
+    },
+    Merge {
+        path: String,
+        other_path: Option<String>,
+        num_segments: Option<usize>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -180,6 +192,22 @@ fn main() -> Result<()> {
             WebgraphOptions::Local { config_path } => {
                 let config = load_toml_config(config_path);
                 entrypoint::Webgraph::run_locally(&config)?;
+            }
+            WebgraphOptions::Merge {
+                path,
+                other_path,
+                num_segments,
+            } => {
+                let mut webgraph = WebgraphBuilder::new(path).open();
+
+                if let Some(other_path) = other_path {
+                    let other = WebgraphBuilder::new(other_path).open();
+                    webgraph.merge(other);
+                }
+
+                if let Some(num_segments) = num_segments {
+                    webgraph.merge_segments(num_segments)
+                }
             }
         },
         Commands::Frontend { config_path } => {

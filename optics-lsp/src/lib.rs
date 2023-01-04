@@ -47,7 +47,7 @@ pub enum Error {
 
 impl From<Error> for JsValue {
     fn from(val: Error) -> Self {
-        JsValue::from_str(&format!("{:?}", val))
+        JsValue::from_str(&format!("{val:?}"))
     }
 }
 
@@ -120,13 +120,13 @@ impl OpticsBackend {
                 );
                 self.send_diagnostics(params.text_document.uri);
             }
-            _ => log(&format!("on_notification {} {:?}", method, params)),
+            _ => log(&format!("on_notification {method} {params:?}")),
         }
     }
 
     #[wasm_bindgen(js_name = onHover)]
     pub fn on_hover(&mut self, params: JsValue) -> Result<JsValue, Error> {
-        log(&format!("on_hover {:?}", params));
+        log(&format!("on_hover {params:?}"));
         let params: HoverParams = serde_wasm_bindgen::from_value(params).unwrap();
 
         Ok(serde_wasm_bindgen::to_value(&self.handle_hover(params))?)
@@ -271,13 +271,12 @@ impl OpticsBackend {
                 .unwrap_or_default(),
             version: None,
         };
-        log(&format!("Sending diagnostic {:?}", params));
+        log(&format!("Sending diagnostic {params:?}"));
 
         let params = &serde_wasm_bindgen::to_value(&params).unwrap();
         if let Err(e) = self.diagnostic_callback.call1(this, params) {
             log(&format!(
-                "send_diagnostics params:\n\t{:?}\n\tJS error: {:?}",
-                params, e
+                "send_diagnostics params:\n\t{params:?}\n\tJS error: {e:?}",
             ));
         }
     }
