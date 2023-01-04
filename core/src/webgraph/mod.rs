@@ -451,9 +451,9 @@ impl<S: Store> Webgraph<S> {
             segment.flush();
             self.meta.comitted_segments.push(segment.id());
             self.segments.push(segment);
-            self.save_metadata();
         }
 
+        self.save_metadata();
         self.node2id.flush();
         self.id2node.flush();
     }
