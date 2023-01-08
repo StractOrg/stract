@@ -40,6 +40,7 @@ WORKDIR /cuely
 
 COPY --from=builder /cuely/bin/cuely /usr/local/bin/cuely
 COPY --from=builder /cuely/frontend/dist frontend/dist
-COPY --from=builder /usr/lib/libonnxruntime.so* /usr/lib
+COPY --from=builder /usr/lib/libonnxruntime.so.1.13.1 /usr/lib
+COPY --from=builder /usr/lib/libonnxruntime.so /usr/lib
 
 ENTRYPOINT ["/usr/local/bin/cuely"]

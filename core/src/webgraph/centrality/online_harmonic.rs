@@ -37,7 +37,7 @@ use crate::webgraph::{Node, ShortestPaths};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 100_000;
+const NUM_PROXY_NODES: usize = 10_000;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 pub const SHIFT: f64 = 1.0;
@@ -227,6 +227,31 @@ impl UserNode {
     }
 }
 
+struct ProxyNodeCandidate {
+    node: Node,
+    score: usize,
+}
+
+impl PartialOrd for ProxyNodeCandidate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.score.partial_cmp(&other.score)
+    }
+}
+
+impl PartialEq for ProxyNodeCandidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score
+    }
+}
+
+impl Ord for ProxyNodeCandidate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl Eq for ProxyNodeCandidate {}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct OnlineHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
@@ -243,21 +268,39 @@ impl OnlineHarmonicCentrality {
 
         // we should probably choose the proxy nodes based on their
         // betweenness centrality, but I don't know how we can approximate betweenness
-        // on a graph that cannot be in memory
-        let mut nodes = Vec::new();
+        // on a graph that cannot be in memory.
+        // For now, we will choose the nodes with highes in_degree + out_degree
+        // as an estimate
+
+        let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
         for id in graph.nodes() {
             if let Some(node) = graph.id2node(&id) {
-                if nodes.len() < num_proxy_nodes {
-                    nodes.push(node.clone());
-                }
+                node2id.insert(node.clone(), id);
 
-                node2id.insert(node, id);
+                let degree_sum = graph.outgoing_edges(node.clone()).len()
+                    + graph.ingoing_edges(node.clone()).len();
+
+                let candidate = ProxyNodeCandidate {
+                    node,
+                    score: degree_sum,
+                };
+
+                if nodes.len() >= num_proxy_nodes {
+                    if let Some(mut existing_node) = nodes.peek_mut() {
+                        if candidate.score > existing_node.score {
+                            *existing_node = candidate;
+                        }
+                    }
+                } else {
+                    nodes.push(candidate);
+                }
             }
         }
 
         let proxy_nodes: Vec<_> = nodes
             .into_iter()
             .take(num_proxy_nodes)
+            .map(|candidate| candidate.node)
             .filter(|node| node2id.contains_key(node))
             .map(|node| {
                 let dist_to_node = graph
@@ -265,6 +308,7 @@ impl OnlineHarmonicCentrality {
                     .into_iter()
                     .map(|(n, v)| (n.0, v))
                     .collect();
+
                 let dist_from_node = graph
                     .raw_reversed_distances(node.clone())
                     .into_iter()

@@ -184,7 +184,7 @@ where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
 {
-    const MAX_DIST: usize = 5;
+    const MAX_DIST: usize = 3;
     let source_id = graph.node2id(&source);
     if source_id.is_none() {
         return HashMap::new();
