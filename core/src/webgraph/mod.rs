@@ -551,7 +551,7 @@ impl<S: Store> Webgraph<S> {
                 .push(segment);
         }
 
-        let segments = self
+        self.segments = self
             .executor
             .map(
                 |mut candidate| {
@@ -564,8 +564,6 @@ impl<S: Store> Webgraph<S> {
                 candidates.into_iter(),
             )
             .unwrap();
-
-        self.segments = segments;
 
         self.meta.comitted_segments = self.segments.iter().map(|segment| segment.id()).collect();
 
