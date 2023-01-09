@@ -23,7 +23,9 @@ struct RemoteWorker {
 
 impl RemoteWorker {
     fn retry_strategy() -> impl Iterator<Item = Duration> {
-        ExponentialBackoff::from_millis(10).take(5)
+        ExponentialBackoff::from_millis(10)
+            .with_limit(Duration::from_secs(100))
+            .take(15)
     }
 
     async fn connect(&self) -> Result<sonic::Connection> {

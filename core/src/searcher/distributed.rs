@@ -26,7 +26,11 @@ use crate::{
     searcher::PrettifiedWebsitesResult,
 };
 
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -57,7 +61,10 @@ pub enum Error {
 
 impl RemoteSearcher {
     async fn search(&self, query: &SearchQuery) -> Result<InitialPrettifiedSearchResult> {
-        for timeout in ExponentialBackoff::from_millis(30).take(5) {
+        for timeout in ExponentialBackoff::from_millis(30)
+            .with_limit(Duration::from_millis(200))
+            .take(5)
+        {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
                 if let Ok(sonic::Response::Content(body)) = connection
@@ -77,7 +84,10 @@ impl RemoteSearcher {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<DisplayedWebpage>> {
-        for timeout in ExponentialBackoff::from_millis(30).take(5) {
+        for timeout in ExponentialBackoff::from_millis(30)
+            .with_limit(Duration::from_millis(200))
+            .take(5)
+        {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
                 if let Ok(sonic::Response::Content(body)) = connection

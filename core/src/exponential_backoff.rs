@@ -31,6 +31,11 @@ impl ExponentialBackoff {
             max_delay: None,
         }
     }
+
+    pub fn with_limit(mut self, limit: Duration) -> Self {
+        self.max_delay = Some(limit);
+        self
+    }
 }
 
 impl Iterator for ExponentialBackoff {
@@ -90,5 +95,15 @@ mod tests {
         assert_eq!(s.next(), Some(Duration::from_millis(U64_MAX - 1)));
         assert_eq!(s.next(), Some(Duration::from_millis(U64_MAX)));
         assert_eq!(s.next(), Some(Duration::from_millis(U64_MAX)));
+    }
+
+    #[test]
+    fn limits_backoff() {
+        let mut s = ExponentialBackoff::from_millis(10).with_limit(Duration::from_millis(100));
+
+        assert_eq!(s.next(), Some(Duration::from_millis(10)));
+        assert_eq!(s.next(), Some(Duration::from_millis(100)));
+        assert_eq!(s.next(), Some(Duration::from_millis(100)));
+        assert_eq!(s.next(), Some(Duration::from_millis(100)));
     }
 }

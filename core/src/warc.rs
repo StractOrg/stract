@@ -96,7 +96,10 @@ impl WarcFile {
         warc_path: &str,
         buf: &mut W,
     ) -> Result<()> {
-        for dur in ExponentialBackoff::from_millis(10).take(5) {
+        for dur in ExponentialBackoff::from_millis(10)
+            .with_limit(Duration::from_secs(100))
+            .take(15)
+        {
             let res = match source.clone() {
                 WarcSource::HTTP(config) => {
                     WarcFile::download_from_http(warc_path, config.base_url, buf).await
