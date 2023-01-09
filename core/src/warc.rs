@@ -149,6 +149,10 @@ impl WarcFile {
             .build()?;
         let res = client.get(url).send().await?;
 
+        if res.status().as_u16() != 200 {
+            return Err(Error::DownloadFailed);
+        }
+
         let mut stream = res.bytes_stream();
 
         buf.rewind()?;
