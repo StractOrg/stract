@@ -321,6 +321,7 @@ impl<S: Store> Webgraph<S> {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
+        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
         let mut segments = Vec::new();
         for segment in &meta.comitted_segments {
             segments.push(Segment::open(
@@ -342,10 +343,11 @@ impl<S: Store> Webgraph<S> {
     }
 
     fn open_read_only<P: AsRef<Path>>(path: P) -> Self {
+        fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
+        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
         let mut segments = Vec::new();
-
         for segment in &meta.comitted_segments {
             segments.push(Segment::open(
                 path.as_ref().join("segments").join(segment),
