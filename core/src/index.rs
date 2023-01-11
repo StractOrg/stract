@@ -152,7 +152,19 @@ impl Index {
         websites: &[inverted_index::WebsitePointer],
         query: &Query,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        self.inverted_index.retrieve_websites(websites, query)
+        let mut websites = self.inverted_index.retrieve_websites(websites, query)?;
+
+        for website in &mut websites {
+            let url = Url::from(website.url.clone());
+            website.favicon = self.retrieve_favicon(&url);
+            if let Some(uuid) = website.primary_image.as_ref().map(|image| &image.uuid) {
+                if self.retrieve_primary_image(uuid).is_none() {
+                    website.primary_image = None;
+                }
+            }
+        }
+
+        Ok(websites)
     }
 
     pub fn merge(mut self, other: Self) -> Self {

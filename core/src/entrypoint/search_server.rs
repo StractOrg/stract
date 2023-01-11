@@ -68,7 +68,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                         }
                     }
                 }
-                searcher::Request::RetrieveWebites { websites, query } => {
+                searcher::Request::RetrieveWebsites { websites, query } => {
                     match local_searcher.retrieve_websites(websites, query) {
                         Ok(response) => {
                             req.respond(sonic::Response::Content(response)).await.ok();
@@ -86,7 +86,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                     match local_searcher.search_initial(query, false) {
                         Ok(result) => match result {
                             searcher::InitialSearchResult::Websites(result) => {
-                                let res = search_prettifier::initial(result, &local_searcher);
+                                let res = search_prettifier::initial(result);
 
                                 req.respond(sonic::Response::Content(
                                     searcher::InitialPrettifiedSearchResult::Websites(res),
@@ -106,25 +106,6 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                             req.respond::<inverted_index::SearchResult>(sonic::Response::Empty)
                                 .await
                                 .ok();
-                        }
-                    }
-                }
-                searcher::Request::RetrievePrettifiedWebites { websites, query } => {
-                    match local_searcher.retrieve_websites(websites, query) {
-                        Ok(result) => {
-                            req.respond(sonic::Response::Content(search_prettifier::retrieve(
-                                result,
-                                &local_searcher,
-                            )))
-                            .await
-                            .ok();
-                        }
-                        Err(_) => {
-                            req.respond::<Vec<search_prettifier::DisplayedWebpage>>(
-                                sonic::Response::Empty,
-                            )
-                            .await
-                            .ok();
                         }
                     }
                 }

@@ -20,7 +20,7 @@ use kuchiki::NodeRef;
 use std::collections::HashMap;
 use thiserror::Error;
 
-use super::{Item, OneOrMany, Property};
+use super::{RawItem, RawOneOrMany, RawProperty};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -36,7 +36,7 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 }
 
-fn rec_text_contents(node: NodeRef) -> Vec<Property> {
+fn rec_text_contents(node: NodeRef) -> Vec<RawProperty> {
     let mut res = Vec::new();
 
     for child in node.children() {
@@ -46,11 +46,11 @@ fn rec_text_contents(node: NodeRef) -> Vec<Property> {
                     let mut properties = HashMap::new();
                     properties.insert(
                         "text".to_string(),
-                        OneOrMany::One(Property::String(child.text_contents())),
+                        RawOneOrMany::One(RawProperty::String(child.text_contents())),
                     );
 
-                    res.push(Property::Item(Item {
-                        itemtype: Some(OneOrMany::One("SourceCode".to_string())),
+                    res.push(RawProperty::Item(RawItem {
+                        itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
                         properties,
                     }))
                 } else if !elem.attributes.borrow().contains("itemprop")
@@ -67,7 +67,7 @@ fn rec_text_contents(node: NodeRef) -> Vec<Property> {
                 if had_line_ending {
                     s.push('\n');
                 }
-                res.push(Property::String(s));
+                res.push(RawProperty::String(s));
             }
             _ => {}
         }
@@ -76,7 +76,7 @@ fn rec_text_contents(node: NodeRef) -> Vec<Property> {
     res
 }
 
-fn text_contents(node: NodeRef) -> Vec<Property> {
+fn text_contents(node: NodeRef) -> Vec<RawProperty> {
     let properties = rec_text_contents(node);
 
     // merge consecutive strings
@@ -85,15 +85,15 @@ fn text_contents(node: NodeRef) -> Vec<Property> {
 
     for prop in properties {
         match &prop {
-            Property::String(s) => {
+            RawProperty::String(s) => {
                 current = match current {
                     Some(current) => match current {
-                        Property::String(mut current_str) => {
+                        RawProperty::String(mut current_str) => {
                             current_str.push(' ');
                             current_str.push_str(s);
-                            Some(Property::String(current_str))
+                            Some(RawProperty::String(current_str))
                         }
-                        Property::Item(_) => {
+                        RawProperty::Item(_) => {
                             res.push(current);
                             Some(prop)
                         }
@@ -101,7 +101,7 @@ fn text_contents(node: NodeRef) -> Vec<Property> {
                     None => Some(prop),
                 }
             }
-            Property::Item(_) => {
+            RawProperty::Item(_) => {
                 if let Some(current) = current {
                     res.push(current);
                 }
@@ -117,7 +117,7 @@ fn text_contents(node: NodeRef) -> Vec<Property> {
 
     // trim strings
     for prop in &mut res {
-        if let Property::String(s) = prop {
+        if let RawProperty::String(s) = prop {
             let had_line_ending = s.ends_with('\n');
 
             *s = itertools::intersperse(
@@ -142,7 +142,7 @@ fn text_contents(node: NodeRef) -> Vec<Property> {
 
 /// implementation of https://html.spec.whatwg.org/multipage/microdata.html#associating-names-with-items
 /// TODO: handle itemrefs
-fn parse_item(root: NodeRef) -> Result<Item> {
+fn parse_item(root: NodeRef) -> Result<RawItem> {
     if !root
         .as_element()
         .unwrap()
@@ -163,13 +163,13 @@ fn parse_item(root: NodeRef) -> Result<Item> {
             let itemtype: Vec<_> = s.split_ascii_whitespace().map(String::from).collect();
 
             if itemtype.len() == 1 {
-                OneOrMany::One(itemtype.into_iter().next().unwrap())
+                RawOneOrMany::One(itemtype.into_iter().next().unwrap())
             } else {
-                OneOrMany::Many(itemtype)
+                RawOneOrMany::Many(itemtype)
             }
         });
 
-    let mut properties: HashMap<String, Vec<Property>> = HashMap::new();
+    let mut properties: HashMap<String, Vec<RawProperty>> = HashMap::new();
     let mut pending: Vec<_> = root.children().collect();
 
     while let Some(current) = pending.pop() {
@@ -180,10 +180,10 @@ fn parse_item(root: NodeRef) -> Result<Item> {
 
             if let Some(itemprop) = elem.attributes.borrow().get("itemprop") {
                 let properties_for_prop = if elem.attributes.borrow().contains("itemscope") {
-                    vec![Property::Item(parse_item(current)?)]
+                    vec![RawProperty::Item(parse_item(current)?)]
                 } else {
                     match elem.name.local.to_string().as_str() {
-                        "meta" => vec![Property::String(
+                        "meta" => vec![RawProperty::String(
                             elem.attributes
                                 .borrow()
                                 .get("content")
@@ -192,26 +192,26 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                         )],
                         "audio" | "embed" | "iframe" | "img" | "source" | "track" | "video" => {
                             if let Some(url) = elem.attributes.borrow().get("src") {
-                                vec![Property::String(url.to_string())]
+                                vec![RawProperty::String(url.to_string())]
                             } else {
-                                vec![Property::String(String::new())]
+                                vec![RawProperty::String(String::new())]
                             }
                         }
                         "a" | "area" | "link" => {
                             if let Some(url) = elem.attributes.borrow().get("href") {
-                                vec![Property::String(url.to_string())]
+                                vec![RawProperty::String(url.to_string())]
                             } else {
-                                vec![Property::String(String::new())]
+                                vec![RawProperty::String(String::new())]
                             }
                         }
-                        "object" => vec![Property::String(
+                        "object" => vec![RawProperty::String(
                             elem.attributes
                                 .borrow()
                                 .get("data")
                                 .map(String::from)
                                 .unwrap_or_default(),
                         )],
-                        "data" | "meter" => vec![Property::String(
+                        "data" | "meter" => vec![RawProperty::String(
                             elem.attributes
                                 .borrow()
                                 .get("value")
@@ -226,7 +226,7 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                                 .map(String::from)
                                 .unwrap_or_else(|| current.text_contents());
 
-                            vec![Property::String(time)]
+                            vec![RawProperty::String(time)]
                         }
                         _ => text_contents(current.clone()),
                     }
@@ -242,7 +242,7 @@ fn parse_item(root: NodeRef) -> Result<Item> {
         }
     }
 
-    Ok(Item {
+    Ok(RawItem {
         itemtype,
         properties: properties
             .into_iter()
@@ -252,16 +252,19 @@ fn parse_item(root: NodeRef) -> Result<Item> {
                 if properties.is_empty() {
                     None
                 } else if properties.len() == 1 {
-                    Some((name, OneOrMany::One(properties.into_iter().next().unwrap())))
+                    Some((
+                        name,
+                        RawOneOrMany::One(properties.into_iter().next().unwrap()),
+                    ))
                 } else {
-                    Some((name, OneOrMany::Many(properties)))
+                    Some((name, RawOneOrMany::Many(properties)))
                 }
             })
             .collect(),
     })
 }
 
-fn parse(root: NodeRef) -> Vec<Item> {
+fn parse(root: NodeRef) -> Vec<RawItem> {
     let mut res = Vec::new();
     let mut pending: Vec<_> = root.inclusive_descendants().collect();
 
@@ -280,10 +283,10 @@ fn parse(root: NodeRef) -> Vec<Item> {
     res
 }
 
-fn fix_type_for_schema(mut item: Item) -> Item {
-    if let Some(OneOrMany::One(itemtype)) = &item.itemtype {
+fn fix_type_for_schema(mut item: RawItem) -> RawItem {
+    if let Some(RawOneOrMany::One(itemtype)) = &item.itemtype {
         if let Some(last) = itemtype.split('/').last() {
-            item.itemtype = Some(OneOrMany::One(last.to_string()));
+            item.itemtype = Some(RawOneOrMany::One(last.to_string()));
         }
     }
 
@@ -291,24 +294,24 @@ fn fix_type_for_schema(mut item: Item) -> Item {
         .properties
         .into_iter()
         .map(|(key, properties)| match properties {
-            OneOrMany::One(property) => {
-                if let Property::Item(subitem) = property {
+            RawOneOrMany::One(property) => {
+                if let RawProperty::Item(subitem) = property {
                     (
                         key,
-                        OneOrMany::One(Property::Item(fix_type_for_schema(subitem))),
+                        RawOneOrMany::One(RawProperty::Item(fix_type_for_schema(subitem))),
                     )
                 } else {
-                    (key, OneOrMany::One(property))
+                    (key, RawOneOrMany::One(property))
                 }
             }
-            OneOrMany::Many(properties) => (
+            RawOneOrMany::Many(properties) => (
                 key,
-                OneOrMany::Many(
+                RawOneOrMany::Many(
                     properties
                         .into_iter()
                         .map(|property| {
-                            if let Property::Item(subitem) = property {
-                                Property::Item(fix_type_for_schema(subitem))
+                            if let RawProperty::Item(subitem) = property {
+                                RawProperty::Item(fix_type_for_schema(subitem))
                             } else {
                                 property
                             }
@@ -322,7 +325,7 @@ fn fix_type_for_schema(mut item: Item) -> Item {
     item
 }
 
-pub fn parse_schema(root: NodeRef) -> Vec<Item> {
+pub fn parse_schema(root: NodeRef) -> Vec<RawItem> {
     parse(root).into_iter().map(fix_type_for_schema).collect()
 }
 
@@ -331,7 +334,7 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::OneOrMany;
+    use crate::webpage::schema_org::RawOneOrMany;
 
     use super::*;
 
@@ -353,11 +356,11 @@ mod tests {
 
         assert_eq!(
             parse_item(root).unwrap(),
-            Item {
-                itemtype: Some(OneOrMany::One(String::from("http://n.whatwg.org/work"))),
+            RawItem {
+                itemtype: Some(RawOneOrMany::One(String::from("http://n.whatwg.org/work"))),
                 properties: hashmap! {
-                    "work".to_string() => OneOrMany::One(Property::String("images/house.jpeg".to_string())),
-                    "title".to_string() => OneOrMany::One(Property::String("The house I found.".to_string())),
+                    "work".to_string() => RawOneOrMany::One(RawProperty::String("images/house.jpeg".to_string())),
+                    "title".to_string() => RawOneOrMany::One(RawProperty::String("The house I found.".to_string())),
                 }
             }
         );
@@ -390,25 +393,25 @@ mod tests {
             .as_node()
             .clone();
 
-        let expected = Item {
-            itemtype: Some(OneOrMany::One(String::from(
+        let expected = RawItem {
+            itemtype: Some(RawOneOrMany::One(String::from(
                 "http://schema.org/BlogPosting",
             ))),
             properties: hashmap! {
-                "comment".to_string() => OneOrMany::One(
-                    Property::Item(
-                        Item {
-                            itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
+                "comment".to_string() => RawOneOrMany::One(
+                    RawProperty::Item(
+                        RawItem {
+                            itemtype: Some(RawOneOrMany::One("http://schema.org/UserComments".to_string())),
                             properties: hashmap! {
-                                "url".to_string() => OneOrMany::One(Property::String("#c1".to_string())),
-                                "creator".to_string() =>  OneOrMany::One(
-                                    Property::Item(Item {
-                                        itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
+                                "url".to_string() => RawOneOrMany::One(RawProperty::String("#c1".to_string())),
+                                "creator".to_string() =>  RawOneOrMany::One(
+                                    RawProperty::Item(RawItem {
+                                        itemtype: Some(RawOneOrMany::One("http://schema.org/Person".to_string())),
                                         properties: hashmap! {
-                                            "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
+                                            "name".to_string() => RawOneOrMany::One(RawProperty::String("Greg".to_string()))
                                         }
                                     })),
-                                "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
+                                "commentTime".to_string() => RawOneOrMany::One(RawProperty::String("2013-08-29".to_string()))
                             }
                 })),
             },
@@ -497,43 +500,43 @@ mod tests {
         let res = parse(root);
         assert_eq!(res.len(), 2);
 
-        let expected_article = Item {
-            itemtype: Some(OneOrMany::One(String::from(
+        let expected_article = RawItem {
+            itemtype: Some(RawOneOrMany::One(String::from(
                 "http://schema.org/BlogPosting",
             ))),
             properties: hashmap! {
-                "headline".to_string() => OneOrMany::One(Property::String(String::from("Progress report"))),
-                "datePublished".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string())),
-                "url".to_string() => OneOrMany::One(Property::String("?comments=0".to_string())),
-                "comment".to_string() => OneOrMany::Many(vec![
-                        Property::Item(
-                            Item {
-                                itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
+                "headline".to_string() => RawOneOrMany::One(RawProperty::String(String::from("Progress report"))),
+                "datePublished".to_string() => RawOneOrMany::One(RawProperty::String("2013-08-29".to_string())),
+                "url".to_string() => RawOneOrMany::One(RawProperty::String("?comments=0".to_string())),
+                "comment".to_string() => RawOneOrMany::Many(vec![
+                        RawProperty::Item(
+                            RawItem {
+                                itemtype: Some(RawOneOrMany::One("http://schema.org/UserComments".to_string())),
                                 properties: hashmap! {
-                                    "url".to_string() => OneOrMany::One(Property::String("#c1".to_string())),
-                                    "creator".to_string() =>  OneOrMany::One(
-                                        Property::Item(Item {
-                                            itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
+                                    "url".to_string() => RawOneOrMany::One(RawProperty::String("#c1".to_string())),
+                                    "creator".to_string() =>  RawOneOrMany::One(
+                                        RawProperty::Item(RawItem {
+                                            itemtype: Some(RawOneOrMany::One("http://schema.org/Person".to_string())),
                                             properties: hashmap! {
-                                                "name".to_string() => OneOrMany::One(Property::String("Greg".to_string()))
+                                                "name".to_string() => RawOneOrMany::One(RawProperty::String("Greg".to_string()))
                                             }
                                         })),
-                                    "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
+                                    "commentTime".to_string() => RawOneOrMany::One(RawProperty::String("2013-08-29".to_string()))
                                 }
                     }),
-                    Property::Item(
-                            Item {
-                                itemtype: Some(OneOrMany::One("http://schema.org/UserComments".to_string())),
+                    RawProperty::Item(
+                            RawItem {
+                                itemtype: Some(RawOneOrMany::One("http://schema.org/UserComments".to_string())),
                                 properties: hashmap! {
-                                    "url".to_string() => OneOrMany::One(Property::String("#c2".to_string())),
-                                    "creator".to_string() =>  OneOrMany::One(
-                                        Property::Item(Item {
-                                            itemtype: Some(OneOrMany::One("http://schema.org/Person".to_string())),
+                                    "url".to_string() => RawOneOrMany::One(RawProperty::String("#c2".to_string())),
+                                    "creator".to_string() =>  RawOneOrMany::One(
+                                        RawProperty::Item(RawItem {
+                                            itemtype: Some(RawOneOrMany::One("http://schema.org/Person".to_string())),
                                             properties: hashmap! {
-                                                "name".to_string() => OneOrMany::One(Property::String("Charlotte".to_string()))
+                                                "name".to_string() => RawOneOrMany::One(RawProperty::String("Charlotte".to_string()))
                                             }
                                         })),
-                                    "commentTime".to_string() => OneOrMany::One(Property::String("2013-08-29".to_string()))
+                                    "commentTime".to_string() => RawOneOrMany::One(RawProperty::String("2013-08-29".to_string()))
                                 }
                     })
                 ]),
@@ -616,15 +619,15 @@ mod tests {
 
         assert_eq!(
             res,
-            vec![Item {
-                itemtype: Some(OneOrMany::One("ImageObject".to_string())),
+            vec![RawItem {
+                itemtype: Some(RawOneOrMany::One("ImageObject".to_string())),
                 properties: hashmap! {
-                    "author".to_string() => OneOrMany::One(Property::String("Jane Doe".to_string())),
-                    "contentLocation".to_string() => OneOrMany::One(Property::String("Puerto Vallarta, Mexico".to_string())),
-                    "contentUrl".to_string() => OneOrMany::One(Property::String("mexico-beach.jpg".to_string())),
-                    "datePublished".to_string() => OneOrMany::One(Property::String("2008-01-25".to_string())),
-                    "description".to_string() => OneOrMany::One(Property::String("I took this picture while on vacation last year.".to_string())),
-                    "name".to_string() => OneOrMany::One(Property::String("Beach in Mexico".to_string())),
+                    "author".to_string() => RawOneOrMany::One(RawProperty::String("Jane Doe".to_string())),
+                    "contentLocation".to_string() => RawOneOrMany::One(RawProperty::String("Puerto Vallarta, Mexico".to_string())),
+                    "contentUrl".to_string() => RawOneOrMany::One(RawProperty::String("mexico-beach.jpg".to_string())),
+                    "datePublished".to_string() => RawOneOrMany::One(RawProperty::String("2008-01-25".to_string())),
+                    "description".to_string() => RawOneOrMany::One(RawProperty::String("I took this picture while on vacation last year.".to_string())),
+                    "name".to_string() => RawOneOrMany::One(RawProperty::String("Beach in Mexico".to_string())),
                 }
             }]
         );

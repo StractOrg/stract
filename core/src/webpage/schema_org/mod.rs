@@ -19,39 +19,38 @@ use std::collections::HashMap;
 use kuchiki::NodeRef;
 use serde::{Deserialize, Serialize};
 
+use crate::tokenizer::FlattenedJson;
+use crate::Result;
+
 mod json_ld;
 mod microdata;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
 pub enum Property {
     String(String),
     Item(Item),
 }
-
 impl Property {
-    pub fn try_into_string(self) -> Option<String> {
-        if let Property::String(s) = self {
-            Some(s)
-        } else {
-            None
+    pub(crate) fn try_into_string(&self) -> Option<String> {
+        match self {
+            Property::String(s) => Some(s.clone()),
+            Property::Item(_) => None,
         }
     }
 
-    pub fn try_into_item(self) -> Option<Item> {
-        if let Property::Item(item) = self {
-            Some(item)
-        } else {
-            None
+    pub(crate) fn try_into_item(&self) -> Option<Item> {
+        match self {
+            Property::String(_) => None,
+            Property::Item(it) => Some(it.clone()),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum SingleMap {
+enum SingleMap {
     Leaf(String),
-    Node(HashMap<OneOrMany<String>, HashMap<String, OneOrMany<SingleMap>>>),
+    Node(HashMap<RawOneOrMany<String>, HashMap<String, RawOneOrMany<SingleMap>>>),
 }
 
 impl From<Property> for SingleMap {
@@ -66,15 +65,18 @@ impl From<Property> for SingleMap {
                         .properties
                         .into_iter()
                         .map(|(key, val)| match val {
-                            OneOrMany::One(one) => (key, OneOrMany::One(SingleMap::from(one))),
+                            OneOrMany::One(one) => (key, RawOneOrMany::One(SingleMap::from(one))),
                             OneOrMany::Many(many) => (
                                 key,
-                                OneOrMany::Many(many.into_iter().map(SingleMap::from).collect()),
+                                RawOneOrMany::Many(many.into_iter().map(SingleMap::from).collect()),
                             ),
                         })
                         .collect();
 
-                    res.insert(tt, recursive);
+                    match tt {
+                        OneOrMany::One(one) => res.insert(RawOneOrMany::One(one), recursive),
+                        OneOrMany::Many(many) => res.insert(RawOneOrMany::Many(many), recursive),
+                    };
                 }
 
                 SingleMap::Node(res)
@@ -83,11 +85,50 @@ impl From<Property> for SingleMap {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct RawItem {
+    #[serde(rename = "@type")]
+    itemtype: Option<RawOneOrMany<String>>,
+    #[serde(flatten)]
+    properties: HashMap<String, RawOneOrMany<RawProperty>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum RawProperty {
+    String(String),
+    Item(RawItem),
+}
+impl RawProperty {
+    #[cfg(test)]
+    fn try_into_item(&self) -> Option<RawItem> {
+        match self {
+            RawProperty::String(_) => None,
+            RawProperty::Item(it) => Some(it.clone()),
+        }
+    }
+
+    #[cfg(test)]
+    fn try_into_string(&self) -> Option<String> {
+        match self {
+            RawProperty::String(s) => Some(s.clone()),
+            RawProperty::Item(_) => None,
+        }
+    }
+}
+
+impl From<RawProperty> for Property {
+    fn from(value: RawProperty) -> Self {
+        match value {
+            RawProperty::String(s) => Self::String(s),
+            RawProperty::Item(it) => Self::Item(Item::from(it)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
-    #[serde(rename = "@type")]
     pub itemtype: Option<OneOrMany<String>>,
-    #[serde(flatten)]
     pub properties: HashMap<String, OneOrMany<Property>>,
 }
 
@@ -102,13 +143,34 @@ impl Item {
         }
     }
 
-    pub fn into_single_map(self) -> SingleMap {
+    fn into_single_map(self) -> SingleMap {
         SingleMap::from(Property::Item(self))
     }
 }
 
+impl From<RawItem> for Item {
+    fn from(value: RawItem) -> Self {
+        Self {
+            itemtype: value.itemtype.map(|tt| match tt {
+                RawOneOrMany::One(one) => OneOrMany::One(one),
+                RawOneOrMany::Many(many) => OneOrMany::Many(many),
+            }),
+            properties: value
+                .properties
+                .into_iter()
+                .map(|(key, val)| match val {
+                    RawOneOrMany::One(prop) => (key, OneOrMany::One(Property::from(prop))),
+                    RawOneOrMany::Many(props) => (
+                        key,
+                        OneOrMany::Many(props.into_iter().map(Property::from).collect()),
+                    ),
+                })
+                .collect(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Hash)]
-#[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
@@ -130,11 +192,36 @@ impl<T> OneOrMany<T> {
     }
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone, Hash)]
+#[serde(untagged)]
+enum RawOneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> RawOneOrMany<T> {
+    #[cfg(test)]
+    pub fn one(self) -> Option<T> {
+        match self {
+            RawOneOrMany::One(one) => Some(one),
+            RawOneOrMany::Many(many) => many.into_iter().next(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn many(self) -> Vec<T> {
+        match self {
+            RawOneOrMany::One(one) => vec![one],
+            RawOneOrMany::Many(many) => many,
+        }
+    }
+}
+
 pub fn parse(root: NodeRef) -> Vec<Item> {
     let mut res = self::json_ld::parse(root.clone());
     res.append(&mut self::microdata::parse_schema(root));
 
-    res
+    res.into_iter().map(Item::from).collect()
 }
 
 #[cfg(test)]
@@ -160,19 +247,19 @@ mod tests {
           }
         "#;
 
-        let item: Item = serde_json::from_str(json).unwrap();
+        let item: RawItem = serde_json::from_str(json).unwrap();
         assert_eq!(
             item,
-            Item {
-                itemtype: Some(OneOrMany::One("ImageObject".to_string())),
+            RawItem {
+                itemtype: Some(RawOneOrMany::One("ImageObject".to_string())),
                 properties: hashmap! {
-                    "@context".to_string() => OneOrMany::One(Property::String("https://schema.org".to_string())),
-                    "author".to_string() => OneOrMany::One(Property::String("Jane Doe".to_string())),
-                    "contentLocation".to_string() => OneOrMany::One(Property::String("Puerto Vallarta, Mexico".to_string())),
-                    "contentUrl".to_string() => OneOrMany::One(Property::String("mexico-beach.jpg".to_string())),
-                    "datePublished".to_string() => OneOrMany::One(Property::String("2008-01-25".to_string())),
-                    "description".to_string() => OneOrMany::One(Property::String("I took this picture while on vacation last year.".to_string())),
-                    "name".to_string() => OneOrMany::One(Property::String("Beach in Mexico".to_string())),
+                    "@context".to_string() => RawOneOrMany::One(RawProperty::String("https://schema.org".to_string())),
+                    "author".to_string() => RawOneOrMany::One(RawProperty::String("Jane Doe".to_string())),
+                    "contentLocation".to_string() => RawOneOrMany::One(RawProperty::String("Puerto Vallarta, Mexico".to_string())),
+                    "contentUrl".to_string() => RawOneOrMany::One(RawProperty::String("mexico-beach.jpg".to_string())),
+                    "datePublished".to_string() => RawOneOrMany::One(RawProperty::String("2008-01-25".to_string())),
+                    "description".to_string() => RawOneOrMany::One(RawProperty::String("I took this picture while on vacation last year.".to_string())),
+                    "name".to_string() => RawOneOrMany::One(RawProperty::String("Beach in Mexico".to_string())),
                 }
             }
         );
@@ -190,7 +277,7 @@ mod tests {
         assert!(res[0].properties.contains_key("primaryImageOfPage"));
         assert_eq!(
             res[0].properties.get("name"),
-            Some(&OneOrMany::One(Property::String(
+            Some(&RawOneOrMany::One(RawProperty::String(
                 "RegEx match open tags except XHTML self-contained tags".to_string()
             )))
         );
@@ -205,16 +292,19 @@ mod tests {
             .try_into_item()
             .unwrap();
 
-        assert_eq!(main.itemtype, Some(OneOrMany::One("Question".to_string())));
+        assert_eq!(
+            main.itemtype,
+            Some(RawOneOrMany::One("Question".to_string()))
+        );
         assert_eq!(
             main.properties.get("name"),
-            Some(&OneOrMany::One(Property::String(
+            Some(&RawOneOrMany::One(RawProperty::String(
                 "RegEx match open tags except XHTML self-contained tags".to_string()
             )))
         );
         assert_eq!(
             main.properties.get("dateCreated"),
-            Some(&OneOrMany::One(Property::String(
+            Some(&RawOneOrMany::One(RawProperty::String(
                 "2009-11-13T22:38:26".to_string()
             )))
         );
@@ -233,14 +323,14 @@ mod tests {
 
         let text = main.properties.get("text").unwrap().clone().many();
 
-        assert_eq!(text[0], Property::String("Locked . Comments on this question have been disabled, but it is still accepting new answers and other interactions. Learn more .\nI need to match all of these opening tags:\n".to_string()));
+        assert_eq!(text[0], RawProperty::String("Locked . Comments on this question have been disabled, but it is still accepting new answers and other interactions. Learn more .\nI need to match all of these opening tags:\n".to_string()));
 
         assert_eq!(
             text[1],
-            Property::Item(Item {
-                itemtype: Some(OneOrMany::One("SourceCode".to_string())),
+            RawProperty::Item(RawItem {
+                itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
                 properties: hashmap! {
-                    "text".to_string() => OneOrMany::One(Property::String("<p>\n<a href=\"foo\">\n".to_string()))
+                    "text".to_string() => RawOneOrMany::One(RawProperty::String("<p>\n<a href=\"foo\">\n".to_string()))
                 }
             })
         );
@@ -267,45 +357,47 @@ mod tests {
 
         assert_eq!(
             recipe.properties.get("recipeCategory"),
-            Some(&OneOrMany::One(Property::String("Aftensmad".to_string())))
+            Some(&RawOneOrMany::One(RawProperty::String(
+                "Aftensmad".to_string()
+            )))
         );
 
         assert_eq!(
             recipe.properties.get("name"),
-            Some(&OneOrMany::One(Property::String(
+            Some(&RawOneOrMany::One(RawProperty::String(
                 "One Pot Pasta med chorizo".to_string()
             )))
         );
 
         assert_eq!(
             recipe.properties.get("recipeYield"),
-            Some(&OneOrMany::One(Property::String("4".to_string())))
+            Some(&RawOneOrMany::One(RawProperty::String("4".to_string())))
         );
 
         assert_eq!(
             recipe.properties.get("cookTime"),
-            Some(&OneOrMany::One(Property::String("PT25M".to_string())))
+            Some(&RawOneOrMany::One(RawProperty::String("PT25M".to_string())))
         );
 
         assert_eq!(
             recipe.properties.get("recipeIngredient"),
-            Some(&OneOrMany::Many(vec![
-                Property::String("400 g spaghetti".to_string()),
-                Property::String("1 dåse hakkede tomater".to_string()),
-                Property::String("1 håndfuld frisk basilikum, bladene herfra".to_string()),
-                Property::String("1 løg, finthakket".to_string()),
-                Property::String("2 fed hvidløg, finthakket".to_string()),
-                Property::String("20 cherrytomater, skåret i både".to_string()),
-                Property::String("0,50 squash, groftrevet".to_string()),
-                Property::String("1 tsk oregano, tørret".to_string()),
-                Property::String("50 g chorizo, finthakket".to_string()),
-                Property::String("5 dl grøntsagsbouillon".to_string()),
-                Property::String("2 spsk olivenolie".to_string()),
-                Property::String("1 tsk chiliflager, kan undlades".to_string()),
-                Property::String("1 tsk salt".to_string()),
-                Property::String("sort peber, friskkværnet".to_string()),
-                Property::String("50 g parmesan, friskrevet til servering".to_string()),
-                Property::String("1 håndfuld frisk basilikum, blade".to_string()),
+            Some(&RawOneOrMany::Many(vec![
+                RawProperty::String("400 g spaghetti".to_string()),
+                RawProperty::String("1 dåse hakkede tomater".to_string()),
+                RawProperty::String("1 håndfuld frisk basilikum, bladene herfra".to_string()),
+                RawProperty::String("1 løg, finthakket".to_string()),
+                RawProperty::String("2 fed hvidløg, finthakket".to_string()),
+                RawProperty::String("20 cherrytomater, skåret i både".to_string()),
+                RawProperty::String("0,50 squash, groftrevet".to_string()),
+                RawProperty::String("1 tsk oregano, tørret".to_string()),
+                RawProperty::String("50 g chorizo, finthakket".to_string()),
+                RawProperty::String("5 dl grøntsagsbouillon".to_string()),
+                RawProperty::String("2 spsk olivenolie".to_string()),
+                RawProperty::String("1 tsk chiliflager, kan undlades".to_string()),
+                RawProperty::String("1 tsk salt".to_string()),
+                RawProperty::String("sort peber, friskkværnet".to_string()),
+                RawProperty::String("50 g parmesan, friskrevet til servering".to_string()),
+                RawProperty::String("1 håndfuld frisk basilikum, blade".to_string()),
             ]))
         );
 
@@ -333,4 +425,12 @@ mod tests {
 
         assert_eq!(&instructions, "Helt enkelt som navnet antyder, så kom alle ingredienserne i en stor gryde på én gang. Kog retten op, rør godt rundt i gryden og skru ned for varmen. Lad det simrekoge under låg i 10-12 minutter, til spaghettien er perfekt kogt – al dente med lidt bid i. Server med revet parmesan og basilikum.");
     }
+}
+
+pub(crate) fn flattened_json(schemas: Vec<Item>) -> Result<FlattenedJson> {
+    let single_maps: Vec<_> = schemas
+        .into_iter()
+        .map(|item| item.into_single_map())
+        .collect();
+    FlattenedJson::new(&single_maps)
 }

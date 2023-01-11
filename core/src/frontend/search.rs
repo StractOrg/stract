@@ -22,8 +22,8 @@ use axum_macros::debug_handler;
 
 use crate::{
     search_prettifier::{
-        thousand_sep_number, CodeOrText, DisplayedSidebar, DisplayedWebpage,
-        HighlightedSpellCorrection, Snippet,
+        thousand_sep_number, CodeOrText, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
+        Snippet,
     },
     searcher::{self, PrettifiedSearchResult, SearchQuery, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
@@ -44,7 +44,7 @@ use axum::{
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
     query: String,
-    sidebar: Option<DisplayedSidebar>,
+    sidebar: Option<Sidebar>,
     spell_correction: Option<HighlightedSpellCorrection>,
     num_matches: String,
     search_duration_sec: String,

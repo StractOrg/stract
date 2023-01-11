@@ -17,16 +17,17 @@
 use crate::{
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
-    inverted_index::{self},
+    inverted_index::{self, RetrievedWebpage},
     ranking::{
         models::cross_encoder::CrossEncoderModel,
         pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
     },
-    search_prettifier::DisplayedWebpage,
+    search_prettifier::{create_stackoverflow_sidebar, DisplayedWebpage, Sidebar},
     searcher::PrettifiedWebsitesResult,
 };
 
 use std::{
+    cmp::Ordering,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -42,6 +43,7 @@ use crate::sonic;
 use super::{InitialPrettifiedSearchResult, PrettifiedSearchResult, SearchQuery};
 
 type Result<T> = std::result::Result<T, Error>;
+const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
 
 struct RemoteSearcher {
     addr: SocketAddr,
@@ -83,7 +85,7 @@ impl RemoteSearcher {
         &self,
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
-    ) -> Result<Vec<DisplayedWebpage>> {
+    ) -> Result<Vec<RetrievedWebpage>> {
         for timeout in ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5)
@@ -91,7 +93,7 @@ impl RemoteSearcher {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
                 if let Ok(sonic::Response::Content(body)) = connection
-                    .send(Request::RetrievePrettifiedWebites {
+                    .send(Request::RetrieveWebsites {
                         websites: pointers.to_vec(),
                         query: original_query.to_string(),
                     })
@@ -151,7 +153,7 @@ impl Shard {
         &self,
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
-    ) -> Result<Vec<DisplayedWebpage>> {
+    ) -> Result<Vec<RetrievedWebpage>> {
         match self
             .replicas
             .iter()
@@ -175,11 +177,7 @@ struct InitialSearchResultShard {
 pub enum Request {
     Search(SearchQuery),
     SearchPrettified(SearchQuery),
-    RetrieveWebites {
-        websites: Vec<inverted_index::WebsitePointer>,
-        query: String,
-    },
-    RetrievePrettifiedWebites {
+    RetrieveWebsites {
         websites: Vec<inverted_index::WebsitePointer>,
         query: String,
     },
@@ -228,67 +226,14 @@ impl DistributedSearcher {
         }
     }
 
-    pub async fn search(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
-        let start = Instant::now();
-
-        if query.is_empty() {
-            return Err(Error::EmptyQuery);
-        }
-
-        let mut search_query = query.clone();
+    fn combine_results(
+        &self,
+        initial_results: Vec<InitialSearchResultShard>,
+        search_query: &mut SearchQuery,
+    ) -> Result<Vec<ScoredWebsitePointer>> {
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::for_query(&mut search_query, self.cross_encoder.clone())?;
+            RankingPipeline::for_query(search_query, self.cross_encoder.clone())?;
 
-        // search shards
-        let initial_results = self
-            .shards
-            .iter()
-            .map(|shard| shard.search(&search_query))
-            .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .filter_map(|result| result.ok())
-            .collect::<Vec<_>>();
-
-        // check if any result has a bang hit
-        if let Some(result) = initial_results
-            .iter()
-            .find(|result| matches!(result.local_result, InitialPrettifiedSearchResult::Bang(_)))
-        {
-            if let InitialPrettifiedSearchResult::Bang(bang) = &result.local_result {
-                return Ok(PrettifiedSearchResult::Bang(bang.clone()));
-            }
-        }
-
-        let spell_corrected_query = initial_results.first().and_then(|result| {
-            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                result.spell_corrected_query.clone()
-            } else {
-                None
-            }
-        });
-
-        let sidebar = initial_results.first().and_then(|result| {
-            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                result.sidebar.clone()
-            } else {
-                None
-            }
-        });
-
-        let num_docs = initial_results
-            .iter()
-            .map(|result| {
-                if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                    result.num_websites
-                } else {
-                    0
-                }
-            })
-            .sum();
-
-        // combine results
         let mut collector =
             BucketCollector::new(pipeline.collector_top_n() + pipeline.collector_offset());
 
@@ -312,9 +257,14 @@ impl DistributedSearcher {
             .take(pipeline.collector_top_n())
             .collect::<Vec<_>>();
 
-        let top_websites = pipeline.apply(top_websites);
+        Ok(pipeline.apply(top_websites))
+    }
 
-        // retrieve webpages
+    async fn retrieve_webpages(
+        &self,
+        top_websites: &[ScoredWebsitePointer],
+        query: &str,
+    ) -> Vec<RetrievedWebpage> {
         let mut retrieved_webpages = Vec::new();
 
         for _ in 0..top_websites.len() {
@@ -329,7 +279,7 @@ impl DistributedSearcher {
                 .map(|(idx, pointer)| (idx, pointer.website.pointer.clone()))
                 .unzip();
 
-            if let Ok(websites) = shard.retrieve_websites(&pointers, &query.query).await {
+            if let Ok(websites) = shard.retrieve_websites(&pointers, query).await {
                 for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
                     retrieved_webpages[index] = Some(website);
                 }
@@ -339,6 +289,132 @@ impl DistributedSearcher {
         let retrieved_webpages: Vec<_> = retrieved_webpages.into_iter().flatten().collect();
 
         debug_assert_eq!(retrieved_webpages.len(), top_websites.len());
+
+        retrieved_webpages
+    }
+
+    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
+        self.shards
+            .iter()
+            .map(|shard| shard.search(query))
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter_map(|result| result.ok())
+            .collect::<Vec<_>>()
+    }
+
+    async fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
+        let query = SearchQuery {
+            query: query.query.clone(),
+            num_results: 1,
+            optic_program: Some(include_str!("stackoverflow.optic").to_string()),
+            ..Default::default()
+        };
+
+        let mut results: Vec<_> = self
+            .search_initial(&query)
+            .await
+            .into_iter()
+            .filter_map(|result| match result.local_result {
+                InitialPrettifiedSearchResult::Websites(websites) => {
+                    if let Some(website) = websites.websites.first().cloned() {
+                        Some((result.shard, website))
+                    } else {
+                        None
+                    }
+                }
+                InitialPrettifiedSearchResult::Bang(_) => None,
+            })
+            .collect();
+
+        results.sort_by(|(_, a), (_, b)| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal));
+
+        if let Some((shard, website)) = results.pop() {
+            if website.score > STACKOVERFLOW_SIDEBAR_THRESHOLD {
+                let scored_websites = vec![ScoredWebsitePointer { website, shard }];
+                let mut retrieved = self.retrieve_webpages(&scored_websites, &query.query).await;
+
+                if let Some(res) = retrieved.pop() {
+                    return Ok(Some(create_stackoverflow_sidebar(res.schema_org, res.url)?));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn sidebar(
+        &self,
+        initial_results: &[InitialSearchResultShard],
+        query: &SearchQuery,
+    ) -> Result<Option<Sidebar>> {
+        let entity = initial_results.first().and_then(|result| {
+            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
+                result.entity_sidebar.clone()
+            } else {
+                None
+            }
+        });
+
+        match entity {
+            Some(entity) => Ok(Some(Sidebar::Entity(entity))),
+            None => Ok(self.stackoverflow_sidebar(query).await?),
+        }
+    }
+
+    pub async fn search(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
+        let start = Instant::now();
+
+        if query.is_empty() {
+            return Err(Error::EmptyQuery);
+        }
+
+        let mut search_query = query.clone();
+
+        let initial_results = self.search_initial(query).await;
+
+        // check if any result has a bang hit
+        if let Some(result) = initial_results
+            .iter()
+            .find(|result| matches!(result.local_result, InitialPrettifiedSearchResult::Bang(_)))
+        {
+            if let InitialPrettifiedSearchResult::Bang(bang) = &result.local_result {
+                return Ok(PrettifiedSearchResult::Bang(bang.clone()));
+            }
+        }
+
+        let sidebar = self.sidebar(&initial_results, query).await?;
+
+        let spell_corrected_query = initial_results.first().and_then(|result| {
+            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
+                result.spell_corrected_query.clone()
+            } else {
+                None
+            }
+        });
+
+        let num_docs = initial_results
+            .iter()
+            .map(|result| {
+                if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
+                    result.num_websites
+                } else {
+                    0
+                }
+            })
+            .sum();
+
+        let top_websites = self.combine_results(initial_results, &mut search_query)?;
+
+        // retrieve webpages
+        let retrieved_webpages: Vec<_> = self
+            .retrieve_webpages(&top_websites, &query.query)
+            .await
+            .into_iter()
+            .map(DisplayedWebpage::from)
+            .collect();
 
         if retrieved_webpages.is_empty() && !top_websites.is_empty() {
             return Err(Error::SearchFailed);

@@ -114,8 +114,8 @@ mod tests {
                     )
                 );
             }
-            Err(err) => {
-                dbg!(err);
+            Err(_err) => {
+                // dbg!(err);
                 // panic!();
             }
         }

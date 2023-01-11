@@ -16,7 +16,7 @@
 
 use kuchiki::NodeRef;
 
-use super::Item;
+use super::RawItem;
 
 pub fn convert_all_ints_to_strings(json: &str) -> Result<String, serde_json::Error> {
     use serde_json::Value;
@@ -38,7 +38,7 @@ pub fn convert_all_ints_to_strings(json: &str) -> Result<String, serde_json::Err
     })
 }
 
-pub fn parse(root: NodeRef) -> Vec<Item> {
+pub(crate) fn parse(root: NodeRef) -> Vec<RawItem> {
     let mut res = Vec::new();
 
     for node in root.select("script").unwrap().filter(|node| {
@@ -65,7 +65,7 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::{OneOrMany, Property};
+    use crate::webpage::schema_org::{RawOneOrMany, RawProperty};
 
     use super::*;
 
@@ -100,16 +100,16 @@ mod tests {
 
         assert_eq!(
             res,
-            vec![Item {
-                itemtype: Some(OneOrMany::One("ImageObject".to_string())),
+            vec![RawItem {
+                itemtype: Some(RawOneOrMany::One("ImageObject".to_string())),
                 properties: hashmap! {
-                    "@context".to_string() => OneOrMany::One(Property::String("https://schema.org".to_string())),
-                    "author".to_string() => OneOrMany::One(Property::String("Jane Doe".to_string())),
-                    "contentLocation".to_string() => OneOrMany::One(Property::String("Puerto Vallarta, Mexico".to_string())),
-                    "contentUrl".to_string() => OneOrMany::One(Property::String("mexico-beach.jpg".to_string())),
-                    "datePublished".to_string() => OneOrMany::One(Property::String("2008-01-25".to_string())),
-                    "description".to_string() => OneOrMany::One(Property::String("I took this picture while on vacation last year.".to_string())),
-                    "name".to_string() => OneOrMany::One(Property::String("Beach in Mexico".to_string())),
+                    "@context".to_string() => RawOneOrMany::One(RawProperty::String("https://schema.org".to_string())),
+                    "author".to_string() => RawOneOrMany::One(RawProperty::String("Jane Doe".to_string())),
+                    "contentLocation".to_string() => RawOneOrMany::One(RawProperty::String("Puerto Vallarta, Mexico".to_string())),
+                    "contentUrl".to_string() => RawOneOrMany::One(RawProperty::String("mexico-beach.jpg".to_string())),
+                    "datePublished".to_string() => RawOneOrMany::One(RawProperty::String("2008-01-25".to_string())),
+                    "description".to_string() => RawOneOrMany::One(RawProperty::String("I took this picture while on vacation last year.".to_string())),
+                    "name".to_string() => RawOneOrMany::One(RawProperty::String("Beach in Mexico".to_string())),
                 }
             }]
         );
@@ -162,11 +162,11 @@ mod tests {
 
         assert_eq!(
             res,
-            vec![Item {
-                itemtype: Some(OneOrMany::One("test".to_string())),
+            vec![RawItem {
+                itemtype: Some(RawOneOrMany::One("test".to_string())),
                 properties: hashmap! {
-                    "@context".to_string() => OneOrMany::One(Property::String("https://schema.org".to_string())),
-                    "cost".to_string() => OneOrMany::One(Property::String("123".to_string())),
+                    "@context".to_string() => RawOneOrMany::One(RawProperty::String("https://schema.org".to_string())),
+                    "cost".to_string() => RawOneOrMany::One(RawProperty::String("123".to_string())),
                 }
             }]
         );

@@ -17,8 +17,7 @@ use crate::{
     human_website_annotations::Topic,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
-    simhash,
-    tokenizer::{self, FlattenedJson},
+    simhash, tokenizer,
     webgraph::NodeID,
     Error, Result,
 };
@@ -709,17 +708,11 @@ impl Html {
         let site = self.pretokenize_site();
         let description = self.pretokenize_description();
 
-        let schemas: Vec<_> = self
-            .schema_org()
-            .into_iter()
-            .map(|schema| schema.into_single_map())
-            .collect();
+        let schemas: Vec<_> = self.schema_org();
 
-        let schema_json = serde_json::to_string(&self.schema_org())
-            .ok()
-            .unwrap_or_default();
+        let schema_json = serde_json::to_string(&schemas).ok().unwrap_or_default();
 
-        let pretokenized_schema_json = match FlattenedJson::new(&schemas) {
+        let pretokenized_schema_json = match schema_org::flattened_json(schemas) {
             Ok(f) => {
                 let mut tokens = Vec::new();
 

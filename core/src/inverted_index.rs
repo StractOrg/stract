@@ -414,8 +414,8 @@ pub struct SearchResult {
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,
-    pub snippet: String,
     pub body: String,
+    pub snippet: String,
     pub dirty_body: String,
     pub description: Option<String>,
     pub dmoz_description: Option<String>,

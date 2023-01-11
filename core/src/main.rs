@@ -96,8 +96,8 @@ enum WebgraphOptions {
         config_path: String,
     },
     Merge {
-        path: String,
-        other_path: Option<String>,
+        #[clap(required = true)]
+        paths: Vec<String>,
         #[clap(long)]
         num_segments: Option<usize>,
     },
@@ -195,13 +195,12 @@ fn main() -> Result<()> {
                 entrypoint::Webgraph::run_locally(&config)?;
             }
             WebgraphOptions::Merge {
-                path,
-                other_path,
+                mut paths,
                 num_segments,
             } => {
-                let mut webgraph = WebgraphBuilder::new(path).open();
+                let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open();
 
-                if let Some(other_path) = other_path {
+                for other_path in paths {
                     let other = WebgraphBuilder::new(other_path).open();
                     webgraph.merge(other);
                 }

@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::bangs::{BangHit, Bangs};
-use crate::entity_index::EntityIndex;
+use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::Query;
@@ -29,6 +29,7 @@ use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
+use crate::search_prettifier::{DisplayedEntity, Sidebar};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webpage::region::Region;
@@ -36,9 +37,7 @@ use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
 use super::WebsitesResult;
-use super::{InitialSearchResult, SearchQuery, SearchResult, Sidebar};
-
-const STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD: f64 = 250.0;
+use super::{InitialSearchResult, SearchQuery, SearchResult};
 
 pub struct LocalSearcher {
     index: Index,
@@ -46,7 +45,6 @@ pub struct LocalSearcher {
     bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
     topic_centrality: Option<TopicCentrality>,
-    stackoverflow_sidebar_threshold: f64,
 }
 
 impl From<Index> for LocalSearcher {
@@ -63,7 +61,6 @@ impl LocalSearcher {
             bangs: None,
             centrality_store: None,
             topic_centrality: None,
-            stackoverflow_sidebar_threshold: STACKOVERFLOW_SIDEBAR_SCORE_THRESHOLD,
         }
     }
 
@@ -228,45 +225,10 @@ impl LocalSearcher {
         Ok(None)
     }
 
-    fn entity_sidebar(&self, query: &SearchQuery) -> Option<Sidebar> {
+    fn entity_sidebar(&self, query: &SearchQuery) -> Option<StoredEntity> {
         self.entity_index
             .as_ref()
             .and_then(|index| index.search(&query.query))
-            .map(Sidebar::Entity)
-    }
-
-    fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
-        let mut query = query.clone();
-        query.optic_program = Some(include_str!("stackoverflow.optic").to_string());
-        query.num_results = 1;
-
-        let (mut top_websites, num_websites) = self.search_inverted_index(&query, false)?;
-
-        if num_websites > 0 && !top_websites.is_empty() {
-            let top = top_websites.remove(0);
-            if top.score > self.stackoverflow_sidebar_threshold {
-                let mut retrieved = self.retrieve_websites(&[top.pointer], &query.query)?;
-                let retrieved = retrieved.remove(0);
-                return Ok(Some(Sidebar::StackOverflow {
-                    schema_org: retrieved.schema_org,
-                    url: retrieved.url,
-                }));
-            }
-        }
-
-        Ok(None)
-    }
-
-    fn sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
-        if let Some(entity) = self.entity_sidebar(query) {
-            return Ok(Some(entity));
-        }
-
-        if let Some(stackoverflow) = self.stackoverflow_sidebar(query)? {
-            return Ok(Some(stackoverflow));
-        }
-
-        Ok(None)
     }
 
     pub fn search_initial(
@@ -280,13 +242,15 @@ impl LocalSearcher {
 
         let (websites, num_websites) = self.search_inverted_index(query, de_rank_similar)?;
         let correction = self.spell_correction(query)?;
-        let sidebar = self.sidebar(query)?;
+        let sidebar = self
+            .entity_sidebar(query)
+            .map(|entity| DisplayedEntity::from(entity, self));
 
         Ok(InitialSearchResult::Websites(InitialWebsiteResult {
             spell_corrected_query: correction,
             websites,
             num_websites,
-            sidebar,
+            entity_sidebar: sidebar,
         }))
     }
 
@@ -344,7 +308,7 @@ impl LocalSearcher {
                         num_docs: search_result.num_websites,
                         documents: retrieved_sites,
                     },
-                    sidebar: search_result.sidebar,
+                    sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
                     search_duration_ms: start.elapsed().as_millis(),
                 }))
             }
@@ -381,7 +345,7 @@ pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
     pub num_websites: usize,
     pub websites: Vec<RankingWebsite>,
-    pub sidebar: Option<Sidebar>,
+    pub entity_sidebar: Option<DisplayedEntity>,
 }
 
 impl SearchResult {
@@ -470,37 +434,5 @@ mod tests {
                 )
             }
         }
-    }
-
-    #[test]
-    fn stackoverflow_sidebar() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(Webpage::new(
-                include_str!("../../testcases/schema_org/stackoverflow.html"),
-                "https://www.stackoverflow.com",
-            ))
-            .expect("failed to insert webpage");
-
-        index.commit().unwrap();
-
-        let mut searcher = LocalSearcher::new(index);
-        searcher.stackoverflow_sidebar_threshold = 0.0;
-
-        let res = searcher
-            .search(&SearchQuery {
-                query: "regex parse html".to_string(),
-                ..Default::default()
-            })
-            .unwrap();
-
-        assert!(matches!(
-            res.into_websites().unwrap().sidebar.unwrap(),
-            Sidebar::StackOverflow {
-                schema_org: _,
-                url: _
-            }
-        ));
     }
 }

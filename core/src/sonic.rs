@@ -59,7 +59,7 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
 
 impl<T> Request<T> {
     pub async fn respond<R: Serialize>(mut self, response: Response<R>) -> Result<()> {
-        let bytes = bincode::serialize(&response)?;
+        let bytes = bincode::serialize(&response).unwrap();
         let header = Header {
             body_size: bytes.len(),
         };
@@ -102,7 +102,7 @@ impl Server {
         stream.read_exact(&mut buf).await?;
         tracing::debug!("received bytes: {:?}", &buf);
 
-        let body = bincode::deserialize(&buf)?;
+        let body = bincode::deserialize(&buf).unwrap();
 
         Ok(Request { stream, body })
     }
@@ -134,7 +134,7 @@ impl Connection {
         mut self,
         request: T,
     ) -> Result<Response<R>> {
-        let bytes = bincode::serialize(&request)?;
+        let bytes = bincode::serialize(&request).unwrap();
 
         let header = Header {
             body_size: bytes.len(),
@@ -155,7 +155,7 @@ impl Connection {
 
         self.stream.shutdown().await?;
 
-        Ok(bincode::deserialize(&buf)?)
+        Ok(bincode::deserialize(&buf).unwrap())
     }
 
     pub async fn send<T: Serialize, R: DeserializeOwned + Serialize>(

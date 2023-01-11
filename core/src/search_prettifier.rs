@@ -19,34 +19,54 @@ use std::collections::BTreeMap;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
-use tracing::log::debug;
 
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
     ranking::pipeline::RankingWebsite,
-    searcher::{self, LocalSearcher, Sidebar},
+    searcher::{self, LocalSearcher},
     spell::CorrectionTerm,
     webpage::{
-        schema_org::{self, OneOrMany, Property},
+        schema_org::{self, Item, OneOrMany, Property},
         Url,
     },
     Error, Result,
 };
 
-pub fn initial(
-    result: searcher::local::InitialWebsiteResult,
-    local_searcher: &LocalSearcher,
-) -> InitialWebsiteResult {
-    let sidebar = result.sidebar.and_then(|sidebar| {
-        let res = DisplayedSidebar::from(sidebar, local_searcher);
-        if let Ok(sidebar) = res {
-            Some(sidebar)
-        } else {
-            debug!("Failed to parse sidebar information: {:?}", res);
-            None
-        }
-    });
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Snippet {
+    Normal {
+        date: Option<String>,
+        text: String,
+    },
+    StackOverflowQA {
+        question: StackOverflowQuestion,
+        answers: Vec<StackOverflowAnswer>,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StackOverflowAnswer {
+    pub body: Vec<CodeOrText>,
+    pub date: String,
+    pub url: String,
+    pub upvotes: u32,
+    pub accepted: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StackOverflowQuestion {
+    pub body: Vec<CodeOrText>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum CodeOrText {
+    Code(String),
+    Text(String),
+}
+
+pub fn initial(result: searcher::local::InitialWebsiteResult) -> InitialWebsiteResult {
+    let sidebar = result.entity_sidebar;
 
     let spell_corrected_query = result.spell_corrected_query.map(|correction| {
         let mut highlighted = String::new();
@@ -78,31 +98,8 @@ pub fn initial(
         spell_corrected_query,
         websites: result.websites,
         num_websites: result.num_websites,
-        sidebar,
+        entity_sidebar: sidebar,
     }
-}
-
-pub fn retrieve(result: Vec<RetrievedWebpage>, searcher: &LocalSearcher) -> Vec<DisplayedWebpage> {
-    result
-        .into_iter()
-        .map(|mut webpage| {
-            webpage.primary_image = webpage.primary_image.and_then(|image| {
-                if searcher
-                    .primary_image(image.uuid.clone().to_string())
-                    .is_some()
-                {
-                    Some(image)
-                } else {
-                    None
-                }
-            });
-
-            let url: Url = webpage.url.clone().into();
-            webpage.favicon = searcher.favicon(&url.site().to_string().into());
-            webpage
-        })
-        .map(DisplayedWebpage::from)
-        .collect()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -116,7 +113,7 @@ pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub num_websites: usize,
     pub websites: Vec<RankingWebsite>,
-    pub sidebar: Option<DisplayedSidebar>,
+    pub entity_sidebar: Option<DisplayedEntity>,
 }
 
 pub fn html_escape(s: &str) -> String {
@@ -165,38 +162,6 @@ fn prettify_date(date: NaiveDateTime) -> String {
     }
 
     format!("{}", date.format("%d. %b. %Y"))
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum CodeOrText {
-    Code(String),
-    Text(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StackOverflowAnswer {
-    pub body: Vec<CodeOrText>,
-    pub date: String,
-    pub url: String,
-    pub upvotes: u32,
-    pub accepted: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StackOverflowQuestion {
-    pub body: Vec<CodeOrText>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Snippet {
-    Normal {
-        date: Option<String>,
-        text: String,
-    },
-    StackOverflowQA {
-        question: StackOverflowQuestion,
-        answers: Vec<StackOverflowAnswer>,
-    },
 }
 
 fn parse_so_answer(
@@ -409,7 +374,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum DisplayedSidebar {
+pub enum Sidebar {
     Entity(DisplayedEntity),
     StackOverflow {
         title: String,
@@ -417,43 +382,34 @@ pub enum DisplayedSidebar {
     },
 }
 
-impl DisplayedSidebar {
-    fn from(sidebar: Sidebar, searcher: &LocalSearcher) -> Result<Self> {
-        match sidebar {
-            Sidebar::Entity(entity) => Ok(DisplayedSidebar::Entity(DisplayedEntity::from(
-                entity, searcher,
-            ))),
-            Sidebar::StackOverflow { schema_org, url } => {
-                if let Some(item) = schema_org
-                    .into_iter()
-                    .find(|item| item.types_contains("QAPage"))
-                    .and_then(|item| item.properties.get("mainEntity").cloned())
-                    .and_then(|properties| properties.one())
-                    .and_then(|property| property.try_into_item())
-                {
-                    let title = item
-                        .properties
-                        .get("name")
-                        .cloned()
-                        .and_then(|prop| prop.one())
-                        .and_then(|prop| prop.try_into_string())
-                        .ok_or(Error::InvalidStackoverflowSchema)?;
+pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: String) -> Result<Sidebar> {
+    if let Some(item) = schema_org
+        .into_iter()
+        .find(|item| item.types_contains("QAPage"))
+        .and_then(|item| item.properties.get("mainEntity").cloned())
+        .and_then(|properties| properties.one())
+        .and_then(|property| property.try_into_item())
+    {
+        let title = item
+            .properties
+            .get("name")
+            .cloned()
+            .and_then(|prop| prop.one())
+            .and_then(|prop| prop.try_into_string())
+            .ok_or(Error::InvalidStackoverflowSchema)?;
 
-                    item.properties
-                        .get("acceptedAnswer")
-                        .cloned()
-                        .and_then(|ans| ans.one())
-                        .and_then(|prop| prop.try_into_item())
-                        .and_then(|item| {
-                            schema_item_to_stackoverflow_answer(item, Url::from(url.clone()), true)
-                        })
-                        .map(|answer| DisplayedSidebar::StackOverflow { title, answer })
-                        .ok_or(Error::InvalidStackoverflowSchema)
-                } else {
-                    Err(Error::InvalidStackoverflowSchema)
-                }
-            }
-        }
+        item.properties
+            .get("acceptedAnswer")
+            .cloned()
+            .and_then(|ans| ans.one())
+            .and_then(|prop| prop.try_into_item())
+            .and_then(|item| {
+                schema_item_to_stackoverflow_answer(item, Url::from(url.clone()), true)
+            })
+            .map(|answer| Sidebar::StackOverflow { title, answer })
+            .ok_or(Error::InvalidStackoverflowSchema)
+    } else {
+        Err(Error::InvalidStackoverflowSchema)
     }
 }
 

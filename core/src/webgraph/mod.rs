@@ -36,6 +36,8 @@ mod executor;
 use self::executor::Executor;
 use self::segment::{CachedStore, SegmentNodeID};
 
+const MAX_NUM_SEGMENTS: usize = 200;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(pub u64);
 
@@ -458,6 +460,8 @@ impl<S: Store> Webgraph<S> {
         self.save_metadata();
         self.node2id.flush();
         self.id2node.flush();
+
+        self.merge_segments(MAX_NUM_SEGMENTS);
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {

@@ -26,7 +26,7 @@ use tantivy::tokenizer::{TextAnalyzer, Token};
 use tantivy::{Score, Searcher};
 use whatlang::Lang;
 
-/// For now we use the snippet generator from tantivy with a minor modifications.
+/// For now we use the snippet generator from tantivy with modifications.
 /// In the future we want to implement something closer to the method described in <https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf>.
 /// This will require us to store each paragraph of the webpage separately to get adequate performance.
 /// Implementing SnippetIL will also allow us to correctly add "..." to the snippet.
@@ -74,7 +74,7 @@ impl FragmentCandidate {
 /// `Snippet`
 /// Contains a fragment of a document, and some highlighed parts inside it.
 #[derive(Debug)]
-struct Snippet {
+struct SnippetString {
     fragment: String,
     highlighted: Vec<Range<usize>>,
 }
@@ -82,7 +82,7 @@ struct Snippet {
 const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 700;\">";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
-impl Snippet {
+impl SnippetString {
     /// Returns a hignlightned html from the `Snippet`.
     fn to_html(&self) -> String {
         let mut html = String::new();
@@ -156,7 +156,7 @@ fn search_fragments(
 ///
 /// Takes a vector of `FragmentCandidate`s and the text.
 /// Figures out the best fragment from it and creates a snippet.
-fn select_best_fragment_combination(fragments: &[FragmentCandidate], text: &str) -> Snippet {
+fn select_best_fragment_combination(fragments: &[FragmentCandidate], text: &str) -> SnippetString {
     let best_fragment_opt = fragments.iter().max_by(|left, right| {
         let cmp_score = left
             .score
@@ -175,14 +175,14 @@ fn select_best_fragment_combination(fragments: &[FragmentCandidate], text: &str)
             .iter()
             .map(|item| item.start - fragment.start_offset..item.end - fragment.start_offset)
             .collect();
-        Snippet {
+        SnippetString {
             fragment: fragment_text.to_string(),
             highlighted,
         }
     } else {
         // when there no fragments to chose from,
         // for now create a empty snippet
-        Snippet {
+        SnippetString {
             fragment: String::new(),
             highlighted: vec![],
         }
@@ -246,7 +246,7 @@ impl SnippetGenerator {
     }
 
     /// Generates a snippet for the given text.
-    fn snippet(&self, text: &str) -> Snippet {
+    fn snippet(&self, text: &str) -> SnippetString {
         let fragment_candidates =
             search_fragments(&self.tokenizer, text, &self.terms_text, self.max_num_chars);
         select_best_fragment_combination(&fragment_candidates[..], text)
@@ -324,7 +324,7 @@ fn generate_snippet_without_stem(
     searcher: &Searcher,
     query: &Query,
     field: Field,
-) -> Result<Snippet> {
+) -> Result<SnippetString> {
     let tokenizer = Tokenizer::default().into();
     let generator = SnippetGenerator::create(searcher, query, tokenizer, field)?;
 
