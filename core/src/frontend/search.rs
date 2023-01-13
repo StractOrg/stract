@@ -25,7 +25,7 @@ use crate::{
         thousand_sep_number, CodeOrText, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
         Snippet,
     },
-    searcher::{self, PrettifiedSearchResult, SearchQuery, NUM_RESULTS_PER_PAGE},
+    searcher::{self, SearchQuery, SearchResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
 };
 
@@ -131,11 +131,11 @@ pub async fn route(
         .await
     {
         Ok(result) => match result {
-            PrettifiedSearchResult::Websites(result) => {
+            SearchResult::Websites(result) => {
                 let sidebar = result.sidebar;
                 let spell_correction = result.spell_corrected_query;
 
-                let num_matches = thousand_sep_number(result.num_docs);
+                let num_matches = thousand_sep_number(result.num_hits);
 
                 let search_duration_sec =
                     format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
@@ -196,9 +196,7 @@ pub async fn route(
 
                 HtmlTemplate(template).into_response()
             }
-            PrettifiedSearchResult::Bang(result) => {
-                Redirect::to(&result.redirect_to.full()).into_response()
-            }
+            SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
         },
         Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
@@ -216,10 +214,8 @@ pub async fn api(
 
     match state.searcher.search(&query).await {
         Ok(result) => match result {
-            PrettifiedSearchResult::Websites(result) => Json(result).into_response(),
-            PrettifiedSearchResult::Bang(result) => {
-                Redirect::to(&result.redirect_to.full()).into_response()
-            }
+            SearchResult::Websites(result) => Json(result).into_response(),
+            SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
         },
         Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here

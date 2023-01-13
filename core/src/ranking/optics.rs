@@ -201,16 +201,13 @@ mod tests {
                 }),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 3);
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
-        assert_eq!(result.documents[2].url, "https://www.third.com");
+        assert_eq!(result.num_hits, 3);
+        assert_eq!(result.webpages.len(), 3);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
+        assert_eq!(result.webpages[2].url, "https://www.third.com");
 
         let result = searcher
             .search(&SearchQuery {
@@ -222,16 +219,13 @@ mod tests {
                 }),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 3);
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
-        assert_eq!(result.documents[2].url, "https://www.third.com");
+        assert_eq!(result.num_hits, 3);
+        assert_eq!(result.webpages.len(), 3);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
+        assert_eq!(result.webpages[2].url, "https://www.third.com");
 
         let result = searcher
             .search(&SearchQuery {
@@ -243,14 +237,11 @@ mod tests {
                 }),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.third.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.third.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
     }
 }

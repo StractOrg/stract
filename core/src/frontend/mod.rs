@@ -19,6 +19,7 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 
 use crate::{
     autosuggest::Autosuggest,
+    bangs::Bangs,
     ranking::models::cross_encoder::CrossEncoderModel,
     searcher::{DistributedSearcher, Shard},
 };
@@ -78,17 +79,19 @@ pub async fn favicon() -> impl IntoResponse {
 pub fn router(
     queries_csv_path: &str,
     crossencoder_model_path: &str,
+    bangs_path: &str,
     shards: Vec<Vec<String>>,
 ) -> Result<Router> {
     let shards: Vec<_> = shards
         .into_iter()
         .enumerate()
-        .map(|(id, replicas)| Shard::new(id as u32, replicas))
+        .map(|(id, replicas)| Shard::new(id as u64, replicas))
         .collect();
 
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
     let crossencoder = CrossEncoderModel::open(crossencoder_model_path)?;
-    let searcher = DistributedSearcher::new(shards, crossencoder);
+    let bangs = Bangs::from_path(bangs_path);
+    let searcher = DistributedSearcher::new(shards, crossencoder, bangs);
 
     let state = Arc::new(State {
         searcher,

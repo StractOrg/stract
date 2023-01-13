@@ -342,6 +342,7 @@ mod tests {
     use super::*;
     use crate::{
         index::Index,
+        search_prettifier::Snippet,
         searcher::{LocalSearcher, SearchQuery},
         webpage::Webpage,
     };
@@ -359,6 +360,13 @@ web browser layout engine[14] and the Rust compiler. A large proportion of curre
 to the project are from community members.[15]
 Rust won first place for "most loved programming language" in the Stack Overflow Developer
 Survey in 2016, 2017, and 2018."#;
+
+    fn snippet_text(snippet: Snippet) -> String {
+        match snippet {
+            Snippet::Normal { date: _, text } => text,
+            _ => panic!("The snippet was not text"),
+        }
+    }
 
     #[test]
     fn snippet_during_search() {
@@ -390,13 +398,11 @@ Survey in 2016, 2017, and 2018."#;
                 query: "rust language".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.num_docs, 1);
-        assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its..."));
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(snippet_text(result.webpages[0].snippet.clone()), format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -429,13 +435,11 @@ Survey in 2016, 2017, and 2018."#;
                 query: "describe".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.num_docs, 1);
-        assert_eq!(result.webpages.documents.len(), 1);
-        assert_eq!(result.webpages.documents[0].snippet, format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its..."));
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(snippet_text(result.webpages[0].snippet.clone()), format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?], but its..."));
     }
 
     #[test]
@@ -638,14 +642,12 @@ Survey in 2016, 2017, and 2018."#;
                 query: "paradigms".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.num_docs, 1);
-        assert_eq!(result.webpages.documents.len(), 1);
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
         assert_eq!(
-            result.webpages.documents[0].snippet,
+            snippet_text(result.webpages[0].snippet.clone()),
             format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?], but its...")
         );
     }

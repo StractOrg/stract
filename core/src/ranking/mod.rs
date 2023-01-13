@@ -256,12 +256,10 @@ mod tests {
                 query: "example".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
-        assert_eq!(result.webpages.documents.len(), 2);
-        assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
-        assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
+            .expect("Search failed");
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.b.com");
+        assert_eq!(result.webpages[1].url, "https://www.a.com");
     }
 
     #[test]
@@ -337,12 +335,10 @@ mod tests {
                 query: "example".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
-        assert_eq!(result.webpages.documents.len(), 2);
-        assert_eq!(result.webpages.documents[0].url, "https://www.b.com");
-        assert_eq!(result.webpages.documents[1].url, "https://www.a.com");
+            .expect("Search failed");
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.b.com");
+        assert_eq!(result.webpages[1].url, "https://www.a.com");
     }
 
     #[test]
@@ -445,12 +441,10 @@ mod tests {
                 query: "dr dk".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.documents.len(), 3);
-        assert_eq!(result.webpages.documents[0].url, "https://www.dr.dk");
+        assert_eq!(result.webpages.len(), 3);
+        assert_eq!(result.webpages[0].url, "https://www.dr.dk");
     }
 
     #[test]
@@ -525,11 +519,9 @@ mod tests {
                 query: "title".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.documents[0].url, "https://www.new.com");
+        assert_eq!(result.webpages[0].url, "https://www.new.com");
     }
 
     #[test]
@@ -610,12 +602,10 @@ mod tests {
                 query: "test".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.documents.len(), 2);
-        assert_eq!(result.webpages.documents[0].url, "https://www.first.com");
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
     }
 
     #[test]
@@ -688,12 +678,10 @@ mod tests {
                 query: "test".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap();
+            .expect("Search failed");
 
-        assert_eq!(result.webpages.documents.len(), 2);
-        assert_eq!(result.webpages.documents[0].url, "https://www.first.com");
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
     }
 
     #[test]
@@ -805,12 +793,10 @@ mod tests {
                 ),
                 ..Default::default()
             })
-            .unwrap()
-            .into_websites()
             .unwrap();
 
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.title.com");
+        assert_eq!(res.num_hits, 3);
+        assert_eq!(&res.webpages[0].url, "https://www.title.com");
 
         let res = searcher
             .search(&SearchQuery {
@@ -827,12 +813,10 @@ mod tests {
                 ),
                 ..Default::default()
             })
-            .unwrap()
-            .into_websites()
             .unwrap();
 
-        assert_eq!(res.webpages.num_docs, 3);
-        assert_eq!(&res.webpages.documents[0].url, "https://www.centrality.com");
+        assert_eq!(res.num_hits, 3);
+        assert_eq!(&res.webpages[0].url, "https://www.centrality.com");
     }
 
     #[test]
@@ -936,16 +920,13 @@ mod tests {
                 query: "termA termB".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 3);
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
-        assert_eq!(result.documents[2].url, "https://www.third.com");
+        assert_eq!(result.num_hits, 3);
+        assert_eq!(result.webpages.len(), 3);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
+        assert_eq!(result.webpages[2].url, "https://www.third.com");
     }
 
     #[test]
@@ -1020,15 +1001,12 @@ mod tests {
                 query: "test".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
     }
 
     #[test]
@@ -1103,15 +1081,12 @@ mod tests {
                 query: "test".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
-        assert_eq!(result.documents[1].url, "https://www.second.com");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[1].url, "https://www.second.com");
     }
 
     #[test]
@@ -1271,29 +1246,23 @@ mod tests {
                 query: "topic_a".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.a.com");
-        assert_eq!(result.documents[1].url, "https://www.wrong.com");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.a.com");
+        assert_eq!(result.webpages[1].url, "https://www.wrong.com");
 
         let result = searcher
             .search(&SearchQuery {
                 query: "topic_b".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 2);
-        assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.b.com");
-        assert_eq!(result.documents[1].url, "https://www.wrong.com");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.b.com");
+        assert_eq!(result.webpages[1].url, "https://www.wrong.com");
     }
 }

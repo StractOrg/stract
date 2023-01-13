@@ -23,9 +23,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     entity_index::{entity::Span, StoredEntity},
     inverted_index::RetrievedWebpage,
-    ranking::pipeline::RankingWebsite,
-    searcher::{self, LocalSearcher},
-    spell::CorrectionTerm,
+    searcher::LocalSearcher,
+    spell::{self, CorrectionTerm},
     webpage::{
         schema_org::{self, Item, OneOrMany, Property},
         Url,
@@ -65,10 +64,14 @@ pub enum CodeOrText {
     Text(String),
 }
 
-pub fn initial(result: searcher::local::InitialWebsiteResult) -> InitialWebsiteResult {
-    let sidebar = result.entity_sidebar;
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HighlightedSpellCorrection {
+    pub raw: String,
+    pub highlighted: String,
+}
 
-    let spell_corrected_query = result.spell_corrected_query.map(|correction| {
+impl From<spell::Correction> for HighlightedSpellCorrection {
+    fn from(correction: spell::Correction) -> Self {
         let mut highlighted = String::new();
         let mut raw = String::new();
 
@@ -91,29 +94,8 @@ pub fn initial(result: searcher::local::InitialWebsiteResult) -> InitialWebsiteR
         raw = raw.trim_end().to_string();
         highlighted = highlighted.trim_end().to_string();
 
-        HighlightedSpellCorrection { raw, highlighted }
-    });
-
-    InitialWebsiteResult {
-        spell_corrected_query,
-        websites: result.websites,
-        num_websites: result.num_websites,
-        entity_sidebar: sidebar,
+        Self { raw, highlighted }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HighlightedSpellCorrection {
-    pub raw: String,
-    pub highlighted: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<HighlightedSpellCorrection>,
-    pub num_websites: usize,
-    pub websites: Vec<RankingWebsite>,
-    pub entity_sidebar: Option<DisplayedEntity>,
 }
 
 pub fn html_escape(s: &str) -> String {

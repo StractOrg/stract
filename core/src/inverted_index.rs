@@ -206,7 +206,7 @@ impl InvertedIndex {
 
         for pointer in pointers {
             let doc = searcher.doc(pointer.address.into())?;
-            top_websites.push(RankingWebsite::new(doc, pointer, aggregator))
+            top_websites.push(RankingWebsite::new(doc, pointer, aggregator));
         }
 
         Ok(top_websites)
@@ -237,7 +237,7 @@ impl InvertedIndex {
         let mut webpages: Vec<RetrievedWebpage> = websites
             .iter()
             .map(|website| self.retrieve_doc(website.address, &searcher))
-            .filter_map(|page| page.ok())
+            .filter_map(|res| res.ok())
             .map(|mut doc| {
                 if let Some(image) = doc.primary_image.as_ref() {
                     if !query.simple_terms().into_iter().all(|term| {
@@ -438,14 +438,14 @@ impl From<Document> for RetrievedWebpage {
                         .value
                         .as_text()
                         .expect("Title field should be text")
-                        .to_string()
+                        .to_string();
                 }
                 Field::Text(TextField::StemmedCleanBody) => {
                     webpage.body = value
                         .value
                         .as_text()
                         .expect("Body field should be text")
-                        .to_string()
+                        .to_string();
                 }
                 Field::Text(TextField::Description) => {
                     let desc = value
@@ -461,7 +461,7 @@ impl From<Document> for RetrievedWebpage {
                         .value
                         .as_text()
                         .expect("Url field should be text")
-                        .to_string()
+                        .to_string();
                 }
                 Field::Text(TextField::PrimaryImage) => {
                     webpage.primary_image = {
@@ -488,7 +488,7 @@ impl From<Document> for RetrievedWebpage {
                         .value
                         .as_text()
                         .expect("All body field should be text")
-                        .to_string()
+                        .to_string();
                 }
                 Field::Fast(FastField::Region) => {
                     webpage.region = {
@@ -500,7 +500,7 @@ impl From<Document> for RetrievedWebpage {
                     let facet = value.value.as_facet().unwrap();
 
                     if !facet.is_root() {
-                        webpage.host_topic = Some(facet.clone().into())
+                        webpage.host_topic = Some(facet.clone().into());
                     }
                 }
                 Field::Text(TextField::DmozDescription) => {

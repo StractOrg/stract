@@ -1,5 +1,4 @@
 host = "0.0.0.0:3001"
 index_path = "data/index"
 entity_index_path = "data/entity"
-bangs_path = "data/bangs.json"
 centrality_store_path = "data/centrality"

@@ -352,15 +352,10 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
 
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.second.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.second.com");
     }
 
     #[test]
@@ -404,43 +399,28 @@ mod tests {
             query: "test site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
 
         let query = SearchQuery {
             query: "test site:www.first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
 
         let query = SearchQuery {
             query: "test -site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.second.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.second.com");
     }
 
     #[test]
@@ -484,15 +464,10 @@ mod tests {
             query: "intitle:website".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.first.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
     }
 
     #[test]
@@ -536,15 +511,10 @@ mod tests {
             query: "test inurl:forum".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.first.com/forum");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/forum");
     }
 
     #[test]
@@ -618,41 +588,26 @@ mod tests {
             query: "test site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 0);
-        assert_eq!(result.documents.len(), 0);
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 0);
+        assert_eq!(result.webpages.len(), 0);
 
         let query = SearchQuery {
             query: "test site:the-first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.the-first.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.the-first.com");
 
         let query = SearchQuery {
             query: "test site:www.the-first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher
-            .search(&query)
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.the-first.com");
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.the-first.com");
     }
 }

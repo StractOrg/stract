@@ -152,6 +152,7 @@ pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: String,
     pub crossencoder_model_path: String,
+    pub bangs_path: String,
     pub search_servers: Vec<Vec<String>>,
 }
 
@@ -159,7 +160,6 @@ pub struct FrontendConfig {
 pub struct SearchServerConfig {
     pub index_path: String,
     pub entity_index_path: Option<String>,
-    pub bangs_path: Option<String>,
     pub centrality_store_path: Option<String>,
     pub host: String,
 }

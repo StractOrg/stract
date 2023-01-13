@@ -17,12 +17,10 @@
 use std::net::SocketAddr;
 
 use crate::{
-    bangs::Bangs,
     entity_index::EntityIndex,
     index::Index,
     inverted_index,
     ranking::centrality_store::CentralityStore,
-    search_prettifier::{self},
     searcher::{self, LocalSearcher},
     sonic, Result, SearchServerConfig,
 };
@@ -35,7 +33,6 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     let entity_index = config
         .entity_index_path
         .map(|path| EntityIndex::open(path).unwrap());
-    let bangs = config.bangs_path.map(Bangs::from_path);
     let centrality_store = config.centrality_store_path.map(CentralityStore::open);
     let search_index = Index::open(config.index_path)?;
 
@@ -45,10 +42,6 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
         local_searcher.set_entity_index(entity_index);
     }
 
-    if let Some(bangs) = bangs {
-        local_searcher.set_bangs(bangs);
-    }
-
     if let Some(centrality_store) = centrality_store {
         local_searcher.set_centrality_store(centrality_store);
     }
@@ -56,18 +49,6 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     loop {
         if let Ok(req) = server.accept::<searcher::distributed::Request>().await {
             match &req.body {
-                searcher::Request::Search(query) => {
-                    match local_searcher.search_initial(query, false) {
-                        Ok(response) => {
-                            req.respond(sonic::Response::Content(response)).await.ok();
-                        }
-                        Err(_) => {
-                            req.respond::<searcher::InitialSearchResult>(sonic::Response::Empty)
-                                .await
-                                .ok();
-                        }
-                    }
-                }
                 searcher::Request::RetrieveWebsites { websites, query } => {
                     match local_searcher.retrieve_websites(websites, query) {
                         Ok(response) => {
@@ -82,26 +63,11 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                         }
                     }
                 }
-                searcher::Request::SearchPrettified(query) => {
+                searcher::Request::Search(query) => {
                     match local_searcher.search_initial(query, false) {
-                        Ok(result) => match result {
-                            searcher::InitialSearchResult::Websites(result) => {
-                                let res = search_prettifier::initial(result);
-
-                                req.respond(sonic::Response::Content(
-                                    searcher::InitialPrettifiedSearchResult::Websites(res),
-                                ))
-                                .await
-                                .ok();
-                            }
-                            searcher::InitialSearchResult::Bang(bang) => {
-                                req.respond(sonic::Response::Content(
-                                    searcher::InitialSearchResult::Bang(bang),
-                                ))
-                                .await
-                                .ok();
-                            }
-                        },
+                        Ok(result) => {
+                            req.respond(sonic::Response::Content(result)).await.ok();
+                        }
                         Err(_) => {
                             req.respond::<inverted_index::SearchResult>(sonic::Response::Empty)
                                 .await

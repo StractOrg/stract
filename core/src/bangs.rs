@@ -19,10 +19,7 @@ use std::{collections::HashMap, fs, path::Path};
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    query::{parser::Term, Query},
-    webpage::Url,
-};
+use crate::{query::parser::Term, webpage::Url};
 
 pub const BANG_PREFIX: char = '!';
 
@@ -78,8 +75,8 @@ impl Bangs {
         }
     }
 
-    pub fn get(&self, query: &Query) -> Option<BangHit> {
-        for possible_bang in query.terms().iter().filter_map(|term| {
+    pub fn get(&self, terms: &[Box<Term>]) -> Option<BangHit> {
+        for possible_bang in terms.iter().filter_map(|term| {
             if let Term::PossibleBang(possible_bang) = term.as_ref() {
                 Some(possible_bang)
             } else {
@@ -94,8 +91,7 @@ impl Bangs {
                         .replace(
                             "{{{s}}}",
                             intersperse(
-                                query
-                                    .terms()
+                                terms
                                     .iter()
                                     .filter(|term| {
                                         if let Term::PossibleBang(bang) = term.as_ref() {
@@ -121,19 +117,13 @@ impl Bangs {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
 
-    use tantivy::tokenizer::TokenizerManager;
-
-    use crate::{ranking::SignalAggregator, schema::create_schema};
+    use crate::query::parser::parse;
 
     use super::*;
 
     #[test]
     fn simple_bang() {
-        let schema = Arc::new(create_schema());
-        let tokenizer_manager = TokenizerManager::new();
-
         let bangs = Bangs::from_json(
             r#"[{
             "c": "Multimedia",
@@ -146,33 +136,11 @@ mod tests {
         }]"#,
         );
 
-        let query = Query::parse(
-            "no bangs",
-            schema.clone(),
-            &tokenizer_manager,
-            &SignalAggregator::default(),
-        )
-        .unwrap();
-        assert_eq!(bangs.get(&query), None);
+        assert_eq!(bangs.get(&parse("no bangs")), None);
+        assert_eq!(bangs.get(&parse("!no bangs")), None);
 
-        let query = Query::parse(
-            "!no bangs",
-            schema.clone(),
-            &tokenizer_manager,
-            &SignalAggregator::default(),
-        )
-        .unwrap();
-        assert_eq!(bangs.get(&query), None);
-
-        let query = Query::parse(
-            "!ty bangs",
-            schema,
-            &tokenizer_manager,
-            &SignalAggregator::default(),
-        )
-        .unwrap();
         assert_eq!(
-            bangs.get(&query),
+            bangs.get(&parse("!ty bangs")),
             Some(BangHit {
                 bang: Bang {
                     category: Some("Multimedia".to_string()),

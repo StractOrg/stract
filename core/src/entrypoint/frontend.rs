@@ -16,16 +16,16 @@
 
 use anyhow::Result;
 
-use crate::frontend::router;
+use crate::{frontend::router, FrontendConfig};
 
-pub async fn run(
-    queries_csv_path: &str,
-    crossencoder_model_path: &str,
-    host: &str,
-    shards: Vec<Vec<String>>,
-) -> Result<()> {
-    let app = router(queries_csv_path, crossencoder_model_path, shards)?;
-    let addr = host.parse()?;
+pub async fn run(config: FrontendConfig) -> Result<()> {
+    let app = router(
+        &config.queries_csv_path,
+        &config.crossencoder_model_path,
+        &config.bangs_path,
+        config.search_servers,
+    )?;
+    let addr = config.host.parse()?;
     tracing::info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

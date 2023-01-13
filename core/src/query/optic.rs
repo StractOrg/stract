@@ -287,10 +287,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].url, "https://www.b.com");
@@ -313,10 +310,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.a.com");
@@ -338,10 +332,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].url, "https://www.a.com");
@@ -424,10 +415,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         let _ = searcher
             .search(&SearchQuery {
@@ -438,10 +426,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         let _ = searcher
             .search(&SearchQuery {
@@ -452,10 +437,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
     }
 
     #[test]
@@ -581,10 +563,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].url, "https://www.a.com/this/is/a/pattern");
@@ -741,10 +720,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 3);
         assert_eq!(res[0].url, "https://www.b.com/this/is/b/pattern");
@@ -865,10 +841,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.b.com/");
@@ -890,10 +863,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.b.com/");
@@ -915,10 +885,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.a.com/");
@@ -940,10 +907,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://www.b.com/");
@@ -1018,10 +982,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap()
-            .into_websites()
-            .unwrap()
-            .webpages
-            .documents;
+            .webpages;
 
         assert_eq!(res.len(), 0);
     }

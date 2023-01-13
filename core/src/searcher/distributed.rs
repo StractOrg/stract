@@ -15,14 +15,18 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    bangs::{BangHit, Bangs},
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self, RetrievedWebpage},
+    query,
     ranking::{
         models::cross_encoder::CrossEncoderModel,
         pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
     },
-    search_prettifier::{create_stackoverflow_sidebar, DisplayedWebpage, Sidebar},
+    search_prettifier::{
+        create_stackoverflow_sidebar, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
+    },
     searcher::PrettifiedWebsitesResult,
 };
 
@@ -40,7 +44,7 @@ use thiserror::Error;
 
 use crate::sonic;
 
-use super::{InitialPrettifiedSearchResult, PrettifiedSearchResult, SearchQuery};
+use super::{InitialWebsiteResult, SearchQuery, SearchResult};
 
 type Result<T> = std::result::Result<T, Error>;
 const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
@@ -62,16 +66,15 @@ pub enum Error {
 }
 
 impl RemoteSearcher {
-    async fn search(&self, query: &SearchQuery) -> Result<InitialPrettifiedSearchResult> {
+    async fn search(&self, query: &SearchQuery) -> Result<InitialWebsiteResult> {
         for timeout in ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5)
         {
             if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
             {
-                if let Ok(sonic::Response::Content(body)) = connection
-                    .send(Request::SearchPrettified(query.clone()))
-                    .await
+                if let Ok(sonic::Response::Content(body)) =
+                    connection.send(Request::Search(query.clone())).await
                 {
                     return Ok(body);
                 }
@@ -109,7 +112,7 @@ impl RemoteSearcher {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct ShardId(u32);
+struct ShardId(u64);
 
 pub struct Shard {
     id: ShardId,
@@ -117,7 +120,7 @@ pub struct Shard {
 }
 
 impl Shard {
-    pub fn new(id: u32, replicas: Vec<String>) -> Self {
+    pub fn new(id: u64, replicas: Vec<String>) -> Self {
         let mut parsed_replicas = Vec::new();
 
         for replica in replicas {
@@ -169,14 +172,13 @@ impl Shard {
 }
 
 struct InitialSearchResultShard {
-    local_result: InitialPrettifiedSearchResult,
+    local_result: InitialWebsiteResult,
     shard: ShardId,
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum Request {
     Search(SearchQuery),
-    SearchPrettified(SearchQuery),
     RetrieveWebsites {
         websites: Vec<inverted_index::WebsitePointer>,
         query: String,
@@ -186,6 +188,7 @@ pub enum Request {
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
     cross_encoder: Arc<CrossEncoderModel>,
+    bangs: Bangs,
 }
 
 #[derive(Clone)]
@@ -219,10 +222,11 @@ impl collector::Doc for ScoredWebsitePointer {
 }
 
 impl DistributedSearcher {
-    pub fn new(shards: Vec<Shard>, model: CrossEncoderModel) -> Self {
+    pub fn new(shards: Vec<Shard>, model: CrossEncoderModel, bangs: Bangs) -> Self {
         Self {
             shards,
             cross_encoder: Arc::new(model),
+            bangs,
         }
     }
 
@@ -238,15 +242,13 @@ impl DistributedSearcher {
             BucketCollector::new(pipeline.collector_top_n() + pipeline.collector_offset());
 
         for result in initial_results {
-            if let InitialPrettifiedSearchResult::Websites(local_result) = result.local_result {
-                for website in local_result.websites {
-                    let pointer = ScoredWebsitePointer {
-                        website,
-                        shard: result.shard.clone(),
-                    };
+            for website in result.local_result.websites {
+                let pointer = ScoredWebsitePointer {
+                    website,
+                    shard: result.shard.clone(),
+                };
 
-                    collector.insert(pointer);
-                }
+                collector.insert(pointer);
             }
         }
 
@@ -317,15 +319,13 @@ impl DistributedSearcher {
             .search_initial(&query)
             .await
             .into_iter()
-            .filter_map(|result| match result.local_result {
-                InitialPrettifiedSearchResult::Websites(websites) => {
-                    if let Some(website) = websites.websites.first().cloned() {
-                        Some((result.shard, website))
-                    } else {
-                        None
-                    }
-                }
-                InitialPrettifiedSearchResult::Bang(_) => None,
+            .filter_map(|result| {
+                result
+                    .local_result
+                    .websites
+                    .first()
+                    .cloned()
+                    .map(|website| (result.shard, website))
             })
             .collect();
 
@@ -350,13 +350,9 @@ impl DistributedSearcher {
         initial_results: &[InitialSearchResultShard],
         query: &SearchQuery,
     ) -> Result<Option<Sidebar>> {
-        let entity = initial_results.first().and_then(|result| {
-            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                result.entity_sidebar.clone()
-            } else {
-                None
-            }
-        });
+        let entity = initial_results
+            .first()
+            .and_then(|result| result.local_result.entity_sidebar.clone());
 
         match entity {
             Some(entity) => Ok(Some(Sidebar::Entity(entity))),
@@ -364,7 +360,17 @@ impl DistributedSearcher {
         }
     }
 
-    pub async fn search(&self, query: &SearchQuery) -> Result<PrettifiedSearchResult> {
+    fn check_bangs(&self, query: &SearchQuery) -> Option<BangHit> {
+        let parsed_terms = query::parser::parse(&query.query);
+
+        self.bangs.get(&parsed_terms)
+    }
+
+    pub async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
+        if let Some(bang) = self.check_bangs(query) {
+            return Ok(SearchResult::Bang(bang));
+        }
+
         let start = Instant::now();
 
         if query.is_empty() {
@@ -375,35 +381,16 @@ impl DistributedSearcher {
 
         let initial_results = self.search_initial(query).await;
 
-        // check if any result has a bang hit
-        if let Some(result) = initial_results
-            .iter()
-            .find(|result| matches!(result.local_result, InitialPrettifiedSearchResult::Bang(_)))
-        {
-            if let InitialPrettifiedSearchResult::Bang(bang) = &result.local_result {
-                return Ok(PrettifiedSearchResult::Bang(bang.clone()));
-            }
-        }
-
         let sidebar = self.sidebar(&initial_results, query).await?;
 
-        let spell_corrected_query = initial_results.first().and_then(|result| {
-            if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                result.spell_corrected_query.clone()
-            } else {
-                None
-            }
-        });
+        let spell_corrected_query = initial_results
+            .first()
+            .and_then(|result| result.local_result.spell_corrected_query.clone())
+            .map(HighlightedSpellCorrection::from);
 
         let num_docs = initial_results
             .iter()
-            .map(|result| {
-                if let InitialPrettifiedSearchResult::Websites(result) = &result.local_result {
-                    result.num_websites
-                } else {
-                    0
-                }
-            })
+            .map(|result| result.local_result.num_websites)
             .sum();
 
         let top_websites = self.combine_results(initial_results, &mut search_query)?;
@@ -420,9 +407,9 @@ impl DistributedSearcher {
             return Err(Error::SearchFailed);
         }
 
-        Ok(PrettifiedSearchResult::Websites(PrettifiedWebsitesResult {
+        Ok(SearchResult::Websites(PrettifiedWebsitesResult {
             spell_corrected_query,
-            num_docs,
+            num_hits: num_docs,
             webpages: retrieved_webpages,
             sidebar,
             search_duration_ms: start.elapsed().as_millis(),

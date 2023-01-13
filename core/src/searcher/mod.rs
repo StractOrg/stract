@@ -24,8 +24,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bangs::BangHit,
-    inverted_index,
-    search_prettifier::{self, DisplayedWebpage, HighlightedSpellCorrection, Sidebar},
+    ranking::pipeline::RankingWebsite,
+    search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar},
     spell::Correction,
     webpage::region::Region,
 };
@@ -33,21 +33,7 @@ use crate::{
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
 #[derive(Debug, Serialize)]
-pub struct WebsitesResult {
-    pub spell_corrected_query: Option<Correction>,
-    pub webpages: inverted_index::SearchResult,
-    pub sidebar: Option<Sidebar>,
-    pub search_duration_ms: u128,
-}
-
-#[derive(Debug, Serialize)]
 pub enum SearchResult {
-    Websites(WebsitesResult),
-    Bang(BangHit),
-}
-
-#[derive(Debug, Serialize)]
-pub enum PrettifiedSearchResult {
     Websites(PrettifiedWebsitesResult),
     Bang(BangHit),
 }
@@ -56,21 +42,9 @@ pub enum PrettifiedSearchResult {
 pub struct PrettifiedWebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
-    pub num_docs: usize,
+    pub num_hits: usize,
     pub sidebar: Option<Sidebar>,
     pub search_duration_ms: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum InitialSearchResult {
-    Websites(local::InitialWebsiteResult),
-    Bang(BangHit),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum InitialPrettifiedSearchResult {
-    Websites(search_prettifier::InitialWebsiteResult),
-    Bang(BangHit),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -81,6 +55,14 @@ pub struct SearchQuery {
     pub selected_region: Option<Region>,
     pub optic_program: Option<String>,
     pub site_rankings: Option<SiteRankings>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialWebsiteResult {
+    pub spell_corrected_query: Option<Correction>,
+    pub num_websites: usize,
+    pub websites: Vec<RankingWebsite>,
+    pub entity_sidebar: Option<DisplayedEntity>,
 }
 
 impl Default for SearchQuery {

@@ -17,10 +17,8 @@
 use std::str::FromStr;
 
 use optics::Optic;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bangs::{BangHit, Bangs};
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
@@ -29,20 +27,19 @@ use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
-use crate::search_prettifier::{DisplayedEntity, Sidebar};
+use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::WebsitesResult;
-use super::{InitialSearchResult, SearchQuery, SearchResult};
+use super::PrettifiedWebsitesResult;
+use super::{InitialWebsiteResult, SearchQuery};
 
 pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
-    bangs: Option<Bangs>,
     centrality_store: Option<CentralityStore>,
     topic_centrality: Option<TopicCentrality>,
 }
@@ -58,7 +55,6 @@ impl LocalSearcher {
         LocalSearcher {
             index,
             entity_index: None,
-            bangs: None,
             centrality_store: None,
             topic_centrality: None,
         }
@@ -66,10 +62,6 @@ impl LocalSearcher {
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
         self.entity_index = Some(entity_index);
-    }
-
-    pub fn set_bangs(&mut self, bangs: Bangs) {
-        self.bangs = Some(bangs);
     }
 
     pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
@@ -215,16 +207,6 @@ impl LocalSearcher {
         Ok(self.index.spell_correction(&parsed_query.simple_terms()))
     }
 
-    fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
-        let parsed_query = self.parse_query(query, None)?;
-
-        if let Some(bangs) = self.bangs.as_ref() {
-            return Ok(bangs.get(&parsed_query));
-        }
-
-        Ok(None)
-    }
-
     fn entity_sidebar(&self, query: &SearchQuery) -> Option<StoredEntity> {
         self.entity_index
             .as_ref()
@@ -235,23 +217,19 @@ impl LocalSearcher {
         &self,
         query: &SearchQuery,
         de_rank_similar: bool,
-    ) -> Result<InitialSearchResult> {
-        if let Some(bang) = self.check_bangs(query)? {
-            return Ok(InitialSearchResult::Bang(bang));
-        }
-
+    ) -> Result<InitialWebsiteResult> {
         let (websites, num_websites) = self.search_inverted_index(query, de_rank_similar)?;
         let correction = self.spell_correction(query)?;
         let sidebar = self
             .entity_sidebar(query)
             .map(|entity| DisplayedEntity::from(entity, self));
 
-        Ok(InitialSearchResult::Websites(InitialWebsiteResult {
+        Ok(InitialWebsiteResult {
             spell_corrected_query: correction,
             websites,
             num_websites,
             entity_sidebar: sidebar,
-        }))
+        })
     }
 
     pub fn retrieve_websites(
@@ -273,12 +251,15 @@ impl LocalSearcher {
         self.index.retrieve_websites(websites, &query)
     }
 
-    pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
+    pub fn search(&self, query: &SearchQuery) -> Result<PrettifiedWebsitesResult> {
         use std::{sync::Arc, time::Instant};
 
-        use crate::ranking::{
-            models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
-            pipeline::RankingPipeline,
+        use crate::{
+            ranking::{
+                models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
+                pipeline::RankingPipeline,
+            },
+            search_prettifier::Sidebar,
         };
 
         let start = Instant::now();
@@ -291,29 +272,28 @@ impl LocalSearcher {
             }
         };
 
-        let initial_result = self.search_initial(&search_query, true)?;
+        let search_result = self.search_initial(&search_query, true)?;
 
-        match initial_result {
-            InitialSearchResult::Websites(search_result) => {
-                let top_websites = pipeline.apply(search_result.websites);
-                let pointers: Vec<_> = top_websites
-                    .into_iter()
-                    .map(|website| website.pointer)
-                    .collect();
+        let top_websites = pipeline.apply(search_result.websites);
+        let pointers: Vec<_> = top_websites
+            .into_iter()
+            .map(|website| website.pointer)
+            .collect();
 
-                let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
-                Ok(SearchResult::Websites(WebsitesResult {
-                    spell_corrected_query: search_result.spell_corrected_query,
-                    webpages: inverted_index::SearchResult {
-                        num_docs: search_result.num_websites,
-                        documents: retrieved_sites,
-                    },
-                    sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
-                    search_duration_ms: start.elapsed().as_millis(),
-                }))
-            }
-            InitialSearchResult::Bang(bang) => Ok(SearchResult::Bang(bang)),
-        }
+        let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
+
+        Ok(PrettifiedWebsitesResult {
+            spell_corrected_query: search_result
+                .spell_corrected_query
+                .map(HighlightedSpellCorrection::from),
+            num_hits: search_result.num_websites,
+            webpages: retrieved_sites
+                .into_iter()
+                .map(DisplayedWebpage::from)
+                .collect(),
+            sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
+            search_duration_ms: start.elapsed().as_millis(),
+        })
     }
 
     pub fn favicon(&self, site: &Url) -> Option<Image> {
@@ -337,25 +317,6 @@ impl LocalSearcher {
         self.entity_index
             .as_ref()
             .and_then(|index| index.get_attribute_occurrence(attribute))
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<Correction>,
-    pub num_websites: usize,
-    pub websites: Vec<RankingWebsite>,
-    pub entity_sidebar: Option<DisplayedEntity>,
-}
-
-impl SearchResult {
-    #[cfg(test)]
-    pub fn into_websites(self) -> Option<WebsitesResult> {
-        if let SearchResult::Websites(res) = self {
-            Some(res)
-        } else {
-            None
-        }
     }
 }
 
@@ -417,10 +378,7 @@ mod tests {
                     ..Default::default()
                 })
                 .unwrap()
-                .into_websites()
-                .unwrap()
                 .webpages
-                .documents
                 .into_iter()
                 .map(|page| page.url)
                 .collect();

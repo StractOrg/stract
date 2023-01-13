@@ -402,14 +402,11 @@ mod tests {
                 query: "website".to_string(),
                 ..Default::default()
             })
-            .expect("Search failed")
-            .into_websites()
-            .unwrap()
-            .webpages;
+            .expect("Search failed");
 
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.example.com");
     }
 
     #[test]
