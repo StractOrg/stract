@@ -201,8 +201,9 @@ fn main() -> Result<()> {
                 let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open();
 
                 for other_path in paths {
-                    let other = WebgraphBuilder::new(other_path).open();
+                    let other = WebgraphBuilder::new(&other_path).open();
                     webgraph.merge(other);
+                    std::fs::remove_dir_all(other_path).unwrap();
                 }
 
                 if let Some(num_segments) = num_segments {
@@ -216,12 +217,7 @@ fn main() -> Result<()> {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?
-                .block_on(frontend::run(
-                    &config.queries_csv_path,
-                    &config.crossencoder_model_path,
-                    &config.host,
-                    config.search_servers,
-                ))?
+                .block_on(frontend::run(config))?
         }
         Commands::SearchServer { config_path } => {
             let config: SearchServerConfig = load_toml_config(config_path);
