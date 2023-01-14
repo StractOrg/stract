@@ -44,6 +44,7 @@ pub struct WebsitesResult {
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: usize,
     pub sidebar: Option<Sidebar>,
+    pub discussions: Option<Vec<DisplayedWebpage>>,
     pub search_duration_ms: u128,
 }
 

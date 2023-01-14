@@ -7,6 +7,7 @@ import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
 import Header from "../components/Header.astro";
 import RankingModal from "../components/RankingModal.astro";
+import Discussions from "../components/Discussions.astro";
 import { askama } from "../askama";
 ---
 
@@ -62,7 +63,7 @@ import { askama } from "../askama";
       </div>
 
       <!-- Search results -->
-      <div class="col-start-1 flex min-w-0 max-w-4xl flex-col space-y-10">
+      <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-10">
         {
           askama.if_("let Some(correction) = spell_correction", () => (
             <div>
@@ -79,6 +80,12 @@ import { askama } from "../askama";
 
         {
           askama.for_("item in search_result", () => (
+            <>
+            {
+              askama.if_("loop.index == 3", () => (
+                <Discussions discussions="discussions" />
+              ))
+            }
             <div class="flex w-full">
               <div class="flex min-w-0 grow flex-col space-y-1">
                 <div class="flex min-w-0">
@@ -110,23 +117,8 @@ import { askama } from "../askama";
                   <Snippet snippet={askama`item.snippet`} />
                 </div>
               </div>
-              <div class="flex h-full w-20 items-center">
-                <div class="h-20 w-20 py-1 pl-2">
-                  {askama.if_(
-                    "let Some(val) = item.primary_image_uuid",
-                    <a href="{{ item.url|urlencode }}">
-                      <img
-                        class="h-full w-full rounded-full object-cover"
-                        src={askama.fake(
-                          "/image/{{ val|urlencode }}",
-                          "{{image.avatar}}"
-                        )}
-                      />
-                    </a>
-                  )}
-                </div>
-              </div>
             </div>
+          </>
           ))
         }
 
@@ -180,7 +172,7 @@ import { askama } from "../askama";
     @apply text-blue-800 visited:text-purple-800;
     max-width: calc(100% - 30px);
   }
-
+  
   .url {
     max-width: calc(100% - 100px);
   }

@@ -47,7 +47,9 @@ use crate::sonic;
 use super::{InitialWebsiteResult, SearchQuery, SearchResult};
 
 type Result<T> = std::result::Result<T, Error>;
+
 const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
+const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 10.0;
 
 struct RemoteSearcher {
     addr: SocketAddr,
@@ -366,6 +368,65 @@ impl DistributedSearcher {
         self.bangs.get(&parsed_terms)
     }
 
+    async fn discussions_widget(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<Option<Vec<DisplayedWebpage>>> {
+        if query.optic_program.is_some() || query.offset > 0 {
+            return Ok(None);
+        }
+
+        const NUM_RESULTS: usize = 4;
+
+        let mut query = SearchQuery {
+            query: query.query.clone(),
+            num_results: NUM_RESULTS,
+            optic_program: Some(include_str!("discussions.optic").to_string()),
+            ..Default::default()
+        };
+
+        let initial_results = self.search_initial(&query).await;
+
+        if initial_results.is_empty() {
+            return Ok(None);
+        }
+
+        let num_results: usize = initial_results
+            .iter()
+            .map(|res| res.local_result.num_websites)
+            .sum();
+
+        if num_results < NUM_RESULTS / 2 {
+            return Ok(None);
+        }
+
+        let results = self.combine_results(initial_results, &mut query)?;
+
+        let scores: Vec<_> = results
+            .iter()
+            .map(|pointer| pointer.website.score)
+            .collect();
+
+        let median = if scores.len() % 2 == 0 {
+            (scores[(scores.len() / 2) - 1] + scores[(scores.len() / 2)]) / 2.0
+        } else {
+            scores[scores.len() / 2]
+        };
+
+        if median < DISCUSSIONS_WIDGET_THRESHOLD {
+            return Ok(None);
+        }
+
+        let result = self
+            .retrieve_webpages(&results, &query.query)
+            .await
+            .into_iter()
+            .map(DisplayedWebpage::from)
+            .collect();
+
+        Ok(Some(result))
+    }
+
     pub async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         if let Some(bang) = self.check_bangs(query) {
             return Ok(SearchResult::Bang(bang));
@@ -382,6 +443,7 @@ impl DistributedSearcher {
         let initial_results = self.search_initial(query).await;
 
         let sidebar = self.sidebar(&initial_results, query).await?;
+        let discussions = self.discussions_widget(query).await?;
 
         let spell_corrected_query = initial_results
             .first()
@@ -412,6 +474,7 @@ impl DistributedSearcher {
             num_hits: num_docs,
             webpages: retrieved_webpages,
             sidebar,
+            discussions,
             search_duration_ms: start.elapsed().as_millis(),
         }))
     }

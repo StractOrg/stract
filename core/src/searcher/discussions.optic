@@ -1,0 +1,20 @@
+DiscardNonMatching;
+
+Rule {
+    Matches {
+        Schema("QAPage"),
+    }
+};
+
+Rule {
+    Matches {
+        Schema("DiscussionForumPosting"),
+    }
+};
+
+Rule {
+    Matches {
+        Domain("reddit.com"),
+        Url("comments"),
+    }
+}

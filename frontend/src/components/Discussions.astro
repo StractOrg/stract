@@ -1,0 +1,45 @@
+---
+import { askama } from "../askama";
+import Hero from "./Hero.astro";
+
+export interface Props {
+    discussions: string;
+}
+---
+
+{
+askama.if_("let Some(discussions) = discussions", () => (
+<div class="discussions relative overflow-hidden flex flex-col space-y-1.5" id="discussions">
+    <div class="text-lg space-x-1 flex mb" id="discussions-header">
+        <Hero class="w-4" icon="chat-alt-2" />
+        <span>Discussions</span>
+    </div>
+    <div class="flex flex-col">
+    {
+    askama.for_("discussion in discussions", () => (
+        <div class="discussion overflow-hidden">
+            <div>
+                <a class="text-sm hover:no-underline" href="{{ discussion.url }} ">
+                {askama`discussion.domain`}
+                </a>
+            </div>
+            <a
+                class="discussion-title truncate text-md font-medium"
+                title="{{ discussion.title }}"
+                href="{{ discussion.url }}"
+            >
+                {askama`discussion.title $ {{lorem.sentence}}`}
+            </a>
+        </div>
+    ))
+    }
+    </div>
+</div>
+))
+}
+<style>
+  .discussion-title {
+    display: inline-block;
+    max-width: calc(100% - 10px);
+  }
+</style>

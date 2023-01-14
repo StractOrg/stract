@@ -386,7 +386,7 @@ impl Field {
 
     pub fn boost(&self) -> Option<f32> {
         match self {
-            Field::Text(TextField::Site) => Some(3.0),
+            Field::Text(TextField::Site) => Some(2.0),
             Field::Text(TextField::TitleIfHomepage) => Some(3.0),
             Field::Text(TextField::DomainIfHomepage) => Some(6.0),
             Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => Some(30.0),

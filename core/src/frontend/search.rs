@@ -44,6 +44,7 @@ use axum::{
 #[template(path = "search/index.html")]
 struct SearchTemplate {
     search_result: Vec<DisplayedWebpage>,
+    discussions: Option<Vec<DisplayedWebpage>>,
     query: String,
     sidebar: Option<Sidebar>,
     spell_correction: Option<HighlightedSpellCorrection>,
@@ -154,6 +155,7 @@ pub async fn route(
 
                 let template = SearchTemplate {
                     search_result: result.webpages,
+                    discussions: result.discussions,
                     query,
                     sidebar,
                     spell_correction,

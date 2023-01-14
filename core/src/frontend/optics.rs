@@ -18,7 +18,7 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
-pub const DEFAULT_OPTICS: [OpticLink; 2] = [
+pub const DEFAULT_OPTICS: [OpticLink; 3] = [
     OpticLink {
         name: "Copycats removal",
         url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/copycats_removal.optic",
@@ -26,6 +26,10 @@ pub const DEFAULT_OPTICS: [OpticLink; 2] = [
     OpticLink {
         name: "Hacker News",
         url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/hacker_news.optic",
+    },
+    OpticLink {
+        name: "Discussions",
+        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/discussions.optic",
     },
 ];
 

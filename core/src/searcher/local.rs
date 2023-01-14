@@ -315,6 +315,7 @@ impl LocalSearcher {
                 .into_iter()
                 .map(DisplayedWebpage::from)
                 .collect(),
+            discussions: None,
             sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
             search_duration_ms: start.elapsed().as_millis(),
         })

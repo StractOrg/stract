@@ -121,7 +121,7 @@ struct ReRanker<M: CrossEncoder> {
 impl<M: CrossEncoder> ReRanker<M> {
     fn new(model: Arc<M>) -> Self {
         Self {
-            coefficient: 1.0,
+            coefficient: 100.0,
             model,
             prev_score: 1.0,
             query: String::new(),
@@ -133,8 +133,9 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
     fn score(&self, websites: &mut [T]) {
         for website in websites {
             let mut website = website.as_mut_ranking();
+            let text = website.title.clone() + ". " + &website.clean_body;
             website.score = self.prev_score * website.score
-                + self.coefficient * self.model.run(&self.query, &website.clean_body);
+                + self.coefficient * self.model.run(&self.query, &text);
         }
     }
 
