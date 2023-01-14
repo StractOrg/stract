@@ -34,12 +34,12 @@ pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
 #[derive(Debug, Serialize)]
 pub enum SearchResult {
-    Websites(PrettifiedWebsitesResult),
+    Websites(WebsitesResult),
     Bang(BangHit),
 }
 
 #[derive(Debug, Serialize)]
-pub struct PrettifiedWebsitesResult {
+pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: usize,
@@ -67,6 +67,9 @@ pub struct InitialWebsiteResult {
 
 impl Default for SearchQuery {
     fn default() -> Self {
+        // This does not use `..Default::default()` as there should be
+        // an explicit compile error when new fields are added to the `SearchQuery` struct
+        // to ensure the developer considers what the default should be.
         Self {
             query: Default::default(),
             offset: Default::default(),

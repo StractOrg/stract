@@ -19,6 +19,7 @@ use crate::{
     ranking::SignalAggregator,
     schema::{Field, TextField},
     searcher::NUM_RESULTS_PER_PAGE,
+    webpage::region::Region,
     Result,
 };
 use optics::Optic;
@@ -48,6 +49,8 @@ pub struct Query {
     terms: Vec<Box<Term>>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
+    offset: usize,
+    region: Option<Region>,
     num_results: usize,
 }
 
@@ -156,6 +159,8 @@ impl Query {
             terms,
             simple_terms_text,
             tantivy_query,
+            offset: 0,
+            region: None,
             num_results: NUM_RESULTS_PER_PAGE,
         })
     }
@@ -167,7 +172,7 @@ impl Query {
             &mut optic.as_multiple_tantivy(&index.schema(), index.inverted_index.fastfield_cache()),
         );
 
-        self.tantivy_query = Box::new(BooleanQuery::new(subqueries))
+        self.tantivy_query = Box::new(BooleanQuery::new(subqueries));
     }
 
     pub fn simple_terms(&self) -> Vec<String> {
@@ -176,6 +181,14 @@ impl Query {
 
     pub fn set_num_results(&mut self, num_results: usize) {
         self.num_results = num_results;
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+
+    pub fn set_region(&mut self, region: Region) {
+        self.region = Some(region);
     }
 
     pub fn terms(&self) -> &[Box<Term>] {
@@ -188,6 +201,14 @@ impl Query {
 
     pub fn num_results(&self) -> usize {
         self.num_results
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn region(&self) -> Option<&Region> {
+        self.region.as_ref()
     }
 }
 

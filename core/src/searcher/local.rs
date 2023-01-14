@@ -22,7 +22,8 @@ use uuid::Uuid;
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::query::Query;
+use crate::query::parser::Term;
+use crate::query::{self, Query};
 use crate::ranking::centrality_store::CentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::RankingWebsite;
@@ -34,7 +35,7 @@ use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
-use super::PrettifiedWebsitesResult;
+use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
 
 pub struct LocalSearcher {
@@ -72,8 +73,14 @@ impl LocalSearcher {
         self.topic_centrality = Some(topic_centrality);
     }
 
-    fn parse_query(&self, query: &SearchQuery, optic: Option<&Optic>) -> Result<Query> {
+    fn parse_query(&self, query: &SearchQuery) -> Result<(Query, Optic)> {
+        let optic = match query.optic_program.as_ref() {
+            Some(program) => Some(optics::parse(program)?),
+            None => None,
+        };
+
         let mut query_aggregator = optic
+            .as_ref()
             .and_then(|optic| {
                 optic
                     .pipeline
@@ -83,7 +90,7 @@ impl LocalSearcher {
             .unwrap_or_default();
 
         if let (Some(optic), Some(harmonic)) = (
-            optic,
+            optic.as_ref(),
             self.centrality_store
                 .as_ref()
                 .map(|store| &store.online_harmonic),
@@ -100,30 +107,16 @@ impl LocalSearcher {
         )?;
 
         parsed_query.set_num_results(query.num_results);
+        parsed_query.set_offset(query.offset);
 
-        if parsed_query.is_empty() {
-            Err(Error::EmptyQuery)
-        } else {
-            Ok(parsed_query)
+        if let Some(region) = query.selected_region {
+            parsed_query.set_region(region);
         }
-    }
-
-    fn search_inverted_index(
-        &self,
-        query: &SearchQuery,
-        de_rank_similar: bool,
-    ) -> Result<(Vec<RankingWebsite>, usize)> {
-        let optic = match query.optic_program.as_ref() {
-            Some(program) => Some(optics::parse(program)?),
-            None => None,
-        };
-
-        let mut parsed_query = self.parse_query(query, optic.as_ref())?;
 
         let mut optics = Vec::new();
 
-        if let Some(optic) = &optic {
-            optics.push(optic.clone());
+        if let Some(optic) = optic {
+            optics.push(optic);
         }
 
         if let Some(site_rankings) = &query.site_rankings {
@@ -137,6 +130,65 @@ impl LocalSearcher {
         }
 
         parsed_query.set_optic(&optic, &self.index);
+
+        if parsed_query.is_empty() {
+            Err(Error::EmptyQuery)
+        } else {
+            Ok((parsed_query, optic))
+        }
+    }
+
+    fn ranker(
+        &self,
+        query: &Query,
+        de_rank_similar: bool,
+        aggregator: SignalAggregator,
+    ) -> Result<Ranker> {
+        let mut ranker = Ranker::new(
+            self.index.region_count.clone(),
+            aggregator,
+            self.index.inverted_index.fastfield_cache(),
+        );
+
+        if let Some(region) = query.region() {
+            if *region != Region::All {
+                ranker = ranker.with_region(*region);
+            }
+        }
+
+        if let Some(topic_centrality) = self.topic_centrality.as_ref() {
+            let topic_scorer = topic_centrality.scorer(query);
+            ranker.set_topic_scorer(topic_scorer);
+        }
+
+        ranker.de_rank_similar(de_rank_similar);
+
+        if let Some(centrality_store) = self.centrality_store.as_ref() {
+            ranker = ranker
+                .with_max_docs(10_000, self.index.num_segments())
+                .with_num_results(100);
+
+            let top_host_nodes = self.index.top_nodes(query, ranker.collector())?;
+            if !top_host_nodes.is_empty() {
+                let harmonic = centrality_store
+                    .online_harmonic
+                    .scorer_from_ids(&top_host_nodes, &[]);
+                ranker.set_query_centrality(harmonic);
+            }
+        }
+
+        Ok(ranker
+            .with_max_docs(10_000_000, self.index.num_segments())
+            .with_num_results(query.num_results())
+            .with_offset(query.offset()))
+    }
+
+    fn search_inverted_index(
+        &self,
+        query: &SearchQuery,
+        de_rank_similar: bool,
+    ) -> Result<(Vec<RankingWebsite>, usize)> {
+        let (parsed_query, optic) = self.parse_query(query)?;
 
         let mut aggregator = optic
             .pipeline
@@ -152,43 +204,7 @@ impl LocalSearcher {
                 .add_personal_harmonic(online_centrality_scorer(&optic.site_rankings, harmonic));
         }
 
-        let mut ranker = Ranker::new(
-            self.index.region_count.clone(),
-            aggregator,
-            self.index.inverted_index.fastfield_cache(),
-        );
-
-        if let Some(region) = query.selected_region {
-            if region != Region::All {
-                ranker = ranker.with_region(region);
-            }
-        }
-
-        if let Some(topic_centrality) = self.topic_centrality.as_ref() {
-            let topic_scorer = topic_centrality.scorer(&parsed_query);
-            ranker.set_topic_scorer(topic_scorer);
-        }
-
-        ranker.de_rank_similar(de_rank_similar);
-
-        if let Some(centrality_store) = self.centrality_store.as_ref() {
-            ranker = ranker
-                .with_max_docs(10_000, self.index.num_segments())
-                .with_num_results(100);
-
-            let top_host_nodes = self.index.top_nodes(&parsed_query, ranker.collector())?;
-            if !top_host_nodes.is_empty() {
-                let harmonic = centrality_store
-                    .online_harmonic
-                    .scorer_from_ids(&top_host_nodes, &[]);
-                ranker.set_query_centrality(harmonic);
-            }
-        }
-
-        ranker = ranker
-            .with_max_docs(10_000_000, self.index.num_segments())
-            .with_num_results(parsed_query.num_results())
-            .with_offset(query.offset);
+        let ranker = self.ranker(&parsed_query, de_rank_similar, aggregator)?;
 
         let res = self
             .index
@@ -202,9 +218,16 @@ impl LocalSearcher {
         Ok((ranking_websites, res.num_websites))
     }
 
-    fn spell_correction(&self, query: &SearchQuery) -> Result<Option<Correction>> {
-        let parsed_query = self.parse_query(query, None)?;
-        Ok(self.index.spell_correction(&parsed_query.simple_terms()))
+    fn spell_correction(&self, query: &SearchQuery) -> Option<Correction> {
+        let terms: Vec<_> = query::parser::parse(&query.query)
+            .into_iter()
+            .filter_map(|term| match *term {
+                Term::Simple(s) => Some(s),
+                _ => None,
+            })
+            .collect();
+
+        self.index.spell_correction(&terms)
     }
 
     fn entity_sidebar(&self, query: &SearchQuery) -> Option<StoredEntity> {
@@ -219,7 +242,7 @@ impl LocalSearcher {
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
         let (websites, num_websites) = self.search_inverted_index(query, de_rank_similar)?;
-        let correction = self.spell_correction(query)?;
+        let correction = self.spell_correction(query);
         let sidebar = self
             .entity_sidebar(query)
             .map(|entity| DisplayedEntity::from(entity, self));
@@ -251,7 +274,8 @@ impl LocalSearcher {
         self.index.retrieve_websites(websites, &query)
     }
 
-    pub fn search(&self, query: &SearchQuery) -> Result<PrettifiedWebsitesResult> {
+    /// This function is mainly used for tests and benchmarks
+    pub fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         use std::{sync::Arc, time::Instant};
 
         use crate::{
@@ -282,7 +306,7 @@ impl LocalSearcher {
 
         let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
 
-        Ok(PrettifiedWebsitesResult {
+        Ok(WebsitesResult {
             spell_corrected_query: search_result
                 .spell_corrected_query
                 .map(HighlightedSpellCorrection::from),

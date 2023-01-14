@@ -48,6 +48,7 @@ use crate::{
 
 pub use self::signal::*;
 
+#[derive(Clone)]
 pub struct Ranker {
     region_count: Arc<RegionCount>,
     selected_region: Option<Region>,

@@ -27,7 +27,7 @@ use crate::{
     search_prettifier::{
         create_stackoverflow_sidebar, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
     },
-    searcher::PrettifiedWebsitesResult,
+    searcher::WebsitesResult,
 };
 
 use std::{
@@ -407,7 +407,7 @@ impl DistributedSearcher {
             return Err(Error::SearchFailed);
         }
 
-        Ok(SearchResult::Websites(PrettifiedWebsitesResult {
+        Ok(SearchResult::Websites(WebsitesResult {
             spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,

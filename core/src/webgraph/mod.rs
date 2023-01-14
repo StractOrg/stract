@@ -540,7 +540,7 @@ impl<S: Store> Webgraph<S> {
         }
 
         self.segments
-            .sort_by_key(|b| std::cmp::Reverse(b.num_nodes()));
+            .sort_by_key(|segment| std::cmp::Reverse(segment.num_nodes()));
 
         let mut candidates = Vec::with_capacity(num_segments);
 

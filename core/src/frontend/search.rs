@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use http::Uri;
 use optics::SiteRankings;
 use std::{collections::HashMap, sync::Arc};
 
@@ -61,6 +62,27 @@ enum RegionSelection {
     Unselected(Region),
 }
 
+fn extract_site_rankings(params: &HashMap<String, String>) -> Option<SiteRankings> {
+    match params.get("sr") {
+        Some(sr) => {
+            if !sr.is_empty() {
+                if let Ok(site_rankings) = base64::decode(sr) {
+                    if let Ok(site_rankings) = std::str::from_utf8(&site_rankings) {
+                        serde_json::from_str(site_rankings).ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        None => None,
+    }
+}
+
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
@@ -78,6 +100,7 @@ pub async fn route(
     let offset = skip_pages * NUM_RESULTS_PER_PAGE;
 
     let mut optic = None;
+    // should only be set if optic was successfully downloaded
     let mut current_optic_url = None;
 
     if let Some(url) = params.get("optic") {
@@ -99,24 +122,7 @@ pub async fn route(
         }
     });
 
-    let site_rankings: Option<SiteRankings> = match params.get("sr") {
-        Some(sr) => {
-            if !sr.is_empty() {
-                if let Ok(site_rankings) = base64::decode(sr) {
-                    if let Ok(site_rankings) = std::str::from_utf8(&site_rankings) {
-                        serde_json::from_str(site_rankings).ok()
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        None => None,
-    };
+    let site_rankings = extract_site_rankings(&params);
 
     match state
         .searcher
@@ -140,44 +146,11 @@ pub async fn route(
                 let search_duration_sec =
                     format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
 
-                let all_regions = ALL_REGIONS
-                    .into_iter()
-                    .map(|region| {
-                        if let Some(selected_region) = selected_region {
-                            if region == selected_region {
-                                RegionSelection::Selected(region)
-                            } else {
-                                RegionSelection::Unselected(region)
-                            }
-                        } else {
-                            RegionSelection::Unselected(region)
-                        }
-                    })
-                    .collect();
+                let all_regions = generate_regions(selected_region);
+                let next_page_url = next_page_url(&uri, params.clone(), skip_pages);
+                let prev_page_url = prev_page_url(&uri, params, skip_pages);
 
                 let current_page = skip_pages + 1;
-
-                let mut next_page_params = params.clone();
-                next_page_params.insert("p".to_string(), (skip_pages + 1).to_string());
-                let next_page_url = uri.path().to_string()
-                    + "?"
-                    + serde_urlencoded::to_string(&next_page_params)
-                        .unwrap()
-                        .as_str();
-
-                let prev_page_url = if current_page > 1 {
-                    let mut prev_page_params = params;
-                    prev_page_params.insert("p".to_string(), (skip_pages - 1).to_string());
-                    Some(
-                        uri.path().to_string()
-                            + "?"
-                            + serde_urlencoded::to_string(&prev_page_params)
-                                .unwrap()
-                                .as_str(),
-                    )
-                } else {
-                    None
-                };
 
                 let template = SearchTemplate {
                     search_result: result.webpages,
@@ -201,6 +174,51 @@ pub async fn route(
         Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
     }
+}
+
+fn generate_regions(selected_region: Option<Region>) -> Vec<RegionSelection> {
+    ALL_REGIONS
+        .into_iter()
+        .map(|region| {
+            if let Some(selected_region) = selected_region {
+                if region == selected_region {
+                    RegionSelection::Selected(region)
+                } else {
+                    RegionSelection::Unselected(region)
+                }
+            } else {
+                RegionSelection::Unselected(region)
+            }
+        })
+        .collect()
+}
+
+fn prev_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) -> Option<String> {
+    if skip_pages > 0 {
+        let mut prev_page_params = params;
+        prev_page_params.insert("p".to_string(), (skip_pages - 1).to_string());
+        Some(
+            uri.path().to_string()
+                + "?"
+                + serde_urlencoded::to_string(&prev_page_params)
+                    .unwrap()
+                    .as_str(),
+        )
+    } else {
+        None
+    }
+}
+
+fn next_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) -> String {
+    let mut next_page_params = params;
+    next_page_params.insert("p".to_string(), (skip_pages + 1).to_string());
+    let next_page_url = uri.path().to_string()
+        + "?"
+        + serde_urlencoded::to_string(&next_page_params)
+            .unwrap()
+            .as_str();
+
+    next_page_url
 }
 
 #[allow(clippy::unused_async)]
