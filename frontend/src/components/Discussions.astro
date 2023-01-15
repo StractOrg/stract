@@ -1,6 +1,7 @@
 ---
 import { askama } from "../askama";
 import Hero from "./Hero.astro";
+import DiscussionItem from "./DiscussionItem.astro";
 
 export interface Props {
     discussions: string;
@@ -14,32 +15,40 @@ askama.if_("let Some(discussions) = discussions", () => (
         <Hero class="w-4" icon="chat-alt-2" />
         <span>Discussions</span>
     </div>
-    <div class="flex flex-col">
-    {
-    askama.for_("discussion in discussions", () => (
-        <div class="discussion overflow-hidden">
-            <div>
-                <a class="text-sm hover:no-underline" href="{{ discussion.url }} ">
-                {askama`discussion.domain`}
-                </a>
-            </div>
-            <a
-                class="discussion-title truncate text-md font-medium"
-                title="{{ discussion.title }}"
-                href="{{ discussion.url }}"
-            >
-                {askama`discussion.title $ {{lorem.sentence}}`}
-            </a>
+    <div class="discussion-list flex flex-col">
+        {
+        askama.for_("discussion in discussions.iter().take(4)", () => (
+            <DiscussionItem discussion="discussion" />
+        ))
+        }
+        <div id="discussion-more" class="hidden">
+            {
+            askama.for_("discussion in discussions.iter().skip(4)", () => (
+                <DiscussionItem discussion="discussion" />
+            ))
+            }
         </div>
-    ))
-    }
+        <div id="discussion-more-btn" class="hover:cursor-pointer hover:bg-neutral-100 w-fit px-2 py-1 mt-2 border rounded-full">More discussions</div>
     </div>
 </div>
 ))
 }
-<style>
-  .discussion-title {
-    display: inline-block;
-    max-width: calc(100% - 10px);
-  }
-</style>
+
+<script>
+    const discussionMore = document.getElementById("discussion-more")!;
+    const discussionMoreBtn = document.getElementById("discussion-more-btn")!;
+
+    let moreIsShown = false;
+    discussionMoreBtn.addEventListener("click", () => {
+        moreIsShown = !moreIsShown;
+
+        if (moreIsShown) {
+            discussionMore.classList.remove("hidden");
+            discussionMoreBtn.innerHTML = "Less discussions";
+        } else {
+            discussionMore.classList.add("hidden");
+            discussionMoreBtn.innerHTML = "More discussions";
+        }
+    })
+
+</script>

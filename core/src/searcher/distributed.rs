@@ -376,7 +376,7 @@ impl DistributedSearcher {
             return Ok(None);
         }
 
-        const NUM_RESULTS: usize = 4;
+        const NUM_RESULTS: usize = 10;
 
         let mut query = SearchQuery {
             query: query.query.clone(),
