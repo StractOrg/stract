@@ -70,7 +70,7 @@ fn proximity_queries(
         let tantivy_field = schema.get_field(field.name()).unwrap();
         let tantivy_entry = schema.get_field_entry(tantivy_field);
 
-        for (boost, slop) in [(6, 0), (5, 1), (4, 2), (3, 4), (2, 16), (1, 32)] {
+        for (boost, slop) in [(32, 0), (16, 1), (8, 2), (4, 4), (2, 16), (1, 32)] {
             let mut terms = Vec::new();
 
             let mut num_terms = 0;

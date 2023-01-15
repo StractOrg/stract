@@ -49,7 +49,7 @@ use super::{InitialWebsiteResult, SearchQuery, SearchResult};
 type Result<T> = std::result::Result<T, Error>;
 
 const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
-const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 10.0;
+const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 100.0;
 
 struct RemoteSearcher {
     addr: SocketAddr,

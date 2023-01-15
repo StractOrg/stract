@@ -60,17 +60,24 @@ impl CrossEncoder for CrossEncoderModel {
     fn run(&self, query: &str, body: &str) -> f64 {
         let encoded = self.tokenizer.encode((query, body), true).unwrap();
 
-        let ids = encoded.get_ids().iter().map(|i| *i as i64).collect_vec();
+        let ids = encoded
+            .get_ids()
+            .iter()
+            .map(|i| *i as i64)
+            .take(512)
+            .collect_vec();
 
         let attention_mask = encoded
             .get_attention_mask()
             .iter()
+            .take(512)
             .map(|i| *i as i64)
             .collect_vec();
 
         let type_ids = encoded
             .get_type_ids()
             .iter()
+            .take(512)
             .map(|i| *i as i64)
             .collect_vec();
 
@@ -78,7 +85,7 @@ impl CrossEncoder for CrossEncoderModel {
 
         let mut sess = self.session.lock().unwrap();
 
-        let res: Vec<OrtOwnedTensor<f64, _>> = sess
+        let res: Vec<OrtOwnedTensor<f32, _>> = sess
             .run(vec![
                 ArrayBase::from_vec(ids)
                     .into_shape((1, num_tokens))
@@ -92,7 +99,10 @@ impl CrossEncoder for CrossEncoderModel {
             ])
             .unwrap();
 
-        res[0][[0, 0]]
+        let res = res[0][[0, 0]] as f64;
+
+        let s = res.exp();
+        s / (s + 1.0)
     }
 }
 
@@ -104,6 +114,21 @@ mod tests {
     fn sanity_check() {
         match CrossEncoderModel::open("../data/cross_encoder") {
             Ok(model) => {
+                let s = model.run(
+                    "how many people live in paris",
+                    "there are currently 1234 people living in paris",
+                );
+
+                for _ in 0..10 {
+                    assert_eq!(
+                        s,
+                        model.run(
+                            "how many people live in paris",
+                            "there are currently 1234 people living in paris"
+                        )
+                    );
+                }
+
                 assert!(
                     model.run(
                         "how many people live in paris",
@@ -115,7 +140,7 @@ mod tests {
                 );
             }
             Err(_err) => {
-                // dbg!(err);
+                // dbg!(_err);
                 // panic!();
             }
         }

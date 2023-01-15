@@ -94,7 +94,7 @@ impl RankingWebsite {
                 Field::Text(TextField::Title) => {
                     res.title = value.value.as_text().unwrap().to_string()
                 }
-                Field::Text(TextField::CleanBody) => {
+                Field::Text(TextField::StemmedCleanBody) => {
                     res.clean_body = value.value.as_text().unwrap().to_string()
                 }
                 _ => {}
@@ -121,7 +121,7 @@ struct ReRanker<M: CrossEncoder> {
 impl<M: CrossEncoder> ReRanker<M> {
     fn new(model: Arc<M>) -> Self {
         Self {
-            coefficient: 100.0,
+            coefficient: 10000.0,
             model,
             prev_score: 1.0,
             query: String::new(),
@@ -164,7 +164,7 @@ struct PrioritizeText {
 impl Default for PrioritizeText {
     fn default() -> Self {
         Self {
-            bm25: 1.0,
+            bm25: 10.0,
             prev_score: 1.0,
         }
     }

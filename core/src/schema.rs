@@ -395,7 +395,7 @@ impl Field {
             }
             Field::Text(TextField::CleanBody) => Some(4.0),
             Field::Text(TextField::DmozDescription) => Some(3.0),
-            Field::Text(TextField::Title) => Some(10.0),
+            Field::Text(TextField::Title) => Some(15.0),
             Field::Text(TextField::Url) => Some(1.0),
             Field::Text(TextField::Domain) => Some(1.0),
             Field::Text(TextField::AllBody) => Some(0.01),

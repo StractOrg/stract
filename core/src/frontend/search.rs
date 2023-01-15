@@ -174,7 +174,10 @@ pub async fn route(
             SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
         },
         Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
-        Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
+        Err(_err) => {
+            dbg!(_err);
+            panic!("Search failed")
+        } // TODO: show 500 status to user here
     }
 }
 
