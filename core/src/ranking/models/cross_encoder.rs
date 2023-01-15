@@ -22,6 +22,7 @@ use onnxruntime::{ndarray::ArrayBase, tensor::OrtOwnedTensor, GraphOptimizationL
 use crate::Result;
 
 use super::ONNX_ENVIRONMENT;
+const TRUNCATE_INPUT: usize = 128;
 
 pub struct CrossEncoderModel {
     tokenizer: tokenizers::Tokenizer,
@@ -58,26 +59,27 @@ impl CrossEncoder for DummyCrossEncoder {
 
 impl CrossEncoder for CrossEncoderModel {
     fn run(&self, query: &str, body: &str) -> f64 {
+        let body: String = body.split_whitespace().take(TRUNCATE_INPUT).collect();
         let encoded = self.tokenizer.encode((query, body), true).unwrap();
 
         let ids = encoded
             .get_ids()
             .iter()
             .map(|i| *i as i64)
-            .take(512)
+            .take(TRUNCATE_INPUT)
             .collect_vec();
 
         let attention_mask = encoded
             .get_attention_mask()
             .iter()
-            .take(512)
+            .take(TRUNCATE_INPUT)
             .map(|i| *i as i64)
             .collect_vec();
 
         let type_ids = encoded
             .get_type_ids()
             .iter()
-            .take(512)
+            .take(TRUNCATE_INPUT)
             .map(|i| *i as i64)
             .collect_vec();
 

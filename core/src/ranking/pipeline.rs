@@ -286,10 +286,10 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
                 scorer: Box::<PrioritizeText>::default(),
                 prev: Prev::Initial,
                 memory: None,
-                top_n: 100,
+                top_n: 40,
             })),
             memory: None,
-            top_n: 50,
+            top_n: 20,
         };
 
         Ok(Self {
@@ -340,9 +340,11 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn apply(mut self, websites: Vec<T>) -> Vec<T> {
+        dbg!(websites.len());
         self.last_stage.populate(websites);
 
-        self.last_stage.apply(20, self.offset)
+        self.last_stage
+            .apply(self.top_n, dbg!(self.pipeline_offset()))
     }
 
     pub fn collector_top_n(&self) -> usize {
@@ -353,8 +355,12 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         self.last_stage.initial_top_n()
     }
 
+    fn pipeline_offset(&self) -> usize {
+        self.offset - self.collector_offset()
+    }
+
     pub fn collector_offset(&self) -> usize {
-        (self.offset / self.initial_top_n()) * self.initial_top_n()
+        dbg!((self.offset / self.initial_top_n()) * self.initial_top_n())
     }
 }
 

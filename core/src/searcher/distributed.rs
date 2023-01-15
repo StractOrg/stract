@@ -113,7 +113,7 @@ impl RemoteSearcher {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ShardId(u64);
 
 pub struct Shard {
@@ -173,6 +173,7 @@ impl Shard {
     }
 }
 
+#[derive(Debug)]
 struct InitialSearchResultShard {
     local_result: InitialWebsiteResult,
     shard: ShardId,
@@ -235,13 +236,9 @@ impl DistributedSearcher {
     fn combine_results(
         &self,
         initial_results: Vec<InitialSearchResultShard>,
-        search_query: &mut SearchQuery,
-    ) -> Result<Vec<ScoredWebsitePointer>> {
-        let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::for_query(search_query, self.cross_encoder.clone())?;
-
-        let mut collector =
-            BucketCollector::new(pipeline.collector_top_n() + pipeline.collector_offset());
+        pipeline: RankingPipeline<ScoredWebsitePointer>,
+    ) -> Vec<ScoredWebsitePointer> {
+        let mut collector = BucketCollector::new(pipeline.collector_top_n());
 
         for result in initial_results {
             for website in result.local_result.websites {
@@ -257,11 +254,10 @@ impl DistributedSearcher {
         let top_websites = collector
             .into_sorted_vec(true)
             .into_iter()
-            .skip(pipeline.collector_offset())
             .take(pipeline.collector_top_n())
             .collect::<Vec<_>>();
 
-        Ok(pipeline.apply(top_websites))
+        pipeline.apply(top_websites)
     }
 
     async fn retrieve_webpages(
@@ -385,6 +381,9 @@ impl DistributedSearcher {
             ..Default::default()
         };
 
+        let pipeline: RankingPipeline<ScoredWebsitePointer> =
+            RankingPipeline::for_query(&mut query, self.cross_encoder.clone())?;
+
         let initial_results = self.search_initial(&query).await;
 
         if initial_results.is_empty() {
@@ -400,7 +399,7 @@ impl DistributedSearcher {
             return Ok(None);
         }
 
-        let results = self.combine_results(initial_results, &mut query)?;
+        let results = self.combine_results(initial_results, pipeline);
 
         let scores: Vec<_> = results
             .iter()
@@ -439,8 +438,10 @@ impl DistributedSearcher {
         }
 
         let mut search_query = query.clone();
+        let pipeline: RankingPipeline<ScoredWebsitePointer> =
+            RankingPipeline::for_query(&mut search_query, self.cross_encoder.clone())?;
 
-        let initial_results = self.search_initial(query).await;
+        let initial_results = self.search_initial(&search_query).await;
 
         let sidebar = self.sidebar(&initial_results, query).await?;
         let discussions = self.discussions_widget(query).await?;
@@ -455,7 +456,7 @@ impl DistributedSearcher {
             .map(|result| result.local_result.num_websites)
             .sum();
 
-        let top_websites = self.combine_results(initial_results, &mut search_query)?;
+        let top_websites = self.combine_results(initial_results, pipeline);
 
         // retrieve webpages
         let retrieved_webpages: Vec<_> = self
@@ -469,13 +470,15 @@ impl DistributedSearcher {
             return Err(Error::SearchFailed);
         }
 
+        let search_duration_ms = start.elapsed().as_millis();
+
         Ok(SearchResult::Websites(WebsitesResult {
             spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,
             sidebar,
             discussions,
-            search_duration_ms: start.elapsed().as_millis(),
+            search_duration_ms,
         }))
     }
 }
