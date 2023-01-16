@@ -26,30 +26,30 @@ pub const BANG_PREFIX: char = '!';
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bang {
     #[serde(rename = "c")]
-    category: Option<String>,
+    pub(crate) category: Option<String>,
 
     #[serde(rename = "sc")]
-    sub_category: Option<String>,
+    pub(crate) sub_category: Option<String>,
 
     #[serde(rename = "d")]
-    domain: Option<String>,
+    pub(crate) domain: Option<String>,
 
     #[serde(rename = "r")]
-    ranking: Option<usize>,
+    pub(crate) ranking: Option<usize>,
 
     #[serde(rename = "s")]
-    site: Option<String>,
+    pub(crate) site: Option<String>,
 
     #[serde(rename = "t")]
-    tag: String,
+    pub(crate) tag: String,
 
     #[serde(rename = "u")]
-    url: String,
+    pub(crate) url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct BangHit {
-    bang: Bang,
+    pub bang: Bang,
     pub redirect_to: Url,
 }
 

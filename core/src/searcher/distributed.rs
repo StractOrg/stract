@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    bangs::{BangHit, Bangs},
+    bangs::{Bang, BangHit, Bangs},
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self, RetrievedWebpage},
@@ -39,6 +39,7 @@ use std::{
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -358,10 +359,42 @@ impl DistributedSearcher {
         }
     }
 
-    fn check_bangs(&self, query: &SearchQuery) -> Option<BangHit> {
+    async fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
         let parsed_terms = query::parser::parse(&query.query);
 
-        self.bangs.get(&parsed_terms)
+        if parsed_terms.iter().any(|term| match term.as_ref() {
+            query::parser::Term::PossibleBang(t) => t.is_empty(),
+            _ => false,
+        }) {
+            let q: String = intersperse(
+                parsed_terms
+                    .iter()
+                    .filter(|term| !matches!(term.as_ref(), query::parser::Term::PossibleBang(_)))
+                    .map(|term| term.to_string()),
+                " ".to_string(),
+            )
+            .collect();
+
+            let mut query = query.clone();
+            query.query = q;
+
+            let res = self.search_websites(&query).await?;
+
+            return Ok(res.webpages.first().map(|webpage| BangHit {
+                bang: Bang {
+                    category: None,
+                    sub_category: None,
+                    domain: None,
+                    ranking: None,
+                    site: None,
+                    tag: String::new(),
+                    url: webpage.url.clone(),
+                },
+                redirect_to: webpage.url.clone().into(),
+            }));
+        }
+
+        Ok(self.bangs.get(&parsed_terms))
     }
 
     async fn discussions_widget(
@@ -426,11 +459,7 @@ impl DistributedSearcher {
         Ok(Some(result))
     }
 
-    pub async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
-        if let Some(bang) = self.check_bangs(query) {
-            return Ok(SearchResult::Bang(bang));
-        }
-
+    async fn search_websites(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         let start = Instant::now();
 
         if query.is_empty() {
@@ -472,13 +501,21 @@ impl DistributedSearcher {
 
         let search_duration_ms = start.elapsed().as_millis();
 
-        Ok(SearchResult::Websites(WebsitesResult {
+        Ok(WebsitesResult {
             spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,
             sidebar,
             discussions,
             search_duration_ms,
-        }))
+        })
+    }
+
+    pub async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
+        if let Some(bang) = self.check_bangs(query).await? {
+            return Ok(SearchResult::Bang(bang));
+        }
+
+        Ok(SearchResult::Websites(self.search_websites(query).await?))
     }
 }
