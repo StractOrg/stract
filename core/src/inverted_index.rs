@@ -479,7 +479,7 @@ impl From<Document> for RetrievedWebpage {
                         if timestamp == 0 {
                             None
                         } else {
-                            Some(NaiveDateTime::from_timestamp(timestamp, 0))
+                            NaiveDateTime::from_timestamp_opt(timestamp, 0)
                         }
                     }
                 }
