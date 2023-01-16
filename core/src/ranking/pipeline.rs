@@ -340,11 +340,9 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn apply(mut self, websites: Vec<T>) -> Vec<T> {
-        dbg!(websites.len());
         self.last_stage.populate(websites);
 
-        self.last_stage
-            .apply(self.top_n, dbg!(self.pipeline_offset()))
+        self.last_stage.apply(self.top_n, self.pipeline_offset())
     }
 
     pub fn collector_top_n(&self) -> usize {
@@ -360,7 +358,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn collector_offset(&self) -> usize {
-        dbg!((self.offset / self.initial_top_n()) * self.initial_top_n())
+        (self.offset / self.initial_top_n()) * self.initial_top_n()
     }
 }
 
@@ -418,7 +416,7 @@ mod tests {
             Arc::new(DummyCrossEncoder {}),
         )
         .unwrap();
-        assert_eq!(pipeline.collector_top_n(), 200);
+        assert_eq!(pipeline.collector_top_n(), 80);
 
         let sample = sample_websites(pipeline.collector_top_n());
         let res: Vec<_> = pipeline

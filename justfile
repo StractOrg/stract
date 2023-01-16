@@ -6,13 +6,13 @@
     rm -rf data/webgraph
     cargo run --release -- webgraph local configs/webgraph/local.toml
 
-@frontend-rerun:
+@frontend-rerun *ARGS:
     cd frontend; npm run build
-    bash scripts/run_frontend.sh
+    bash scripts/run_frontend.sh {{ARGS}}
 
-@frontend:
+@frontend *ARGS:
     cd frontend; npm install
-    cargo watch -s 'just frontend-rerun'
+    cargo watch -s 'just frontend-rerun {{ARGS}}'
 
 @astro:
     cd frontend; npm run dev

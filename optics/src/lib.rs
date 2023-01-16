@@ -275,39 +275,16 @@ pub struct SiteRankings {
 
 impl SiteRankings {
     pub fn rules(&self) -> Vec<Rule> {
-        let mut instructions = Vec::new();
-
-        for site in &self.liked {
-            instructions.push(Rule {
-                matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
-                    location: MatchLocation::Site,
-                }],
-                action: Action::Boost(5),
-            });
-        }
-
-        for site in &self.disliked {
-            instructions.push(Rule {
-                matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
-                    location: MatchLocation::Site,
-                }],
-                action: Action::Downrank(5),
-            });
-        }
-
-        for site in &self.blocked {
-            instructions.push(Rule {
+        self.blocked
+            .iter()
+            .map(|site| Rule {
                 matches: vec![Matching {
                     pattern: vec![PatternPart::Raw(site.clone())],
                     location: MatchLocation::Site,
                 }],
                 action: Action::Discard,
-            });
-        }
-
-        instructions
+            })
+            .collect()
     }
 
     pub fn into_optic(self) -> Optic {
