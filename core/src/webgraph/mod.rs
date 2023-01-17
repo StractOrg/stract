@@ -109,9 +109,9 @@ impl From<Url> for Node {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Edge {
-    from: NodeID,
-    to: NodeID,
-    label: String,
+    pub from: NodeID,
+    pub to: NodeID,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

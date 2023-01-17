@@ -305,6 +305,9 @@ impl OnlineHarmonicCentrality {
             }
         }
 
+        drop(in_degree);
+        drop(out_degree);
+
         let proxy_nodes: Vec<_> = nodes
             .into_iter()
             .map(|candidate| candidate.node)
