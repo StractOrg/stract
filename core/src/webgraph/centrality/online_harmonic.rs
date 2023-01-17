@@ -229,7 +229,7 @@ impl UserNode {
 
 struct ProxyNodeCandidate {
     node: Node,
-    score: usize,
+    score: u64,
 }
 
 impl PartialOrd for ProxyNodeCandidate {
@@ -272,13 +272,21 @@ impl OnlineHarmonicCentrality {
         // For now, we will choose the nodes with highes in_degree + out_degree
         // as an estimate
 
+        let mut in_degree: HashMap<NodeID, u64> = HashMap::new();
+        let mut out_degree: HashMap<NodeID, u64> = HashMap::new();
+
+        for edge in graph.edges() {
+            *out_degree.entry(edge.from).or_default() += 1;
+            *in_degree.entry(edge.to).or_default() += 1;
+        }
+
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
         for id in graph.nodes() {
             if let Some(node) = graph.id2node(&id) {
                 node2id.insert(node.clone(), id);
 
-                let degree_sum = graph.outgoing_edges(node.clone()).len()
-                    + graph.ingoing_edges(node.clone()).len();
+                let degree_sum = in_degree.get(&id).copied().unwrap_or_default()
+                    + out_degree.get(&id).copied().unwrap_or_default();
 
                 let candidate = ProxyNodeCandidate {
                     node,
