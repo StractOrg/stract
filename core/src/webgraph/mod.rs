@@ -170,10 +170,10 @@ where
 }
 
 pub trait ShortestPaths {
-    fn distances(&self, source: Node) -> HashMap<Node, usize>;
-    fn raw_distances(&self, source: Node) -> HashMap<NodeID, usize>;
-    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize>;
-    fn reversed_distances(&self, source: Node) -> HashMap<Node, usize>;
+    fn distances(&self, source: Node) -> HashMap<Node, u8>;
+    fn raw_distances(&self, source: Node) -> HashMap<NodeID, u8>;
+    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, u8>;
+    fn reversed_distances(&self, source: Node) -> HashMap<Node, u8>;
 }
 
 fn dijkstra<F1, F2>(
@@ -181,23 +181,23 @@ fn dijkstra<F1, F2>(
     node_edges: F1,
     edge_node: F2,
     graph: &Webgraph,
-) -> HashMap<NodeID, usize>
+) -> HashMap<NodeID, u8>
 where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
 {
-    const MAX_DIST: usize = 3;
+    const MAX_DIST: u8 = 3;
     let source_id = graph.node2id(&source);
     if source_id.is_none() {
         return HashMap::new();
     }
 
     let source_id = source_id.unwrap();
-    let mut distances: HashMap<NodeID, usize> = HashMap::default();
+    let mut distances: HashMap<NodeID, u8> = HashMap::default();
 
     let mut queue = BinaryHeap::new();
 
-    queue.push(cmp::Reverse((0_usize, source_id)));
+    queue.push(cmp::Reverse((0, source_id)));
     distances.insert(source_id, 0);
 
     while let Some(state) = queue.pop() {
@@ -207,14 +207,14 @@ where
             continue;
         }
 
-        let current_dist = distances.get(&v).unwrap_or(&usize::MAX);
+        let current_dist = distances.get(&v).unwrap_or(&u8::MAX);
 
         if cost > *current_dist {
             continue;
         }
 
         for edge in node_edges(v) {
-            if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&usize::MAX) {
+            if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
                 let d = cost + 1;
 
                 if d > MAX_DIST {
@@ -232,14 +232,14 @@ where
 }
 
 impl ShortestPaths for Webgraph {
-    fn distances(&self, source: Node) -> HashMap<Node, usize> {
+    fn distances(&self, source: Node) -> HashMap<Node, u8> {
         self.raw_distances(source)
             .into_iter()
             .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
             .collect()
     }
 
-    fn raw_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+    fn raw_distances(&self, source: Node) -> HashMap<NodeID, u8> {
         dijkstra(
             source,
             |node| self.raw_outgoing_edges(&node),
@@ -248,7 +248,7 @@ impl ShortestPaths for Webgraph {
         )
     }
 
-    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, usize> {
+    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, u8> {
         dijkstra(
             source,
             |node| self.raw_ingoing_edges(&node),
@@ -257,7 +257,7 @@ impl ShortestPaths for Webgraph {
         )
     }
 
-    fn reversed_distances(&self, source: Node) -> HashMap<Node, usize> {
+    fn reversed_distances(&self, source: Node) -> HashMap<Node, u8> {
         self.raw_reversed_distances(source)
             .into_iter()
             .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))

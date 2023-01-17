@@ -326,13 +326,13 @@ impl Store for RocksDbStore {
 
         Segment {
             adjacency: Adjacency {
-                tree: CachedStore::new(adjacency, 50_000),
+                tree: CachedStore::new(adjacency, 100),
             },
             reversed_adjacency: Adjacency {
-                tree: CachedStore::new(reversed_adjacency, 50_000),
+                tree: CachedStore::new(reversed_adjacency, 100),
             },
-            id_mapping: CachedStore::new(id_mapping, 100_000),
-            rev_id_mapping: CachedStore::new(rev_id_mapping, 100_000),
+            id_mapping: CachedStore::new(id_mapping, 100),
+            rev_id_mapping: CachedStore::new(rev_id_mapping, 100),
             meta: CachedStore::new(meta, 1_000),
             store: Default::default(),
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
@@ -350,13 +350,13 @@ impl Store for RocksDbStore {
 
         Segment {
             adjacency: Adjacency {
-                tree: CachedStore::new(adjacency, 50_000),
+                tree: CachedStore::new(adjacency, 100),
             },
             reversed_adjacency: Adjacency {
-                tree: CachedStore::new(reversed_adjacency, 50_000),
+                tree: CachedStore::new(reversed_adjacency, 100),
             },
-            id_mapping: CachedStore::new(id_mapping, 100_000),
-            rev_id_mapping: CachedStore::new(rev_id_mapping, 100_000),
+            id_mapping: CachedStore::new(id_mapping, 100),
+            rev_id_mapping: CachedStore::new(rev_id_mapping, 100),
             meta: CachedStore::new(meta, 1_000),
             store: Default::default(),
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),

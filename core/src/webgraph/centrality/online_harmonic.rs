@@ -37,7 +37,7 @@ use crate::webgraph::{Node, ShortestPaths};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 10_000;
+const NUM_PROXY_NODES: usize = 100;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 pub const SHIFT: f64 = 1.0;
@@ -45,12 +45,12 @@ pub const SHIFT: f64 = 1.0;
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
     pub id: NodeID,
-    dist_from_node: IntMap<usize>, // from node to proxy node
-    dist_to_node: IntMap<usize>,   // from proxy node to other node
+    dist_from_node: IntMap<u8>, // from node to proxy node
+    dist_to_node: IntMap<u8>,   // from proxy node to other node
 }
 
 impl ProxyNode {
-    fn dist(&self, from: &NodeID, to: &NodeID) -> Option<usize> {
+    fn dist(&self, from: &NodeID, to: &NodeID) -> Option<u8> {
         if let Some(from_node_to_proxy) = self.dist_from_node.get(&from.0) {
             if let Some(from_proxy_to_node) = self.dist_to_node.get(&to.0) {
                 return Some(from_node_to_proxy + from_proxy_to_node);
@@ -63,7 +63,7 @@ impl ProxyNode {
 
 struct WeightedProxyNode {
     node: Arc<ProxyNode>,
-    dist: usize,
+    dist: u8,
 }
 
 impl PartialOrd for WeightedProxyNode {
@@ -105,7 +105,7 @@ fn create_user_nodes(nodes: &[NodeID], proxy_nodes: &[Arc<ProxyNode>]) -> Vec<Us
         } else {
             let mut best = res
                 .iter_mut()
-                .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(1_000_000))
+                .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(255))
                 .unwrap();
 
             best.weight += 1;
@@ -205,7 +205,7 @@ impl UserNode {
         }
     }
 
-    fn best_dist(&self, node: &NodeID) -> Option<usize> {
+    fn best_dist(&self, node: &NodeID) -> Option<u8> {
         let mut best = None;
 
         for proxy in &self.proxy_nodes {
@@ -299,9 +299,9 @@ impl OnlineHarmonicCentrality {
 
         let proxy_nodes: Vec<_> = nodes
             .into_iter()
-            .take(num_proxy_nodes)
             .map(|candidate| candidate.node)
             .filter(|node| node2id.contains_key(node))
+            .take(num_proxy_nodes)
             .map(|node| {
                 let dist_to_node = graph
                     .raw_distances(node.clone())
