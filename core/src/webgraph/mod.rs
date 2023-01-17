@@ -16,7 +16,7 @@
 mod segment;
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
@@ -170,10 +170,10 @@ where
 }
 
 pub trait ShortestPaths {
-    fn distances(&self, source: Node) -> HashMap<Node, u8>;
-    fn raw_distances(&self, source: Node) -> HashMap<NodeID, u8>;
-    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, u8>;
-    fn reversed_distances(&self, source: Node) -> HashMap<Node, u8>;
+    fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
+    fn raw_distances(&self, source: Node) -> BTreeMap<NodeID, u8>;
+    fn raw_reversed_distances(&self, source: Node) -> BTreeMap<NodeID, u8>;
+    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
 
 fn dijkstra<F1, F2>(
@@ -181,7 +181,7 @@ fn dijkstra<F1, F2>(
     node_edges: F1,
     edge_node: F2,
     graph: &Webgraph,
-) -> HashMap<NodeID, u8>
+) -> BTreeMap<NodeID, u8>
 where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
@@ -189,11 +189,11 @@ where
     const MAX_DIST: u8 = 3;
     let source_id = graph.node2id(&source);
     if source_id.is_none() {
-        return HashMap::new();
+        return BTreeMap::new();
     }
 
     let source_id = source_id.unwrap();
-    let mut distances: HashMap<NodeID, u8> = HashMap::default();
+    let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
 
     let mut queue = BinaryHeap::new();
 
@@ -232,14 +232,14 @@ where
 }
 
 impl ShortestPaths for Webgraph {
-    fn distances(&self, source: Node) -> HashMap<Node, u8> {
+    fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_distances(source)
             .into_iter()
             .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
             .collect()
     }
 
-    fn raw_distances(&self, source: Node) -> HashMap<NodeID, u8> {
+    fn raw_distances(&self, source: Node) -> BTreeMap<NodeID, u8> {
         dijkstra(
             source,
             |node| self.raw_outgoing_edges(&node),
@@ -248,7 +248,7 @@ impl ShortestPaths for Webgraph {
         )
     }
 
-    fn raw_reversed_distances(&self, source: Node) -> HashMap<NodeID, u8> {
+    fn raw_reversed_distances(&self, source: Node) -> BTreeMap<NodeID, u8> {
         dijkstra(
             source,
             |node| self.raw_ingoing_edges(&node),
@@ -257,7 +257,7 @@ impl ShortestPaths for Webgraph {
         )
     }
 
-    fn reversed_distances(&self, source: Node) -> HashMap<Node, u8> {
+    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_reversed_distances(source)
             .into_iter()
             .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
