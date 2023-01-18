@@ -35,7 +35,15 @@ impl<V: Clone> Clone for IntMap<V> {
 
 impl<V> IntMap<V> {
     pub fn new() -> Self {
-        let bins = vec![Vec::new(), Vec::new()];
+        Self::with_capacity(2)
+    }
+
+    pub fn with_capacity(cap: usize) -> Self {
+        let mut bins = Vec::with_capacity(cap);
+
+        for _ in 0..cap {
+            bins.push(Vec::new());
+        }
 
         Self { bins, len: 0 }
     }
@@ -47,7 +55,7 @@ impl<V> IntMap<V> {
     }
 
     pub fn insert(&mut self, key: Key, value: V) {
-        if self.len >= (self.bins.len() as f64 * 0.8) as usize {
+        if self.len >= (self.bins.len() as f64 * 1.2) as usize {
             self.grow();
         }
 
@@ -118,7 +126,15 @@ impl<V> IntMap<V> {
 
 impl<V> std::iter::FromIterator<(u64, V)> for IntMap<V> {
     fn from_iter<T: IntoIterator<Item = (u64, V)>>(iter: T) -> Self {
-        let mut map = Self::new();
+        let iter = iter.into_iter();
+
+        let (_, upper) = iter.size_hint();
+
+        let mut map = if let Some(cap) = upper {
+            Self::with_capacity(cap)
+        } else {
+            Self::new()
+        };
 
         for (key, val) in iter {
             map.insert(key, val);

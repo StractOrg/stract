@@ -24,6 +24,8 @@ use crate::{
     },
 };
 
+use super::inbound_similarity::InboundSimilarity;
+
 pub struct HarmonicCentralityStore {
     pub host: Box<dyn Kv<String, f64>>,
     pub full: Box<dyn Kv<String, f64>>,
@@ -46,6 +48,7 @@ impl HarmonicCentralityStore {
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
     pub online_harmonic: OnlineHarmonicCentrality,
+    pub inbound_similarity: InboundSimilarity,
     pub base_path: String,
 }
 
@@ -54,6 +57,9 @@ impl CentralityStore {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
             online_harmonic: OnlineHarmonicCentrality::open(path.as_ref().join("online_harmonic"))
+                .ok()
+                .unwrap_or_default(),
+            inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .ok()
                 .unwrap_or_default(),
             base_path: path.as_ref().to_str().unwrap().to_string(),
@@ -90,6 +96,7 @@ impl CentralityStore {
 
         Self::store_host(&output_path, &mut store, &harmonic_centrality);
         store.online_harmonic = OnlineHarmonicCentrality::new(graph, &harmonic_centrality);
+        store.inbound_similarity = InboundSimilarity::build(graph, &harmonic_centrality);
 
         store.flush();
 
@@ -101,6 +108,10 @@ impl CentralityStore {
 
         self.online_harmonic
             .save(Path::new(&self.base_path).join("online_harmonic"))
+            .unwrap();
+
+        self.inbound_similarity
+            .save(Path::new(&self.base_path).join("inbound_similarity"))
             .unwrap();
     }
 }

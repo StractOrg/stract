@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod bitvec_similarity;
 pub mod bm25;
 pub mod centrality_store;
+pub mod inbound_similarity;
 pub mod initial;
 pub mod models;
 pub mod optics;
@@ -175,7 +177,10 @@ mod tests {
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{
-            centrality::{online_harmonic::OnlineHarmonicCentrality, topic::TopicCentrality},
+            centrality::{
+                harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality,
+                topic::TopicCentrality,
+            },
             Node, WebgraphBuilder,
         },
         webpage::{Html, Link, Webpage},
@@ -1235,7 +1240,8 @@ mod tests {
 
         webgraph.commit();
 
-        let harmonic = OnlineHarmonicCentrality::new(&webgraph);
+        let centrality = HarmonicCentrality::calculate(&webgraph);
+        let harmonic = OnlineHarmonicCentrality::new(&webgraph, &centrality);
 
         let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
 
