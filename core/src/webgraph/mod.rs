@@ -186,7 +186,6 @@ where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
 {
-    const MAX_DIST: u8 = 3;
     let source_id = graph.node2id(&source);
     if source_id.is_none() {
         return BTreeMap::new();
@@ -203,10 +202,6 @@ where
     while let Some(state) = queue.pop() {
         let (cost, v) = state.0;
 
-        if cost >= MAX_DIST {
-            continue;
-        }
-
         let current_dist = distances.get(&v).unwrap_or(&u8::MAX);
 
         if cost > *current_dist {
@@ -216,10 +211,6 @@ where
         for edge in node_edges(v) {
             if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
                 let d = cost + 1;
-
-                if d > MAX_DIST {
-                    continue;
-                }
 
                 let next = cmp::Reverse((d, edge_node(&edge)));
                 queue.push(next);

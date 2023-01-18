@@ -89,8 +89,7 @@ impl CentralityStore {
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
 
         Self::store_host(&output_path, &mut store, &harmonic_centrality);
-
-        store.online_harmonic = OnlineHarmonicCentrality::new(graph);
+        store.online_harmonic = OnlineHarmonicCentrality::new(graph, &harmonic_centrality);
 
         store.flush();
 

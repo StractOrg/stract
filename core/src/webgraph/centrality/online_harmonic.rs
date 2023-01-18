@@ -23,7 +23,8 @@
 //! the shortest distance as the distance through their best proxy node. This distance estimate is very fast since
 //! all distances are pre-computed for the proxy nodes.
 
-use std::collections::{BinaryHeap, HashMap};
+use std::cmp;
+use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read};
 use std::path::Path;
@@ -33,13 +34,17 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;
-use crate::webgraph::{Node, ShortestPaths};
+use crate::webgraph::{Edge, Node};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 100;
+use super::harmonic::HarmonicCentrality;
+
+const NUM_PROXY_NODES: usize = 500;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
+const MAX_DIST_PROXY: u8 = 3;
+const MAX_NUM_DISTANCE_NODES: usize = 10_000;
 pub const SHIFT: f64 = 1.0;
 
 #[derive(Serialize, Deserialize)]
@@ -229,7 +234,7 @@ impl UserNode {
 
 struct ProxyNodeCandidate {
     node: Node,
-    score: u64,
+    score: f64,
 }
 
 impl PartialOrd for ProxyNodeCandidate {
@@ -252,6 +257,82 @@ impl Ord for ProxyNodeCandidate {
 
 impl Eq for ProxyNodeCandidate {}
 
+fn modified_dijkstra<F1, F2>(
+    source: Node,
+    node_edges: F1,
+    edge_node: F2,
+    graph: &Webgraph,
+) -> BTreeMap<NodeID, u8>
+where
+    F1: Fn(NodeID) -> Vec<Edge>,
+    F2: Fn(&Edge) -> NodeID,
+{
+    let source_id = graph.node2id(&source);
+    if source_id.is_none() {
+        return BTreeMap::new();
+    }
+
+    let source_id = source_id.unwrap();
+    let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
+
+    let mut queue = BinaryHeap::new();
+
+    queue.push(cmp::Reverse((0, source_id)));
+    distances.insert(source_id, 0);
+
+    while let Some(state) = queue.pop() {
+        let (cost, v) = state.0;
+
+        if cost >= MAX_DIST_PROXY {
+            continue;
+        }
+
+        let current_dist = distances.get(&v).unwrap_or(&u8::MAX);
+
+        if cost > *current_dist {
+            continue;
+        }
+
+        for edge in node_edges(v) {
+            if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
+                let d = cost + 1;
+
+                if d > MAX_DIST_PROXY {
+                    continue;
+                }
+
+                let next = cmp::Reverse((d, edge_node(&edge)));
+                queue.push(next);
+                distances.insert(edge_node(&edge), d);
+            }
+        }
+
+        if distances.len() > MAX_NUM_DISTANCE_NODES {
+            break;
+        }
+    }
+
+    distances
+}
+
+fn distances(graph: &Webgraph, source: Node) -> BTreeMap<NodeID, u8> {
+    modified_dijkstra(
+        source,
+        |node| graph.raw_outgoing_edges(&node),
+        |edge| edge.to,
+        graph,
+    )
+}
+
+fn reversed_distances(graph: &Webgraph, source: Node) -> BTreeMap<NodeID, u8> {
+    modified_dijkstra(
+        source,
+        |node| graph.raw_ingoing_edges(&node),
+        |edge| edge.to,
+        graph,
+    )
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct OnlineHarmonicCentrality {
     pub node2id: HashMap<Node, NodeID>,
@@ -259,39 +340,30 @@ pub struct OnlineHarmonicCentrality {
 }
 
 impl OnlineHarmonicCentrality {
-    pub fn new(graph: &Webgraph) -> Self {
-        Self::new_with_num_proxy(graph, NUM_PROXY_NODES)
+    pub fn new(graph: &Webgraph, centrality: &HarmonicCentrality) -> Self {
+        Self::new_with_num_proxy(graph, centrality, NUM_PROXY_NODES)
     }
 
-    fn new_with_num_proxy(graph: &Webgraph, num_proxy_nodes: usize) -> Self {
+    fn new_with_num_proxy(
+        graph: &Webgraph,
+        centrality: &HarmonicCentrality,
+        num_proxy_nodes: usize,
+    ) -> Self {
         let mut node2id: HashMap<Node, NodeID> = HashMap::new();
 
         // we should probably choose the proxy nodes based on their
         // betweenness centrality, but I don't know how we can approximate betweenness
         // on a graph that cannot be in memory.
-        // For now, we will choose the nodes with highes in_degree + out_degree
+        // For now, we will choose the nodes with highest harmonic centrality
         // as an estimate
-
-        let mut in_degree: HashMap<NodeID, u64> = HashMap::new();
-        let mut out_degree: HashMap<NodeID, u64> = HashMap::new();
-
-        for edge in graph.edges() {
-            *out_degree.entry(edge.from).or_default() += 1;
-            *in_degree.entry(edge.to).or_default() += 1;
-        }
 
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
         for id in graph.nodes() {
             if let Some(node) = graph.id2node(&id) {
                 node2id.insert(node.clone(), id);
 
-                let degree_sum = in_degree.get(&id).copied().unwrap_or_default()
-                    + out_degree.get(&id).copied().unwrap_or_default();
-
-                let candidate = ProxyNodeCandidate {
-                    node,
-                    score: degree_sum,
-                };
+                let score = *centrality.host.get(&node).unwrap_or(&0.0);
+                let candidate = ProxyNodeCandidate { node, score };
 
                 if nodes.len() >= num_proxy_nodes {
                     if let Some(mut existing_node) = nodes.peek_mut() {
@@ -305,23 +377,18 @@ impl OnlineHarmonicCentrality {
             }
         }
 
-        drop(in_degree);
-        drop(out_degree);
-
         let proxy_nodes: Vec<_> = nodes
             .into_iter()
             .map(|candidate| candidate.node)
             .filter(|node| node2id.contains_key(node))
             .take(num_proxy_nodes)
             .map(|node| {
-                let dist_to_node = graph
-                    .raw_distances(node.clone())
+                let dist_to_node = distances(graph, node.clone())
                     .into_iter()
                     .map(|(n, v)| (n.0, v))
                     .collect();
 
-                let dist_from_node = graph
-                    .raw_reversed_distances(node.clone())
+                let dist_from_node = reversed_distances(graph, node.clone())
                     .into_iter()
                     .map(|(n, v)| (n.0, v))
                     .collect();
@@ -427,7 +494,8 @@ mod tests {
     #[test]
     fn ordering() {
         let graph = test_graph();
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let harmonic = HarmonicCentrality::calculate(&graph);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
 
@@ -478,7 +546,8 @@ mod tests {
     #[test]
     fn disliked_nodes_centrality() {
         let graph = test_graph();
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let harmonic = HarmonicCentrality::calculate(&graph);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
         let disliked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
 
@@ -492,7 +561,8 @@ mod tests {
     #[test]
     fn ordering_with_dislikes() {
         let graph = test_graph();
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, 5);
+        let harmonic = HarmonicCentrality::calculate(&graph);
+        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
         let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
         let disliked_nodes = vec![Node::from("F".to_string())];
