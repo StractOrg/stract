@@ -20,16 +20,22 @@ use std::{
     path::Path,
 };
 
+use optics::SiteRankings;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     intmap::IntMap,
-    webgraph::{centrality::harmonic::HarmonicCentrality, Webgraph},
+    webgraph::{centrality::harmonic::HarmonicCentrality, NodeID, Webgraph},
     Result,
 };
 
 use super::bitvec_similarity;
-const HARMONIC_CENTRALITY_THRESHOLD: f64 = 0.025;
+const HARMONIC_CENTRALITY_THRESHOLD: f64 = 0.038;
+
+pub struct Scorer<'a> {
+    liked: Vec<&'a bitvec_similarity::BitVec>,
+    disliked: Vec<&'a bitvec_similarity::BitVec>,
+}
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct InboundSimilarity {
@@ -64,6 +70,20 @@ impl InboundSimilarity {
         }
 
         Self { vectors }
+    }
+
+    pub fn scorer<'a>(&'a self, liked_sites: &[NodeID], disliked_sites: &[NodeID]) -> Scorer<'a> {
+        let liked: Vec<_> = liked_sites
+            .iter()
+            .filter_map(|id| self.vectors.get(&id.0))
+            .collect();
+
+        let disliked: Vec<_> = disliked_sites
+            .iter()
+            .filter_map(|id| self.vectors.get(&id.0))
+            .collect();
+
+        Scorer { liked, disliked }
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {

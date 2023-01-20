@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs::File, path::Path};
+use std::io::{BufReader, BufWriter, Read};
+use std::{collections::BTreeMap, fs::File, path::Path};
 
+use crate::Result;
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{
         centrality::{harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality},
-        Webgraph,
+        Node, NodeID, Webgraph,
     },
 };
 
@@ -49,7 +51,18 @@ pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
     pub online_harmonic: OnlineHarmonicCentrality,
     pub inbound_similarity: InboundSimilarity,
+    pub node2id: BTreeMap<Node, NodeID>,
     pub base_path: String,
+}
+
+fn open_node2id<P: AsRef<Path>>(path: P) -> Result<BTreeMap<Node, NodeID>> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let mut buf = Vec::new();
+    reader.read_to_end(&mut buf)?;
+
+    Ok(bincode::deserialize(&buf)?)
 }
 
 impl CentralityStore {
@@ -60,6 +73,9 @@ impl CentralityStore {
                 .ok()
                 .unwrap_or_default(),
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
+                .ok()
+                .unwrap_or_default(),
+            node2id: open_node2id(path.as_ref().join("node2id"))
                 .ok()
                 .unwrap_or_default(),
             base_path: path.as_ref().to_str().unwrap().to_string(),
@@ -98,6 +114,8 @@ impl CentralityStore {
         store.online_harmonic = OnlineHarmonicCentrality::new(graph, &harmonic_centrality);
         store.inbound_similarity = InboundSimilarity::build(graph, &harmonic_centrality);
 
+        store.node2id = graph.node_ids().collect();
+
         store.flush();
 
         store
@@ -113,5 +131,15 @@ impl CentralityStore {
         self.inbound_similarity
             .save(Path::new(&self.base_path).join("inbound_similarity"))
             .unwrap();
+
+        let mut file = BufWriter::new(
+            File::options()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(Path::new(&self.base_path).join("node2id"))
+                .unwrap(),
+        );
+        bincode::serialize_into(&mut file, &self.node2id).unwrap();
     }
 }

@@ -520,6 +520,10 @@ impl<S: Store> Webgraph<S> {
         self.node2id.iter().map(|(_, id)| id)
     }
 
+    pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
+        self.node2id.iter()
+    }
+
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
         self.segments.iter().flat_map(|segment| segment.edges())
     }

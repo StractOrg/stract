@@ -358,22 +358,20 @@ impl OnlineHarmonicCentrality {
         // as an estimate
 
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
-        for id in graph.nodes() {
-            if let Some(node) = graph.id2node(&id) {
-                node2id.insert(node.clone(), id);
+        for (node, id) in graph.node_ids() {
+            node2id.insert(node.clone(), id);
 
-                let score = *centrality.host.get(&node).unwrap_or(&0.0);
-                let candidate = ProxyNodeCandidate { node, score };
+            let score = *centrality.host.get(&node).unwrap_or(&0.0);
+            let candidate = ProxyNodeCandidate { node, score };
 
-                if nodes.len() >= num_proxy_nodes {
-                    if let Some(mut existing_node) = nodes.peek_mut() {
-                        if candidate.score > existing_node.score {
-                            *existing_node = candidate;
-                        }
+            if nodes.len() >= num_proxy_nodes {
+                if let Some(mut existing_node) = nodes.peek_mut() {
+                    if candidate.score > existing_node.score {
+                        *existing_node = candidate;
                     }
-                } else {
-                    nodes.push(candidate);
                 }
+            } else {
+                nodes.push(candidate);
             }
         }
 
