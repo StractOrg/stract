@@ -36,7 +36,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use super::initial::Score;
+use super::{inbound_similarity, initial::Score};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
@@ -52,6 +52,7 @@ pub enum Signal {
     CrawlStability,
     TopicCentrality,
     QueryCentrality,
+    InboundSimilarity,
 }
 
 pub const ALL_SIGNALS: [Signal; 12] = [
@@ -77,6 +78,7 @@ struct SignalValue {
     personal_centrality: Option<f64>,
     topic_score: Option<f64>,
     query_centrality: Option<f64>,
+    inbound_similarity: Option<f64>,
 }
 
 impl Signal {
@@ -142,6 +144,7 @@ impl Signal {
             Signal::CrawlStability => value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64,
             Signal::TopicCentrality => value.topic_score.unwrap_or_default(),
             Signal::QueryCentrality => value.query_centrality.unwrap_or_default(),
+            Signal::InboundSimilarity => value.inbound_similarity.unwrap_or_default(),
         }
     }
 
@@ -159,6 +162,7 @@ impl Signal {
             Signal::TrackerScore => 20.0,
             Signal::Region => 60.0,
             Signal::CrawlStability => 20.0,
+            Signal::InboundSimilarity => 1000.0,
         }
     }
 
@@ -175,6 +179,8 @@ impl Signal {
             "personal_centrality" => Some(Signal::PersonalCentrality),
             "topic_centrality" => Some(Signal::TopicCentrality),
             "query_centrality" => Some(Signal::QueryCentrality),
+            "inbound_similarity" => Some(Signal::InboundSimilarity),
+            "crawl_stability" => Some(Signal::CrawlStability),
             _ => None,
         }
     }
@@ -193,6 +199,7 @@ impl Signal {
             Signal::PersonalCentrality => None,
             Signal::TopicCentrality => None,
             Signal::QueryCentrality => None,
+            Signal::InboundSimilarity => None,
         }
     }
 }
@@ -260,7 +267,8 @@ impl FieldBoost {
 pub struct SignalAggregator {
     fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
     signal_coefficients: SignalCoefficient,
-    personal_centrality: Vec<Arc<online_harmonic::Scorer>>,
+    personal_centrality: Option<Arc<online_harmonic::Scorer>>,
+    inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
     field_boost: FieldBoost,
     fetch_time_ms_cache: [f64; 1000],
     update_time_cache: Vec<f64>,
@@ -299,7 +307,8 @@ impl SignalAggregator {
 
         Self {
             fastfield_cache: None,
-            personal_centrality: Vec::new(),
+            personal_centrality: None,
+            inbound_similariy: None,
             signal_coefficients,
             field_boost,
             fetch_time_ms_cache,
@@ -321,8 +330,12 @@ impl SignalAggregator {
         self.query_centrality = Some(Arc::new(query_centrality));
     }
 
-    pub fn add_personal_harmonic(&mut self, personal_centrality: online_harmonic::Scorer) {
-        self.personal_centrality.push(Arc::new(personal_centrality))
+    pub fn set_personal_harmonic(&mut self, personal_centrality: online_harmonic::Scorer) {
+        self.personal_centrality = Some(Arc::new(personal_centrality));
+    }
+
+    pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
+        self.inbound_similariy = Some(Arc::new(scorer));
     }
 
     pub fn topic_centrality(&self, host_id: NodeID) -> Option<f64> {
@@ -339,9 +352,16 @@ impl SignalAggregator {
 
     pub fn personal_centrality(&self, host_id: NodeID) -> f64 {
         self.personal_centrality
-            .iter()
+            .as_ref()
             .map(|scorer| scorer.score(host_id))
-            .sum()
+            .unwrap_or_default()
+    }
+
+    pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {
+        self.inbound_similariy
+            .as_ref()
+            .map(|scorer| scorer.score(&host_id))
+            .unwrap_or_default()
     }
 
     pub fn score(
@@ -353,10 +373,16 @@ impl SignalAggregator {
         selected_region: Option<Region>,
     ) -> Score {
         let host_id = self.fastfield_cache.as_ref().and_then(|cache| {
-            cache
+            let node_id = cache
                 .get_doc_cache(&FastField::HostNodeID)
                 .get_u64(&doc)
-                .map(NodeID::from)
+                .unwrap();
+
+            if node_id == u64::MAX {
+                None
+            } else {
+                Some(NodeID::from(node_id))
+            }
         });
 
         let topic_score = host_id.and_then(|host_id| self.topic_centrality(host_id));
@@ -364,6 +390,7 @@ impl SignalAggregator {
         let query_centrality = host_id.and_then(|host_id| self.query_centrality(host_id));
 
         let personal_centrality = host_id.map(|host_id| self.personal_centrality(host_id));
+        let inbound_similarity = host_id.map(|host_id| self.inbound_similarity(host_id));
 
         let score = ALL_SIGNALS
             .into_iter()
@@ -384,6 +411,7 @@ impl SignalAggregator {
                             current_timestamp,
                             selected_region,
                             personal_centrality,
+                            inbound_similarity,
                             topic_score,
                             query_centrality,
                         },
@@ -421,6 +449,7 @@ impl SignalAggregator {
                     Signal::Bm25
                     | Signal::PersonalCentrality
                     | Signal::TopicCentrality
+                    | Signal::InboundSimilarity
                     | Signal::QueryCentrality => {
                         panic!("signal cannot be determined from webpage")
                     }
@@ -440,6 +469,7 @@ impl SignalAggregator {
                             personal_centrality: None,
                             topic_score: None,
                             query_centrality: None,
+                            inbound_similarity: None,
                         },
                     )
             })

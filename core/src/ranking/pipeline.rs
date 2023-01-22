@@ -51,6 +51,7 @@ pub struct RankingWebsite {
     pub topic_centrality: f64,
     pub personal_centrality: f64,
     pub query_centrality: f64,
+    pub inbound_similarity: f64,
     pub title: String,
     pub clean_body: String,
     pub score: f64,
@@ -68,6 +69,7 @@ impl RankingWebsite {
             topic_centrality: 0.0,
             personal_centrality: 0.0,
             query_centrality: 0.0,
+            inbound_similarity: 0.0,
             title: String::new(),
             clean_body: String::new(),
             score: pointer.score.total,
@@ -88,6 +90,7 @@ impl RankingWebsite {
                     let node = value.value.as_u64().unwrap().into();
 
                     res.personal_centrality = aggregator.personal_centrality(node);
+                    res.inbound_similarity = aggregator.inbound_similarity(node);
                     res.topic_centrality = aggregator.topic_centrality(node).unwrap_or_default();
                     res.query_centrality = aggregator.query_centrality(node).unwrap_or_default();
                 }
@@ -399,6 +402,7 @@ mod tests {
                     topic_centrality: 0.0,
                     personal_centrality: 0.0,
                     query_centrality: 0.0,
+                    inbound_similarity: 0.0,
                     title: String::new(),
                     clean_body: String::new(),
                     score: 1.0 / i as f64,
@@ -571,6 +575,7 @@ mod tests {
             topic_centrality: 0.0,
             personal_centrality: 0.0,
             query_centrality: 0.0,
+            inbound_similarity: 0.0,
             title: String::new(),
             clean_body: String::new(),
             score: 1.0,

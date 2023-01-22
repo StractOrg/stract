@@ -17,13 +17,13 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Block {
     data: u64,
     offset: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
     blocks: Vec<Block>,
     sqrt_len: f64,
@@ -56,7 +56,7 @@ impl BitVec {
         }
     }
 
-    fn sim(&self, other: &Self) -> f64 {
+    pub fn sim(&self, other: &Self) -> f64 {
         let mut i = 0;
         let mut j = 0;
 
@@ -161,7 +161,6 @@ mod tests {
 
         let expected = naive_sim(&a, &b);
 
-        dbg!(expected);
         assert!(expected < 0.01);
 
         let a = BitVec::new(a);

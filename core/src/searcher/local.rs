@@ -31,6 +31,7 @@ use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
+use crate::webgraph::Node;
 use crate::webpage::region::Region;
 use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
@@ -79,7 +80,7 @@ impl LocalSearcher {
             None => None,
         };
 
-        let mut query_aggregator = optic
+        let query_aggregator = optic
             .as_ref()
             .and_then(|optic| {
                 optic
@@ -88,16 +89,6 @@ impl LocalSearcher {
                     .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
             })
             .unwrap_or_default();
-
-        if let (Some(optic), Some(harmonic)) = (
-            optic.as_ref(),
-            self.centrality_store
-                .as_ref()
-                .map(|store| &store.online_harmonic),
-        ) {
-            query_aggregator
-                .add_personal_harmonic(online_centrality_scorer(&optic.site_rankings, harmonic));
-        }
 
         let mut parsed_query = Query::parse(
             &query.query,
@@ -195,13 +186,33 @@ impl LocalSearcher {
             .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
             .unwrap_or_default();
 
-        if let Some(harmonic) = self
-            .centrality_store
-            .as_ref()
-            .map(|store| &store.online_harmonic)
-        {
-            aggregator
-                .add_personal_harmonic(online_centrality_scorer(&optic.site_rankings, harmonic));
+        if let Some(store) = &self.centrality_store {
+            aggregator.set_personal_harmonic(online_centrality_scorer(
+                &optic.site_rankings,
+                &store.online_harmonic,
+            ));
+
+            let liked_sites: Vec<_> = optic
+                .site_rankings
+                .liked
+                .iter()
+                .map(|site| Node::from(site.clone()).into_host())
+                .filter_map(|node| store.node2id.get(&node).copied())
+                .collect();
+
+            let disliked_sites: Vec<_> = optic
+                .site_rankings
+                .disliked
+                .iter()
+                .map(|site| Node::from(site.clone()).into_host())
+                .filter_map(|node| store.node2id.get(&node).copied())
+                .collect();
+
+            aggregator.set_inbound_similarity(
+                store
+                    .inbound_similarity
+                    .scorer(&liked_sites, &disliked_sites),
+            )
         }
 
         let ranker = self.ranker(&parsed_query, de_rank_similar, aggregator)?;
