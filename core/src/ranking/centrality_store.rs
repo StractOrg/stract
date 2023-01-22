@@ -47,6 +47,57 @@ impl HarmonicCentralityStore {
     }
 }
 
+pub struct IndexerCentralityStore {
+    pub harmonic: HarmonicCentralityStore,
+    pub node2id: BTreeMap<Node, NodeID>,
+}
+
+impl IndexerCentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
+            node2id: open_node2id(path.as_ref().join("node2id")).unwrap(),
+        }
+    }
+}
+
+impl From<CentralityStore> for IndexerCentralityStore {
+    fn from(store: CentralityStore) -> Self {
+        Self {
+            node2id: store.node2id,
+            harmonic: store.harmonic,
+        }
+    }
+}
+
+pub struct SearchCentralityStore {
+    pub online_harmonic: OnlineHarmonicCentrality,
+    pub inbound_similarity: InboundSimilarity,
+    pub node2id: BTreeMap<Node, NodeID>,
+}
+
+impl SearchCentralityStore {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            online_harmonic: OnlineHarmonicCentrality::open(path.as_ref().join("online_harmonic"))
+                .unwrap(),
+            inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
+                .unwrap(),
+            node2id: open_node2id(path.as_ref().join("node2id")).unwrap(),
+        }
+    }
+}
+
+impl From<CentralityStore> for SearchCentralityStore {
+    fn from(store: CentralityStore) -> Self {
+        Self {
+            online_harmonic: store.online_harmonic,
+            inbound_similarity: store.inbound_similarity,
+            node2id: store.node2id,
+        }
+    }
+}
+
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
     pub online_harmonic: OnlineHarmonicCentrality,

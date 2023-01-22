@@ -29,7 +29,7 @@ macro_rules! bench {
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let mut searcher = LocalSearcher::new(index);
-    searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH));
+    searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
 
     for _ in 0..100 {
         bench!("the", searcher, c);

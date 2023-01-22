@@ -24,7 +24,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::query::parser::Term;
 use crate::query::{self, Query};
-use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
@@ -42,7 +42,7 @@ use super::{InitialWebsiteResult, SearchQuery};
 pub struct LocalSearcher {
     index: Index,
     entity_index: Option<EntityIndex>,
-    centrality_store: Option<CentralityStore>,
+    centrality_store: Option<SearchCentralityStore>,
     topic_centrality: Option<TopicCentrality>,
 }
 
@@ -66,7 +66,7 @@ impl LocalSearcher {
         self.entity_index = Some(entity_index);
     }
 
-    pub fn set_centrality_store(&mut self, centrality_store: CentralityStore) {
+    pub fn set_centrality_store(&mut self, centrality_store: SearchCentralityStore) {
         self.centrality_store = Some(centrality_store);
     }
 

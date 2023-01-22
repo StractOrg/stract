@@ -189,7 +189,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let mut searcher = LocalSearcher::new(index);
 
-        searcher.set_centrality_store(CentralityStore::build(&graph, gen_temp_path()));
+        searcher.set_centrality_store(CentralityStore::build(&graph, gen_temp_path()).into());
 
         let result = searcher
             .search(&SearchQuery {

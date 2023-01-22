@@ -20,7 +20,7 @@ use crate::{
     entity_index::EntityIndex,
     index::Index,
     inverted_index,
-    ranking::centrality_store::CentralityStore,
+    ranking::centrality_store::SearchCentralityStore,
     searcher::{self, LocalSearcher},
     sonic, Result, SearchServerConfig,
 };
@@ -33,7 +33,9 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     let entity_index = config
         .entity_index_path
         .map(|path| EntityIndex::open(path).unwrap());
-    let centrality_store = config.centrality_store_path.map(CentralityStore::open);
+    let centrality_store = config
+        .centrality_store_path
+        .map(SearchCentralityStore::open);
     let search_index = Index::open(config.index_path)?;
 
     let mut local_searcher = LocalSearcher::new(search_index);

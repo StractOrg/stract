@@ -706,7 +706,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let mut searcher = LocalSearcher::from(index);
 
-        searcher.set_centrality_store(centrality_store);
+        searcher.set_centrality_store(centrality_store.into());
 
         let res = searcher
             .search(&SearchQuery {

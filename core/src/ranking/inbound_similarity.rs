@@ -260,7 +260,7 @@ mod tests {
         index.commit().unwrap();
 
         let mut searcher = LocalSearcher::new(index);
-        searcher.set_centrality_store(centrality_store);
+        searcher.set_centrality_store(centrality_store.into());
 
         let res = searcher
             .search(&SearchQuery {

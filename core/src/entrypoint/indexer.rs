@@ -26,7 +26,7 @@ use tracing::{debug, info, trace};
 use crate::entrypoint::async_download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Manager, Map, Reduce, Worker};
-use crate::ranking::centrality_store::CentralityStore;
+use crate::ranking::centrality_store::IndexerCentralityStore;
 use crate::ranking::SignalAggregator;
 use crate::warc::WarcFile;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
@@ -57,7 +57,7 @@ pub struct Job {
 }
 
 pub struct IndexingWorker {
-    centrality_store: CentralityStore,
+    centrality_store: IndexerCentralityStore,
     webgraph: Option<Webgraph>,
     crawl_stabilty: Option<CrawlStability>,
     topics: Option<human_website_annotations::Mapper>,
@@ -71,7 +71,7 @@ impl IndexingWorker {
         topics_path: Option<String>,
     ) -> Self {
         Self {
-            centrality_store: CentralityStore::open(centrality_store_path),
+            centrality_store: IndexerCentralityStore::open(centrality_store_path),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).read_only(true).open()),
             crawl_stabilty: crawl_stability_path.map(CrawlStability::open),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
@@ -170,7 +170,6 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
                 let node_id = worker
                     .centrality_store
-                    .online_harmonic
                     .node2id
                     .get(&Node::from_url(html.url()).into_host())
                     .cloned();
