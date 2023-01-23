@@ -18,6 +18,7 @@
     cd frontend; npm run dev
 
 @configure *ARGS:
+    pip3 install -r scripts/requirements.txt
     ./scripts/export_crossencoder
     cd frontend; npm install; npm run build
     cargo run --release --all-features -- configure {{ARGS}}

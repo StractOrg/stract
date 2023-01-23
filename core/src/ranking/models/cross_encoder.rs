@@ -22,7 +22,7 @@ use onnxruntime::{ndarray::ArrayBase, tensor::OrtOwnedTensor, GraphOptimizationL
 use crate::Result;
 
 use super::ONNX_ENVIRONMENT;
-const TRUNCATE_INPUT: usize = 128;
+const TRUNCATE_INPUT: usize = 256;
 
 pub struct CrossEncoderModel {
     tokenizer: tokenizers::Tokenizer,
@@ -38,7 +38,7 @@ impl CrossEncoderModel {
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
                 .with_number_threads(1)?
-                .with_model_from_file(folder.as_ref().join("model.onnx"))?,
+                .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
         );
 
         Ok(Self { tokenizer, session })
@@ -141,9 +141,9 @@ mod tests {
                     )
                 );
             }
-            Err(_err) => {
-                // dbg!(_err);
-                // panic!();
+            Err(err) => {
+                dbg!(err);
+                panic!();
             }
         }
     }

@@ -1,0 +1,4 @@
+transformers[onnx]
+torch
+optimum
+datasets

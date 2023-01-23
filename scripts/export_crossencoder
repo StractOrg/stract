@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 import os
+from optimum.onnxruntime import ORTModelForSequenceClassification, ORTQuantizer
+from optimum.onnxruntime.configuration import AutoQuantizationConfig, QuantizationMode
 import transformers
+from functools import partial
 
 MODEL = "cross-encoder/ms-marco-TinyBERT-L-2-v2"
 
-os.system("pip3 install transformers[onnx] torch")
 os.system("mkdir data/cross_encoder")
-os.system(
-    f"python3 -m transformers.onnx --feature sequence-classification --model={MODEL} data/cross_encoder")
+
+model = ORTModelForSequenceClassification.from_pretrained(
+    MODEL, from_transformers=True)
 
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
 tokenizer.save_pretrained("data/cross_encoder")
+
+qconfig = AutoQuantizationConfig.avx512(is_static=False)
+quantizer = ORTQuantizer.from_pretrained(model)
+
+quantizer.quantize(
+    quantization_config=qconfig, save_dir="data/cross_encoder")
+# model.save_pretrained("data/cross_encoder")
