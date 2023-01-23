@@ -30,7 +30,8 @@ use crate::{
 };
 
 use super::bitvec_similarity;
-const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD: f64 = 0.038;
+const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND: f64 = 0.038;
+const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES: f64 = 0.03;
 const SCORE_SCALE: f64 = 5.0;
 
 pub struct Scorer {
@@ -62,18 +63,33 @@ pub struct InboundSimilarity {
 
 impl InboundSimilarity {
     pub fn build(graph: &Webgraph, harmonic: &HarmonicCentrality) -> Self {
-        Self::build_with_threshold(graph, harmonic, DEFAULT_HARMONIC_CENTRALITY_THRESHOLD)
+        Self::build_with_threshold(
+            graph,
+            harmonic,
+            DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES,
+            DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND,
+        )
     }
     fn build_with_threshold(
         graph: &Webgraph,
         harmonic: &HarmonicCentrality,
-        harmonic_centrality_threshold: f64,
+        harmonic_centrality_threshold_nodes: f64,
+        harmonic_centrality_threshold_inbound: f64,
     ) -> Self {
         let mut vectors = IntMap::new();
         let nodes: Vec<_> = graph.nodes().collect();
 
         if let Some(max_node) = nodes.iter().max().copied() {
-            for node_id in nodes {
+            for node_id in nodes
+                .into_iter()
+                .filter(|node_id| match graph.id2node(&node_id) {
+                    Some(node) => {
+                        let score = *harmonic.host.get(&node.into_host()).unwrap_or(&0.0);
+                        score >= harmonic_centrality_threshold_nodes
+                    }
+                    None => false,
+                })
+            {
                 let mut buf = vec![false; max_node.0 as usize];
 
                 for edge in graph
@@ -82,7 +98,7 @@ impl InboundSimilarity {
                     .filter(|edge| match graph.id2node(&edge.from) {
                         Some(node) => {
                             let score = *harmonic.host.get(&node.into_host()).unwrap_or(&0.0);
-                            score >= harmonic_centrality_threshold
+                            score >= harmonic_centrality_threshold_inbound
                         }
                         None => false,
                     })
@@ -169,7 +185,7 @@ mod tests {
         graph.commit();
 
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0);
+        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0, -1.0);
 
         let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
         let e = graph.node2id(&Node::from("e.com")).unwrap();
@@ -189,7 +205,7 @@ mod tests {
         graph.commit();
 
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0);
+        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0, -1.0);
 
         let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
         centrality_store.inbound_similarity = inbound;
