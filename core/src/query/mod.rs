@@ -229,6 +229,7 @@ impl tantivy::query::Query for Query {
 mod tests {
     use crate::{
         index::Index,
+        rand_words,
         schema::create_schema,
         searcher::{LocalSearcher, SearchQuery},
         webpage::Webpage,
@@ -574,31 +575,37 @@ mod tests {
 
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
                             </head>
                             <body>
-                                This is a test website
+                                This is a test website {}
                             </body>
                         </html>
                     "#,
+                    rand_words(1000)
+                ),
                 "https://www.the-first.com",
             ))
             .expect("failed to insert webpage");
         index
             .insert(Webpage::new(
-                r#"
+                &format!(
+                    r#"
                         <html>
                             <head>
                                 <title>Test test</title>
                             </head>
                             <body>
-                                This test page does not contain the forbidden word
+                                This test page does not contain the forbidden word {}
                             </body>
                         </html>
                     "#,
+                    rand_words(1000)
+                ),
                 "https://www.second.com",
             ))
             .expect("failed to insert webpage");
@@ -630,5 +637,66 @@ mod tests {
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.the-first.com");
+    }
+
+    #[test]
+    fn phrase_query() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                    rand_words(1000)
+                ),
+                "https://www.first.com",
+            ))
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a bad test website {}
+                            </body>
+                        </html>
+                    "#,
+                    rand_words(1000)
+                ),
+                "https://www.second.com",
+            ))
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "\"This is a test website\"".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+
+        let query = SearchQuery {
+            query: "\"This is a test website\" site:www.second.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 0);
+        assert_eq!(result.webpages.len(), 0);
     }
 }

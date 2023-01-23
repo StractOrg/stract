@@ -29,6 +29,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Simple(String),
+    Phrase(String),
     Not(Box<Term>),
     Site(String),
     Title(String),
@@ -41,6 +42,7 @@ impl ToString for Term {
     fn to_string(&self) -> String {
         match self {
             Term::Simple(term) => term.clone(),
+            Term::Phrase(phrase) => "\"".to_string() + &phrase + "\"",
             Term::Not(term) => "-".to_string() + term.to_string().as_str(),
             Term::Site(site) => "site:".to_string() + site.as_str(),
             Term::Title(title) => "intitle:".to_string() + title.as_str(),
@@ -79,7 +81,7 @@ fn simple_into_tantivy(
         ),
         (
             Occur::Should,
-            Box::new(Term::tantivy_term_query(
+            Box::new(Term::tantivy_text_query(
                 backlink_field,
                 backlink_field_entry,
                 tokenizer_manager,
@@ -99,6 +101,27 @@ impl Term {
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         match self {
             Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager, field_boost),
+            Term::Phrase(phrase) => {
+                let mut phrases = Vec::with_capacity(fields.len());
+
+                for (field, entry) in fields
+                    .iter()
+                    .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
+                {
+                    phrases.push((
+                        Occur::Should,
+                        Term::tantivy_text_query(
+                            field,
+                            entry,
+                            tokenizer_manager,
+                            field_boost,
+                            phrase,
+                        ),
+                    ));
+                }
+
+                vec![(Occur::Must, Box::new(BooleanQuery::new(phrases)))]
+            }
             Term::Not(subterm) => vec![(
                 Occur::MustNot,
                 Box::new(BooleanQuery::new(subterm.as_tantivy_query(
@@ -126,9 +149,10 @@ impl Term {
                         )
                     })
                     .unwrap();
+
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, title),
+                    Term::tantivy_text_query(field, entry, tokenizer_manager, field_boost, title),
                 )]
             }
             Term::Body(body) => {
@@ -141,9 +165,10 @@ impl Term {
                         )
                     })
                     .unwrap();
+
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, body),
+                    Term::tantivy_text_query(field, entry, tokenizer_manager, field_boost, body),
                 )]
             }
             Term::Url(url) => {
@@ -156,13 +181,15 @@ impl Term {
                         )
                     })
                     .unwrap();
+
                 vec![(
                     Occur::Must,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, url),
+                    Term::tantivy_text_query(field, entry, tokenizer_manager, field_boost, url),
                 )]
             }
             Term::PossibleBang(text) => {
                 let mut term = String::new();
+
                 term.push(BANG_PREFIX);
                 term.push_str(text);
 
@@ -184,7 +211,7 @@ impl Term {
             .map(|(field, entry)| {
                 (
                     Occur::Should,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, term),
+                    Term::tantivy_text_query(field, entry, tokenizer_manager, field_boost, term),
                 )
             })
             .collect()
@@ -209,13 +236,13 @@ impl Term {
             .map(|(field, entry)| {
                 (
                     Occur::Should,
-                    Term::tantivy_term_query(field, entry, tokenizer_manager, field_boost, term),
+                    Term::tantivy_text_query(field, entry, tokenizer_manager, field_boost, term),
                 )
             })
             .collect()
     }
 
-    fn tantivy_term_query(
+    fn tantivy_text_query(
         field: &tantivy::schema::Field,
         entry: &tantivy::schema::FieldEntry,
         tokenizer_manager: &TokenizerManager,
@@ -318,7 +345,43 @@ fn parse_term(term: &str) -> Box<Term> {
 
 #[allow(clippy::vec_box)]
 pub fn parse(query: &str) -> Vec<Box<Term>> {
-    query.split_whitespace().map(parse_term).collect()
+    let mut res = Vec::new();
+
+    let mut chars = query.char_indices();
+    let mut cur_term_begin = 0;
+
+    while let Some((offset, c)) = chars.next() {
+        if cur_term_begin > offset {
+            continue;
+        }
+
+        if query[cur_term_begin..].starts_with('"') {
+            if let Some(offset) = query[cur_term_begin + 1..].find('"') {
+                let offset = offset + cur_term_begin + 1;
+                res.push(Box::new(Term::Phrase(
+                    query[cur_term_begin + 1..offset].to_string(),
+                )));
+
+                cur_term_begin = offset + 1;
+                continue;
+            }
+        }
+        if c.is_whitespace() {
+            if offset - cur_term_begin == 0 {
+                cur_term_begin = offset + 1;
+                continue;
+            }
+
+            res.push(parse_term(&query[cur_term_begin..offset]));
+            cur_term_begin = offset + 1;
+        }
+    }
+
+    if cur_term_begin < query.len() {
+        res.push(parse_term(&query[cur_term_begin..query.len()]));
+    }
+
+    res
 }
 
 #[cfg(test)]
@@ -396,6 +459,55 @@ mod tests {
                 Box::new(Term::Simple("this".to_string())),
                 Box::new(Term::Url("test".to_string()))
             ]
+        );
+    }
+
+    #[test]
+    fn empty() {
+        assert_eq!(parse(""), vec![]);
+    }
+
+    #[test]
+    fn phrase() {
+        assert_eq!(
+            parse("\"this is a\" inurl:test"),
+            vec![
+                // Box::new(Term::Phrase(vec![
+                //     "this".to_string(),
+                //     "is".to_string(),
+                //     "a".to_string()
+                // ])),
+                Box::new(Term::Phrase("this is a".to_string(),)),
+                Box::new(Term::Url("test".to_string()))
+            ]
+        );
+        assert_eq!(
+            parse("\"this is a inurl:test"),
+            vec![
+                Box::new(Term::Simple("\"this".to_string())),
+                Box::new(Term::Simple("is".to_string())),
+                Box::new(Term::Simple("a".to_string())),
+                Box::new(Term::Url("test".to_string()))
+            ]
+        );
+        assert_eq!(
+            parse("this is a\" inurl:test"),
+            vec![
+                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Simple("is".to_string())),
+                Box::new(Term::Simple("a\"".to_string())),
+                Box::new(Term::Url("test".to_string()))
+            ]
+        );
+
+        assert_eq!(
+            parse("\"this is a inurl:test\""),
+            vec![Box::new(Term::Phrase("this is a inurl:test".to_string(),)),]
+        );
+
+        assert_eq!(
+            parse("\"\""),
+            vec![Box::new(Term::Phrase("".to_string(),)),]
         );
     }
 }

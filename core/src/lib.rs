@@ -220,6 +220,9 @@ pub enum Error {
     #[error("Query cannot be completely empty")]
     EmptyQuery,
 
+    #[error("Error parsing the query")]
+    QueryParser,
+
     #[error("Unknown region")]
     UnknownRegion,
 
