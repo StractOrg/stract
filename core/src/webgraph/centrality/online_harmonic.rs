@@ -346,8 +346,6 @@ impl OnlineHarmonicCentrality {
         centrality: &HarmonicCentralityStore,
         num_proxy_nodes: usize,
     ) -> Self {
-        let mut node2id: BTreeMap<Node, NodeID> = BTreeMap::new();
-
         // we should probably choose the proxy nodes based on their
         // betweenness centrality, but I don't know how we can approximate betweenness
         // on a graph that cannot be in memory.
@@ -355,9 +353,7 @@ impl OnlineHarmonicCentrality {
         // as an estimate
 
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
-        for (node, id) in graph.node_ids() {
-            node2id.insert(node.clone(), id);
-
+        for (node, _) in graph.node_ids() {
             let score = centrality.host.get(&node.name).unwrap_or(0.0);
             let candidate = ProxyNodeCandidate { node, score };
 
@@ -375,7 +371,6 @@ impl OnlineHarmonicCentrality {
         let proxy_nodes: Vec<_> = nodes
             .into_iter()
             .map(|candidate| candidate.node)
-            .filter(|node| node2id.contains_key(node))
             .take(num_proxy_nodes)
             .map(|node| {
                 let dist_to_node = distances(graph, node.clone())
@@ -389,7 +384,7 @@ impl OnlineHarmonicCentrality {
                     .collect();
 
                 Arc::new(ProxyNode {
-                    id: *node2id.get(&node).unwrap(),
+                    id: graph.node2id(&node).unwrap(),
                     dist_to_node,
                     dist_from_node,
                 })
