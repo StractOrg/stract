@@ -28,6 +28,7 @@ use crate::{
     search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar},
     spell::Correction,
     webpage::region::Region,
+    widgets::Widget,
 };
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
@@ -44,6 +45,7 @@ pub struct WebsitesResult {
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: usize,
     pub sidebar: Option<Sidebar>,
+    pub widget: Option<Widget>,
     pub discussions: Option<Vec<DisplayedWebpage>>,
     pub search_duration_ms: u128,
 }

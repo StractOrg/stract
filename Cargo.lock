@@ -804,6 +804,8 @@ dependencies = [
  "indicatif 0.16.2",
  "itertools 0.10.5",
  "kuchiki",
+ "lalrpop",
+ "lalrpop-util",
  "logos",
  "maplit",
  "md5",

@@ -28,6 +28,7 @@ use crate::{
         create_stackoverflow_sidebar, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
     },
     searcher::WebsitesResult,
+    widgets::Widget,
 };
 
 use std::{
@@ -475,10 +476,16 @@ impl DistributedSearcher {
         let sidebar = self.sidebar(&initial_results, query).await?;
         let discussions = self.discussions_widget(query).await?;
 
-        let spell_corrected_query = initial_results
-            .first()
-            .and_then(|result| result.local_result.spell_corrected_query.clone())
-            .map(HighlightedSpellCorrection::from);
+        let widget = self.widget(query);
+
+        let spell_corrected_query = if widget.is_none() {
+            initial_results
+                .first()
+                .and_then(|result| result.local_result.spell_corrected_query.clone())
+                .map(HighlightedSpellCorrection::from)
+        } else {
+            None
+        };
 
         let num_docs = initial_results
             .iter()
@@ -506,6 +513,7 @@ impl DistributedSearcher {
             num_hits: num_docs,
             webpages: retrieved_webpages,
             sidebar,
+            widget,
             discussions,
             search_duration_ms,
         })
@@ -517,5 +525,13 @@ impl DistributedSearcher {
         }
 
         Ok(SearchResult::Websites(self.search_websites(query).await?))
+    }
+
+    fn widget(&self, query: &SearchQuery) -> Option<Widget> {
+        if query.offset > 0 {
+            return None;
+        }
+
+        Widget::try_new(&query.query)
     }
 }

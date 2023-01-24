@@ -14,22 +14,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use serde::Serialize;
+use thiserror::Error;
 
-use crate::{api::router, FrontendConfig};
+use self::calculator::{try_calculate, Calculation};
 
-pub async fn run(config: FrontendConfig) -> Result<()> {
-    let app = router(
-        &config.queries_csv_path,
-        &config.crossencoder_model_path,
-        &config.bangs_path,
-        config.search_servers,
-    )?;
-    let addr = config.host.parse()?;
-    tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+mod calculator;
 
-    Ok(())
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Calculator parse")]
+    CalculatorParse,
+}
+
+#[derive(Debug, Serialize)]
+pub enum Widget {
+    Calculator(Calculation),
+}
+
+impl Widget {
+    pub fn try_new(query: &str) -> Option<Widget> {
+        Self::calculator(query)
+    }
+
+    fn calculator(query: &str) -> Option<Widget> {
+        try_calculate(query).ok().map(Widget::Calculator)
+    }
 }

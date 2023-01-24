@@ -1,0 +1,16 @@
+---
+import { askama } from "../askama";
+
+export interface Props {
+    calculation: string;
+}
+---
+
+<div class="border rounded-xl p-5 flex flex-col items-end">
+    <div class="text-xs text-gray-500 flex w-fit">
+        {askama`calculation.input`} =
+    </div>
+    <div class="font-bold text-3xl flex w-fit">
+        {askama`calculation.result`}
+    </div>
+</div>

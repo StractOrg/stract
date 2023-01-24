@@ -31,6 +31,7 @@ mod inverted_index;
 
 pub mod mapreduce;
 
+mod api;
 mod autosuggest;
 mod bangs;
 mod collector;
@@ -38,7 +39,6 @@ mod directory;
 mod entity_index;
 mod exponential_backoff;
 mod fastfield_cache;
-mod frontend;
 mod human_website_annotations;
 mod hyperloglog;
 mod image_downloader;
@@ -64,6 +64,7 @@ mod ttl_cache;
 mod warc;
 pub mod webgraph;
 pub mod webpage;
+mod widgets;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
@@ -219,9 +220,6 @@ pub enum Error {
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,
-
-    #[error("Error parsing the query")]
-    QueryParser,
 
     #[error("Unknown region")]
     UnknownRegion,

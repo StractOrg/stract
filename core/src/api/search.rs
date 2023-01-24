@@ -28,6 +28,7 @@ use crate::{
     },
     searcher::{self, SearchQuery, SearchResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
+    widgets::Widget,
 };
 
 use super::{
@@ -47,6 +48,7 @@ struct SearchTemplate {
     discussions: Option<Vec<DisplayedWebpage>>,
     query: String,
     sidebar: Option<Sidebar>,
+    widget: Option<Widget>,
     spell_correction: Option<HighlightedSpellCorrection>,
     num_matches: String,
     search_duration_sec: String,
@@ -139,9 +141,6 @@ pub async fn route(
     {
         Ok(result) => match result {
             SearchResult::Websites(result) => {
-                let sidebar = result.sidebar;
-                let spell_correction = result.spell_corrected_query;
-
                 let num_matches = thousand_sep_number(result.num_hits);
 
                 let search_duration_sec =
@@ -157,8 +156,9 @@ pub async fn route(
                     search_result: result.webpages,
                     discussions: result.discussions,
                     query,
-                    sidebar,
-                    spell_correction,
+                    sidebar: result.sidebar,
+                    widget: result.widget,
+                    spell_correction: result.spell_corrected_query,
                     num_matches,
                     search_duration_sec,
                     all_regions,

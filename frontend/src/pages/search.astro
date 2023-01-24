@@ -8,6 +8,7 @@ import OpticSelector from "../components/OpticSelector.astro";
 import Header from "../components/Header.astro";
 import RankingModal from "../components/RankingModal.astro";
 import Discussions from "../components/Discussions.astro";
+import Widget from "../components/Widget.astro";
 import { askama } from "../askama";
 ---
 
@@ -77,6 +78,8 @@ import { askama } from "../askama";
             </div>
           ))
         }
+
+        <Widget widget="widget" />
 
         {
           askama.for_("item in search_result", () => (
