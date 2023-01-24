@@ -91,7 +91,12 @@ fn print_top_nodes(
 ) {
     let liked_nodes: Vec<_> = liked_sites
         .iter()
-        .map(|host| Node::from_url(&Url::from(host.to_string())))
+        .filter_map(|host| {
+            store
+                .node2id
+                .get(&Node::from_url(&Url::from(host.to_string())))
+                .copied()
+        })
         .collect();
 
     let scorer = store.online_harmonic.scorer(&liked_nodes, &[]);

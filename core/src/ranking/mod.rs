@@ -24,7 +24,7 @@ pub mod optics;
 pub mod pipeline;
 pub mod signal;
 
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use ::optics::SiteRankings;
 use initial::InitialScoreTweaker;
@@ -40,7 +40,7 @@ use crate::{
             online_harmonic::{self, OnlineHarmonicCentrality, Scorer},
             topic,
         },
-        Node,
+        Node, NodeID,
     },
     webpage::{
         region::{Region, RegionCount},
@@ -153,19 +153,24 @@ impl Ranker {
 pub fn online_centrality_scorer(
     site_rankings: &SiteRankings,
     harmonic: &OnlineHarmonicCentrality,
+    node2id: &BTreeMap<Node, NodeID>,
 ) -> Scorer {
-    let mut liked_nodes = Vec::new();
-    let mut disliked_nodes = Vec::new();
+    let mut liked = Vec::new();
+    let mut disliked = Vec::new();
 
     for site in &site_rankings.liked {
-        liked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+        if let Some(nodeid) = node2id.get(&Node::from_url(&Url::from(site.clone())).into_host()) {
+            liked.push(*nodeid);
+        }
     }
 
     for site in &site_rankings.disliked {
-        disliked_nodes.push(Node::from_url(&Url::from(site.clone())).into_host());
+        if let Some(nodeid) = node2id.get(&Node::from_url(&Url::from(site.clone())).into_host()) {
+            disliked.push(*nodeid);
+        }
     }
 
-    harmonic.scorer(&liked_nodes, &disliked_nodes)
+    harmonic.scorer(&liked, &disliked)
 }
 
 #[cfg(test)]
@@ -175,6 +180,7 @@ mod tests {
     use crate::{
         human_website_annotations::{self, Info, Topic},
         index::Index,
+        ranking::centrality_store::HarmonicCentralityStore,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{
             centrality::{
@@ -1240,8 +1246,15 @@ mod tests {
 
         webgraph.commit();
 
-        let centrality = HarmonicCentrality::calculate(&webgraph);
-        let harmonic = OnlineHarmonicCentrality::new(&webgraph, &centrality);
+        let harmonic = HarmonicCentrality::calculate(&webgraph);
+
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let harmonic = OnlineHarmonicCentrality::new(&webgraph, &harmonic_centrality_store);
 
         let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
 

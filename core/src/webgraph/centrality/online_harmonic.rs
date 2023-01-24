@@ -30,15 +30,13 @@ use std::io::{BufReader, BufWriter, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;
+use crate::ranking::centrality_store::HarmonicCentralityStore;
 use crate::webgraph::{Edge, Node};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
-
-use super::harmonic::HarmonicCentrality;
 
 const NUM_PROXY_NODES: usize = 500;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
@@ -335,21 +333,20 @@ fn reversed_distances(graph: &Webgraph, source: Node) -> BTreeMap<NodeID, u8> {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct OnlineHarmonicCentrality {
-    pub node2id: HashMap<Node, NodeID>,
     pub proxy_nodes: Vec<Arc<ProxyNode>>,
 }
 
 impl OnlineHarmonicCentrality {
-    pub fn new(graph: &Webgraph, centrality: &HarmonicCentrality) -> Self {
+    pub fn new(graph: &Webgraph, centrality: &HarmonicCentralityStore) -> Self {
         Self::new_with_num_proxy(graph, centrality, NUM_PROXY_NODES)
     }
 
     fn new_with_num_proxy(
         graph: &Webgraph,
-        centrality: &HarmonicCentrality,
+        centrality: &HarmonicCentralityStore,
         num_proxy_nodes: usize,
     ) -> Self {
-        let mut node2id: HashMap<Node, NodeID> = HashMap::new();
+        let mut node2id: BTreeMap<Node, NodeID> = BTreeMap::new();
 
         // we should probably choose the proxy nodes based on their
         // betweenness centrality, but I don't know how we can approximate betweenness
@@ -361,7 +358,7 @@ impl OnlineHarmonicCentrality {
         for (node, id) in graph.node_ids() {
             node2id.insert(node.clone(), id);
 
-            let score = *centrality.host.get(&node).unwrap_or(&0.0);
+            let score = centrality.host.get(&node.name).unwrap_or(0.0);
             let candidate = ProxyNodeCandidate { node, score };
 
             if nodes.len() >= num_proxy_nodes {
@@ -399,29 +396,10 @@ impl OnlineHarmonicCentrality {
             })
             .collect();
 
-        Self {
-            proxy_nodes,
-            node2id,
-        }
+        Self { proxy_nodes }
     }
 
-    pub fn scorer(&self, liked_nodes: &[Node], disliked_nodes: &[Node]) -> Scorer {
-        let liked_nodes = liked_nodes
-            .iter()
-            .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).cloned())
-            .collect_vec();
-
-        let disliked_nodes = disliked_nodes
-            .iter()
-            .map(|node| node.clone().into_host())
-            .filter_map(|node| self.node2id.get(&node).cloned())
-            .collect_vec();
-
-        self.scorer_from_ids(&liked_nodes, &disliked_nodes)
-    }
-
-    pub fn scorer_from_ids(&self, liked_nodes: &[NodeID], disliked_nodes: &[NodeID]) -> Scorer {
+    pub fn scorer(&self, liked_nodes: &[NodeID], disliked_nodes: &[NodeID]) -> Scorer {
         Scorer::new(
             &self.proxy_nodes,
             liked_nodes,
@@ -458,7 +436,7 @@ impl OnlineHarmonicCentrality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webgraph::WebgraphBuilder;
+    use crate::webgraph::{centrality::harmonic::HarmonicCentrality, WebgraphBuilder};
 
     fn test_graph() -> Webgraph {
         /*
@@ -493,51 +471,35 @@ mod tests {
     fn ordering() {
         let graph = test_graph();
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
-        let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let centrality =
+            OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic_centrality_store, 5);
+
+        let liked_nodes: Vec<_> = vec![Node::from("B".to_string()), Node::from("E".to_string())]
+            .into_iter()
+            .filter_map(|node| graph.node2id(&node))
+            .collect();
 
         let scorer = centrality.scorer(&liked_nodes, &[]);
 
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("E".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("H".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("E".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
         );
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("H".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("C".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("C".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("A".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("A".to_string())).unwrap())
         );
     }
 
@@ -545,14 +507,25 @@ mod tests {
     fn disliked_nodes_centrality() {
         let graph = test_graph();
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
-        let disliked_nodes = vec![Node::from("D".to_string()), Node::from("E".to_string())];
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let centrality =
+            OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic_centrality_store, 5);
+
+        let disliked_nodes: Vec<_> = vec![Node::from("D".to_string()), Node::from("E".to_string())]
+            .into_iter()
+            .filter_map(|node| graph.node2id(&node))
+            .collect();
 
         let scorer = centrality.scorer(&[], &disliked_nodes);
 
         for node in &disliked_nodes {
-            assert_eq!(scorer.score(*centrality.node2id.get(node).unwrap()), 0.0);
+            assert_eq!(scorer.score(*node), 0.0);
         }
     }
 
@@ -560,53 +533,41 @@ mod tests {
     fn ordering_with_dislikes() {
         let graph = test_graph();
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let centrality = OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic, 5);
 
-        let liked_nodes = vec![Node::from("B".to_string()), Node::from("E".to_string())];
-        let disliked_nodes = vec![Node::from("F".to_string())];
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let centrality =
+            OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic_centrality_store, 5);
+
+        let liked_nodes: Vec<_> = vec![Node::from("B".to_string()), Node::from("E".to_string())]
+            .into_iter()
+            .filter_map(|node| graph.node2id(&node))
+            .collect();
+
+        let disliked_nodes: Vec<_> = vec![Node::from("F".to_string())]
+            .into_iter()
+            .filter_map(|node| graph.node2id(&node))
+            .collect();
 
         let scorer = centrality.scorer(&liked_nodes, &disliked_nodes);
 
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("E".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("H".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("E".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("H".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("C".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("C".to_string()))
-                    .unwrap()
-            ) > scorer.score(
-                *centrality
-                    .node2id
-                    .get(&Node::from("A".to_string()))
-                    .unwrap()
-            )
+            scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
+                > scorer.score(graph.node2id(&Node::from("A".to_string())).unwrap())
         );
     }
 }

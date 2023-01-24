@@ -174,7 +174,10 @@ impl TopicCentrality {
                 })
                 .collect();
 
-            let top_sites: Vec<_> = top_sites.into_iter().collect();
+            let top_sites: Vec<_> = top_sites
+                .into_iter()
+                .filter_map(|node| webgraph.node2id(&node))
+                .collect();
 
             assert!(!top_sites.is_empty());
 

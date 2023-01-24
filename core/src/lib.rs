@@ -255,7 +255,7 @@ pub enum Error {
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-fn gen_temp_path() -> PathBuf {
+pub fn gen_temp_path() -> PathBuf {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::SystemTime;
 

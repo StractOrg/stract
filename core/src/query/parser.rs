@@ -42,7 +42,7 @@ impl ToString for Term {
     fn to_string(&self) -> String {
         match self {
             Term::Simple(term) => term.clone(),
-            Term::Phrase(phrase) => "\"".to_string() + &phrase + "\"",
+            Term::Phrase(phrase) => "\"".to_string() + phrase + "\"",
             Term::Not(term) => "-".to_string() + term.to_string().as_str(),
             Term::Site(site) => "site:".to_string() + site.as_str(),
             Term::Title(title) => "intitle:".to_string() + title.as_str(),
@@ -347,10 +347,9 @@ fn parse_term(term: &str) -> Box<Term> {
 pub fn parse(query: &str) -> Vec<Box<Term>> {
     let mut res = Vec::new();
 
-    let mut chars = query.char_indices();
     let mut cur_term_begin = 0;
 
-    while let Some((offset, c)) = chars.next() {
+    for (offset, c) in query.char_indices() {
         if cur_term_begin > offset {
             continue;
         }

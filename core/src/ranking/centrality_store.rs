@@ -136,7 +136,7 @@ impl CentralityStore {
     fn store_host<P: AsRef<Path>>(
         output_path: P,
         store: &mut CentralityStore,
-        harmonic_centrality: &HarmonicCentrality,
+        harmonic_centrality: HarmonicCentrality,
     ) {
         let csv_file = File::options()
             .write(true)
@@ -145,7 +145,7 @@ impl CentralityStore {
             .open(output_path.as_ref().join("harmonic_host.csv"))
             .unwrap();
 
-        let mut host: Vec<_> = harmonic_centrality.host.clone().into_iter().collect();
+        let mut host: Vec<_> = harmonic_centrality.host.into_iter().collect();
         host.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut wtr = csv::Writer::from_writer(csv_file);
         for (node, centrality) in host {
@@ -154,6 +154,7 @@ impl CentralityStore {
                 .unwrap();
         }
         wtr.flush().unwrap();
+        store.harmonic.host.flush();
     }
 
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
@@ -161,9 +162,10 @@ impl CentralityStore {
 
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
 
-        Self::store_host(&output_path, &mut store, &harmonic_centrality);
-        store.online_harmonic = OnlineHarmonicCentrality::new(graph, &harmonic_centrality);
-        store.inbound_similarity = InboundSimilarity::build(graph, &harmonic_centrality);
+        Self::store_host(&output_path, &mut store, harmonic_centrality);
+
+        store.online_harmonic = OnlineHarmonicCentrality::new(graph, &store.harmonic);
+        store.inbound_similarity = InboundSimilarity::build(graph, &store.harmonic);
 
         store.node2id = graph.node_ids().collect();
 

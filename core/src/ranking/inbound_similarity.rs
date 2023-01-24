@@ -25,11 +25,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     intmap::IntMap,
-    webgraph::{centrality::harmonic::HarmonicCentrality, NodeID, Webgraph},
+    webgraph::{NodeID, Webgraph},
     Result,
 };
 
-use super::bitvec_similarity;
+use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
 const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND: f64 = 0.038;
 const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES: f64 = 0.03;
 const SCORE_SCALE: f64 = 5.0;
@@ -62,7 +62,7 @@ pub struct InboundSimilarity {
 }
 
 impl InboundSimilarity {
-    pub fn build(graph: &Webgraph, harmonic: &HarmonicCentrality) -> Self {
+    pub fn build(graph: &Webgraph, harmonic: &HarmonicCentralityStore) -> Self {
         Self::build_with_threshold(
             graph,
             harmonic,
@@ -72,7 +72,7 @@ impl InboundSimilarity {
     }
     fn build_with_threshold(
         graph: &Webgraph,
-        harmonic: &HarmonicCentrality,
+        harmonic: &HarmonicCentralityStore,
         harmonic_centrality_threshold_nodes: f64,
         harmonic_centrality_threshold_inbound: f64,
     ) -> Self {
@@ -82,9 +82,9 @@ impl InboundSimilarity {
         if let Some(max_node) = nodes.iter().max().copied() {
             for node_id in nodes
                 .into_iter()
-                .filter(|node_id| match graph.id2node(&node_id) {
+                .filter(|node_id| match graph.id2node(node_id) {
                     Some(node) => {
-                        let score = *harmonic.host.get(&node.into_host()).unwrap_or(&0.0);
+                        let score = harmonic.host.get(&node.into_host().name).unwrap_or(0.0);
                         score >= harmonic_centrality_threshold_nodes
                     }
                     None => false,
@@ -97,7 +97,7 @@ impl InboundSimilarity {
                     .into_iter()
                     .filter(|edge| match graph.id2node(&edge.from) {
                         Some(node) => {
-                            let score = *harmonic.host.get(&node.into_host()).unwrap_or(&0.0);
+                            let score = harmonic.host.get(&node.into_host().name).unwrap_or(0.0);
                             score >= harmonic_centrality_threshold_inbound
                         }
                         None => false,
@@ -168,7 +168,7 @@ mod tests {
         rand_words,
         ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphBuilder},
+        webgraph::{centrality::harmonic::HarmonicCentrality, Node, WebgraphBuilder},
         webpage::{Html, Webpage},
     };
 
@@ -185,7 +185,15 @@ mod tests {
         graph.commit();
 
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0, -1.0);
+
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let inbound =
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, -1.0, -1.0);
 
         let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
         let e = graph.node2id(&Node::from("e.com")).unwrap();
@@ -205,7 +213,15 @@ mod tests {
         graph.commit();
 
         let harmonic = HarmonicCentrality::calculate(&graph);
-        let inbound = InboundSimilarity::build_with_threshold(&graph, &harmonic, -1.0, -1.0);
+
+        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+        for (node, centrality) in harmonic.host {
+            harmonic_centrality_store.host.insert(node.name, centrality);
+        }
+        harmonic_centrality_store.host.flush();
+
+        let inbound =
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, -1.0, -1.0);
 
         let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
         centrality_store.inbound_similarity = inbound;

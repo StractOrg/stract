@@ -163,7 +163,7 @@ impl LocalSearcher {
             if !top_host_nodes.is_empty() {
                 let harmonic = centrality_store
                     .online_harmonic
-                    .scorer_from_ids(&top_host_nodes, &[]);
+                    .scorer(&top_host_nodes, &[]);
                 ranker.set_query_centrality(harmonic);
             }
         }
@@ -190,6 +190,7 @@ impl LocalSearcher {
             aggregator.set_personal_harmonic(online_centrality_scorer(
                 &optic.site_rankings,
                 &store.online_harmonic,
+                &store.node2id,
             ));
 
             let liked_sites: Vec<_> = optic

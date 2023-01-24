@@ -621,13 +621,7 @@ mod tests {
                 primary_image: None,
                 host_topic: None,
                 dmoz_description: None,
-                node_id: Some(
-                    *centrality_store
-                        .online_harmonic
-                        .node2id
-                        .get(&Node::from("www.a.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(graph.node2id(&Node::from("www.a.com").into_host()).unwrap()),
             })
             .expect("failed to insert webpage");
         index
@@ -657,13 +651,7 @@ mod tests {
                 fetch_time_ms: 500,
                 dmoz_description: None,
                 host_topic: None,
-                node_id: Some(
-                    *centrality_store
-                        .online_harmonic
-                        .node2id
-                        .get(&Node::from("www.b.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(graph.node2id(&Node::from("www.b.com").into_host()).unwrap()),
             })
             .expect("failed to insert webpage");
         index
@@ -693,13 +681,7 @@ mod tests {
                 fetch_time_ms: 500,
                 host_topic: None,
                 dmoz_description: None,
-                node_id: Some(
-                    *centrality_store
-                        .online_harmonic
-                        .node2id
-                        .get(&Node::from("www.c.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(graph.node2id(&Node::from("www.c.com").into_host()).unwrap()),
             })
             .expect("failed to insert webpage");
 

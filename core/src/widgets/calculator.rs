@@ -59,8 +59,8 @@ impl Debug for Expr {
     fn fmt(&self, fmt: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
         use self::Expr::*;
         match *self {
-            Number(n) => write!(fmt, "{:?}", n),
-            Op(ref l, op, ref r) => write!(fmt, "({:?} {:?} {:?})", l, op, r),
+            Number(n) => write!(fmt, "{n:?}"),
+            Op(ref l, op, ref r) => write!(fmt, "({l:?} {op:?} {r:?})"),
         }
     }
 }
@@ -69,8 +69,8 @@ impl Display for Expr {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         use self::Expr::*;
         match *self {
-            Number(n) => write!(fmt, "{}", n),
-            Op(ref l, op, ref r) => write!(fmt, "{} {} {}", l, op, r),
+            Number(n) => write!(fmt, "{n}"),
+            Op(ref l, op, ref r) => write!(fmt, "{l} {op} {r}"),
         }
     }
 }
