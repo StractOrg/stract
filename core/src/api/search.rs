@@ -23,8 +23,8 @@ use axum_macros::debug_handler;
 
 use crate::{
     search_prettifier::{
-        thousand_sep_number, CodeOrText, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
-        Snippet,
+        thousand_sep_number, CodeOrText, DisplayedAnswer, DisplayedWebpage,
+        HighlightedSpellCorrection, Sidebar, Snippet,
     },
     searcher::{self, SearchQuery, SearchResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
@@ -49,6 +49,7 @@ struct SearchTemplate {
     query: String,
     sidebar: Option<Sidebar>,
     widget: Option<Widget>,
+    direct_answer: Option<DisplayedAnswer>,
     spell_correction: Option<HighlightedSpellCorrection>,
     num_matches: String,
     search_duration_sec: String,
@@ -158,6 +159,7 @@ pub async fn route(
                     query,
                     sidebar: result.sidebar,
                     widget: result.widget,
+                    direct_answer: result.direct_answer,
                     spell_correction: result.spell_corrected_query,
                     num_matches,
                     search_duration_sec,

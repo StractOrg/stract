@@ -161,6 +161,16 @@ pub struct DisplayedWebpage {
     pub primary_image_uuid: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DisplayedAnswer {
+    pub title: String,
+    pub url: String,
+    pub pretty_url: String,
+    pub snippet: String,
+    pub answer: String,
+    pub body: String,
+}
+
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
         let snippet = generate_snippet(&webpage);

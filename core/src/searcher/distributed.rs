@@ -19,13 +19,15 @@ use crate::{
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     inverted_index::{self, RetrievedWebpage},
+    qa_model::QaModel,
     query,
     ranking::{
         models::cross_encoder::CrossEncoderModel,
         pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
     },
     search_prettifier::{
-        create_stackoverflow_sidebar, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
+        create_stackoverflow_sidebar, DisplayedAnswer, DisplayedWebpage,
+        HighlightedSpellCorrection, Sidebar,
     },
     searcher::WebsitesResult,
     widgets::Widget,
@@ -34,6 +36,7 @@ use crate::{
 use std::{
     cmp::Ordering,
     net::SocketAddr,
+    ops::Range,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -193,6 +196,7 @@ pub enum Request {
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
     cross_encoder: Arc<CrossEncoderModel>,
+    qa_model: Arc<QaModel>,
     bangs: Bangs,
 }
 
@@ -227,10 +231,16 @@ impl collector::Doc for ScoredWebsitePointer {
 }
 
 impl DistributedSearcher {
-    pub fn new(shards: Vec<Shard>, model: CrossEncoderModel, bangs: Bangs) -> Self {
+    pub fn new(
+        shards: Vec<Shard>,
+        model: CrossEncoderModel,
+        qa_model: QaModel,
+        bangs: Bangs,
+    ) -> Self {
         Self {
             shards,
             cross_encoder: Arc::new(model),
+            qa_model: Arc::new(qa_model),
             bangs,
         }
     }
@@ -495,7 +505,7 @@ impl DistributedSearcher {
         let top_websites = self.combine_results(initial_results, pipeline);
 
         // retrieve webpages
-        let retrieved_webpages: Vec<_> = self
+        let mut retrieved_webpages: Vec<_> = self
             .retrieve_webpages(&top_websites, &query.query)
             .await
             .into_iter()
@@ -506,12 +516,15 @@ impl DistributedSearcher {
             return Err(Error::SearchFailed);
         }
 
+        let direct_answer = self.answer(&query.query, &mut retrieved_webpages);
+
         let search_duration_ms = start.elapsed().as_millis();
 
         Ok(WebsitesResult {
             spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,
+            direct_answer,
             sidebar,
             widget,
             discussions,
@@ -533,5 +546,161 @@ impl DistributedSearcher {
         }
 
         Widget::try_new(&query.query)
+    }
+
+    fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
+        let contexts: Vec<_> = webpages
+            .iter()
+            .take(3)
+            .map(|webpage| webpage.body.as_str())
+            .collect();
+
+        match self.qa_model.run(query, &contexts) {
+            Some(answer) => {
+                let answer_webpage = webpages.remove(answer.context_idx);
+                Some(DisplayedAnswer {
+                    title: answer_webpage.title,
+                    url: answer_webpage.url,
+                    pretty_url: answer_webpage.pretty_url,
+                    snippet: generate_answer_snippet(&answer_webpage.body, answer.offset.clone()),
+                    answer: answer_webpage.body[answer.offset].to_string(),
+                    body: answer_webpage.body,
+                })
+            }
+            None => None,
+        }
+    }
+}
+
+fn generate_answer_snippet(body: &str, answer_offset: Range<usize>) -> String {
+    let mut best_start = 0;
+    let mut best_end = 0;
+    const SNIPPET_LENGTH: usize = 200;
+
+    if body.is_empty() || answer_offset.start > body.len() - 1 {
+        return body.to_string();
+    }
+
+    for (idx, _) in body.char_indices().filter(|(_, c)| *c == '.') {
+        if idx > answer_offset.end + SNIPPET_LENGTH {
+            break;
+        }
+
+        if idx < answer_offset.start {
+            best_start = idx;
+        }
+
+        if idx > answer_offset.end {
+            best_end = idx;
+        }
+    }
+
+    if (answer_offset.end - best_start > SNIPPET_LENGTH) || (best_start >= best_end) {
+        if answer_offset.end - answer_offset.start >= SNIPPET_LENGTH {
+            let end = floor_char_boundary(body, answer_offset.start + SNIPPET_LENGTH);
+
+            return "<b>".to_string() + &body[answer_offset.start..end] + "</b>";
+        }
+
+        let chars_either_side = (SNIPPET_LENGTH - (answer_offset.end - answer_offset.start)) / 2;
+
+        let start = ceil_char_boundary(
+            body,
+            answer_offset
+                .start
+                .checked_sub(chars_either_side)
+                .unwrap_or_default(),
+        );
+        let mut end = ceil_char_boundary(body, answer_offset.end + chars_either_side);
+
+        if end >= body.len() {
+            end = floor_char_boundary(body, body.len());
+        }
+
+        body[start..answer_offset.start].to_string()
+            + "<b>"
+            + &body[answer_offset.clone()]
+            + "</b>"
+            + &body[answer_offset.end..end]
+    } else {
+        let mut res = body[best_start..answer_offset.start].to_string()
+            + "<b>"
+            + &body[answer_offset.clone()]
+            + "</b>";
+
+        let remaining_chars = SNIPPET_LENGTH - (res.len() - 7);
+        let end = ceil_char_boundary(body, (remaining_chars + answer_offset.end).min(best_end));
+
+        res += &body[answer_offset.end..end];
+
+        res
+    }
+}
+
+fn ceil_char_boundary(str: &str, index: usize) -> usize {
+    let mut res = index;
+
+    while !str.is_char_boundary(res) && res < str.len() {
+        res += 1;
+    }
+
+    res
+}
+
+fn floor_char_boundary(str: &str, index: usize) -> usize {
+    let mut res = index;
+
+    while !str.is_char_boundary(res) && res > 0 {
+        res -= 1;
+    }
+
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_generate_answer_snippet() {
+        assert_eq!(
+            generate_answer_snippet("this is a test", 0..4),
+            "<b>this</b> is a test".to_string()
+        );
+
+        assert_eq!(
+            generate_answer_snippet("this is a test", 0..1000),
+            "<b>this is a test</b>".to_string()
+        );
+        assert_eq!(
+            generate_answer_snippet("this is a test", 1000..2000),
+            "this is a test".to_string()
+        );
+        let input = r#"
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+            "#;
+
+        let res = generate_answer_snippet(input, 0..500);
+        assert!(!res.is_empty());
+        assert!(res.len() > 100);
+        assert!(res.len() < input.len());
+        assert!(res.starts_with("<b>"));
+        assert!(res.ends_with("</b>"));
+
+        assert_eq!(generate_answer_snippet("", 0..2000), "".to_string());
     }
 }

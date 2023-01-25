@@ -142,8 +142,7 @@ mod tests {
                 );
             }
             Err(err) => {
-                dbg!(err);
-                panic!();
+                panic!("{err:?}");
             }
         }
     }

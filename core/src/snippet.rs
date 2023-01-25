@@ -79,7 +79,7 @@ struct SnippetString {
     highlighted: Vec<Range<usize>>,
 }
 
-const HIGHLIGHTEN_PREFIX: &str = "<b style=\"font-weight: 700;\">";
+const HIGHLIGHTEN_PREFIX: &str = "<b>";
 const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
 impl SnippetString {

@@ -25,7 +25,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bangs::BangHit,
     ranking::pipeline::RankingWebsite,
-    search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar},
+    search_prettifier::{
+        DisplayedAnswer, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
+    },
     spell::Correction,
     webpage::region::Region,
     widgets::Widget,
@@ -46,6 +48,7 @@ pub struct WebsitesResult {
     pub num_hits: usize,
     pub sidebar: Option<Sidebar>,
     pub widget: Option<Widget>,
+    pub direct_answer: Option<DisplayedAnswer>,
     pub discussions: Option<Vec<DisplayedWebpage>>,
     pub search_duration_ms: u128,
 }

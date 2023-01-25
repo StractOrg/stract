@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+import os
+from optimum.onnxruntime import ORTModelForQuestionAnswering, ORTQuantizer
+from optimum.onnxruntime.configuration import AutoQuantizationConfig
+import transformers
+from functools import partial
+
+MODEL = "deepset/tinyroberta-squad2"
+
+os.system("mkdir data/qa_model")
+
+model = ORTModelForQuestionAnswering.from_pretrained(
+    MODEL, from_transformers=True)
+
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
+tokenizer.save_pretrained("data/qa_model")
+
+qconfig = AutoQuantizationConfig.avx512(is_static=False)
+quantizer = ORTQuantizer.from_pretrained(model)
+
+quantizer.quantize(
+    quantization_config=qconfig, save_dir="data/qa_model")

@@ -2,4 +2,5 @@ queries_csv_path = "data/queries_us.csv"
 host = "0.0.0.0:3000"
 search_servers = [["0.0.0.0:3001"]]
 crossencoder_model_path = "data/cross_encoder"
+qa_model_path = "data/qa_model"
 bangs_path = "data/bangs.json"

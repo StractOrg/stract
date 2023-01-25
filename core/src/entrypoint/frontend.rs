@@ -22,6 +22,7 @@ pub async fn run(config: FrontendConfig) -> Result<()> {
     let app = router(
         &config.queries_csv_path,
         &config.crossencoder_model_path,
+        &config.qa_model_path,
         &config.bangs_path,
         config.search_servers,
     )?;

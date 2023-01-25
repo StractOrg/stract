@@ -9,6 +9,7 @@ import Header from "../components/Header.astro";
 import RankingModal from "../components/RankingModal.astro";
 import Discussions from "../components/Discussions.astro";
 import Widget from "../components/Widget.astro";
+import DirectAnswer from "../components/DirectAnswer.astro";
 import { askama } from "../askama";
 ---
 
@@ -80,6 +81,7 @@ import { askama } from "../askama";
         }
 
         <Widget widget="widget" />
+        <DirectAnswer direct_answer="direct_answer" />
 
         {
           askama.for_("item in search_result", () => (
@@ -196,6 +198,9 @@ import { askama } from "../askama";
 
   .text-snippet {
     font-weight: 400;
+  }
+  .text-snippet>b {
+    font-weight: 700;
   }
 </style>
 

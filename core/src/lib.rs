@@ -48,6 +48,7 @@ mod intmap;
 mod kahan_sum;
 mod kv;
 pub mod prehashed;
+mod qa_model;
 mod query;
 pub mod ranking;
 mod schema;
@@ -153,6 +154,7 @@ pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: String,
     pub crossencoder_model_path: String,
+    pub qa_model_path: String,
     pub bangs_path: String,
     pub search_servers: Vec<Vec<String>>,
 }
