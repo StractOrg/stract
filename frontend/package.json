@@ -11,20 +11,20 @@
     "prettier": "prettier -w . --cache"
   },
   "dependencies": {
-    "@alpinejs/persist": "^3.10.5",
+    "@alpinejs/persist": "^3.11.1",
     "@types/alpinejs": "^3.7.1",
-    "alpinejs": "^3.10.5",
-    "astro": "^1.7.2",
+    "alpinejs": "^3.11.1",
+    "astro": "^2.0.2",
     "astro-icon": "^0.8.0"
   },
   "devDependencies": {
-    "@astrojs/mdx": "^0.13.0",
-    "@astrojs/tailwind": "^2.1.3",
+    "@astrojs/mdx": "^0.15.1",
+    "@astrojs/tailwind": "^3.0.0",
     "@faker-js/faker": "^7.6.0",
-    "@fontsource/montserrat": "^4.5.13",
-    "@tailwindcss/typography": "^0.5.8",
-    "prettier": "^2.8.1",
-    "prettier-plugin-astro": "^0.7.0",
-    "prettier-plugin-tailwindcss": "^0.2.1"
+    "@fontsource/montserrat": "^4.5.14",
+    "@tailwindcss/typography": "^0.5.9",
+    "prettier": "^2.8.3",
+    "prettier-plugin-astro": "^0.8.0",
+    "prettier-plugin-tailwindcss": "^0.2.2"
   }
 }
