@@ -4,51 +4,54 @@ import Hero from "./Hero.astro";
 import DiscussionItem from "./DiscussionItem.astro";
 
 export interface Props {
-    discussions: string;
+  discussions: string;
 }
 ---
 
 {
-askama.if_("let Some(discussions) = discussions", () => (
-<div class="discussions relative overflow-hidden flex flex-col space-y-1.5" id="discussions">
-    <div class="text-lg space-x-1 flex mb" id="discussions-header">
+  askama.if_("let Some(discussions) = discussions", () => (
+    <div
+      class="discussions relative flex flex-col space-y-1.5 overflow-hidden"
+      id="discussions"
+    >
+      <div class="mb flex space-x-1 text-lg" id="discussions-header">
         <Hero class="w-4" icon="chat-alt-2" />
         <span>Discussions</span>
-    </div>
-    <div class="discussion-list flex flex-col">
-        {
-        askama.for_("discussion in discussions.iter().take(4)", () => (
-            <DiscussionItem discussion="discussion" />
-        ))
-        }
+      </div>
+      <div class="discussion-list flex flex-col">
+        {askama.for_("discussion in discussions.iter().take(4)", () => (
+          <DiscussionItem discussion="discussion" />
+        ))}
         <div id="discussion-more" class="hidden">
-            {
-            askama.for_("discussion in discussions.iter().skip(4)", () => (
-                <DiscussionItem discussion="discussion" />
-            ))
-            }
+          {askama.for_("discussion in discussions.iter().skip(4)", () => (
+            <DiscussionItem discussion="discussion" />
+          ))}
         </div>
-        <div id="discussion-more-btn" class="hover:cursor-pointer hover:bg-neutral-100 w-fit px-2 py-1 mt-3 border rounded-full">Show more</div>
+        <div
+          id="discussion-more-btn"
+          class="mt-3 w-fit rounded-full border px-2 py-1 hover:cursor-pointer hover:bg-neutral-100"
+        >
+          Show more
+        </div>
+      </div>
     </div>
-</div>
-))
+  ))
 }
 
 <script>
-    const discussionMore = document.getElementById("discussion-more")!;
-    const discussionMoreBtn = document.getElementById("discussion-more-btn")!;
+  const discussionMore = document.getElementById("discussion-more")!;
+  const discussionMoreBtn = document.getElementById("discussion-more-btn")!;
 
-    let moreIsShown = false;
-    discussionMoreBtn.addEventListener("click", () => {
-        moreIsShown = !moreIsShown;
+  let moreIsShown = false;
+  discussionMoreBtn.addEventListener("click", () => {
+    moreIsShown = !moreIsShown;
 
-        if (moreIsShown) {
-            discussionMore.classList.remove("hidden");
-            discussionMoreBtn.innerHTML = "Show less";
-        } else {
-            discussionMore.classList.add("hidden");
-            discussionMoreBtn.innerHTML = "Show more";
-        }
-    })
-
+    if (moreIsShown) {
+      discussionMore.classList.remove("hidden");
+      discussionMoreBtn.innerHTML = "Show less";
+    } else {
+      discussionMore.classList.add("hidden");
+      discussionMoreBtn.innerHTML = "Show more";
+    }
+  });
 </script>

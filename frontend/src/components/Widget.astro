@@ -3,20 +3,19 @@ import { askama } from "../askama";
 import CalculatorWidget from "./CalculatorWidget.astro";
 
 export interface Props {
-    widget: string;
+  widget: string;
 }
 ---
 
 {
-askama.if_("let Some(widget) = widget", (
+  askama.if_(
+    "let Some(widget) = widget",
     <div>
-    {
-        askama.match("widget", {
-            "Widget::Calculator(calculation)": (
-                <CalculatorWidget calculation="calculation" />
-            )
-        })
-    }
+      {askama.match("widget", {
+        "Widget::Calculator(calculation)": (
+          <CalculatorWidget calculation="calculation" />
+        ),
+      })}
     </div>
-))
+  )
 }

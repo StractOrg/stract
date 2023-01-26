@@ -3,40 +3,45 @@ import { askama } from "../askama";
 import Hero from "./Hero.astro";
 
 export interface Props {
-    discussion: string;
+  discussion: string;
 }
 ---
+
 <div class="discussion overflow-hidden">
-    <div>
-        <a class="text-sm hover:no-underline" href="{{ discussion.url }} ">
-        {askama`discussion.domain`}
-        </a>
+  <div>
+    <a class="text-sm hover:no-underline" href="{{ discussion.url }} ">
+      {askama`discussion.domain`}
+    </a>
+  </div>
+  <div class="flex">
+    <a
+      class="discussion-title text-md truncate font-medium"
+      title="{{ discussion.title }}"
+      href="{{ discussion.url }}"
+    >
+      {askama`discussion.title $ {{lorem.sentence}}`}
+    </a>
+    <div class="toggle-discussion-snippet">
+      <Hero class="w-4 hover:cursor-pointer" icon="chevron-down" />
     </div>
-    <div class="flex">
-        <a
-            class="discussion-title truncate text-md font-medium"
-            title="{{ discussion.title }}"
-            href="{{ discussion.url }}"
-        >
-            {askama`discussion.title $ {{lorem.sentence}}`}
-        </a>
-        <div class="toggle-discussion-snippet"><Hero class="w-4 hover:cursor-pointer" icon="chevron-down" /></div>
-    </div>
-    <div class="discussion-snippet text-snippet hidden">
-        {askama.match("discussion.snippet", {
-            "Snippet::Normal { date, text }": (
-                <div>
-                    {askama.if_("let Some(date) = date", () => (
-                        <span class="text-gray-500">{askama`date $ 2. May 2022`}</span>
-                    ))}
-                    <span class="[&:nth-child(2)]:before:content-['—']">
-                        {askama`text|safe $ {{lorem.lines}}`}
-                    </span>
-                </div>
-            ),
-            "_": (<></>)
-        })}
-    </div>
+  </div>
+  <div class="discussion-snippet hidden text-snippet">
+    {
+      askama.match("discussion.snippet", {
+        "Snippet::Normal { date, text }": (
+          <div>
+            {askama.if_("let Some(date) = date", () => (
+              <span class="text-gray-500">{askama`date $ 2. May 2022`}</span>
+            ))}
+            <span class="[&:nth-child(2)]:before:content-['—']">
+              {askama`text|safe $ {{lorem.lines}}`}
+            </span>
+          </div>
+        ),
+        _: null,
+      })
+    }
+  </div>
 </div>
 
 <style>
@@ -64,28 +69,33 @@ export interface Props {
 </style>
 
 <script>
-    const snippetBtns = document.getElementsByClassName("toggle-discussion-snippet");
-    const snippets = document.getElementsByClassName("discussion-snippet");
-    const titles = document.getElementsByClassName("discussion-title");
+  const snippetBtns = document.getElementsByClassName(
+    "toggle-discussion-snippet"
+  );
+  const snippets = document.getElementsByClassName("discussion-snippet");
+  const titles = document.getElementsByClassName("discussion-title");
 
-    for (const btn of snippetBtns) {
-        btn.addEventListener("click", (e) => {
-            if (e.currentTarget instanceof HTMLElement) {
-                const index = Array.prototype.indexOf.call(snippetBtns, e.currentTarget);
+  for (const btn of snippetBtns) {
+    btn.addEventListener("click", (e) => {
+      if (e.currentTarget instanceof HTMLElement) {
+        const index = Array.prototype.indexOf.call(
+          snippetBtns,
+          e.currentTarget
+        );
 
-                let snippet = snippets[index];
-                let title = titles[index];
+        let snippet = snippets[index];
+        let title = titles[index];
 
-                if (snippet.classList.contains("hidden")) {
-                    snippet.classList.remove("hidden");
-                    e.currentTarget.classList.add("active");
-                    title.classList.add("active");
-                } else {
-                    snippet.classList.add("hidden")
-                    e.currentTarget.classList.remove("active");
-                    title.classList.remove("active");
-                }
-             }
-        });
-    }
+        if (snippet.classList.contains("hidden")) {
+          snippet.classList.remove("hidden");
+          e.currentTarget.classList.add("active");
+          title.classList.add("active");
+        } else {
+          snippet.classList.add("hidden");
+          e.currentTarget.classList.remove("active");
+          title.classList.remove("active");
+        }
+      }
+    });
+  }
 </script>
