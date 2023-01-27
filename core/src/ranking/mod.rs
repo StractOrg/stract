@@ -1250,7 +1250,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(webgraph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 

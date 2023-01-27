@@ -353,8 +353,8 @@ impl OnlineHarmonicCentrality {
         // as an estimate
 
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
-        for (node, _) in graph.node_ids() {
-            let score = centrality.host.get(&node.name).unwrap_or(0.0);
+        for (node, node_id) in graph.node_ids() {
+            let score = centrality.host.get(&node_id).unwrap_or(0.0);
             let candidate = ProxyNodeCandidate { node, score };
 
             if nodes.len() >= num_proxy_nodes {
@@ -469,7 +469,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -505,7 +507,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -531,7 +535,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 

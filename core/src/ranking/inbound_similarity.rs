@@ -31,7 +31,7 @@ use crate::{
 
 use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
 const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND: f64 = 0.038;
-const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES: f64 = 0.03;
+const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES: f64 = 0.038;
 const SCORE_SCALE: f64 = 5.0;
 
 pub struct Scorer {
@@ -80,33 +80,27 @@ impl InboundSimilarity {
         let nodes: Vec<_> = graph.nodes().collect();
 
         if let Some(max_node) = nodes.iter().max().copied() {
-            for node_id in nodes
-                .into_iter()
-                .filter(|node_id| match graph.id2node(node_id) {
-                    Some(node) => {
-                        let score = harmonic.host.get(&node.into_host().name).unwrap_or(0.0);
-                        score >= harmonic_centrality_threshold_nodes
-                    }
-                    None => false,
-                })
-            {
-                let mut buf = vec![false; max_node.0 as usize];
+            let mut buf = vec![false; max_node.0 as usize];
+
+            for node_id in nodes.into_iter().filter(|node_id| {
+                let score = harmonic.host.get(node_id).unwrap_or(0.0);
+                score >= harmonic_centrality_threshold_nodes
+            }) {
+                buf.clear();
+                buf.resize(max_node.0 as usize, false);
 
                 for edge in graph
                     .raw_ingoing_edges(&node_id)
                     .into_iter()
-                    .filter(|edge| match graph.id2node(&edge.from) {
-                        Some(node) => {
-                            let score = harmonic.host.get(&node.into_host().name).unwrap_or(0.0);
-                            score >= harmonic_centrality_threshold_inbound
-                        }
-                        None => false,
+                    .filter(|edge| {
+                        let score = harmonic.host.get(&edge.from).unwrap_or(0.0);
+                        score >= harmonic_centrality_threshold_inbound
                     })
                 {
                     buf[edge.from.0 as usize] = true;
                 }
 
-                vectors.insert(node_id.0, bitvec_similarity::BitVec::new(buf));
+                vectors.insert(node_id.0, bitvec_similarity::BitVec::new(&buf));
             }
         }
 
@@ -188,7 +182,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -216,7 +212,9 @@ mod tests {
 
         let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
         for (node, centrality) in harmonic.host {
-            harmonic_centrality_store.host.insert(node.name, centrality);
+            harmonic_centrality_store
+                .host
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 

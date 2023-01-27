@@ -29,8 +29,8 @@ use crate::{
 use super::inbound_similarity::InboundSimilarity;
 
 pub struct HarmonicCentralityStore {
-    pub host: Box<dyn Kv<String, f64>>,
-    pub full: Box<dyn Kv<String, f64>>,
+    pub host: Box<dyn Kv<NodeID, f64>>,
+    pub full: Box<dyn Kv<NodeID, f64>>,
 }
 
 impl HarmonicCentralityStore {
@@ -149,7 +149,8 @@ impl CentralityStore {
         host.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut wtr = csv::Writer::from_writer(csv_file);
         for (node, centrality) in host {
-            store.harmonic.host.insert(node.name.clone(), centrality);
+            let node_id = store.node2id.get(&node).unwrap();
+            store.harmonic.host.insert(*node_id, centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
         }
@@ -160,14 +161,13 @@ impl CentralityStore {
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
         let mut store = CentralityStore::open(output_path.as_ref());
 
+        store.node2id = graph.node_ids().collect();
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
 
         Self::store_host(&output_path, &mut store, harmonic_centrality);
 
         store.online_harmonic = OnlineHarmonicCentrality::new(graph, &store.harmonic);
         store.inbound_similarity = InboundSimilarity::build(graph, &store.harmonic);
-
-        store.node2id = graph.node_ids().collect();
 
         store.flush();
 

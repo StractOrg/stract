@@ -110,17 +110,16 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
             {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
+                let node_id = worker.centrality_store.node2id.get(
+                    &html
+                        .url()
+                        .host_without_specific_subdomains_and_query()
+                        .to_string()
+                        .into(),
+                );
 
-                let host_centrality = worker
-                    .centrality_store
-                    .harmonic
-                    .host
-                    .get(
-                        &html
-                            .url()
-                            .host_without_specific_subdomains_and_query()
-                            .to_string(),
-                    )
+                let host_centrality = node_id
+                    .and_then(|node_id| worker.centrality_store.harmonic.host.get(node_id))
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
@@ -154,11 +153,13 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
                     .unwrap_or_else(Vec::new);
 
-                let page_centrality = worker
+                let node_id = worker
                     .centrality_store
-                    .harmonic
-                    .full
-                    .get(&html.url().without_protocol().to_lowercase())
+                    .node2id
+                    .get(&html.url().without_protocol().to_lowercase().into());
+
+                let page_centrality = node_id
+                    .and_then(|node_id| worker.centrality_store.harmonic.full.get(node_id))
                     .unwrap_or_default();
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;

@@ -30,14 +30,14 @@ pub struct BitVec {
 }
 
 impl BitVec {
-    pub fn new(data: Vec<bool>) -> Self {
+    pub fn new(data: &[bool]) -> Self {
         let mut blocks = Vec::new();
         let mut len = 0;
 
-        for (offset, chunk) in data.into_iter().chunks(64).into_iter().enumerate() {
+        for (offset, chunk) in data.iter().chunks(64).into_iter().enumerate() {
             let mut data = 0u64;
             for (i, b) in chunk.into_iter().enumerate() {
-                if b {
+                if *b {
                     data |= 1u64 << (63 - i);
                     len += 1;
                 }
@@ -117,8 +117,8 @@ mod tests {
 
         assert!(expected > 0.894);
 
-        let a = BitVec::new(a);
-        let b = BitVec::new(b);
+        let a = BitVec::new(&a);
+        let b = BitVec::new(&b);
 
         assert!((expected - a.sim(&b)).abs() < 0.00001);
     }
@@ -129,8 +129,8 @@ mod tests {
 
         let b: Vec<_> = repeat(true).take(1000).collect();
 
-        let a = BitVec::new(a);
-        let b = BitVec::new(b);
+        let a = BitVec::new(&a);
+        let b = BitVec::new(&b);
 
         assert_eq!(a.sim(&b), 0.0);
     }
@@ -140,8 +140,8 @@ mod tests {
         let a: Vec<_> = Vec::new();
         let b: Vec<_> = Vec::new();
 
-        let a = BitVec::new(a);
-        let b = BitVec::new(b);
+        let a = BitVec::new(&a);
+        let b = BitVec::new(&b);
 
         assert_eq!(a.sim(&b), 0.0);
     }
@@ -163,8 +163,8 @@ mod tests {
 
         assert!(expected < 0.01);
 
-        let a = BitVec::new(a);
-        let b = BitVec::new(b);
+        let a = BitVec::new(&a);
+        let b = BitVec::new(&b);
 
         assert!((expected - a.sim(&b)).abs() < 0.00001);
     }
