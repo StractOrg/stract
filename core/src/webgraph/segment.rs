@@ -87,13 +87,16 @@ where
 
     fn update_cache(&self, key: &K) {
         if !self.cache.read().unwrap().contains_key(key) {
+            let mut cache = self.cache.write().unwrap();
+
+            while cache.len() >= self.cache_size {
+                cache.pop_first();
+            }
+
             let val = self.store.get(key);
 
             if let Some(val) = val {
-                self.cache
-                    .write()
-                    .unwrap()
-                    .insert(key.clone(), Arc::new(RwLock::new(val)));
+                cache.insert(key.clone(), Arc::new(RwLock::new(val)));
             }
         }
     }
