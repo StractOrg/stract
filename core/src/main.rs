@@ -43,6 +43,8 @@ enum Commands {
         options: IndexingOptions,
     },
     Centrality {
+        #[clap(subcommand)]
+        mode: CentralityType,
         webgraph_path: String,
         output_path: String,
     },
@@ -82,6 +84,13 @@ enum Commands {
         #[clap(long, takes_value = false)]
         skip_download: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum CentralityType {
+    Harmonic,
+    OnlineHarmonic,
+    Similarity,
 }
 
 #[derive(Subcommand)]
@@ -179,9 +188,20 @@ fn main() -> Result<()> {
             )?,
         },
         Commands::Centrality {
+            mode,
             webgraph_path,
             output_path,
-        } => entrypoint::Centrality::run(webgraph_path, output_path),
+        } => match mode {
+            CentralityType::Harmonic => {
+                entrypoint::Centrality::build_harmonic(webgraph_path, output_path)
+            }
+            CentralityType::OnlineHarmonic => {
+                entrypoint::Centrality::build_online(webgraph_path, output_path)
+            }
+            CentralityType::Similarity => {
+                entrypoint::Centrality::build_similarity(webgraph_path, output_path)
+            }
+        },
         Commands::Webgraph { options } => match options {
             WebgraphOptions::Master { config_path } => {
                 let config = load_toml_config(config_path);

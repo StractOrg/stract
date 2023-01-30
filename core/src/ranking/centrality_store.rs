@@ -162,21 +162,39 @@ impl CentralityStore {
     }
 
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
+        Self::build_harmonic(graph, &output_path);
+        Self::build_online(graph, &output_path);
+        Self::build_similarity(graph, &output_path)
+    }
+
+    pub fn build_harmonic<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
         let mut store = CentralityStore::open(output_path.as_ref());
 
         store.node2id = graph.node_ids().collect();
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
-
         Self::store_host(&output_path, &mut store, harmonic_centrality);
+
+        store.flush();
+        store
+    }
+
+    pub fn build_online<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
+        let mut store = CentralityStore::open(output_path.as_ref());
 
         debug!("Begin online harmonic");
         store.online_harmonic = OnlineHarmonicCentrality::new(graph, &store.harmonic);
+
+        store.flush();
+        store
+    }
+
+    pub fn build_similarity<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
+        let mut store = CentralityStore::open(output_path.as_ref());
 
         debug!("Begin inbound similarity index construction");
         store.inbound_similarity = InboundSimilarity::build(graph, &store.harmonic);
 
         store.flush();
-
         store
     }
 

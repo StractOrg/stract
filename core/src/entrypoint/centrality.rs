@@ -21,9 +21,18 @@ use crate::{ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilde
 pub struct Centrality {}
 
 impl Centrality {
-    pub fn run<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
+    pub fn build_harmonic<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
         let graph = WebgraphBuilder::new(webgraph_path).read_only(true).open();
+        CentralityStore::build_harmonic(&graph, output_path);
+    }
 
-        CentralityStore::build(&graph, output_path);
+    pub fn build_online<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
+        let graph = WebgraphBuilder::new(webgraph_path).read_only(true).open();
+        CentralityStore::build_online(&graph, output_path);
+    }
+
+    pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
+        let graph = WebgraphBuilder::new(webgraph_path).read_only(true).open();
+        CentralityStore::build_similarity(&graph, output_path);
     }
 }

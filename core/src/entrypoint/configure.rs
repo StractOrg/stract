@@ -104,7 +104,10 @@ fn calculate_centrality() {
     debug!("Calculating centrality");
     let webgraph_path = Path::new(DATA_PATH).join("webgraph");
     let out_path = Path::new(DATA_PATH).join("centrality");
-    Centrality::run(webgraph_path, out_path);
+
+    Centrality::build_harmonic(&webgraph_path, &out_path);
+    Centrality::build_online(&webgraph_path, &out_path);
+    Centrality::build_similarity(&webgraph_path, &out_path);
 }
 
 fn create_inverted_index() -> Result<()> {

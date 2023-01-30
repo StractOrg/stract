@@ -32,8 +32,8 @@ use crate::{
 };
 
 use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
-const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND: usize = 1000;
-const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 1000;
+const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND: usize = 2000;
+const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 10000;
 const SCORE_SCALE: f64 = 5.0;
 
 pub struct Scorer {
