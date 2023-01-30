@@ -86,44 +86,42 @@ import { askama } from "../askama";
         {
           askama.for_("item in search_result", () => (
             <>
-            {
-              askama.if_("loop.index == 3", () => (
+              {askama.if_("loop.index == 3", () => (
                 <Discussions discussions="discussions" />
-              ))
-            }
-            <div class="flex w-full">
-              <div class="flex min-w-0 grow flex-col space-y-1">
-                <div class="flex min-w-0">
-                  <div class="flex min-w-0 grow flex-col space-y-1">
-                    <div class="flex items-center text-sm">
+              ))}
+              <div class="flex w-full">
+                <div class="flex min-w-0 grow flex-col space-y-1">
+                  <div class="flex min-w-0">
+                    <div class="flex min-w-0 grow flex-col space-y-1">
+                      <div class="flex items-center text-sm">
+                        <a
+                          class="url truncate text-gray-800 hover:no-underline"
+                          href="{{ item.url }}"
+                        >
+                          {askama`item.pretty_url $ {{internet.url}}`}
+                        </a>
+                      </div>
                       <a
-                        class="url truncate text-gray-800 hover:no-underline"
+                        class="title-link truncate text-xl font-medium"
+                        title="{{ item.title }}"
                         href="{{ item.url }}"
                       >
-                        {askama`item.pretty_url $ {{internet.url}}`}
+                        {askama`item.title $ {{lorem.sentence}}`}
                       </a>
                     </div>
-                    <a
-                      class="title-link truncate text-xl font-medium"
-                      title="{{ item.title }}"
-                      href="{{ item.url }}"
+                    <div
+                      class="adjust-btn hidden min-w-fit items-center justify-center md:flex"
+                      data-site="{{ item.site }}"
                     >
-                      {askama`item.title $ {{lorem.sentence}}`}
-                    </a>
+                      <Hero class="w-6" icon="adjustments" />
+                    </div>
                   </div>
-                  <div
-                    class="adjust-btn hidden min-w-fit items-center justify-center md:flex"
-                    data-site="{{ item.site }}"
-                  >
-                    <Hero class="w-6" icon="adjustments" />
+                  <div class="text-sm text-snippet">
+                    <Snippet snippet={askama`item.snippet`} />
                   </div>
-                </div>
-                <div class="text-sm text-snippet">
-                  <Snippet snippet={askama`item.snippet`} />
                 </div>
               </div>
-            </div>
-          </>
+            </>
           ))
         }
 
@@ -177,7 +175,7 @@ import { askama } from "../askama";
     @apply text-blue-800 visited:text-purple-800;
     max-width: calc(100% - 30px);
   }
-  
+
   .url {
     max-width: calc(100% - 100px);
   }
@@ -199,7 +197,7 @@ import { askama } from "../askama";
   .text-snippet {
     font-weight: 400;
   }
-  .text-snippet>b {
+  .text-snippet > b {
     font-weight: 700;
   }
 </style>

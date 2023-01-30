@@ -2,15 +2,15 @@
 import { askama } from "../askama";
 
 export interface Props {
-    calculation: string;
+  calculation: string;
 }
 ---
 
-<div class="border rounded-xl p-5 flex flex-col items-end">
-    <div class="text-xs text-gray-500 flex w-fit">
-        {askama`calculation.input`} =
-    </div>
-    <div class="font-bold text-3xl flex w-fit">
-        {askama`calculation.result`}
-    </div>
+<div class="flex flex-col items-end rounded-xl border p-5">
+  <div class="flex w-fit text-xs text-gray-500">
+    {askama`calculation.input`} =
+  </div>
+  <div class="flex w-fit text-3xl font-bold">
+    {askama`calculation.result`}
+  </div>
 </div>
