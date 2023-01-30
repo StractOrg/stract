@@ -19,7 +19,7 @@ use crate::{
     schema::{FastField, TextField},
     webgraph::{
         centrality::{
-            online_harmonic::{self, SHIFT},
+            online_harmonic::{self, SCORE_OFFSET},
             topic,
         },
         NodeID,
@@ -347,7 +347,7 @@ impl SignalAggregator {
     pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.query_centrality
             .as_ref()
-            .map(|scorer| scorer.score(host_id) - SHIFT)
+            .map(|scorer| scorer.score(host_id) - SCORE_OFFSET)
     }
 
     pub fn personal_centrality(&self, host_id: NodeID) -> f64 {

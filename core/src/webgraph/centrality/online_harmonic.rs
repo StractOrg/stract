@@ -38,12 +38,12 @@ use crate::webgraph::{Edge, Node};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 500;
+const NUM_PROXY_NODES: usize = 50;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 const MAX_DIST_PROXY: u8 = 3;
-const MAX_NUM_DISTANCE_NODES: usize = 10_000;
-pub const SHIFT: f64 = 1.0;
+const MAX_NUM_OUT_EDGES: usize = 200;
+pub const SCORE_OFFSET: f64 = 1.0;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
@@ -144,7 +144,7 @@ impl Scorer {
                 return *cached;
             }
 
-            let res = (SHIFT
+            let res = (SCORE_OFFSET
                 + (self
                     .liked_nodes
                     .iter()
@@ -183,7 +183,9 @@ struct UserNode {
 
 impl UserNode {
     fn new(id: NodeID, proxy_nodes: &[Arc<ProxyNode>]) -> Self {
-        let mut heap = BinaryHeap::with_capacity(BEST_PROXY_NODES_PER_USER_NODE);
+        let mut heap: BinaryHeap<WeightedProxyNode> =
+            BinaryHeap::with_capacity(BEST_PROXY_NODES_PER_USER_NODE);
+
         for proxy in proxy_nodes {
             if let Some(dist_to_proxy) = proxy.dist_from_node.get(&id.0) {
                 let weighted_node = WeightedProxyNode {
@@ -191,9 +193,11 @@ impl UserNode {
                     dist: *dist_to_proxy,
                 };
 
-                if heap.len() == BEST_PROXY_NODES_PER_USER_NODE {
+                if heap.len() >= BEST_PROXY_NODES_PER_USER_NODE {
                     if let Some(mut worst) = heap.peek_mut() {
-                        *worst = weighted_node;
+                        if worst.dist > weighted_node.dist {
+                            *worst = weighted_node;
+                        }
                     }
                 } else {
                     heap.push(weighted_node);
@@ -266,6 +270,7 @@ where
     F2: Fn(&Edge) -> NodeID,
 {
     let source_id = graph.node2id(&source);
+
     if source_id.is_none() {
         return BTreeMap::new();
     }
@@ -291,7 +296,12 @@ where
             continue;
         }
 
-        for edge in node_edges(v) {
+        let mut out_edges_taken = 0;
+        for edge in node_edges(v).into_iter() {
+            if out_edges_taken >= MAX_NUM_OUT_EDGES {
+                break;
+            }
+
             if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
                 let d = cost + 1;
 
@@ -299,14 +309,11 @@ where
                     continue;
                 }
 
+                out_edges_taken += 1;
                 let next = cmp::Reverse((d, edge_node(&edge)));
                 queue.push(next);
                 distances.insert(edge_node(&edge), d);
             }
-        }
-
-        if distances.len() > MAX_NUM_DISTANCE_NODES {
-            break;
         }
     }
 

@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    cmp::{Ordering, Reverse},
+    collections::{BinaryHeap, HashSet},
     fs::File,
     io::{BufReader, BufWriter, Read},
     path::Path,
@@ -30,8 +32,8 @@ use crate::{
 };
 
 use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
-const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND: f64 = 0.038;
-const DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES: f64 = 0.038;
+const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND: usize = 1000;
+const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 1000;
 const SCORE_SCALE: f64 = 5.0;
 
 pub struct Scorer {
@@ -56,6 +58,32 @@ impl Scorer {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ScoredNode {
+    node: NodeID,
+    score: f64,
+}
+
+impl PartialOrd for ScoredNode {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.score.partial_cmp(&other.score)
+    }
+}
+
+impl PartialEq for ScoredNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score
+    }
+}
+
+impl Ord for ScoredNode {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+impl Eq for ScoredNode {}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct InboundSimilarity {
     vectors: Arc<IntMap<bitvec_similarity::BitVec>>,
@@ -66,36 +94,65 @@ impl InboundSimilarity {
         Self::build_with_threshold(
             graph,
             harmonic,
-            DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_NODES,
-            DEFAULT_HARMONIC_CENTRALITY_THRESHOLD_FOR_INBOUND,
+            DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES,
+            DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND,
         )
     }
     fn build_with_threshold(
         graph: &Webgraph,
         harmonic: &HarmonicCentralityStore,
-        harmonic_centrality_threshold_nodes: f64,
-        harmonic_centrality_threshold_inbound: f64,
+        num_top_nodes: usize,
+        num_top_nodes_inbound: usize,
     ) -> Self {
         let mut vectors = IntMap::new();
         let nodes: Vec<_> = graph.nodes().collect();
 
+        let mut top_nodes: BinaryHeap<Reverse<ScoredNode>> =
+            BinaryHeap::with_capacity(num_top_nodes);
+        let mut top_nodes_inbound: BinaryHeap<Reverse<ScoredNode>> =
+            BinaryHeap::with_capacity(num_top_nodes_inbound);
+
+        for (node, centrality) in harmonic.host.iter() {
+            let scored_node = Reverse(ScoredNode {
+                node,
+                score: centrality,
+            });
+
+            if top_nodes.len() >= num_top_nodes {
+                if let Some(mut worst) = top_nodes.peek_mut() {
+                    if worst.0.score < scored_node.0.score {
+                        *worst = scored_node.clone();
+                    }
+                }
+            } else {
+                top_nodes.push(scored_node.clone());
+            }
+
+            if top_nodes_inbound.len() >= num_top_nodes_inbound {
+                if let Some(mut worst) = top_nodes_inbound.peek_mut() {
+                    if worst.0.score < scored_node.0.score {
+                        *worst = scored_node;
+                    }
+                }
+            } else {
+                top_nodes_inbound.push(scored_node);
+            }
+        }
+
+        let inbound_nodes: HashSet<NodeID> =
+            top_nodes_inbound.into_iter().map(|n| n.0.node).collect();
+
         if let Some(max_node) = nodes.iter().max().copied() {
             let mut buf = vec![false; max_node.0 as usize];
 
-            for node_id in nodes.into_iter().filter(|node_id| {
-                let score = harmonic.host.get(node_id).unwrap_or(0.0);
-                score >= harmonic_centrality_threshold_nodes
-            }) {
+            for node_id in top_nodes.into_iter().map(|n| n.0.node) {
                 buf.clear();
                 buf.resize(max_node.0 as usize, false);
 
                 for edge in graph
                     .raw_ingoing_edges(&node_id)
                     .into_iter()
-                    .filter(|edge| {
-                        let score = harmonic.host.get(&edge.from).unwrap_or(0.0);
-                        score >= harmonic_centrality_threshold_inbound
-                    })
+                    .filter(|edge| inbound_nodes.contains(&edge.from))
                 {
                     buf[edge.from.0 as usize] = true;
                 }
@@ -176,6 +233,11 @@ mod tests {
         graph.insert(Node::from("c.com"), Node::from("d.com"), String::new());
         graph.insert(Node::from("a.com"), Node::from("e.com"), String::new());
 
+        graph.insert(Node::from("z.com"), Node::from("a.com"), String::new());
+        graph.insert(Node::from("z.com"), Node::from("b.com"), String::new());
+        graph.insert(Node::from("z.com"), Node::from("c.com"), String::new());
+        graph.insert(Node::from("z.com"), Node::from("d.com"), String::new());
+
         graph.commit();
 
         let harmonic = HarmonicCentrality::calculate(&graph);
@@ -189,7 +251,7 @@ mod tests {
         harmonic_centrality_store.host.flush();
 
         let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, -1.0, -1.0);
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000, 1000);
 
         let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
         let e = graph.node2id(&Node::from("e.com")).unwrap();
@@ -219,7 +281,7 @@ mod tests {
         harmonic_centrality_store.host.flush();
 
         let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, -1.0, -1.0);
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000, 1000);
 
         let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
         centrality_store.inbound_similarity = inbound;

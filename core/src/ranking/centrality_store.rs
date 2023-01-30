@@ -17,6 +17,9 @@
 use std::io::{BufReader, BufWriter, Read};
 use std::{collections::BTreeMap, fs::File, path::Path};
 
+use tracing::debug;
+use tracing::log::trace;
+
 use crate::Result;
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
@@ -166,7 +169,10 @@ impl CentralityStore {
 
         Self::store_host(&output_path, &mut store, harmonic_centrality);
 
+        debug!("Begin online harmonic");
         store.online_harmonic = OnlineHarmonicCentrality::new(graph, &store.harmonic);
+
+        debug!("Begin inbound similarity index construction");
         store.inbound_similarity = InboundSimilarity::build(graph, &store.harmonic);
 
         store.flush();
@@ -175,16 +181,20 @@ impl CentralityStore {
     }
 
     pub fn flush(&self) {
+        trace!("flushing");
         self.harmonic.flush();
 
+        trace!("saving online harmonic");
         self.online_harmonic
             .save(Path::new(&self.base_path).join("online_harmonic"))
             .unwrap();
 
+        trace!("saving inbound similarity");
         self.inbound_similarity
             .save(Path::new(&self.base_path).join("inbound_similarity"))
             .unwrap();
 
+        trace!("saving node2id");
         let mut file = BufWriter::new(
             File::options()
                 .create(true)
