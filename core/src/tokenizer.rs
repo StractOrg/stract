@@ -23,6 +23,8 @@ use tantivy::tokenizer::{
 
 use whatlang::Lang;
 
+use crate::{ceil_char_boundary, floor_char_boundary};
+
 struct MyStemmer(Stemmer);
 
 impl From<Lang> for MyStemmer {
@@ -393,6 +395,10 @@ impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
                 if prev_was_quote {
                     self.token.offset_from -= 1;
                     self.token.offset_to += 1;
+
+                    self.token.offset_from = floor_char_boundary(self.text, self.token.offset_from);
+                    self.token.offset_to =
+                        ceil_char_boundary(self.text, self.token.offset_to).min(self.text.len());
                 }
 
                 self.token
@@ -456,6 +462,18 @@ mod tests {
                 "test".to_string(),
                 "string".to_string()
             ]
+        );
+    }
+
+    #[test]
+    fn out_of_bounds_crash() {
+        tokenize_json(
+            r#"
+Breadcrumb.title="Home"
+Breadcrumb.url="https://www.eurotecnicaservice.it/?lang=en"
+Breadcrumb.title="Fuser Pur"
+Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
+"#,
         );
     }
 

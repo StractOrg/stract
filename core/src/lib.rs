@@ -304,3 +304,23 @@ fn rand_words(num_words: usize) -> String {
 
     res.trim().to_string()
 }
+
+fn ceil_char_boundary(str: &str, index: usize) -> usize {
+    let mut res = index;
+
+    while !str.is_char_boundary(res) && res < str.len() {
+        res += 1;
+    }
+
+    res
+}
+
+fn floor_char_boundary(str: &str, index: usize) -> usize {
+    let mut res = index;
+
+    while !str.is_char_boundary(res) && res > 0 {
+        res -= 1;
+    }
+
+    res
+}

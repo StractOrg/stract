@@ -16,8 +16,10 @@
 
 use crate::{
     bangs::{Bang, BangHit, Bangs},
+    ceil_char_boundary,
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
+    floor_char_boundary,
     inverted_index::{self, RetrievedWebpage},
     qa_model::QaModel,
     query,
@@ -635,26 +637,6 @@ fn generate_answer_snippet(body: &str, answer_offset: Range<usize>) -> String {
 
         res
     }
-}
-
-fn ceil_char_boundary(str: &str, index: usize) -> usize {
-    let mut res = index;
-
-    while !str.is_char_boundary(res) && res < str.len() {
-        res += 1;
-    }
-
-    res
-}
-
-fn floor_char_boundary(str: &str, index: usize) -> usize {
-    let mut res = index;
-
-    while !str.is_char_boundary(res) && res > 0 {
-        res -= 1;
-    }
-
-    res
 }
 
 #[cfg(test)]
