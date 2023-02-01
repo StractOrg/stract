@@ -309,9 +309,11 @@ impl Indexer {
                     WarcSource::Local(config) => JobConfig::Local(config),
                 };
 
-                let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
+                let warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
                     warc_paths
                         .into_iter()
+                        .skip(config.skip_num_warc_files.unwrap_or(0))
+                        .take(config.limit_warc_files.unwrap_or(usize::MAX))
                         .chunks(config.batch_size.unwrap_or(1))
                         .into_iter()
                         .map(|warc_paths| Job {
@@ -328,10 +330,6 @@ impl Indexer {
                         .collect_vec()
                         .into_iter(),
                 );
-
-                if let Some(limit) = config.limit_warc_files {
-                    warc_paths = Box::new(warc_paths.take(limit));
-                }
 
                 let manager = Manager::new(&workers);
                 let mut index: Index = manager
@@ -394,6 +392,7 @@ impl Indexer {
 
         let indexes: Vec<_> = warc_paths
             .into_iter()
+            .skip(config.skip_num_warc_files.unwrap_or(0))
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
             .into_iter()

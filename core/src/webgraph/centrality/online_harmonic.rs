@@ -38,10 +38,10 @@ use crate::webgraph::{Edge, Node};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 50;
+const NUM_PROXY_NODES: usize = 500;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
-const MAX_DIST_PROXY: u8 = 5;
+const MAX_DIST_PROXY: u8 = 6;
 const MAX_NUM_OUT_EDGES: usize = 1000;
 pub const SCORE_OFFSET: f64 = 1.0;
 
