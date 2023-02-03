@@ -17,7 +17,7 @@
 //! Almost spec compliant microdata parser: https://html.spec.whatwg.org/multipage/microdata.htm
 
 use kuchiki::NodeRef;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 
 use super::{RawItem, RawOneOrMany, RawProperty};
@@ -36,27 +36,28 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 }
 
-fn rec_text_contents(node: NodeRef) -> Vec<RawProperty> {
+fn parse_properties(node: NodeRef) -> Vec<RawProperty> {
     let mut res = Vec::new();
+    let mut q = VecDeque::new();
 
     for child in node.children() {
-        match child.data() {
+        q.push_back(child);
+    }
+
+    while let Some(node) = q.pop_front() {
+        match node.data() {
             kuchiki::NodeData::Element(elem) => {
                 if elem.name.local.to_string().as_str() == "code" {
                     let mut properties = HashMap::new();
                     properties.insert(
                         "text".to_string(),
-                        RawOneOrMany::One(RawProperty::String(child.text_contents())),
+                        RawOneOrMany::One(RawProperty::String(node.text_contents())),
                     );
 
                     res.push(RawProperty::Item(RawItem {
                         itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
                         properties,
                     }))
-                } else if !elem.attributes.borrow().contains("itemprop")
-                    && !elem.attributes.borrow().contains("itemscope")
-                {
-                    res.append(&mut rec_text_contents(child));
                 }
             }
             kuchiki::NodeData::Text(text) => {
@@ -71,13 +72,17 @@ fn rec_text_contents(node: NodeRef) -> Vec<RawProperty> {
             }
             _ => {}
         }
+
+        for child in node.children().rev() {
+            q.push_front(child);
+        }
     }
 
     res
 }
 
 fn text_contents(node: NodeRef) -> Vec<RawProperty> {
-    let properties = rec_text_contents(node);
+    let properties = parse_properties(node);
 
     // merge consecutive strings
     let mut res = Vec::new();

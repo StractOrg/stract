@@ -270,37 +270,62 @@ pub struct FlattenedJson {
     flattened_json: String,
 }
 
-fn rec_flatten(val: serde_json::Value) -> Vec<String> {
-    match val {
-        serde_json::Value::Null => vec![],
-        serde_json::Value::Bool(b) => vec![format!("=\"{b}\"")],
-        serde_json::Value::Number(n) => vec![format!("=\"{n}\"")],
-        serde_json::Value::String(s) => vec![format!("=\"{}\"", s.replace('"', "\\\""))],
-        serde_json::Value::Array(arr) => arr
-            .into_iter()
-            .flat_map(|val| rec_flatten(val).into_iter())
-            .collect(),
-        serde_json::Value::Object(map) => {
-            let mut res = Vec::new();
-            for (key, value) in map {
-                let mut k = ".".to_string();
-                k.push_str(&key);
+struct IntermediateFlatValue {
+    parent_keys: Vec<String>,
+    val: serde_json::Value,
+}
 
-                let rec = rec_flatten(value);
-                if rec.is_empty() {
-                    res.push(k);
-                } else {
-                    for val in rec {
-                        let mut k = k.clone();
-                        k.push_str(&val);
-                        res.push(k)
-                    }
+fn flatten(val: serde_json::Value) -> Vec<String> {
+    let mut res = Vec::new();
+
+    let mut stack = Vec::new();
+    stack.push(IntermediateFlatValue {
+        parent_keys: Vec::new(),
+        val,
+    });
+
+    while let Some(elem) = stack.pop() {
+        match elem.val {
+            serde_json::Value::Null => res.push(
+                itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect(),
+            ),
+            serde_json::Value::Bool(b) => {
+                let key: String =
+                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                res.push(format!("{key}=\"{b}\""))
+            }
+            serde_json::Value::Number(n) => {
+                let key: String =
+                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                res.push(format!("{key}=\"{n}\""))
+            }
+            serde_json::Value::String(s) => {
+                let key: String =
+                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                res.push(format!("{key}=\"{}\"", s.replace('"', "\\\"")))
+            }
+            serde_json::Value::Array(arr) => {
+                for item in arr {
+                    stack.push(IntermediateFlatValue {
+                        parent_keys: elem.parent_keys.clone(),
+                        val: item,
+                    });
                 }
             }
+            serde_json::Value::Object(map) => {
+                for (key, val) in map {
+                    let mut parent_keys = elem.parent_keys.clone();
+                    parent_keys.push(key);
 
-            res
+                    stack.push(IntermediateFlatValue { parent_keys, val });
+                }
+            }
         }
     }
+
+    res.reverse();
+
+    res
 }
 
 impl FlattenedJson {
@@ -311,13 +336,8 @@ impl FlattenedJson {
         let json = serde_json::to_string(value)?;
         let val: serde_json::Value = serde_json::from_str(&json)?;
 
-        let flattened_json = itertools::intersperse(
-            rec_flatten(val)
-                .into_iter()
-                .map(|l| l.strip_prefix('.').unwrap().to_string()),
-            "\n".to_string(),
-        )
-        .collect();
+        let flattened_json =
+            itertools::intersperse(flatten(val).into_iter(), "\n".to_string()).collect();
 
         Ok(Self { flattened_json })
     }

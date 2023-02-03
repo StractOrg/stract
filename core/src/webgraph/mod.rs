@@ -27,13 +27,12 @@ use uuid::Uuid;
 use segment::Segment;
 
 use crate::directory::{self, DirEntry};
+use crate::executor::Executor;
 use crate::webpage::Url;
 
 use crate::kv::rocksdb_store::RocksDbStore;
 
 pub mod centrality;
-mod executor;
-use self::executor::Executor;
 use self::segment::{CachedStore, SegmentNodeID};
 
 const MAX_NUM_SEGMENTS: usize = 400;

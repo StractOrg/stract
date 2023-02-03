@@ -4034,17 +4034,15 @@ pub(crate) const BIAS_DATA_VEC: &[&[f64]] = &[
     ],
 ];
 
-use std::array;
-
 #[derive(Clone)]
 pub struct HyperLogLog<const N: usize> {
-    registers: Box<[u8; N]>,
+    registers: Vec<u8>,
 }
 
 impl<const N: usize> Default for HyperLogLog<N> {
     fn default() -> Self {
         Self {
-            registers: Box::new(array::from_fn(|_| 0)),
+            registers: vec![0; N],
         }
     }
 }

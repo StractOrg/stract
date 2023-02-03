@@ -72,6 +72,7 @@ num_cpus = { workspace = true }
 onnxruntime = { workspace = true }
 tokenizers = { workspace = true }
 lalrpop-util = { workspace = true }
+byteorder = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

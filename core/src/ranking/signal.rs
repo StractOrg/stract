@@ -26,7 +26,7 @@ use crate::{
     },
     webpage::Webpage,
 };
-use std::{array, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 use chrono::Utc;
 use tantivy::DocId;
@@ -270,7 +270,7 @@ pub struct SignalAggregator {
     personal_centrality: Option<Arc<online_harmonic::Scorer>>,
     inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
     field_boost: FieldBoost,
-    fetch_time_ms_cache: [f64; 1000],
+    fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
     topic_scorer: Option<topic::Scorer>,
     query_centrality: Option<Arc<online_harmonic::Scorer>>,
@@ -299,7 +299,9 @@ impl SignalAggregator {
         let signal_coefficients = SignalCoefficient::new(coefficients);
         let field_boost = FieldBoost::new(boosts);
 
-        let fetch_time_ms_cache = array::from_fn(|fetch_time| 1.0 / (fetch_time as f64 + 1.0));
+        let fetch_time_ms_cache: Vec<_> = (0..1000)
+            .map(|fetch_time| 1.0 / (fetch_time as f64 + 1.0))
+            .collect();
 
         let update_time_cache = (0..(3 * 365 * 24))
             .map(|hours_since_update| 1.0 / ((hours_since_update as f64 + 1.0).log2()))

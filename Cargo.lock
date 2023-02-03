@@ -788,6 +788,7 @@ dependencies = [
  "base64 0.13.1",
  "bincode",
  "bitvec",
+ "byteorder",
  "bzip2",
  "chrono",
  "clap 3.2.23",

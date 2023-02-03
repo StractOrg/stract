@@ -67,3 +67,4 @@ crossbeam-channel = "0.5.6"
 num_cpus = "1.15.0"
 onnxruntime = { git = "https://github.com/Cuely/onnxruntime-rs" }
 tokenizers = "0.13.2"
+byteorder = "1.4.3"

@@ -37,6 +37,7 @@ mod bangs;
 mod collector;
 mod directory;
 mod entity_index;
+mod executor;
 mod exponential_backoff;
 mod fastfield_cache;
 mod human_website_annotations;
@@ -59,6 +60,7 @@ mod snippet;
 mod sonic;
 mod spell;
 mod subdomain_count;
+mod summarizer;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;

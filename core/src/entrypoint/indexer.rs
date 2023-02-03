@@ -18,12 +18,12 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use itertools::Itertools;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::pin;
 use tracing::{debug, info, trace};
 
 use crate::entrypoint::async_download_all_warc_files;
+use crate::executor::Executor;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Manager, Map, Reduce, Worker};
 use crate::ranking::centrality_store::IndexerCentralityStore;
@@ -390,28 +390,30 @@ impl Indexer {
             config.topics_path.clone(),
         );
 
-        let indexes: Vec<_> = warc_paths
-            .into_iter()
-            .skip(config.skip_num_warc_files.unwrap_or(0))
-            .take(config.limit_warc_files.unwrap_or(usize::MAX))
-            .chunks(config.batch_size.unwrap_or(1))
-            .into_iter()
-            .map(|warc_paths| Job {
-                source_config: job_config.clone(),
-                warc_paths: warc_paths.collect_vec(),
-                download_images: config.download_images.unwrap_or(true),
-                host_centrality_threshold: config.host_centrality_threshold,
-                base_path: config
-                    .output_path
-                    .clone()
-                    .unwrap_or_else(|| "data/index".to_string()),
-                max_num_segments: config.final_num_segments.unwrap_or(20),
-            })
-            .collect_vec()
-            .into_par_iter()
-            .panic_fuse()
-            .map(|job| -> IndexPointer { job.map(&worker) })
-            .collect();
+        let executor = Executor::multi_thread("indexer").unwrap();
+
+        let indexes = executor
+            .map(
+                |job| -> IndexPointer { job.map(&worker) },
+                warc_paths
+                    .into_iter()
+                    .skip(config.skip_num_warc_files.unwrap_or(0))
+                    .take(config.limit_warc_files.unwrap_or(usize::MAX))
+                    .chunks(config.batch_size.unwrap_or(1))
+                    .into_iter()
+                    .map(|warc_paths| Job {
+                        source_config: job_config.clone(),
+                        warc_paths: warc_paths.collect_vec(),
+                        download_images: config.download_images.unwrap_or(true),
+                        host_centrality_threshold: config.host_centrality_threshold,
+                        base_path: config
+                            .output_path
+                            .clone()
+                            .unwrap_or_else(|| "data/index".to_string()),
+                        max_num_segments: config.final_num_segments.unwrap_or(20),
+                    }),
+            )
+            .unwrap_or_default();
 
         Self::merge(indexes, config.final_num_segments.unwrap_or(20))?;
         Ok(())

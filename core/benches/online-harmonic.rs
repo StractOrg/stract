@@ -15,7 +15,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     let harmonic_centrality_store = HarmonicCentralityStore::open(cuely::gen_temp_path());
     for (node, centrality) in centrality.host {
-        harmonic_centrality_store.host.insert(node.name, centrality);
+        harmonic_centrality_store
+            .host
+            .insert(webgraph.node2id(&node).unwrap(), centrality);
     }
     harmonic_centrality_store.host.flush();
 
