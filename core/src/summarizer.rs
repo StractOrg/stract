@@ -23,7 +23,7 @@ use std::{
 
 use itertools::{intersperse, Itertools};
 use onnxruntime::{
-    ndarray::{Array, ArrayBase, Axis, Dim, IxDynImpl, OwnedRepr},
+    ndarray::{ArrayBase, Axis, Dim, IxDynImpl, OwnedRepr},
     tensor::OrtOwnedTensor,
     GraphOptimizationLevel, TypedArray,
 };
@@ -226,7 +226,6 @@ pub struct AbstractiveModel {
     tokenizer: tokenizers::Tokenizer,
 
     bos_token_id: usize,
-    pad_token_id: usize,
     eos_token_id: usize,
     begin_decoder_token: usize,
 }
@@ -279,7 +278,6 @@ impl AbstractiveModel {
             decoder_with_past,
 
             bos_token_id: 0,
-            pad_token_id: 1,
             eos_token_id: 2,
             begin_decoder_token: 2,
         })
@@ -517,16 +515,23 @@ impl AbstractiveModel {
                     for new_token in 0..vocab_size {
                         let tok_score = beam_tok_scores[beam_idx][new_token];
 
+                        let tok_score = tok_score.log2();
+
+                        let new_score = beams[beam_idx].score + tok_score;
+
                         let possible_beam = PossibleBeam {
                             beam_idx,
+                            beam_length: beams[beam_idx].len(),
                             new_token: new_token as i64,
-                            new_score: beams[beam_idx].score + tok_score.log2(),
+                            length_penalty: config.length_penalty,
+                            eos_token: self.eos_token_id as i64,
+                            new_score,
                         };
 
                         if new_beams.len() < beams.len() {
                             new_beams.push(Reverse(possible_beam));
                         } else if let Some(mut worst) = new_beams.peek_mut() {
-                            if possible_beam.new_score > worst.0.new_score {
+                            if possible_beam > worst.0 {
                                 *worst = Reverse(possible_beam);
                             }
                         }
@@ -535,44 +540,45 @@ impl AbstractiveModel {
 
                 let mut new_caches = Vec::with_capacity(output_caches.len());
 
-                for c in &output_caches {
-                    let shape = c.shape();
-                    new_caches.push(Array::zeros((0, shape[1], shape[2], shape[3])).into_dyn());
+                for _ in &output_caches {
+                    new_caches.push(Vec::with_capacity(100));
                 }
+
+                for possible_beam in &new_beams {
+                    for (new_cache, old_cache) in new_caches.iter_mut().zip_eq(output_caches.iter())
+                    {
+                        let shape = old_cache.shape();
+
+                        new_cache.push(
+                            old_cache
+                                .index_axis(Axis(0), possible_beam.0.beam_idx)
+                                .into_shape((1, shape[1], shape[2], shape[3]))
+                                .unwrap()
+                                .into_dyn(),
+                        );
+                    }
+                }
+
+                let new_caches: Vec<_> = new_caches
+                    .into_iter()
+                    .map(|cache| {
+                        onnxruntime::ndarray::concatenate(Axis(0), cache.as_slice()).unwrap()
+                    })
+                    .collect();
 
                 let new_beams: Vec<_> = new_beams
                     .into_iter()
                     .map(|r| r.0)
                     .map(|possible_beam| {
-                        let input_ids = if beams[possible_beam.beam_idx]
-                            .is_finished(self.eos_token_id as i64)
-                        {
-                            beams[possible_beam.beam_idx].input_ids.clone()
+                        if beams[possible_beam.beam_idx].is_finished(self.eos_token_id as i64) {
+                            beams[possible_beam.beam_idx].clone()
                         } else {
-                            let mut ids = beams[possible_beam.beam_idx].input_ids.clone();
-                            ids.push(possible_beam.new_token);
-                            ids
-                        };
-
-                        for (new_cache, old_cache) in
-                            new_caches.iter_mut().zip_eq(output_caches.iter())
-                        {
-                            let shape = old_cache.shape();
-
-                            new_cache
-                                .append(
-                                    Axis(0),
-                                    old_cache
-                                        .index_axis(Axis(0), possible_beam.beam_idx)
-                                        .into_shape((1, shape[1], shape[2], shape[3]))
-                                        .unwrap()
-                                        .into_dyn(),
-                                )
-                                .unwrap();
-                        }
-                        Beam {
-                            input_ids,
-                            score: possible_beam.new_score,
+                            let mut input_ids = beams[possible_beam.beam_idx].input_ids.clone();
+                            input_ids.push(possible_beam.new_token);
+                            Beam {
+                                input_ids,
+                                score: possible_beam.new_score,
+                            }
                         }
                     })
                     .collect();
@@ -640,6 +646,7 @@ impl PartialEq for ScoredToken {
 
 impl Eq for ScoredToken {}
 
+#[derive(Clone, Debug)]
 struct Beam {
     input_ids: Vec<i64>,
     score: f32,
@@ -652,17 +659,43 @@ impl Beam {
             .map(|tok| *tok == eos_tok)
             .unwrap_or(false)
     }
+
+    fn len(&self) -> usize {
+        self.input_ids.len()
+    }
 }
 
+#[derive(Debug)]
 struct PossibleBeam {
     beam_idx: usize,
+    beam_length: usize,
     new_token: i64,
+    length_penalty: f32,
     new_score: f32,
+
+    eos_token: i64,
+}
+
+impl PossibleBeam {
+    fn normalized_score(&self) -> f32 {
+        if self.length_penalty == 1.0 {
+            self.new_score
+        } else {
+            let length = if self.new_token == self.eos_token {
+                self.beam_length as f32
+            } else {
+                (self.beam_length + 1) as f32
+            };
+
+            self.new_score / length.powf(self.length_penalty)
+        }
+    }
 }
 
 impl PartialOrd for PossibleBeam {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.new_score.partial_cmp(&other.new_score)
+        self.normalized_score()
+            .partial_cmp(&other.normalized_score())
     }
 }
 
@@ -674,7 +707,7 @@ impl Ord for PossibleBeam {
 
 impl PartialEq for PossibleBeam {
     fn eq(&self, other: &Self) -> bool {
-        self.new_score == other.new_score
+        self.normalized_score() == other.normalized_score()
     }
 }
 
@@ -683,19 +716,19 @@ impl Eq for PossibleBeam {}
 pub struct GenerationConfig {
     pub early_stopping: Option<EarlyStopping>,
     pub force_min_tokens: Option<u32>,
-    pub num_beams: u32,
     pub length_penalty: f32,
+    pub num_beams: u32,
 }
 
 impl Default for GenerationConfig {
     fn default() -> Self {
         Self {
             early_stopping: Some(EarlyStopping::MaxTokens {
-                max_new_tokens: 256,
+                max_new_tokens: 128,
             }),
             force_min_tokens: None,
+            length_penalty: 1.0,
             num_beams: 5,
-            length_penalty: 1.5,
         }
     }
 }
@@ -752,19 +785,18 @@ mod tests {
         Though Aristotle wrote many elegant treatises and dialogues for publication, only around a third of his original output has survived, none of it intended for publication. Aristotle provided a complex synthesis of the various philosophies existing prior to him. It was above all from his teachings that the West inherited its intellectual lexicon, as well as problems and methods of inquiry. As a result, his philosophy has exerted a unique influence on almost every form of knowledge in the West and it continues to be a subject of contemporary philosophical discussion.
         Aristotle's views profoundly shaped medieval scholarship. The influence of physical science extended from Late Antiquity and the Early Middle Ages into the Renaissance, and were not replaced systematically until the Enlightenment and theories such as classical mechanics were developed. Some of Aristotle's zoological observations found in his biology, such as on the hectocotyl (reproductive) arm of the octopus, were disbelieved until the 19th century. He also influenced Judeo-Islamic philosophies during the Middle Ages, as well as Christian theology, especially the Neoplatonism of the Early Church and the scholastic tradition of the Catholic Church. Aristotle was revered among medieval Muslim scholars as "The First Teacher", and among medieval Christians like Thomas Aquinas as simply "The Philosopher", while the poet Dante called him "the master of those who know". His works contain the earliest known formal study of logic, and were studied by medieval scholars such as Peter Abelard and John Buridan. Aristotle's influence on logic continued well into the 19th century. In addition, his ethics, though always influential, gained renewed interest with the modern advent of virtue ethics."#;
 
-        let start = std::time::Instant::now();
         let config = GenerationConfig {
-            num_beams: 1,
+            num_beams: 2,
+            length_penalty: 1.0,
+            early_stopping: Some(EarlyStopping::MaxTokens { max_new_tokens: 32 }),
             ..Default::default()
         };
 
+        let start = std::time::Instant::now();
         let summary = model.summarize(text, config).unwrap();
-        dbg!(start.elapsed());
-
+        println!("Elapsed: {:?}", start.elapsed());
+        println!("{:?}", &summary);
         assert!(summary.len() > 50);
         assert!(summary.contains("Aristotle"));
-        dbg!(&summary);
-
-        // todo!()
     }
 }
