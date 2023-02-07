@@ -16,24 +16,14 @@
 
 use std::{cmp::Ordering, ops::Range, path::Path, sync::Mutex};
 
-use crate::Result;
+use crate::{softmax, Result, ONNX_ENVIRONMENT};
 use itertools::Itertools;
 use onnxruntime::{
-    environment::Environment,
     ndarray::{Array2, Axis},
     tensor::OrtOwnedTensor,
-    GraphOptimizationLevel, LoggingLevel,
+    GraphOptimizationLevel, TypedArray,
 };
 use tokenizers::{PaddingParams, TruncationParams};
-
-pub static ONNX_ENVIRONMENT: once_cell::sync::Lazy<Environment> =
-    once_cell::sync::Lazy::new(|| {
-        Environment::builder()
-            .with_name("qa")
-            .with_log_level(LoggingLevel::Info)
-            .build()
-            .unwrap()
-    });
 
 const TRUNCATE_INPUT: usize = 128;
 const SCORE_THRESHOLD: f64 = 0.0;
@@ -114,7 +104,9 @@ impl QaModel {
 
         let mut sess = self.session.lock().unwrap();
 
-        let mut res: Vec<OrtOwnedTensor<f32, _>> = sess.run(vec![ids, masks]).unwrap();
+        let mut res: Vec<OrtOwnedTensor<f32, _>> = sess
+            .run(vec![TypedArray::I64(ids), TypedArray::I64(masks)])
+            .unwrap();
 
         if res.len() != 2 {
             return None;
@@ -193,14 +185,6 @@ impl QaModel {
     }
 }
 
-fn softmax(vec: &mut [f32]) {
-    let s: f32 = vec.iter().map(|z| z.exp()).sum();
-
-    for z in vec {
-        *z = z.exp() / s
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,20 +201,14 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        match QaModel::open("../data/qa_model") {
-            Ok(model) => {
-                let answer = model.run(question, &contexts).unwrap();
+        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let answer = model.run(question, &contexts).unwrap();
 
-                assert!(answer.score > 0.6);
-                assert_eq!(
-                    &contexts[answer.context_idx][answer.offset],
-                    "South America"
-                );
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
+        assert!(answer.score > 0.6);
+        assert_eq!(
+            &contexts[answer.context_idx][answer.offset],
+            "South America"
+        );
     }
 
     #[test]
@@ -258,20 +236,14 @@ of tropical rainforest in the world, with an estimated 390 billion individual tr
 "#,
         ];
 
-        match QaModel::open("../data/qa_model") {
-            Ok(model) => {
-                let answer = model.run(question, &contexts).unwrap();
+        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let answer = model.run(question, &contexts).unwrap();
 
-                assert!(answer.score > 0.6);
-                assert_eq!(
-                    &contexts[answer.context_idx][answer.offset],
-                    "South America"
-                );
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
+        assert!(answer.score > 0.6);
+        assert_eq!(
+            &contexts[answer.context_idx][answer.offset],
+            "South America"
+        );
     }
 
     #[test]
@@ -299,20 +271,14 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        match QaModel::open("../data/qa_model") {
-            Ok(model) => {
-                let answer = model.run(question, &contexts).unwrap();
+        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let answer = model.run(question, &contexts).unwrap();
 
-                assert!(answer.score > 0.6);
-                assert_eq!(
-                    &contexts[answer.context_idx][answer.offset],
-                    "South America"
-                );
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
+        assert!(answer.score > 0.6);
+        assert_eq!(
+            &contexts[answer.context_idx][answer.offset],
+            "South America"
+        );
     }
 
     #[test]
@@ -339,25 +305,19 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        match QaModel::open("../data/qa_model") {
-            Ok(model) => {
-                let answer = model.run(question, &contexts);
+        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
 
-                assert!(answer.is_none());
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
+        let answer = model.run(question, &contexts);
+        assert!(answer.is_none());
     }
 
     #[test]
     fn empty() {
-        match QaModel::open("../data/qa_model") {
-            Ok(model) => {
-                let question = "";
-                let contexts = [
-                    r#"The Amazon rainforest (Portuguese: Floresta Amazônica or Amazônia; Spanish: Selva Amazónica, Amazonía or usually Amazonia; French: Forêt amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of 
+        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+
+        let question = "";
+        let contexts = [
+            r#"The Amazon rainforest (Portuguese: Floresta Amazônica or Amazônia; Spanish: Selva Amazónica, Amazonía or usually Amazonia; French: Forêt amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of 
         which 5,500,000 square kilometres (2,100,000 sq mi) are covered by the rainforest. This region includes territory belonging to nine nations. 
         The majority of the forest is contained within Brazil, with 60% of the rainforest, followed by Peru with 13%, Colombia with 10%, and with 
         minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain 
@@ -375,24 +335,19 @@ of tropical rainforest in the world, with an estimated 390 billion individual tr
         minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain 
         "Amazonas" in their names. The Amazon represents over half of the planet's remaining rainforests, and comprises the largest and most biodiverse tract 
         of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
-                ];
-                let answer = model.run(question, &contexts);
+        ];
+        let answer = model.run(question, &contexts);
 
-                assert!(answer.is_none());
+        assert!(answer.is_none());
 
-                let question = "test";
-                let contexts = [r#""#];
-                let answer = model.run(question, &contexts);
-                assert!(answer.is_none());
+        let question = "test";
+        let contexts = [r#""#];
+        let answer = model.run(question, &contexts);
+        assert!(answer.is_none());
 
-                let question = "";
-                let contexts = [r#""#];
-                let answer = model.run(question, &contexts);
-                assert!(answer.is_none());
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
+        let question = "";
+        let contexts = [r#""#];
+        let answer = model.run(question, &contexts);
+        assert!(answer.is_none());
     }
 }

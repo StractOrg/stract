@@ -14,15 +14,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use onnxruntime::{environment::Environment, LoggingLevel};
-
 pub mod cross_encoder;
-
-pub static ONNX_ENVIRONMENT: once_cell::sync::Lazy<Environment> =
-    once_cell::sync::Lazy::new(|| {
-        Environment::builder()
-            .with_name("ranking")
-            .with_log_level(LoggingLevel::Info)
-            .build()
-            .unwrap()
-    });

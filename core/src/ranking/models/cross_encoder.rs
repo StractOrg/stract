@@ -17,11 +17,13 @@
 use std::{path::Path, sync::Mutex};
 
 use itertools::Itertools;
-use onnxruntime::{ndarray::ArrayBase, tensor::OrtOwnedTensor, GraphOptimizationLevel};
+use onnxruntime::{ndarray::ArrayBase, tensor::OrtOwnedTensor, GraphOptimizationLevel, TypedArray};
+use tokenizers::PaddingParams;
+use tokenizers::TruncationParams;
 
 use crate::Result;
 
-use super::ONNX_ENVIRONMENT;
+use crate::ONNX_ENVIRONMENT;
 const TRUNCATE_INPUT: usize = 256;
 
 pub struct CrossEncoderModel {
@@ -31,7 +33,20 @@ pub struct CrossEncoderModel {
 
 impl CrossEncoderModel {
     pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
-        let tokenizer = tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+        let truncation = TruncationParams {
+            max_length: TRUNCATE_INPUT,
+            ..Default::default()
+        };
+
+        let padding = PaddingParams {
+            ..Default::default()
+        };
+
+        let mut tokenizer =
+            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+
+        tokenizer.with_truncation(Some(truncation));
+        tokenizer.with_padding(Some(padding));
 
         let session = Mutex::new(
             ONNX_ENVIRONMENT
@@ -89,15 +104,21 @@ impl CrossEncoder for CrossEncoderModel {
 
         let res: Vec<OrtOwnedTensor<f32, _>> = sess
             .run(vec![
-                ArrayBase::from_vec(ids)
-                    .into_shape((1, num_tokens))
-                    .unwrap(),
-                ArrayBase::from_vec(attention_mask)
-                    .into_shape((1, num_tokens))
-                    .unwrap(),
-                ArrayBase::from_vec(type_ids)
-                    .into_shape((1, num_tokens))
-                    .unwrap(),
+                TypedArray::I64(
+                    ArrayBase::from_vec(ids)
+                        .into_shape((1, num_tokens))
+                        .unwrap(),
+                ),
+                TypedArray::I64(
+                    ArrayBase::from_vec(attention_mask)
+                        .into_shape((1, num_tokens))
+                        .unwrap(),
+                ),
+                TypedArray::I64(
+                    ArrayBase::from_vec(type_ids)
+                        .into_shape((1, num_tokens))
+                        .unwrap(),
+                ),
             ])
             .unwrap();
 
@@ -114,36 +135,32 @@ mod tests {
 
     #[test]
     fn sanity_check() {
-        match CrossEncoderModel::open("../data/cross_encoder") {
-            Ok(model) => {
-                let s = model.run(
+        let model = CrossEncoderModel::open("../data/cross_encoder")
+            .expect("Failed to find cross-encoder model");
+
+        let s = model.run(
+            "how many people live in paris",
+            "there are currently 1234 people living in paris",
+        );
+
+        for _ in 0..10 {
+            assert_eq!(
+                s,
+                model.run(
                     "how many people live in paris",
-                    "there are currently 1234 people living in paris",
-                );
-
-                for _ in 0..10 {
-                    assert_eq!(
-                        s,
-                        model.run(
-                            "how many people live in paris",
-                            "there are currently 1234 people living in paris"
-                        )
-                    );
-                }
-
-                assert!(
-                    model.run(
-                        "how many people live in paris",
-                        "there are currently 1234 people living in paris"
-                    ) > model.run(
-                        "how many people live in paris",
-                        "I really like cake and my favorite cake is probably brownie"
-                    )
-                );
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
+                    "there are currently 1234 people living in paris"
+                )
+            );
         }
+
+        assert!(
+            model.run(
+                "how many people live in paris",
+                "there are currently 1234 people living in paris"
+            ) > model.run(
+                "how many people live in paris",
+                "I really like cake and my favorite cake is probably brownie"
+            )
+        );
     }
 }

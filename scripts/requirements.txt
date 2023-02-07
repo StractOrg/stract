@@ -1,5 +1,5 @@
 transformers[onnx]
 tensorboard>1.15.0
 torch
-optimum
+optimum>=1.6.3
 datasets

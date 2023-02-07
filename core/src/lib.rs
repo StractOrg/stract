@@ -60,7 +60,7 @@ mod snippet;
 mod sonic;
 mod spell;
 mod subdomain_count;
-mod summarizer;
+pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
@@ -326,3 +326,19 @@ fn floor_char_boundary(str: &str, index: usize) -> usize {
 
     res
 }
+
+fn softmax(vec: &mut [f32]) {
+    let s: f32 = vec.iter().map(|z| z.exp()).sum();
+
+    for z in vec {
+        *z = z.exp() / s
+    }
+}
+
+pub static ONNX_ENVIRONMENT: once_cell::sync::Lazy<onnxruntime::environment::Environment> =
+    once_cell::sync::Lazy::new(|| {
+        onnxruntime::environment::Environment::builder()
+            .with_log_level(onnxruntime::LoggingLevel::Info)
+            .build()
+            .unwrap()
+    });

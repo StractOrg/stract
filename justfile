@@ -21,6 +21,7 @@
     pip3 install -r scripts/requirements.txt
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
+    ./scripts/export_abstractive_summary_model
     cd frontend; npm install; npm run build
     cargo run --release --all-features -- configure {{ARGS}}
 

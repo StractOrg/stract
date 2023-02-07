@@ -97,3 +97,7 @@ harness = false
 [[bench]]
 name = "online-harmonic"
 harness = false
+
+[[bench]]
+name = "abstractive-summarizer"
+harness = false
