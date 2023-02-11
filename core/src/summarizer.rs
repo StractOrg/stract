@@ -314,9 +314,70 @@ impl AbstractiveModel {
     }
 
     pub fn summarize(&self, text: &str, config: GenerationConfig) -> Result<String> {
-        let encoded_text = self.tokenizer.encode(text, true)?;
+        let generator = BeamGenerator {
+            model: self,
+            config,
+            state: Some(BeamState::Encoding {
+                text: text.to_string(),
+            }),
+        };
 
-        let mut ids = encoded_text
+        Ok(generator.collect())
+    }
+}
+
+struct BeamGenerator<'a> {
+    model: &'a AbstractiveModel,
+    config: GenerationConfig,
+    state: Option<BeamState>,
+}
+
+impl<'a> Iterator for BeamGenerator<'a> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.state
+            .take()
+            .and_then(|state| match state.step(self.model, &self.config) {
+                Ok((state, res)) => {
+                    self.state = Some(state);
+                    res
+                }
+                Err(err) => {
+                    tracing::error!("Encountered an error while generating summary: {err}");
+                    None
+                }
+            })
+    }
+}
+
+enum BeamState {
+    Encoding {
+        text: String,
+    },
+    Decoding {
+        encoder_hidden_states: ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>,
+        attention_mask: ArrayBase<OwnedRepr<i64>, Dim<IxDynImpl>>,
+    },
+    DecodingWithPast {
+        encoder_hidden_states: ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>,
+        attention_mask: ArrayBase<OwnedRepr<i64>, Dim<IxDynImpl>>,
+        caches: Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>>,
+        beams: Vec<Beam>,
+        generated_tokens: u32,
+        /// all beams agree on the tokens up to this index
+        beam_token_agreement_idx: usize,
+    },
+    Remaining {
+        terms: VecDeque<String>,
+    },
+}
+
+impl BeamState {
+    fn encode_step(model: &AbstractiveModel, text: String) -> Result<Self> {
+        let encoded_text = model.tokenizer.encode(text.as_str(), true)?;
+
+        let ids = encoded_text
             .get_ids()
             .iter()
             .map(|i| *i as i64)
@@ -332,292 +393,492 @@ impl AbstractiveModel {
 
         let encoder_num_tokens = ids.len();
 
-        let mut decoder = self
+        let encoder_hidden_states = model.encode(ids, attention_mask.clone())?;
+
+        let attention_mask: ArrayBase<OwnedRepr<i64>, Dim<IxDynImpl>> =
+            ArrayBase::from_vec(attention_mask)
+                .into_shape((1, encoder_num_tokens))
+                .unwrap()
+                .into_dyn();
+
+        Ok(BeamState::Decoding {
+            encoder_hidden_states,
+            attention_mask,
+        })
+    }
+
+    fn run_decoder_model(
+        model: &AbstractiveModel,
+        ids: &[i64],
+        encoder_hidden_states: ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>,
+        attention_mask: ArrayBase<OwnedRepr<i64>, Dim<IxDynImpl>>,
+    ) -> Result<Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>>> {
+        let mut decoder = model
             .decoder
             .lock()
             .expect("Failed to get lock. Maybe another thread crashed?");
 
-        let mut decoder_with_past = self
+        let num_tokens = ids.len();
+        let arr_ids = ArrayBase::from_vec(ids.to_vec())
+            .into_shape((1, num_tokens))
+            .unwrap()
+            .into_dyn();
+
+        let decoder_input = vec![
+            TypedArray::I64(attention_mask),
+            TypedArray::I64(arr_ids),
+            TypedArray::F32(encoder_hidden_states),
+        ];
+
+        let output = decoder.run(decoder_input)?;
+
+        Ok(output.into_iter().map(|t| t.clone().into_owned()).collect())
+    }
+
+    fn create_beams(
+        decoder_output: &[ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>],
+        ids: Vec<i64>,
+        num_beams: u32,
+        bos_token: usize,
+    ) -> Vec<Beam> {
+        let mut next_scores = BinaryHeap::with_capacity(num_beams as usize + 1);
+
+        let all_logits = &decoder_output[0];
+        let vocab_size = all_logits.shape()[2];
+        let mut scores = Vec::with_capacity(vocab_size);
+
+        for token_id in 0..vocab_size {
+            let score: f32 = all_logits[[
+                all_logits.shape()[0] - 1,
+                all_logits.shape()[1] - 1,
+                token_id,
+            ]];
+            scores.push(score);
+        }
+
+        softmax(&mut scores);
+
+        for (token_id, score) in scores.into_iter().enumerate() {
+            if token_id == bos_token {
+                continue;
+            }
+
+            let scored_token = Reverse(ScoredToken {
+                token: token_id as i64,
+                score: score.log2(),
+            });
+
+            if next_scores.len() < num_beams as usize {
+                next_scores.push(scored_token);
+            } else if let Some(mut worst) = next_scores.peek_mut() {
+                if worst.0.score < scored_token.0.score {
+                    *worst = scored_token
+                }
+            }
+        }
+
+        let mut beams = Vec::new();
+        for scored_token in next_scores.into_iter().map(|t| t.0) {
+            let mut ids = ids.clone();
+            ids.push(scored_token.token);
+
+            beams.push(Beam {
+                input_ids: ids,
+                score: scored_token.score,
+            })
+        }
+
+        beams
+    }
+
+    fn create_caches(
+        decoder_output: Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>>,
+        num_beams: u32,
+    ) -> Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>> {
+        let num_outputs = decoder_output.len();
+
+        decoder_output
+            .into_iter()
+            .map(|t| t.into_owned())
+            .map(|mut t| {
+                let orig = t.clone();
+
+                for _ in 0..num_beams - 1 {
+                    t.append(Axis(0), orig.view()).unwrap();
+                }
+
+                t
+            })
+            .skip(1)
+            .take(num_outputs - 2) // skip 'encoder_hidden_states' since this is not changed by the decoder model
+            .collect::<Vec<_>>()
+    }
+
+    fn run_decoder_model_with_past(
+        model: &AbstractiveModel,
+        beams: &[Beam],
+        encoder_hidden_states: &ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>,
+        attention_mask: &ArrayBase<OwnedRepr<i64>, Dim<IxDynImpl>>,
+        mut caches: Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>>,
+    ) -> Result<Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>>> {
+        let mut decoder_with_past = model
             .decoder_with_past
             .lock()
             .expect("Failed to get lock. Maybe another thread crashed?");
 
-        let arr_encoder_hidden_states = self.encode(ids.clone(), attention_mask.clone())?;
+        let mut combined_attention_mask = Vec::new();
+        let mut combined_encoder_hidden_states = Vec::with_capacity(beams.len());
+        let mut combined_ids = Vec::new();
 
-        let arr_attention_mask = ArrayBase::from_vec(attention_mask.clone())
-            .into_shape((1, encoder_num_tokens))
+        // TODO: Only advance non-finished beams
+
+        for beam in beams {
+            combined_ids.push(*beam.input_ids.last().unwrap());
+
+            for mask in attention_mask {
+                combined_attention_mask.push(*mask);
+            }
+
+            for state in encoder_hidden_states {
+                combined_encoder_hidden_states.push(*state);
+            }
+        }
+
+        let combined_ids = ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_ids)
+            .into_shape((beams.len(), 1))
             .unwrap()
             .into_dyn();
 
-        let mut beams = Vec::new();
+        let mut attention_shape = attention_mask.shape().to_vec();
+        attention_shape[0] = beams.len();
 
-        ids = vec![self.begin_decoder_token as i64, self.bos_token_id as i64];
-        let mut generated_tokens = 0;
+        let combined_attention_mask =
+            ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_attention_mask)
+                .into_shape(attention_shape.as_slice())
+                .unwrap();
 
-        let mut caches = Vec::new();
+        let mut state_shape = encoder_hidden_states.shape().to_vec();
+        state_shape[0] = beams.len();
 
-        loop {
-            generated_tokens += 1;
+        let combined_encoder_hidden_states =
+            ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_encoder_hidden_states)
+                .into_shape(state_shape.as_slice())
+                .unwrap();
 
-            if beams.is_empty() {
-                let num_tokens = ids.len();
-                let arr_ids = ArrayBase::from_vec(ids.clone())
-                    .into_shape((1, num_tokens))
-                    .unwrap()
-                    .into_dyn();
+        let mut decoder_input = vec![
+            TypedArray::I64(combined_attention_mask),
+            TypedArray::I64(combined_ids),
+            TypedArray::F32(combined_encoder_hidden_states),
+        ];
 
-                let decoder_input = vec![
-                    TypedArray::I64(arr_attention_mask.clone()),
-                    TypedArray::I64(arr_ids),
-                    TypedArray::F32(arr_encoder_hidden_states.clone()),
-                ];
+        for tensor in caches.drain(0..) {
+            decoder_input.push(TypedArray::F32(tensor));
+        }
 
-                let decoder_output = decoder.run(decoder_input)?;
-                let mut next_scores = BinaryHeap::with_capacity(config.num_beams as usize + 1);
+        let res = decoder_with_past.run(decoder_input)?;
 
-                let all_logits = &decoder_output[0];
-                let vocab_size = all_logits.shape()[2];
-                let mut scores = Vec::with_capacity(vocab_size);
+        Ok(res.into_iter().map(|t| t.clone().into_owned()).collect())
+    }
 
-                for token_id in 0..vocab_size {
-                    let score: f32 = all_logits[[0, num_tokens - 1, token_id]];
-                    scores.push(score);
-                }
+    fn new_possible_beams(
+        decoder_output: &[ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>],
+        beams: &[Beam],
+        force_min_tokens: Option<u32>,
+        generated_tokens: u32,
+        eos_token_id: usize,
+        length_penalty: f32,
+    ) -> Vec<PossibleBeam> {
+        let all_logits = &decoder_output[0];
+        let vocab_size = all_logits.shape()[2];
 
-                softmax(&mut scores);
+        let mut beam_tok_scores = Vec::with_capacity(beams.len());
+        for beam_idx in 0..beams.len() {
+            let mut scores = Vec::with_capacity(vocab_size);
 
-                for (token_id, score) in scores.into_iter().enumerate() {
-                    if token_id == self.bos_token_id {
-                        continue;
-                    }
-
-                    let scored_token = Reverse(ScoredToken {
-                        token: token_id as i64,
-                        score: score.log2(),
-                    });
-
-                    if next_scores.len() < config.num_beams as usize {
-                        next_scores.push(scored_token);
-                    } else if let Some(mut worst) = next_scores.peek_mut() {
-                        if worst.0.score < scored_token.0.score {
-                            *worst = scored_token
-                        }
-                    }
-                }
-
-                let num_outputs = decoder_output.len();
-
-                caches = decoder_output
-                    .into_iter()
-                    .map(|t| t.clone().into_owned())
-                    .map(|mut t| {
-                        let orig = t.clone();
-
-                        for _ in 0..config.num_beams - 1 {
-                            t.append(Axis(0), orig.view()).unwrap();
-                        }
-
-                        t
-                    })
-                    .skip(1)
-                    .take(num_outputs - 2) // skip 'encoder_hidden_states' since this is not changed by the decoder model
-                    .collect::<Vec<_>>();
-
-                for scored_token in next_scores.into_iter().map(|t| t.0) {
-                    let mut ids = ids.clone();
-                    ids.push(scored_token.token);
-
-                    beams.push(Beam {
-                        input_ids: ids,
-                        score: scored_token.score,
-                    })
-                }
-            } else {
-                let mut combined_attention_mask = Vec::new();
-                let mut combined_encoder_hidden_states = Vec::with_capacity(beams.len());
-                let mut combined_ids = Vec::new();
-
-                // TODO: Only advance non-finished beams
-
-                for beam in &beams {
-                    combined_ids.push(*beam.input_ids.last().unwrap());
-
-                    for mask in &attention_mask {
-                        combined_attention_mask.push(*mask);
-                    }
-
-                    for state in &arr_encoder_hidden_states {
-                        combined_encoder_hidden_states.push(*state);
-                    }
-                }
-
-                let combined_ids = ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_ids)
-                    .into_shape((beams.len(), 1))
-                    .unwrap()
-                    .into_dyn();
-
-                let mut attention_shape = arr_attention_mask.shape().to_vec();
-                attention_shape[0] = beams.len();
-
-                let combined_attention_mask =
-                    ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_attention_mask)
-                        .into_shape(attention_shape.as_slice())
-                        .unwrap();
-
-                let mut state_shape = arr_encoder_hidden_states.shape().to_vec();
-                state_shape[0] = beams.len();
-
-                let combined_encoder_hidden_states =
-                    ArrayBase::<OwnedRepr<_>, _>::from_vec(combined_encoder_hidden_states)
-                        .into_shape(state_shape.as_slice())
-                        .unwrap();
-
-                let mut decoder_input = vec![
-                    TypedArray::I64(combined_attention_mask),
-                    TypedArray::I64(combined_ids),
-                    TypedArray::F32(combined_encoder_hidden_states),
-                ];
-
-                for tensor in caches.drain(0..) {
-                    decoder_input.push(TypedArray::F32(tensor));
-                }
-
-                let decoder_output: Vec<OrtOwnedTensor<f32, Dim<IxDynImpl>>> =
-                    decoder_with_past.run(decoder_input)?;
-
-                let all_logits = &decoder_output[0];
-                let vocab_size = all_logits.shape()[2];
-
-                let mut beam_tok_scores = Vec::with_capacity(beams.len());
-                for beam_idx in 0..beams.len() {
-                    let mut scores = Vec::with_capacity(vocab_size);
-
-                    for token_id in 0..vocab_size {
-                        scores.push(all_logits[[beam_idx, 0, token_id]]);
-                    }
-
-                    softmax(&mut scores);
-                    beam_tok_scores.push(scores)
-                }
-
-                let num_outputs = decoder_output.len();
-
-                // skip(num_outputs-2) to skip 'encoder_hidden_states' since this is not changed by the decoder model
-                let output_caches: Vec<_> = decoder_output
-                    .iter()
-                    .skip(1)
-                    .take(num_outputs - 2)
-                    .collect();
-
-                let mut new_beams = BinaryHeap::with_capacity(beams.len());
-
-                for beam_idx in 0..beams.len() {
-                    for new_token in 0..vocab_size {
-                        let tok_score = beam_tok_scores[beam_idx][new_token];
-
-                        let tok_score = tok_score.log2();
-
-                        let new_score = beams[beam_idx].score + tok_score;
-
-                        let possible_beam = PossibleBeam {
-                            beam_idx,
-                            beam_length: beams[beam_idx].len(),
-                            new_token: new_token as i64,
-                            length_penalty: config.length_penalty,
-                            eos_token: self.eos_token_id as i64,
-                            new_score,
-                        };
-
-                        if new_beams.len() < beams.len() {
-                            new_beams.push(Reverse(possible_beam));
-                        } else if let Some(mut worst) = new_beams.peek_mut() {
-                            if possible_beam > worst.0 {
-                                *worst = Reverse(possible_beam);
-                            }
-                        }
-                    }
-                }
-
-                let mut new_caches = Vec::with_capacity(output_caches.len());
-
-                for _ in &output_caches {
-                    new_caches.push(Vec::with_capacity(100));
-                }
-
-                for possible_beam in &new_beams {
-                    for (new_cache, old_cache) in new_caches.iter_mut().zip_eq(output_caches.iter())
-                    {
-                        let shape = old_cache.shape();
-
-                        new_cache.push(
-                            old_cache
-                                .index_axis(Axis(0), possible_beam.0.beam_idx)
-                                .into_shape((1, shape[1], shape[2], shape[3]))
-                                .unwrap()
-                                .into_dyn(),
-                        );
-                    }
-                }
-
-                let new_caches: Vec<_> = new_caches
-                    .into_iter()
-                    .map(|cache| {
-                        onnxruntime::ndarray::concatenate(Axis(0), cache.as_slice()).unwrap()
-                    })
-                    .collect();
-
-                let new_beams: Vec<_> = new_beams
-                    .into_iter()
-                    .map(|r| r.0)
-                    .map(|possible_beam| {
-                        if beams[possible_beam.beam_idx].is_finished(self.eos_token_id as i64) {
-                            beams[possible_beam.beam_idx].clone()
-                        } else {
-                            let mut input_ids = beams[possible_beam.beam_idx].input_ids.clone();
-                            input_ids.push(possible_beam.new_token);
-                            Beam {
-                                input_ids,
-                                score: possible_beam.new_score,
-                            }
-                        }
-                    })
-                    .collect();
-
-                beams = new_beams;
-                caches = new_caches;
-
-                if beams
-                    .iter()
-                    .all(|beam| beam.is_finished(self.eos_token_id as i64))
-                {
-                    break;
-                }
+            for token_id in 0..vocab_size {
+                scores.push(all_logits[[beam_idx, 0, token_id]]);
             }
 
-            if let Some(min_tokens) = config.force_min_tokens {
-                if generated_tokens < min_tokens {
+            softmax(&mut scores);
+            beam_tok_scores.push(scores)
+        }
+
+        let mut new_beams = BinaryHeap::with_capacity(beams.len());
+
+        let mut skip_eos = false;
+
+        if let Some(min_tokens) = force_min_tokens {
+            if generated_tokens < min_tokens {
+                skip_eos = true;
+            }
+        }
+
+        for beam_idx in 0..beams.len() {
+            for new_token in 0..vocab_size {
+                if skip_eos && new_token == eos_token_id {
                     continue;
                 }
-            }
 
-            if let Some(early_stopping) = &config.early_stopping {
-                match early_stopping {
-                    EarlyStopping::MaxTokens { max_new_tokens } => {
-                        if generated_tokens >= *max_new_tokens {
-                            break;
-                        }
+                let tok_score = beam_tok_scores[beam_idx][new_token];
+
+                let tok_score = tok_score.log2();
+
+                let new_score = beams[beam_idx].score + tok_score;
+
+                let possible_beam = PossibleBeam {
+                    beam_idx,
+                    beam_length: beams[beam_idx].len(),
+                    new_token: new_token as i64,
+                    length_penalty,
+                    eos_token: eos_token_id as i64,
+                    new_score,
+                };
+
+                if new_beams.len() < beams.len() {
+                    new_beams.push(Reverse(possible_beam));
+                } else if let Some(mut worst) = new_beams.peek_mut() {
+                    if possible_beam > worst.0 {
+                        *worst = Reverse(possible_beam);
                     }
                 }
             }
         }
 
-        let best_beam = beams
+        new_beams.into_iter().map(|r| r.0).collect()
+    }
+
+    fn new_caches(
+        decoder_output: &[ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>],
+        new_beams: &[PossibleBeam],
+    ) -> Vec<ArrayBase<OwnedRepr<f32>, Dim<IxDynImpl>>> {
+        let num_outputs = decoder_output.len();
+        // skip(num_outputs-2) to skip 'encoder_hidden_states' since this is not changed by the decoder model
+        let output_caches: Vec<_> = decoder_output
+            .iter()
+            .skip(1)
+            .take(num_outputs - 2)
+            .collect();
+
+        let mut new_caches = Vec::with_capacity(output_caches.len());
+
+        for _ in &output_caches {
+            new_caches.push(Vec::with_capacity(100));
+        }
+
+        for possible_beam in new_beams {
+            for (new_cache, old_cache) in new_caches.iter_mut().zip_eq(output_caches.iter()) {
+                let shape = old_cache.shape();
+
+                new_cache.push(
+                    old_cache
+                        .index_axis(Axis(0), possible_beam.beam_idx)
+                        .into_shape((1, shape[1], shape[2], shape[3]))
+                        .unwrap()
+                        .into_dyn(),
+                );
+            }
+        }
+
+        new_caches
+            .into_iter()
+            .map(|cache| onnxruntime::ndarray::concatenate(Axis(0), cache.as_slice()).unwrap())
+            .collect()
+    }
+
+    fn cement_beams(
+        beams: Vec<Beam>,
+        possible_beams: Vec<PossibleBeam>,
+        eos_token_id: i64,
+    ) -> Vec<Beam> {
+        possible_beams
+            .into_iter()
+            .map(|possible_beam| {
+                if beams[possible_beam.beam_idx].is_finished(eos_token_id) {
+                    beams[possible_beam.beam_idx].clone()
+                } else {
+                    let mut input_ids = beams[possible_beam.beam_idx].input_ids.clone();
+                    input_ids.push(possible_beam.new_token);
+                    Beam {
+                        input_ids,
+                        score: possible_beam.new_score,
+                    }
+                }
+            })
+            .collect()
+    }
+
+    fn output_from_best(
+        model: &AbstractiveModel,
+        new_beams: Vec<Beam>,
+        beam_agreement_index: usize,
+    ) -> BeamState {
+        let best_beam = new_beams
             .into_iter()
             .max_by(|a, b| a.score.total_cmp(&b.score))
             .unwrap();
 
-        let res: Vec<_> = best_beam.input_ids.into_iter().map(|i| i as u32).collect();
-        Ok(self.tokenizer.decode(res, true).unwrap())
+        let terms: VecDeque<_> = best_beam
+            .input_ids
+            .into_iter()
+            .skip(beam_agreement_index)
+            .map(|i| i as u32)
+            .map(|tok| model.tokenizer.decode(vec![tok], true).unwrap())
+            .collect();
+
+        BeamState::Remaining { terms }
+    }
+
+    fn check_early_stopping(early_stopping: Option<&EarlyStopping>, generated_tokens: u32) -> bool {
+        early_stopping
+            .map(|early_stopping| match early_stopping {
+                EarlyStopping::MaxTokens { max_new_tokens } => generated_tokens >= *max_new_tokens,
+            })
+            .unwrap_or(false)
+    }
+
+    fn all_beams_agree(beams: &[Beam], beam_token_agreement_idx: usize) -> bool {
+        if beams
+            .iter()
+            .any(|beam| beam_token_agreement_idx >= beam.len())
+        {
+            return false;
+        }
+
+        beams
+            .iter()
+            .map(|beam| beam.input_ids[beam_token_agreement_idx])
+            .all_equal()
+    }
+
+    fn step<'a>(
+        mut self,
+        model: &'a AbstractiveModel,
+        config: &'a GenerationConfig,
+    ) -> Result<(Self, Option<<BeamGenerator<'a> as Iterator>::Item>)> {
+        loop {
+            match self {
+                BeamState::Encoding { text } => {
+                    self = Self::encode_step(model, text)?;
+                }
+                BeamState::Decoding {
+                    encoder_hidden_states,
+                    attention_mask,
+                } => {
+                    let ids = vec![model.begin_decoder_token as i64, model.bos_token_id as i64];
+                    let decoder_output = Self::run_decoder_model(
+                        model,
+                        &ids,
+                        encoder_hidden_states.clone(),
+                        attention_mask.clone(),
+                    )?;
+
+                    let beams = Self::create_beams(
+                        &decoder_output,
+                        ids,
+                        config.num_beams,
+                        model.bos_token_id,
+                    );
+
+                    let caches = Self::create_caches(decoder_output, config.num_beams);
+
+                    self = BeamState::DecodingWithPast {
+                        encoder_hidden_states,
+                        attention_mask,
+                        caches,
+                        beams,
+                        generated_tokens: 1,
+                        beam_token_agreement_idx: 0,
+                    };
+                }
+
+                BeamState::DecodingWithPast {
+                    encoder_hidden_states,
+                    attention_mask,
+                    caches,
+                    mut beams,
+                    generated_tokens,
+                    beam_token_agreement_idx,
+                } => {
+                    let shortest_beam = beams
+                        .iter()
+                        .min_by(|a, b| a.input_ids.len().cmp(&b.input_ids.len()))
+                        .unwrap();
+
+                    if (shortest_beam.input_ids.len() - beam_token_agreement_idx) as u32
+                        > config.max_beam_divergence_tokens
+                    {
+                        let longest_beam = beams
+                            .iter()
+                            .max_by(|a, b| a.input_ids.len().cmp(&b.input_ids.len()))
+                            .unwrap()
+                            .clone();
+
+                        let num_beams = beams.len();
+                        beams = vec![longest_beam; num_beams];
+                    }
+
+                    if Self::all_beams_agree(&beams, beam_token_agreement_idx) {
+                        let tok = beams[0].input_ids[beam_token_agreement_idx];
+                        let decoded = model.tokenizer.decode(vec![tok as u32], true)?;
+
+                        self = BeamState::DecodingWithPast {
+                            encoder_hidden_states,
+                            attention_mask,
+                            caches,
+                            beams,
+                            generated_tokens,
+                            beam_token_agreement_idx: beam_token_agreement_idx + 1,
+                        };
+
+                        return Ok((self, Some(decoded)));
+                    }
+
+                    let decoder_output = Self::run_decoder_model_with_past(
+                        model,
+                        &beams,
+                        &encoder_hidden_states,
+                        &attention_mask,
+                        caches,
+                    )?;
+
+                    let possible_beams = Self::new_possible_beams(
+                        &decoder_output,
+                        &beams,
+                        config.force_min_tokens,
+                        generated_tokens,
+                        model.eos_token_id,
+                        config.length_penalty,
+                    );
+
+                    let new_caches = Self::new_caches(&decoder_output, &possible_beams);
+
+                    let new_beams =
+                        Self::cement_beams(beams, possible_beams, model.eos_token_id as i64);
+
+                    if Self::check_early_stopping(config.early_stopping.as_ref(), generated_tokens)
+                        || new_beams
+                            .iter()
+                            .all(|beam| beam.is_finished(model.eos_token_id as i64))
+                    {
+                        self = Self::output_from_best(model, new_beams, beam_token_agreement_idx);
+                    } else {
+                        self = BeamState::DecodingWithPast {
+                            encoder_hidden_states,
+                            attention_mask,
+                            caches: new_caches,
+                            beams: new_beams,
+                            generated_tokens: generated_tokens + 1,
+                            beam_token_agreement_idx,
+                        };
+                    }
+                }
+                BeamState::Remaining { mut terms } => {
+                    let term = terms.pop_front();
+
+                    return Ok((BeamState::Remaining { terms }, term));
+                }
+            }
+        }
     }
 }
 
@@ -716,8 +977,13 @@ impl Eq for PossibleBeam {}
 pub struct GenerationConfig {
     pub early_stopping: Option<EarlyStopping>,
     pub force_min_tokens: Option<u32>,
+    /// Exponential penalty to the length that is used with beam-based generation.
+    /// It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence.
+    /// Since the score is the log likelihood of the sequence (i.e. negative),
+    /// length_penalty > 0.0 promotes longer sequences, while length_penalty < 0.0 encourages shorter sequences
     pub length_penalty: f32,
     pub num_beams: u32,
+    pub max_beam_divergence_tokens: u32,
 }
 
 impl Default for GenerationConfig {
@@ -729,6 +995,7 @@ impl Default for GenerationConfig {
             force_min_tokens: None,
             length_penalty: 1.0,
             num_beams: 5,
+            max_beam_divergence_tokens: 20,
         }
     }
 }
@@ -788,7 +1055,7 @@ mod tests {
         let config = GenerationConfig {
             num_beams: 2,
             length_penalty: 1.0,
-            early_stopping: Some(EarlyStopping::MaxTokens { max_new_tokens: 32 }),
+            early_stopping: Some(EarlyStopping::MaxTokens { max_new_tokens: 16 }),
             ..Default::default()
         };
 
@@ -796,6 +1063,7 @@ mod tests {
         let summary = model.summarize(text, config).unwrap();
         println!("Elapsed: {:?}", start.elapsed());
         println!("{:?}", &summary);
+
         assert!(summary.len() > 50);
         assert!(summary.contains("Aristotle"));
     }

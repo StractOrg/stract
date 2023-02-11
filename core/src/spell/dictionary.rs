@@ -268,7 +268,6 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
         self.cache
             .entry(
                 term.chars()
-                    .into_iter()
                     .map(|c| c.to_ascii_lowercase())
                     .filter(|c| !matches!(c, ',' | '.' | '\\' | '=' | '*' | '(' | ')'))
                     .collect(),

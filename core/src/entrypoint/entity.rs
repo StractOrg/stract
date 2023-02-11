@@ -113,7 +113,6 @@ impl EntityIndexer {
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;
         EntityIterator::from(reader)
-            .into_iter()
             .filter(|entity| !entity.categories.is_empty())
             .take(200_000)
             .for_each(|entity| {

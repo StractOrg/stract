@@ -207,7 +207,6 @@ impl Term {
         fields
             .iter()
             .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
-            .into_iter()
             .map(|(field, entry)| {
                 (
                     Occur::Should,
@@ -232,7 +231,6 @@ impl Term {
                         | Field::Text(TextField::SiteNoTokenizer)
                 )
             })
-            .into_iter()
             .map(|(field, entry)| {
                 (
                     Occur::Should,

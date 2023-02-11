@@ -22,20 +22,15 @@ use crate::{Error, Result};
 
 use super::Webpage;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Default)]
 pub enum Region {
+    #[default]
     All,
     Denmark,
     France,
     Germany,
     Spain,
     US,
-}
-
-impl Default for Region {
-    fn default() -> Self {
-        Region::All
-    }
 }
 
 pub const ALL_REGIONS: [Region; 6] = [
