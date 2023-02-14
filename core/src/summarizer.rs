@@ -17,11 +17,12 @@
 use std::{
     cmp::{Ordering, Reverse},
     collections::{BinaryHeap, VecDeque},
+    ops::Range,
     path::Path,
     sync::{Arc, Mutex},
 };
 
-use itertools::{intersperse, Itertools};
+use itertools::Itertools;
 use onnxruntime::{
     ndarray::{ArrayBase, Axis, Dim, IxDynImpl, OwnedRepr},
     tensor::OrtOwnedTensor,
@@ -29,11 +30,13 @@ use onnxruntime::{
 };
 use tokenizers::{PaddingParams, TruncationParams};
 
-use crate::{softmax, spell::word2vec::Word2Vec};
+use crate::{ceil_char_boundary, softmax, spell::word2vec::Word2Vec};
 use crate::{Result, ONNX_ENVIRONMENT};
 
+#[derive(Clone)]
 struct CandidatePassage<'a> {
     passage: &'a str,
+    range: Range<usize>,
     index: usize,
     score: f32,
 }
@@ -63,6 +66,7 @@ struct OverlappingSents<'a> {
     window_size: usize,
     next_start: VecDeque<usize>,
     overlap: usize,
+    prev_end: usize,
 }
 
 impl<'a> OverlappingSents<'a> {
@@ -79,12 +83,13 @@ impl<'a> OverlappingSents<'a> {
             window_size,
             overlap,
             next_start,
+            prev_end: 0,
         }
     }
 }
 
 impl<'a> Iterator for OverlappingSents<'a> {
-    type Item = &'a str;
+    type Item = (&'a str, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.text.is_empty() {
@@ -123,18 +128,24 @@ impl<'a> Iterator for OverlappingSents<'a> {
         }
 
         let res = &self.text[..end];
+        let range = self.prev_end..self.prev_end + end;
 
         if let Some(next_start) = self.next_start.pop_front() {
             if next_start == 0 {
                 self.text = "";
+                self.prev_end += end;
             } else {
-                self.text = &self.text[next_start + 1..];
+                let next_start = ceil_char_boundary(self.text, next_start + 1);
+
+                self.text = &self.text[next_start..];
+                self.prev_end += next_start;
             }
         } else {
             self.text = "";
+            self.prev_end += end;
         }
 
-        Some(res)
+        Some((res, range))
     }
 }
 pub struct Summarizer {
@@ -147,7 +158,7 @@ impl Summarizer {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self {
             word2vec: Word2Vec::open(path.as_ref().join("word2vec.bin.gz").as_path())?,
-            top_n_extractive_passages: 20,
+            top_n_extractive_passages: 10,
             abstractive_summarizer: AbstractiveSummarizer {
                 model: Arc::new(AbstractiveModel::open(
                     path.as_ref().join("abstractive").as_path(),
@@ -171,7 +182,7 @@ impl Summarizer {
 
         let overlap_sents = OverlappingSents::new(text, 100, 10);
 
-        for (index, passage) in overlap_sents.enumerate() {
+        for (index, (passage, range)) in overlap_sents.enumerate() {
             let mut score = 0.0;
             let mut count = 0;
 
@@ -193,6 +204,7 @@ impl Summarizer {
                 passage,
                 index,
                 score,
+                range,
             };
 
             if best_passages.len() >= self.top_n_extractive_passages {
@@ -213,7 +225,33 @@ impl Summarizer {
         let mut best_passages: Vec<_> = best_passages.into_iter().map(|r| r.0).collect();
         best_passages.sort_by_key(|a| a.index);
 
-        Some(intersperse(best_passages.into_iter().map(|p| p.passage), ". ").collect())
+        let mut new_best_passages = Vec::with_capacity(best_passages.len());
+
+        new_best_passages.push(best_passages[0].clone());
+
+        for (a, mut b) in best_passages.into_iter().tuple_windows() {
+            if a.range.end > b.range.start {
+                b.range.start = ceil_char_boundary(text, a.range.end);
+                b.passage = &text[b.range.clone()];
+            }
+
+            new_best_passages.push(b);
+        }
+
+        let mut res = String::new();
+
+        res.push_str(new_best_passages[0].passage);
+
+        for (a, b) in new_best_passages.into_iter().tuple_windows() {
+            if b.index == a.index + 1 {
+                res.push_str(b.passage);
+            } else {
+                res.push_str(". \n");
+                res.push_str(b.passage);
+            }
+        }
+
+        Some(res)
     }
 
     pub fn abstractive_summary(&self, _query: &str, text: &str) -> String {
@@ -227,7 +265,7 @@ impl Summarizer {
     }
 
     pub fn summarize_iter(&self, query: &str, text: &str) -> Option<impl Iterator<Item = String>> {
-        self.extractive_summary(query, text).map(|summary| {
+        dbg!(self.extractive_summary(query, text)).map(|summary| {
             self.abstractive_summarizer
                 .summarize_iter(&summary, GenerationConfig::default())
         })
@@ -1056,20 +1094,20 @@ mod tests {
 
     #[test]
     fn overlapping_sentences() {
-        let mut it = OverlappingSents::new("this is a test sentence", 3, 1);
+        let mut it = OverlappingSents::new("this is a test sentence", 3, 1).map(|(p, _)| p);
 
         assert_eq!(it.next(), Some("this is a"));
         assert_eq!(it.next(), Some("a test sentence"));
         assert_eq!(it.next(), Some("sentence"));
         assert_eq!(it.next(), None);
 
-        let mut it = OverlappingSents::new("this is a test sentence", 3, 0);
+        let mut it = OverlappingSents::new("this is a test sentence", 3, 0).map(|(p, _)| p);
 
         assert_eq!(it.next(), Some("this is a"));
         assert_eq!(it.next(), Some("test sentence"));
         assert_eq!(it.next(), None);
 
-        let mut it = OverlappingSents::new("this is a test sentence", 3, 2);
+        let mut it = OverlappingSents::new("this is a test sentence", 3, 2).map(|(p, _)| p);
 
         assert_eq!(it.next(), Some("this is a"));
         assert_eq!(it.next(), Some("is a test"));
@@ -1077,15 +1115,23 @@ mod tests {
         assert_eq!(it.next(), Some("sentence"));
         assert_eq!(it.next(), None);
 
-        let mut it = OverlappingSents::new("this", 3, 1);
+        let mut it = OverlappingSents::new("this", 3, 1).map(|(p, _)| p);
 
         assert_eq!(it.next(), Some("this"));
         assert_eq!(it.next(), None);
 
-        let mut it = OverlappingSents::new("this ", 3, 0);
+        let mut it = OverlappingSents::new("this ", 3, 0).map(|(p, _)| p);
 
         assert_eq!(it.next(), Some("this ")); // this is not really great, but close enough. At least no panic
         assert_eq!(it.next(), None);
+
+        let text = "this is a test sentence";
+        let it = OverlappingSents::new(text, 3, 1);
+
+        for (p, range) in it {
+            dbg!(p, &range, &text[range.clone()]);
+            assert_eq!(p, &text[range]);
+        }
     }
 
     #[test]
