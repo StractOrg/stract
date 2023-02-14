@@ -75,8 +75,13 @@ import Hero from "./Hero.astro";
   }
 
   #summarize-btn {
-    @apply rounded-full px-2 py-1 border bg-white hover:border-brand hover:text-brand;
+    @apply rounded-full px-2 py-1 border bg-white;
   }
+
+  #summarize-btn:not(:disabled) {
+    @apply hover:border-brand hover:text-brand;
+  }
+
   #summarize-btn.active {
     @apply border-brand text-brand;
   }
@@ -94,6 +99,7 @@ import Hero from "./Hero.astro";
   var currentSite = "";
   var currentUrl = "";
   var currentIdx = null;
+  var currentHasCleanBody = false;
 
   const BLOCKED = 0;
   const LESS = 1;
@@ -109,11 +115,14 @@ import Hero from "./Hero.astro";
 
   // This is called from search.astro
   // Do not delete!
-  function updateModal(idx, site, url) {
+  function updateModal(idx, site, url, hasCleanBody) {
     siteLabel.innerHTML = site;
     currentSite = site;
     currentUrl = url;
     currentIdx = idx;
+    currentHasCleanBody = hasCleanBody;
+
+    btnSummarize.disabled = !currentHasCleanBody;
 
     updateSelection();
     updateSummaryBtn();

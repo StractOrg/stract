@@ -114,6 +114,7 @@ import { askama } from "../askama";
                       data-site="{{ item.site }}"
                       data-url="{{ item.url }}"
                       data-idx="{{ loop.index0 }}"
+                      data-has-clean-body="{{ !item.body.is_empty() }}"
                     >
                       <Hero class="w-6" icon="adjustments" />
                     </div>
@@ -230,8 +231,9 @@ import { askama } from "../askama";
       event.stopPropagation();
 
       const elem = event.target;
+      const hasCleanBody = (elem.dataset.hasCleanBody === "true");
 
-      updateModal(elem.dataset.idx, elem.dataset.site, elem.dataset.url);
+      updateModal(elem.dataset.idx, elem.dataset.site, elem.dataset.url, hasCleanBody);
 
       const rect = elem.getBoundingClientRect();
       modal.style.left = rect.left + rect.width + 5 + "px";

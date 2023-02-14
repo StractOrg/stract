@@ -420,8 +420,9 @@ impl Iterator for BeamGenerator {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.state.take().and_then(|state| {
-            match state.step(Arc::clone(&self.model), &self.config) {
+        self.state
+            .take()
+            .and_then(|state| match state.step(&self.model, &self.config) {
                 Ok((state, res)) => {
                     self.state = Some(state);
                     res
@@ -430,8 +431,7 @@ impl Iterator for BeamGenerator {
                     tracing::error!("Encountered an error while generating summary: {err}");
                     None
                 }
-            }
-        })
+            })
     }
 }
 
@@ -836,13 +836,13 @@ impl BeamState {
 
     fn step(
         mut self,
-        model: Arc<AbstractiveModel>,
+        model: &AbstractiveModel,
         config: &GenerationConfig,
     ) -> Result<(Self, Option<<BeamGenerator as Iterator>::Item>)> {
         loop {
             match self {
                 BeamState::Encoding { text } => {
-                    self = Self::encode_step(model.as_ref(), text)?;
+                    self = Self::encode_step(model, text)?;
                 }
                 BeamState::Decoding {
                     encoder_hidden_states,
@@ -850,7 +850,7 @@ impl BeamState {
                 } => {
                     let ids = vec![model.begin_decoder_token as i64, model.bos_token_id as i64];
                     let decoder_output = Self::run_decoder_model(
-                        model.as_ref(),
+                        model,
                         &ids,
                         encoder_hidden_states.clone(),
                         attention_mask.clone(),
@@ -918,7 +918,7 @@ impl BeamState {
                     }
 
                     let decoder_output = Self::run_decoder_model_with_past(
-                        model.as_ref(),
+                        model,
                         &beams,
                         &encoder_hidden_states,
                         &attention_mask,
@@ -944,11 +944,7 @@ impl BeamState {
                             .iter()
                             .all(|beam| beam.is_finished(model.eos_token_id as i64))
                     {
-                        self = Self::output_from_best(
-                            model.as_ref(),
-                            new_beams,
-                            beam_token_agreement_idx,
-                        );
+                        self = Self::output_from_best(model, new_beams, beam_token_agreement_idx);
                     } else {
                         self = BeamState::DecodingWithPast {
                             encoder_hidden_states,
