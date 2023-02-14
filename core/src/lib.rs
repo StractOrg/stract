@@ -18,6 +18,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
+use searcher::distributed;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -58,7 +59,7 @@ pub mod searcher;
 mod simhash;
 mod snippet;
 mod sonic;
-mod spell;
+pub mod spell;
 mod subdomain_count;
 pub mod summarizer;
 mod tokenizer;
@@ -160,6 +161,7 @@ pub struct FrontendConfig {
     pub crossencoder_model_path: String,
     pub qa_model_path: String,
     pub bangs_path: String,
+    pub summarizer_path: String,
     pub search_servers: Vec<Vec<String>>,
 }
 
@@ -256,6 +258,12 @@ pub enum Error {
 
     #[error("Onnx")]
     Onnx(#[from] onnxruntime::OrtError),
+
+    #[error("Word2Vec")]
+    Word2Vec(#[from] spell::word2vec::Error),
+
+    #[error("Distributed searcher")]
+    DistributedSearcher(#[from] distributed::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

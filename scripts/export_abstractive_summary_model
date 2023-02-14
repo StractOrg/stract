@@ -2,26 +2,33 @@
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from optimum.onnxruntime import ORTQuantizer, ORTModelForSeq2SeqLM
 from optimum.onnxruntime.configuration import AutoQuantizationConfig
+import urllib.request
 
 MODEL = "lidiya/bart-large-xsum-samsum"
 
 model = ORTModelForSeq2SeqLM.from_pretrained(MODEL, from_transformers=True)
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
-model.save_pretrained("data/abstractive_summary")
+model.save_pretrained("data/summarizer/abstractive")
 
 model_dir = model.model_save_dir
 
-encoder_quantizer = ORTQuantizer.from_pretrained(model_dir, file_name="encoder_model.onnx")
-decoder_quantizer = ORTQuantizer.from_pretrained(model_dir, file_name="decoder_model.onnx")
-decoder_wp_quantizer = ORTQuantizer.from_pretrained(model_dir, file_name="decoder_with_past_model.onnx")
+encoder_quantizer = ORTQuantizer.from_pretrained(
+    model_dir, file_name="encoder_model.onnx")
+decoder_quantizer = ORTQuantizer.from_pretrained(
+    model_dir, file_name="decoder_model.onnx")
+decoder_wp_quantizer = ORTQuantizer.from_pretrained(
+    model_dir, file_name="decoder_with_past_model.onnx")
 
 quantizer = [encoder_quantizer, decoder_quantizer, decoder_wp_quantizer]
 
-dqconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
+dqconfig = AutoQuantizationConfig.avx512_vnni(
+    is_static=False, per_channel=False)
 
 for q in quantizer:
-    q.quantize(save_dir="data/abstractive_summary",quantization_config=dqconfig)
+    q.quantize(save_dir="data/summarizer/abstractive",
+               quantization_config=dqconfig)
 
 
-
+urllib.request.urlretrieve("https://s3.eu-central-1.amazonaws.com/s3.cuely.io/truncated_word2vec.bin.gz",
+                           "data/summarizer/word2vec.bin.gz")

@@ -33,6 +33,7 @@ use crate::{
     },
     searcher::WebsitesResult,
     widgets::Widget,
+    Result,
 };
 
 use std::{
@@ -53,8 +54,6 @@ use crate::sonic;
 
 use super::{InitialWebsiteResult, SearchQuery, SearchResult};
 
-type Result<T> = std::result::Result<T, Error>;
-
 const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
 const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 100.0;
 
@@ -70,8 +69,8 @@ pub enum Error {
     #[error("Query cannot be empty")]
     EmptyQuery,
 
-    #[error("Internal error")]
-    InternalError(#[from] crate::Error),
+    #[error("Webpage not found")]
+    WebpageNotFound,
 }
 
 impl RemoteSearcher {
@@ -90,7 +89,7 @@ impl RemoteSearcher {
             }
         }
 
-        Err(Error::SearchFailed)
+        Err(Error::SearchFailed.into())
     }
 
     async fn retrieve_websites(
@@ -116,7 +115,28 @@ impl RemoteSearcher {
             }
         }
 
-        Err(Error::SearchFailed)
+        Err(Error::SearchFailed.into())
+    }
+
+    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
+        for timeout in ExponentialBackoff::from_millis(30)
+            .with_limit(Duration::from_millis(200))
+            .take(5)
+        {
+            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
+            {
+                if let Ok(sonic::Response::Content(body)) = connection
+                    .send(Request::GetWebpage {
+                        url: url.to_string(),
+                    })
+                    .await
+                {
+                    return Ok(body);
+                }
+            }
+        }
+
+        Err(Error::WebpageNotFound.into())
     }
 }
 
@@ -157,7 +177,7 @@ impl Shard {
                 local_result: result?,
                 shard: self.id.clone(),
             }),
-            None => Err(Error::SearchFailed),
+            None => Err(Error::SearchFailed.into()),
         }
     }
 
@@ -175,7 +195,21 @@ impl Shard {
             .await
         {
             Some(Ok(websites)) => Ok(websites),
-            _ => Err(Error::SearchFailed),
+            _ => Err(Error::SearchFailed.into()),
+        }
+    }
+
+    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
+        match self
+            .replicas
+            .iter()
+            .map(|remote| remote.get_webpage(url))
+            .collect::<FuturesUnordered<_>>()
+            .next()
+            .await
+        {
+            Some(t) => t,
+            _ => Err(Error::WebpageNotFound.into()),
         }
     }
 }
@@ -192,6 +226,9 @@ pub enum Request {
     RetrieveWebsites {
         websites: Vec<inverted_index::WebsitePointer>,
         query: String,
+    },
+    GetWebpage {
+        url: String,
     },
 }
 
@@ -476,7 +513,7 @@ impl DistributedSearcher {
         let start = Instant::now();
 
         if query.is_empty() {
-            return Err(Error::EmptyQuery);
+            return Err(Error::EmptyQuery.into());
         }
 
         let mut search_query = query.clone();
@@ -515,7 +552,7 @@ impl DistributedSearcher {
             .collect();
 
         if retrieved_webpages.is_empty() && !top_websites.is_empty() {
-            return Err(Error::SearchFailed);
+            return Err(Error::SearchFailed.into());
         }
 
         let direct_answer = self.answer(&query.query, &mut retrieved_webpages);
@@ -553,7 +590,7 @@ impl DistributedSearcher {
     fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
         let contexts: Vec<_> = webpages
             .iter()
-            .take(3)
+            .take(1)
             .map(|webpage| webpage.body.as_str())
             .collect();
 
@@ -571,6 +608,21 @@ impl DistributedSearcher {
             }
             None => None,
         }
+    }
+
+    pub(crate) async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {
+        self.shards
+            .iter()
+            .map(|shard| shard.get_webpage(url))
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter_map(|result| result.ok())
+            .flatten()
+            .collect::<Vec<_>>()
+            .pop()
+            .ok_or(Error::WebpageNotFound.into())
     }
 }
 

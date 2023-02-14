@@ -38,9 +38,7 @@ export interface Props {
           {askama.match("part", {
             "CodeOrText::Text(text)": <span>{askama`text`}</span>,
             "CodeOrText::Code(code)": (
-              <pre class="rounded-lg bg-slate-50">
-                <code style="background: none">{askama`code`}</code>
-              </pre>
+              <pre class="rounded-lg bg-slate-50"><code style="background: none">{askama`code`}</code></pre>
             ),
           })}
         </div>

@@ -18,10 +18,7 @@ use crate::{
     fastfield_cache,
     schema::{FastField, TextField},
     webgraph::{
-        centrality::{
-            online_harmonic::{self, SCORE_OFFSET},
-            topic,
-        },
+        centrality::{online_harmonic, topic},
         NodeID,
     },
     webpage::Webpage,
@@ -55,7 +52,7 @@ pub enum Signal {
     InboundSimilarity,
 }
 
-pub const ALL_SIGNALS: [Signal; 12] = [
+pub const ALL_SIGNALS: [Signal; 13] = [
     Signal::Bm25,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -68,6 +65,7 @@ pub const ALL_SIGNALS: [Signal; 12] = [
     Signal::CrawlStability,
     Signal::TopicCentrality,
     Signal::QueryCentrality,
+    Signal::InboundSimilarity,
 ];
 
 struct SignalValue {
@@ -97,7 +95,6 @@ impl Signal {
             Signal::HostCentrality | Signal::PageCentrality => {
                 value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64
             }
-            Signal::PersonalCentrality => value.personal_centrality.unwrap_or_default(),
             Signal::IsHomepage => value.fastfield_value.unwrap() as f64,
             Signal::FetchTimeMs => {
                 let fetch_time_ms = value.fastfield_value.unwrap() as usize;
@@ -144,6 +141,7 @@ impl Signal {
             Signal::CrawlStability => value.fastfield_value.unwrap() as f64 / FLOAT_SCALING as f64,
             Signal::TopicCentrality => value.topic_score.unwrap_or_default(),
             Signal::QueryCentrality => value.query_centrality.unwrap_or_default(),
+            Signal::PersonalCentrality => value.personal_centrality.unwrap_or_default(),
             Signal::InboundSimilarity => value.inbound_similarity.unwrap_or_default(),
         }
     }
@@ -151,18 +149,18 @@ impl Signal {
     fn default_coefficient(&self) -> f64 {
         match self {
             Signal::Bm25 => 1.0,
-            Signal::HostCentrality => 2500.0,
-            Signal::PageCentrality => 4500.0,
-            Signal::TopicCentrality => 2500.0,
-            Signal::PersonalCentrality => 1000.0,
-            Signal::QueryCentrality => 2500.0,
+            Signal::HostCentrality => 2_500.0,
+            Signal::PageCentrality => 4_500.0,
+            Signal::TopicCentrality => 2_500.0,
+            Signal::QueryCentrality => 1_000.0,
             Signal::IsHomepage => 0.1,
-            Signal::FetchTimeMs => 0.01,
+            Signal::FetchTimeMs => 0.001,
             Signal::UpdateTimestamp => 80.0,
             Signal::TrackerScore => 20.0,
             Signal::Region => 60.0,
             Signal::CrawlStability => 20.0,
-            Signal::InboundSimilarity => 1000.0,
+            Signal::PersonalCentrality => 5_000.0,
+            Signal::InboundSimilarity => 5_000.0,
         }
     }
 
@@ -349,7 +347,7 @@ impl SignalAggregator {
     pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.query_centrality
             .as_ref()
-            .map(|scorer| scorer.score(host_id) - SCORE_OFFSET)
+            .map(|scorer| scorer.score(host_id))
     }
 
     pub fn personal_centrality(&self, host_id: NodeID) -> f64 {

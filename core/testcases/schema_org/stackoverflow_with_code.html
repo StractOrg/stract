@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+
+
+    <html itemscope itemtype="https://schema.org/QAPage" class="html__responsive " lang="es">
+
+    <head>
+
+        <title>jquery - Almacenar y comparar valor de atributo de un objeto en javascript - Stack Overflow en espa&#241;ol</title>
+        <link rel="shortcut icon" href="https://cdn.sstatic.net/Sites/es/Img/favicon.ico?v=9c017e88b153">
+        <link rel="apple-touch-icon" href="https://cdn.sstatic.net/Sites/es/Img/apple-touch-icon.png?v=7739871010e6">
+        <link rel="image_src" href="https://cdn.sstatic.net/Sites/es/Img/apple-touch-icon.png?v=7739871010e6"> 
+        <link rel="search" type="application/opensearchdescription+xml" title="Stack Overflow en espa&#xF1;ol" href="/opensearch.xml">
+        <link rel="canonical" href="https://es.stackoverflow.com/questions/163192/almacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript" />
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, minimum-scale=1.0">
+        <meta property="og:type" content= "website" />
+        <meta property="og:url" content="https://es.stackoverflow.com/questions/163192/almacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript"/>
+        <meta property="og:site_name" content="Stack Overflow en espa&#xF1;ol" />
+        <meta property="og:image" itemprop="image primaryImageOfPage" content="https://cdn.sstatic.net/Sites/es/Img/apple-touch-icon@2.png?v=62634cce9d6c" />
+        <meta name="twitter:card" content="summary"/>
+        <meta name="twitter:domain" content="es.stackoverflow.com"/>
+        <meta name="twitter:site" content="@esStackOverflow" />
+        <meta name="twitter:creator" content="@esStackOverflow" />
+        <meta name="twitter:title" property="og:title" itemprop="name" content="Almacenar y comparar valor de atributo de un objeto en javascript" />
+        <meta name="twitter:description" property="og:description" itemprop="description" content="Tengo un objeto con unos atributos y me gustar&#xED;a almacenar el valor de uno (el atributo es &quot;estado&quot; y tiene de valor &quot;cerrado&quot;) en una variable para comparar su valor mediante una sentencia &quot;if&quot;. L..." />
+    <script id="webpack-public-path" type="text/uri-list">https://cdn.sstatic.net/</script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script defer src="https://cdn.sstatic.net/Js/third-party/npm/@stackoverflow/stacks/dist/js/stacks.min.js?v=1d4d417772d8"></script>
+    <script src="https://cdn.sstatic.net/Js/stub.es.js?v=5b74284dd362"></script>
+
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.sstatic.net/Shared/stacks.css?v=549572c32c99">
+    <link rel="stylesheet" type="text/css" href="https://cdn.sstatic.net/Sites/es/primary.css?v=8aa6d8e67030">
+
+
+    
+            <link rel="alternate" type="application/atom+xml" title="Fuente de la pregunta&quot;Almacenar y comparar valor de atributo de un objeto en javascript&quot;" href="/feeds/question/163192">
+        <script>
+            StackExchange.ready(function () {
+
+                    StackExchange.using("snippets", function () {
+                        StackExchange.snippets.initSnippetRenderer();
+                    });
+                    
+                StackExchange.using("postValidation", function () {
+                    StackExchange.postValidation.initOnBlurAndSubmit($('#post-form'), 2, 'answer');
+                });
+
+
+                StackExchange.question.init({showAnswerHelp:true,totalCommentCount:0,shownCommentCount:0,enableTables:true,questionId:163192});
+
+                styleCode();
+
+                    StackExchange.realtime.subscribeToQuestion('637', '163192');
+                    StackExchange.using("gps", function () { StackExchange.gps.trackOutboundClicks('#content', '.js-post-body'); });
+
+
+            });
+        </script>
+
+        
+        
+        
+        <link rel="stylesheet" type="text/css" href="https://cdn.sstatic.net/Shared/Channels/channels.css?v=a5fae8812988">
+
+        
+        
+
+
+    <script>
+        StackExchange.ready(function () {
+            StackExchange.realtime.init('wss://qa.sockets.stackexchange.com');
+                StackExchange.realtime.subscribeToReputationNotifications('637');
+        StackExchange.realtime.subscribeToTopBarNotifications('637');
+        });
+    </script>
+    <script type="application/json" data-role="module-args" data-module-name="Shared/options.mod">{"options":{"locale":"es","serverTime":1676149698,"routeName":"Questions/Show","stackAuthUrl":"https://stackauth.com","networkMetaHostname":"meta.stackexchange.com","site":{"name":"Stack Overflow en español","description":"Preguntas y respuestas para programadores y profesionales de la informática","isNoticesTabEnabled":true,"enableNewTagCreationWarning":false,"insertSpaceAfterNameTabCompletion":false,"id":637,"cookieDomain":".stackoverflow.com","childUrl":"https://es.meta.stackoverflow.com","negativeVoteScoreFloor":null,"enableSocialMediaInSharePopup":true,"protocol":"https"},"user":{"fkey":"33a56eb08180d5f2dc525531083ff1233cacbf36c07ad580b69bbe523244d21e","tid":"d7bec551-915d-76e4-af83-3b67295e899f","rep":0,"isAnonymous":true,"isAnonymousNetworkWide":true},"realtime":{"newest":true,"active":true,"tagged":true,"staleDisconnectIntervalInHours":0},"events":{"postType":{"question":1},"postEditionSection":{"title":1,"body":2,"tags":3}}}}</script>
+<script type="application/json" data-role="module-args" data-module-name="Shared/settings.mod">{"settings":{"userMessaging":{"showNewFeatureNotice":true},"tags":{"allowNonAsciiTags":true},"subscriptions":{"defaultBasicMaxTrueUpSeats":250,"defaultFreemiumMaxTrueUpSeats":50,"defaultMaxTrueUpSeats":1000},"snippets":{"renderDomain":"stacksnippets.net","snippetsEnabled":true},"site":{"allowImageUploads":true,"enableImgurHttps":true,"enableUserHovercards":true,"forceHttpsImages":true,"stacksEditorPreviewEnabled":true,"styleCode":true},"questions":{"enableQuestionTitleLengthLiveWarning":true,"enableSavesFeature":true,"maxTitleSize":150,"questionTitleLengthStartLiveWarningChars":50},"intercom":{"appId":"inf0secd","hostBaseUrl":"https://stacksnippets.net"},"paths":{"jQueryUICSSPath":"https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.0/themes/smoothness/jquery-ui.css","jQueryUIJSPath":"https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.0/jquery-ui.min.js"},"monitoring":{"clientTimingsAbsoluteTimeout":30000,"clientTimingsDebounceTimeout":1000},"mentions":{"maxNumUsersInDropdown":50},"markdown":{"enableTables":true},"legal":{"oneTrustConfigId":"c3d9f1e3-55f3-4eba-b268-46cee4c6789c"},"flags":{"allowRetractingCommentFlags":true,"allowRetractingFlags":true},"elections":{"opaVoteResultsBaseUrl":"https://www.opavote.com/results/"},"comments":{},"accounts":{"currentPasswordRequiredForChangingStackIdPassword":true}}}</script>
+<script>StackExchange.init();</script>
+
+    <script>
+        StackExchange.using.setCacheBreakers({"Js/adops.es.js":"6da43f5e0a84","Js/ask.es.js":"","Js/begin-edit-event.es.js":"20edbaccceae","Js/copy-transpiled.es.js":"e7855bee94f2","Js/events.es.js":"","Js/explore-qlist.es.js":"2b1f34938b8b","Js/full-anon.es.js":"c2f76865ca02","Js/full.es.js":"b1f64c54ea32","Js/highlightjs-loader.es.js":"a284064706b3","Js/inline-tag-editing.es.js":"cb82c5eb1c78","Js/keyboard-shortcuts.es.js":"5adabce8659b","Js/markdown-it-loader.es.js":"5818ef89ff9d","Js/mentions-transpiled.es.js":"9e816548395f","Js/moderator.es.js":"4c1eee40b955","Js/postCollections-transpiled.es.js":"969747bccfe0","Js/post-validation.es.js":"1e7af0239404","Js/question-editor.es.js":"","Js/review-v2-transpiled.es.js":"9852380620df","Js/revisions.es.js":"c465b1eb8fd0","Js/stacks-editor.es.js":"96418c13ac43","Js/tageditor.es.js":"4f1a58f4af2f","Js/tageditornew.es.js":"cc2b22db706a","Js/tagsuggestions.es.js":"77d202c64057","Js/unlimited-transpiled.es.js":"7ed67670b600","Js/wmd.es.js":"5268a79d381a","Js/snippet-javascript-codemirror.es.js":"73fce5cc7219"});
+        StackExchange.using("gps", function() {
+             StackExchange.gps.init(false);
+        });
+    </script>
+    <noscript id="noscript-css"><style>body,.s-topbar{margin-top:1.9em}</style></noscript>
+    </head>
+    <body class="question-page unified-theme">
+    <div id="notify-container"></div>
+    <div id="custom-header"></div>
+        
+<header class="s-topbar ps-fixed t0 l0 js-top-bar">
+	<div class="s-topbar--container">
+			<a href="#" class="s-topbar--menu-btn js-left-sidebar-toggle" role="menuitem" aria-haspopup="true" aria-controls="left-sidebar" aria-expanded="false"><span></span></a>
+			<div class="topbar-dialog leftnav-dialog js-leftnav-dialog dno">
+				<div class="left-sidebar js-unpinned-left-sidebar" data-can-be="left-sidebar" data-is-here-when="sm"></div>
+			</div>
+				<a href="https://es.stackoverflow.com" class="s-topbar--logo js-gps-track"
+		   data-gps-track="top_nav.click({is_current:false, location:2, destination:8})">
+					<span class="-img _glyph">Stack Overflow en espa&#xF1;ol</span>
+				</a>
+
+
+
+
+
+			<form id="search" role="search" action=/search class="s-topbar--searchbar js-searchbar " autocomplete="off">
+					<div class="s-topbar--searchbar--input-group">
+						<input name="q"
+					   type="text"
+					   role="combobox"
+					   placeholder="Buscar&#x2026;"
+					   value=""
+					   autocomplete="off"
+					   maxlength="240"
+					   class="s-input s-input__search js-search-field "
+					   aria-label="Buscar"
+					   aria-controls="top-search" 
+					   data-controller="s-popover"
+					   data-action="focus->s-popover#show"
+					   data-s-popover-placement="bottom-start" />
+						<svg aria-hidden="true" class="s-input-icon s-input-icon__search svg-icon iconSearch" width="18" height="18"  viewBox="0 0 18 18"><path  d="m18 16.5-5.14-5.18h-.35a7 7 0 1 0-1.19 1.19v.35L16.5 18l1.5-1.5ZM12 7A5 5 0 1 1 2 7a5 5 0 0 1 10 0Z"/></svg>
+						<div class="s-popover p0 wmx100 wmn4 sm:wmn-initial js-top-search-popover" id="top-search" role="menu">
+    <div class="s-popover--arrow"></div>
+    <div class="js-spinner p24 d-flex ai-center jc-center d-none">
+        <div class="s-spinner s-spinner__sm fc-orange-400">
+            <div class="v-visible-sr">Loading&#x2026;</div>
+        </div>
+    </div>
+
+    <span class="v-visible-sr js-screen-reader-info"></span>
+    <div class="js-ac-results overflow-y-auto hmx3 d-none"></div>
+
+    <div class="js-search-hints" aria-describedby="Tips for searching"></div>
+</div>
+					</div>
+			</form>
+		
+<nav class="h100 ml-auto overflow-x-auto pr12">
+    <ol class="s-topbar--content" role="menubar">
+    
+        <li role="none">
+            <a href="/help" class="s-topbar--item js-help-button" role="menuitem" title="Centro de ayuda y otros recursos" aria-haspopup="true" aria-controls="topbar-help-dialog"
+           data-ga="[&quot;top navigation&quot;,&quot;help menu click&quot;,null,null,null]"><svg aria-hidden="true" class="svg-icon iconHelp" width="18" height="18"  viewBox="0 0 18 18"><path  d="M9 1C4.64 1 1 4.64 1 9c0 4.36 3.64 8 8 8 4.36 0 8-3.64 8-8 0-4.36-3.64-8-8-8Zm.81 12.13c-.02.71-.55 1.15-1.24 1.13-.66-.02-1.17-.49-1.15-1.2.02-.72.56-1.18 1.22-1.16.7.03 1.2.51 1.17 1.23ZM11.77 8c-.59.66-1.78 1.09-2.05 1.97a4 4 0 0 0-.09.75c0 .05-.03.16-.18.16H7.88c-.16 0-.18-.1-.18-.15.06-1.35.66-2.2 1.83-2.88.39-.29.7-.75.7-1.24.01-1.24-1.64-1.82-2.35-.72-.21.33-.18.73-.18 1.1H5.75c0-1.97 1.03-3.26 3.03-3.26 1.75 0 3.47.87 3.47 2.83 0 .57-.2 1.05-.48 1.44Z"/></svg></a>
+        </li>
+        <div class="topbar-dialog help-dialog js-help-dialog dno" id="topbar-help-dialog" role="menu">
+            <div class="modal-content">
+                <ul>
+                        <li>
+                            <a href="/tour" class="js-gps-track" data-gps-track="help_popup.click({ item_type:1 })"
+                       data-ga="[&quot;top navigation&quot;,&quot;tour submenu click&quot;,null,null,null]">
+                                Recorrido
+                                <span class="item-summary">
+                                    Comienza aqu&#xED; para acceder a una breve descripci&#xF3;n general del sitio
+                                </span>
+                            </a>
+                        </li>
+                    <li>
+                        <a href="/help" class="js-gps-track"
+                       data-gps-track="help_popup.click({ item_type:4 })"
+                       data-ga="[&quot;top navigation&quot;,&quot;help center&quot;,null,null,null]">
+                            Centro de Ayuda
+                            <span class="item-summary">
+                                Respuestas detalladas para cualquier pregunta que puedas tener
+                            </span>
+                        </a>
+                    </li>
+                                <li>
+                                    <a href="https://es.meta.stackoverflow.com" class="js-gps-track" data-gps-track="help_popup.click({ item_type:2 })"
+                       data-ga="[&quot;top navigation&quot;,&quot;meta submenu click&quot;,null,null,null]">
+                                        Meta
+                                        <span class="item-summary">
+                                            Analizar el funcionamiento y las pol&#xED;ticas de este sitio
+                                        </span>
+                                    </a>
+                                </li>
+                            <li>
+                                <a href="https://stackoverflow.co/" class="js-gps-track" data-gps-track="help_popup.click({ item_type:6 })"
+                       data-ga="[&quot;top navigation&quot;,&quot;about us submenu click&quot;,null,null,null]">
+                                    Sobre nosotros
+                                    <span class="item-summary">
+                                        Aprende m&#xE1;s sobre Stack Overflow, la empresa
+                                    </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackoverflow.co/" class="js-gps-track" data-gps-track="help_popup.click({ item_type:7 })"
+                       data-ga="[&quot;top navigation&quot;,&quot;business submenu click&quot;,null,null,null]">
+                                    Negocios
+                                    <span class="item-summary">
+                                        Learn more about our products
+                                    </span>
+                                </a>
+                            </li>
+                </ul>
+            </div>
+        </div>
+        <li role="none">
+            <a href="https://stackexchange.com" class="s-topbar--item js-site-switcher-button js-gps-track" data-gps-track="site_switcher.show"
+           aria-label="Site switcher"
+           role="menuitem"
+           title="Lista de los 181 sitios de Stack Exchange"
+           aria-haspopup="true" aria-expanded="false"
+           data-ga="[&quot;top navigation&quot;,&quot;stack exchange click&quot;,null,null,null]">
+                <svg aria-hidden="true" class="svg-icon iconStackExchange" width="18" height="18"  viewBox="0 0 18 18"><path  d="M15 1H3a2 2 0 0 0-2 2v2h16V3a2 2 0 0 0-2-2ZM1 13c0 1.1.9 2 2 2h8v3l3-3h1a2 2 0 0 0 2-2v-2H1v2Zm16-7H1v4h16V6Z"/></svg>
+            </a>
+        </li>
+    
+    
+        <li class="js-topbar-dialog-corral" role="presentation">
+                
+
+    <div class="topbar-dialog siteSwitcher-dialog dno" role="menu">
+        <div class="header fw-wrap">
+            <h3 class="flex--item">
+                <a href="https://es.stackoverflow.com">comunidad actual</a>
+            </h3>
+            <div class="flex--item fl1">
+                <div class="ai-center d-flex jc-end">
+                    <button
+                        class="js-close-button s-btn s-btn__muted p0 ml8 d-none sm:d-block"
+                        type="button"
+                        aria-label="Close"
+                    >
+                        <svg aria-hidden="true" class="svg-icon iconClear" width="18" height="18"  viewBox="0 0 18 18"><path  d="M15 4.41 13.59 3 9 7.59 4.41 3 3 4.41 7.59 9 3 13.59 4.41 15 9 10.41 13.59 15 15 13.59 10.41 9 15 4.41Z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-content bg-powder-050 current-site-container">
+            <ul class="current-site ">
+                    <li class="d-flex">
+                            <div class="fl1">
+                <a href="https://es.stackoverflow.com"
+       class="current-site-link site-link js-gps-track d-flex gs8 gsx"
+       data-id="637"
+       data-gps-track="site_switcher.click({ item_type:3 })">
+        <div class="favicon favicon-es site-icon flex--item" title="Stack Overflow en español"></div>
+        <span class="flex--item fl1">
+            Stack Overflow en espa&#xF1;ol
+        </span>
+    </a>
+
+    </div>
+    <div class="related-links">
+            <a href="https://es.stackoverflow.com/help" class="js-gps-track" data-gps-track="site_switcher.click({ item_type:14 })">ayuda</a>
+            <a href="https://chat.stackexchange.com?tab=site&amp;host=es.stackoverflow.com" class="js-gps-track" data-gps-track="site_switcher.click({ item_type:6 })">chat</a>
+    </div>
+
+                    </li>
+                    <li class="related-site d-flex">
+                            <div class="L-shaped-icon-container">
+        <span class="L-shaped-icon"></span>
+    </div>
+
+                            <a href="https://es.meta.stackoverflow.com"
+       class=" site-link js-gps-track d-flex gs8 gsx"
+       data-id="638"
+       data-gps-track="site.switch({ target_site:638, item_type:3 }),site_switcher.click({ item_type:4 })">
+        <div class="favicon favicon-esmeta site-icon flex--item" title="Stack Overflow Meta en español"></div>
+        <span class="flex--item fl1">
+            Stack Overflow Meta en espa&#xF1;ol
+        </span>
+    </a>
+
+                    </li>
+            </ul>
+        </div>
+
+        <div class="header" id="your-communities-header">
+            <h3>
+tus comunidades            </h3>
+
+        </div>
+        <div class="modal-content" id="your-communities-section">
+
+                <div class="call-to-login">
+<a href="https://es.stackoverflow.com/users/signup?ssrc=site_switcher&amp;returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%2f163215" class="login-link js-gps-track" data-gps-track="site_switcher.click({ item_type:10 })">Reg&#237;strate</a> o <a href="https://es.stackoverflow.com/users/login?ssrc=site_switcher&amp;returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%2f163215" class="login-link js-gps-track" data-gps-track="site_switcher.click({ item_type:11 })">inicia sesi&#243;n</a> para personalizar tu lista.                </div>
+        </div>
+
+        <div class="header">
+            <h3><a href="https://stackexchange.com/sites">m&#xE1;s comunidades Stack Exchange</a>
+            </h3>
+            <a href="https://stackoverflow.blog" class="float-right">blog de la empresa</a>
+        </div>
+        <div class="modal-content">
+                <div class="child-content"></div>
+        </div>        
+    </div>
+
+        </li>
+    
+            <li role="none"><button class="s-topbar--item s-btn s-btn__icon s-btn__muted d-none sm:d-inline-flex js-searchbar-trigger" role="menuitem" aria-label="Buscar" aria-haspopup="true" aria-controls="search" title="Clic para mostrar la b&#xFA;squeda"><svg aria-hidden="true" class="svg-icon iconSearch" width="18" height="18"  viewBox="0 0 18 18"><path  d="m18 16.5-5.14-5.18h-.35a7 7 0 1 0-1.19 1.19v.35L16.5 18l1.5-1.5ZM12 7A5 5 0 1 1 2 7a5 5 0 0 1 10 0Z"/></svg></button></li>
+                        <li role="none">
+                            <a href="https://es.stackoverflow.com/users/login?ssrc=head&returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%2f163215" class="s-topbar--item s-topbar--item__unset s-btn s-btn__filled ws-nowrap js-gps-track" role="menuitem" rel="nofollow"
+               data-gps-track="login.click" data-ga="[&quot;top navigation&quot;,&quot;login button click&quot;,null,null,null]">Iniciar sesi&#xF3;n</a>
+                        </li>
+                        <li role="none"><a href="https://es.stackoverflow.com/users/signup?ssrc=head&returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%2f163215" class="s-topbar--item s-topbar--item__unset ml4 s-btn s-btn__primary ws-nowrap" role="menuitem" rel="nofollow" data-ga="[&quot;sign up&quot;,&quot;Sign Up Navigation&quot;,&quot;Header&quot;,null,null]">Registrarse</a></li>
+    </ol>
+</nav>
+
+
+	</div>
+</header>
+
+	<script>
+		StackExchange.ready(function () { StackExchange.topbar.init(); });
+		StackExchange.scrollPadding.setPaddingTop(50, 10); 
+	</script>
+
+
+
+            
+
+        
+    
+<div class="sm:d-none py24 bg-black-750 fc-black-200 ps-relative js-dismissable-hero">
+    <div class="px12 d-flex ai-center jc-center mx-auto wmx12">
+        <div class="flex--item wmx3 fs-body2 mr64 md:mr32">
+            <p>Stack Overflow en espa&#xF1;ol es un sitio de preguntas y respuestas para programadores y profesionales de la inform&#xE1;tica. Solo te toma un minuto registrarte.</p>
+
+            <a href="/users/signup?ssrc=hero&amp;returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%2f163215" class="s-btn s-btn__primary">Reg&#xED;strate para unirte a esta comunidad</a>
+        </div>
+        <div class="d-flex fd-column ai-center wmn3 hero-background">
+            <div class="d-flex ai-center mb24">
+                <div class="flex--item mr16">
+                    <img width="31" src="https://cdn.sstatic.net/Img/hero/anonymousHeroQuestions.svg?v=748bfb046b78" alt="">
+                </div>
+                <div class="flex--item">
+                    Cualquiera puede formular una pregunta
+                </div>
+            </div>
+            <div class="d-flex ai-center mb24">
+                <div class="flex--item mr16">
+                    <img width="35" src="https://cdn.sstatic.net/Img/hero/anonymousHeroAnswers.svg?v=d5348b00eddc" alt="">
+                </div>
+                <div class="flex--item">
+                    Cualquiera puede responder
+                </div>
+            </div>
+            <div class="d-flex ai-center">
+                <div class="flex--item mr16">
+                    <img width="24" src="https://cdn.sstatic.net/Img/hero/anonymousHeroUpvote.svg?v=af2bb70d5d1b" alt="">
+                </div>
+                <div class="flex--item wmx2">
+                    Se vota a favor de las mejores respuestas, y &#xE9;stas suben a los primeros puestos
+                </div>
+            </div>
+        </div>
+            <div class="flex--item as-start md:ps-absolute t8 r8">
+                <button class="s-btn s-btn__muted p8 js-dismiss">
+                    <svg aria-hidden="true" class="svg-icon iconClear" width="18" height="18"  viewBox="0 0 18 18"><path  d="M15 4.41 13.59 3 9 7.59 4.41 3 3 4.41 7.59 9 3 13.59 4.41 15 9 10.41 13.59 15 15 13.59 10.41 9 15 4.41Z"/></svg>
+                </button>
+            </div>
+    </div>
+</div>
+
+<script>
+    StackExchange.ready(function () {
+        StackExchange.Hero.init("nso", "a");
+
+        var location = 0;
+        if ($("body").hasClass("questions-page")) {
+            location = 1;
+        } else if ($("body").hasClass("question-page")) {
+            location = 1;
+        } else if ($("body").hasClass("faq-page")) {
+            location = 5;
+        } else if ($("body").hasClass("home-page")) {
+            location = 3;
+        }
+
+        $('.js-cta-button').click(function () {
+            StackExchange.using("gps", function () {
+                StackExchange.gps.track("hero.action", { hero_action_type: 'cta', location: location }, true);
+            });
+        });
+
+        // TODO: we should review the class names and whatnot in use here. Older heroes use id selectors, the newer
+        // sticky question hero on SO has a .js-dismiss class instead, but it's apparently not used anywhere... 
+        // It's not great. Ideally we'd have a set of classes in the partials above that would correspond to 
+        // the behaviours we want here in a more clear way. 
+
+        // sticky question-page hero at the bottom of the page on SO
+        $('.js-dismiss').on('click', function () {
+            StackExchange.using("gps", function () {
+                StackExchange.gps.track("hero.action", { hero_action_type: "close", location: location }, true);
+            });
+            StackExchange.Hero.dismiss();
+            $(".js-dismissable-hero").fadeOut("fast");
+        });
+    });
+</script>
+
+
+
+    <div class="container">
+            
+
+<div id="left-sidebar" data-is-here-when="md lg" class="left-sidebar js-pinned-left-sidebar ps-relative">
+    <div class="left-sidebar--sticky-container js-sticky-leftnav">
+        <nav role="navigation">
+            <ol class="nav-links">
+                    
+
+<li class="ps-relative"  aria-current="false">
+
+
+    <a
+       href="/"
+       class="pl8 js-gps-track nav-links--link"
+       
+       data-gps-track="top_nav.click({is_current: false, location:2, destination:8})"
+       aria-controls="" data-controller="" data-s-popover-placement="right"
+       aria-current="false"
+       data-s-popover-auto-show="true" data-s-popover-hide-on-outside-click="never">
+            <div class="d-flex ai-center">
+                <div class="flex--item truncate">
+                    Inicio
+                </div>
+            </div>
+    </a>
+</li>
+
+                <li>
+                    <ol class="nav-links">
+                            <li class="fs-fine tt-uppercase ml8 mt16 mb4 fc-light">P&#xFA;blico</li>
+
+                            
+
+<li class="ps-relative  youarehere"  aria-current="true">
+
+
+    <a id="nav-questions"
+       href="/questions"
+       class="pl8 js-gps-track nav-links--link -link__with-icon"
+       
+       data-gps-track="top_nav.click({is_current: true, location:2, destination:1})"
+       aria-controls="" data-controller="" data-s-popover-placement="right"
+       aria-current="false"
+       data-s-popover-auto-show="true" data-s-popover-hide-on-outside-click="never">
+<svg aria-hidden="true" class="svg-icon iconGlobe" width="18" height="18"  viewBox="0 0 18 18"><path  d="M9 1C4.64 1 1 4.64 1 9c0 4.36 3.64 8 8 8 4.36 0 8-3.64 8-8 0-4.36-3.64-8-8-8ZM8 15.32a6.46 6.46 0 0 1-4.3-2.74 6.46 6.46 0 0 1-.93-5.01L7 11.68v.8c0 .88.12 1.32 1 1.32v1.52Zm5.72-2c-.2-.66-1-1.32-1.72-1.32h-1v-2c0-.44-.56-1-1-1H6V7h1c.44 0 1-.56 1-1V5h2c.88 0 1.4-.72 1.4-1.6v-.33a6.45 6.45 0 0 1 3.83 4.51 6.45 6.45 0 0 1-1.51 5.73v.01Z"/></svg>            <span class="-link--channel-name">Preguntas</span>
+    </a>
+</li>
+
+                                
+
+<li class="ps-relative"  aria-current="false">
+
+
+    <a id="nav-tags"
+       href="/tags"
+       class=" js-gps-track nav-links--link"
+       
+       data-gps-track="top_nav.click({is_current: false, location:2, destination:2})"
+       aria-controls="" data-controller="" data-s-popover-placement="right"
+       aria-current="false"
+       data-s-popover-auto-show="true" data-s-popover-hide-on-outside-click="never">
+            <div class="d-flex ai-center">
+                <div class="flex--item truncate">
+                    Etiquetas
+                </div>
+            </div>
+    </a>
+</li>
+
+                                
+
+<li class="ps-relative"  aria-current="false">
+
+
+    <a id="nav-users"
+       href="/users"
+       class=" js-gps-track nav-links--link"
+       
+       data-gps-track="top_nav.click({is_current: false, location:2, destination:3})"
+       aria-controls="" data-controller="" data-s-popover-placement="right"
+       aria-current="false"
+       data-s-popover-auto-show="true" data-s-popover-hide-on-outside-click="never">
+            <div class="d-flex ai-center">
+                <div class="flex--item truncate">
+                    Usuarios
+                </div>
+            </div>
+    </a>
+</li>
+
+                                    
+
+<li class="ps-relative"  aria-current="false">
+
+
+    <a id="nav-unanswered"
+       href="/unanswered"
+       class=" js-gps-track nav-links--link"
+       
+       data-gps-track="top_nav.click({is_current: false, location:2, destination:5})"
+       aria-controls="" data-controller="" data-s-popover-placement="right"
+       aria-current="false"
+       data-s-popover-auto-show="true" data-s-popover-hide-on-outside-click="never">
+            <div class="d-flex ai-center">
+                <div class="flex--item truncate">
+                    Sin responder
+                </div>
+            </div>
+    </a>
+</li>
+
+                    </ol>
+                </li>
+                   
+
+
+<li>
+    <ol class="nav-links">
+    </ol>
+</li>
+            </ol>
+        </nav>
+    </div>
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+        <div id="content" class="snippet-hidden">
+
+            
+
+<div itemprop="mainEntity" itemscope itemtype="https://schema.org/Question">
+    <link itemprop="image" href="https://cdn.sstatic.net/Sites/es/Img/apple-touch-icon.png?v=7739871010e6">
+
+    <div class="inner-content clearfix">
+
+        
+
+            <div id="question-header" class="d-flex sm:fd-column">
+                        <h1 itemprop="name" class="fs-headline1 ow-break-word mb8 flex--item fl1"><a href="/questions/163192/almacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript" class="question-hyperlink">Almacenar y comparar valor de atributo de un objeto en javascript</a></h1>
+                <div class="ml12 aside-cta flex--item print:d-none sm:ml0 sm:mb12 sm:order-first sm:as-end">
+                        <a href="/questions/ask" class="ws-nowrap s-btn s-btn__primary">
+        Formular una pregunta
+    </a>
+
+                </div>
+            </div>
+            <div class="d-flex fw-wrap pb8 mb16 bb bc-black-075">
+                    <div class="flex--item ws-nowrap mr16 mb8" title="2018-05-10 10:17:26Z">
+                        <span class="fc-light mr2">Formulada</span>
+                        <time itemprop="dateCreated" datetime="2018-05-10T10:17:26">hace 4 a&#241;os y 9 meses</time>
+                    </div>
+                    <div class="flex--item ws-nowrap mr16 mb8">
+                        <span class="fc-light mr2">Modificada</span>
+                        <a href="?lastactivity" class="s-link s-link__inherit" title="2018-05-10 11:35:44Z">hace 4 a&#241;os y 9 meses</a>
+                    </div>
+                    <div class="flex--item ws-nowrap mb8" title="Vista 345 veces">
+                        <span class="fc-light mr2">Vista</span>
+                        345 veces
+                    </div>
+            </div>
+            <div id="mainbar" role="main" aria-label="preguntas y respuestas">
+
+                
+<div class="question js-question" data-questionid="163192" data-position-on-page="0" data-score="1"  id="question">
+    <style>
+    </style>
+<div class="js-zone-container zone-container-main">
+    <div id="dfp-tlb" class="everyonelovesstackoverflow everyoneloves__top-leaderboard everyoneloves__leaderboard"></div>
+		<div class="js-report-ad-button-container " style="width: 728px"></div>
+</div>
+
+    <div class="post-layout ">
+        <div class="votecell post-layout--left">
+            <div class="js-voting-container d-flex jc-center fd-column ai-stretch gs4 fc-black-200" data-post-id="163192">
+        <button class="js-vote-up-btn flex--item s-btn s-btn__unset c-pointer "
+                data-controller="s-tooltip"
+                data-s-tooltip-placement="right"
+                title="Esta pregunta demuestra trabajo de investigaci&#xF3;n; es &#xFA;til y clara"
+                aria-pressed="false"
+                aria-label="Up vote"
+                data-selected-classes="fc-theme-primary"
+                data-unselected-classes="">
+            <svg aria-hidden="true" class="svg-icon iconArrowUpLg" width="36" height="36"  viewBox="0 0 36 36"><path  d="M2 25h32L18 9 2 25Z"/></svg>
+        </button>
+        <div class="js-vote-count flex--item d-flex fd-column ai-center fc-black-500 fs-title"
+             itemprop="upvoteCount"
+             data-value="1">
+            1
+        </div>
+        <button class="js-vote-down-btn flex--item s-btn s-btn__unset c-pointer "
+                data-controller="s-tooltip"
+                data-s-tooltip-placement="right"
+                title="Esta pregunta no parece tener un trabajo de investigaci&#xF3;n; es confusa o poco &#xFA;til"
+                aria-pressed="false"
+                aria-label="Down vote"
+                data-selected-classes="fc-theme-primary"
+                data-unselected-classes="">
+            <svg aria-hidden="true" class="svg-icon iconArrowDownLg" width="36" height="36"  viewBox="0 0 36 36"><path  d="M2 11h32L18 27 2 11Z"/></svg>
+        </button>
+
+
+        
+<button class="js-saves-btn s-btn s-btn__unset c-pointer py4"
+        id="saves-btn-163192"
+        data-controller="s-tooltip"
+        data-s-tooltip-placement="right"
+        data-s-popover-placement=""
+        title="Save this question."
+        aria-pressed="false"
+        data-post-id="163192"
+        data-post-type-id="1"
+        data-user-privilege-for-post-click="0"
+        aria-controls=""
+        data-s-popover-auto-show="false"
+>
+    <svg aria-hidden="true" class="fc-theme-primary-500 js-saves-btn-selected d-none svg-icon iconBookmark" width="18" height="18"  viewBox="0 0 18 18"><path  d="M3 17V3c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v14l-6-4-6 4Z"/></svg>
+    <svg aria-hidden="true" class="js-saves-btn-unselected svg-icon iconBookmarkAlt" width="18" height="18"  viewBox="0 0 18 18"><path  d="m9 10.6 4 2.66V3H5v10.26l4-2.66ZM3 17V3c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v14l-6-4-6 4Z"/></svg>
+</button>
+
+
+
+
+
+
+
+
+    
+        <a class="js-post-issue flex--item s-btn s-btn__unset c-pointer py6 mx-auto" href="/posts/163192/timeline" data-shortcut="T" data-ks-title="l&#xED;nea de tiempo" data-controller="s-tooltip" data-s-tooltip-placement="right" title="Mostrar actividad de esta publicaci&#xF3;n." aria-label="L&#xED;nea de tiempo"><svg aria-hidden="true" class="mln2 mr0 svg-icon iconHistory" width="19" height="18"  viewBox="0 0 19 18"><path  d="M3 9a8 8 0 1 1 3.73 6.77L8.2 14.3A6 6 0 1 0 5 9l3.01-.01-4 4-4-4h3L3 9Zm7-4h1.01L11 9.36l3.22 2.1-.6.93L10 10V5Z"/></svg></a>
+
+</div>
+
+        </div>
+
+        
+
+<div class="postcell post-layout--right">
+    
+    <div class="s-prose js-post-body" itemprop="text">
+                
+<p>Tengo un objeto con unos atributos y me gustaría almacenar el valor de uno (el atributo es "estado" y tiene de valor "cerrado") en una variable para comparar su valor mediante una sentencia "if". Lo que busco es hacer algo dependiendo del valor del atributo "estado". </p>
+
+<p>He probado algo tal que así pero no funciona:</p>
+
+<pre><code>var tipo = objeto.getAttribute('estado', 'cerrado');
+
+if (tipo == 'cerrado') {
+
+//ejecución
+
+} else {
+
+//ejecución
+
+}
+</code></pre>
+
+<p>El objeto es el siguiente:</p>
+
+<pre><code>// Pulsador Cerrado
+var pulsador_cerrado = joint.shapes.basic.Generic.define('electrics.pulsador_cerrado', {
+    size: {width: 80, height: 40},
+    position: {x: 50},
+    attrs: {
+        '.': {magnet: false},
+        '.body': {width: 50, height: 25},
+        '.input': {ref: '.body', 'ref-x': -4, 'ref-y': 0.5, magnet: true, port: 'in'},
+        '.output': {ref: '.body', 'ref-x': 84, 'ref-y': 0.5, magnet: true, port: 'out'},
+        circle: {r: 5, stroke: 'black', fill: 'transparent', 'stroke-width': 1},
+        image: {'xlink:href': 'pulsador.nc.jpg'},
+        **estado: 'cerrado'**
+    },
+});
+</code></pre>
+
+<p>¿Sabéis como almacenar el valor de un atributo de un objeto y como poder comparar el valor de dicho atributo con otro valor? </p>
+
+<p>Pd: Estoy usando librería joint y jquery.</p>
+
+<p>Un saludo y gracias</p>
+    </div>
+
+        <div class="mt24 mb12">
+            <div class="post-taglist d-flex gs4 gsy fd-column">
+                <div class="d-flex ps-relative fw-wrap">
+                    <ul class='ml0 list-ls-none js-post-tag-list-wrapper d-inline'><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/javascript" class="post-tag" title="mostrar preguntas con la etiqueta &quot;javascript&quot;" aria-label="mostrar preguntas con la etiqueta &quot;javascript&quot;" rel="tag" aria-labelledby="javascript-container">javascript</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/jquery" class="post-tag" title="mostrar preguntas con la etiqueta &quot;jquery&quot;" aria-label="mostrar preguntas con la etiqueta &quot;jquery&quot;" rel="tag" aria-labelledby="jquery-container">jquery</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/objeto" class="post-tag" title="mostrar preguntas con la etiqueta &quot;objeto&quot;" aria-label="mostrar preguntas con la etiqueta &quot;objeto&quot;" rel="tag" aria-labelledby="objeto-container">objeto</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/atributos" class="post-tag" title="mostrar preguntas con la etiqueta &quot;atributos&quot;" aria-label="mostrar preguntas con la etiqueta &quot;atributos&quot;" rel="tag" aria-labelledby="atributos-container">atributos</a></li></ul>
+                </div>
+            </div>
+        </div>
+
+    <div class="mb0 ">
+        <div class="mt16 d-flex gs8 gsy fw-wrap jc-end ai-start pt4 mb16">
+            <div class="flex--item mr16 fl1 w96">
+                
+
+
+<div class="js-post-menu pt2" data-post-id="163192" data-post-type-id="1">
+
+    <div class="d-flex gs8 s-anchors s-anchors__muted fw-wrap">
+
+            <div class="flex--item">
+                <a href="/q/163192"
+                   rel="nofollow"
+                   itemprop="url"
+                   class="js-share-link js-gps-track"
+                   title="Enlace corto permanente a esta pregunta"
+                   data-gps-track="post.click({ item: 2, priv: 0, post_type: 1 })"
+                   data-controller="se-share-sheet"
+                   data-se-share-sheet-title="Comparte un enlace a esta pregunta"
+                   data-se-share-sheet-subtitle=""
+                   data-se-share-sheet-post-type="question"
+                   data-se-share-sheet-social="facebook twitter "
+                   data-se-share-sheet-location="1"
+                   data-se-share-sheet-license-url="https%3a%2f%2fcreativecommons.org%2flicenses%2fby-sa%2f4.0%2f"
+                   data-se-share-sheet-license-name="CC BY-SA 4.0"
+                   data-s-popover-placement="bottom-start">Compartir</a>
+            </div>
+
+
+                    <div class="flex--item">
+                        <a href="/posts/163192/edit" class="js-suggest-edit-post js-gps-track" data-gps-track="post.click({ item: 6, priv: 0, post_type: 1 })" title="">Mejora esta pregunta</a>
+                    </div>
+
+            <div class="flex--item">
+                <button type="button"
+                        id="btnFollowPost-163192" class="s-btn s-btn__link js-follow-post js-follow-question js-gps-track"
+                        data-gps-track="post.click({ item: 14, priv: 0, post_type: 1 })"
+                        data-controller="s-tooltip " data-s-tooltip-placement="bottom"
+                        data-s-popover-placement="bottom" aria-controls=""
+                        title="Sigue esta pregunta para recibir notificaciones">
+                    Seguir
+                </button>
+            </div>
+
+
+
+
+
+
+    </div>
+    <div class="js-menu-popup-container"></div>
+</div>
+            </div>
+
+            <div class="post-signature owner flex--item">
+                <div class="user-info ">
+    <div class="user-action-time">
+        formulada <span title='2018-05-10 10:17:26Z' class='relativetime'>el 10 may. 2018 a las 10:17</span>
+    </div>
+    <div class="user-gravatar32">
+        <a href="/users/84009/manuel-bueno-mora"><div class="gravatar-wrapper-32"><img src="https://lh3.googleusercontent.com/-TTZxF4jvCaI/AAAAAAAAAAI/AAAAAAAAABg/o4ys7mI-Qwg/photo.jpg?sz=64" alt="Manuel Bueno Mora&#39;s user avatar" width="32" height="32" class="bar-sm"></div></a>
+    </div>
+    <div class="user-details" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <a href="/users/84009/manuel-bueno-mora">Manuel Bueno Mora</a><span class="d-none" itemprop="name">Manuel Bueno Mora</span>
+        <div class="-flair">
+            <span class="reputation-score" title="puntuación de reputación de " dir="ltr">29</span><span title="7 medallas de bronce" aria-hidden="true"><span class="badge3"></span><span class="badgecount">7</span></span><span class="v-visible-sr">7 medallas de bronce</span>
+        </div>
+    </div>
+</div>
+
+
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+
+
+
+            <span class="d-none" itemprop="commentCount"></span> 
+    <div class="post-layout--right js-post-comments-component">
+        <div id="comments-163192" class="comments js-comments-container bt bc-black-075 mt12  dno" data-post-id="163192" data-min-length="15">
+            <ul class="comments-list js-comments-list"
+                    data-remaining-comments-count="0"
+                    data-canpost="false"
+                    data-cansee="true"
+                    data-comments-unavailable="false"
+                    data-addlink-disabled="true">
+
+            </ul>
+	    </div>
+
+        <div id="comments-link-163192" data-rep=50 data-anon=true>
+                    <a class="js-add-link comments-link disabled-link" title="Utiliza los comentarios para pedir m&#xE1;s informaci&#xF3;n o para sugerir mejoras. Evita responder a preguntas en los comentarios."  href="#" role="button">A&#xF1;ade un comentario</a>
+                <span class="js-link-separator dno">&nbsp;|&nbsp;</span>
+            <a class="js-show-link comments-link dno" title="expandir para mostrar todos los comentarios de esta publicaci&#xF3;n" href=# onclick="" role="button"></a>
+        </div>         
+    </div>
+    </div>
+
+</div>
+
+
+
+
+                <div id="answers">
+                    <a name="tab-top"></a>
+                    <div id="answers-header">
+                        <div class="answers-subheader d-flex ai-center mb8">
+                            <div class="flex--item fl1">
+                                <h2 class="mb0" data-answercount="1">
+                                        1 respuesta
+                                    <span style="display:none;" itemprop="answerCount">1</span>
+                                </h2>
+                            </div>
+                            <div class="flex--item">
+                                
+
+<div class="d-flex g4 gsx ai-center sm:fd-column sm:ai-start">
+    <div class="d-flex fd-column ai-end sm:ai-start">
+        <label class="flex--item fs-caption" for="answer-sort-dropdown-select-menu">
+            Ordenado por:
+        </label>
+        <a 
+            class="js-sort-preference-change s-link flex--item fs-fine d-none"
+            data-value="ScoreDesc"
+            href="/questions/163192/almacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript?answertab=scoredesc#tab-top"
+        >
+            Restablecer a predeterminado
+        </a>
+    </div>
+    <div class="flex--item s-select">
+        <select id="answer-sort-dropdown-select-menu">
+                    <option
+                        value=scoredesc
+                        selected=selected
+                    >
+                        Mayor puntuaci&#xF3;n (por defecto)
+                    </option>
+                    <option
+                        value=modifieddesc
+                    >
+                        Fecha de modificaci&#xF3;n (lo m&#xE1;s nuevo primero)
+                    </option>
+                    <option
+                        value=createdasc
+                    >
+                        Fecha de creaci&#xF3;n (lo m&#xE1;s antiguo primero)
+                    </option>
+        </select>
+    </div>
+</div>
+
+
+                            </div>
+                        </div>
+                    </div>
+
+
+                                        
+<a name="163215"></a>
+<div id="answer-163215" class="answer js-answer accepted-answer js-accepted-answer" data-answerid="163215" data-parentid="163192" data-score="1" data-position-on-page="1" data-highest-scored="1" data-question-has-accepted-highest-score="1"  itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
+    <div class="post-layout">
+        <div class="votecell post-layout--left">
+            <div class="js-voting-container d-flex jc-center fd-column ai-stretch gs4 fc-black-200" data-post-id="163215">
+        <button class="js-vote-up-btn flex--item s-btn s-btn__unset c-pointer "
+                data-controller="s-tooltip"
+                data-s-tooltip-placement="right"
+                title="Esta respuesta es &#xFA;til"
+                aria-pressed="false"
+                aria-label="Up vote"
+                data-selected-classes="fc-theme-primary"
+                data-unselected-classes="">
+            <svg aria-hidden="true" class="svg-icon iconArrowUpLg" width="36" height="36"  viewBox="0 0 36 36"><path  d="M2 25h32L18 9 2 25Z"/></svg>
+        </button>
+        <div class="js-vote-count flex--item d-flex fd-column ai-center fc-black-500 fs-title"
+             itemprop="upvoteCount"
+             data-value="1">
+            1
+        </div>
+        <button class="js-vote-down-btn flex--item s-btn s-btn__unset c-pointer "
+                data-controller="s-tooltip"
+                data-s-tooltip-placement="right"
+                title="Esta respuesta no es &#xFA;til"
+                aria-pressed="false"
+                aria-label="Down vote"
+                data-selected-classes="fc-theme-primary"
+                data-unselected-classes="">
+            <svg aria-hidden="true" class="svg-icon iconArrowDownLg" width="36" height="36"  viewBox="0 0 36 36"><path  d="M2 11h32L18 27 2 11Z"/></svg>
+        </button>
+
+
+        
+<button class="js-saves-btn s-btn s-btn__unset c-pointer py4"
+        id="saves-btn-163215"
+        data-controller="s-tooltip"
+        data-s-tooltip-placement="right"
+        data-s-popover-placement=""
+        title="Save this answer."
+        aria-pressed="false"
+        data-post-id="163215"
+        data-post-type-id="2"
+        data-user-privilege-for-post-click="0"
+        aria-controls=""
+        data-s-popover-auto-show="false"
+>
+    <svg aria-hidden="true" class="fc-theme-primary-500 js-saves-btn-selected d-none svg-icon iconBookmark" width="18" height="18"  viewBox="0 0 18 18"><path  d="M3 17V3c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v14l-6-4-6 4Z"/></svg>
+    <svg aria-hidden="true" class="js-saves-btn-unselected svg-icon iconBookmarkAlt" width="18" height="18"  viewBox="0 0 18 18"><path  d="m9 10.6 4 2.66V3H5v10.26l4-2.66ZM3 17V3c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v14l-6-4-6 4Z"/></svg>
+</button>
+
+
+
+
+
+
+
+            <div class="js-accepted-answer-indicator flex--item fc-green-700 py6 mtn8" data-s-tooltip-placement="right" title="Loading when this answer was accepted&#x2026;" tabindex="0" role="note" aria-label="Aceptado">
+                <div class="ta-center">
+                    <svg aria-hidden="true" class="svg-icon iconCheckmarkLg" width="36" height="36"  viewBox="0 0 36 36"><path  d="m6 14 8 8L30 6v8L14 30l-8-8v-8Z"/></svg>
+                </div>
+            </div>
+
+    
+        <a class="js-post-issue flex--item s-btn s-btn__unset c-pointer py6 mx-auto" href="/posts/163215/timeline" data-shortcut="T" data-ks-title="l&#xED;nea de tiempo" data-controller="s-tooltip" data-s-tooltip-placement="right" title="Mostrar actividad de esta publicaci&#xF3;n." aria-label="L&#xED;nea de tiempo"><svg aria-hidden="true" class="mln2 mr0 svg-icon iconHistory" width="19" height="18"  viewBox="0 0 19 18"><path  d="M3 9a8 8 0 1 1 3.73 6.77L8.2 14.3A6 6 0 1 0 5 9l3.01-.01-4 4-4-4h3L3 9Zm7-4h1.01L11 9.36l3.22 2.1-.6.93L10 10V5Z"/></svg></a>
+
+</div>
+
+        </div>
+
+        
+
+<div class="answercell post-layout--right">
+    
+    <div class="s-prose js-post-body" itemprop="text">
+<p>En pulsador_cerrado tienes una definición de clase que luego tienes que instanciar según lo que he visto en la documentación.
+Entiendo que lo que quieres hacer quedaría de la siguiente forma:</p>
+
+<pre><code>var pulsador_cerrado = joint.shapes.basic.Generic.define('electrics.pulsador_cerrado', {
+    size: {width: 80, height: 40},
+    position: {x: 50},
+    attrs: {
+        '.': {magnet: false},
+        '.body': {width: 50, height: 25},
+        '.input': {ref: '.body', 'ref-x': -4, 'ref-y': 0.5, magnet: true, port: 'in'},
+        '.output': {ref: '.body', 'ref-x': 84, 'ref-y': 0.5, magnet: true, port: 'out'},
+        circle: {r: 5, stroke: 'black', fill: 'transparent', 'stroke-width': 1},
+        image: {'xlink:href': 'pulsador.nc.jpg'},
+        estado: 'cerrado'
+    },
+});
+
+//En base a lo que has definido creamos un objeto
+var objeto= new pulsador_cerrado();
+
+//Con esto obtienes el valor de estado
+var tipo= objeto.attributes.attrs["estado"];
+</code></pre>
+
+<p>Espero que te funcione</p>
+    </div>
+    <div class="mt24">
+        <div class="d-flex fw-wrap ai-start jc-end gs8 gsy">
+            <time itemprop="dateCreated" datetime="2018-05-10T11:35:44"></time>
+            <div class="flex--item mr16" style="flex: 1 1 100px;">
+                
+
+
+<div class="js-post-menu pt2" data-post-id="163215" data-post-type-id="2">
+
+    <div class="d-flex gs8 s-anchors s-anchors__muted fw-wrap">
+
+            <div class="flex--item">
+                <a href="/a/163215"
+                   rel="nofollow"
+                   itemprop="url"
+                   class="js-share-link js-gps-track"
+                   title="Enlace corto permanente a esta respuesta"
+                   data-gps-track="post.click({ item: 2, priv: 0, post_type: 2 })"
+                   data-controller="se-share-sheet"
+                   data-se-share-sheet-title="Comparte un enlace a esta respuesta"
+                   data-se-share-sheet-subtitle=""
+                   data-se-share-sheet-post-type="answer"
+                   data-se-share-sheet-social="facebook twitter "
+                   data-se-share-sheet-location="2"
+                   data-se-share-sheet-license-url="https%3a%2f%2fcreativecommons.org%2flicenses%2fby-sa%2f4.0%2f"
+                   data-se-share-sheet-license-name="CC BY-SA 4.0"
+                   data-s-popover-placement="bottom-start">Compartir</a>
+            </div>
+
+
+                    <div class="flex--item">
+                        <a href="/posts/163215/edit" class="js-suggest-edit-post js-gps-track" data-gps-track="post.click({ item: 6, priv: 0, post_type: 2 })" title="">Mejora esta respuesta</a>
+                    </div>
+
+            <div class="flex--item">
+                <button type="button"
+                        id="btnFollowPost-163215" class="s-btn s-btn__link js-follow-post js-follow-answer js-gps-track"
+                        data-gps-track="post.click({ item: 14, priv: 0, post_type: 2 })"
+                        data-controller="s-tooltip " data-s-tooltip-placement="bottom"
+                        data-s-popover-placement="bottom" aria-controls=""
+                        title="Sigue esta respuesta para recibir notificaciones">
+                    Seguir
+                </button>
+            </div>
+
+
+
+
+
+
+    </div>
+    <div class="js-menu-popup-container"></div>
+</div>
+            </div>
+
+
+            <div class="post-signature flex--item fl0">
+                <div class="user-info user-hover">
+    <div class="user-action-time">
+        respondida <span title='2018-05-10 11:35:44Z' class='relativetime'>el 10 may. 2018 a las 11:35</span>
+    </div>
+    <div class="user-gravatar32">
+        <a href="/users/83990/ldanny7"><div class="gravatar-wrapper-32"><img src="https://www.gravatar.com/avatar/4d45376662b77646e5f6d52528892cf6?s=64&amp;d=identicon&amp;r=PG&amp;f=1" alt="lDanny7&#39;s user avatar" width="32" height="32" class="bar-sm"></div></a>
+    </div>
+    <div class="user-details" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <a href="/users/83990/ldanny7">lDanny7</a><span class="d-none" itemprop="name">lDanny7</span>
+        <div class="-flair">
+            <span class="reputation-score" title="puntuación de reputación de " dir="ltr">1,536</span><span title="6 medallas de plata" aria-hidden="true"><span class="badge2"></span><span class="badgecount">6</span></span><span class="v-visible-sr">6 medallas de plata</span><span title="10 medallas de bronce" aria-hidden="true"><span class="badge3"></span><span class="badgecount">10</span></span><span class="v-visible-sr">10 medallas de bronce</span>
+        </div>
+    </div>
+</div>
+
+
+            </div>
+        </div>
+        
+    
+    </div>
+    
+</div>
+
+
+
+
+            <span class="d-none" itemprop="commentCount">1</span> 
+    <div class="post-layout--right js-post-comments-component">
+        <div id="comments-163215" class="comments js-comments-container bt bc-black-075 mt12 " data-post-id="163215" data-min-length="15">
+            <ul class="comments-list js-comments-list"
+                    data-remaining-comments-count="0"
+                    data-canpost="false"
+                    data-cansee="true"
+                    data-comments-unavailable="false"
+                    data-addlink-disabled="true">
+
+                        <li id="comment-307537" class="comment js-comment " data-comment-id="307537" data-comment-owner-id="84009" data-comment-score="0">
+        <div class="js-comment-actions comment-actions">
+            <div class="comment-score js-comment-score js-comment-edit-hide">
+            </div>
+        </div>
+        <div class="comment-text  js-comment-text-and-form">
+            <div class="comment-body js-comment-edit-hide">
+                
+                <span class="comment-copy">He comprobado lo que has puesto y funciona, la unica pregunta que tengo es por qu&#233; me salta error cuando uso la consola de internet cuando realizo el cambio de atributo? @IDanny7</span>
+                
+                <div class="d-inline-flex ai-center">
+&ndash;&nbsp;<a href="/users/84009/manuel-bueno-mora"
+                                title="29 reputaci&#xF3;n"
+                                class="comment-user owner">Manuel Bueno Mora</a>
+                </div>
+                <span class="comment-date" dir="ltr"><span title='2018-05-11 12:48:55Z, Licencia: CC BY-SA 4.0' class='relativetime-clean'>el 11 may. 2018 a las 12:48</span></span>
+            </div>
+        </div>
+    </li>
+
+            </ul>
+	    </div>
+
+        <div id="comments-link-163215" data-rep=50 data-anon=true>
+                    <a class="js-add-link comments-link disabled-link" title="Utiliza los comentarios para pedir una aclaraci&#xF3;n o para a&#xF1;adir m&#xE1;s informaci&#xF3;n.  Evita los comentarios como &#x201C;&#x2B;1&#x201D; o &#x201C;gracias&#x201D;. Utiliza @nombre para responder a otras personas que hayan comentado, si quieres que sean notificadas."  href="#" role="button">A&#xF1;ade un comentario</a>
+                <span class="js-link-separator dno">&nbsp;|&nbsp;</span>
+            <a class="js-show-link comments-link dno" title="expandir para mostrar todos los comentarios de esta publicaci&#xF3;n" href=# onclick="" role="button"></a>
+        </div>         
+    </div>
+    </div>
+</div>
+
+
+                        <a name='new-answer'></a>
+                            <form id="post-form" action="/questions/163192/answer/submit" method="post" class="js-add-answer-component post-form">
+                                <input type="hidden" id="post-id" value="163192" />
+                                <input type="hidden" id="qualityBanWarningShown" name="qualityBanWarningShown" value="false" />
+                                <input type="hidden" name="referrer" value="" />
+                                <h2 class="space" id="your-answer-header">
+                                    Tu Respuesta
+                                </h2>
+                                    
+
+    <script>
+        StackExchange.ifUsing("editor", function () {
+            StackExchange.using("externalEditor", function () {
+                StackExchange.using("snippets", function () {
+                    StackExchange.snippets.init();
+                });
+            });
+        }, "code-snippets");
+    </script>
+
+
+<script>
+    StackExchange.ready(function() {
+        var channelOptions = {
+            tags: "".split(" "),
+            id: "637"
+        };
+        initTagRenderer("".split(" "), "".split(" "), channelOptions);
+
+        StackExchange.using("externalEditor", function() {
+            // Have to fire editor after snippets, if snippets enabled
+            if (StackExchange.settings.snippets.snippetsEnabled) {
+                StackExchange.using("snippets", function() {
+                    createEditor();
+                });
+            }
+            else {
+                createEditor();
+            }
+        });
+
+        function createEditor() {
+            StackExchange.prepareEditor({
+                useStacksEditor: false,
+                heartbeatType: 'answer',
+                autoActivateHeartbeat: false,
+                convertImagesToLinks: false,
+                noModals: true,
+                showLowRepImageUploadWarning: true,
+                reputationToPostImages: null,
+                bindNavPrevention: true,
+                postfix: "",
+                imageUploader: {
+                    brandingHtml: "Con tecnolog\u0026#237;a de \u003ca href=\"https://imgur.com/\"\u003e\u003csvg class=\"svg-icon\" width=\"50\" height=\"18\" viewBox=\"0 0 50 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"\u003e\u003ctitle\u003eImgur Logo\u003c/title\u003e\u003cpath d=\"M46.1709 9.17788C46.1709 8.26454 46.2665 7.94324 47.1084 7.58816C47.4091 7.46349 47.7169 7.36433 48.0099 7.26993C48.9099 6.97997 49.672 6.73443 49.672 5.93063C49.672 5.22043 48.9832 4.61182 48.1414 4.61182C47.4335 4.61182 46.7256 4.91628 46.0943 5.50789C45.7307 4.9328 45.2525 4.66231 44.6595 4.66231C43.6264 4.66231 43.1481 5.28821 43.1481 6.59048V11.9512C43.1481 13.2535 43.6264 13.8962 44.6595 13.8962C45.6924 13.8962 46.1709 13.2535 46.1709 11.9512V9.17788Z\"/\u003e\u003cpath d=\"M32.492 10.1419C32.492 12.6954 34.1182 14.0484 37.0451 14.0484C39.9723 14.0484 41.5985 12.6954 41.5985 10.1419V6.59049C41.5985 5.28821 41.1394 4.66232 40.1061 4.66232C39.0732 4.66232 38.5948 5.28821 38.5948 6.59049V9.60062C38.5948 10.8521 38.2696 11.5455 37.0451 11.5455C35.8209 11.5455 35.4954 10.8521 35.4954 9.60062V6.59049C35.4954 5.28821 35.0173 4.66232 34.0034 4.66232C32.9703 4.66232 32.492 5.28821 32.492 6.59049V10.1419Z\" /\u003e\u003cpath fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M25.6622 17.6335C27.8049 17.6335 29.3739 16.9402 30.2537 15.6379C30.8468 14.7755 30.9615 13.5579 30.9615 11.9512V6.59049C30.9615 5.28821 30.4833 4.66231 29.4502 4.66231C28.9913 4.66231 28.4555 4.94978 28.1109 5.50789C27.499 4.86533 26.7335 4.56087 25.7005 4.56087C23.1369 4.56087 21.0134 6.57349 21.0134 9.27932C21.0134 11.9852 23.003 13.913 25.3754 13.913C26.5612 13.913 27.4607 13.4902 28.1109 12.6616C28.1109 12.7229 28.1161 12.7799 28.121 12.8346C28.1256 12.8854 28.1301 12.9342 28.1301 12.983C28.1301 14.4373 27.2502 15.2321 25.777 15.2321C24.8349 15.2321 24.1352 14.9821 23.5661 14.7787C23.176 14.6393 22.8472 14.5218 22.5437 14.5218C21.7977 14.5218 21.2429 15.0123 21.2429 15.6887C21.2429 16.7375 22.9072 17.6335 25.6622 17.6335ZM24.1317 9.27932C24.1317 7.94324 24.9928 7.09766 26.1024 7.09766C27.2119 7.09766 28.0918 7.94324 28.0918 9.27932C28.0918 10.6321 27.2311 11.5116 26.1024 11.5116C24.9737 11.5116 24.1317 10.6491 24.1317 9.27932Z\"/\u003e\u003cpath d=\"M16.8045 11.9512C16.8045 13.2535 17.2637 13.8962 18.2965 13.8962C19.3298 13.8962 19.8079 13.2535 19.8079 11.9512V8.12928C19.8079 5.82936 18.4879 4.62866 16.4027 4.62866C15.1594 4.62866 14.279 4.98375 13.3609 5.88013C12.653 5.05154 11.6581 4.62866 10.3573 4.62866C9.34336 4.62866 8.57809 4.89931 7.9466 5.5079C7.58314 4.9328 7.10506 4.66232 6.51203 4.66232C5.47873 4.66232 5.00066 5.28821 5.00066 6.59049V11.9512C5.00066 13.2535 5.47873 13.8962 6.51203 13.8962C7.54479 13.8962 8.0232 13.2535 8.0232 11.9512V8.90741C8.0232 7.58817 8.44431 6.91179 9.53458 6.91179C10.5104 6.91179 10.893 7.58817 10.893 8.94108V11.9512C10.893 13.2535 11.3711 13.8962 12.4044 13.8962C13.4375 13.8962 13.9157 13.2535 13.9157 11.9512V8.90741C13.9157 7.58817 14.3365 6.91179 15.4269 6.91179C16.4027 6.91179 16.8045 7.58817 16.8045 8.94108V11.9512Z\"/\u003e\u003cpath d=\"M3.31675 6.59049C3.31675 5.28821 2.83866 4.66232 1.82471 4.66232C0.791758 4.66232 0.313354 5.28821 0.313354 6.59049V11.9512C0.313354 13.2535 0.791758 13.8962 1.82471 13.8962C2.85798 13.8962 3.31675 13.2535 3.31675 11.9512V6.59049Z\" /\u003e\u003cpath d=\"M1.87209 0.400291C0.843612 0.400291 0 1.1159 0 1.98861C0 2.87869 0.822846 3.57676 1.87209 3.57676C2.90056 3.57676 3.7234 2.87869 3.7234 1.98861C3.7234 1.1159 2.90056 0.400291 1.87209 0.400291Z\" fill=\"#1BB76E\"/\u003e\u003c/svg\u003e\u003c/a\u003e",
+                    contentPolicyHtml: "Contribuciones de los usuarios licenciadas bajo \u003ca href=\"https://stackoverflow.com/help/licensing\"\u003eCC BY-SA\u003c/a\u003e \u003ca href=\"https://stackoverflow.com/legal/content-policy\"\u003e(pol\u0026#237;tica de contenido)\u003c/a\u003e",
+                    allowUrls: true
+                },
+                onDemand: true,
+                discardSelector: ".discard-answer",
+                enableTables: true,
+                isStacksEditorPreviewEnabled: false
+                ,immediatelyShowMarkdownHelp:true,enableTables:true,enableSnippets:true
+            });
+                    }
+    });
+</script>
+<div id="post-editor" class="post-editor js-post-editor">
+
+
+        <div class="ps-relative">
+            <div class="wmd-container mb8">
+                <div id="wmd-button-bar" class="wmd-button-bar btr-sm"></div>
+                <div class="js-stacks-validation">
+                    <div class="ps-relative">
+                        <textarea id="wmd-input"
+                                  name="post-text"
+                                  class="wmd-input s-input bar0 js-post-body-field"
+                                  data-editor-type="wmd"
+                                  data-post-type-id="2"
+                                  cols="92" rows="15"
+                                  aria-labelledby="your-answer-header"
+                                  tabindex="101"
+                                  data-min-length=""></textarea>
+                    </div>
+                    <div class="s-input-message mt4 d-none js-stacks-validation-message"></div>
+                </div>
+            </div>
+        </div>
+
+    <aside class="d-flex ai-start jc-space-between js-answer-help s-notice s-notice__warning pb0 pr4 pt4 mb8 d-none" role="status" aria-hidden="true">
+    <div class="flex--item pt8">
+        <p>¡Gracias por contribuir en StackOverflow en español con una respuesta!</p>
+<ul><li>Por favor, asegúrate de  <em>responder a la pregunta</em>. ¡Proporciona información y comparte tu investigación!</li></ul>
+<p>Pero <em>evita</em>…</p>
+<ul><li>Pedir ayuda o aclaraciones, o responder a otras respuestas.</li>
+<li>Hacer declaraciones basadas en opiniones; asegúrate de respaldarlas con referencias o con tu propia experiencia personal.</li></ul>
+<p>Para obtener más información, consulta nuestros <a href="/help/how-to-answer">consejos sobre cómo escribir grandes respuestas</a>.</p>
+    </div>
+    <button class="flex--item js-answer-help-close-btn s-btn s-btn__muted fc-dark">
+        <svg aria-hidden="true" class="svg-icon iconClear" width="18" height="18"  viewBox="0 0 18 18"><path  d="M15 4.41 13.59 3 9 7.59 4.41 3 3 4.41 7.59 9 3 13.59 4.41 15 9 10.41 13.59 15 15 13.59 10.41 9 15 4.41Z"/></svg>
+    </button>
+</aside>
+
+
+
+    <div>
+        <div id="draft-saved" class="fc-success h24" style="display:none;">Borrador guardado</div>
+        <div id="draft-discarded" class="fc-error h24" style="display:none;">Borrador descartado</div>
+    </div>
+
+
+            <div id="wmd-preview" class="s-prose mb16 wmd-preview js-wmd-preview"></div>
+            <div></div>
+
+        <div class="edit-block">
+            <input id="fkey" name="fkey" type="hidden" value="33a56eb08180d5f2dc525531083ff1233cacbf36c07ad580b69bbe523244d21e">
+            <input id="author" name="author" type="text">
+        </div>
+
+</div>
+
+
+                                <div class="ps-relative">
+                                                <div class="form-item dno new-post-login p0 my16">
+                <div class="d-flex gs16 md:fd-column new-login-form">
+                    <div class="d-flex fd-column w50 md:w-auto gsy gs8 jc-space-between new-login-left">
+                        <h3 class="flex--item fs-title">Registrarse o <a id="login-link" href="/users/login?ssrc=question_page&returnurl=https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%23new-answer">iniciar sesi&#243;n</a></h3>
+                        <script>
+                            StackExchange.ready(function () {
+                                StackExchange.helpers.onClickDraftSave('#login-link');
+                            });
+                        </script>
+                        <div class="flex--item s-btn s-btn__muted s-btn__outlined s-btn__icon google-login" data-ga="[&quot;sign up&quot;,&quot;Sign Up Started - Google&quot;,&quot;New Post&quot;,null,null]">
+                            <svg aria-hidden="true" class="native svg-icon iconGoogle" width="18" height="18"  viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18Z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17Z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07Z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3Z"/></svg> Reg&#xED;strate mediante Google
+                        </div>
+                        <div class="flex--item s-btn s-btn__muted s-btn__icon facebook-login" data-ga="[&quot;sign up&quot;,&quot;Sign Up Started - Facebook&quot;,&quot;New Post&quot;,null,null]">
+                            <svg aria-hidden="true" class="svg-icon iconFacebook" width="18" height="18"  viewBox="0 0 18 18"><path fill="#4167B2" d="M3 1a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H3Zm6.55 16v-6.2H7.46V8.4h2.09V6.61c0-2.07 1.26-3.2 3.1-3.2.88 0 1.64.07 1.87.1v2.16h-1.29c-1 0-1.19.48-1.19 1.18V8.4h2.39l-.31 2.42h-2.08V17h-2.5Z"/></svg> Reg&#xED;strate mediante Facebook
+                        </div>
+                        <div class="flex--item s-btn s-btn__muted s-btn__outlined s-btn__icon stackexchange-login" data-ga="[&quot;sign up&quot;,&quot;Sign Up Navigation&quot;,&quot;New Post&quot;,null,null]">
+                            <svg aria-hidden="true" class="native svg-icon iconLogoGlyphXSm" width="18" height="18" viewBox="0 0 18 18"><path d="M14 16v-5h2v7H2v-7h2v5h10Z" fill="#BCBBBB"/><path d="m12.09.72-1.21.9 4.5 6.07 1.22-.9L12.09.71ZM5 15h8v-2H5v2Zm9.15-5.87L8.35 4.3l.96-1.16 5.8 4.83-.96 1.16Zm-7.7-1.47 6.85 3.19.63-1.37-6.85-3.2-.63 1.38Zm6.53 5L5.4 11.39l.38-1.67 7.42 1.48-.22 1.46Z" fill="#F48024"/></svg> Reg&#xED;strate con email y contrase&#xF1;a
+                        </div>
+                    </div>
+                    <input type="hidden" name="use-facebook" class="use-facebook" value="false" />
+                    <input type="hidden" name="use-google" class="use-google" value="false" />
+                    <button type="button" class="d-none js-submit-openid">Submit</button>
+                    <div class="d-flex gsy gs8 fd-column w50 md:w-auto new-login-right form-item p0">
+                                <h3 class="flex--item fs-title">Publicar como invitado</h3>
+            <div class="flex--item">
+                <div class="d-flex gs4 gsy fd-column">
+                    <label class="s-label" for="display-name">Nombre</label>
+                    <div class="d-flex ps-relative">
+                        <input class="s-input" id="display-name" name="display-name" maxlength="30" type="text" value="" tabindex="105" placeholder="" />
+                    </div>
+                </div>
+            </div>
+            <div class="flex--item">
+                <div class="d-flex gs4 gsy fd-column">
+                    <div class="flex--item">
+                        <div class="d-flex gs2 gsy fd-column">
+                            <label class="flex--item s-label" for="m-address">Correo electr&#xF3;nico</label>
+                            <p class="flex--item s-description">Requerido, nunca se muestra</p>
+                        </div>
+                    </div>
+                    <div class="d-flex ps-relative">
+                        <input class="s-input js-post-email-field" id="m-address" name="m-address" type="text" value="" size="40" tabindex="106" placeholder="" />
+                    </div>
+                </div>
+            </div>
+
+                    </div>
+                </div>
+            </div>
+            <script>
+                StackExchange.ready(
+                    function () {
+                        StackExchange.openid.initPostLogin('.new-post-login', 'https%3a%2f%2fes.stackoverflow.com%2fquestions%2f163192%2falmacenar-y-comparar-valor-de-atributo-de-un-objeto-en-javascript%23new-answer', 'question_page');
+                    }
+                );
+            </script>
+            <noscript>
+                        <h3 class="flex--item fs-title">Publicar como invitado</h3>
+            <div class="flex--item">
+                <div class="d-flex gs4 gsy fd-column">
+                    <label class="s-label" for="display-name">Nombre</label>
+                    <div class="d-flex ps-relative">
+                        <input class="s-input" id="display-name" name="display-name" maxlength="30" type="text" value="" tabindex="105" placeholder="" />
+                    </div>
+                </div>
+            </div>
+            <div class="flex--item">
+                <div class="d-flex gs4 gsy fd-column">
+                    <div class="flex--item">
+                        <div class="d-flex gs2 gsy fd-column">
+                            <label class="flex--item s-label" for="m-address">Correo electr&#xF3;nico</label>
+                            <p class="flex--item s-description">Requerido, nunca se muestra</p>
+                        </div>
+                    </div>
+                    <div class="d-flex ps-relative">
+                        <input class="s-input js-post-email-field" id="m-address" name="m-address" type="text" value="" size="40" tabindex="106" placeholder="" />
+                    </div>
+                </div>
+            </div>
+
+            </noscript>
+
+                                </div>
+
+                                    <div class="form-submit clear-both d-flex gsx gs4">
+                                        <button id="submit-button" class="flex--item s-btn s-btn__primary s-btn__icon" type="submit" tabindex="120" autocomplete="off">
+Publica tu respuesta                                        </button>
+                                        <button class="flex--item s-btn s-btn__danger discard-answer dno">
+                                            Descartar
+                                        </button>
+                                            <p class="privacy-policy-agreement">
+                                                Al pulsar en “Publica tu respuesta”, muestras tu consentimiento a nuestros <a href='https://stackoverflow.com/legal/terms-of-service/public' name='tos' target='_blank' class='-link'>t&#233;rminos de servicio</a>, <a href='https://stackoverflow.com/legal/privacy-policy' name='privacy' target='_blank' class='-link'>pol&#237;tica de privacidad</a> y <a href='https://stackoverflow.com/legal/cookie-policy' name='cookie' target='_blank' class='-link'>pol&#237;tica de cookies</a><input type="hidden" name="legalLinksShown" value="1" />
+                                            </p>
+                                    </div>
+                                    <div class="js-general-error general-error clear-both d-none" aria-live="polite"></div>
+                            </form>
+
+
+                            <h2 class="bottom-notice" data-loc="1">
+                                <div>
+&#xBF;No es la respuesta que buscas? Examina otras preguntas con la etiqueta <ul class='ml0 list-ls-none js-post-tag-list-wrapper d-inline'><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/javascript" class="post-tag" title="mostrar preguntas con la etiqueta &quot;javascript&quot;" aria-label="mostrar preguntas con la etiqueta &quot;javascript&quot;" rel="tag" aria-labelledby="javascript-container">javascript</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/jquery" class="post-tag" title="mostrar preguntas con la etiqueta &quot;jquery&quot;" aria-label="mostrar preguntas con la etiqueta &quot;jquery&quot;" rel="tag" aria-labelledby="jquery-container">jquery</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/objeto" class="post-tag" title="mostrar preguntas con la etiqueta &quot;objeto&quot;" aria-label="mostrar preguntas con la etiqueta &quot;objeto&quot;" rel="tag" aria-labelledby="objeto-container">objeto</a></li><li class='d-inline mr4 js-post-tag-list-item'><a href="/questions/tagged/atributos" class="post-tag" title="mostrar preguntas con la etiqueta &quot;atributos&quot;" aria-label="mostrar preguntas con la etiqueta &quot;atributos&quot;" rel="tag" aria-labelledby="atributos-container">atributos</a></li></ul> o <a href="/questions/ask">formula tu propia pregunta</a>.                                </div>
+                            </h2>
+                </div>
+            </div>
+
+            
+<div id="sidebar" class="show-votes" role="complementary" aria-label="barra lateral">
+        
+
+    
+    <div class="s-sidebarwidget s-sidebarwidget__yellow s-anchors s-anchors__grayscale mb16" data-tracker="cb=1">
+        <ul class="d-block p0 m0">
+                        <li class="s-sidebarwidget--header s-sidebarwidget__small-bold-text d-flex fc-black-600 d:fc-black-900 bb bbw1">
+                            Destacado en Meta
+                        </li>
+        <li class="s-sidebarwidget--item d-flex px16">
+            <div class="flex--item1 fl-shrink0">
+<div class="favicon favicon-stackexchangemeta" title="Meta Stack Exchange"></div>            </div>
+            <div class="flex--item wmn0 ow-break-word">
+                <a href="https://meta.stackexchange.com/questions/386102/accessibility-update-colors" class="js-gps-track" data-ga="[&quot;community bulletin board&quot;,&quot;Destacado en Meta&quot;,&quot;https://meta.stackexchange.com/questions/386102/accessibility-update-colors&quot;,null,null]" data-gps-track="communitybulletin.click({ priority: 3, position: 0 })">Accessibility Update: Colors</a>
+            </div>
+        </li>
+        </ul>
+    </div>
+
+
+<div class="js-zone-container zone-container-sidebar">
+    <div id="dfp-tsb" class="everyonelovesstackoverflow everyoneloves__top-sidebar"></div>
+		<div class="js-report-ad-button-container " style="width: 300px"></div>
+</div>
+        
+
+    
+        <div class="module sidebar-related">
+            <h4 id="h-related">Relacionados</h4>
+            <div class="related js-gps-related-questions" data-tracker="rq=1">
+                    <div class="spacer">
+                        <a href="/q/76824" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes answered-accepted default">0</div>
+                        </a>
+                        <a href="/questions/76824/almacenar-valor-de-una-variable-en-un-objeto" class="question-hyperlink">Almacenar valor de una variable en un objeto</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/107093" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes default">1</div>
+                        </a>
+                        <a href="/questions/107093/usar-dos-puntos-como-valor-de-atributo-en-xml" class="question-hyperlink">Usar dos puntos como valor de atributo en XML</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/177781" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes default">0</div>
+                        </a>
+                        <a href="/questions/177781/obtener-valor-de-un-atributo-de-un-objeto-en-javascript" class="question-hyperlink">Obtener valor de un atributo de un objeto en javascript</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/197234" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes answered-accepted default">0</div>
+                        </a>
+                        <a href="/questions/197234/como-eliminar-propiedad-de-objeto-sin-saber-su-key-javascript" class="question-hyperlink">Como eliminar Propiedad de Objeto sin saber su Key. JavaScript</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/248176" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes default">0</div>
+                        </a>
+                        <a href="/questions/248176/jquery-cambiar-el-atributo-src" class="question-hyperlink">jquery cambiar el atributo src</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/261223" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes answered-accepted default">0</div>
+                        </a>
+                        <a href="/questions/261223/como-obtener-el-valor-de-un-atributo-en-json-que-tiene-como-nombre-un-numero-en" class="question-hyperlink">Como obtener el valor de un atributo en json que tiene como nombre un numero en Javascript?</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/352568" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes answered-accepted default">0</div>
+                        </a>
+                        <a href="/questions/352568/valor-atributo-javascript" class="question-hyperlink">valor atributo Javascript</a>
+                    </div>
+                    <div class="spacer">
+                        <a href="/q/513532" title="Puntuaci&#xF3;n de la pregunta (votos a favor - votos en contra)">
+                            <div class="answer-votes answered-accepted default">0</div>
+                        </a>
+                        <a href="/questions/513532/comparar-dos-objetos-y-unir-propiedades-diferentes-en-javascript" class="question-hyperlink">comparar dos objetos y unir propiedades diferentes en Javascript</a>
+                    </div>
+            </div>
+        </div>
+
+
+
+
+    <div id="hot-network-questions" class="module tex2jax_ignore">
+    <h4>
+        <a href="https://stackexchange.com/questions?tab=hot"
+           class="js-gps-track s-link s-link__inherit" 
+           data-gps-track="posts_hot_network.click({ item_type:1, location:11 })">
+            Preguntas populares en la red
+        </a>
+    </h4>
+    <ul>
+            <li >
+                <div class="favicon favicon-retrocomputing" title="Retrocomputing Stack Exchange"></div><a href="https://retrocomputing.stackexchange.com/questions/26407/did-pascal-programmers-really-move-on-to-java-in-the-90s" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:648 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Did Pascal programmers really move on to Java in the 90s?
+                </a>
+
+            </li>
+            <li >
+                <div class="favicon favicon-philosophy" title="Philosophy Stack Exchange"></div><a href="https://philosophy.stackexchange.com/questions/96804/what-did-russell-mean-when-he-wrote-that-the-null-class-the-class-having-no-mem" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:265 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    What did Russell mean when he wrote that the null-class, the class having no members, did not exist?
+                </a>
+
+            </li>
+            <li >
+                <div class="favicon favicon-chemistry" title="Chemistry Stack Exchange"></div><a href="https://chemistry.stackexchange.com/questions/171252/why-are-some-ph-standard-solutions-6-86-and-9-18" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:431 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Why are some pH standard solutions 6.86 and 9.18?
+                </a>
+
+            </li>
+            <li >
+                <div class="favicon favicon-law" title="Law Stack Exchange"></div><a href="https://law.stackexchange.com/questions/89062/how-is-a-wealthy-criminal-expected-to-get-a-good-lawyer" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:617 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    How is a wealthy criminal expected to get a good lawyer?
+                </a>
+
+            </li>
+            <li >
+                <div class="favicon favicon-pets" title="Pets Stack Exchange"></div><a href="https://pets.stackexchange.com/questions/37473/my-cat-is-fighting-for-his-life-with-chronic-calicivirus" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:518 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    My cat is fighting for his life with chronic calicivirus
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-tex" title="TeX - LaTeX Stack Exchange"></div><a href="https://tex.stackexchange.com/questions/674790/fill-between-separately-drawn-random-generated-lines" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:85 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Fill between separately drawn random generated lines
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-math" title="Mathematics Stack Exchange"></div><a href="https://math.stackexchange.com/questions/4636892/are-most-real-functions-non-linear" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:69 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Are most real functions non-linear?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-unix" title="Unix &amp; Linux Stack Exchange"></div><a href="https://unix.stackexchange.com/questions/734931/why-isnt-something-like-compound-syscalls-implemented" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:106 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Why isn&#x27;t something like compound syscalls implemented?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-matheducators" title="Mathematics Educators Stack Exchange"></div><a href="https://matheducators.stackexchange.com/questions/26124/teaching-math-too-soon-in-middle-school-and-high-school" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:548 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Teaching math too soon in middle school and high school
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-workplace" title="The Workplace Stack Exchange"></div><a href="https://workplace.stackexchange.com/questions/189958/how-do-i-make-agile-process-more-comfortable-for-introverts" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:423 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    How do I make agile process more comfortable for introverts?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-music" title="Music: Practice &amp; Theory Stack Exchange"></div><a href="https://music.stackexchange.com/questions/127403/writing-for-bass-clarinet-in-bb-in-the-same-range" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:240 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Writing for bass clarinet in Bb in the same range
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-stats" title="Cross Validated"></div><a href="https://stats.stackexchange.com/questions/605062/in-some-sense-is-linear-regression-an-estimate-of-an-estimate-of-an-estimate" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:65 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    In some sense, is linear regression an estimate of an estimate of an estimate?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-puzzling" title="Puzzling Stack Exchange"></div><a href="https://puzzling.stackexchange.com/questions/119730/multidimensional-travel" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:559 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Multidimensional Travel
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-codereview" title="Code Review Stack Exchange"></div><a href="https://codereview.stackexchange.com/questions/283203/singly-linked-list-optimally-defined-over-operations-in-c" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:196 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    singly linked list optimally defined over operations in C?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-worldbuilding" title="Worldbuilding Stack Exchange"></div><a href="https://worldbuilding.stackexchange.com/questions/241784/designing-a-portable-space-elevator" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:579 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Designing a portable space elevator
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-bicycles" title="Bicycles Stack Exchange"></div><a href="https://bicycles.stackexchange.com/questions/87553/i-am-trying-to-find-a-trailer-for-a-disabled-adult" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:126 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    I am trying to find a trailer for a disabled adult
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-academia" title="Academia Stack Exchange"></div><a href="https://academia.stackexchange.com/questions/193369/is-it-legal-in-the-uk-to-aim-for-a-certain-percentage-of-women-in-a-math-departm" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:415 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Is it legal in the UK to aim for a certain percentage of women in a math department?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-superuser" title="Super User"></div><a href="https://superuser.com/questions/1767951/automatically-compressing-files-on-file-server" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:3 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Automatically compressing files on file server
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-rpg" title="Role-playing Games Stack Exchange"></div><a href="https://rpg.stackexchange.com/questions/204623/im-new-to-dd-where-to-begin" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:122 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    I&#x27;m new to D&amp;D: where to begin?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-mathematica" title="Mathematica Stack Exchange"></div><a href="https://mathematica.stackexchange.com/questions/279808/function-concerning-change-of-fractions" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:387 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Function concerning change of fractions
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-tex" title="TeX - LaTeX Stack Exchange"></div><a href="https://tex.stackexchange.com/questions/674885/drawing-physical-diagrams-particle-spin" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:85 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    drawing physical diagrams (particle spin)
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-academia" title="Academia Stack Exchange"></div><a href="https://academia.stackexchange.com/questions/193318/i-screwed-up-a-talk-how-to-move-on" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:415 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    I screwed up a talk - how to move on
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-money" title="Personal Finance &amp; Money Stack Exchange"></div><a href="https://money.stackexchange.com/questions/155173/why-is-the-remaining-credit-positive" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:93 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Why is the remaining credit positive?
+                </a>
+
+            </li>
+            <li class="dno js-hidden">
+                <div class="favicon favicon-codegolf" title="Code Golf Stack Exchange"></div><a href="https://codegolf.stackexchange.com/questions/257650/determine-the-octet-duplet-18-electron-rule" class="js-gps-track question-hyperlink mb0" data-gps-track="site.switch({ item_type:11, target_site:200 }); posts_hot_network.click({ item_type:2, location:11 })">
+                    Determine the Octet(/Duplet/18-electron) Rule
+                </a>
+
+            </li>
+    </ul>
+
+        <a href="#" 
+           class="show-more js-show-more js-gps-track" 
+           data-gps-track="posts_hot_network.click({ item_type:3, location:11 })">
+            m&#xE1;s preguntas populares
+        </a>
+</div>
+
+                <div id="feed-link" class="js-feed-link">
+        <a href="/feeds/question/163192" title="Fuente de esta pregunta y sus respuestas">
+            <svg aria-hidden="true" class="fc-orange-400 svg-icon iconRss" width="18" height="18"  viewBox="0 0 18 18"><path  d="M3 1a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H3Zm0 1.5c6.9 0 12.5 5.6 12.5 12.5H13C13 9.55 8.45 5 3 5V2.5Zm0 5c4.08 0 7.5 3.41 7.5 7.5H8c0-2.72-2.28-5-5-5V7.5Zm0 5c1.36 0 2.5 1.14 2.5 2.5H3v-2.5Z"/></svg>
+            Fuente de la pregunta
+        </a>
+    </div>
+    <aside class="s-modal js-feed-link-modal" tabindex="-1" role="dialog" aria-labelledby="feed-modal-title" aria-describedby="feed-modal-description" aria-hidden="true">
+        <div class="s-modal--dialog js-modal-dialog wmx4" role="document"  data-controller="se-draggable">
+            <h1 class="s-modal--header fw-bold js-first-tabbable" id="feed-modal-title" data-se-draggable-target="handle" tabindex="0">
+                Suscribirte al RSS
+            </h1>
+            <div class="d-flex gs4 gsy fd-column">
+                <div class="flex--item">
+                    <label class="d-block s-label c-default" for="feed-url">
+                        Fuente de la pregunta
+                        <p class="s-description mt2" id="feed-modal-description">Para suscribirte a esta fuente RSS, copia y pega esta URL en tu lector RSS.</p>
+                    </label>
+                </div>
+                <div class="d-flex ps-relative">
+                    <input class="s-input" type="text" name="feed-url" id="feed-url" readonly="readonly" value="https://es.stackoverflow.com/feeds/question/163192" />
+                    <svg aria-hidden="true" class="s-input-icon fc-orange-400 svg-icon iconRss" width="18" height="18"  viewBox="0 0 18 18"><path  d="M3 1a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H3Zm0 1.5c6.9 0 12.5 5.6 12.5 12.5H13C13 9.55 8.45 5 3 5V2.5Zm0 5c4.08 0 7.5 3.41 7.5 7.5H8c0-2.72-2.28-5-5-5V7.5Zm0 5c1.36 0 2.5 1.14 2.5 2.5H3v-2.5Z"/></svg>
+                </div>
+            </div>
+            <a class="s-modal--close s-btn s-btn__muted js-modal-close js-last-tabbable" href="#" aria-label="Cerrar">
+                <svg aria-hidden="true" class="svg-icon iconClearSm" width="14" height="14"  viewBox="0 0 14 14"><path  d="M12 3.41 10.59 2 7 5.59 3.41 2 2 3.41 5.59 7 2 10.59 3.41 12 7 8.41 10.59 12 12 10.59 8.41 7 12 3.41Z"/></svg>
+            </a>
+        </div>
+    </aside>
+
+</div>
+
+    </div>
+<script>StackExchange.ready(function(){$.get('/posts/163192/ivc/ac99?prg=58423173-671f-4767-885d-b402e09efdd4');});</script>
+<noscript><div><img src="/posts/163192/ivc/ac99?prg=58423173-671f-4767-885d-b402e09efdd4" class="dno" alt="" width="0" height="0"></div></noscript><div style="display:none" id="js-codeblock-lang">default</div></div>
+
+
+        </div>
+    </div>
+
+
+        
+    <script type="text/javascript">
+    var cam = cam || { opt: {} };
+    var clcGamLoaderOptions = cam || { opt: {} };
+    var opt = clcGamLoaderOptions.opt;
+
+
+    opt.sf = !1;
+    opt.hb = !1;
+    opt.ll = !0;
+    opt.tlb_position = 0;
+    opt.personalization_consent = !1;
+    opt.targeting_consent = !1;
+    opt.performance_consent = !1;
+
+    opt.targeting = {Registered:['false'],'es.so-tag':['javascript','jquery','objeto','atributos'],NumberOfAnswers:['1']};
+    opt.adReportEnabled = !1;
+    opt.adReportUrl = '/ads/report-ad';
+    opt.adReportText = 'Reportar este anuncio';
+	opt.adReportFileTypeErrorMessage = 'Please select a PNG or JPG file.';
+    opt.adReportFileSizeErrorMessage = 'The file must be under 2 MiB.';
+	opt.adReportErrorText = 'Error uploading ad report.';
+	opt.adReportThanksText = 'Gracias por tus comentarios. Revisaremos esto contra nuestro código de conducta y tomaremos medidas si es necesario.';
+    opt.adReportLoginExpiredMessage = 'Your login session has expired, please login and try again.';
+    opt.adReportLoginErrorMessage = 'An error occurred when loading the report form - please try again';
+	opt.adReportModalClass = 'js-ad-report';
+
+    opt.requestGuid = '58423173-671f-4767-885d-b402e09efdd4';
+
+
+    opt.targeting.TargetingConsent = ['False_Passive'];
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('dfptestads')) {
+        const dfptestads = urlParams.get('dfptestads');
+        opt.targeting.DfpTestAds = dfptestads;
+    }
+</script>
+<script>;(()=>{"use strict";var __webpack_modules__={23:(e,t,o)=>{o.d(t,{Z7:()=>l,eq:()=>r,kG:()=>n});const a=/^\/tags\//.test(location.pathname)||/^\/questions\/tagged\//.test(location.pathname)?"tag-pages":/^\/$/.test(location.pathname)||/^\/home/.test(location.pathname)?"home-page":"question-pages";let s=location.hostname;const i={slots:{lb:[[728,90]],mlb:[[728,90]],smlb:[[728,90]],bmlb:[[728,90]],sb:e=>"dfp-tsb"===e?[[300,250],[300,600]]:[[300,250]],"tag-sponsorship":[[730,135]],"mobile-below-question":[[320,50],[300,250]],msb:[[300,250],[300,600]],"talent-conversion-tracking":[[1,1]],"site-sponsorship":[[230,60]]},ids:{"dfp-tlb":"lb","dfp-mlb":"mlb","dfp-smlb":"smlb","dfp-bmlb":"bmlb","dfp-tsb":"sb","dfp-isb":"sb","dfp-tag":"tag-sponsorship","dfp-msb":"msb","dfp-sspon":"site-sponsorship","dfp-m-aq":"mobile-below-question"},idsToExcludeFromAdReports:["dfp-sspon"]};function n(){return Object.keys(i.ids)}function r(e){return i.idsToExcludeFromAdReports.indexOf(e)<0}function l(e){var t=e.split("_")[0];const o=i.ids[t];let n=i.slots[o];return"function"==typeof n&&(n=n(t)),{path:`/248424177/${s}/${o}/${a}`,sizes:n,zone:o}}},865:(e,t,o)=>{function a(e){return"string"==typeof e?document.getElementById(e):e}function s(e){return!!(e=a(e))&&"none"===getComputedStyle(e).display}function i(e){return!s(e)}function n(e){return!!e}function r(e){return/^\s*$/.test(a(e).innerHTML)}function l(e){const{style:t}=e;t.height=t.maxHeight=t.minHeight="auto",t.display="none"}function d(e){const{style:t}=e;t.height=t.maxHeight=t.minHeight="auto",t.display="none",[].forEach.call(e.children,d)}function c(e){const{style:t}=e;t.height=t.maxHeight=t.minHeight="auto",t.removeProperty("display")}function p(e){const t=document.createElement("script");t.src=e,document.body.appendChild(t)}function g(e){return o=e,(t=[]).push=function(e){return o(),delete this.push,this.push(e)},t;var t,o}function h(e){let t="function"==typeof HTMLTemplateElement;var o=document.createElement(t?"template":"div");return e=e.trim(),o.innerHTML=e,t?o.content.firstChild:o.firstChild}o.d(t,{$Z:()=>c,Bv:()=>h,Gx:()=>p,Nj:()=>a,QZ:()=>g,cf:()=>l,pn:()=>i,wo:()=>d,xb:()=>r,xj:()=>s,yb:()=>n})},763:(__unused_webpack_module,__webpack_exports__,__webpack_require__)=>{__webpack_require__.d(__webpack_exports__,{t:()=>AdReports});var _common_helper__WEBPACK_IMPORTED_MODULE_2__=__webpack_require__(865),_console__WEBPACK_IMPORTED_MODULE_1__=__webpack_require__(276),_ad_units__WEBPACK_IMPORTED_MODULE_0__=__webpack_require__(23);class AdReports{constructor(e,t){if(this.googletag=e,this.cam=t,this.allowedFileTypes=["image/png","image/jpg","image/jpeg"],this.ignoreValidation=!1,_console__WEBPACK_IMPORTED_MODULE_1__.cM("Ad reporting init"),this.cam=t,this.callOnButtonClick=e=>this.onButtonClick(e),this.googletag.pubads().addEventListener("slotRenderEnded",e=>this.handleSlotRendered(e)),Array.isArray(t.slotsRenderedEvents)){_console__WEBPACK_IMPORTED_MODULE_1__.cM("Adding report button to "+t.slotsRenderedEvents.length+" events that have transpired");for(var o=0;o<t.slotsRenderedEvents.length;o++)this.handleSlotRendered(t.slotsRenderedEvents[o])}}handleSlotRendered(e){if(e&&e.slot&&!e.isEmpty&&(e.creativeId||e.lineItemId||!e.isEmpty)){var t=e.slot.getSlotElementId();if(t){var o=document.getElementById(t);if(o)if((0,_ad_units__WEBPACK_IMPORTED_MODULE_0__.eq)(t)){var a=o?.closest(".js-zone-container")?.querySelector(".js-report-ad-button-container");a.append(this.createButton(e)),a.style.height="24px",_console__WEBPACK_IMPORTED_MODULE_1__.cM("Added report button to the bottom of "+t)}else _console__WEBPACK_IMPORTED_MODULE_1__.cM("Not adding report button to the bottom of "+t+": shouldHaveReportButton = false");else _console__WEBPACK_IMPORTED_MODULE_1__.cM("Not adding report button to the bottom of "+t+": resolved invalid adUnit element")}else _console__WEBPACK_IMPORTED_MODULE_1__.cM("Not adding report button to the bottom of element: invalid adUnitElementId")}else _console__WEBPACK_IMPORTED_MODULE_1__.cM("Not adding report button to the bottom of element: invalid SlotRenderEndedEvent")}async onButtonClick(e){e.preventDefault();let t=e.target;const o=t.dataset.modalUrl,a=t.dataset.googleEventData;return await this.loadModal(o,t,a),!1}createButton(e){let t=document.createElement("button");var o=JSON.stringify(e);return t.dataset.googleEventData=o,t.dataset.modalUrl=this.cam.opt.adReportUrl,t.dataset.adUnit=e.slot.getSlotElementId(),t.classList.add("js-report-ad","s-btn","s-btn__link","fs-fine","mt2","float-right"),t.append(document.createTextNode(this.cam.opt.adReportText)),t.removeEventListener("click",this.callOnButtonClick),t.addEventListener("click",this.callOnButtonClick),t}async loadModal(url,$link,googleEventData){try{await window.StackExchange.helpers.loadModal(url,{returnElements:window.$($link)}),this.initForm(googleEventData)}catch(e){var message="",response=e.responseText?eval(`(${e.responseText})`):null;message=response&&response.isLoggedOut?this.cam.opt.adReportLoginExpiredMessage:this.cam.opt.adReportLoginErrorMessage,window.StackExchange.helpers.showToast(message,{type:"danger"})}}removeModal(){window.StackExchange.helpers.closePopups(document.querySelectorAll("."+this.cam.opt.adReportModalClass),"dismiss")}initForm(e,t=!1){this.ignoreValidation=t,this.$form=document.querySelector(".js-ad-report-form"),this.$googleEventData=this.$form.querySelector(".js-json-data"),this.$adReportReasons=this.$form.querySelectorAll(".js-ad-report-reason"),this.$adReportReasonOther=this.$form.querySelector(".js-ad-report-reason-other"),this.$fileUploaderInput=this.$form.querySelector(".js-file-uploader-input"),this.$imageUploader=this.$form.querySelector(".js-image-uploader"),this.$clearImageUpload=this.$form.querySelector(".js-clear-image-upload"),this.$imageUploaderText=this.$form.querySelector(".js-image-uploader-text"),this.$imageUploaderPreview=this.$form.querySelector(".js-image-uploader-preview"),this.$fileErrorMessage=this.$form.querySelector(".js-file-error");const o=this.$form.querySelector(".js-drag-drop-enabled"),a=this.$form.querySelector(".js-drag-drop-disabled");this.$googleEventData.value=e,this.$adReportReasons.forEach((e,t)=>e.addEventListener("change",e=>{this.$adReportReasonOther.classList.toggle("d-none","3"!==e.target.value)})),this.$fileUploaderInput.addEventListener("change",()=>{this.validateFileInput()&&this.updateImagePreview(this.$fileUploaderInput.files)}),this.$clearImageUpload.addEventListener("click",e=>{e.preventDefault(),this.clearImageUpload()});try{this.$fileUploaderInput[0].value="",this.$imageUploader.addEventListener("dragenter dragover dragleave drop",this.preventDefaults),this.$imageUploader.addEventListener("dragenter dragover",this.handleDragStart),this.$imageUploader.addEventListener("dragleave drop",this.handleDragEnd),this.$imageUploader.addEventListener("drop",this.handleDrop)}catch(e){o.classList.add("d-none"),a.classList.remove("d-none")}this.$form.removeEventListener("",this.handleDragEnd),this.$form.addEventListener("submit",async e=>(e.preventDefault(),this.submitForm(),!1))}clearImageUpload(){this.$fileUploaderInput.value="",this.$imageUploaderPreview.setAttribute("src",""),this.$imageUploaderPreview.classList.add("d-none"),this.$clearImageUpload.classList.add("d-none"),this.$imageUploaderText.classList.remove("d-none"),this.$imageUploader.classList.add("p16","ba","bas-dashed","bc-black-100")}preventDefaults(e){e.preventDefault(),e.stopPropagation()}handleDragStart(e){this.$imageUploader.classList.remove("bas-dashed"),this.$imageUploader.classList.add("bas-solid","bc-black-100")}handleDragEnd(e){this.$imageUploader.classList.remove("bas-solid","bc-black-100"),this.$imageUploader.classList.add("bas-dashed")}handleDrop(e){var t=e.originalEvent.dataTransfer.files;FileReader&&t&&1===t.length&&(this.$fileUploaderInput.files=t,this.validateFileInput()&&this.updateImagePreview(t))}setError(e){this.$fileErrorMessage.parentElement.classList.toggle("has-error",e)}updateImagePreview(e){this.$imageUploader.classList.remove("p16","ba","bas-dashed","bc-black-100"),this.$clearImageUpload.classList.remove("d-none"),this.$imageUploaderText.classList.add("d-none");var t=new FileReader;t.onload=e=>{null!=e.target&&(this.$imageUploaderPreview.setAttribute("src",e.target.result),this.$imageUploaderPreview.classList.remove("d-none"))},t.readAsDataURL(e[0])}validateFileInput(){if(this.ignoreValidation)return!0;const e=this.cam.opt.adReportFileTypeErrorMessage,t=this.cam.opt.adReportFileSizeErrorMessage;if(null==this.$fileUploaderInput.files)return!1;var o=this.$fileUploaderInput.files[0];return null==o?(this.setError(!0),!1):this.allowedFileTypes.indexOf(o.type)<0?(this.$fileErrorMessage.textContent=e,this.$fileErrorMessage.classList.remove("d-none"),this.setError(!0),!1):o.size>2097152?(this.$fileErrorMessage.textContent=t,this.$fileErrorMessage.classList.remove("d-none"),this.setError(!0),!1):(this.$fileErrorMessage.classList.add("d-none"),this.setError(!1),!0)}async submitForm(){if(!this.validateFileInput())return!1;this.$form.querySelector("[type=submit]").setAttribute("disabled","true");var e=JSON.parse(this.$googleEventData.value||"{}");e.Reason=parseInt(this.$form.querySelector(".js-ad-report-reason:checked").value,10),e.Description=this.$adReportReasonOther.value,this.$googleEventData.value=JSON.stringify(e);var t=new FormData(this.$form);try{const e=await window.fetch(this.$form.getAttribute("action"),{method:this.$form.getAttribute("method"),body:t,cache:"no-cache"}),a=e.headers.get("content-type")||"",s=await e.text();if(!e.ok)throw new Error("response not valid");if(0===a.indexOf("text/html")){var o=(0,_common_helper__WEBPACK_IMPORTED_MODULE_2__.Bv)(s);const e=o?o.querySelector(".js-modal-content"):null;if(_console__WEBPACK_IMPORTED_MODULE_1__.cM("$popupContent"),_console__WEBPACK_IMPORTED_MODULE_1__.cM(e),!e)throw new Error(`Could not find .js-modal-content in response from ${this.$form.getAttribute("action")}`);document.querySelector(".js-modal-content").replaceWith(e)}else window.StackExchange.helpers.showToast(this.cam.opt.adReportThanksText,{type:"success"}),this.removeModal()}catch(e){window.StackExchange.helpers.showToast(this.cam.opt.adReportErrorText,{type:"danger"})}finally{let e=this.$form.querySelector("[type=submit]");e&&e.removeAttribute("disabled")}}}},276:(e,t,o)=>{function a(...e){}o.d(t,{cM:()=>a})}},__webpack_module_cache__={};function __webpack_require__(e){var t=__webpack_module_cache__[e];if(void 0!==t)return t.exports;var o=__webpack_module_cache__[e]={exports:{}};return __webpack_modules__[e](o,o.exports,__webpack_require__),o.exports}__webpack_require__.d=(e,t)=>{for(var o in t)__webpack_require__.o(t,o)&&!__webpack_require__.o(e,o)&&Object.defineProperty(e,o,{enumerable:!0,get:t[o]})},__webpack_require__.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t);var __webpack_exports__={};(()=>{var e=__webpack_require__(276),t=(e=>(e[e.Above=0]="Above",e[e.Below=1]="Below",e))(t||{});const o=Object.assign({},{"lib":"https://cdn.sstatic.net/clc/js/bundles/gam_loader_script/gam_loader_script.bundle.741.a1bd5bd69766c6c9192d.min.js","style":null,"u":null,"wa":true,"kt":2000,"tto":true,"h":"clc.stackoverflow.com","allowed":"^(((talent\\.)?stackoverflow)|(blog\\.codinghorror)|(.*\\.googlesyndication)|(serverfault|askubuntu)|([^\\.]+\\.stackexchange))\\.com$","wv":true,"al":false,"abd":true,"cpa_liid":[5882654614],"cpa_cid":[138377597667],"dp":false});var a=__webpack_require__(23),s=__webpack_require__(865),i=__webpack_require__(763);window.cam=new class{constructor(){this.gptImported=!1,this.collapsed={},e.cM("constructor"),this.clc_options=o,window.clcGamLoaderOptions?Object.assign(this,window.clcGamLoaderOptions):void 0===this.opt&&(this.opt=window.opt)}init(){if(e.cM("init"),void 0===this.opt)throw new Error("opt not set, required by GAM Loader");e.cM("setup message handler"),window.addEventListener("message",e=>{this.onmessage(e)}),this.opt.targeting&&this.opt.targeting.ProductVariant&&"SystemDefault"===this.opt.targeting.ProductVariant[0]&&(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?this.opt.targeting.ProductVariant="Dark":this.opt.targeting.ProductVariant="Light")}handleSlotRenderedNoAdReport(){if(googletag.pubads().addEventListener("slotRenderEnded",e=>this.applyExtraMarginBottom(e)),Array.isArray(this.slotsRenderedEvents))for(var e=0;e<this.slotsRenderedEvents.length;e++)this.applyExtraMarginBottom(this.slotsRenderedEvents[e])}onmessage(t){let o="omni";if(t.data&&("string"==typeof t.data||t.data instanceof String))if(0===t.data.indexOf("get-omni-")){e.cM("Recevied get-omni message, sending back omni");var a=t.source,i=this.opt.omni,n="string"==typeof i?i:"";a.postMessage([o,n,this.opt.requestGuid].join("|"),"*")}else if(0===t.data.indexOf("collapse-")){e.cM("Recevied collapse message, collapse ad iframe"),e.cM(t);for(var r=t.source.window,l=document.getElementsByTagName("IFRAME"),d=0;d<l.length;d++){var c=l[d];if(c.contentWindow==r)return void(0,s.wo)(c.parentElement.parentElement.parentElement)}}else if(0===t.data.indexOf("resize|")){e.cM("Recevied resize message, resize ad iframe"),e.cM(t);let o=this._getFrameByEvent(t),a=t.data.indexOf("|")+1,s=t.data.slice(a),i=parseFloat(s)+.5;e.cM("New iframe height "+i),o.height=i.toString(),o.parentElement.style.height=i.toString()+"px"}else if(0===t.data.indexOf("getmarkup|")){let o=t.data.indexOf("|")+1,a=t.data.slice(o);e.cM("Recevied get markup message: "+a);let s=this._getFrameByEvent(t).closest(".everyonelovesstackoverflow");const i=document.createElement("script");i.dataset.adZoneId=s.id,i.src=a,document.body.appendChild(i)}}placeInIframe(t,o){e.cM("Received markup result in main frame");let a=document.getElementById(t.dataset.adZoneId),s=a.querySelector("iframe");if("string"==typeof o.prefixToIframeHtml){let e=document.createElement("div");e.innerHTML=o.prefixToIframeHtml,a.prepend(e.querySelector("img"))}s.contentWindow.postMessage(["markup",JSON.stringify(o)].join("|"),"*")}_getFrameByEvent(e){return Array.from(document.getElementsByTagName("iframe")).filter(t=>t.contentWindow===e.source)[0]}classifyZoneIds(e){const t=e.map(s.Nj).filter(s.yb);return{eligible:t.filter(s.xb).filter(s.pn),ineligible:t.filter(s.xj)}}applyExtraMarginBottom(t){if(t&&t.slot&&!t.isEmpty&&(t.creativeId||t.lineItemId||!t.isEmpty)){var o=t.slot.getSlotElementId();if(o){var s=document.getElementById(o);if(s)if((0,a.eq)(o)){var i=s?.closest(".js-zone-container");i.style.marginBottom="24px",e.cM("Applied extra margin to the bottom of "+o)}else e.cM("Not applying extra margin to the bottom of "+o+": shouldHaveReportButton = false");else e.cM("Not applying extra margin to the bottom of "+o+": resolved invalid adUnit element")}else e.cM("Not applying extra margin to the bottom of element: invalid adUnitElementId")}else e.cM("Not applying extra margin to the bottom of element: invalid SlotRenderEndedEvent")}load(o=(0,a.kG)()){const n=this.opt.tlb_position===t.Above?["dfp-mlb","dfp-smlb"]:["dfp-mlb","dfp-smlb","dfp-tlb"];if(!this.isGptReady())return e.cM("Initializing..."),this.initGpt(),void googletag.cmd.push(()=>this.load(o));this.opt.adReportEnabled?(e.cM("Ad reporting enabled"),this.adReports=new i.t(googletag,this)):(e.cM("Ad reporting not enabled"),this.handleSlotRenderedNoAdReport()),e.cM("Attempting to load ads into ids: ",o);const{eligible:r,ineligible:l}=this.classifyZoneIds(o);if(this.initDebugPanel(googletag,r.concat(l)),r.forEach(e=>(0,s.cf)(e)),l.forEach(s.wo),0===r.length)return void e.cM("Found no ad ids on page");e.cM("Eligible ids:",r),this.opt.abd&&this.appendAdblockDetector();var d=googletag.pubads().getSlots().filter(e=>o.indexOf(e.getSlotElementId())>=0);googletag.destroySlots(d),this.opt.sf&&(googletag.pubads().setForceSafeFrame(!0),googletag.pubads().setSafeFrameConfig({allowOverlayExpansion:!0,allowPushExpansion:!0,sandbox:!0})),e.cM("Targeting consent: Checking...");let c=!1,p=!1;void 0!==this.opt.targeting_consent&&(p=!0,e.cM("Targeting consent: Parameter set"),e.cM("Targeting consent: Consent given? ",this.opt.targeting_consent),c=this.opt.targeting_consent),void 0!==this.opt.personalization_consent&&(e.cM("Personalization consent: Parameter set"),e.cM("Personalization consent: Consent given? ",this.opt.personalization_consent),c=c&&this.opt.personalization_consent),c=c&&p,googletag.pubads().setRequestNonPersonalizedAds(c?0:1),c||googletag.pubads().setPrivacySettings({limitedAds:!0}),this.opt.ll||googletag.pubads().enableSingleRequest(),cam.sreEvent||(googletag.pubads().addEventListener("slotRenderEnded",e=>this.onSlotRendered(e)),cam.sreEvent=!0),this.setTargeting(googletag);var g=r.filter(e=>!this.opt.ll||n.indexOf(e.id)<0),h=r.filter(e=>!!this.opt.ll&&n.indexOf(e.id)>=0);e.cM("Up front ids:",g),e.cM("Lazy loaded ids:",h),g.forEach(t=>{e.cM(`Defining ad for element ${t.id}`),this.defineSlot(t.id,googletag),t.setAttribute("data-dfp-zone","true")}),googletag.enableServices(),g.forEach(t=>{e.cM(`Displaying ad for element ${t.id}`),googletag.cmd.push(()=>googletag.display(t.id))}),this.opt.ll&&(e.cM("Enabling lazy loading for GAM"),googletag.pubads().enableLazyLoad({fetchMarginPercent:0,renderMarginPercent:0}),e.cM("Setting up lazy loaded ad units"),h.forEach(t=>{e.cM(`Lazy loading - Defining Slot ${t.id}`),this.defineSlot(t.id,googletag)}),h.forEach(t=>{e.cM(`Lazy loading - Displaying ad for element ${t.id}`),googletag.cmd.push(()=>googletag.display(t.id))}))}setTargeting(t){let o=this.opt.targeting;if(!o)throw new Error("Targeting not defined");Object.keys(o).forEach(a=>{e.cM(`-> targeting - ${a}: ${o[a]}`),t.pubads().setTargeting(a,o[a])})}appendAdblockDetector(){const e=document.createElement("div");e.className="adsbox",e.id="clc-abd",e.style.position="absolute",e.style.pointerEvents="none",e.innerHTML="&nbsp;",document.body.appendChild(e)}onSlotRendered(o){try{const n=o.slot.getSlotElementId();let r=[];n||r.push("id=0");const l=document.getElementById(n);if(n&&!l&&r.push("el=0"),0!==r.length)return void this.stalled(r.join("&"));const{path:d,sizes:c,zone:p}=(0,a.Z7)(n);if(this.collapsed[p]&&o.isEmpty)return e.cM(`No line item for the element #${l.id}... collapsing.`),void(0,s.wo)(l);if(this.slotsRenderedEvents.push(o),o.lineItemId||o.creativeId||!o.isEmpty){e.cM(`Rendered ad for element #${l.id} [line item #${o.lineItemId}]`),e.cM(o);var i=l.parentElement;if(i.classList.contains("js-zone-container")){switch((0,s.cf)(i),n){case"dfp-tlb":this.opt.tlb_position===t.Above?i.classList.add("mb8"):i.classList.add("mt16");break;case"dfp-tag":i.classList.add("mb8");break;case"dfp-msb":i.classList.add("mt16");break;case"dfp-mlb":case"dfp-smlb":case"dfp-bmlb":i.classList.add("my8");break;case"dfp-isb":i.classList.add("mt24");break;case"dfp-m-aq":i.classList.add("my12"),i.classList.add("mx-auto")}(0,s.$Z)(i),(0,s.$Z)(l)}else e.cM(`No ad for element #${l.id}, collapsing`),e.cM(o),(0,s.wo)(l)}}catch(e){this.stalled("e=1")}}stalled(e){(new Image).src=`https://${this.clc_options.h}/stalled.gif?${e}`}defineSlot(t,o){"dfp-isb"===t&&(e.cM("-> targeting - Sidebar: Inline"),o.pubads().setTargeting("Sidebar",["Inline"])),"dfp-tsb"===t&&(e.cM("-> targeting - Sidebar: Right"),o.pubads().setTargeting("Sidebar",["Right"]));const{path:s,sizes:i,zone:n}=(0,a.Z7)(t);e.cM(`Defining slot for ${t}: ${s}, sizes: ${JSON.stringify(i)}`),o.defineSlot(s,i,t).addService(o.pubads())}importGptLibrary(){this.gptImported||(this.gptImported=!0,void 0===this.opt.targeting_consent||this.opt.targeting_consent?(0,s.Gx)("https://securepubads.g.doubleclick.net/tag/js/gpt.js"):(0,s.Gx)("https://pagead2.googlesyndication.com/tag/js/gpt.js"))}isGptReady(){return"undefined"!=typeof googletag&&!!googletag.apiReady}initGpt(){"undefined"==typeof googletag&&(window.googletag={cmd:(0,s.QZ)(()=>this.importGptLibrary())})}initDebugPanel(t,o){e.cM("initDebugPanel"),e.cM("Not showing debug panel")}},window.clcGamLoaderOptions&&(cam.init(),cam.load())})()})();</script>
+        
+    <footer id="footer" class="site-footer js-footer" role="contentinfo">
+        <div class="site-footer--container">
+            <nav class="site-footer--nav">
+                    <div class="site-footer--col">
+                        <h5 class="-title"><a href="/">Stack Overflow en espa&#xF1;ol</a></h5>
+                        <ul class="-list js-primary-footer-links">
+                                    <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 2 })" href="/tour">Recorrido</a></li>
+                                <li><a href="/help" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 3 })">Ayuda</a></li>
+                                    <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 5 })" href="https://chat.stackexchange.com?tab=site&host=es.stackoverflow.com">Chat</a></li>
+                            <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 13 })" href="/contact">Contacto</a></li>
+                                <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 14 })" href="https://es.meta.stackoverflow.com">Comentarios</a></li>
+                        </ul>
+                    </div>
+                <div class="site-footer--col">
+                    <h5 class="-title"><a class="js-gps-track" data-gps-track="footer.click({ location: 2, link: 1 })" href="https://stackoverflow.co/">Empresa</a></h5>
+                    <ul class="-list">
+                            <li><a href="https://stackoverflow.com" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 15})">Stack Overflow</a></li>
+                            <li><a href="https://stackoverflow.co/teams" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 29 })">Teams</a></li>
+                            <li><a href="https://stackoverflow.co/advertising" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 21 })">Advertising</a></li>
+                            <li><a href="https://stackoverflow.co/collectives" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 40 })">Collectives</a></li>
+                            <li><a href="https://stackoverflow.co/talent" class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 20 })">Talent</a></li>
+                                <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 1 })" href="https://stackoverflow.co/">Acerca de</a></li>
+                        <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 27 })" href="https://stackoverflow.co/company/press">Prensa</a></li>
+                        <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 7 })" href="https://stackoverflow.com/legal">Legal</a></li>
+                        <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 8 })" href="https://stackoverflow.com/legal/privacy-policy">Pol&#xED;tica de privacidad</a></li>
+                        <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 37 })" href="https://stackoverflow.com/legal/terms-of-service">T&#xE9;rminos de Servicio</a></li>
+                            <li class="" id="consent-footer-link"><a class="js-gps-track -link js-cookie-settings" data-gps-track="footer.click({ location: 2, link: 38 })" href="#" data-consent-popup-loader="footer">Configuraci&#xF3;n de las cookies</a></li>
+                        <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link: 39 })" href="https://stackoverflow.com/legal/cookie-policy">Pol&#xED;tica de las cookies</a></li>
+                    </ul>
+                </div>
+                <div class="site-footer--col site-footer--categories-nav">
+                    <div>
+                        <h5 class="-title"><a href="https://stackexchange.com" data-gps-track="footer.click({ location: 2, link: 30 })">Red Stack Exchange</a></h5>
+                        <ul class="-list">
+                            <li>
+                                <a href="https://stackexchange.com/sites#technology" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Technology
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackexchange.com/sites#culturerecreation" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Culture &amp; recreation
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackexchange.com/sites#lifearts" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Life &amp; arts
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackexchange.com/sites#science" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Science
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackexchange.com/sites#professional" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Professional
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://stackexchange.com/sites#business" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Negocios
+                                </a>
+                            </li>
+
+                            <li class="mt16 md:mt0">
+                                <a href="https://api.stackexchange.com/" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    API
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="https://data.stackexchange.com/" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 24 })">
+                                    Data
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+            <div class="site-footer--copyright fs-fine md:mt24">
+                <ul class="-list -social md:mb8">
+                    <li><a class="js-gps-track -link" data-gps-track="footer.click({ location: 2, link:4 })" href="https://stackoverflow.blog?blb=1">Blog</a></li>
+                    <li><a href="https://www.facebook.com/officialstackoverflow/" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 31 })">Facebook</a></li>
+                    <li><a href="https://twitter.com/stackoverflow" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 32 })">Twitter</a></li>
+                    <li><a href="https://linkedin.com/company/stack-overflow" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 33 })">LinkedIn</a></li>
+                    <li><a href="https://www.instagram.com/thestackoverflow" class="-link js-gps-track" data-gps-track="footer.click({ location: 2, link: 36 })">Instagram</a></li>
+                </ul>
+
+                <p class="md:mb0">
+Site design / logo &#169; 2023 Stack Exchange Inc; user contributions licensed under <span class='td-underline'><a href="https://stackoverflow.com/help/licensing">CC BY-SA</a></span>.                    <span id="svnrev">rev&nbsp;2023.2.10.43235</span>
+                </p>
+            </div>
+        </div>
+
+    </footer>
+
+
+                <!-- Google tag (gtag.js) -->
+            <script async src="https://www.googletagmanager.com/gtag/js?id=G-S812YQPLT2"></script>
+            <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag() { dataLayer.push(arguments); }
+            </script>
+        <script>
+            StackExchange.ready(function() {
+
+                var ga3Settings = {
+                    autoLink: ["stackoverflow.blog","info.stackoverflowsolutions.com","stackoverflowsolutions.com"],
+                    sendTitles: true,
+                    tracker: window.ga,
+                    trackingCodes: [
+                        'UA-108242619-5'
+                    ],
+                    checkDimension: 'dimension42'
+                                                    };
+
+                var customGA4Dimensions = {};
+
+
+                var ga4Settings = {
+                    tracker: gtag,
+                    trackingCodes: [
+                        'G-S812YQPLT2'
+                    ],
+                    consentsToPerformanceCookies: "denied",
+                    consentsToTargetingCookies: "denied",
+                    eventParameters: customGA4Dimensions,
+                    checkForAdBlock: true
+                };
+
+                StackExchange.ga.init({ GA3: ga3Settings, GA4: ga4Settings });
+
+
+                StackExchange.ga.setDimension('dimension2', '|javascript|jquery|objeto|atributos|');
+
+
+                StackExchange.ga.setDimension('dimension3', 'Questions/Show');
+
+
+                StackExchange.ga.setDimension('dimension7', "1676149698.1416658831");
+
+                StackExchange.ga.trackPageView();
+            });
+        </script>
+
+        
+                <div class="ff-sans ps-fixed z-nav-fixed ws4 sm:w-auto p32 sm:p16 bg-black-750 fc-white bar-lg b16 l16 r16 js-consent-banner">
+                    <svg aria-hidden="true" class="mln4 mb24 sm:d-none svg-spot spotCookieLg" style="color: var(--theme-button-filled-background-color)" width="96" height="96" viewBox="0 0 96 96">
+                        <path d="M35 45.5a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0zM63.5 63a7.5 7.5 0 100-15 7.5 7.5 0 000 15zm-19 19a7.5 7.5 0 100-15 7.5 7.5 0 000 15z" opacity=".2"/>
+                        <path d="M56.99 2.53a23.1 23.1 0 0114.66 6.15h.01l.01.02c.57.55.61 1.27.5 1.74v.07a10.95 10.95 0 01-3.07 4.77 9 9 0 01-6.9 2.5 10.34 10.34 0 01-9.72-10.44v-.08a10 10 0 011.03-3.74l.01-.03.02-.02c.28-.5.82-.92 1.52-.95.63-.02 1.27-.02 1.93.01zm12.04 7.83a20.1 20.1 0 00-12.2-4.83l-.92-.03c-.23.6-.38 1.25-.43 1.94a7.34 7.34 0 006.95 7.34 6 6 0 004.64-1.7c.94-.88 1.6-1.9 1.96-2.72zm15.3 8.76a6.84 6.84 0 00-5.09-.24 7.9 7.9 0 00-3.28 2.05 1.8 1.8 0 00-.3 1.95l.02.02v.02a15.16 15.16 0 008.74 7.47c.64.23 1.32.08 1.8-.33a6.63 6.63 0 001.63-1.97l.01-.03.01-.03c1.67-3.5-.12-7.32-3.54-8.91zm-5.5 3.28c.36-.25.82-.5 1.35-.67.92-.3 1.92-.35 2.89.1 2.14 1 2.92 3.14 2.11 4.88-.12.21-.26.41-.43.6l-.26-.1a12.29 12.29 0 01-5.66-4.81zM32 24a2 2 0 11-4 0 2 2 0 014 0zm12 21a2 2 0 11-4 0 2 2 0 014 0zm36 4a2 2 0 11-4 0 2 2 0 014 0zm-7 21a2 2 0 11-4 0 2 2 0 014 0zM59 81a2 2 0 11-4 0 2 2 0 014 0zM22 63a2 2 0 11-4 0 2 2 0 014 0zm27 7a9 9 0 11-18 0 9 9 0 0118 0zm-3 0a6 6 0 10-12 0 6 6 0 0012 0zM33 41a9 9 0 11-18 0 9 9 0 0118 0zm-15 0a6 6 0 1012 0 6 6 0 00-12 0zm50 11a9 9 0 11-18 0 9 9 0 0118 0zm-3 0a6 6 0 10-12 0 6 6 0 0012 0zM44.08 4.24c.31.48.33 1.09.05 1.58a17.46 17.46 0 00-2.36 8.8c0 9.55 7.58 17.24 16.85 17.24 2.97 0 5.75-.78 8.16-2.15a1.5 1.5 0 012.1.66 12.08 12.08 0 0011 6.74 12.4 12.4 0 007.85-2.75 1.5 1.5 0 012.38.74A45.76 45.76 0 0192 48.16c0 24.77-19.67 44.9-44 44.9S4 72.93 4 48.16C4 25.23 20.84 6.28 42.64 3.58a1.5 1.5 0 011.44.66zM40.22 7C21.32 10.71 7 27.7 7 48.16c0 23.17 18.39 41.9 41 41.9s41-18.73 41-41.9c0-3.52-.42-6.93-1.22-10.2a15.5 15.5 0 01-7.9 2.15c-5.5 0-10.36-2.83-12.97-7.1a19.46 19.46 0 01-8.28 1.85c-11 0-19.86-9.1-19.86-20.24 0-2.7.52-5.26 1.45-7.62zM92 91a2 2 0 100-4 2 2 0 000 4zM7 8.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM82.5 90a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm9.5-7.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM13.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM80 14.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM53.5 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+                    </svg>
+                    <p class="fs-body2 fw-bold mb4">
+                        Tu privacidad
+                    </p>
+                    <p class="mb16 s-anchors s-anchors__inherit s-anchors__underlined">
+                        Presionando &quot;Aceptar todas las cookies&quot;, aceptas que Stack Exchange puede guardar cookies en tu dispositivo y mostrar informaci&#243;n de acuerdo a nuestra <a href="https://stackoverflow.com/legal/cookie-policy">pol&#237;tica de cookies</a>.
+                    </p>
+                    <div class="d-flex gs8 ai-stretch fd-column sm:fd-row">
+                        <button class="flex--item s-btn s-btn__primary js-accept-cookies js-consent-banner-hide">
+                            Aceptar todas las cookies
+                        </button>
+
+                        <button class="flex--item s-btn s-btn__filled js-cookie-settings" data-consent-popup-loader="banner">
+                            Personalizar las configuraciones
+                        </button>
+                    </div>
+                </div>
+    <div id="onetrust-consent-sdk" class="d-none"></div>
+    <div id="onetrust-banner-sdk" data-controller="s-modal"></div>
+    <div id="ot-pc-content" class="d-none"></div>
+    <div id="onetrust-style" class="d-none">&nbsp;</div>
+    <div class="d-none js-consent-banner-version" data-consent-banner-version="baseline"></div>
+
+    
+    </body>
+    </html>

@@ -124,7 +124,7 @@ struct ReRanker<M: CrossEncoder> {
 impl<M: CrossEncoder> ReRanker<M> {
     fn new(model: Arc<M>) -> Self {
         Self {
-            coefficient: 10000.0,
+            coefficient: 800.0,
             model,
             prev_score: 1.0,
             query: String::new(),

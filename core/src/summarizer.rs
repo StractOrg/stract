@@ -18,7 +18,7 @@ use std::{
     cmp::{Ordering, Reverse},
     collections::{BinaryHeap, VecDeque},
     path::Path,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use itertools::{intersperse, Itertools};
@@ -139,14 +139,22 @@ impl<'a> Iterator for OverlappingSents<'a> {
 }
 pub struct Summarizer {
     word2vec: Word2Vec,
-    top_n_passages: usize,
-    abstractive_model: AbstractiveModel,
+    top_n_extractive_passages: usize,
+    abstractive_summarizer: AbstractiveSummarizer,
 }
 
 impl Summarizer {
-    // pub fn new() -> Self {
-    //     Self {}
-    // }
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Ok(Self {
+            word2vec: Word2Vec::open(path.as_ref().join("word2vec.bin.gz").as_path())?,
+            top_n_extractive_passages: 20,
+            abstractive_summarizer: AbstractiveSummarizer {
+                model: Arc::new(AbstractiveModel::open(
+                    path.as_ref().join("abstractive").as_path(),
+                )?),
+            },
+        })
+    }
 
     pub fn extractive_summary(&self, query: &str, text: &str) -> Option<String> {
         let query_vectors: Vec<_> = query
@@ -159,7 +167,7 @@ impl Summarizer {
         }
 
         let mut best_passages: BinaryHeap<Reverse<CandidatePassage<'_>>> =
-            BinaryHeap::with_capacity(self.top_n_passages);
+            BinaryHeap::with_capacity(self.top_n_extractive_passages);
 
         let overlap_sents = OverlappingSents::new(text, 100, 10);
 
@@ -187,7 +195,7 @@ impl Summarizer {
                 score,
             };
 
-            if best_passages.len() >= self.top_n_passages {
+            if best_passages.len() >= self.top_n_extractive_passages {
                 if let Some(mut worst) = best_passages.peek_mut() {
                     if worst.0.score < candidate.score {
                         *worst = Reverse(candidate);
@@ -209,12 +217,20 @@ impl Summarizer {
     }
 
     pub fn abstractive_summary(&self, _query: &str, text: &str) -> String {
-        todo!("use onnx to generate stuff")
+        self.abstractive_summarizer
+            .summarize(text, GenerationConfig::default())
     }
 
     pub fn summarize(&self, query: &str, text: &str) -> Option<String> {
         self.extractive_summary(query, text)
             .map(|summary| self.abstractive_summary(query, &summary))
+    }
+
+    pub fn summarize_iter(&self, query: &str, text: &str) -> Option<impl Iterator<Item = String>> {
+        self.extractive_summary(query, text).map(|summary| {
+            self.abstractive_summarizer
+                .summarize_iter(&summary, GenerationConfig::default())
+        })
     }
 }
 
@@ -251,7 +267,7 @@ impl AbstractiveModel {
             ONNX_ENVIRONMENT
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(1)?
+                .with_number_threads(5)?
                 .with_model_from_file(folder.as_ref().join("encoder_model.onnx"))?,
         );
 
@@ -259,7 +275,7 @@ impl AbstractiveModel {
             ONNX_ENVIRONMENT
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(1)?
+                .with_number_threads(5)?
                 .with_model_from_file(folder.as_ref().join("decoder_model.onnx"))?,
         );
 
@@ -267,7 +283,7 @@ impl AbstractiveModel {
             ONNX_ENVIRONMENT
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(1)?
+                .with_number_threads(5)?
                 .with_model_from_file(folder.as_ref().join("decoder_with_past_model.onnx"))?,
         );
 
@@ -312,33 +328,58 @@ impl AbstractiveModel {
 
         Ok(res)
     }
+}
 
-    pub fn summarize(&self, text: &str, config: GenerationConfig) -> Result<String> {
-        let generator = BeamGenerator {
-            model: self,
+pub struct AbstractiveSummarizer {
+    model: Arc<AbstractiveModel>,
+}
+
+impl AbstractiveSummarizer {
+    pub fn new(model: AbstractiveModel) -> Self {
+        Self {
+            model: Arc::new(model),
+        }
+    }
+    pub fn summarize(&self, text: &str, config: GenerationConfig) -> String {
+        BeamGenerator {
+            model: Arc::clone(&self.model),
             config,
             state: Some(BeamState::Encoding {
                 text: text.to_string(),
             }),
-        };
+        }
+        .skip(2) // the first 2 tokens are BeginDecoder and BOS
+        .collect()
+    }
 
-        Ok(generator.collect())
+    pub fn summarize_iter(
+        &self,
+        text: &str,
+        config: GenerationConfig,
+    ) -> impl Iterator<Item = String> {
+        BeamGenerator {
+            model: Arc::clone(&self.model),
+            config,
+            state: Some(BeamState::Encoding {
+                text: text.to_string(),
+            }),
+        }
+        .skip(2) // the first 2 tokens are BeginDecoder and BOS
     }
 }
 
-struct BeamGenerator<'a> {
-    model: &'a AbstractiveModel,
+struct BeamGenerator {
+    model: Arc<AbstractiveModel>,
     config: GenerationConfig,
     state: Option<BeamState>,
 }
 
-impl<'a> Iterator for BeamGenerator<'a> {
+impl Iterator for BeamGenerator {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.state
-            .take()
-            .and_then(|state| match state.step(self.model, &self.config) {
+        self.state.take().and_then(|state| {
+            match state.step(Arc::clone(&self.model), &self.config) {
                 Ok((state, res)) => {
                     self.state = Some(state);
                     res
@@ -347,7 +388,8 @@ impl<'a> Iterator for BeamGenerator<'a> {
                     tracing::error!("Encountered an error while generating summary: {err}");
                     None
                 }
-            })
+            }
+        })
     }
 }
 
@@ -750,15 +792,15 @@ impl BeamState {
             .all_equal()
     }
 
-    fn step<'a>(
+    fn step(
         mut self,
-        model: &'a AbstractiveModel,
-        config: &'a GenerationConfig,
-    ) -> Result<(Self, Option<<BeamGenerator<'a> as Iterator>::Item>)> {
+        model: Arc<AbstractiveModel>,
+        config: &GenerationConfig,
+    ) -> Result<(Self, Option<<BeamGenerator as Iterator>::Item>)> {
         loop {
             match self {
                 BeamState::Encoding { text } => {
-                    self = Self::encode_step(model, text)?;
+                    self = Self::encode_step(model.as_ref(), text)?;
                 }
                 BeamState::Decoding {
                     encoder_hidden_states,
@@ -766,7 +808,7 @@ impl BeamState {
                 } => {
                     let ids = vec![model.begin_decoder_token as i64, model.bos_token_id as i64];
                     let decoder_output = Self::run_decoder_model(
-                        model,
+                        model.as_ref(),
                         &ids,
                         encoder_hidden_states.clone(),
                         attention_mask.clone(),
@@ -807,14 +849,14 @@ impl BeamState {
                     if (shortest_beam.input_ids.len() - beam_token_agreement_idx) as u32
                         > config.max_beam_divergence_tokens
                     {
-                        let longest_beam = beams
+                        let best_beam = beams
                             .iter()
-                            .max_by(|a, b| a.input_ids.len().cmp(&b.input_ids.len()))
+                            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal))
                             .unwrap()
                             .clone();
 
                         let num_beams = beams.len();
-                        beams = vec![longest_beam; num_beams];
+                        beams = vec![best_beam; num_beams];
                     }
 
                     if Self::all_beams_agree(&beams, beam_token_agreement_idx) {
@@ -834,7 +876,7 @@ impl BeamState {
                     }
 
                     let decoder_output = Self::run_decoder_model_with_past(
-                        model,
+                        model.as_ref(),
                         &beams,
                         &encoder_hidden_states,
                         &attention_mask,
@@ -860,7 +902,11 @@ impl BeamState {
                             .iter()
                             .all(|beam| beam.is_finished(model.eos_token_id as i64))
                     {
-                        self = Self::output_from_best(model, new_beams, beam_token_agreement_idx);
+                        self = Self::output_from_best(
+                            model.as_ref(),
+                            new_beams,
+                            beam_token_agreement_idx,
+                        );
                     } else {
                         self = BeamState::DecodingWithPast {
                             encoder_hidden_states,
@@ -994,7 +1040,7 @@ impl Default for GenerationConfig {
             }),
             force_min_tokens: None,
             length_penalty: 1.0,
-            num_beams: 5,
+            num_beams: 10,
             max_beam_divergence_tokens: 20,
         }
     }
@@ -1044,8 +1090,12 @@ mod tests {
 
     #[test]
     fn abstractive_summary() {
-        let model = AbstractiveModel::open("../data/abstractive_summary")
-            .expect("abstractive summary model not found");
+        let summarizer = AbstractiveSummarizer {
+            model: Arc::new(
+                AbstractiveModel::open("../data/summarizer/abstractive")
+                    .expect("abstractive summary model not found"),
+            ),
+        };
 
         let text = r#"Aristotle (/ˈærɪstɒtəl/;[1] Greek: Ἀριστοτέλης Aristotélēs, pronounced [aristotélɛːs]; 384–322 BC) was an Ancient Greek philosopher and polymath. His writings cover a broad range of subjects including physics, biology, zoology, metaphysics, logic, ethics, aesthetics, poetry, drama, music, rhetoric, psychology, linguistics, economics, politics, meteorology, geology, and government. As the founder of the Peripatetic school of philosophy in the Lyceum in Athens, he began the wider Aristotelian tradition that followed, which set the groundwork for the development of modern science.
         Little is known about Aristotle's life. He was born in the city of Stagira in Northern Greece during the Classical period. His father, Nicomachus, died when Aristotle was a child, and he was brought up by a guardian. At seventeen or eighteen years of age he joined Plato's Academy in Athens and remained there until the age of thirty-seven (c. 347 BC). Shortly after Plato died, Aristotle left Athens and, at the request of Philip II of Macedon, tutored his son Alexander the Great beginning in 343 BC. He established a library in the Lyceum which helped him to produce many of his hundreds of books on papyrus scrolls.
@@ -1060,7 +1110,7 @@ mod tests {
         };
 
         let start = std::time::Instant::now();
-        let summary = model.summarize(text, config).unwrap();
+        let summary = summarizer.summarize(text, config);
         println!("Elapsed: {:?}", start.elapsed());
         println!("{:?}", &summary);
 

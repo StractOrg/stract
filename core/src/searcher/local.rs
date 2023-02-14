@@ -22,6 +22,7 @@ use uuid::Uuid;
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
+use crate::inverted_index::RetrievedWebpage;
 use crate::query::parser::Term;
 use crate::query::{self, Query};
 use crate::ranking::centrality_store::SearchCentralityStore;
@@ -356,6 +357,10 @@ impl LocalSearcher {
         self.entity_index
             .as_ref()
             .and_then(|index| index.get_attribute_occurrence(attribute))
+    }
+
+    pub fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
+        self.index.get_webpage(url)
     }
 }
 

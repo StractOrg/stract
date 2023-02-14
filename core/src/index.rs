@@ -316,6 +316,10 @@ impl Index {
     pub fn num_segments(&self) -> usize {
         self.inverted_index.num_segments()
     }
+
+    pub(crate) fn get_webpage(&self, url: &str) -> Option<inverted_index::RetrievedWebpage> {
+        self.inverted_index.get_webpage(url)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -20,7 +20,7 @@ use tantivy::collector::{Collector, Count};
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
-use tantivy::tokenizer::TokenizerManager;
+use tantivy::tokenizer::{Tokenizer as _, TokenizerManager};
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
@@ -401,6 +401,30 @@ impl InvertedIndex {
 
     pub fn num_segments(&self) -> usize {
         self.tantivy_index.searchable_segments().unwrap().len()
+    }
+
+    pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
+        let searcher = self.reader.searcher();
+        let field = searcher
+            .schema()
+            .get_field(Field::Text(TextField::Url).name())
+            .unwrap();
+        let tokenizer = Tokenizer::default();
+        let mut stream = tokenizer.token_stream(url);
+        let mut term_queries = Vec::new();
+
+        while let Some(tok) = stream.next() {
+            let term = tantivy::Term::from_field_text(field, &tok.text);
+            term_queries.push(term);
+        }
+
+        let query = tantivy::query::PhraseQuery::new(term_queries);
+        let mut res = searcher
+            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
+            .unwrap();
+
+        res.pop()
+            .map(|(_, doc)| self.retrieve_doc(doc.into(), &searcher).unwrap())
     }
 }
 
@@ -1244,5 +1268,38 @@ mod tests {
                 }
             )))
         );
+    }
+
+    #[test]
+    fn get_webpage() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                            <script type="application/ld+json">{{"@context":"http://schema.org","@type":"LiveBlogPosting","coverageStartTime":"2022-11-14T23:45:00+00:00","coverageEndTime":"2022-11-15T23:45:00.000Z","datePublished":"2022-11-14T23:45:00+00:00","articleBody":"","author":[{{"name":"DR"}}],"copyrightYear":2022}}</script>
+                        </head>
+                        <body>
+                            {CONTENT} test
+                            <article itemscope="" itemType="http://schema.org/NewsArticle">
+                                <div itemProp="publisher" itemscope="" itemType="https://schema.org/Organization"><meta itemProp="name" content="DR"/>
+                                </div>
+                            </article>
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.example.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let webpage = index.get_webpage("https://www.example.com").unwrap();
+        assert_eq!(webpage.title, "News website".to_string());
+        assert_eq!(webpage.url, "https://www.example.com".to_string());
     }
 }

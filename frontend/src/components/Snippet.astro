@@ -4,10 +4,11 @@ import { askama } from "../askama";
 
 export interface Props {
   snippet: string;
+  index: string;
 }
 ---
 
-<div>
+<div class="snippet">
   {
     askama.match("item.snippet", {
       "Snippet::Normal { date, text }": (
@@ -15,7 +16,7 @@ export interface Props {
           {askama.if_("let Some(date) = date", () => (
             <span class="text-gray-500">{askama`date $ 2. May 2022`}</span>
           ))}
-          <span class="[&:nth-child(2)]:before:content-['—']">
+          <span id={"snippet-text-" + askama`loop.index0`} class="[&:nth-child(2)]:before:content-['—'] snippet-text">
             {askama`text|safe $ {{lorem.lines}}`}
           </span>
         </div>
@@ -81,3 +82,20 @@ export interface Props {
     })
   }
 </div>
+
+<style>
+  @keyframes cursor-blink {
+    0% {
+      opacity: 0;
+    }
+  }
+
+  .blinking-cursor::after {
+    content: "";
+    width: 2px;
+    height: 1rem;
+    background: #292d30;
+    display: inline-block;
+    animation: cursor-blink 1s steps(2) infinite;
+  }
+</style>

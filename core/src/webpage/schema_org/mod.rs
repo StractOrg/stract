@@ -337,6 +337,99 @@ mod tests {
     }
 
     #[test]
+    fn stackoverflow_question_with_code() {
+        let html = include_str!("../../../testcases/schema_org/stackoverflow_with_code.html");
+        let root = kuchiki::parse_html().one(html);
+        let res = microdata::parse_schema(root);
+
+        assert_eq!(res.len(), 1);
+
+        assert!(res[0].properties.contains_key("image"));
+        assert!(res[0].properties.contains_key("primaryImageOfPage"));
+        assert_eq!(
+            res[0].properties.get("name"),
+            Some(&RawOneOrMany::One(RawProperty::String(
+                "Almacenar y comparar valor de atributo de un objeto en javascript".to_string()
+            )))
+        );
+
+        let main = res[0]
+            .properties
+            .get("mainEntity")
+            .unwrap()
+            .clone()
+            .one()
+            .unwrap()
+            .try_into_item()
+            .unwrap();
+
+        assert_eq!(
+            main.itemtype,
+            Some(RawOneOrMany::One("Question".to_string()))
+        );
+        assert_eq!(
+            main.properties.get("name"),
+            Some(&RawOneOrMany::One(RawProperty::String(
+                "Almacenar y comparar valor de atributo de un objeto en javascript".to_string()
+            )))
+        );
+        assert_eq!(
+            main.properties.get("dateCreated"),
+            Some(&RawOneOrMany::One(RawProperty::String(
+                "2018-05-10T10:17:26".to_string()
+            )))
+        );
+
+        assert!(main.properties.contains_key("acceptedAnswer"));
+
+        let text = main.properties.get("text").unwrap().clone().many();
+
+        assert!(text[0].try_into_string().is_some());
+
+        let answer = main
+            .properties
+            .get("acceptedAnswer")
+            .unwrap()
+            .clone()
+            .one()
+            .unwrap()
+            .try_into_item()
+            .unwrap();
+        let parts = answer.properties.get("text").cloned().unwrap().many();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].try_into_string().unwrap(), "En pulsador_cerrado tienes una definición de clase que luego tienes que instanciar según lo que he visto en la documentación. Entiendo que lo que quieres hacer quedaría de la siguiente forma:\n".to_string());
+        assert_eq!(
+            parts[1]
+                .try_into_item()
+                .unwrap()
+                .itemtype
+                .unwrap()
+                .one()
+                .unwrap(),
+            "SourceCode".to_string()
+        );
+        assert!(
+            parts[1]
+                .try_into_item()
+                .unwrap()
+                .properties
+                .get("text")
+                .cloned()
+                .unwrap()
+                .one()
+                .unwrap()
+                .try_into_string()
+                .unwrap()
+                .len()
+                > 100
+        );
+        assert_eq!(
+            parts[2].try_into_string().unwrap(),
+            "Espero que te funcione".to_string()
+        );
+    }
+
+    #[test]
     fn recipe() {
         let html = include_str!("../../../testcases/schema_org/recipe.html");
         let root = kuchiki::parse_html().one(html);

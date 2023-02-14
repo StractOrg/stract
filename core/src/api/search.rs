@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use http::Uri;
+use http::{StatusCode, Uri};
 use optics::SiteRankings;
 use std::{collections::HashMap, sync::Arc};
 
@@ -29,6 +29,7 @@ use crate::{
     searcher::{self, SearchQuery, SearchResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
     widgets::Widget,
+    Error,
 };
 
 use super::{
@@ -94,7 +95,7 @@ pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
     extract::OriginalUri(uri): extract::OriginalUri,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, StatusCode> {
     let query = params.get("q").cloned().unwrap_or_default();
 
     let skip_pages: usize = params
@@ -171,15 +172,20 @@ pub async fn route(
                     current_optic_url,
                 };
 
-                HtmlTemplate(template).into_response()
+                Ok(HtmlTemplate(template).into_response())
             }
-            SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
+            SearchResult::Bang(result) => {
+                Ok(Redirect::to(&result.redirect_to.full()).into_response())
+            }
         },
-        Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
-        Err(_err) => {
-            dbg!(_err);
-            panic!("Search failed")
-        } // TODO: show 500 status to user here
+        Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
+            Ok(Redirect::to("/").into_response())
+        }
+        Err(err) => {
+            tracing::error!("{:?}", err);
+
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
@@ -242,7 +248,9 @@ pub async fn api(
             SearchResult::Websites(result) => Json(result).into_response(),
             SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
         },
-        Err(searcher::distributed::Error::EmptyQuery) => Redirect::to("/").into_response(),
+        Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
+            Redirect::to("/").into_response()
+        }
         Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
     }
 }

@@ -23,6 +23,7 @@ use crate::{
     qa_model::QaModel,
     ranking::models::cross_encoder::CrossEncoderModel,
     searcher::{DistributedSearcher, Shard},
+    summarizer::Summarizer,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -43,12 +44,14 @@ mod optics;
 mod privacy;
 pub mod search;
 mod sites;
+mod summarize;
 
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
     pub searcher: DistributedSearcher,
     pub autosuggest: Autosuggest,
+    pub summarizer: Arc<Summarizer>,
 }
 
 impl<T> IntoResponse for HtmlTemplate<T>
@@ -82,6 +85,7 @@ pub fn router(
     crossencoder_model_path: &str,
     qa_model_path: &str,
     bangs_path: &str,
+    summarizer_path: &str,
     shards: Vec<Vec<String>>,
 ) -> Result<Router> {
     let shards: Vec<_> = shards
@@ -99,6 +103,7 @@ pub fn router(
     let state = Arc::new(State {
         searcher,
         autosuggest,
+        summarizer: Arc::new(Summarizer::open(summarizer_path)?),
     });
 
     Ok(Router::new()
@@ -122,6 +127,7 @@ pub fn router(
                 )
             },
         ))
-        .layer(Extension(state))
-        .layer(CompressionLayer::new()))
+        .layer(CompressionLayer::new())
+        .merge(Router::new().route("/summarize", get(summarize::route)))
+        .layer(Extension(state)))
 }

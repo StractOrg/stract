@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+import gensim
+
+model = gensim.models.KeyedVectors.load_word2vec_format(
+    "data/summarizer/word2vec.bin", limit=1000, binary=True)
+model.save_word2vec_format(
+    "data/summarizer/truncated_word2vec.bin", binary=True)

@@ -52,7 +52,7 @@ impl CrossEncoderModel {
             ONNX_ENVIRONMENT
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(1)?
+                // .with_number_threads(10)?
                 .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
         );
 

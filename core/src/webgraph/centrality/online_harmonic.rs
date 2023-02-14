@@ -43,7 +43,6 @@ const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
 const MAX_DIST_PROXY: u8 = 6;
 const MAX_NUM_OUT_EDGES: usize = 1000;
-pub const SCORE_OFFSET: f64 = 1.0;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
@@ -93,7 +92,6 @@ pub struct Scorer {
     liked_nodes: Vec<UserNode>,
     disliked_nodes: Vec<UserNode>,
     cache: Mutex<HashMap<NodeID, f64>>,
-    num_liked_nodes: usize,
 }
 
 fn create_user_nodes(nodes: &[NodeID], proxy_nodes: &[Arc<ProxyNode>]) -> Vec<UserNode> {
@@ -125,11 +123,8 @@ impl Scorer {
         disliked_nodes: &[NodeID],
         fixed_scores: HashMap<NodeID, f64>,
     ) -> Self {
-        let num_liked_nodes = liked_nodes.len();
-
         Self {
             fixed_scores,
-            num_liked_nodes,
             liked_nodes: create_user_nodes(liked_nodes, proxy_nodes),
             disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes),
             cache: Mutex::new(HashMap::new()),
@@ -144,7 +139,7 @@ impl Scorer {
                 return *cached;
             }
 
-            let res = (SCORE_OFFSET
+            let res = (self.disliked_nodes.len() as f64
                 + (self
                     .liked_nodes
                     .iter()
@@ -164,9 +159,8 @@ impl Scorer {
                         .map(|(dist, disliked_node)| {
                             disliked_node.weight as f64 / (dist as f64 + 1.0)
                         })
-                        .sum::<f64>())
-                    / self.num_liked_nodes as f64)
-                .max(0.0);
+                        .sum::<f64>()))
+            .max(0.0);
 
             self.cache.lock().unwrap().insert(node, res);
 
@@ -213,6 +207,10 @@ impl UserNode {
     }
 
     fn best_dist(&self, node: &NodeID) -> Option<u8> {
+        if *node == self.id {
+            return Some(0);
+        }
+
         let mut best = None;
 
         for proxy in &self.proxy_nodes {
@@ -525,13 +523,13 @@ mod tests {
 
         let disliked_nodes: Vec<_> = vec![Node::from("D".to_string()), Node::from("E".to_string())]
             .into_iter()
-            .filter_map(|node| graph.node2id(&node))
+            .map(|node| graph.node2id(&node).unwrap())
             .collect();
 
         let scorer = centrality.scorer(&[], &disliked_nodes);
 
         for node in &disliked_nodes {
-            assert_eq!(scorer.score(*node), 0.0);
+            assert!(scorer.score(*node) < 1.0);
         }
     }
 

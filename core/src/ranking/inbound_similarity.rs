@@ -16,7 +16,7 @@
 
 use std::{
     cmp::{Ordering, Reverse},
-    collections::{BinaryHeap, HashSet},
+    collections::BinaryHeap,
     fs::File,
     io::{BufReader, BufWriter, Read},
     path::Path,
@@ -32,25 +32,43 @@ use crate::{
 };
 
 use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
-const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND: usize = 2000;
 const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 1_000_000;
-const SCORE_SCALE: f64 = 5.0;
 
 pub struct Scorer {
-    liked: Vec<bitvec_similarity::BitVec>,
-    disliked: Vec<bitvec_similarity::BitVec>,
+    liked: Vec<NodeScorer>,
+    disliked: Vec<NodeScorer>,
     vectors: Arc<IntMap<bitvec_similarity::BitVec>>,
+}
+
+#[derive(Debug)]
+struct NodeScorer {
+    node: NodeID,
+    inbound: bitvec_similarity::BitVec,
+}
+
+impl NodeScorer {
+    fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
+        if self.node == *other {
+            1.0
+        } else {
+            self.inbound.sim(other_inbound)
+        }
+    }
 }
 
 impl Scorer {
     pub fn score(&self, node: &NodeID) -> f64 {
         match self.vectors.get(&node.0) {
-            Some(vec) => (SCORE_SCALE
-                + (self.liked.iter().map(|liked| liked.sim(vec)).sum::<f64>()
+            Some(vec) => (self.disliked.len() as f64
+                + (self
+                    .liked
+                    .iter()
+                    .map(|liked| liked.sim(node, vec))
+                    .sum::<f64>()
                     - self
                         .disliked
                         .iter()
-                        .map(|disliked| disliked.sim(vec))
+                        .map(|disliked| disliked.sim(node, vec))
                         .sum::<f64>()))
             .max(0.0),
             None => 0.0,
@@ -95,22 +113,18 @@ impl InboundSimilarity {
             graph,
             harmonic,
             DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES,
-            DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_INBOUND,
         )
     }
     fn build_with_threshold(
         graph: &Webgraph,
         harmonic: &HarmonicCentralityStore,
         num_top_nodes: usize,
-        num_top_nodes_inbound: usize,
     ) -> Self {
         let mut vectors = IntMap::new();
         let nodes: Vec<_> = graph.nodes().collect();
 
         let mut top_nodes: BinaryHeap<Reverse<ScoredNode>> =
             BinaryHeap::with_capacity(num_top_nodes);
-        let mut top_nodes_inbound: BinaryHeap<Reverse<ScoredNode>> =
-            BinaryHeap::with_capacity(num_top_nodes_inbound);
 
         for (node, centrality) in harmonic.host.iter() {
             let scored_node = Reverse(ScoredNode {
@@ -127,33 +141,16 @@ impl InboundSimilarity {
             } else {
                 top_nodes.push(scored_node.clone());
             }
-
-            if top_nodes_inbound.len() >= num_top_nodes_inbound {
-                if let Some(mut worst) = top_nodes_inbound.peek_mut() {
-                    if worst.0.score < scored_node.0.score {
-                        *worst = scored_node;
-                    }
-                }
-            } else {
-                top_nodes_inbound.push(scored_node);
-            }
         }
 
-        let inbound_nodes: HashSet<NodeID> =
-            top_nodes_inbound.into_iter().map(|n| n.0.node).collect();
-
         if let Some(max_node) = nodes.iter().max().copied() {
-            let mut buf = vec![false; max_node.0 as usize];
+            let mut buf = vec![false; max_node.0 as usize + 1];
 
             for node_id in top_nodes.into_iter().map(|n| n.0.node) {
                 buf.clear();
-                buf.resize(max_node.0 as usize, false);
+                buf.resize(max_node.0 as usize + 1, false);
 
-                for edge in graph
-                    .raw_ingoing_edges(&node_id)
-                    .into_iter()
-                    .filter(|edge| inbound_nodes.contains(&edge.from))
-                {
+                for edge in graph.raw_ingoing_edges(&node_id) {
                     buf[edge.from.0 as usize] = true;
                 }
 
@@ -169,12 +166,20 @@ impl InboundSimilarity {
     pub fn scorer(&self, liked_sites: &[NodeID], disliked_sites: &[NodeID]) -> Scorer {
         let liked: Vec<_> = liked_sites
             .iter()
-            .filter_map(|id| self.vectors.get(&id.0).cloned())
+            .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
+            .map(|(node, inbound)| NodeScorer {
+                node: *node,
+                inbound,
+            })
             .collect();
 
         let disliked: Vec<_> = disliked_sites
             .iter()
-            .filter_map(|id| self.vectors.get(&id.0).cloned())
+            .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
+            .map(|(node, inbound)| NodeScorer {
+                node: *node,
+                inbound,
+            })
             .collect();
 
         Scorer {
@@ -196,6 +201,10 @@ impl InboundSimilarity {
         bincode::serialize_into(&mut file, &self)?;
 
         Ok(())
+    }
+
+    pub fn get(&self, node: &NodeID) -> Option<&bitvec_similarity::BitVec> {
+        self.vectors.get(&node.0)
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -251,7 +260,7 @@ mod tests {
         harmonic_centrality_store.host.flush();
 
         let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000, 1000);
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
 
         let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
         let e = graph.node2id(&Node::from("e.com")).unwrap();
@@ -281,7 +290,7 @@ mod tests {
         harmonic_centrality_store.host.flush();
 
         let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000, 1000);
+            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
 
         let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
         centrality_store.inbound_similarity = inbound;

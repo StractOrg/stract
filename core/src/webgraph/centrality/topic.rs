@@ -37,7 +37,7 @@ use crate::{
     index::Index,
     ranking::{initial::InitialScoreTweaker, SignalAggregator},
     schema::{FastField, Field, TextField},
-    webgraph::{centrality::online_harmonic::SCORE_OFFSET, NodeID, Webgraph},
+    webgraph::{NodeID, Webgraph},
 };
 use crate::{query::Query, Result};
 
@@ -184,7 +184,7 @@ impl TopicCentrality {
             let scorer = harmonic.scorer(&top_sites, &[]);
 
             for node in &nodes {
-                node_scores[node.0 as usize][i] = scorer.score(*node) - SCORE_OFFSET;
+                node_scores[node.0 as usize][i] = scorer.score(*node);
             }
         }
 

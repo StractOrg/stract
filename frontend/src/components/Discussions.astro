@@ -39,19 +39,22 @@ export interface Props {
 }
 
 <script>
-  const discussionMore = document.getElementById("discussion-more")!;
-  const discussionMoreBtn = document.getElementById("discussion-more-btn")!;
+  const discussionMore = document.getElementById("discussion-more");
+  const discussionMoreBtn = document.getElementById("discussion-more-btn");
 
   let moreIsShown = false;
-  discussionMoreBtn.addEventListener("click", () => {
-    moreIsShown = !moreIsShown;
 
-    if (moreIsShown) {
-      discussionMore.classList.remove("hidden");
-      discussionMoreBtn.innerHTML = "Show less";
-    } else {
-      discussionMore.classList.add("hidden");
-      discussionMoreBtn.innerHTML = "Show more";
-    }
-  });
+  if (discussionMoreBtn && discussionMore) {
+    discussionMoreBtn.addEventListener("click", () => {
+      moreIsShown = !moreIsShown;
+
+      if (moreIsShown) {
+        discussionMore.classList.remove("hidden");
+        discussionMoreBtn.innerHTML = "Show less";
+      } else {
+        discussionMore.classList.add("hidden");
+        discussionMoreBtn.innerHTML = "Show more";
+      }
+    });
+  }
 </script>

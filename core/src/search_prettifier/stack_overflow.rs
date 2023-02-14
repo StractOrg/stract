@@ -66,7 +66,9 @@ fn parse_so_answer(
                     .get("text")
                     .and_then(|p| p.clone().one())
                     .and_then(|prop| prop.try_into_string())
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string(),
             ),
         })
         .collect();

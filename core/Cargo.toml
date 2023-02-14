@@ -73,6 +73,8 @@ onnxruntime = { workspace = true }
 tokenizers = { workspace = true }
 lalrpop-util = { workspace = true }
 byteorder = { workspace = true }
+async-stream = { workspace = true }
+tokio-stream = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

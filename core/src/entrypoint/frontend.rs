@@ -24,6 +24,7 @@ pub async fn run(config: FrontendConfig) -> Result<()> {
         &config.crossencoder_model_path,
         &config.qa_model_path,
         &config.bangs_path,
+        &config.summarizer_path,
         config.search_servers,
     )?;
     let addr = config.host.parse()?;

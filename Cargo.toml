@@ -68,3 +68,5 @@ num_cpus = "1.15.0"
 onnxruntime = { git = "https://github.com/Cuely/onnxruntime-rs" }
 tokenizers = "0.13.2"
 byteorder = "1.4.3"
+async-stream = "0.3.3"
+tokio-stream = "0.1.11"

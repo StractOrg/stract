@@ -77,6 +77,10 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                         }
                     }
                 }
+                searcher::Request::GetWebpage { url } => {
+                    let result = local_searcher.get_webpage(url);
+                    req.respond(sonic::Response::Content(result)).await.ok();
+                }
             }
         }
     }

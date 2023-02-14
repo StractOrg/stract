@@ -45,10 +45,12 @@ fn parse_properties(node: NodeRef) -> Vec<RawProperty> {
     }
 
     while let Some(node) = q.pop_front() {
+        let mut expand_children = true;
         match node.data() {
             kuchiki::NodeData::Element(elem) => {
                 if elem.name.local.to_string().as_str() == "code" {
                     let mut properties = HashMap::new();
+
                     properties.insert(
                         "text".to_string(),
                         RawOneOrMany::One(RawProperty::String(node.text_contents())),
@@ -57,7 +59,9 @@ fn parse_properties(node: NodeRef) -> Vec<RawProperty> {
                     res.push(RawProperty::Item(RawItem {
                         itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
                         properties,
-                    }))
+                    }));
+
+                    expand_children = false;
                 }
             }
             kuchiki::NodeData::Text(text) => {
@@ -73,8 +77,10 @@ fn parse_properties(node: NodeRef) -> Vec<RawProperty> {
             _ => {}
         }
 
-        for child in node.children().rev() {
-            q.push_front(child);
+        if expand_children {
+            for child in node.children().rev() {
+                q.push_front(child);
+            }
         }
     }
 

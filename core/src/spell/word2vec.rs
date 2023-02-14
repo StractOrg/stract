@@ -15,9 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Modified from: https://github.com/DimaKudosh/word2vec
-use std::{collections::HashMap, io::BufRead};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::bufread::MultiGzDecoder;
+use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -26,6 +33,9 @@ pub enum Error {
 
     #[error("IO")]
     IO(#[from] std::io::Error),
+
+    #[error("Bincode")]
+    Bincode(#[from] bincode::Error),
 }
 
 struct WordVectorReader<R: BufRead> {
@@ -37,14 +47,6 @@ struct WordVectorReader<R: BufRead> {
 }
 
 impl<R: BufRead> WordVectorReader<R> {
-    pub fn vocabulary_size(&self) -> usize {
-        return self.vocabulary_size;
-    }
-
-    pub fn vector_size(&self) -> usize {
-        return self.vector_size;
-    }
-
     pub fn new_from_reader(mut reader: R) -> Result<WordVectorReader<R>, Error> {
         // Read UTF8 header string from start of file
         let mut header = String::new();
@@ -113,18 +115,38 @@ impl<R: BufRead> Iterator for WordVectorReader<R> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct WordVec(Vec<f32>);
 impl WordVec {
-    pub(crate) fn sim(&self, passage_vec: &WordVec) -> f32 {
-        todo!();
+    fn magnitude(&self) -> f32 {
+        self.0.iter().map(|f| f.powf(2.0)).sum::<f32>().sqrt()
+    }
+
+    pub(crate) fn sim(&self, other: &WordVec) -> f32 {
+        self.0
+            .iter()
+            .zip(other.0.iter())
+            .map(|(a, b)| a * b)
+            .sum::<f32>()
+            / (self.magnitude() * other.magnitude())
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Word2Vec {
     vectors: HashMap<String, WordVec>,
 }
+
 impl Word2Vec {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let reader = BufReader::new(MultiGzDecoder::new(BufReader::new(File::open(path)?)));
+        let reader = WordVectorReader::new_from_reader(reader)?;
+        let vectors: HashMap<_, _> = reader.map(|(word, vec)| (word, WordVec(vec))).collect();
+
+        Ok(Self { vectors })
+    }
+
     pub(crate) fn get(&self, word: &str) -> Option<&WordVec> {
-        todo!()
+        self.vectors.get(word)
     }
 }

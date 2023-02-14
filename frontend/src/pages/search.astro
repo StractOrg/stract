@@ -5,8 +5,8 @@ import Sidebar from "../components/Sidebar.astro";
 import Snippet from "../components/Snippet.astro";
 import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
+import Modal from "../components/SearchModal.astro";
 import Header from "../components/Header.astro";
-import RankingModal from "../components/RankingModal.astro";
 import Discussions from "../components/Discussions.astro";
 import Widget from "../components/Widget.astro";
 import DirectAnswer from "../components/DirectAnswer.astro";
@@ -112,12 +112,14 @@ import { askama } from "../askama";
                     <div
                       class="adjust-btn hidden min-w-fit items-center justify-center md:flex"
                       data-site="{{ item.site }}"
+                      data-url="{{ item.url }}"
+                      data-idx="{{ loop.index0 }}"
                     >
                       <Hero class="w-6" icon="adjustments" />
                     </div>
                   </div>
                   <div class="text-sm text-snippet">
-                    <Snippet snippet={askama`item.snippet`} />
+                    <Snippet snippet={askama`item.snippet`} index={askama`loop.index0`} />
                   </div>
                 </div>
               </div>
@@ -155,8 +157,8 @@ import { askama } from "../askama";
       }
     </div>
 
-    <!-- Ranking modal -->
-    <RankingModal />
+    <!-- Modal -->
+    <Modal />
   </main>
 
   <Footer />
@@ -214,14 +216,14 @@ import { askama } from "../askama";
 <script is:inline src="/js/highlight.min.js"></script>
 <script is:inline>
   var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
-  var rankingModal = document.getElementById("ranking-modal");
+  var modal = document.getElementById("modal");
 
   document.addEventListener("click", (elem) => {
-    rankingModal.classList.remove("modal-open");
-    rankingModal.classList.add("modal-closed");
+    modal.classList.remove("modal-open");
+    modal.classList.add("modal-closed");
   });
 
-  var rankingModalHeight = rankingModal.clientHeight;
+  var rankingModalHeight = modal.clientHeight;
 
   rankingAdjustButtons.forEach((btn) => {
     btn.addEventListener("click", (event) => {
@@ -229,19 +231,19 @@ import { askama } from "../askama";
 
       const elem = event.target;
 
-      updateModal(elem.dataset.site);
+      updateModal(elem.dataset.idx, elem.dataset.site, elem.dataset.url);
 
       const rect = elem.getBoundingClientRect();
-      rankingModal.style.left = rect.left + rect.width + 5 + "px";
-      rankingModal.style.top =
+      modal.style.left = rect.left + rect.width + 5 + "px";
+      modal.style.top =
         rect.top +
         document.documentElement.scrollTop -
         rankingModalHeight / 2 +
         "px";
 
       setTimeout(() => {
-        rankingModal.classList.remove("modal-closed");
-        rankingModal.classList.add("modal-open");
+        modal.classList.remove("modal-closed");
+        modal.classList.add("modal-open");
       }, 0);
     });
   });

@@ -14,21 +14,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use cuely::webgraph::{Node, WebgraphBuilder};
+use cuely::{
+    ranking::inbound_similarity::InboundSimilarity,
+    webgraph::{Node, WebgraphBuilder},
+};
 
 pub fn main() {
     let graph = WebgraphBuilder::new("data/webgraph").read_only(true).open();
+    let inbound = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
 
-    for host in [
-        "plapcatesq.ga",
-        "lfsni36qvn.ga",
-        "onlinester.ga",
-        "GroomersNew.ga",
-    ] {
+    for host in ["archwaypublishing.com", "wordpressfoundation.org"] {
         println!("{host}:");
-        for edge in graph.ingoing_edges(Node::from(host)) {
+
+        let node = Node::from(host);
+        let node_id = graph.node2id(&node).unwrap();
+        let inbound_vec = inbound.get(&node_id).unwrap();
+        println!("{:?}", inbound_vec);
+
+        for edge in graph.ingoing_edges(node) {
             println!("{} -> {} ({})", edge.from.name, edge.to.name, edge.label);
         }
+
         println!();
     }
 }

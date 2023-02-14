@@ -1,0 +1,314 @@
+---
+import Hero from "./Hero.astro";
+---
+<div
+  class="modal-closed absolute flex h-fit w-52 origin-left flex-col items-center overflow-hidden rounded-lg border bg-white py-5 px-2 text-sm drop-shadow-md"
+  id="modal"
+>
+  <div>
+    <h2 class="w-fit text-center">
+      Do you like results from <span id="modal-site-label">
+        EXAMPLE.com
+      </span>?
+    </h2>
+    <div class="flex space-x-1.5 pt-2 justify-center">
+      <button
+        class="rounded-full border bg-white px-2 py-2 hover:border-brand hover:text-brand"
+        onclick="preferMore()"
+        id="prefer-more"
+      >
+          <Hero class="w-4" icon="thumb-up" />
+      </button>
+      <button
+        class="rounded-full border bg-white px-2 py-2 hover:border-amber-400 hover:text-amber-400"
+        onclick="preferLess()"
+        id="prefer-less"
+      >
+        <Hero class="w-4" icon="thumb-down" />
+      </button>
+      <button
+        class="rounded-full border bg-white px-2 py-2 hover:border-red-500 hover:text-red-500"
+        onclick="block()"
+        id="prefer-block"
+      >
+        <Hero class="w-4" icon="ban" />
+      </button>
+    </div>
+  </div>
+  <div class="mt-4 flex justify-center">
+    <button id="summarize-btn" onclick="summarizeBtn()">
+      Summarize Result
+    </button>
+  </div>
+</div>
+
+<noscript>
+  <style>
+    #modal {
+      visibility: hidden;
+    }
+  </style>
+</noscript>
+
+<style>
+  #modal.modal-open {
+    transition: transform 0.15s ease-in-out, left 0.15s ease-in-out,
+      top 0.15s ease-in-out;
+    transform: scale(1);
+  }
+
+  #prefer-more.selected {
+    @apply border-brand text-brand;
+  }
+
+  #prefer-less.selected {
+    @apply border-amber-400 text-amber-400;
+  }
+
+  #prefer-block.selected {
+    @apply border-red-500 text-red-500;
+  }
+
+  #modal.modal-closed {
+    transition: none !important;
+    transform: scale(0);
+  }
+
+  #summarize-btn {
+    @apply rounded-full px-2 py-1 border bg-white hover:border-brand hover:text-brand;
+  }
+  #summarize-btn.active {
+    @apply border-brand text-brand;
+  }
+</style>
+
+<script is:inline>
+  var rankingModal = document.getElementById("modal");
+  var siteLabel = document.getElementById("modal-site-label");
+  var btnPreferMore = document.getElementById("prefer-more");
+  var btnPreferLess = document.getElementById("prefer-less");
+  var btnPreferBlock = document.getElementById("prefer-block");
+  var btnPreferBlock = document.getElementById("prefer-block");
+  var btnSummarize = document.getElementById("summarize-btn");
+
+  var currentSite = "";
+  var currentUrl = "";
+  var currentIdx = null;
+
+  const BLOCKED = 0;
+  const LESS = 1;
+  const MORE = 2;
+
+  let rankings = JSON.parse(
+    window.localStorage.getItem("sites-ranking-adjustment") || "{}"
+  );
+
+  rankingModal.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  // This is called from search.astro
+  // Do not delete!
+  function updateModal(idx, site, url) {
+    siteLabel.innerHTML = site;
+    currentSite = site;
+    currentUrl = url;
+    currentIdx = idx;
+
+    updateSelection();
+    updateSummaryBtn();
+  }
+  function updateSummaryBtn() {
+    var idx = parseInt(currentIdx);
+    var snip = snippets[idx];
+
+    if (snip["summaryShown"]) {
+      if (!btnSummarize.classList.contains("active")) {
+        btnSummarize.classList.add("active");
+      }
+    } else {
+      if (btnSummarize.classList.contains("active")) {
+        btnSummarize.classList.remove("active");
+      }
+    }
+  }
+
+  function updateSelection() {
+    let rankings = JSON.parse(
+      window.localStorage.getItem("sites-ranking-adjustment") || "{}"
+    );
+
+    btnPreferMore.classList.remove("selected");
+    btnPreferLess.classList.remove("selected");
+    btnPreferBlock.classList.remove("selected");
+
+    if (rankings[currentSite] != undefined) {
+      let pref = rankings[currentSite];
+
+      if (pref == MORE) {
+        btnPreferMore.classList.add("selected");
+      } else if (pref == LESS) {
+        btnPreferLess.classList.add("selected");
+      } else if (pref == BLOCKED) {
+        btnPreferBlock.classList.add("selected");
+      }
+    }
+  }
+
+  function setSitePreference(pref) {
+    if (rankings[currentSite] == pref) {
+      delete rankings[currentSite];
+    } else {
+      rankings[currentSite] = pref;
+    }
+
+    window.localStorage.setItem(
+      "sites-ranking-adjustment",
+      JSON.stringify(rankings)
+    );
+
+    updateSelection();
+    document.getElementById("searchbar-form").submit();
+  }
+
+  // called from button
+  function preferMore() {
+    setSitePreference(MORE);
+  }
+
+  // called from button
+  function preferLess() {
+    setSitePreference(LESS);
+  }
+
+  // called from button
+  function block() {
+    setSitePreference(BLOCKED);
+  }
+
+  const allSnippetElements = document.getElementsByClassName("snippet");
+  var snippets = {};
+
+  for (let i = 0; i < allSnippetElements.length; i++) {
+    const snip = allSnippetElements[i];
+    const snipText = snip.querySelector(".snippet-text");
+    if (snipText) {
+      snippets[i] = {
+        "origSnippet": snipText.innerHTML,
+        "summaryShown": false,
+        "summary": {
+          "text": "",
+          "shownUpto": 0,
+          "hasStarted": false,
+        }};
+    }
+  }
+
+  function displayPreviousStreamed(summary, elem) {
+    let s = ""
+
+    for (i = 0; i < summary["shownUpto"]; i++) {
+      s += summary["text"][i];
+    }
+
+    elem.innerHTML = s;
+  }
+
+  var previousDisplayStreams = {};
+
+  // called from button
+  function summarizeBtn() {
+    if (currentIdx === null) {
+      return;
+    }
+
+    var snippetElem = document.getElementById("snippet-text-" + currentIdx);
+
+    if (snippetElem == null) {
+      return;
+    }
+
+    var idx = parseInt(currentIdx);
+    var snip = snippets[idx];
+
+    snip["summaryShown"] = !snip["summaryShown"];
+    if (snip["summaryShown"]) {
+      if (!btnSummarize.classList.contains("active")) {
+        btnSummarize.classList.add("active");
+      }
+      summarize(idx, snippetElem);
+    } else {
+      if (snippetElem.classList.contains("blinking-cursor")) {
+        snippetElem.classList.remove("blinking-cursor");
+      }
+      if (btnSummarize.classList.contains("active")) {
+        btnSummarize.classList.remove("active");
+      }
+
+      snippetElem.innerHTML = snip["origSnippet"];
+    }
+
+  }
+
+
+  function summarize(idx, snippetElem) {
+    if (previousDisplayStreams[idx] != null) {
+      clearInterval(previousDisplayStreams[idx]);
+    }
+
+    var snip = snippets[idx];
+    displayPreviousStreamed(snip["summary"], snippetElem);
+
+    var searchParams = new URLSearchParams(window.location.search);
+    var query = searchParams.get("q");
+
+    var displayChars = setInterval(() => {
+      if (snip["summary"]["shownUpto"] < snip["summary"]["text"].length) {
+        if (snip["summaryShown"]) {
+          snippetElem.innerHTML += snip["summary"]["text"][snip["summary"]["shownUpto"]];
+        }
+
+        snip["summary"]["shownUpto"] += 1;
+      }
+    }, 20);
+
+    previousDisplayStreams[idx] = displayChars;
+
+    var reqData = {
+        'query': query,
+        'url': currentUrl,
+      };
+
+    var queryData = new URLSearchParams(reqData).toString();
+
+    if (!snip["summary"]["hasStarted"]) {
+      snip["summary"]["hasStarted"] = true;
+      snippetElem.classList.add("blinking-cursor");
+      var source = new EventSource("/summarize?" + queryData);
+      source.onmessage = function(event) {
+        if (event.data == "") {
+          setTimeout(() => {
+            clearInterval(displayChars);
+            snip["summary"]["shownUpto"] = snip["summary"]["text"].length;
+            if (snip["summaryShown"]) {
+              displayPreviousStreamed(snip["summary"], snippetElem);
+            }
+          }, 10000);
+          snippetElem.classList.remove("blinking-cursor");
+          source.close();
+          return;
+        }
+
+        snip["summary"]["text"] += event.data;
+      }
+
+      source.onerror = function(e) {
+        console.log("summarization error", e);
+        clearInterval(displayChars);
+        snippetElem.classList.remove("blinking-cursor");
+        snippetElem.innerHTML = snip["origSnippet"];
+        source.close();
+      }
+    }
+  }
+</script>

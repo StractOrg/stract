@@ -3,3 +3,4 @@ tensorboard>1.15.0
 torch
 optimum>=1.6.3
 datasets
+gensim
