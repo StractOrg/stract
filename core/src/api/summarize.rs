@@ -50,12 +50,7 @@ async fn summarize(
 
     let summarizer = Arc::clone(&state.summarizer);
     tokio::task::spawn_blocking(move || {
-        summarize_blocking(
-            summarizer
-                .summarize_iter(&params.query, &webpage.body)
-                .unwrap(),
-            tx,
-        )
+        summarize_blocking(summarizer.summarize_iter(&params.query, &webpage.body), tx)
     });
 
     let stream = async_stream::stream! {

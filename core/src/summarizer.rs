@@ -22,7 +22,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use itertools::Itertools;
+use itertools::{intersperse, Itertools};
 use onnxruntime::{
     ndarray::{ArrayBase, Axis, Dim, IxDynImpl, OwnedRepr},
     tensor::OrtOwnedTensor,
@@ -167,7 +167,7 @@ impl Summarizer {
         })
     }
 
-    pub fn extractive_summary(&self, query: &str, text: &str) -> Option<String> {
+    fn extractive_query_specific(&self, query: &str, text: &str) -> Option<String> {
         let query_vectors: Vec<_> = query
             .split_whitespace()
             .filter_map(|word| self.word2vec.get(word))
@@ -254,21 +254,25 @@ impl Summarizer {
         Some(res)
     }
 
+    pub fn extractive_summary(&self, query: &str, text: &str) -> String {
+        self.extractive_query_specific(query, text)
+            .unwrap_or_else(|| intersperse(text.split_whitespace().take(1000), " ").collect())
+    }
+
     pub fn abstractive_summary(&self, _query: &str, text: &str) -> String {
         self.abstractive_summarizer
             .summarize(text, GenerationConfig::default())
     }
 
-    pub fn summarize(&self, query: &str, text: &str) -> Option<String> {
-        self.extractive_summary(query, text)
-            .map(|summary| self.abstractive_summary(query, &summary))
+    pub fn summarize(&self, query: &str, text: &str) -> String {
+        let summary = self.extractive_summary(query, text);
+        self.abstractive_summary(query, &summary)
     }
 
-    pub fn summarize_iter(&self, query: &str, text: &str) -> Option<impl Iterator<Item = String>> {
-        dbg!(self.extractive_summary(query, text)).map(|summary| {
-            self.abstractive_summarizer
-                .summarize_iter(&summary, GenerationConfig::default())
-        })
+    pub fn summarize_iter(&self, query: &str, text: &str) -> impl Iterator<Item = String> {
+        let summary = self.extractive_summary(query, text);
+        self.abstractive_summarizer
+            .summarize_iter(&summary, GenerationConfig::default())
     }
 }
 
