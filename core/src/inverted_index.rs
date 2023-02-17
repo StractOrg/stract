@@ -271,8 +271,21 @@ impl InvertedIndex {
         Ok(webpages)
     }
 
-    pub fn merge_into_segments(&mut self, num_segments: u32) -> Result<()> {
-        assert!(num_segments > 0);
+    pub fn merge_into_max_segments(&mut self, max_num_segments: u32) -> Result<()> {
+        assert!(max_num_segments > 0);
+
+        let mut segments: Vec<_> = self
+            .tantivy_index
+            .load_metas()?
+            .segments
+            .into_iter()
+            .collect();
+
+        if segments.len() <= max_num_segments as usize {
+            return Ok(());
+        }
+
+        let num_segments = (max_num_segments + 1) / 2; // ceil(num_segments/2)
 
         let mut merge_segments = Vec::new();
 
@@ -283,39 +296,29 @@ impl InvertedIndex {
             });
         }
 
-        let mut segments: Vec<_> = self
-            .tantivy_index
-            .load_metas()?
-            .segments
+        segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
+
+        for segment in segments {
+            let best_candidate = merge_segments
+                .iter_mut()
+                .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
+                .unwrap();
+
+            best_candidate.num_docs += segment.num_docs();
+            best_candidate.segments.push(segment);
+        }
+
+        for merge in merge_segments
             .into_iter()
-            .collect();
+            .filter(|merge| !merge.segments.is_empty())
+        {
+            let segment_ids: Vec<_> = merge.segments.iter().map(|segment| segment.id()).collect();
+            self.writer.merge(&segment_ids[..]).wait()?;
 
-        if segments.len() > num_segments as usize {
-            segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
-
-            for segment in segments {
-                let best_candidate = merge_segments
-                    .iter_mut()
-                    .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
-                    .unwrap();
-
-                best_candidate.num_docs += segment.num_docs();
-                best_candidate.segments.push(segment);
-            }
-
-            for merge in merge_segments
-                .into_iter()
-                .filter(|merge| !merge.segments.is_empty())
-            {
-                let segment_ids: Vec<_> =
-                    merge.segments.iter().map(|segment| segment.id()).collect();
-                self.writer.merge(&segment_ids[..]).wait()?;
-
-                let path = Path::new(&self.path);
-                for segment in merge.segments {
-                    for file in segment.list_files() {
-                        std::fs::remove_file(path.join(file)).ok();
-                    }
+            let path = Path::new(&self.path);
+            for segment in merge.segments {
+                for file in segment.list_files() {
+                    std::fs::remove_file(path.join(file)).ok();
                 }
             }
         }

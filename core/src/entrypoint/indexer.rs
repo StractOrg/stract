@@ -230,7 +230,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     index
         .inverted_index
-        .merge_into_segments(job.max_num_segments)
+        .merge_into_max_segments(job.max_num_segments)
         .unwrap();
 
     info!("{} done", name);
@@ -351,7 +351,7 @@ impl Indexer {
 
                 index
                     .inverted_index
-                    .merge_into_segments(config.final_num_segments.unwrap_or(20))
+                    .merge_into_max_segments(config.final_num_segments.unwrap_or(20))
                     .unwrap();
             });
 
@@ -442,7 +442,7 @@ impl Indexer {
             index = index.merge(other);
 
             std::fs::remove_dir_all(other_path)?;
-            index.inverted_index.merge_into_segments(num_segments)?;
+            index.inverted_index.merge_into_max_segments(num_segments)?;
         }
 
         Ok(())
