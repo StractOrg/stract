@@ -53,6 +53,7 @@ pub struct Job {
     pub warc_paths: Vec<String>,
     pub base_path: String,
     pub host_centrality_threshold: Option<f64>,
+    pub minimum_clean_words: Option<usize>,
     pub max_num_segments: u32,
 }
 
@@ -129,13 +130,23 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     }
                 }
 
+                html.parse_text();
+                if let Some(minimum_clean_words) = job.minimum_clean_words {
+                    match html.clean_text() {
+                        Some(clean_text) => {
+                            if clean_text.split_whitespace().count() < minimum_clean_words {
+                                continue;
+                            }
+                        }
+                        None => continue,
+                    }
+                }
+
                 let crawl_stability = worker
                     .crawl_stabilty
                     .as_ref()
                     .and_then(|stability| stability.get(&html.url().site().to_string()))
                     .unwrap_or_default();
-
-                html.parse_text();
 
                 let backlinks: Vec<Link> = worker
                     .webgraph
@@ -326,6 +337,7 @@ impl Indexer {
                                 .clone()
                                 .unwrap_or_else(|| "data/index".to_string()),
                             max_num_segments: config.final_num_segments.unwrap_or(20),
+                            minimum_clean_words: config.minimum_clean_words,
                         })
                         .collect_vec()
                         .into_iter(),
@@ -411,6 +423,7 @@ impl Indexer {
                             .clone()
                             .unwrap_or_else(|| "data/index".to_string()),
                         max_num_segments: config.final_num_segments.unwrap_or(20),
+                        minimum_clean_words: config.minimum_clean_words,
                     }),
             )
             .unwrap_or_default();

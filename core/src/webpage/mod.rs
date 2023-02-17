@@ -568,8 +568,8 @@ impl Html {
         }
     }
 
-    pub fn clean_text(&self) -> Option<String> {
-        self.clean_text.clone()
+    pub fn clean_text(&self) -> Option<&String> {
+        self.clean_text.as_ref()
     }
 
     fn calculate_all_text(paragraphs: &[Paragraph], lang: &Lang) -> Option<String> {
@@ -659,7 +659,7 @@ impl Html {
     }
 
     fn pretokenize_clean_text(&self) -> PreTokenizedString {
-        let clean_text = self.clean_text().unwrap_or_default();
+        let clean_text = self.clean_text().cloned().unwrap_or_default();
         self.pretokenize_string(clean_text)
     }
 
@@ -1217,7 +1217,7 @@ mod tests {
                 text: "Link to example".to_string()
             }]
         );
-        assert_eq!(webpage.clean_text(), Some(CONTENT.to_string()));
+        assert_eq!(webpage.clean_text(), Some(&CONTENT.to_string()));
 
         let mut expected_meta = HashMap::new();
         expected_meta.insert("name".to_string(), "meta1".to_string());
@@ -1266,7 +1266,7 @@ mod tests {
 
         let webpage = Html::parse(&raw, "https://www.example.com/whatever");
 
-        assert_eq!(webpage.clean_text(), Some(CONTENT.to_string()));
+        assert_eq!(webpage.clean_text(), Some(&CONTENT.to_string()));
     }
 
     #[test]
@@ -1879,5 +1879,13 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn stackoverflow_question_has_clean_text() {
+        let stackoverflow = include_str!("../../testcases/schema_org/stackoverflow_with_code.html");
+        let html = Html::parse(stackoverflow, "https://www.example.com");
+
+        assert!(html.clean_text().is_some());
     }
 }

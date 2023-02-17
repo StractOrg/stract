@@ -1,6 +1,7 @@
 centrality_store_path = "./data/centrality"
 limit_warc_files = 1
 download_images = false
+minimum_clean_words = 40
 # crawl_stability_path = "data/crawl-stability"
 
 [warc_source]

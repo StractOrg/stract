@@ -179,7 +179,9 @@ impl TopicCentrality {
                 .filter_map(|node| webgraph.node2id(&node))
                 .collect();
 
-            assert!(!top_sites.is_empty());
+            if top_sites.is_empty() {
+                continue;
+            }
 
             let scorer = harmonic.scorer(&top_sites, &[]);
 

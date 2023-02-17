@@ -81,6 +81,7 @@ pub struct IndexingMasterConfig {
     download_images: Option<bool>,
     host_centrality_threshold: Option<f64>,
     index_base_path: Option<String>,
+    minimum_clean_words: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -97,6 +98,7 @@ pub struct IndexingLocalConfig {
     host_centrality_threshold: Option<f64>,
     topics_path: Option<String>,
     centrality_store_path: String,
+    minimum_clean_words: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

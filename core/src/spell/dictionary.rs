@@ -332,7 +332,7 @@ impl<const TOP_N: usize> Dictionary<TOP_N> {
     }
 
     pub fn insert_page(&mut self, webpage: &Webpage) {
-        let text = webpage.html.clean_text().unwrap_or_default();
+        let text = webpage.html.clean_text().cloned().unwrap_or_default();
 
         let mut stream = Normal::default().token_stream(text.as_str());
 

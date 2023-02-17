@@ -24,12 +24,30 @@ use super::Preprocessor;
 // implementation of the JustText algorithm described in this thesis: https://is.muni.cz/th/45523/fi_d/phdthesis.pdf
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py
 
-const MAX_LINK_DENSITY_DEFAULT: f64 = 0.2;
-const LENGTH_LOW_DEFAULT: usize = 70;
-const LENGTH_HIGH_DEFAULT: usize = 200;
-const STOPWORDS_LOW_DEFAULT: f64 = 0.30;
-const STOPWORDS_HIGH_DEFAULT: f64 = 0.32;
-const MAX_HEADING_DISTANCE_DEFAULT: usize = 200;
+/// Paragraphs that have a length density above this threshold
+/// will be classified as bad.
+const MAX_LINK_DENSITY_DEFAULT: f64 = 0.2; // originally 0.2
+
+/// paragraphs that has a length less than this is
+/// either bad or short.
+const LENGTH_LOW_DEFAULT: usize = 50; // originally 70
+
+/// Paragraphs that has a length greater than this are classified
+/// as good given they have a higher stopword density than `STOPWORDS_HIGH_DEFAULT`.
+const LENGTH_HIGH_DEFAULT: usize = 100; // originally 200
+
+/// If stopword density is greater than this threshold, the paragraph
+/// is classified as neargood.
+const STOPWORDS_LOW_DEFAULT: f64 = 0.15; // originaly 0.30
+
+/// If stopword density is greater than this threshold, the paragraph
+/// is either classified as good or neargood depending on the
+/// `LENGTH_HIGH_DEFAULT`.
+const STOPWORDS_HIGH_DEFAULT: f64 = 0.2; // originaly 0.32
+
+/// Max number of heading characters that will be classified
+/// as good or neargood.
+const MAX_HEADING_DISTANCE_DEFAULT: usize = 200; // originally 200
 
 #[derive(Debug, Clone)]
 enum IntermediateClassification {
