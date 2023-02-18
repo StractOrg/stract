@@ -18,6 +18,7 @@ use crate::{
     index::Index,
     ranking::SignalAggregator,
     schema::{Field, TextField},
+    search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::Region,
     Result,
@@ -165,11 +166,12 @@ impl Query {
         })
     }
 
-    pub fn set_optic(&mut self, optic: &Optic, index: &Index) {
+    pub fn set_optic(&mut self, optic: &Optic, index: &Index, ctx: &Ctx) {
         let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
 
         subqueries.append(
-            &mut optic.as_multiple_tantivy(&index.schema(), index.inverted_index.fastfield_cache()),
+            &mut optic
+                .as_multiple_tantivy(&index.schema(), index.inverted_index.fastfield_reader(ctx)),
         );
 
         self.tantivy_query = Box::new(BooleanQuery::new(subqueries));

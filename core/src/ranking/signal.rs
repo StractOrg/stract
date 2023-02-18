@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    fastfield_cache,
+    fastfield_reader,
     schema::{FastField, TextField},
     webgraph::{
         centrality::{online_harmonic, topic},
@@ -263,7 +263,7 @@ impl FieldBoost {
 
 #[derive(Clone)]
 pub struct SignalAggregator {
-    fastfield_cache: Option<Arc<fastfield_cache::SegmentCache>>,
+    fastfield_reader: Option<Arc<fastfield_reader::SegmentReader>>,
     signal_coefficients: SignalCoefficient,
     personal_centrality: Option<Arc<online_harmonic::Scorer>>,
     inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
@@ -306,7 +306,7 @@ impl SignalAggregator {
             .collect();
 
         Self {
-            fastfield_cache: None,
+            fastfield_reader: None,
             personal_centrality: None,
             inbound_similariy: None,
             signal_coefficients,
@@ -318,8 +318,8 @@ impl SignalAggregator {
         }
     }
 
-    pub fn register_segment(&mut self, cache: Arc<fastfield_cache::SegmentCache>) {
-        self.fastfield_cache = Some(cache);
+    pub fn register_segment(&mut self, reader: Arc<fastfield_reader::SegmentReader>) {
+        self.fastfield_reader = Some(reader);
     }
 
     pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
@@ -372,11 +372,12 @@ impl SignalAggregator {
         current_timestamp: usize,
         selected_region: Option<Region>,
     ) -> Score {
-        let host_id = self.fastfield_cache.as_ref().and_then(|cache| {
-            let node_id = cache
-                .get_doc_cache(&FastField::HostNodeID)
-                .get_u64(&doc)
-                .unwrap();
+        let host_id = self.fastfield_reader.as_ref().and_then(|reader| {
+            let node_id: Option<u64> = reader
+                .get_field_reader(&FastField::HostNodeID)
+                .get(&doc)
+                .into();
+            let node_id = node_id.unwrap();
 
             if node_id == u64::MAX {
                 None
@@ -396,9 +397,9 @@ impl SignalAggregator {
             .into_iter()
             .map(|signal| {
                 let fastfield_value = signal.as_fastfield().and_then(|field| {
-                    self.fastfield_cache
+                    self.fastfield_reader
                         .as_ref()
-                        .and_then(|cache| cache.get_doc_cache(&field).get_u64(&doc))
+                        .and_then(|reader| reader.get_field_reader(&field).get(&doc).into())
                 });
 
                 self.coefficients().get(&signal)

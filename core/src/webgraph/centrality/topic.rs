@@ -83,10 +83,10 @@ impl TopicCentrality {
             .get_field(Field::Text(TextField::CleanBody).name())
             .unwrap();
 
-        let searcher = index.inverted_index.reader.searcher();
+        let ctx = index.inverted_index.local_search_ctx();
         let mut term_count: HashMap<String, u64> = HashMap::new();
 
-        for segment in searcher.segment_readers() {
+        for segment in ctx.tv_searcher.segment_readers() {
             let reader = segment.inverted_index(body_field).unwrap();
 
             let mut stream = reader.terms().stream().unwrap();
@@ -100,7 +100,8 @@ impl TopicCentrality {
         }
 
         let top_topics = topics.top_topics(NUM_TOPICS);
-        let topic_field = searcher
+        let topic_field = ctx
+            .tv_searcher
             .schema()
             .get_field(Field::Text(TextField::HostTopic).name())
             .unwrap();
@@ -125,7 +126,7 @@ impl TopicCentrality {
 
                     let query = BooleanQuery::new(vec![(Occur::Must, topic), (Occur::Must, term)]);
 
-                    let topic_freq = searcher.search(&query, &collector).unwrap();
+                    let topic_freq = ctx.tv_searcher.search(&query, &collector).unwrap();
                     scores[i] = topic_freq as f64 / total_doc_freq as f64;
                 }
 
@@ -137,7 +138,7 @@ impl TopicCentrality {
             Arc::new(index.region_count.clone()),
             None,
             SignalAggregator::default(),
-            Arc::clone(&index.inverted_index.fastfield_cache),
+            index.inverted_index.fastfield_reader(&ctx),
         );
 
         let graph_node_id = index
@@ -145,7 +146,7 @@ impl TopicCentrality {
             .get_field(Field::Fast(FastField::HostNodeID).name())
             .unwrap();
 
-        let collector = TopDocs::with_limit(1000, index.inverted_index.fastfield_cache())
+        let collector = TopDocs::with_limit(1000, index.inverted_index.fastfield_reader(&ctx))
             .tweak_score(score_tweaker);
 
         let mut nodes: Vec<_> = webgraph.nodes().collect();
@@ -158,12 +159,13 @@ impl TopicCentrality {
             let topic = tantivy::Term::from_facet(topic_field, &facet);
             let query = TermQuery::new(topic, IndexRecordOption::Basic).box_clone();
 
-            let top_sites: HashSet<_> = searcher
+            let top_sites: HashSet<_> = ctx
+                .tv_searcher
                 .search(&query, &collector)
                 .unwrap()
                 .into_iter()
                 .filter_map(|pointer| {
-                    let doc = searcher.doc(pointer.address.into()).unwrap();
+                    let doc = ctx.tv_searcher.doc(pointer.address.into()).unwrap();
                     let id = doc.get_first(graph_node_id).unwrap().as_u64().unwrap();
                     if id == u64::MAX {
                         None

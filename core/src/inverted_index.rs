@@ -24,7 +24,7 @@ use tantivy::tokenizer::{Tokenizer as _, TokenizerManager};
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
-use crate::fastfield_cache::FastFieldCache;
+use crate::fastfield_reader::FastFieldReader;
 use crate::human_website_annotations::Topic;
 use crate::image_store::Image;
 use crate::query::Query;
@@ -32,6 +32,7 @@ use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
+use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::tokenizer::Identity;
 use crate::webgraph::NodeID;
@@ -42,7 +43,7 @@ use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
@@ -90,8 +91,7 @@ pub struct InvertedIndex {
     pub path: String,
     tantivy_index: tantivy::Index,
     writer: IndexWriter,
-    pub(crate) reader: IndexReader,
-    pub(crate) fastfield_cache: Arc<FastFieldCache>,
+    reader: IndexReader,
     schema: Arc<Schema>,
 }
 
@@ -138,25 +138,19 @@ impl InvertedIndex {
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
 
-        let fastfield_cache = Arc::new(FastFieldCache::default());
-
-        let warmers: Vec<Weak<dyn tantivy::Warmer>> = vec![Arc::downgrade(
-            &(Arc::clone(&fastfield_cache) as Arc<dyn tantivy::Warmer>),
-        )];
-        let reader = tantivy_index.reader_builder().warmers(warmers).try_into()?;
+        let reader = tantivy_index.reader_builder().try_into()?;
 
         Ok(InvertedIndex {
             writer,
             reader,
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
-            fastfield_cache,
             tantivy_index,
         })
     }
 
-    pub fn fastfield_cache(&self) -> Arc<FastFieldCache> {
-        Arc::clone(&self.fastfield_cache)
+    pub fn fastfield_reader(&self, ctx: &Ctx) -> FastFieldReader {
+        FastFieldReader::new(ctx)
     }
 
     pub fn tokenizers(&self) -> &TokenizerManager {
@@ -182,13 +176,16 @@ impl InvertedIndex {
         Ok(())
     }
 
-    pub fn search_initial<C>(&self, query: &Query, collector: C) -> Result<InitialSearchResult>
+    pub fn search_initial<C>(
+        &self,
+        query: &Query,
+        ctx: &Ctx,
+        collector: C,
+    ) -> Result<InitialSearchResult>
     where
         C: Collector<Fruit = Vec<WebsitePointer>>,
     {
-        let searcher = self.reader.searcher();
-
-        let (count, pointers) = searcher.search(query, &(Count, collector))?;
+        let (count, pointers) = ctx.tv_searcher.search(query, &(Count, collector))?;
 
         Ok(InitialSearchResult {
             num_websites: count,
@@ -196,16 +193,22 @@ impl InvertedIndex {
         })
     }
 
+    pub fn local_search_ctx(&self) -> Ctx {
+        Ctx {
+            tv_searcher: self.reader.searcher(),
+        }
+    }
+
     pub fn retrieve_ranking_websites(
         &self,
+        ctx: &Ctx,
         pointers: Vec<WebsitePointer>,
         aggregator: &SignalAggregator,
     ) -> Result<Vec<RankingWebsite>> {
-        let searcher = self.reader.searcher();
         let mut top_websites = Vec::new();
 
         for pointer in pointers {
-            let doc = searcher.doc(pointer.address.into())?;
+            let doc = ctx.tv_searcher.doc(pointer.address.into())?;
             top_websites.push(RankingWebsite::new(doc, pointer, aggregator));
         }
 
@@ -233,10 +236,10 @@ impl InvertedIndex {
         websites: &[WebsitePointer],
         query: &Query,
     ) -> Result<Vec<RetrievedWebpage>> {
-        let searcher = self.reader.searcher();
+        let ctx = self.local_search_ctx();
         let mut webpages: Vec<RetrievedWebpage> = websites
             .iter()
-            .map(|website| self.retrieve_doc(website.address, &searcher))
+            .map(|website| self.retrieve_doc(website.address, &ctx))
             .filter_map(|res| res.ok())
             .map(|mut doc| {
                 if let Some(image) = doc.primary_image.as_ref() {
@@ -264,7 +267,7 @@ impl InvertedIndex {
                 &page.description,
                 &page.dmoz_description,
                 &page.region,
-                &searcher,
+                &ctx.tv_searcher,
             )?;
         }
 
@@ -326,12 +329,8 @@ impl InvertedIndex {
         Ok(())
     }
 
-    fn retrieve_doc(
-        &self,
-        doc_address: DocAddress,
-        searcher: &tantivy::Searcher,
-    ) -> Result<RetrievedWebpage> {
-        let doc = searcher.doc(doc_address.into())?;
+    fn retrieve_doc(&self, doc_address: DocAddress, ctx: &Ctx) -> Result<RetrievedWebpage> {
+        let doc = ctx.tv_searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
     }
 
@@ -407,8 +406,9 @@ impl InvertedIndex {
     }
 
     pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        let searcher = self.reader.searcher();
-        let field = searcher
+        let ctx = self.local_search_ctx();
+        let field = ctx
+            .tv_searcher
             .schema()
             .get_field(Field::Text(TextField::Url).name())
             .unwrap();
@@ -422,12 +422,13 @@ impl InvertedIndex {
         }
 
         let query = tantivy::query::PhraseQuery::new(term_queries);
-        let mut res = searcher
+        let mut res = ctx
+            .tv_searcher
             .search(&query, &tantivy::collector::TopDocs::with_limit(1))
             .unwrap();
 
         res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &searcher).unwrap())
+            .map(|(_, doc)| self.retrieve_doc(doc.into(), &ctx).unwrap())
     }
 }
 
@@ -569,11 +570,16 @@ mod tests {
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-    fn search<C>(index: &InvertedIndex, query: &Query, collector: C) -> Result<SearchResult>
+    fn search<C>(
+        index: &InvertedIndex,
+        query: &Query,
+        ctx: &Ctx,
+        collector: C,
+    ) -> Result<SearchResult>
     where
         C: Collector<Fruit = Vec<WebsitePointer>>,
     {
-        let initial_result = index.search_initial(query, collector)?;
+        let initial_result = index.search_initial(query, ctx, collector)?;
 
         let pointers: Vec<_> = initial_result.top_websites;
 
@@ -588,6 +594,7 @@ mod tests {
     #[test]
     fn simple_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
         let query = Query::parse(
             "website",
             index.schema(),
@@ -595,13 +602,14 @@ mod tests {
             &SignalAggregator::default(),
         )
         .expect("Failed to parse query");
+
+        let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
-
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -624,7 +632,14 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -633,6 +648,27 @@ mod tests {
     #[test]
     fn document_not_matching() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT}
+                            </body>
+                        </html>
+                    "#
+                ),
+                "https://www.example.com",
+            ))
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
             "this query should not match",
             index.schema(),
@@ -643,29 +679,10 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
 
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                {CONTENT}
-                            </body>
-                        </html>
-                    "#
-                ),
-                "https://www.example.com",
-            ))
-            .expect("failed to insert webpage");
-        index.commit().expect("failed to commit index");
-
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
     }
@@ -673,18 +690,6 @@ mod tests {
     #[test]
     fn english_stemming() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse(
-            "runner",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
 
         index
             .insert(Webpage::new(
@@ -705,16 +710,9 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn stemmed_query_english() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "runners",
+            "runner",
             index.schema(),
             index.tokenizers(),
             &SignalAggregator::default(),
@@ -723,8 +721,17 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn stemmed_query_english() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -745,16 +752,9 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn not_searchable_backlinks() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "great site",
+            "runners",
             index.schema(),
             index.tokenizers(),
             &SignalAggregator::default(),
@@ -763,8 +763,17 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn not_searchable_backlinks() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -818,7 +827,21 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let query = Query::parse(
+            "great site",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+
+        let mut result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
 
         result
             .documents
@@ -831,18 +854,6 @@ mod tests {
     #[test]
     fn limited_top_docs() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse(
-            "runner",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
 
         for _ in 0..100 {
             let dedup_s = crate::rand_words(100);
@@ -868,15 +879,9 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.documents.len(), 20);
-    }
-
-    #[test]
-    fn host_search() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "dr",
+            "runner",
             index.schema(),
             index.tokenizers(),
             &SignalAggregator::default(),
@@ -885,8 +890,16 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        assert_eq!(result.documents.len(), 20);
+    }
+
+    #[test]
+    fn host_search() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -907,7 +920,21 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let query = Query::parse(
+            "dr",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
@@ -958,6 +985,7 @@ mod tests {
 
         let mut index = index1.merge(index2);
         index.commit().unwrap();
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
             "website",
@@ -969,10 +997,10 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 2);
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -982,6 +1010,8 @@ mod tests {
     #[test]
     fn match_across_fields() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
             "example test",
             index.schema(),
@@ -992,10 +1022,10 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -1018,7 +1048,13 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1027,11 +1063,6 @@ mod tests {
     #[test]
     fn only_show_primary_images_when_relevant() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
 
         let mut webpage = Webpage::new(
             &format!(
@@ -1065,7 +1096,14 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1087,7 +1125,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1098,22 +1136,6 @@ mod tests {
     #[test]
     fn id_links_removed_during_indexing() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
-        let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_cache(),
-        );
-
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
 
         index
             .insert(Webpage::new(
@@ -1134,17 +1156,9 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn remove_duplicates() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "dr",
+            "website",
             index.schema(),
             index.tokenizers(),
             &SignalAggregator::default(),
@@ -1153,8 +1167,18 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        assert_eq!(result.num_docs, 1);
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.example.com");
+    }
+
+    #[test]
+    fn remove_duplicates() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -1194,16 +1218,9 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.dr.dk");
-    }
-
-    #[test]
-    fn schema_org_stored() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "test",
+            "dr",
             index.schema(),
             index.tokenizers(),
             &SignalAggregator::default(),
@@ -1212,8 +1229,17 @@ mod tests {
         let ranker = Ranker::new(
             RegionCount::default(),
             SignalAggregator::default(),
-            index.fastfield_cache(),
+            index.fastfield_reader(&ctx),
         );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        assert_eq!(result.documents.len(), 1);
+        assert_eq!(result.documents[0].url, "https://www.dr.dk");
+    }
+
+    #[test]
+    fn schema_org_stored() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(Webpage::new(
@@ -1240,7 +1266,21 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let result = search(&index, &query, ranker.collector()).expect("Search failed");
+        let ctx = index.local_search_ctx();
+        let query = Query::parse(
+            "test",
+            index.schema(),
+            index.tokenizers(),
+            &SignalAggregator::default(),
+        )
+        .expect("Failed to parse query");
+        let ranker = Ranker::new(
+            RegionCount::default(),
+            SignalAggregator::default(),
+            index.fastfield_reader(&ctx),
+        );
+
+        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         let schema = result.documents[0].schema_org.clone();
 
@@ -1276,6 +1316,7 @@ mod tests {
     #[test]
     fn get_webpage() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
         index
             .insert(Webpage::new(
                 &format!(

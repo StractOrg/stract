@@ -24,7 +24,7 @@ use tantivy::{
 };
 
 use crate::{
-    fastfield_cache,
+    fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::{combine_u64s, Prehashed},
     ranking::initial::Score,
@@ -61,18 +61,18 @@ pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
-    fastfield_cache: Arc<fastfield_cache::FastFieldCache>,
+    fastfield_reader: fastfield_reader::FastFieldReader,
     de_rank_similar: bool,
 }
 
 impl TopDocs {
-    pub fn with_limit(top_n: usize, fastfield_cache: Arc<fastfield_cache::FastFieldCache>) -> Self {
+    pub fn with_limit(top_n: usize, fastfield_reader: fastfield_reader::FastFieldReader) -> Self {
         Self {
             top_n,
             offset: 0,
             max_docs: None,
             de_rank_similar: false,
-            fastfield_cache,
+            fastfield_reader,
         }
     }
 
@@ -117,7 +117,7 @@ impl TopDocs {
             .map(|max_docs| max_docs.total_docs / max_docs.segments);
 
         Ok(TopSegmentCollector {
-            fastfield_segment_cache: self.fastfield_cache.get_segment(&segment.segment_id()),
+            fastfield_segment_reader: self.fastfield_reader.get_segment(&segment.segment_id()),
             max_docs,
             num_docs_taken: 0,
             segment_ord: segment_local_id,
@@ -127,7 +127,7 @@ impl TopDocs {
 }
 
 pub struct TopSegmentCollector {
-    fastfield_segment_cache: Arc<fastfield_cache::SegmentCache>,
+    fastfield_segment_reader: Arc<fastfield_reader::SegmentReader>,
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
@@ -135,16 +135,22 @@ pub struct TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn get_hash(&self, doc: &DocId, field: &FastField) -> Prehashed {
-        let hash = self
-            .fastfield_segment_cache
-            .get_doc_cache(field)
-            .get_u64s(doc)
-            .unwrap();
+    fn get_hash(&self, doc: &DocId, field1: &FastField, field2: &FastField) -> Prehashed {
+        let hash: Option<u64> = self
+            .fastfield_segment_reader
+            .get_field_reader(field1)
+            .get(doc)
+            .into();
+        let hash1 = hash.unwrap();
 
-        debug_assert_eq!(hash.len(), 2);
+        let hash: Option<u64> = self
+            .fastfield_segment_reader
+            .get_field_reader(field2)
+            .get(doc)
+            .into();
+        let hash2 = hash.unwrap();
 
-        let hash = [hash[0], hash[1]];
+        let hash = [hash1, hash2];
         combine_u64s(hash).into()
     }
 }
@@ -159,16 +165,18 @@ impl TopSegmentCollector {
             self.num_docs_taken += 1;
         }
 
+        let simhash: Option<u64> = self
+            .fastfield_segment_reader
+            .get_field_reader(&FastField::SimHash)
+            .get(&doc)
+            .into();
+
         self.bucket_collector.insert(SegmentDoc {
             hashes: Hashes {
-                site: self.get_hash(&doc, &FastField::SiteHash),
-                title: self.get_hash(&doc, &FastField::TitleHash),
-                url: self.get_hash(&doc, &FastField::UrlHash),
-                simhash: self
-                    .fastfield_segment_cache
-                    .get_doc_cache(&FastField::SimHash)
-                    .get_u64(&doc)
-                    .unwrap(),
+                site: self.get_hash(&doc, &FastField::SiteHash1, &FastField::SiteHash2),
+                title: self.get_hash(&doc, &FastField::TitleHash1, &FastField::TitleHash2),
+                url: self.get_hash(&doc, &FastField::UrlHash1, &FastField::UrlHash2),
+                simhash: simhash.unwrap(),
             },
             id: doc,
             segment: self.segment_ord,

@@ -30,8 +30,9 @@ use uuid::Uuid;
 use crate::directory::{self, DirEntry};
 use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
 use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
-use crate::inverted_index::{self, InitialSearchResult, InvertedIndex};
+use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
+use crate::search_ctx::Ctx;
 use crate::spell::{
     Correction, CorrectionTerm, Dictionary, LogarithmicEdit, SpellChecker, TermSplitter,
 };
@@ -122,20 +123,13 @@ impl Index {
         Ok(())
     }
 
-    pub fn search_initial<C>(&self, query: &Query, collector: C) -> Result<InitialSearchResult>
-    where
-        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
-    {
-        self.inverted_index.search_initial(query, collector)
-    }
-
-    pub fn top_nodes<C>(&self, query: &Query, collector: C) -> Result<Vec<NodeID>>
+    pub fn top_nodes<C>(&self, query: &Query, ctx: &Ctx, collector: C) -> Result<Vec<NodeID>>
     where
         C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
     {
         let websites = self
             .inverted_index
-            .search_initial(query, collector)?
+            .search_initial(query, ctx, collector)?
             .top_websites;
 
         let mut hosts = HashSet::with_capacity(websites.len());

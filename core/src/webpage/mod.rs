@@ -733,6 +733,12 @@ impl Html {
             },
         };
 
+        let site_hash = split_u128(hash(self.url().site()).0);
+        let url_without_query_hash = split_u128(hash(self.url().without_query()).0);
+        let url_hash = split_u128(hash(self.url().full()).0);
+        let domain_hash = split_u128(hash(self.url().domain()).0);
+        let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
+
         for field in &ALL_FIELDS {
             let tantivy_field = schema
                 .get_field(field.name())
@@ -881,35 +887,35 @@ impl Html {
                 Field::Fast(FastField::NumFlattenedSchemaTokens) => {
                     doc.add_u64(tantivy_field, pretokenized_schema_json.tokens.len() as u64)
                 }
-                Field::Fast(FastField::SiteHash) => {
-                    let hash = hash(self.url().site()).0;
-                    let u64s = split_u128(hash);
-                    doc.add_u64(tantivy_field, u64s[0]);
-                    doc.add_u64(tantivy_field, u64s[1]);
+                Field::Fast(FastField::SiteHash1) => {
+                    doc.add_u64(tantivy_field, site_hash[0]);
                 }
-                Field::Fast(FastField::UrlWithoutQueryHash) => {
-                    let hash = hash(self.url().without_query()).0;
-                    let u64s = split_u128(hash);
-                    doc.add_u64(tantivy_field, u64s[0]);
-                    doc.add_u64(tantivy_field, u64s[1]);
+                Field::Fast(FastField::SiteHash2) => {
+                    doc.add_u64(tantivy_field, site_hash[1]);
                 }
-                Field::Fast(FastField::UrlHash) => {
-                    let hash = hash(self.url().full()).0;
-                    let u64s = split_u128(hash);
-                    doc.add_u64(tantivy_field, u64s[0]);
-                    doc.add_u64(tantivy_field, u64s[1]);
+                Field::Fast(FastField::UrlWithoutQueryHash1) => {
+                    doc.add_u64(tantivy_field, url_without_query_hash[0]);
                 }
-                Field::Fast(FastField::DomainHash) => {
-                    let hash = hash(self.url().domain()).0;
-                    let u64s = split_u128(hash);
-                    doc.add_u64(tantivy_field, u64s[0]);
-                    doc.add_u64(tantivy_field, u64s[1]);
+                Field::Fast(FastField::UrlWithoutQueryHash2) => {
+                    doc.add_u64(tantivy_field, url_without_query_hash[1]);
                 }
-                Field::Fast(FastField::TitleHash) => {
-                    let hash = hash(self.title().unwrap_or_default()).0;
-                    let u64s = split_u128(hash);
-                    doc.add_u64(tantivy_field, u64s[0]);
-                    doc.add_u64(tantivy_field, u64s[1]);
+                Field::Fast(FastField::UrlHash1) => {
+                    doc.add_u64(tantivy_field, url_hash[0]);
+                }
+                Field::Fast(FastField::UrlHash2) => {
+                    doc.add_u64(tantivy_field, url_hash[1]);
+                }
+                Field::Fast(FastField::DomainHash1) => {
+                    doc.add_u64(tantivy_field, domain_hash[0]);
+                }
+                Field::Fast(FastField::DomainHash2) => {
+                    doc.add_u64(tantivy_field, domain_hash[1]);
+                }
+                Field::Fast(FastField::TitleHash1) => {
+                    doc.add_u64(tantivy_field, title_hash[0]);
+                }
+                Field::Fast(FastField::TitleHash2) => {
+                    doc.add_u64(tantivy_field, title_hash[1]);
                 }
                 Field::Fast(FastField::SimHash) => {
                     let hash = if !clean_text.text.is_empty() {

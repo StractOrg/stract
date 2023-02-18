@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
 use tantivy::{
@@ -23,7 +21,7 @@ use tantivy::{
     schema::Schema,
 };
 
-use crate::{fastfield_cache::FastFieldCache, ranking::optics::SCALE, schema::TextField};
+use crate::{fastfield_reader::FastFieldReader, ranking::optics::SCALE, schema::TextField};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -31,7 +29,7 @@ pub trait AsTantivyQuery {
     fn as_tantivy(
         &self,
         schema: &Schema,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Box<dyn tantivy::query::Query>;
 }
 
@@ -39,7 +37,7 @@ pub trait AsMultipleTantivyQuery {
     fn as_multiple_tantivy(
         &self,
         schema: &Schema,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)>;
 }
 
@@ -47,7 +45,7 @@ impl AsMultipleTantivyQuery for Optic {
     fn as_multiple_tantivy(
         &self,
         schema: &Schema,
-        fastfields: Arc<FastFieldCache>,
+        fastfields: FastFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         if self.discard_non_matching {
             vec![(
@@ -84,7 +82,7 @@ impl AsMultipleTantivyQuery for Rule {
     fn as_multiple_tantivy(
         &self,
         schema: &Schema,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         let mut subqueries: Vec<_> = self
             .matches
@@ -92,7 +90,7 @@ impl AsMultipleTantivyQuery for Rule {
             .map(|matching| {
                 (
                     Occur::Must,
-                    matching.as_tantivy(schema, fastfield_cache.clone()),
+                    matching.as_tantivy(schema, fastfield_reader.clone()),
                 )
             })
             .collect();
@@ -133,35 +131,35 @@ impl AsTantivyQuery for Matching {
     fn as_tantivy(
         &self,
         schema: &Schema,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Box<dyn tantivy::query::Query> {
         match &self.location {
             MatchLocation::Site => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::Site,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
             MatchLocation::Url => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::Url,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
             MatchLocation::Domain => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::Domain,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
             MatchLocation::Title => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::Title,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
             MatchLocation::Description => UnionQuery::from(vec![
@@ -169,14 +167,14 @@ impl AsTantivyQuery for Matching {
                     self.pattern.clone(),
                     TextField::Description,
                     schema,
-                    fastfield_cache.clone(),
+                    fastfield_reader.clone(),
                 )
                 .box_clone(),
                 PatternQuery::new(
                     self.pattern.clone(),
                     TextField::DmozDescription,
                     schema,
-                    fastfield_cache,
+                    fastfield_reader,
                 )
                 .box_clone(),
             ])
@@ -185,14 +183,14 @@ impl AsTantivyQuery for Matching {
                 self.pattern.clone(),
                 TextField::CleanBody,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
             MatchLocation::Schema => PatternQuery::new(
                 self.pattern.clone(),
                 TextField::FlattenedSchemaOrgJson,
                 schema,
-                fastfield_cache,
+                fastfield_reader,
             )
             .box_clone(),
         }

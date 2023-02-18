@@ -29,6 +29,7 @@ use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::optics::CreateAggregator;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
+use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Correction;
 use crate::webgraph::centrality::topic::TopicCentrality;
@@ -75,7 +76,7 @@ impl LocalSearcher {
         self.topic_centrality = Some(topic_centrality);
     }
 
-    fn parse_query(&self, query: &SearchQuery) -> Result<(Query, Optic)> {
+    fn parse_query(&self, query: &SearchQuery, ctx: &Ctx) -> Result<(Query, Optic)> {
         let optic = match query.optic_program.as_ref() {
             Some(program) => Some(optics::parse(program)?),
             None => None,
@@ -121,7 +122,7 @@ impl LocalSearcher {
             optic = optic.try_merge(o)?;
         }
 
-        parsed_query.set_optic(&optic, &self.index);
+        parsed_query.set_optic(&optic, &self.index, ctx);
 
         if parsed_query.is_empty() {
             Err(Error::EmptyQuery)
@@ -133,13 +134,14 @@ impl LocalSearcher {
     fn ranker(
         &self,
         query: &Query,
+        ctx: &Ctx,
         de_rank_similar: bool,
         aggregator: SignalAggregator,
     ) -> Result<Ranker> {
         let mut ranker = Ranker::new(
             self.index.region_count.clone(),
             aggregator,
-            self.index.inverted_index.fastfield_cache(),
+            self.index.inverted_index.fastfield_reader(ctx),
         );
 
         if let Some(region) = query.region() {
@@ -160,7 +162,7 @@ impl LocalSearcher {
                 .with_max_docs(10_000, self.index.num_segments())
                 .with_num_results(100);
 
-            let top_host_nodes = self.index.top_nodes(query, ranker.collector())?;
+            let top_host_nodes = self.index.top_nodes(query, ctx, ranker.collector())?;
             if !top_host_nodes.is_empty() {
                 let harmonic = centrality_store
                     .online_harmonic
@@ -180,7 +182,9 @@ impl LocalSearcher {
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<(Vec<RankingWebsite>, usize)> {
-        let (parsed_query, optic) = self.parse_query(query)?;
+        let searcher = self.index.inverted_index.local_search_ctx();
+
+        let (parsed_query, optic) = self.parse_query(query, &searcher)?;
 
         let mut aggregator = optic
             .pipeline
@@ -217,16 +221,19 @@ impl LocalSearcher {
             )
         }
 
-        let ranker = self.ranker(&parsed_query, de_rank_similar, aggregator)?;
+        let ranker = self.ranker(&parsed_query, &searcher, de_rank_similar, aggregator)?;
 
-        let res = self
-            .index
-            .search_initial(&parsed_query, ranker.collector())?;
+        let res = self.index.inverted_index.search_initial(
+            &parsed_query,
+            &searcher,
+            ranker.collector(),
+        )?;
 
-        let ranking_websites = self
-            .index
-            .inverted_index
-            .retrieve_ranking_websites(res.top_websites, &ranker.aggregator())?;
+        let ranking_websites = self.index.inverted_index.retrieve_ranking_websites(
+            &searcher,
+            res.top_websites,
+            &ranker.aggregator(),
+        )?;
 
         Ok((ranking_websites, res.num_websites))
     }

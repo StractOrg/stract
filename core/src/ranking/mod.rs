@@ -32,7 +32,7 @@ use tantivy::collector::Collector;
 
 use crate::{
     collector::{MaxDocsConsidered, TopDocs},
-    fastfield_cache::FastFieldCache,
+    fastfield_reader::FastFieldReader,
     inverted_index,
     searcher::NUM_RESULTS_PER_PAGE,
     webgraph::{
@@ -57,7 +57,7 @@ pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     aggregator: SignalAggregator,
-    fastfield_cache: Arc<FastFieldCache>,
+    fastfield_reader: FastFieldReader,
     de_rank_similar: bool,
     num_results: Option<usize>,
 }
@@ -66,7 +66,7 @@ impl Ranker {
     pub fn new(
         region_count: RegionCount,
         aggregator: SignalAggregator,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Self {
         Ranker {
             region_count: Arc::new(region_count),
@@ -75,7 +75,7 @@ impl Ranker {
             aggregator,
             max_docs: None,
             de_rank_similar: true,
-            fastfield_cache,
+            fastfield_reader,
             num_results: None,
         }
     }
@@ -118,12 +118,12 @@ impl Ranker {
             Arc::clone(&self.region_count),
             self.selected_region,
             aggregator,
-            Arc::clone(&self.fastfield_cache),
+            self.fastfield_reader.clone(),
         );
 
         let mut collector = TopDocs::with_limit(
             self.num_results.unwrap_or(NUM_RESULTS_PER_PAGE),
-            Arc::clone(&self.fastfield_cache),
+            self.fastfield_reader.clone(),
         );
 
         if self.de_rank_similar {

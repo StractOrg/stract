@@ -27,7 +27,7 @@ use tantivy::{
 };
 
 use crate::{
-    fastfield_cache::FastFieldCache,
+    fastfield_reader::{self, FastFieldReader},
     query::intersection::Intersection,
     ranking::bm25::Bm25Weight,
     schema::{FastField, Field, TextField, ALL_FIELDS},
@@ -38,7 +38,7 @@ pub struct PatternQuery {
     patterns: Vec<PatternPart>,
     field: tantivy::schema::Field,
     raw_terms: Vec<tantivy::Term>,
-    fastfield_cache: Arc<FastFieldCache>,
+    fastfield_reader: FastFieldReader,
 }
 
 impl std::fmt::Debug for PatternQuery {
@@ -56,7 +56,7 @@ impl PatternQuery {
         patterns: Vec<PatternPart>,
         field: TextField,
         schema: &tantivy::schema::Schema,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Self {
         let mut raw_terms = Vec::new();
 
@@ -81,7 +81,7 @@ impl PatternQuery {
             patterns,
             field: tv_field,
             raw_terms,
-            fastfield_cache,
+            fastfield_reader,
         }
     }
 }
@@ -103,7 +103,7 @@ impl tantivy::query::Query for PatternQuery {
             raw_terms: self.raw_terms.clone(),
             patterns: self.patterns.clone(),
             field: self.field,
-            fastfield_cache: self.fastfield_cache.clone(),
+            fastfield_reader: self.fastfield_reader.clone(),
         }))
     }
 
@@ -125,7 +125,7 @@ struct PatternWeight {
     patterns: Vec<PatternPart>,
     raw_terms: Vec<tantivy::Term>,
     field: tantivy::schema::Field,
-    fastfield_cache: Arc<FastFieldCache>,
+    fastfield_reader: FastFieldReader,
 }
 
 impl PatternWeight {
@@ -196,7 +196,7 @@ impl PatternWeight {
             small_patterns,
             reader.segment_id(),
             num_tokens_fastfield,
-            self.fastfield_cache.clone(),
+            self.fastfield_reader.clone(),
         )))
     }
 }
@@ -254,9 +254,8 @@ struct PatternScorer {
     left: Vec<u32>,
     right: Vec<u32>,
     phrase_count: u32,
-    segment: tantivy::SegmentId,
     num_tokens_field: FastField,
-    fastfield_cache: Arc<FastFieldCache>,
+    segment_reader: Arc<fastfield_reader::SegmentReader>,
 }
 
 impl PatternScorer {
@@ -267,9 +266,10 @@ impl PatternScorer {
         pattern: Vec<SmallPatternPart>,
         segment: tantivy::SegmentId,
         num_tokens_field: FastField,
-        fastfield_cache: Arc<FastFieldCache>,
+        fastfield_reader: FastFieldReader,
     ) -> Self {
         let num_query_terms = term_postings_list.len();
+        let segment_reader = fastfield_reader.get_segment(&segment);
 
         Self {
             intersection_docset: Intersection::new(term_postings_list),
@@ -280,9 +280,8 @@ impl PatternScorer {
             left: Vec::with_capacity(100),
             right: Vec::with_capacity(100),
             phrase_count: 0,
-            segment,
             num_tokens_field,
-            fastfield_cache,
+            segment_reader,
         }
     }
     fn phrase_count(&self) -> u32 {
@@ -307,12 +306,12 @@ impl PatternScorer {
 
         let mut current_right_term = 1;
         let mut slop = 1;
-        let num_tokens_doc = self
-            .fastfield_cache
-            .get_segment(&self.segment)
-            .get_doc_cache(&self.num_tokens_field)
-            .get_u64(&self.doc())
-            .unwrap();
+        let num_tokens_doc: Option<u64> = self
+            .segment_reader
+            .get_field_reader(&self.num_tokens_field)
+            .get(&self.doc())
+            .into();
+        let num_tokens_doc = num_tokens_doc.unwrap();
 
         for (i, pattern_part) in self.pattern.iter().enumerate().skip(1) {
             match pattern_part {
