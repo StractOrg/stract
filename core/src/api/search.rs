@@ -60,6 +60,7 @@ struct SearchTemplate {
     prev_page_url: Option<String>,
     default_optics: Vec<OpticLink>,
     current_optic_url: Option<String>,
+    has_more_results: bool,
 }
 
 enum RegionSelection {
@@ -170,6 +171,7 @@ pub async fn route(
                     prev_page_url,
                     default_optics: DEFAULT_OPTICS.to_vec(),
                     current_optic_url,
+                    has_more_results: result.has_more_results,
                 };
 
                 Ok(HtmlTemplate(template).into_response())

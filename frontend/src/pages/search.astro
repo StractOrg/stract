@@ -141,9 +141,15 @@ import { askama } from "../askama";
           <div class="mx-2">
             Page {askama`current_page $ 5`}
           </div>
-          <a href="{{ next_page_url }}">
-            <Hero class="change-page-active" icon="chevron-right" />
-          </a>
+          {
+            askama.if_(
+              "has_more_results", 
+              <a href="{{ next_page_url }}">
+                <Hero class="change-page-active" icon="chevron-right" />
+              </a>,
+              <Hero class="change-page-inactive" icon="chevron-right" />
+            )
+          }
         </div>
       </div>
 

@@ -51,6 +51,7 @@ pub struct WebsitesResult {
     pub direct_answer: Option<DisplayedAnswer>,
     pub discussions: Option<Vec<DisplayedWebpage>>,
     pub search_duration_ms: u128,
+    pub has_more_results: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

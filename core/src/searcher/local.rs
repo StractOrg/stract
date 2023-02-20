@@ -318,7 +318,12 @@ impl LocalSearcher {
 
         let search_result = self.search_initial(&search_query, true)?;
 
+        let search_len = search_result.websites.len();
+
         let top_websites = pipeline.apply(search_result.websites);
+
+        let has_more_results = search_len != top_websites.len();
+
         let pointers: Vec<_> = top_websites
             .into_iter()
             .map(|website| website.pointer)
@@ -340,6 +345,7 @@ impl LocalSearcher {
             direct_answer: None,
             sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
             search_duration_ms: start.elapsed().as_millis(),
+            has_more_results,
         })
     }
 

@@ -541,7 +541,14 @@ impl DistributedSearcher {
             .map(|result| result.local_result.num_websites)
             .sum();
 
+        let num_shard_websites: usize = initial_results
+            .iter()
+            .map(|res| res.local_result.websites.len())
+            .sum();
+
         let top_websites = self.combine_results(initial_results, pipeline);
+
+        let has_more_results = num_shard_websites != top_websites.len();
 
         // retrieve webpages
         let mut retrieved_webpages: Vec<_> = self
@@ -568,6 +575,7 @@ impl DistributedSearcher {
             widget,
             discussions,
             search_duration_ms,
+            has_more_results,
         })
     }
 
