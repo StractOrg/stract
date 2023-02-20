@@ -24,7 +24,7 @@ use tokenizers::TruncationParams;
 use crate::Result;
 
 use crate::ONNX_ENVIRONMENT;
-const TRUNCATE_INPUT: usize = 256;
+const TRUNCATE_INPUT: usize = 128;
 
 pub struct CrossEncoderModel {
     tokenizer: tokenizers::Tokenizer,
@@ -52,7 +52,7 @@ impl CrossEncoderModel {
             ONNX_ENVIRONMENT
                 .new_session_builder()?
                 .with_optimization_level(GraphOptimizationLevel::All)?
-                // .with_number_threads(10)?
+                .with_number_threads(5)?
                 .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
         );
 
@@ -61,71 +61,102 @@ impl CrossEncoderModel {
 }
 
 pub trait CrossEncoder: Send + Sync {
-    fn run(&self, query: &str, body: &str) -> f64;
+    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64>;
 }
 
 pub struct DummyCrossEncoder {}
 
 impl CrossEncoder for DummyCrossEncoder {
-    fn run(&self, _query: &str, _body: &str) -> f64 {
-        1.0
+    fn run(&self, _query: &str, bodies: &[String]) -> Vec<f64> {
+        vec![1.0; bodies.len()]
     }
 }
 
 impl CrossEncoder for CrossEncoderModel {
-    fn run(&self, query: &str, body: &str) -> f64 {
-        let body: String = body.split_whitespace().take(TRUNCATE_INPUT).collect();
-        let encoded = self.tokenizer.encode((query, body), true).unwrap();
+    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
+        if bodies.is_empty() {
+            return Vec::new();
+        }
+
+        let bs = bodies.len();
+
+        let input: Vec<_> = bodies
+            .iter()
+            .map(|body| {
+                (
+                    query.to_string(),
+                    body.split_whitespace()
+                        .take(TRUNCATE_INPUT)
+                        .collect::<String>(),
+                )
+            })
+            .collect();
+
+        let encoded = self.tokenizer.encode_batch(input, true).unwrap();
+
+        let num_tokens = encoded
+            .iter()
+            .map(|enc| enc.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
         let ids = encoded
-            .get_ids()
             .iter()
-            .map(|i| *i as i64)
-            .take(TRUNCATE_INPUT)
+            .flat_map(|enc| enc.get_ids().iter().map(|i| *i as i64).take(TRUNCATE_INPUT))
             .collect_vec();
 
         let attention_mask = encoded
-            .get_attention_mask()
             .iter()
-            .take(TRUNCATE_INPUT)
-            .map(|i| *i as i64)
+            .flat_map(|enc| {
+                enc.get_attention_mask()
+                    .iter()
+                    .map(|i| *i as i64)
+                    .take(TRUNCATE_INPUT)
+            })
             .collect_vec();
 
         let type_ids = encoded
-            .get_type_ids()
             .iter()
-            .take(TRUNCATE_INPUT)
-            .map(|i| *i as i64)
+            .flat_map(|enc| {
+                enc.get_type_ids()
+                    .iter()
+                    .map(|i| *i as i64)
+                    .take(TRUNCATE_INPUT)
+            })
             .collect_vec();
-
-        let num_tokens = ids.len();
 
         let mut sess = self.session.lock().unwrap();
 
-        let res: Vec<OrtOwnedTensor<f32, _>> = sess
+        let output: Vec<OrtOwnedTensor<f32, _>> = sess
             .run(vec![
                 TypedArray::I64(
                     ArrayBase::from_vec(ids)
-                        .into_shape((1, num_tokens))
+                        .into_shape((bs, num_tokens))
                         .unwrap(),
                 ),
                 TypedArray::I64(
                     ArrayBase::from_vec(attention_mask)
-                        .into_shape((1, num_tokens))
+                        .into_shape((bs, num_tokens))
                         .unwrap(),
                 ),
                 TypedArray::I64(
                     ArrayBase::from_vec(type_ids)
-                        .into_shape((1, num_tokens))
+                        .into_shape((bs, num_tokens))
                         .unwrap(),
                 ),
             ])
             .unwrap();
 
-        let res = res[0][[0, 0]] as f64;
+        let mut res = Vec::with_capacity(bs);
 
-        let s = res.exp();
-        s / (s + 1.0)
+        for i in 0..bs {
+            let s = output[0][[i, 0]] as f64;
+            let s = s.exp();
+            let s = s / (s + 1.0);
+            res.push(s);
+        }
+
+        res
     }
 }
 
@@ -140,7 +171,7 @@ mod tests {
 
         let s = model.run(
             "how many people live in paris",
-            "there are currently 1234 people living in paris",
+            &["there are currently 1234 people living in paris".to_string()],
         );
 
         for _ in 0..10 {
@@ -148,7 +179,7 @@ mod tests {
                 s,
                 model.run(
                     "how many people live in paris",
-                    "there are currently 1234 people living in paris"
+                    &["there are currently 1234 people living in paris".to_string()]
                 )
             );
         }
@@ -156,11 +187,11 @@ mod tests {
         assert!(
             model.run(
                 "how many people live in paris",
-                "there are currently 1234 people living in paris"
-            ) > model.run(
+                &["there are currently 1234 people living in paris".to_string()]
+            )[0] > model.run(
                 "how many people live in paris",
-                "I really like cake and my favorite cake is probably brownie"
-            )
+                &["I really like cake and my favorite cake is probably brownie".to_string()]
+            )[0]
         );
     }
 }

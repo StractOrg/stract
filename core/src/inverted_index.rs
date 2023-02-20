@@ -260,15 +260,7 @@ impl InvertedIndex {
             .collect();
 
         for page in &mut webpages {
-            page.snippet = snippet::generate(
-                query,
-                &page.body,
-                &page.dirty_body,
-                &page.description,
-                &page.dmoz_description,
-                &page.region,
-                &ctx.tv_searcher,
-            )?;
+            page.snippet = snippet::generate(query, &page.body, &page.region);
         }
 
         Ok(webpages)

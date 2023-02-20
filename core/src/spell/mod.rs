@@ -19,8 +19,12 @@ pub mod spell_checker;
 pub mod splitter;
 pub mod word2vec;
 
+use std::ops::Range;
+
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
+
+use crate::floor_char_boundary;
 
 pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit};
 pub use self::spell_checker::SpellChecker;
@@ -68,4 +72,21 @@ impl Correction {
             .iter()
             .all(|term| matches!(term, CorrectionTerm::NotCorrected(_)))
     }
+}
+
+pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
+    let mut res = Vec::new();
+    let mut last_start = 0;
+
+    // We should really do something more clever than this.
+    // Tried using `SRX`[https://docs.rs/srx/latest/srx/] but it was a bit too slow.
+    for (end, _) in text
+        .char_indices()
+        .filter(|(_, c)| matches!(c, '.' | '\n' | '?' | '!'))
+    {
+        res.push(last_start..end + 1);
+        last_start = floor_char_boundary(text, end + 2);
+    }
+
+    res
 }

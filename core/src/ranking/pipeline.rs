@@ -134,11 +134,19 @@ impl<M: CrossEncoder> ReRanker<M> {
 
 impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
     fn score(&self, websites: &mut [T]) {
-        for website in websites {
-            let mut website = website.as_mut_ranking();
+        let mut bodies = Vec::with_capacity(websites.len());
+
+        for website in websites.iter_mut() {
+            let website = website.as_mut_ranking();
             let text = website.title.clone() + ". " + &website.clean_body;
-            website.score = self.prev_score * website.score
-                + self.coefficient * self.model.run(&self.query, &text);
+            bodies.push(text);
+        }
+
+        let scores = self.model.run(&self.query, &bodies);
+
+        for (website, score) in websites.iter_mut().zip(scores.into_iter()) {
+            let website = website.as_mut_ranking();
+            website.score = self.prev_score * website.score + self.coefficient * score;
         }
     }
 

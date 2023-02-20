@@ -26,11 +26,12 @@ use onnxruntime::{
 use tokenizers::{PaddingParams, TruncationParams};
 
 const TRUNCATE_INPUT: usize = 128;
-const SCORE_THRESHOLD: f64 = 0.0;
+const DEFAULT_SCORE_THRESHOLD: f64 = 0.7;
 
 pub struct QaModel {
     tokenizer: tokenizers::Tokenizer,
     session: Mutex<onnxruntime::session::Session<'static>>,
+    score_threshold: f64,
 }
 
 #[derive(Debug)]
@@ -63,7 +64,11 @@ impl QaModel {
                 .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
         );
 
-        Ok(Self { tokenizer, session })
+        Ok(Self {
+            tokenizer,
+            session,
+            score_threshold: DEFAULT_SCORE_THRESHOLD,
+        })
     }
 
     pub fn run(&self, question: &str, contexts: &[&str]) -> Option<Answer> {
@@ -152,7 +157,7 @@ impl QaModel {
 
             let score = (start[best_start] * end[best_end]) as f64;
 
-            if score < SCORE_THRESHOLD {
+            if score < self.score_threshold {
                 continue;
             }
 
@@ -201,7 +206,9 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let mut model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        model.score_threshold = 0.0;
+
         let answer = model.run(question, &contexts).unwrap();
 
         assert!(answer.score > 0.6);
@@ -236,7 +243,9 @@ of tropical rainforest in the world, with an estimated 390 billion individual tr
 "#,
         ];
 
-        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let mut model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        model.score_threshold = 0.0;
+
         let answer = model.run(question, &contexts).unwrap();
 
         assert!(answer.score > 0.6);
@@ -271,7 +280,9 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let mut model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        model.score_threshold = 0.0;
+
         let answer = model.run(question, &contexts).unwrap();
 
         assert!(answer.score > 0.6);
@@ -305,7 +316,8 @@ minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."#,
         ];
 
-        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let mut model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        model.score_threshold = 0.0;
 
         let answer = model.run(question, &contexts);
         assert!(answer.is_none());
@@ -313,7 +325,8 @@ of tropical rainforest in the world, with an estimated 390 billion individual tr
 
     #[test]
     fn empty() {
-        let model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        let mut model = QaModel::open("../data/qa_model").expect("Failed to find QA model");
+        model.score_threshold = 0.0;
 
         let question = "";
         let contexts = [
