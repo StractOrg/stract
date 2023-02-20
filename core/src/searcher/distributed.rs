@@ -461,6 +461,7 @@ impl DistributedSearcher {
             query: query.query.clone(),
             num_results: NUM_RESULTS,
             optic_program: Some(include_str!("discussions.optic").to_string()),
+            site_rankings: query.site_rankings.clone(),
             ..Default::default()
         };
 
