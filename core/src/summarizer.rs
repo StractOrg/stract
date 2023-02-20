@@ -903,18 +903,40 @@ impl BeamState {
 
                     if Self::all_beams_agree(&beams, beam_token_agreement_idx) {
                         let tok = beams[0].input_ids[beam_token_agreement_idx];
-                        let decoded = model.tokenizer.decode(vec![tok as u32], true)?;
+                        if tok == 17 {
+                            self = BeamState::DecodingWithPast {
+                                encoder_hidden_states,
+                                attention_mask,
+                                caches,
+                                beams,
+                                generated_tokens,
+                                beam_token_agreement_idx: beam_token_agreement_idx + 1,
+                            };
+                            continue;
+                        } else if tok == 27 {
+                            self = BeamState::DecodingWithPast {
+                                encoder_hidden_states,
+                                attention_mask,
+                                caches,
+                                beams,
+                                generated_tokens,
+                                beam_token_agreement_idx: beam_token_agreement_idx + 1,
+                            };
 
-                        self = BeamState::DecodingWithPast {
-                            encoder_hidden_states,
-                            attention_mask,
-                            caches,
-                            beams,
-                            generated_tokens,
-                            beam_token_agreement_idx: beam_token_agreement_idx + 1,
-                        };
+                            return Ok((self, Some("'".to_string())));
+                        } else {
+                            self = BeamState::DecodingWithPast {
+                                encoder_hidden_states,
+                                attention_mask,
+                                caches,
+                                beams,
+                                generated_tokens,
+                                beam_token_agreement_idx: beam_token_agreement_idx + 1,
+                            };
+                            let decoded = model.tokenizer.decode(vec![tok as u32], true)?;
 
-                        return Ok((self, Some(decoded)));
+                            return Ok((self, Some(decoded)));
+                        }
                     }
 
                     let decoder_output = Self::run_decoder_model_with_past(
@@ -1129,7 +1151,6 @@ mod tests {
         let it = OverlappingSents::new(text, 3, 1);
 
         for (p, range) in it {
-            dbg!(p, &range, &text[range.clone()]);
             assert_eq!(p, &text[range]);
         }
     }
