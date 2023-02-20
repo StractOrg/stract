@@ -162,7 +162,7 @@ pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: String,
     pub crossencoder_model_path: String,
-    pub qa_model_path: String,
+    pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
     pub search_servers: Vec<Vec<String>>,

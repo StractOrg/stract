@@ -235,7 +235,7 @@ pub enum Request {
 pub struct DistributedSearcher {
     shards: Vec<Shard>,
     cross_encoder: Arc<CrossEncoderModel>,
-    qa_model: Arc<QaModel>,
+    qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
 }
 
@@ -273,13 +273,13 @@ impl DistributedSearcher {
     pub fn new(
         shards: Vec<Shard>,
         model: CrossEncoderModel,
-        qa_model: QaModel,
+        qa_model: Option<QaModel>,
         bangs: Bangs,
     ) -> Self {
         Self {
             shards,
             cross_encoder: Arc::new(model),
-            qa_model: Arc::new(qa_model),
+            qa_model: qa_model.map(Arc::new),
             bangs,
         }
     }
@@ -588,26 +588,31 @@ impl DistributedSearcher {
     }
 
     fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
-        let contexts: Vec<_> = webpages
-            .iter()
-            .take(1)
-            .map(|webpage| webpage.body.as_str())
-            .collect();
+        self.qa_model.as_ref().and_then(|qa_model| {
+            let contexts: Vec<_> = webpages
+                .iter()
+                .take(1)
+                .map(|webpage| webpage.body.as_str())
+                .collect();
 
-        match self.qa_model.run(query, &contexts) {
-            Some(answer) => {
-                let answer_webpage = webpages.remove(answer.context_idx);
-                Some(DisplayedAnswer {
-                    title: answer_webpage.title,
-                    url: answer_webpage.url,
-                    pretty_url: answer_webpage.pretty_url,
-                    snippet: generate_answer_snippet(&answer_webpage.body, answer.offset.clone()),
-                    answer: answer_webpage.body[answer.offset].to_string(),
-                    body: answer_webpage.body,
-                })
+            match qa_model.run(query, &contexts) {
+                Some(answer) => {
+                    let answer_webpage = webpages.remove(answer.context_idx);
+                    Some(DisplayedAnswer {
+                        title: answer_webpage.title,
+                        url: answer_webpage.url,
+                        pretty_url: answer_webpage.pretty_url,
+                        snippet: generate_answer_snippet(
+                            &answer_webpage.body,
+                            answer.offset.clone(),
+                        ),
+                        answer: answer_webpage.body[answer.offset].to_string(),
+                        body: answer_webpage.body,
+                    })
+                }
+                None => None,
             }
-            None => None,
-        }
+        })
     }
 
     pub(crate) async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {

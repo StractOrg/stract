@@ -83,7 +83,7 @@ pub async fn favicon() -> impl IntoResponse {
 pub fn router(
     queries_csv_path: &str,
     crossencoder_model_path: &str,
-    qa_model_path: &str,
+    qa_model_path: &Option<String>,
     bangs_path: &str,
     summarizer_path: &str,
     shards: Vec<Vec<String>>,
@@ -96,7 +96,12 @@ pub fn router(
 
     let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
     let crossencoder = CrossEncoderModel::open(crossencoder_model_path)?;
-    let qa_model = QaModel::open(qa_model_path)?;
+
+    let qa_model = match qa_model_path {
+        Some(path) => Some(QaModel::open(path)?),
+        None => None,
+    };
+
     let bangs = Bangs::from_path(bangs_path);
     let searcher = DistributedSearcher::new(shards, crossencoder, qa_model, bangs);
 
