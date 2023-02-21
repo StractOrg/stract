@@ -74,6 +74,39 @@ impl TextField {
             TextField::FlattenedSchemaOrgJson => Tokenizer::Json(JsonField),
         }
     }
+
+    pub fn index_option(&self) -> IndexRecordOption {
+        if self.has_pos() {
+            IndexRecordOption::WithFreqsAndPositions
+        } else {
+            IndexRecordOption::WithFreqs
+        }
+    }
+
+    pub fn has_pos(&self) -> bool {
+        match self {
+            TextField::Title => true,
+            TextField::CleanBody => true,
+            TextField::StemmedTitle => false,
+            TextField::StemmedCleanBody => false,
+            TextField::AllBody => false,
+            TextField::Url => true,
+            TextField::Site => true,
+            TextField::Domain => true,
+            TextField::SiteNoTokenizer => false,
+            TextField::DomainNoTokenizer => false,
+            TextField::DomainIfHomepage => false,
+            TextField::DomainNameIfHomepageNoTokenizer => false,
+            TextField::TitleIfHomepage => false,
+            TextField::BacklinkText => false,
+            TextField::PrimaryImage => false,
+            TextField::Description => true,
+            TextField::HostTopic => false,
+            TextField::DmozDescription => true,
+            TextField::SchemaOrgJson => false,
+            TextField::FlattenedSchemaOrgJson => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -169,11 +202,20 @@ pub static ALL_FIELDS: [Field; 48] = [
 impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
         let tokenizer = self.as_text().unwrap().tokenizer();
+        let option = self.as_text().unwrap().index_option();
+
         TextOptions::default().set_indexing_options(
             TextFieldIndexing::default()
                 .set_tokenizer(tokenizer.as_str())
-                .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                .set_index_option(option),
         )
+    }
+
+    pub fn has_pos(&self) -> bool {
+        match self {
+            Field::Fast(_) => false,
+            Field::Text(text) => text.has_pos(),
+        }
     }
 
     pub fn options(&self) -> IndexingOption {
@@ -193,9 +235,7 @@ impl Field {
             Field::Text(TextField::DomainNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::AllBody) => {
-                IndexingOption::Text(self.default_text_options().set_stored())
-            }
+            Field::Text(TextField::AllBody) => IndexingOption::Text(self.default_text_options()),
             Field::Text(TextField::DomainIfHomepage) => {
                 IndexingOption::Text(self.default_text_options())
             }
@@ -230,7 +270,7 @@ impl Field {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Text(TextField::FlattenedSchemaOrgJson) => {
-                IndexingOption::Text(self.default_text_options().set_stored())
+                IndexingOption::Text(self.default_text_options())
             }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()

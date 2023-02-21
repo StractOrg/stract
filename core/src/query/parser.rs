@@ -16,7 +16,6 @@
 
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, TermQuery},
-    schema::IndexRecordOption,
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
 
@@ -107,6 +106,7 @@ impl Term {
                 for (field, entry) in fields
                     .iter()
                     .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
+                    .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].has_pos())
                 {
                     phrases.push((
                         Occur::Should,
@@ -250,15 +250,18 @@ impl Term {
         let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
         let mut processed_terms = Term::process_tantivy_term(term, analyzer, *field);
 
-        let processed_query = if processed_terms.len() > 1 {
-            Box::new(PhraseQuery::new(processed_terms)) as Box<dyn tantivy::query::Query>
-        } else {
-            let term = processed_terms.pop().unwrap();
-            Box::new(TermQuery::new(
-                term,
-                IndexRecordOption::WithFreqsAndPositions,
-            ))
-        };
+        let processed_query =
+            if processed_terms.len() > 1 && ALL_FIELDS[field.field_id() as usize].has_pos() {
+                Box::new(PhraseQuery::new(processed_terms)) as Box<dyn tantivy::query::Query>
+            } else {
+                let option = ALL_FIELDS[field.field_id() as usize]
+                    .as_text()
+                    .unwrap()
+                    .index_option();
+
+                let term = processed_terms.remove(0);
+                Box::new(TermQuery::new(term, option))
+            };
 
         let boost =
             field_boost.get(&ALL_FIELDS[field.field_id() as usize].as_text().unwrap()) as f32;

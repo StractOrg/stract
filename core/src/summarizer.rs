@@ -903,6 +903,12 @@ impl BeamState {
 
                     if Self::all_beams_agree(&beams, beam_token_agreement_idx) {
                         let tok = beams[0].input_ids[beam_token_agreement_idx];
+                        // for some reason, [17, 27] decodes to "'" or something like that.
+                        // If the tokens are decoded separately, they correspond to some characters
+                        // that shows up as errors in a string.
+                        // This hack skips the token 17 and simply decodes 27 as "'".
+                        // While this might not be correct decoding in all scenarios, it seems to work
+                        // most of the time.
                         if tok == 17 {
                             self = BeamState::DecodingWithPast {
                                 encoder_hidden_states,
@@ -933,6 +939,7 @@ impl BeamState {
                                 generated_tokens,
                                 beam_token_agreement_idx: beam_token_agreement_idx + 1,
                             };
+
                             let decoded = model.tokenizer.decode(vec![tok as u32], true)?;
 
                             return Ok((self, Some(decoded)));

@@ -685,7 +685,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            query: "\"This is a test website\"".to_string(),
+            query: "\"Test website\"".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -694,7 +694,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com");
 
         let query = SearchQuery {
-            query: "\"This is a test website\" site:www.second.com".to_string(),
+            query: "\"Test website\" site:www.second.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
