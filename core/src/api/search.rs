@@ -97,6 +97,8 @@ pub async fn route(
     Extension(state): Extension<Arc<State>>,
     extract::OriginalUri(uri): extract::OriginalUri,
 ) -> Result<impl IntoResponse, StatusCode> {
+    state.search_counter.inc();
+
     let query = params.get("q").cloned().unwrap_or_default();
 
     let skip_pages: usize = params
@@ -243,6 +245,8 @@ pub async fn api(
     extract::Json(mut query): extract::Json<SearchQuery>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
+    state.search_counter.inc();
+
     query.num_results = query.num_results.min(50 * NUM_RESULTS_PER_PAGE);
 
     match state.searcher.search(&query).await {

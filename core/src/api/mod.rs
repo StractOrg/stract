@@ -24,6 +24,7 @@ use crate::{
     ranking::models::cross_encoder::CrossEncoderModel,
     searcher::{DistributedSearcher, Shard},
     summarizer::Summarizer,
+    FrontendConfig,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -39,6 +40,7 @@ use axum::{
 mod about;
 mod autosuggest;
 mod index;
+mod metrics;
 mod opensearch;
 mod optics;
 mod privacy;
@@ -51,6 +53,7 @@ pub struct HtmlTemplate<T>(T);
 pub struct State {
     pub searcher: DistributedSearcher,
     pub autosuggest: Autosuggest,
+    pub search_counter: crate::metrics::Counter,
     pub summarizer: Arc<Summarizer>,
 }
 
@@ -80,35 +83,31 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn router(
-    queries_csv_path: &str,
-    crossencoder_model_path: &str,
-    qa_model_path: &Option<String>,
-    bangs_path: &str,
-    summarizer_path: &str,
-    shards: Vec<Vec<String>>,
-) -> Result<Router> {
-    let shards: Vec<_> = shards
+pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) -> Result<Router> {
+    let shards: Vec<_> = config
+        .search_servers
+        .clone()
         .into_iter()
         .enumerate()
         .map(|(id, replicas)| Shard::new(id as u64, replicas))
         .collect();
 
-    let autosuggest = Autosuggest::load_csv(queries_csv_path)?;
-    let crossencoder = CrossEncoderModel::open(crossencoder_model_path)?;
+    let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
+    let crossencoder = CrossEncoderModel::open(&config.crossencoder_model_path)?;
 
-    let qa_model = match qa_model_path {
+    let qa_model = match &config.qa_model_path {
         Some(path) => Some(QaModel::open(path)?),
         None => None,
     };
 
-    let bangs = Bangs::from_path(bangs_path);
+    let bangs = Bangs::from_path(&config.bangs_path);
     let searcher = DistributedSearcher::new(shards, crossencoder, qa_model, bangs);
 
     let state = Arc::new(State {
         searcher,
         autosuggest,
-        summarizer: Arc::new(Summarizer::open(summarizer_path)?),
+        search_counter,
+        summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
     });
 
     Ok(Router::new()
@@ -135,4 +134,10 @@ pub fn router(
         .layer(CompressionLayer::new())
         .merge(Router::new().route("/summarize", get(summarize::route)))
         .layer(Extension(state)))
+}
+
+pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Result<Router> {
+    Ok(Router::new()
+        .route("/metrics", get(metrics::route))
+        .layer(Extension(Arc::new(registry))))
 }

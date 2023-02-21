@@ -49,6 +49,7 @@ pub mod index;
 mod intmap;
 mod kahan_sum;
 mod kv;
+mod metrics;
 pub mod prehashed;
 mod qa_model;
 mod query;
@@ -161,6 +162,7 @@ pub struct HttpConfig {
 pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: String,
+    pub prometheus_host: String,
     pub crossencoder_model_path: String,
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
