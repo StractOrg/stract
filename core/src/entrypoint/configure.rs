@@ -14,11 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use rusoto_core::credential::StaticProvider;
-use rusoto_core::HttpClient;
-use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use tokio::fs::File;
 use tokio::io;
+use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
 use crate::entrypoint::{dmoz_parser, indexer};
@@ -37,13 +35,6 @@ fn download_files() {
         .build()
         .unwrap()
         .block_on(async {
-            let creds = StaticProvider::new(String::new(), String::new(), None, None);
-            let client = S3Client::new_with(
-                HttpClient::new().unwrap(),
-                creds,
-                rusoto_core::Region::EuCentral1,
-            );
-
             for name in [
                 "enwiki_subset.xml.bz2",
                 "queries_us.csv",
@@ -52,20 +43,18 @@ fn download_files() {
                 "content.rdf.u8.gz",
             ] {
                 info!("Downloading {}", name);
-                let mut object = client
-                    .get_object(GetObjectRequest {
-                        bucket: BUCKET_NAME.into(),
-                        key: name.into(),
-                        ..Default::default()
-                    })
+                let body = reqwest::get(format!("http://s3.cuely.io/{BUCKET_NAME}/{name}"))
                     .await
                     .unwrap();
 
-                let body = object.body.take().expect("The object has no body");
-
-                let mut body = body.into_async_read();
                 let mut file = File::create(Path::new(DATA_PATH).join(name)).await.unwrap();
-                io::copy(&mut body, &mut file).await.unwrap();
+                let mut bytes = body.bytes_stream();
+
+                while let Some(item) = bytes.next().await {
+                    io::copy(&mut item.unwrap().as_ref(), &mut file)
+                        .await
+                        .unwrap();
+                }
             }
         });
 }

@@ -9,7 +9,7 @@ default-run = "cuely"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-dev = ["rusoto_s3", "rusoto_core"]
+dev = []
 
 [[bin]]
 name = "cuely"
@@ -61,8 +61,6 @@ base64 = { workspace = true }
 async-trait = { workspace = true }
 axum-macros = { workspace = true }
 urlencoding = { workspace = true }
-rusoto_s3 = { workspace = true, optional = true }
-rusoto_core = { workspace = true, optional = true }
 bitvec = { workspace = true }
 tower-http = { workspace = true }
 once_cell = { workspace = true }

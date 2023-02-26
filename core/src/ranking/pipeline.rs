@@ -138,7 +138,7 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
 
         for website in websites.iter_mut() {
             let website = website.as_mut_ranking();
-            let text = website.title.clone() + ". " + &website.clean_body;
+            let text = website.title.clone() + ". " + website.clean_body.as_str();
             bodies.push(text);
         }
 

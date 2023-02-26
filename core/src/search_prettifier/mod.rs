@@ -58,7 +58,8 @@ impl From<spell::Correction> for HighlightedSpellCorrection {
         for term in correction.terms {
             match term {
                 CorrectionTerm::Corrected(correction) => {
-                    highlighted.push_str(&("<b><i>".to_string() + &correction + "</i></b>"));
+                    highlighted
+                        .push_str(&("<b><i>".to_string() + correction.as_str() + "</i></b>"));
                     raw.push_str(&correction);
                 }
                 CorrectionTerm::NotCorrected(orig) => {
@@ -96,7 +97,7 @@ fn prettify_url(url: &Url) -> String {
     pretty_url = Url::from(pretty_url.clone())
         .strip_protocol()
         .replace('/', " › ");
-    pretty_url = protocol + &pretty_url;
+    pretty_url = protocol + pretty_url.as_str();
 
     pretty_url
 }

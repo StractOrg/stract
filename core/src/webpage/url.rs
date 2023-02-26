@@ -158,25 +158,25 @@ impl Url {
                 if prot.is_empty() {
                     url.full() + self.0.strip_prefix('/').unwrap()
                 } else {
-                    prot + "://" + url.site() + &self.0
+                    prot + "://" + url.site() + self.0.as_str()
                 }
             }
-            (true, false) => url.full() + &self.0,
+            (true, false) => url.full() + self.0.as_str(),
             (false, true) => {
                 let prot = url.protocol().to_string();
                 if prot.is_empty() {
-                    url.full() + &self.0
+                    url.full() + self.0.as_str()
                 } else {
-                    prot + "://" + url.site() + &self.0
+                    prot + "://" + url.site() + self.0.as_str()
                 }
             }
-            (false, false) => url.full() + "/" + &self.0,
+            (false, false) => url.full() + "/" + self.0.as_str(),
         };
     }
 
     pub fn full(&self) -> String {
         if self.find_protocol_end() == 0 {
-            "https://".to_string() + &self.0
+            "https://".to_string() + self.0.as_str()
         } else {
             self.0.clone()
         }

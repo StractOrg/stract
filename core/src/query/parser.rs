@@ -41,7 +41,7 @@ impl ToString for Term {
     fn to_string(&self) -> String {
         match self {
             Term::Simple(term) => term.clone(),
-            Term::Phrase(phrase) => "\"".to_string() + phrase + "\"",
+            Term::Phrase(phrase) => "\"".to_string() + phrase.as_str() + "\"",
             Term::Not(term) => "-".to_string() + term.to_string().as_str(),
             Term::Site(site) => "site:".to_string() + site.as_str(),
             Term::Title(title) => "intitle:".to_string() + title.as_str(),
