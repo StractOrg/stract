@@ -1,0 +1,37 @@
+---
+import SettingsLayout from "../../layouts/Settings.astro";
+---
+<SettingsLayout>
+  <div class="flex flex-col space-y-2">
+    <h1 class="text-2xl font-medium">Privacy</h1>
+    <div class="text-sm">
+      By default, some data about your searches are stored on our servers. We primarily store the text you used for the search, and which results (if any) you clicked on.
+      This data immensely helps us improve everyones search experience by training our ranking models.
+    </div>
+
+    <div class="text-sm">
+      It is important to note, that <b class="font-extrabold">no</b> personal information is stored about your search. We don't store your IP, browser fingerprint or even a precise timestamp.
+      In fact, you can see exactly what gets stored <a href="#">here</a>.
+    </div>
+
+    <div class="text-sm">
+      We hope you feel comfortable sharing this data with us as this makes the results much better for everyone, but we also respect if you don't.
+      You can opt-out at any point by toggling the checkbox below and we wont store anything at all about your searches.
+    </div>
+
+    <div class="flex space-x-1 pl-1 text-sm" x-data="{ allowStats: $persist(true).as('allowStats') }">
+      <input type="checkbox" id="allowStats" x-model="allowStats">
+      <label for="allowStats">Allow usage statistics</label>
+    </div>
+  </div>
+</SettingsLayout>
+
+<style>
+  a {
+    @apply text-blue-600;
+  }
+</style>
+
+<script>
+  import "$/alpine";
+</script>

@@ -73,6 +73,7 @@ lalrpop-util = { workspace = true }
 byteorder = { workspace = true }
 async-stream = { workspace = true }
 tokio-stream = { workspace = true }
+scylla = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

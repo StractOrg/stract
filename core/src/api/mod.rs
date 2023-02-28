@@ -15,12 +15,15 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use axum::{body::Body, routing::get_service, Extension, Router};
+use tokio::sync::Mutex;
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
+    leaky_queue::LeakyQueue,
     qa_model::QaModel,
+    query_store::{self, ImprovementEvent},
     ranking::models::cross_encoder::CrossEncoderModel,
     searcher::{DistributedSearcher, Shard},
     summarizer::Summarizer,
@@ -39,6 +42,7 @@ use axum::{
 
 mod about;
 mod autosuggest;
+mod improvement;
 mod index;
 mod metrics;
 mod opensearch;
@@ -55,6 +59,7 @@ pub struct State {
     pub autosuggest: Autosuggest,
     pub search_counter: crate::metrics::Counter,
     pub summarizer: Arc<Summarizer>,
+    pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
 }
 
 impl<T> IntoResponse for HtmlTemplate<T>
@@ -100,6 +105,15 @@ pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) 
         None => None,
     };
 
+    let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
+        let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
+        tokio::spawn(query_store::store_queries_loop(
+            query_store_queue.clone(),
+            db_host,
+        ));
+        query_store_queue
+    });
+
     let bangs = Bangs::from_path(&config.bangs_path);
     let searcher = DistributedSearcher::new(shards, crossencoder, qa_model, bangs);
 
@@ -108,6 +122,7 @@ pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) 
         autosuggest,
         search_counter,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
+        improvement_queue: query_store_queue,
     });
 
     Ok(Router::new()
@@ -121,8 +136,11 @@ pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) 
         .route("/settings", get(optics::route))
         .route("/settings/optics", get(optics::route))
         .route("/settings/sites", get(sites::route))
+        .route("/settings/privacy", get(improvement::settings))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/opensearch.xml", get(opensearch::route))
+        .route("/improvement/click", post(improvement::click))
+        .route("/improvement/store", post(improvement::store))
         .fallback(get_service(ServeDir::new("frontend/dist/")).handle_error(
             |error: std::io::Error| async move {
                 (

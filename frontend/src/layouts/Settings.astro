@@ -1,0 +1,20 @@
+---
+import Footer from "../components/Footer.astro";
+import Layout from "./Layout.astro";
+import Header from "../components/Header.astro";
+import SettingsMenu from "../components/SettingsMenu.astro";
+---
+<Layout title="Cuely">
+    <div class="flex h-full w-full flex-col">
+        <Header />
+
+        <div class="flex h-fit w-full justify-center pt-10">
+            <SettingsMenu />
+            <div class="flex w-full max-w-2xl flex-col">
+                <slot />
+            </div>
+        </div>
+        <div class="flex flex-grow"></div>
+        <Footer />
+    </div>
+</Layout>

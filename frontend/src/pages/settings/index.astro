@@ -1,91 +1,79 @@
 ---
-import Footer from "../../components/Footer.astro";
-import Layout from "../../layouts/Layout.astro";
-import Header from "../../components/Header.astro";
-import SettingsMenu from "../../components/SettingsMenu.astro";
+import SettingsLayout from "../../layouts/Settings.astro";
 import { askama } from "../../askama";
 ---
 
-<Layout title="Cuely">
-  <div class="flex h-full w-full flex-col">
-    <Header />
-
-    <div class="flex h-fit w-full justify-center pt-10">
-      <SettingsMenu />
-      <div class="flex max-w-2xl flex-col">
-        <h1 class="text-2xl font-medium">Manage Optics</h1>
-        <div class="mt-5 text-sm">
-          Optics lets you control almost everything about which search results
-          that gets returned to you. You can discard results from specific
-          sites, boost results from other sites and much more.
-        </div>
-        <div class="mt-3 text-sm">
-          See our <a
-            href="https://github.com/Cuely/sample-optics/blob/main/quickstart.optic"
-            >quickstart</a
-          > for how to get started. Once you have developed your optic, you can add
-          it here to be used during your search.
-        </div>
-        <div class="mt-3 text-sm">
-          Simply host the optic on a url that returns a plain-text HTTP response
-          with the optic. We use raw.githubusercontent.com, but you are free to
-          host them elsewhere.
-        </div>
-        <div
-          class="mt-16"
-          x-data="{ items: $persist([]).as('optics'), name: '', url: '' }"
+<SettingsLayout>
+  <div>
+    <h1 class="text-2xl font-medium">Manage Optics</h1>
+    <div class="mt-5 text-sm">
+      Optics lets you control almost everything about which search results
+      that gets returned to you. You can discard results from specific
+      sites, boost results from other sites and much more.
+    </div>
+    <div class="mt-3 text-sm">
+      See our <a
+        href="https://github.com/Cuely/sample-optics/blob/main/quickstart.optic"
+        >quickstart</a
+      > for how to get started. Once you have developed your optic, you can add
+      it here to be used during your search.
+    </div>
+    <div class="mt-3 text-sm">
+      Simply host the optic on a url that returns a plain-text HTTP response
+      with the optic. We use raw.githubusercontent.com, but you are free to
+      host them elsewhere.
+    </div>
+    <div
+      class="mt-16"
+      x-data="{ items: $persist([]).as('optics'), name: '', url: '' }"
+    >
+      <div class="flex w-full justify-between pl-5 pr-5">
+        <input id="name" type="text" placeholder="Name" x-model="name" />
+        <input id="url" type="text" placeholder="Url" x-model="url" />
+        <button
+          x-on:click="if (name != '' && url != '') {items.push({ name, url }); name = url = ''}"
+          class="h-10 w-20 rounded-full border-0 bg-brand text-sm text-white"
+          >Add</button
         >
-          <div class="flex w-full justify-between pl-5 pr-5">
-            <input id="name" type="text" placeholder="Name" x-model="name" />
-            <input id="url" type="text" placeholder="Url" x-model="url" />
-            <button
-              x-on:click="items.push({ name, url }); name = url = ''"
-              class="h-10 w-20 rounded-full border-0 bg-brand text-sm text-white"
-              >Add</button
-            >
+      </div>
+      <div class="mt-5">
+        <div class="grid w-full space-y-5" id="optics-list">
+          <div class="flex">
+            <div class="w-10"></div>
+            <div class="flex-1 font-medium">Name</div>
+            <div class="flex-1 font-medium">Url</div>
           </div>
-          <div class="mt-5">
-            <div class="grid w-full space-y-5" id="optics-list">
+          {
+            askama.for_("optic in default_optics", () => (
               <div class="flex">
-                <div class="w-10"></div>
-                <div class="flex-1 font-medium">Name</div>
-                <div class="flex-1 font-medium">Url</div>
-              </div>
-              {
-                askama.for_("optic in default_optics", () => (
-                  <div class="flex">
-                    <div class="mr-5 w-5">
-                      <img src="/images/disabled-delete.svg" class="h-5 w-5" />
-                    </div>
-                    <div class="flex-1 text-sm">{askama`optic.name $ {{random.words}}`}</div>
-                    <div class="flex-1 text-sm">{askama`optic.url $ {{internet.url}}`}</div>
-                  </div>
-                ))
-              }
-              <template x-for="(item, index) in items">
-                <div class="flex">
-                  <div class="w-10">
-                    <img
-                      src="/images/delete.svg"
-                      class="h-5 w-5 hover:cursor-pointer"
-                      x-on:click="items.splice(index, 1)"
-                    />
-                  </div>
-                  <div class="user-optic flex-1 text-sm" x-text="item.name">
-                  </div>
-                  <div class="user-optic flex-1 text-sm" x-text="item.url">
-                  </div>
+                <div class="mr-5 w-5">
+                  <img src="/images/disabled-delete.svg" class="h-5 w-5" />
                 </div>
-              </template>
+                <div class="flex-1 text-sm">{askama`optic.name $ {{random.words}}`}</div>
+                <div class="flex-1 text-sm">{askama`optic.url $ {{internet.url}}`}</div>
+              </div>
+            ))
+          }
+          <template x-for="(item, index) in items">
+            <div class="flex">
+              <div class="w-10">
+                <img
+                  src="/images/delete.svg"
+                  class="h-5 w-5 hover:cursor-pointer"
+                  x-on:click="items.splice(index, 1)"
+                />
+              </div>
+              <div class="user-optic flex-1 text-sm" x-text="item.name">
+              </div>
+              <div class="user-optic flex-1 text-sm" x-text="item.url">
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>
-    <div class="flex flex-grow"></div>
-    <Footer />
   </div>
-</Layout>
+</SettingsLayout>
 
 <script>
   import "$/alpine";

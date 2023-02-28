@@ -6,6 +6,7 @@ members = [
 
 [profile.release]
 debug = true
+lto = "thin"
 
 [workspace.dependencies]
 bincode = "1.3.3"
@@ -68,3 +69,4 @@ tokenizers = "0.13.2"
 byteorder = "1.4.3"
 async-stream = "0.3.3"
 tokio-stream = "0.1.11"
+scylla = "0.7.0"

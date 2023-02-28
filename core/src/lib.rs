@@ -49,10 +49,12 @@ pub mod index;
 mod intmap;
 mod kahan_sum;
 mod kv;
+mod leaky_queue;
 mod metrics;
 pub mod prehashed;
 mod qa_model;
 mod query;
+mod query_store;
 pub mod ranking;
 mod schema;
 mod search_ctx;
@@ -168,6 +170,7 @@ pub struct FrontendConfig {
     pub bangs_path: String,
     pub summarizer_path: String,
     pub search_servers: Vec<Vec<String>>,
+    pub query_store_db_host: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

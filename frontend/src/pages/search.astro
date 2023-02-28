@@ -97,14 +97,16 @@ import { askama } from "../askama";
                         <a
                           class="url truncate text-gray-800 hover:no-underline"
                           href="{{ item.url }}"
+                          onclick="improvement({{ loop.index0 }})"
                         >
                           {askama`item.pretty_url $ {{internet.url}}`}
                         </a>
                       </div>
                       <a
-                        class="title-link truncate text-xl font-medium"
+                        class="title-link sr-title-link truncate text-xl font-medium"
                         title="{{ item.title }}"
                         href="{{ item.url }}"
+                        onclick="improvement({{ loop.index0 }})"
                       >
                         {askama`item.title $ {{lorem.sentence}}`}
                       </a>
@@ -223,7 +225,38 @@ import { askama } from "../askama";
 <script is:inline src="/js/highlight.min.js"></script>
 <script is:inline>
   var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
+  var titleLinks = document.querySelectorAll(".sr-title-link");
   var modal = document.getElementById("modal");
+
+  var searchParams = new URLSearchParams(window.location.search);
+  var query = searchParams.get("q");
+
+  const allowStats = window.localStorage.getItem("allowStats") === "true";
+
+  var qid = null;
+
+  var improvementSent = new Set();
+
+  var urls = [];
+  for (const elem of titleLinks) {
+    urls.push(elem.href);
+  }
+
+  if (allowStats) {
+    fetch("/improvement/store", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "query": query,
+        "urls": urls
+      })
+    }).then((response) => response.text()).then((data) => {
+      console.log(data);
+      qid = data;
+    });
+  }
 
   document.addEventListener("click", (elem) => {
     modal.classList.remove("modal-open");
@@ -255,6 +288,13 @@ import { askama } from "../askama";
       }, 0);
     });
   });
+
+  function improvement(idx) {
+    if (allowStats && qid && !improvementSent.has(idx)) {
+      window.navigator.sendBeacon("/improvement/click?qid=" + qid + "&click=" + idx);
+      improvementSent.add(idx);
+    }
+  }
 </script>
 <script is:inline>
   hljs.highlightAll();
