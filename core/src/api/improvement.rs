@@ -61,8 +61,8 @@ impl From<StoreParams> for StoredQuery {
 
 #[allow(clippy::unused_async)]
 pub async fn store(
-    extract::Json(params): extract::Json<StoreParams>,
     Extension(state): Extension<Arc<State>>,
+    extract::Json(params): extract::Json<StoreParams>,
 ) -> impl IntoResponse {
     match state.improvement_queue.as_ref() {
         Some(q) => {

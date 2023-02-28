@@ -16,14 +16,14 @@
 
 use std::sync::Arc;
 
-use axum::{response::IntoResponse, Extension};
+use axum::{extract, response::IntoResponse};
 use axum_macros::debug_handler;
 
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 pub async fn route(
-    Extension(registry): Extension<Arc<crate::metrics::PrometheusRegistry>>,
+    extract::State(registry): extract::State<Arc<crate::metrics::PrometheusRegistry>>,
 ) -> impl IntoResponse {
     format!("{}", registry)
 }

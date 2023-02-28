@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{body::Body, routing::get_service, Extension, Router};
+use axum::{body::Body, extract, middleware, routing::get_service, Router};
 use tokio::sync::Mutex;
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 
@@ -57,7 +57,8 @@ pub struct HtmlTemplate<T>(T);
 pub struct State {
     pub searcher: DistributedSearcher,
     pub autosuggest: Autosuggest,
-    pub search_counter: crate::metrics::Counter,
+    pub search_counter_success: crate::metrics::Counter,
+    pub search_counter_fail: crate::metrics::Counter,
     pub summarizer: Arc<Summarizer>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
 }
@@ -88,7 +89,11 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) -> Result<Router> {
+pub fn router(
+    config: &FrontendConfig,
+    search_counter_success: crate::metrics::Counter,
+    search_counter_fail: crate::metrics::Counter,
+) -> Result<Router> {
     let shards: Vec<_> = config
         .search_servers
         .clone()
@@ -120,15 +125,20 @@ pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) 
     let state = Arc::new(State {
         searcher,
         autosuggest,
-        search_counter,
+        search_counter_success,
+        search_counter_fail,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
         improvement_queue: query_store_queue,
     });
 
     Ok(Router::new()
         .route("/", get(index::route))
-        .route("/search", get(search::route))
-        .route("/beta/api/search", post(search::api))
+        .merge(
+            Router::new()
+                .route("/search", get(search::route))
+                .route("/beta/api/search", post(search::api))
+                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric)),
+        )
         .route("/autosuggest", get(autosuggest::route))
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
@@ -141,21 +151,30 @@ pub fn router(config: &FrontendConfig, search_counter: crate::metrics::Counter) 
         .route("/opensearch.xml", get(opensearch::route))
         .route("/improvement/click", post(improvement::click))
         .route("/improvement/store", post(improvement::store))
-        .fallback(get_service(ServeDir::new("frontend/dist/")).handle_error(
-            |error: std::io::Error| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled internal error: {error}"),
-                )
-            },
-        ))
+        .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
         .merge(Router::new().route("/summarize", get(summarize::route)))
-        .layer(Extension(state)))
+        .with_state(state))
 }
 
-pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Result<Router> {
-    Ok(Router::new()
+pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Router {
+    Router::new()
         .route("/metrics", get(metrics::route))
-        .layer(Extension(Arc::new(registry))))
+        .with_state(Arc::new(registry))
+}
+
+async fn search_metric<B>(
+    extract::State(state): extract::State<Arc<State>>,
+    request: axum::http::Request<B>,
+    next: middleware::Next<B>,
+) -> Response {
+    let response = next.run(request).await;
+
+    if response.status().is_success() {
+        state.search_counter_success.inc();
+    } else {
+        state.search_counter_fail.inc();
+    }
+
+    response
 }

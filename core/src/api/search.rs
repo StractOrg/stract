@@ -18,7 +18,7 @@ use http::{StatusCode, Uri};
 use optics::SiteRankings;
 use std::{collections::HashMap, sync::Arc};
 
-use axum::{Extension, Json};
+use axum::Json;
 use axum_macros::debug_handler;
 
 use crate::{
@@ -94,11 +94,9 @@ fn extract_site_rankings(params: &HashMap<String, String>) -> Option<SiteRanking
 #[debug_handler]
 pub async fn route(
     extract::Query(params): extract::Query<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
+    extract::State(state): extract::State<Arc<State>>,
     extract::OriginalUri(uri): extract::OriginalUri,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state.search_counter.inc();
-
     let query = params.get("q").cloned().unwrap_or_default();
 
     let skip_pages: usize = params
@@ -242,11 +240,9 @@ fn next_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) 
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 pub async fn api(
+    extract::State(state): extract::State<Arc<State>>,
     extract::Json(mut query): extract::Json<SearchQuery>,
-    Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    state.search_counter.inc();
-
     query.num_results = query.num_results.min(50 * NUM_RESULTS_PER_PAGE);
 
     match state.searcher.search(&query).await {

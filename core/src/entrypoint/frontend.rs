@@ -18,23 +18,39 @@ use anyhow::Result;
 
 use crate::{
     api::{metrics_router, router},
+    metrics::Label,
     FrontendConfig,
 };
 
 pub async fn run(config: FrontendConfig) -> Result<()> {
-    let search_counter = crate::metrics::Counter::default();
+    let search_counter_success = crate::metrics::Counter::default();
+    let search_counter_fail = crate::metrics::Counter::default();
     let mut registry = crate::metrics::PrometheusRegistry::default();
 
     let group = registry
         .new_group(
-            "total_search_requests".to_string(),
+            "search_requests".to_string(),
             Some("Total number of incoming search requests.".to_string()),
         )
         .unwrap();
-    group.register(search_counter.clone(), Vec::new());
 
-    let app = router(&config, search_counter)?;
-    let metrics_app = metrics_router(registry)?;
+    group.register(
+        search_counter_success.clone(),
+        vec![Label {
+            key: "status".to_string(),
+            val: "success".to_string(),
+        }],
+    );
+    group.register(
+        search_counter_fail.clone(),
+        vec![Label {
+            key: "status".to_string(),
+            val: "fail".to_string(),
+        }],
+    );
+
+    let app = router(&config, search_counter_success, search_counter_fail)?;
+    let metrics_app = metrics_router(registry);
 
     let addr = config.host.parse()?;
     tracing::info!("frontend server listening on {}", addr);
