@@ -40,14 +40,13 @@ pub struct StoredQuery {
     qid: Uuid,
     query: String,
     result_urls: Vec<Url>,
-    timestamp: Option<DateTime<Utc>>, // it is extremely important that we strip hours, minutes, seconds and nanoseconds here for privacy
+    timestamp: Option<DateTime<Utc>>, // it is extremely important that we strip minutes, seconds and nanoseconds here for privacy
 }
 
 impl StoredQuery {
     pub fn new(query: String, urls: Vec<Url>) -> Self {
         let timestamp = Utc::now()
             .with_minute(0)
-            .and_then(|t| t.with_minute(0))
             .and_then(|t| t.with_second(0))
             .and_then(|t| t.with_nanosecond(0));
 
