@@ -49,14 +49,14 @@ pub async fn run(config: FrontendConfig) -> Result<()> {
         }],
     );
 
-    let app = router(&config, search_counter_success, search_counter_fail)?;
+    let app = router(&config, search_counter_success, search_counter_fail).await?;
     let metrics_app = metrics_router(registry);
 
-    let addr = config.host.parse()?;
+    let addr = config.host;
     tracing::info!("frontend server listening on {}", addr);
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
 
-    let addr = config.prometheus_host.parse()?;
+    let addr = config.prometheus_host;
     tracing::info!("prometheus exporter listening on {}", addr);
     let metrics_server = axum::Server::bind(&addr).serve(metrics_app.into_make_service());
 

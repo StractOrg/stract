@@ -17,6 +17,7 @@
 use crate::{
     bangs::{Bang, BangHit, Bangs},
     ceil_char_boundary,
+    cluster::{member::Service, Cluster},
     collector::{self, BucketCollector},
     exponential_backoff::ExponentialBackoff,
     floor_char_boundary,
@@ -38,6 +39,7 @@ use crate::{
 
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     net::SocketAddr,
     ops::Range,
     sync::Arc,
@@ -140,8 +142,8 @@ impl RemoteSearcher {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ShardId(u64);
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
+pub struct ShardId(u64);
 
 pub struct Shard {
     id: ShardId,
@@ -233,7 +235,7 @@ pub enum Request {
 }
 
 pub struct DistributedSearcher {
-    shards: Vec<Shard>,
+    cluster: Cluster,
     cross_encoder: Arc<CrossEncoderModel>,
     qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
@@ -271,17 +273,37 @@ impl collector::Doc for ScoredWebsitePointer {
 
 impl DistributedSearcher {
     pub fn new(
-        shards: Vec<Shard>,
+        cluster: Cluster,
         model: CrossEncoderModel,
         qa_model: Option<QaModel>,
         bangs: Bangs,
     ) -> Self {
         Self {
-            shards,
+            cluster,
             cross_encoder: Arc::new(model),
             qa_model: qa_model.map(Arc::new),
             bangs,
         }
+    }
+
+    async fn shards(&self) -> Vec<Shard> {
+        let mut shards = HashMap::new();
+        for member in self.cluster.members().await {
+            if let Service::Searcher { host, shard } = member.service {
+                shards.entry(shard).or_insert_with(Vec::new).push(host);
+            }
+        }
+
+        shards
+            .into_iter()
+            .map(|(shard, replicas)| Shard {
+                id: shard,
+                replicas: replicas
+                    .into_iter()
+                    .map(|addr| RemoteSearcher { addr })
+                    .collect(),
+            })
+            .collect()
     }
 
     fn combine_results(
@@ -322,7 +344,7 @@ impl DistributedSearcher {
             retrieved_webpages.push(None);
         }
 
-        for shard in &self.shards {
+        for shard in self.shards().await.iter() {
             let (indexes, pointers): (Vec<_>, Vec<_>) = top_websites
                 .iter()
                 .enumerate()
@@ -345,7 +367,8 @@ impl DistributedSearcher {
     }
 
     async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
-        self.shards
+        self.shards()
+            .await
             .iter()
             .map(|shard| shard.search(query))
             .collect::<FuturesUnordered<_>>()
@@ -625,7 +648,8 @@ impl DistributedSearcher {
     }
 
     pub(crate) async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {
-        self.shards
+        self.shards()
+            .await
             .iter()
             .map(|shard| shard.get_webpage(url))
             .collect::<FuturesUnordered<_>>()

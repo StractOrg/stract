@@ -490,6 +490,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chitchat"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fec1bff4fabc59f0b7408478183a796ab0a9bcb0534bb413f3cf66f44ce2aca1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -808,6 +824,7 @@ dependencies = [
  "bitvec",
  "byteorder",
  "bzip2",
+ "chitchat",
  "chrono",
  "clap 3.2.23",
  "criterion",
@@ -3878,6 +3895,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

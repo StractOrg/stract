@@ -18,10 +18,11 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
-use searcher::distributed;
+use searcher::{distributed, ShardId};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::net::SocketAddr;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use tantivy::TantivyError;
@@ -35,6 +36,7 @@ pub mod mapreduce;
 mod api;
 mod autosuggest;
 mod bangs;
+mod cluster;
 mod collector;
 mod directory;
 mod entity_index;
@@ -162,23 +164,30 @@ pub struct HttpConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FrontendConfig {
+    pub cluster_id: String,
     pub queries_csv_path: String,
-    pub host: String,
-    pub prometheus_host: String,
+    pub host: SocketAddr,
+    pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: String,
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
     pub search_servers: Vec<Vec<String>>,
     pub query_store_db_host: Option<String>,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchServerConfig {
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
+    pub shard_id: ShardId,
     pub index_path: String,
     pub entity_index_path: Option<String>,
     pub centrality_store_path: Option<String>,
-    pub host: String,
+    pub host: SocketAddr,
 }
 
 #[derive(Error, Debug)]
@@ -272,6 +281,9 @@ pub enum Error {
 
     #[error("Distributed searcher")]
     DistributedSearcher(#[from] distributed::Error),
+
+    #[error("Cluster")]
+    Cluster(#[from] cluster::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

@@ -1,3 +1,6 @@
+cluster_id = "dev_search"
+gossip_addr = "0.0.0.0:3004"
+shard_id = 0
 host = "0.0.0.0:3002"
 index_path = "data/index"
 entity_index_path = "data/entity"

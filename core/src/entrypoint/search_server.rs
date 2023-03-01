@@ -17,6 +17,10 @@
 use std::net::SocketAddr;
 
 use crate::{
+    cluster::{
+        member::{Member, Service},
+        Cluster,
+    },
     entity_index::EntityIndex,
     index::Index,
     inverted_index,
@@ -26,7 +30,7 @@ use crate::{
 };
 
 pub async fn run(config: SearchServerConfig) -> Result<()> {
-    let addr: SocketAddr = config.host.parse().unwrap();
+    let addr: SocketAddr = config.host;
     let server = sonic::Server::bind(addr).await.unwrap();
     tracing::info!("listening on {}", addr);
 
@@ -47,6 +51,20 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     if let Some(centrality_store) = centrality_store {
         local_searcher.set_centrality_store(centrality_store);
     }
+
+    // dropping the handle leaves the cluster
+    let _cluster_handle = Cluster::join(
+        Member {
+            id: config.cluster_id,
+            service: Service::Searcher {
+                host: config.host,
+                shard: config.shard_id,
+            },
+        },
+        config.gossip_addr,
+        config.gossip_seed_nodes.unwrap_or_default(),
+    )
+    .await?;
 
     loop {
         if let Ok(req) = server.accept::<searcher::distributed::Request>().await {

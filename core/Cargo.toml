@@ -74,6 +74,7 @@ byteorder = { workspace = true }
 async-stream = { workspace = true }
 tokio-stream = { workspace = true }
 scylla = { workspace = true }
+chitchat = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

@@ -21,11 +21,15 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
+    cluster::{
+        member::{Member, Service},
+        Cluster,
+    },
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
     query_store::{self, ImprovementEvent},
     ranking::models::cross_encoder::CrossEncoderModel,
-    searcher::{DistributedSearcher, Shard},
+    searcher::DistributedSearcher,
     summarizer::Summarizer,
     FrontendConfig,
 };
@@ -89,19 +93,11 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn router(
+pub async fn router(
     config: &FrontendConfig,
     search_counter_success: crate::metrics::Counter,
     search_counter_fail: crate::metrics::Counter,
 ) -> Result<Router> {
-    let shards: Vec<_> = config
-        .search_servers
-        .clone()
-        .into_iter()
-        .enumerate()
-        .map(|(id, replicas)| Shard::new(id as u64, replicas))
-        .collect();
-
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
     let crossencoder = CrossEncoderModel::open(&config.crossencoder_model_path)?;
 
@@ -120,7 +116,17 @@ pub fn router(
     });
 
     let bangs = Bangs::from_path(&config.bangs_path);
-    let searcher = DistributedSearcher::new(shards, crossencoder, qa_model, bangs);
+
+    let cluster = Cluster::join(
+        Member {
+            id: config.cluster_id.clone(),
+            service: Service::Frontend { host: config.host },
+        },
+        config.gossip_addr,
+        config.gossip_seed_nodes.clone().unwrap_or_default(),
+    )
+    .await?;
+    let searcher = DistributedSearcher::new(cluster, crossencoder, qa_model, bangs);
 
     let state = Arc::new(State {
         searcher,
