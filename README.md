@@ -3,7 +3,7 @@
 </p>
 <br />
 
-Cuely is an open source web search engine hosted at [cuely.io](https://cuely.io/) targeted towards tinkerers and developers.
+Stract is an open source web search engine hosted at [trystract.com](https://trystract.com/) targeted towards tinkerers and developers.
 
 <br />
 <p align="center">
@@ -21,20 +21,20 @@ Cuely is an open source web search engine hosted at [cuely.io](https://cuely.io/
 * De-rank websites with third-party trackers
 * Prioritize fresh content
 * Regional search
-* Customize how signals are combined during search for the final search result
-* Use [optics](https://github.com/Cuely/sample-optics/blob/main/quickstart.optic) to almost endlessly customize your search results.
+* Use [optics](https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic) to almost endlessly customize your search results.
+  * Customize how signals are combined during search for the final search result
 * Prioritize links (centrality) from the sites you trust.
 
 # 👩‍💻 Setup
-We recommend everyone to use the hosted version at [cuely.io](https://cuely.io/), but you can also follow the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md) to setup the engine locally.
+We recommend everyone to use the hosted version at [trystract.com](https://trystract.com/), but you can also follow the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md) to setup the engine locally.
 
 # ‍💼 License
-Cuely is offered under the terms defined under the [LICENSE.md](LICENSE.md) file.
+Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) file.
 
 # 📬 Contact
-You can contact us at [hello@cuely.io](mailto:hello@cuely.io) or in our [Discord server](https://discord.gg/BmzKHffWJM).
+You can contact us at [hello@trystract.com](mailto:hello@trystract.com) or in our [Discord server](https://discord.gg/BmzKHffWJM).
 
 # 🏆 Thank you!
 We truly stand on the shoulders of giants and this project would not have been even remotely feasible without them. An especially huge thank you to
-* The authors and contributors of Tantivy for providing the inverted index library on which Cuely is built.
+* The authors and contributors of Tantivy for providing the inverted index library on which Stract is built.
 * The commoncrawl organization for crawling the web and making the dataset readily available.

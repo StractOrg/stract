@@ -1,5 +1,5 @@
-// Cuely is an open source web search engine.
-// Copyright (C) 2022 Cuely ApS
+// Stract is an open source web search engine.
+// Copyright (C) 2023 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -21,15 +21,16 @@ use axum::response::IntoResponse;
 pub const DEFAULT_OPTICS: [OpticLink; 3] = [
     OpticLink {
         name: "Copycats removal",
-        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/copycats_removal.optic",
+        url:
+            "https://raw.githubusercontent.com/StractOrg/sample-optics/main/copycats_removal.optic",
     },
     OpticLink {
         name: "Hacker News",
-        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/hacker_news.optic",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/hacker_news.optic",
     },
     OpticLink {
         name: "Discussions",
-        url: "https://raw.githubusercontent.com/Cuely/sample-optics/main/discussions.optic",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/discussions.optic",
     },
 ];
 

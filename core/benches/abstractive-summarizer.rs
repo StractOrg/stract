@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::summarizer::{AbstractiveModel, AbstractiveSummarizer, GenerationConfig};
+use stract::summarizer::{AbstractiveModel, AbstractiveSummarizer, GenerationConfig};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let model =

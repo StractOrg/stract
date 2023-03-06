@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::{
+use stract::{
     index::Index,
     searcher::{LocalSearcher, SearchQuery},
 };

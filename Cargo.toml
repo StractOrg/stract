@@ -64,7 +64,7 @@ maplit = "1.0.2"
 rand = "0.8.5"
 crossbeam-channel = "0.5.6"
 num_cpus = "1.15.0"
-onnxruntime = { git = "https://github.com/Cuely/onnxruntime-rs" }
+onnxruntime = { git = "https://github.com/StractOrg/onnxruntime-rs" }
 tokenizers = "0.13.2"
 byteorder = "1.4.3"
 async-stream = "0.3.3"

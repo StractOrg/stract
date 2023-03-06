@@ -1,5 +1,5 @@
-// Cuely is an open source web search engine.
-// Copyright (C) 2022 Cuely ApS
+// Stract is an open source web search engine.
+// Copyright (C) 2023 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,7 @@ use tracing::error;
 
 use self::member::{Member, Service};
 
-const CLUSTER_ID: &str = "cuely-cluster";
+const CLUSTER_ID: &str = "stract-cluster";
 const GOSSIP_INTERVAL: Duration = Duration::from_secs(1);
 const SERVICE_KEY: &str = "service";
 

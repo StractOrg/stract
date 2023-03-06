@@ -5,20 +5,16 @@ import Searchbar from "../components/Searchbar.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout title="Cuely">
+<Layout title="Stract">
   <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
     <Header icon={false} />
     <div class="absolute top-1/4 grid w-full place-items-center">
       <div
         class="flex w-full flex-col items-center justify-center px-2 md:max-w-2xl md:px-0"
       >
-        <div class="flex">
-          <h1 class="mb-1 text-5xl uppercase text-brand">cuely</h1>
-          <span class="text-gray-500">BETA</span>
+        <div class="flex w-64 mb-6">
+          <img src="/images/biglogo.svg" class="h-full w-full" />
         </div>
-
-        <h2 class="mb-8 text-gray-500">Completely Open Search Engine</h2>
-
         <Searchbar autofocus />
       </div>
     </div>

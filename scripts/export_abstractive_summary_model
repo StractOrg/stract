@@ -30,5 +30,5 @@ for q in quantizer:
                quantization_config=dqconfig)
 
 
-urllib.request.urlretrieve("https://s3.eu-central-1.amazonaws.com/s3.cuely.io/truncated_word2vec.bin.gz",
+urllib.request.urlretrieve("https://s3.trystract.com/public/truncated_word2vec.bin.gz",
                            "data/summarizer/word2vec.bin.gz")

@@ -1,5 +1,5 @@
-// Cuely is an open source web search engine.
-// Copyright (C) 2022 Cuely ApS
+// Stract is an open source web search engine.
+// Copyright (C) 2023 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -214,11 +214,11 @@ impl OpticsBackend {
 
                                 optics::Token::Signal => Some("During ranking of the search results, a number of signals are combined in a weighted sum to create the final score for each search result. \
                                 `Signal` allows you to change the coefficient used for each signal, and thereby alter the search result ranking. Some supported signals are e.g. \"host_centrality\", \"bm25\" and \"tracker_score\". \
-                                A complete list of the available signals can be found in the code (https://github.com/Cuely/Cuely/blob/main/src/ranking/signal.rs)".to_string()),
+                                A complete list of the available signals can be found in the code (https://github.com/StractOrg/Stract/blob/main/src/ranking/signal.rs)".to_string()),
 
                                 optics::Token::Field => Some("`Field` lets you change how the various text fields are prioritized during ranking (e.g. a search result matching text in the title is probably more relevant than a result where only the body matches). \
                                 Some supported fields are e.g. \"title\", \"body\", \"backlink_text\" and \"site\". \
-                                A complete list of available fields can be seen in the code (https://github.com/Cuely/Cuely/blob/main/src/schema.rs)".to_string()),
+                                A complete list of available fields can be seen in the code (https://github.com/StractOrg/Stract/blob/main/src/schema.rs)".to_string()),
 
                                 optics::Token::Action => Some("`Action` defines which action should be applied to the matching search result. The result can either be boosted, downranked or discarded.".to_string()),
 

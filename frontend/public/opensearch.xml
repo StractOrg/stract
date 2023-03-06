@@ -1,9 +1,9 @@
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:moz="http://www.mozilla.org/2006/browser/search/">
-  <ShortName>Cuely</ShortName>
+  <ShortName>Stract</ShortName>
   <Description>Open source search engine.</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="32" height="32" type="image/x-icon">https://cuely.io/favicon.ico</Image>
-  <Url rel="results" type="text/html" template="https://cuely.io/search?q={searchTerms}"/>
-  <Url rel="suggestions" type="application/x-suggestions+json" template="https://cuely.io/autosuggest/browser?q={searchTerms}"/>
-  <moz:SearchForm>https://cuely.io/</moz:SearchForm>
+  <Image width="32" height="32" type="image/x-icon">https://trystract.com/favicon.ico</Image>
+  <Url rel="results" type="text/html" template="https://trystract.com/search?q={searchTerms}"/>
+  <Url rel="suggestions" type="application/x-suggestions+json" template="https://trystract.com/autosuggest/browser?q={searchTerms}"/>
+  <moz:SearchForm>https://trystract.com/</moz:SearchForm>
 </OpenSearchDescription>

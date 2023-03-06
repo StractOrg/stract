@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::{
+use stract::{
     ranking::centrality_store::HarmonicCentralityStore,
     webgraph::{
         centrality::{harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality},
@@ -13,7 +13,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let webgraph = WebgraphBuilder::new(WEBGRAPH_PATH).open();
     let centrality = HarmonicCentrality::calculate(&webgraph);
 
-    let harmonic_centrality_store = HarmonicCentralityStore::open(cuely::gen_temp_path());
+    let harmonic_centrality_store = HarmonicCentralityStore::open(stract::gen_temp_path());
     for (node, centrality) in centrality.host {
         harmonic_centrality_store
             .host

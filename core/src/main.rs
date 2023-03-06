@@ -1,5 +1,5 @@
-// Cuely is an open source web search engine.
-// Copyright (C) 2022 Cuely ApS
+// Stract is an open source web search engine.
+// Copyright (C) 2023 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -15,16 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cuely::entrypoint::autosuggest_scrape::{self, Gl};
-#[cfg(feature = "dev")]
-use cuely::entrypoint::configure;
-use cuely::entrypoint::indexer::IndexPointer;
-use cuely::entrypoint::{self, frontend, search_server};
-use cuely::webgraph::WebgraphBuilder;
-use cuely::{FrontendConfig, SearchServerConfig};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
+use stract::entrypoint::autosuggest_scrape::{self, Gl};
+#[cfg(feature = "dev")]
+use stract::entrypoint::configure;
+use stract::entrypoint::indexer::IndexPointer;
+use stract::entrypoint::{self, frontend, search_server};
+use stract::webgraph::WebgraphBuilder;
+use stract::{FrontendConfig, SearchServerConfig};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 

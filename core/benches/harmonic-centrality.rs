@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cuely::webgraph::{centrality::harmonic::HarmonicCentrality, WebgraphBuilder};
+use stract::webgraph::{centrality::harmonic::HarmonicCentrality, WebgraphBuilder};
 
 const WEBGRAPH_PATH: &str = "data/webgraph";
 

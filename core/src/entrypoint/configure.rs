@@ -1,5 +1,5 @@
-// Cuely is an open source web search engine.
-// Copyright (C) 2022 Cuely ApS
+// Stract is an open source web search engine.
+// Copyright (C) 2023 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,7 @@ use std::path::Path;
 use super::{webgraph, Centrality, EntityIndexer};
 
 const DATA_PATH: &str = "data";
-const BUCKET_NAME: &str = "s3.cuely.io";
+const BUCKET_NAME: &str = "public";
 
 fn download_files() {
     tokio::runtime::Builder::new_current_thread()
@@ -43,7 +43,7 @@ fn download_files() {
                 "content.rdf.u8.gz",
             ] {
                 info!("Downloading {}", name);
-                let body = reqwest::get(format!("http://s3.cuely.io/{BUCKET_NAME}/{name}"))
+                let body = reqwest::get(format!("http://s3.trystract.com/{BUCKET_NAME}/{name}"))
                     .await
                     .unwrap();
 

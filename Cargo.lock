@@ -809,75 +809,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cuely"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "askama",
- "async-stream",
- "async-trait",
- "axum",
- "axum-extra",
- "axum-macros",
- "base64 0.13.1",
- "bincode",
- "bitvec",
- "byteorder",
- "bzip2",
- "chitchat",
- "chrono",
- "clap 3.2.23",
- "criterion",
- "crossbeam-channel",
- "csv",
- "encoding_rs",
- "flate2",
- "fst",
- "futures",
- "html-escape",
- "http",
- "image",
- "indicatif 0.16.2",
- "itertools 0.10.5",
- "kuchiki",
- "lalrpop",
- "lalrpop-util",
- "logos",
- "maplit",
- "md5",
- "memmap",
- "min-max-heap",
- "num_cpus",
- "once_cell",
- "onnxruntime",
- "optics",
- "parse_wiki_text",
- "quick-xml",
- "rand 0.8.5",
- "rayon",
- "regex",
- "reqwest",
- "rocksdb",
- "rust-stemmers",
- "scylla",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "tantivy",
- "thiserror",
- "tokenizers",
- "tokio",
- "tokio-stream",
- "toml",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "urlencoding",
- "uuid",
- "whatlang",
-]
-
-[[package]]
 name = "cxx"
 version = "1.0.90"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2396,7 +2327,7 @@ dependencies = [
 [[package]]
 name = "onnxruntime"
 version = "0.0.14"
-source = "git+https://github.com/Cuely/onnxruntime-rs#b8d281e0e6f1e180700e8df437f6a07a36fec931"
+source = "git+https://github.com/StractOrg/onnxruntime-rs#b8d281e0e6f1e180700e8df437f6a07a36fec931"
 dependencies = [
  "lazy_static",
  "ndarray",
@@ -2408,7 +2339,7 @@ dependencies = [
 [[package]]
 name = "onnxruntime-sys"
 version = "0.0.14"
-source = "git+https://github.com/Cuely/onnxruntime-rs#b8d281e0e6f1e180700e8df437f6a07a36fec931"
+source = "git+https://github.com/StractOrg/onnxruntime-rs#b8d281e0e6f1e180700e8df437f6a07a36fec931"
 dependencies = [
  "flate2",
  "tar",
@@ -3439,6 +3370,75 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stract"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "askama",
+ "async-stream",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "axum-macros",
+ "base64 0.13.1",
+ "bincode",
+ "bitvec",
+ "byteorder",
+ "bzip2",
+ "chitchat",
+ "chrono",
+ "clap 3.2.23",
+ "criterion",
+ "crossbeam-channel",
+ "csv",
+ "encoding_rs",
+ "flate2",
+ "fst",
+ "futures",
+ "html-escape",
+ "http",
+ "image",
+ "indicatif 0.16.2",
+ "itertools 0.10.5",
+ "kuchiki",
+ "lalrpop",
+ "lalrpop-util",
+ "logos",
+ "maplit",
+ "md5",
+ "memmap",
+ "min-max-heap",
+ "num_cpus",
+ "once_cell",
+ "onnxruntime",
+ "optics",
+ "parse_wiki_text",
+ "quick-xml",
+ "rand 0.8.5",
+ "rayon",
+ "regex",
+ "reqwest",
+ "rocksdb",
+ "rust-stemmers",
+ "scylla",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "tantivy",
+ "thiserror",
+ "tokenizers",
+ "tokio",
+ "tokio-stream",
+ "toml",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "urlencoding",
+ "uuid",
+ "whatlang",
+]
 
 [[package]]
 name = "string_cache"

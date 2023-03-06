@@ -1,6 +1,6 @@
 FROM rust:bullseye AS builder
 
-WORKDIR /cuely
+WORKDIR /stract
 
 RUN echo "Adding Node.js PPA" \
     && curl -s https://deb.nodesource.com/setup_18.x | bash
@@ -22,13 +22,13 @@ COPY . .
 RUN cd frontend && npm install && npm run build
 
 RUN ORT_STRATEGY=system ORT_LIB_LOCATION=/usr/lib/libonnxruntime.so.1.13.1 cargo build --release \
-    && mkdir /cuely/bin \
-    && find target/release -maxdepth 1 -perm /a+x -type f -exec mv {} /cuely/bin \;
+    && mkdir /stract/bin \
+    && find target/release -maxdepth 1 -perm /a+x -type f -exec mv {} /stract/bin \;
 
-FROM debian:bullseye-slim AS cuely
+FROM debian:bullseye-slim AS stract
 
-LABEL org.opencontainers.image.title="Cuely"
-LABEL maintainer="Cuely <hello@cuely.io>"
+LABEL org.opencontainers.image.title="Stract"
+LABEL maintainer="Stract <hello@trystract.com>"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 RUN apt-get -y update \
@@ -36,11 +36,11 @@ RUN apt-get -y update \
     libssl1.1 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /cuely
+WORKDIR /stract
 
-COPY --from=builder /cuely/bin/cuely /usr/local/bin/cuely
-COPY --from=builder /cuely/frontend/dist frontend/dist
+COPY --from=builder /stract/bin/stract /usr/local/bin/stract
+COPY --from=builder /stract/frontend/dist frontend/dist
 COPY --from=builder /usr/lib/libonnxruntime.so.1.13.1 /usr/lib
 COPY --from=builder /usr/lib/libonnxruntime.so /usr/lib
 
-ENTRYPOINT ["/usr/local/bin/cuely"]
+ENTRYPOINT ["/usr/local/bin/stract"]

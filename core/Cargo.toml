@@ -1,10 +1,10 @@
 [package]
-name = "cuely"
+name = "stract"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-authors = ['Cuely ApS. <hello@cuely.io>']
-default-run = "cuely"
+authors = ['Stract ApS. <hello@trystract.com>']
+default-run = "stract"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,7 +12,7 @@ default-run = "cuely"
 dev = []
 
 [[bin]]
-name = "cuely"
+name = "stract"
 path = "src/main.rs"
 
 [dependencies]
