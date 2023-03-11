@@ -19,8 +19,8 @@ use std::{collections::HashMap, sync::Arc};
 use tantivy::{fastfield::Column, DocId, SegmentId};
 
 use crate::{
+    enum_map::EnumMap,
     schema::{DataType, FastField, Field, ALL_FIELDS},
-    search_ctx::Ctx,
 };
 
 #[derive(Default, Clone)]
@@ -35,12 +35,12 @@ impl FastFieldReader {
 }
 
 impl FastFieldReader {
-    pub fn new(ctx: &Ctx) -> Self {
+    pub fn new(tv_searcher: &tantivy::Searcher) -> Self {
         let mut segments = HashMap::new();
 
-        let schema = ctx.tv_searcher.schema();
+        let schema = tv_searcher.schema();
 
-        for reader in ctx.tv_searcher.segment_readers() {
+        for reader in tv_searcher.segment_readers() {
             let fastfield_readers = reader.fast_fields();
 
             let mut field_readers = Vec::new();
@@ -67,10 +67,7 @@ impl FastFieldReader {
             segments.insert(
                 reader.segment_id(),
                 Arc::new(SegmentReader {
-                    field_readers: field_readers
-                        .into_iter()
-                        .map(|(_, reader)| reader)
-                        .collect(),
+                    field_readers: field_readers.into_iter().collect(),
                 }),
             );
         }
@@ -118,11 +115,11 @@ impl FieldReader {
 }
 
 pub struct SegmentReader {
-    field_readers: Vec<FieldReader>, // fast_field -> field_reader
+    field_readers: EnumMap<FastField, FieldReader>,
 }
 
 impl SegmentReader {
     pub fn get_field_reader(&self, field: &FastField) -> &FieldReader {
-        self.field_readers.get(*field as usize).unwrap()
+        self.field_readers.get(*field).unwrap()
     }
 }

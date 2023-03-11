@@ -1,3 +1,4 @@
+use chrono::Utc;
 // Stract is an open source web search engine.
 // Copyright (C) 2023 Stract ApS
 //
@@ -95,7 +96,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
     let warc_files = async_download_all_warc_files(&job.warc_paths, &source, &job.base_path).await;
     pin!(warc_files);
 
-    let signal_aggregator = SignalAggregator::default();
+    let current_timestamp = Utc::now().timestamp().max(0) as usize;
 
     while let Some(file) = warc_files.next().await {
         let name = file.split('/').last().unwrap();
@@ -210,8 +211,10 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     dmoz_description,
                 };
 
-                webpage.pre_computed_score =
-                    signal_aggregator.precompute_score(&webpage, &index.region_count);
+                let mut signal_aggregator = SignalAggregator::new(None);
+                signal_aggregator.set_current_timestamp(current_timestamp);
+
+                webpage.pre_computed_score = signal_aggregator.precompute_score(&webpage);
 
                 if let Err(err) = index.insert(webpage) {
                     debug!("{:?}", err);

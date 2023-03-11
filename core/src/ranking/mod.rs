@@ -24,7 +24,7 @@ pub mod optics;
 pub mod pipeline;
 pub mod signal;
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 
 use ::optics::SiteRankings;
 use initial::InitialScoreTweaker;
@@ -34,6 +34,7 @@ use crate::{
     collector::{MaxDocsConsidered, TopDocs},
     fastfield_reader::FastFieldReader,
     inverted_index,
+    search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
     webgraph::{
         centrality::{
@@ -42,18 +43,13 @@ use crate::{
         },
         Node, NodeID,
     },
-    webpage::{
-        region::{Region, RegionCount},
-        Url,
-    },
+    webpage::{region::Region, Url},
 };
 
 pub use self::signal::*;
 
 #[derive(Clone)]
 pub struct Ranker {
-    region_count: Arc<RegionCount>,
-    selected_region: Option<Region>,
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     aggregator: SignalAggregator,
@@ -63,14 +59,8 @@ pub struct Ranker {
 }
 
 impl Ranker {
-    pub fn new(
-        region_count: RegionCount,
-        aggregator: SignalAggregator,
-        fastfield_reader: FastFieldReader,
-    ) -> Self {
+    pub fn new(aggregator: SignalAggregator, fastfield_reader: FastFieldReader) -> Self {
         Ranker {
-            region_count: Arc::new(region_count),
-            selected_region: None,
             offset: None,
             aggregator,
             max_docs: None,
@@ -81,7 +71,7 @@ impl Ranker {
     }
 
     pub fn with_region(mut self, region: Region) -> Self {
-        self.selected_region = Some(region);
+        self.aggregator.set_selected_region(region);
         self
     }
 
@@ -111,15 +101,14 @@ impl Ranker {
         self.aggregator.clone()
     }
 
-    pub fn collector(&self) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
+    pub fn collector(
+        &self,
+        ctx: Ctx,
+    ) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
         let aggregator = self.aggregator();
 
-        let score_tweaker = InitialScoreTweaker::new(
-            Arc::clone(&self.region_count),
-            self.selected_region,
-            aggregator,
-            self.fastfield_reader.clone(),
-        );
+        let score_tweaker =
+            InitialScoreTweaker::new(ctx.tv_searcher, aggregator, self.fastfield_reader.clone());
 
         let mut collector = TopDocs::with_limit(
             self.num_results.unwrap_or(NUM_RESULTS_PER_PAGE),
@@ -794,12 +783,8 @@ mod tests {
                 query: "example".to_string(),
                 optic_program: Some(
                     r#"
-                        RankingPipeline {
-                            Stage {
-                                Ranking{Field("title"), 20000000},
-                                Ranking{Signal("host_centrality"), 0}
-                            }
-                        }
+                        Ranking(Signal("bm25_title"), 20000000);
+                        Ranking(Signal("host_centrality"), 0);
                     "#
                     .to_string(),
                 ),
@@ -815,11 +800,7 @@ mod tests {
                 query: "example".to_string(),
                 optic_program: Some(
                     r#"
-                        RankingPipeline {
-                            Stage {
-                                Ranking{Signal("host_centrality"), 2000000}
-                            }
-                        }
+                        Ranking(Signal("host_centrality"), 2000000)
                     "#
                     .to_string(),
                 ),

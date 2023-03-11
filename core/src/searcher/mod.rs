@@ -57,7 +57,7 @@ pub struct WebsitesResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchQuery {
     pub query: String,
-    pub offset: usize,
+    pub page: usize,
     pub num_results: usize,
     pub selected_region: Option<Region>,
     pub optic_program: Option<String>,
@@ -69,6 +69,7 @@ pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
     pub num_websites: usize,
     pub websites: Vec<RankingWebsite>,
+    pub has_more: bool,
     pub entity_sidebar: Option<DisplayedEntity>,
 }
 
@@ -79,7 +80,7 @@ impl Default for SearchQuery {
         // to ensure the developer considers what the default should be.
         Self {
             query: Default::default(),
-            offset: Default::default(),
+            page: Default::default(),
             num_results: NUM_RESULTS_PER_PAGE,
             selected_region: Default::default(),
             optic_program: Default::default(),

@@ -40,6 +40,7 @@ mod cluster;
 mod collector;
 mod directory;
 mod entity_index;
+mod enum_map;
 mod executor;
 mod exponential_backoff;
 mod fastfield_reader;

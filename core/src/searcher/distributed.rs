@@ -474,7 +474,7 @@ impl DistributedSearcher {
         &self,
         query: &SearchQuery,
     ) -> Result<Option<Vec<DisplayedWebpage>>> {
-        if query.optic_program.is_some() || query.offset > 0 {
+        if query.optic_program.is_some() || query.page > 0 {
             return Ok(None);
         }
 
@@ -489,7 +489,7 @@ impl DistributedSearcher {
         };
 
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::for_query(&mut query, self.cross_encoder.clone())?;
+            RankingPipeline::reranking_for_query(&mut query, self.cross_encoder.clone())?;
 
         let initial_results = self.search_initial(&query).await;
 
@@ -542,7 +542,7 @@ impl DistributedSearcher {
 
         let mut search_query = query.clone();
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::for_query(&mut search_query, self.cross_encoder.clone())?;
+            RankingPipeline::reranking_for_query(&mut search_query, self.cross_encoder.clone())?;
 
         let initial_results = self.search_initial(&search_query).await;
 
@@ -565,14 +565,8 @@ impl DistributedSearcher {
             .map(|result| result.local_result.num_websites)
             .sum();
 
-        let num_shard_websites: usize = initial_results
-            .iter()
-            .map(|res| res.local_result.websites.len())
-            .sum();
-
+        let has_more_results = initial_results.iter().any(|res| res.local_result.has_more);
         let top_websites = self.combine_results(initial_results, pipeline);
-
-        let has_more_results = num_shard_websites != top_websites.len();
 
         // retrieve webpages
         let mut retrieved_webpages: Vec<_> = self
@@ -612,7 +606,7 @@ impl DistributedSearcher {
     }
 
     fn widget(&self, query: &SearchQuery) -> Option<Widget> {
-        if query.offset > 0 {
+        if query.page > 0 {
             return None;
         }
 

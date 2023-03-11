@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use crate::fastfield_reader::FastFieldReader;
-use crate::webpage::region::{Region, RegionCount};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
@@ -26,22 +23,19 @@ use tantivy::{DocId, SegmentReader};
 use super::SignalAggregator;
 
 pub(crate) struct InitialScoreTweaker {
-    region_count: Arc<RegionCount>,
-    selected_region: Option<Region>,
+    tv_searcher: tantivy::Searcher,
     fastfield_reader: FastFieldReader,
     aggregator: SignalAggregator,
 }
 
 impl InitialScoreTweaker {
     pub fn new(
-        region_count: Arc<RegionCount>,
-        selected_region: Option<Region>,
+        tv_searcher: tantivy::Searcher,
         aggregator: SignalAggregator,
         fastfield_reader: FastFieldReader,
     ) -> Self {
         Self {
-            region_count,
-            selected_region,
+            tv_searcher,
             aggregator,
             fastfield_reader,
         }
@@ -50,9 +44,6 @@ impl InitialScoreTweaker {
 
 pub(crate) struct InitialSegmentScoreTweaker {
     aggregator: SignalAggregator,
-    region_count: Arc<RegionCount>,
-    current_timestamp: usize,
-    selected_region: Option<Region>,
 }
 
 impl ScoreTweaker<Score> for InitialScoreTweaker {
@@ -65,16 +56,14 @@ impl ScoreTweaker<Score> for InitialScoreTweaker {
             .fastfield_reader
             .get_segment(&segment_reader.segment_id());
 
-        aggregator.register_segment(fastfield_segment_reader);
+        aggregator
+            .register_segment(&self.tv_searcher, segment_reader, fastfield_segment_reader)
+            .unwrap();
 
         let current_timestamp = Utc::now().timestamp() as usize;
+        aggregator.set_current_timestamp(current_timestamp);
 
-        Ok(InitialSegmentScoreTweaker {
-            aggregator,
-            current_timestamp,
-            selected_region: self.selected_region,
-            region_count: Arc::clone(&self.region_count),
-        })
+        Ok(InitialSegmentScoreTweaker { aggregator })
     }
 }
 
@@ -86,12 +75,13 @@ pub struct Score {
 
 impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, score: tantivy::Score) -> Score {
-        self.aggregator.score(
-            doc,
-            score,
-            &self.region_count,
-            self.current_timestamp,
-            self.selected_region,
-        )
+        let total = self
+            .aggregator
+            .compute_signals(doc)
+            .flatten()
+            .map(|computed| computed.coefficient * computed.value)
+            .sum();
+
+        Score { bm25: score, total }
     }
 }

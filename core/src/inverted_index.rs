@@ -149,8 +149,8 @@ impl InvertedIndex {
         })
     }
 
-    pub fn fastfield_reader(&self, ctx: &Ctx) -> FastFieldReader {
-        FastFieldReader::new(ctx)
+    pub fn fastfield_reader(&self, tv_searcher: &tantivy::Searcher) -> FastFieldReader {
+        FastFieldReader::new(tv_searcher)
     }
 
     pub fn tokenizers(&self) -> &TokenizerManager {
@@ -194,25 +194,53 @@ impl InvertedIndex {
     }
 
     pub fn local_search_ctx(&self) -> Ctx {
+        let tv_searcher = self.tv_searcher();
         Ctx {
-            tv_searcher: self.reader.searcher(),
+            fastfield_reader: self.fastfield_reader(&tv_searcher),
+            tv_searcher,
         }
+    }
+
+    pub fn tv_searcher(&self) -> tantivy::Searcher {
+        self.reader.searcher()
     }
 
     pub fn retrieve_ranking_websites(
         &self,
         ctx: &Ctx,
         pointers: Vec<WebsitePointer>,
-        aggregator: &SignalAggregator,
+        mut aggregator: SignalAggregator,
+        fastfield_reader: &FastFieldReader,
     ) -> Result<Vec<RankingWebsite>> {
         let mut top_websites = Vec::new();
 
-        for pointer in pointers {
-            let doc = ctx.tv_searcher.doc(pointer.address.into())?;
-            top_websites.push(RankingWebsite::new(doc, pointer, aggregator));
+        let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
+        pointers.sort_by(|a, b| a.1.address.segment.cmp(&b.1.address.segment));
+        let mut prev_segment = None;
+        for (orig_index, pointer) in pointers {
+            let update_segment = match prev_segment {
+                Some(prev_segment) if prev_segment != pointer.address.segment => true,
+                None => true,
+                _ => false,
+            };
+
+            if update_segment {
+                let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
+                let fastfield_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
+                aggregator.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
+            }
+
+            prev_segment = Some(pointer.address.segment);
+
+            top_websites.push((orig_index, RankingWebsite::new(pointer, &mut aggregator)));
         }
 
-        Ok(top_websites)
+        top_websites.sort_by(|a, b| a.0.cmp(&b.0));
+
+        Ok(top_websites
+            .into_iter()
+            .map(|(_, website)| website)
+            .collect())
     }
 
     pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
@@ -236,14 +264,14 @@ impl InvertedIndex {
         websites: &[WebsitePointer],
         query: &Query,
     ) -> Result<Vec<RetrievedWebpage>> {
-        let ctx = self.local_search_ctx();
+        let tv_searcher = self.reader.searcher();
         let mut webpages: Vec<RetrievedWebpage> = websites
             .iter()
-            .map(|website| self.retrieve_doc(website.address, &ctx))
+            .map(|website| self.retrieve_doc(website.address, &tv_searcher))
             .filter_map(|res| res.ok())
             .map(|mut doc| {
                 if let Some(image) = doc.primary_image.as_ref() {
-                    if !query.simple_terms().into_iter().all(|term| {
+                    if !query.simple_terms().iter().all(|term| {
                         image
                             .title_terms
                             .contains(term.to_ascii_lowercase().as_str())
@@ -321,8 +349,12 @@ impl InvertedIndex {
         Ok(())
     }
 
-    fn retrieve_doc(&self, doc_address: DocAddress, ctx: &Ctx) -> Result<RetrievedWebpage> {
-        let doc = ctx.tv_searcher.doc(doc_address.into())?;
+    fn retrieve_doc(
+        &self,
+        doc_address: DocAddress,
+        searcher: &tantivy::Searcher,
+    ) -> Result<RetrievedWebpage> {
+        let doc = searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
     }
 
@@ -398,9 +430,8 @@ impl InvertedIndex {
     }
 
     pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        let ctx = self.local_search_ctx();
-        let field = ctx
-            .tv_searcher
+        let tv_searcher = self.reader.searcher();
+        let field = tv_searcher
             .schema()
             .get_field(Field::Text(TextField::Url).name())
             .unwrap();
@@ -414,13 +445,12 @@ impl InvertedIndex {
         }
 
         let query = tantivy::query::PhraseQuery::new(term_queries);
-        let mut res = ctx
-            .tv_searcher
+        let mut res = tv_searcher
             .search(&query, &tantivy::collector::TopDocs::with_limit(1))
             .unwrap();
 
         res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &ctx).unwrap())
+            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
     }
 }
 
@@ -555,7 +585,8 @@ mod tests {
 
     use crate::{
         ranking::{Ranker, SignalAggregator},
-        webpage::{region::RegionCount, Html, Link},
+        searcher::SearchQuery,
+        webpage::{Html, Link},
     };
 
     use super::*;
@@ -586,22 +617,24 @@ mod tests {
     #[test]
     fn simple_search() {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
 
-        let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -623,15 +656,15 @@ mod tests {
             ))
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-
         let ctx = index.local_search_ctx();
+
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -662,19 +695,22 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "this query should not match",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "this query should not match".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
+
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
     }
@@ -704,19 +740,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "runner",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "runner".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
@@ -746,19 +784,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "runners",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "runners".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
     }
@@ -821,19 +861,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "great site",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "great site".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let mut result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let mut result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
 
         result
             .documents
@@ -873,19 +915,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "runner",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "runner".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 20);
     }
 
@@ -914,19 +958,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "dr",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "dr".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
@@ -977,22 +1023,24 @@ mod tests {
 
         let mut index = index1.merge(index2);
         index.commit().unwrap();
-        let ctx = index.local_search_ctx();
 
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "website".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 2);
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1005,19 +1053,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "example test",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "example test".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
         assert_eq!(result.num_docs, 0);
 
@@ -1042,11 +1092,11 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1080,22 +1130,23 @@ mod tests {
         index.insert(webpage).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
+        let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "website".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
-
-        let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1110,14 +1161,17 @@ mod tests {
         );
 
         let query = Query::parse(
-            "best website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "best website".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
 
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
@@ -1150,19 +1204,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "website",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "website".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
@@ -1212,19 +1268,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "dr",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "dr".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.dr.dk");
     }
@@ -1260,19 +1318,21 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
-            "test",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            RegionCount::default(),
-            SignalAggregator::default(),
-            index.fastfield_reader(&ctx),
+            SignalAggregator::new(Some(query.clone())),
+            ctx.fastfield_reader.clone(),
         );
 
-        let result = search(&index, &query, &ctx, ranker.collector()).expect("Search failed");
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
         let schema = result.documents[0].schema_org.clone();
 

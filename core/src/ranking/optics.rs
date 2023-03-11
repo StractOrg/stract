@@ -14,42 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use optics::ast::RankingStage;
-
-use crate::schema::Field;
-
-use super::{Signal, SignalAggregator};
-
 pub const SCALE: f32 = 10.0;
-
-pub trait CreateAggregator {
-    fn aggregator(&self) -> SignalAggregator;
-}
-
-impl CreateAggregator for RankingStage {
-    fn aggregator(&self) -> SignalAggregator {
-        let aggregator = SignalAggregator::new(
-            self.coefficients
-                .iter()
-                .filter_map(|coeff| match &coeff.target {
-                    optics::ast::RankingTarget::Signal(s) => {
-                        Signal::from_string(s.clone()).map(|s| (s, coeff.score))
-                    }
-                    optics::ast::RankingTarget::Field(_) => None,
-                }),
-            self.coefficients
-                .iter()
-                .filter_map(|coeff| match &coeff.target {
-                    optics::ast::RankingTarget::Signal(_) => None,
-                    optics::ast::RankingTarget::Field(f) => Field::from_name(f.clone())
-                        .and_then(|f| f.as_text())
-                        .map(|f| (f, coeff.score)),
-                }),
-        );
-
-        aggregator
-    }
-}
 
 #[cfg(test)]
 mod tests {

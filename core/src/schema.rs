@@ -41,12 +41,18 @@ pub enum TextField {
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     TitleIfHomepage,
     BacklinkText,
-    PrimaryImage,
     Description,
+    PrimaryImage,
     HostTopic,
     DmozDescription,
     SchemaOrgJson,
     FlattenedSchemaOrgJson,
+}
+
+impl From<TextField> for usize {
+    fn from(value: TextField) -> Self {
+        value as usize
+    }
 }
 
 impl TextField {
@@ -107,6 +113,31 @@ impl TextField {
             TextField::FlattenedSchemaOrgJson => true,
         }
     }
+
+    pub fn name(&self) -> &str {
+        match self {
+            TextField::Title => "title",
+            TextField::CleanBody => "body",
+            TextField::Url => "url",
+            TextField::Site => "site",
+            TextField::Domain => "domain",
+            TextField::SiteNoTokenizer => "site_no_tokenizer",
+            TextField::DomainNoTokenizer => "domain_no_tokenizer",
+            TextField::BacklinkText => "backlink_text",
+            TextField::StemmedTitle => "stemmed_title",
+            TextField::StemmedCleanBody => "stemmed_body",
+            TextField::DomainIfHomepage => "domain_if_homepage",
+            TextField::DomainNameIfHomepageNoTokenizer => "domain_name_if_homepage_no_tokenizer",
+            TextField::Description => "description",
+            TextField::PrimaryImage => "primary_image_uuid",
+            TextField::TitleIfHomepage => "title_if_homepage",
+            TextField::AllBody => "all_body",
+            TextField::HostTopic => "host_topic",
+            TextField::DmozDescription => "dmoz_description",
+            TextField::SchemaOrgJson => "schema_org_json",
+            TextField::FlattenedSchemaOrgJson => "flattened_schema_org_json",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -139,6 +170,47 @@ pub enum FastField {
     SimHash,
     CrawlStability,
     NumFlattenedSchemaTokens,
+}
+
+impl FastField {
+    pub fn name(&self) -> &str {
+        match self {
+            FastField::HostCentrality => "host_centrality",
+            FastField::PageCentrality => "page_centrality",
+            FastField::IsHomepage => "is_homepage",
+            FastField::FetchTimeMs => "fetch_time_ms",
+            FastField::LastUpdated => "last_updated",
+            FastField::TrackerScore => "tracker_score",
+            FastField::Region => "region",
+            FastField::NumUrlTokens => "num_url_tokens",
+            FastField::NumTitleTokens => "num_title_tokens",
+            FastField::NumCleanBodyTokens => "num_clean_body_tokens",
+            FastField::NumDescriptionTokens => "num_description_tokens",
+            FastField::NumDomainTokens => "num_domain_tokens",
+            FastField::NumSiteTokens => "num_site_tokens",
+            FastField::NumFlattenedSchemaTokens => "num_flattened_schema_tokens",
+            FastField::SiteHash1 => "site_hash1",
+            FastField::SiteHash2 => "site_hash2",
+            FastField::UrlWithoutQueryHash1 => "url_without_query_hash1",
+            FastField::UrlWithoutQueryHash2 => "url_without_query_hash2",
+            FastField::TitleHash1 => "title_hash1",
+            FastField::TitleHash2 => "title_hash2",
+            FastField::UrlHash1 => "url_hash1",
+            FastField::UrlHash2 => "url_hash2",
+            FastField::DomainHash1 => "domain_hash1",
+            FastField::DomainHash2 => "domain_hash2",
+            FastField::PreComputedScore => "pre_computed_score",
+            FastField::HostNodeID => "host_node_id",
+            FastField::SimHash => "sim_hash",
+            FastField::CrawlStability => "crawl_stability",
+        }
+    }
+}
+
+impl From<FastField> for usize {
+    fn from(value: FastField) -> Self {
+        value as usize
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -400,84 +472,8 @@ impl Field {
 
     pub fn name(&self) -> &str {
         match self {
-            Field::Text(TextField::Title) => "title",
-            Field::Text(TextField::CleanBody) => "body",
-            Field::Text(TextField::Url) => "url",
-            Field::Text(TextField::Site) => "site",
-            Field::Text(TextField::Domain) => "domain",
-            Field::Text(TextField::SiteNoTokenizer) => "site_no_tokenizer",
-            Field::Text(TextField::DomainNoTokenizer) => "domain_no_tokenizer",
-            Field::Text(TextField::BacklinkText) => "backlink_text",
-            Field::Text(TextField::StemmedTitle) => "stemmed_title",
-            Field::Text(TextField::StemmedCleanBody) => "stemmed_body",
-            Field::Text(TextField::DomainIfHomepage) => "domain_if_homepage",
-            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
-                "domain_name_if_homepage_no_tokenizer"
-            }
-            Field::Text(TextField::Description) => "description",
-            Field::Text(TextField::PrimaryImage) => "primary_image_uuid",
-            Field::Text(TextField::TitleIfHomepage) => "title_if_homepage",
-            Field::Text(TextField::AllBody) => "all_body",
-            Field::Text(TextField::HostTopic) => "host_topic",
-            Field::Text(TextField::DmozDescription) => "dmoz_description",
-            Field::Text(TextField::SchemaOrgJson) => "schema_org_json",
-            Field::Text(TextField::FlattenedSchemaOrgJson) => "flattened_schema_org_json",
-            // FAST FIELDS
-            Field::Fast(FastField::HostCentrality) => "host_centrality",
-            Field::Fast(FastField::PageCentrality) => "page_centrality",
-            Field::Fast(FastField::IsHomepage) => "is_homepage",
-            Field::Fast(FastField::FetchTimeMs) => "fetch_time_ms",
-            Field::Fast(FastField::LastUpdated) => "last_updated",
-            Field::Fast(FastField::TrackerScore) => "tracker_score",
-            Field::Fast(FastField::Region) => "region",
-            Field::Fast(FastField::NumUrlTokens) => "num_url_tokens",
-            Field::Fast(FastField::NumTitleTokens) => "num_title_tokens",
-            Field::Fast(FastField::NumCleanBodyTokens) => "num_clean_body_tokens",
-            Field::Fast(FastField::NumDescriptionTokens) => "num_description_tokens",
-            Field::Fast(FastField::NumDomainTokens) => "num_domain_tokens",
-            Field::Fast(FastField::NumSiteTokens) => "num_site_tokens",
-            Field::Fast(FastField::NumFlattenedSchemaTokens) => "num_flattened_schema_tokens",
-            Field::Fast(FastField::SiteHash1) => "site_hash1",
-            Field::Fast(FastField::SiteHash2) => "site_hash2",
-            Field::Fast(FastField::UrlWithoutQueryHash1) => "url_without_query_hash1",
-            Field::Fast(FastField::UrlWithoutQueryHash2) => "url_without_query_hash2",
-            Field::Fast(FastField::TitleHash1) => "title_hash1",
-            Field::Fast(FastField::TitleHash2) => "title_hash2",
-            Field::Fast(FastField::UrlHash1) => "url_hash1",
-            Field::Fast(FastField::UrlHash2) => "url_hash2",
-            Field::Fast(FastField::DomainHash1) => "domain_hash1",
-            Field::Fast(FastField::DomainHash2) => "domain_hash2",
-            Field::Fast(FastField::PreComputedScore) => "pre_computed_score",
-            Field::Fast(FastField::HostNodeID) => "host_node_id",
-            Field::Fast(FastField::SimHash) => "sim_hash",
-            Field::Fast(FastField::CrawlStability) => "crawl_stability",
-        }
-    }
-
-    pub fn boost(&self) -> Option<f32> {
-        match self {
-            Field::Text(TextField::Site) => Some(2.0),
-            Field::Text(TextField::TitleIfHomepage) => Some(3.0),
-            Field::Text(TextField::DomainIfHomepage) => Some(6.0),
-            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => Some(30.0),
-            Field::Text(TextField::StemmedCleanBody) | Field::Text(TextField::StemmedTitle) => {
-                Some(0.5)
-            }
-            Field::Text(TextField::CleanBody) => Some(4.0),
-            Field::Text(TextField::DmozDescription) => Some(3.0),
-            Field::Text(TextField::Title) => Some(15.0),
-            Field::Text(TextField::Url) => Some(1.0),
-            Field::Text(TextField::Domain) => Some(1.0),
-            Field::Text(TextField::AllBody) => Some(0.01),
-            Field::Text(TextField::HostTopic) => Some(1.0),
-            Field::Text(TextField::BacklinkText) => Some(4.0),
-            Field::Text(TextField::SiteNoTokenizer)
-            | Field::Text(TextField::DomainNoTokenizer)
-            | Field::Text(TextField::Description)
-            | Field::Text(TextField::FlattenedSchemaOrgJson)
-            | Field::Text(TextField::SchemaOrgJson)
-            | Field::Text(TextField::PrimaryImage) => None,
-            Field::Fast(_) => None,
+            Field::Text(t) => t.name(),
+            Field::Fast(f) => f.name(),
         }
     }
 
@@ -493,53 +489,6 @@ impl Field {
 
     pub fn is_fast(&self) -> bool {
         matches!(self, Field::Fast(_))
-    }
-
-    pub fn from_name(name: String) -> Option<Field> {
-        match name.as_str() {
-            "title" => Some(Field::Text(TextField::Title)),
-            "body" => Some(Field::Text(TextField::CleanBody)),
-            "url" => Some(Field::Text(TextField::Url)),
-            "site" => Some(Field::Text(TextField::Site)),
-            "backlink_text" => Some(Field::Text(TextField::BacklinkText)),
-            "stemmed_title" => Some(Field::Text(TextField::StemmedTitle)),
-            "stemmed_body" => Some(Field::Text(TextField::StemmedCleanBody)),
-            "domain" => Some(Field::Text(TextField::Domain)),
-            "domain_if_homepage" => Some(Field::Text(TextField::DomainIfHomepage)),
-            "primary_image_uuid" => Some(Field::Text(TextField::PrimaryImage)),
-            "domain_name_if_homepage_no_tokenizer" => {
-                Some(Field::Text(TextField::DomainNameIfHomepageNoTokenizer))
-            }
-            "description" => Some(Field::Text(TextField::Description)),
-            "all_body" => Some(Field::Text(TextField::AllBody)),
-            "title_if_homepage" => Some(Field::Text(TextField::TitleIfHomepage)),
-            "host_topic" => Some(Field::Text(TextField::HostTopic)),
-            "dmoz_description" => Some(Field::Text(TextField::DmozDescription)),
-            "schema_org_json" => Some(Field::Text(TextField::SchemaOrgJson)),
-            "flattened_schema_org_json" => Some(Field::Text(TextField::FlattenedSchemaOrgJson)),
-            "host_centrality" => Some(Field::Fast(FastField::HostCentrality)),
-            "page_centrality" => Some(Field::Fast(FastField::PageCentrality)),
-            "is_homepage" => Some(Field::Fast(FastField::IsHomepage)),
-            "fetch_time_ms" => Some(Field::Fast(FastField::FetchTimeMs)),
-            "last_updated" => Some(Field::Fast(FastField::LastUpdated)),
-            "tracker_score" => Some(Field::Fast(FastField::TrackerScore)),
-            "region" => Some(Field::Fast(FastField::Region)),
-            "site_hash1" => Some(Field::Fast(FastField::SiteHash1)),
-            "site_hash2" => Some(Field::Fast(FastField::SiteHash2)),
-            "url_without_query_hash1" => Some(Field::Fast(FastField::UrlWithoutQueryHash1)),
-            "url_without_query_hash2" => Some(Field::Fast(FastField::UrlWithoutQueryHash2)),
-            "url_hash1" => Some(Field::Fast(FastField::UrlHash1)),
-            "url_hash2" => Some(Field::Fast(FastField::UrlHash2)),
-            "domain_hash1" => Some(Field::Fast(FastField::DomainHash1)),
-            "domain_hash2" => Some(Field::Fast(FastField::DomainHash2)),
-            "title_hash1" => Some(Field::Fast(FastField::TitleHash1)),
-            "title_hash2" => Some(Field::Fast(FastField::TitleHash2)),
-            "pre_computed_score" => Some(Field::Fast(FastField::PreComputedScore)),
-            "host_node_id" => Some(Field::Fast(FastField::HostNodeID)),
-            "sim_hash" => Some(Field::Fast(FastField::SimHash)),
-            "crawl_stability" => Some(Field::Fast(FastField::CrawlStability)),
-            _ => None,
-        }
     }
 
     pub fn as_text(&self) -> Option<TextField> {

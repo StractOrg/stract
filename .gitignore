@@ -9,4 +9,4 @@ notes
 *.log
 /data/**/*
 *.tar.gz
-
+*.csv

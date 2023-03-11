@@ -16,7 +16,6 @@
 
 use std::str::FromStr;
 
-use optics::Optic;
 use uuid::Uuid;
 
 use crate::entity_index::{EntityIndex, StoredEntity};
@@ -26,9 +25,9 @@ use crate::inverted_index::RetrievedWebpage;
 use crate::query::parser::Term;
 use crate::query::{self, Query};
 use crate::ranking::centrality_store::SearchCentralityStore;
-use crate::ranking::optics::CreateAggregator;
-use crate::ranking::pipeline::RankingWebsite;
+use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
+use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Correction;
@@ -54,6 +53,12 @@ impl From<Index> for LocalSearcher {
     }
 }
 
+struct InvertedIndexResult {
+    webpages: Vec<RankingWebsite>,
+    num_hits: usize,
+    has_more: bool,
+}
+
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         LocalSearcher {
@@ -76,58 +81,13 @@ impl LocalSearcher {
         self.topic_centrality = Some(topic_centrality);
     }
 
-    fn parse_query(&self, query: &SearchQuery, ctx: &Ctx) -> Result<(Query, Optic)> {
-        let optic = match query.optic_program.as_ref() {
-            Some(program) => Some(optics::parse(program)?),
-            None => None,
-        };
-
-        let query_aggregator = optic
-            .as_ref()
-            .and_then(|optic| {
-                optic
-                    .pipeline
-                    .as_ref()
-                    .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
-            })
-            .unwrap_or_default();
-
-        let mut parsed_query = Query::parse(
-            &query.query,
-            self.index.schema(),
-            self.index.tokenizers(),
-            &query_aggregator,
-        )?;
-
-        parsed_query.set_num_results(query.num_results);
-        parsed_query.set_offset(query.offset);
-
-        if let Some(region) = query.selected_region {
-            parsed_query.set_region(region);
-        }
-
-        let mut optics = Vec::new();
-
-        if let Some(optic) = optic {
-            optics.push(optic);
-        }
-
-        if let Some(site_rankings) = &query.site_rankings {
-            optics.push(site_rankings.clone().into_optic())
-        }
-
-        let mut optic = Optic::default();
-
-        for o in optics {
-            optic = optic.try_merge(o)?;
-        }
-
-        parsed_query.set_optic(&optic, &self.index, ctx);
+    fn parse_query(&self, ctx: &Ctx, query: &SearchQuery) -> Result<Query> {
+        let parsed_query = Query::parse(ctx, query, &self.index.inverted_index)?;
 
         if parsed_query.is_empty() {
             Err(Error::EmptyQuery)
         } else {
-            Ok((parsed_query, optic))
+            Ok(parsed_query)
         }
     }
 
@@ -139,9 +99,8 @@ impl LocalSearcher {
         aggregator: SignalAggregator,
     ) -> Result<Ranker> {
         let mut ranker = Ranker::new(
-            self.index.region_count.clone(),
             aggregator,
-            self.index.inverted_index.fastfield_reader(ctx),
+            self.index.inverted_index.fastfield_reader(&ctx.tv_searcher),
         );
 
         if let Some(region) = query.region() {
@@ -162,7 +121,9 @@ impl LocalSearcher {
                 .with_max_docs(10_000, self.index.num_segments())
                 .with_num_results(100);
 
-            let top_host_nodes = self.index.top_nodes(query, ctx, ranker.collector())?;
+            let top_host_nodes = self
+                .index
+                .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
             if !top_host_nodes.is_empty() {
                 let harmonic = centrality_store
                     .online_harmonic
@@ -179,35 +140,33 @@ impl LocalSearcher {
 
     fn search_inverted_index(
         &self,
+        ctx: &Ctx,
         query: &SearchQuery,
         de_rank_similar: bool,
-    ) -> Result<(Vec<RankingWebsite>, usize)> {
-        let searcher = self.index.inverted_index.local_search_ctx();
+    ) -> Result<InvertedIndexResult> {
+        let mut query = query.clone();
+        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::ltr_for_query(&mut query);
+        let parsed_query = self.parse_query(ctx, &query)?;
 
-        let (parsed_query, optic) = self.parse_query(query, &searcher)?;
-
-        let mut aggregator = optic
-            .pipeline
-            .and_then(|pipeline| pipeline.stages.first().map(|stage| stage.aggregator()))
-            .unwrap_or_default();
+        let mut aggregator = SignalAggregator::new(Some(parsed_query.clone()));
 
         if let Some(store) = &self.centrality_store {
             aggregator.set_personal_harmonic(online_centrality_scorer(
-                &optic.site_rankings,
+                parsed_query.site_rankings(),
                 &store.online_harmonic,
                 &store.node2id,
             ));
 
-            let liked_sites: Vec<_> = optic
-                .site_rankings
+            let liked_sites: Vec<_> = parsed_query
+                .site_rankings()
                 .liked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
                 .filter_map(|node| store.node2id.get(&node).copied())
                 .collect();
 
-            let disliked_sites: Vec<_> = optic
-                .site_rankings
+            let disliked_sites: Vec<_> = parsed_query
+                .site_rankings()
                 .disliked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
@@ -221,21 +180,50 @@ impl LocalSearcher {
             )
         }
 
-        let ranker = self.ranker(&parsed_query, &searcher, de_rank_similar, aggregator)?;
+        aggregator.set_region_count(self.index.region_count.clone());
+
+        let ranker = self.ranker(&parsed_query, ctx, de_rank_similar, aggregator)?;
 
         let res = self.index.inverted_index.search_initial(
             &parsed_query,
-            &searcher,
-            ranker.collector(),
+            ctx,
+            ranker.collector(ctx.clone()),
         )?;
+
+        let fastfield_reader = self.index.inverted_index.fastfield_reader(&ctx.tv_searcher);
 
         let ranking_websites = self.index.inverted_index.retrieve_ranking_websites(
-            &searcher,
+            ctx,
             res.top_websites,
-            &ranker.aggregator(),
+            ranker.aggregator(),
+            &fastfield_reader,
         )?;
 
-        Ok((ranking_websites, res.num_websites))
+        let pipe_top_n = pipeline.top_n;
+        let mut ranking_websites = pipeline.apply(ranking_websites);
+
+        let schema = self.index.schema();
+        for website in &mut ranking_websites {
+            let doc = ctx.tv_searcher.doc(website.pointer.address.into())?;
+            website.title = Some(
+                doc.get_first(schema.get_field(TextField::Title.name()).unwrap())
+                    .map(|text| text.as_text().unwrap().to_string())
+                    .unwrap_or_default(),
+            );
+            website.clean_body = Some(
+                doc.get_first(schema.get_field(TextField::CleanBody.name()).unwrap())
+                    .map(|text| text.as_text().unwrap().to_string())
+                    .unwrap_or_default(),
+            );
+        }
+
+        let has_more = pipe_top_n == ranking_websites.len();
+
+        Ok(InvertedIndexResult {
+            webpages: ranking_websites,
+            num_hits: res.num_websites,
+            has_more,
+        })
     }
 
     fn spell_correction(&self, query: &SearchQuery) -> Option<Correction> {
@@ -261,7 +249,8 @@ impl LocalSearcher {
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
-        let (websites, num_websites) = self.search_inverted_index(query, de_rank_similar)?;
+        let ctx = self.index.inverted_index.local_search_ctx();
+        let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
         let correction = self.spell_correction(query);
         let sidebar = self
             .entity_sidebar(query)
@@ -269,8 +258,9 @@ impl LocalSearcher {
 
         Ok(InitialWebsiteResult {
             spell_corrected_query: correction,
-            websites,
-            num_websites,
+            websites: inverted_index_result.webpages,
+            num_websites: inverted_index_result.num_hits,
+            has_more: inverted_index_result.has_more,
             entity_sidebar: sidebar,
         })
     }
@@ -280,12 +270,12 @@ impl LocalSearcher {
         websites: &[inverted_index::WebsitePointer],
         query: &str,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let query = Query::parse(
-            query,
-            self.index.schema(),
-            self.index.tokenizers(),
-            &SignalAggregator::default(),
-        )?;
+        let ctx = self.index.inverted_index.local_search_ctx();
+        let query = SearchQuery {
+            query: query.to_string(),
+            ..Default::default()
+        };
+        let query = Query::parse(&ctx, &query, &self.index.inverted_index)?;
 
         if query.is_empty() {
             return Err(Error::EmptyQuery);
@@ -299,10 +289,7 @@ impl LocalSearcher {
         use std::{sync::Arc, time::Instant};
 
         use crate::{
-            ranking::{
-                models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
-                pipeline::RankingPipeline,
-            },
+            ranking::models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
             search_prettifier::Sidebar,
         };
 
@@ -310,10 +297,11 @@ impl LocalSearcher {
         let mut search_query = query.clone();
 
         let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
-            Ok(model) => RankingPipeline::for_query(&mut search_query, Arc::new(model))?,
-            Err(_) => {
-                RankingPipeline::for_query(&mut search_query, Arc::new(DummyCrossEncoder {}))?
-            }
+            Ok(model) => RankingPipeline::reranking_for_query(&mut search_query, Arc::new(model))?,
+            Err(_) => RankingPipeline::reranking_for_query(
+                &mut search_query,
+                Arc::new(DummyCrossEncoder {}),
+            )?,
         };
 
         let search_result = self.search_initial(&search_query, true)?;
@@ -431,7 +419,7 @@ mod tests {
             let urls: Vec<_> = searcher
                 .search(&SearchQuery {
                     query: "test".to_string(),
-                    offset: p * NUM_RESULTS_PER_PAGE,
+                    page: p,
                     ..Default::default()
                 })
                 .unwrap()

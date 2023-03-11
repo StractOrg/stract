@@ -103,7 +103,6 @@ pub async fn route(
         .get("p")
         .and_then(|p| p.parse().ok())
         .unwrap_or_default();
-    let offset = skip_pages * NUM_RESULTS_PER_PAGE;
 
     let mut optic = None;
     // should only be set if optic was successfully downloaded
@@ -136,7 +135,7 @@ pub async fn route(
             query: query.clone(),
             selected_region,
             optic_program: optic,
-            offset,
+            page: skip_pages,
             site_rankings,
             num_results: NUM_RESULTS_PER_PAGE,
         })

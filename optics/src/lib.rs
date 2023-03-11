@@ -19,7 +19,7 @@ mod lexer;
 
 use std::convert::TryFrom;
 
-use ast::RankingPipeline;
+use ast::RankingCoeff;
 use logos::Logos;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -93,7 +93,7 @@ impl TryFrom<RawOptic> for Optic {
 
         Ok(Self {
             rules,
-            pipeline: raw.rankings.into_iter().next(),
+            rankings: raw.rankings,
             discard_non_matching: raw.discard_non_matching,
             site_rankings: SiteRankings {
                 liked: liked_sites,
@@ -222,25 +222,21 @@ pub enum Action {
 
 #[derive(Debug, Default, Clone)]
 pub struct Optic {
-    pub pipeline: Option<RankingPipeline>,
+    pub rankings: Vec<RankingCoeff>,
     pub site_rankings: SiteRankings,
     pub rules: Vec<Rule>,
     pub discard_non_matching: bool,
 }
 
 impl Optic {
+    pub fn parse(optic: &str) -> Result<Self> {
+        parse(optic)
+    }
+
     pub fn try_merge(mut self, mut other: Self) -> Result<Self> {
         self.rules.append(&mut other.rules);
 
-        self.pipeline = match (self.pipeline, other.pipeline) {
-            (None, None) => None,
-            (None, Some(pipeline)) => Some(pipeline),
-            (Some(pipeline), None) => Some(pipeline),
-            (Some(mut self_pipeline), Some(other_pipeline)) => {
-                self_pipeline.try_merge(other_pipeline)?;
-                Some(self_pipeline)
-            }
-        };
+        self.rankings.append(&mut other.rankings);
 
         self.discard_non_matching |= other.discard_non_matching;
 

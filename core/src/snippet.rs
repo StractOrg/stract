@@ -237,7 +237,7 @@ pub fn generate(query: &Query, text: &str, region: &Region) -> String {
         None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
     };
 
-    let snippet = snippet_string(text, &query.simple_terms(), lang);
+    let snippet = snippet_string(text, query.simple_terms(), lang);
 
     snippet.to_html()
 }

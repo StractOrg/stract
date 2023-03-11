@@ -16,7 +16,6 @@
 
 use super::Error;
 use super::Result as ModResult;
-use itertools::Itertools;
 use lalrpop_util::lalrpop_mod;
 
 use super::lexer;
@@ -29,48 +28,20 @@ pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
 #[derive(Debug, PartialEq, Clone)]
 pub enum RankingTarget {
     Signal(String),
-    Field(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct RankingCoeff {
     pub target: RankingTarget,
-    pub score: f64,
+    pub value: f64,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct RawOptic {
     pub rules: Vec<RawRule>,
-    pub rankings: Vec<RankingPipeline>,
+    pub rankings: Vec<RankingCoeff>,
     pub site_preferences: Vec<RawSitePreference>,
     pub discard_non_matching: bool,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct RankingPipeline {
-    pub stages: Vec<RankingStage>,
-}
-impl RankingPipeline {
-    pub(crate) fn try_merge(&mut self, other_pipeline: RankingPipeline) -> ModResult<()> {
-        if self.stages.len() != other_pipeline.stages.len() {
-            return Err(Error::RankingStagesMismatch);
-        }
-
-        for (t, mut o) in self
-            .stages
-            .iter_mut()
-            .zip_eq(other_pipeline.stages.into_iter())
-        {
-            t.coefficients.append(&mut o.coefficients)
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct RankingStage {
-    pub coefficients: Vec<RankingCoeff>,
 }
 
 impl From<Vec<RawOpticBlock>> for RawOptic {
@@ -102,7 +73,7 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
 pub enum RawOpticBlock {
     Rule(RawRule),
     SitePreference(RawSitePreference),
-    Ranking(RankingPipeline),
+    Ranking(RankingCoeff),
     DiscardNonMatching,
 }
 
@@ -179,13 +150,8 @@ mod tests {
             /*
                 this is a block comment
              */
-            RankingPipeline {
-                Stage {
-                    Ranking{Signal("host_centrality"), 3},
-                    Ranking{Signal("bm25"), 100},
-                    Ranking{Field("url"), 2},
-                }
-            };
+            Ranking(Signal("host_centrality"), 3);
+            Ranking(Signal("bm25"), 100);
 
             Rule {
                 Matches {
@@ -220,24 +186,16 @@ mod tests {
                         action: None,
                     },
                 ],
-                rankings: vec![RankingPipeline {
-                    stages: vec![RankingStage {
-                        coefficients: vec![
-                            RankingCoeff {
-                                target: RankingTarget::Signal("host_centrality".to_string()),
-                                score: 3.0,
-                            },
-                            RankingCoeff {
-                                target: RankingTarget::Signal("bm25".to_string()),
-                                score: 100.0,
-                            },
-                            RankingCoeff {
-                                target: RankingTarget::Field("url".to_string()),
-                                score: 2.0,
-                            },
-                        ]
-                    }]
-                }],
+                rankings: vec![
+                    RankingCoeff {
+                        target: RankingTarget::Signal("host_centrality".to_string()),
+                        value: 3.0,
+                    },
+                    RankingCoeff {
+                        target: RankingTarget::Signal("bm25".to_string()),
+                        value: 100.0,
+                    },
+                ],
                 site_preferences: vec![],
                 discard_non_matching: false,
             }

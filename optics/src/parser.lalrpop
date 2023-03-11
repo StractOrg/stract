@@ -18,7 +18,7 @@ pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
 
 Block: RawOpticBlock = {
     <Rule> => RawOpticBlock::Rule(<>),
-    <RankingPipeline> => RawOpticBlock::Ranking(<>),
+    <Ranking> => RawOpticBlock::Ranking(<>),
     <SitePreference> => RawOpticBlock::SitePreference(<>),
     "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
 }
@@ -49,47 +49,34 @@ RawAction: RawAction= {
 }
 
 InnerAction: RawAction= {
-    "Boost" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
-        match score.parse() {
+    "Boost" "(" <l:@L> <value:Number> <r:@R>  ")" =>? {
+        match value.parse() {
             Ok(n) => Ok(RawAction::Boost(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+                error: crate::Error::NumberParse{ token: (l, value.to_string(), r)}
             })
         }
     },
-    "Downrank" "(" <l:@L> <score:Number> <r:@R>  ")" =>? {
-        match score.parse() {
+    "Downrank" "(" <l:@L> <value:Number> <r:@R>  ")" =>? {
+        match value.parse() {
             Ok(n) => Ok(RawAction::Downrank(n)),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+                error: crate::Error::NumberParse{ token: (l, value.to_string(), r)}
             })
         }
     },
     "Discard" => RawAction::Discard,
 }
 
-RankingPipeline: RankingPipeline = {
-    "RankingPipeline" "{" <Sep<",", RankingStage>> "}" => RankingPipeline {
-        stages: <>
-    }
-}
-
-RankingStage: RankingStage = {
-    "Stage" "{" <Sep<",", Ranking>> "}" => RankingStage {
-        coefficients: <>
-    }
-}
-
-
 Ranking: RankingCoeff = {
-    "Ranking" "{" <target:RankingTarget> "," <l:@L> <score:Number> <r:@R> "}" =>? {
-        match score.parse() {
-            Ok(score) => Ok(RankingCoeff {
+    "Ranking" "(" <target:RankingTarget> "," <l:@L> <value:Number> <r:@R> ")" =>? {
+        match value.parse() {
+            Ok(value) => Ok(RankingCoeff {
                 target,
-                score
+                value
             }),
             Err(_) => Err(ParseError::User {
-                error: crate::Error::NumberParse{ token: (l, score.to_string(), r)}
+                error: crate::Error::NumberParse{ token: (l, value.to_string(), r)}
             })
         }
     }
@@ -97,7 +84,6 @@ Ranking: RankingCoeff = {
 
 RankingTarget: RankingTarget = {
     "Signal" "(" <StringLiteral> ")" => RankingTarget::Signal(<>.to_string()),
-    "Field" "(" <StringLiteral> ")" => RankingTarget::Field(<>.to_string()),
 }
 
 SitePreference: RawSitePreference = {
@@ -119,7 +105,6 @@ extern {
 
         "DiscardNonMatching" => Token::DiscardNonMatching,
         "Rule" => Token::Rule,
-        "RankingPipeline" => Token::RankingPipeline,
         "Ranking" => Token::Ranking,
         "Stage" => Token::Stage,
         "Signal" => Token::Signal,

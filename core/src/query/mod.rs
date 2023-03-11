@@ -15,16 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    index::Index,
-    ranking::SignalAggregator,
+    inverted_index::InvertedIndex,
+    ranking::{Signal, SignalCoefficient},
     schema::{Field, TextField},
     search_ctx::Ctx,
-    searcher::NUM_RESULTS_PER_PAGE,
+    searcher::SearchQuery,
     webpage::region::Region,
     Result,
 };
-use optics::Optic;
-use std::{collections::HashMap, sync::Arc};
+use optics::{ast::RankingTarget, Optic, SiteRankings};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
     schema::Schema,
@@ -50,9 +50,11 @@ pub struct Query {
     terms: Vec<Box<Term>>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
+    site_rankings: SiteRankings,
     offset: usize,
     region: Option<Region>,
-    num_results: usize,
+    optic: Option<Optic>,
+    top_n: usize,
 }
 
 fn proximity_queries(
@@ -106,13 +108,8 @@ fn proximity_queries(
 }
 
 impl Query {
-    pub fn parse(
-        query: &str,
-        schema: Arc<Schema>,
-        tokenizer_manager: &TokenizerManager,
-        aggregator: &SignalAggregator,
-    ) -> Result<Query> {
-        let parsed_terms = parser::parse(query);
+    pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
+        let parsed_terms = parser::parse(&query.query);
 
         let mut term_count = HashMap::new();
         let mut terms = Vec::new();
@@ -127,14 +124,15 @@ impl Query {
             *count += 1;
         }
 
+        let schema = index.schema();
+        let tokenizer_manager = index.tokenizers();
+
         let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
             schema.fields().collect();
 
-        let field_boost = aggregator.field_boosts();
-
         let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
-            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager, field_boost))
+            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
             .collect();
 
         let simple_terms_text: Vec<String> = terms
@@ -154,43 +152,47 @@ impl Query {
             tokenizer_manager,
         ));
 
-        let tantivy_query = Box::new(BooleanQuery::new(queries));
+        let mut tantivy_query = Box::new(BooleanQuery::new(queries));
+
+        let mut optic = query
+            .site_rankings
+            .clone()
+            .map(|site_rankings| site_rankings.into_optic());
+
+        if let Some(optic_program) = &query.optic_program {
+            match optic.as_mut() {
+                Some(inner) => {
+                    optic = Some(inner.clone().try_merge(Optic::parse(optic_program)?)?);
+                }
+                None => {
+                    optic = Some(Optic::parse(optic_program)?);
+                }
+            }
+        }
+
+        if let Some(optic) = &optic {
+            let mut subqueries = vec![(Occur::Must, tantivy_query.box_clone())];
+            subqueries.append(&mut optic.as_multiple_tantivy(&schema, &ctx.fastfield_reader));
+            tantivy_query = Box::new(BooleanQuery::new(subqueries));
+        }
 
         Ok(Query {
             terms,
+            site_rankings: optic
+                .as_ref()
+                .map(|optic| optic.site_rankings.clone())
+                .unwrap_or_default(),
             simple_terms_text,
             tantivy_query,
-            offset: 0,
-            region: None,
-            num_results: NUM_RESULTS_PER_PAGE,
+            optic,
+            offset: query.num_results * query.page,
+            region: query.selected_region,
+            top_n: query.num_results,
         })
     }
 
-    pub fn set_optic(&mut self, optic: &Optic, index: &Index, ctx: &Ctx) {
-        let mut subqueries = vec![(Occur::Must, self.tantivy_query.box_clone())];
-
-        subqueries.append(
-            &mut optic
-                .as_multiple_tantivy(&index.schema(), index.inverted_index.fastfield_reader(ctx)),
-        );
-
-        self.tantivy_query = Box::new(BooleanQuery::new(subqueries));
-    }
-
-    pub fn simple_terms(&self) -> Vec<String> {
-        self.simple_terms_text.clone()
-    }
-
-    pub fn set_num_results(&mut self, num_results: usize) {
-        self.num_results = num_results;
-    }
-
-    pub fn set_offset(&mut self, offset: usize) {
-        self.offset = offset;
-    }
-
-    pub fn set_region(&mut self, region: Region) {
-        self.region = Some(region);
+    pub fn simple_terms(&self) -> &[String] {
+        &self.simple_terms_text
     }
 
     pub fn terms(&self) -> &[Box<Term>] {
@@ -202,7 +204,7 @@ impl Query {
     }
 
     pub fn num_results(&self) -> usize {
-        self.num_results
+        self.top_n
     }
 
     pub fn offset(&self) -> usize {
@@ -211,6 +213,25 @@ impl Query {
 
     pub fn region(&self) -> Option<&Region> {
         self.region.as_ref()
+    }
+
+    pub fn site_rankings(&self) -> &SiteRankings {
+        &self.site_rankings
+    }
+
+    pub fn signal_coefficients(&self) -> SignalCoefficient {
+        self.optic
+            .as_ref()
+            .map(|optic| {
+                SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
+                    match &coeff.target {
+                        RankingTarget::Signal(signal) => Signal::from_str(signal)
+                            .ok()
+                            .map(|signal| (signal, coeff.value)),
+                    }
+                }))
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -232,22 +253,29 @@ mod tests {
     use crate::{
         index::Index,
         rand_words,
-        schema::create_schema,
         searcher::{LocalSearcher, SearchQuery},
         webpage::Webpage,
     };
 
     use super::*;
 
+    fn empty_index() -> InvertedIndex {
+        InvertedIndex::temporary().unwrap()
+    }
+
     #[test]
     fn simple_parse() {
-        let schema = Arc::new(create_schema());
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
-            "this is a simple query the the the the the the the the the the the the the",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "this is a simple query the the the the the the the the the the the the the"
+                    .to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
 
@@ -275,13 +303,16 @@ mod tests {
 
     #[test]
     fn parse_trailing_leading_whitespace() {
-        let schema = Arc::new(create_schema());
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
-            "   this is a simple query   ",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "   this is a simple query   ".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
 
@@ -299,36 +330,46 @@ mod tests {
 
     #[test]
     fn parse_weird_characters() {
-        let schema = Arc::new(create_schema());
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
 
         let terms = Query::parse(
-            "123",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "123".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query")
-        .simple_terms();
+        .simple_terms()
+        .to_vec();
         assert_eq!(terms, vec!["123".to_string()]);
 
         let terms = Query::parse(
-            "123 33",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "123 33".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query")
-        .simple_terms();
+        .simple_terms()
+        .to_vec();
         assert_eq!(terms, vec!["123".to_string(), "33".to_string()]);
 
         let terms = Query::parse(
-            "term! term# $",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "term! term# $".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query")
-        .simple_terms();
+        .simple_terms()
+        .to_vec();
         assert_eq!(
             terms,
             vec!["term!".to_string(), "term#".to_string(), "$".to_string()]
@@ -543,13 +584,16 @@ mod tests {
 
     #[test]
     fn empty_query() {
-        let schema = Arc::new(create_schema());
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
-            "",
-            Arc::clone(&schema),
-            &TokenizerManager::new(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("failed to parse query");
 
@@ -558,13 +602,16 @@ mod tests {
 
     #[test]
     fn query_term_only_special_char() {
-        let index = Index::temporary().expect("Unable to open index");
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
 
         let query = Query::parse(
-            "&",
-            index.schema(),
-            index.tokenizers(),
-            &SignalAggregator::default(),
+            &ctx,
+            &SearchQuery {
+                query: "&".to_string(),
+                ..Default::default()
+            },
+            &index,
         )
         .expect("Failed to parse query");
 
