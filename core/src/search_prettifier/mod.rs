@@ -160,6 +160,7 @@ pub struct DisplayedWebpage {
     pub snippet: Snippet,
     pub body: String,
     pub primary_image_uuid: Option<String>,
+    pub ranking_signals: Option<Vec<Option<f64>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -197,6 +198,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             snippet,
             body: webpage.body,
             primary_image_uuid: webpage.primary_image.map(|image| image.uuid.to_string()),
+            ranking_signals: None,
         }
     }
 }

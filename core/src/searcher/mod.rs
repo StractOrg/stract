@@ -62,6 +62,7 @@ pub struct SearchQuery {
     pub selected_region: Option<Region>,
     pub optic_program: Option<String>,
     pub site_rankings: Option<SiteRankings>,
+    pub return_ranking_signals: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,6 +86,7 @@ impl Default for SearchQuery {
             selected_region: Default::default(),
             optic_program: Default::default(),
             site_rankings: Default::default(),
+            return_ranking_signals: false,
         }
     }
 }

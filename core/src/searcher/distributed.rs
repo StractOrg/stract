@@ -27,6 +27,7 @@ use crate::{
     ranking::{
         models::cross_encoder::CrossEncoderModel,
         pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
+        ALL_SIGNALS,
     },
     search_prettifier::{
         create_stackoverflow_sidebar, DisplayedAnswer, DisplayedWebpage,
@@ -506,9 +507,9 @@ impl DistributedSearcher {
             return Ok(None);
         }
 
-        let results = self.combine_results(initial_results, pipeline);
+        let top_websites = self.combine_results(initial_results, pipeline);
 
-        let scores: Vec<_> = results
+        let scores: Vec<_> = top_websites
             .iter()
             .map(|pointer| pointer.website.score)
             .collect();
@@ -523,8 +524,8 @@ impl DistributedSearcher {
             return Ok(None);
         }
 
-        let result = self
-            .retrieve_webpages(&results, &query.query)
+        let result: Vec<DisplayedWebpage> = self
+            .retrieve_webpages(&top_websites, &query.query)
             .await
             .into_iter()
             .map(DisplayedWebpage::from)
@@ -576,8 +577,20 @@ impl DistributedSearcher {
             .map(DisplayedWebpage::from)
             .collect();
 
-        if retrieved_webpages.is_empty() && !top_websites.is_empty() {
+        if retrieved_webpages.len() != top_websites.len() {
             return Err(Error::SearchFailed.into());
+        }
+
+        if query.return_ranking_signals {
+            for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {
+                let mut signals = Vec::with_capacity(ALL_SIGNALS.len());
+
+                for signal in ALL_SIGNALS {
+                    signals.push(pointer.website.signals.get(signal).copied());
+                }
+
+                website.ranking_signals = Some(signals);
+            }
         }
 
         let direct_answer = self.answer(&query.query, &mut retrieved_webpages);

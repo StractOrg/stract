@@ -138,6 +138,7 @@ pub async fn route(
             page: skip_pages,
             site_rankings,
             num_results: NUM_RESULTS_PER_PAGE,
+            return_ranking_signals: false,
         })
         .await
     {

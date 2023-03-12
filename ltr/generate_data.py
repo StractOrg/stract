@@ -7,9 +7,9 @@ import pandas as pd
 from tqdm import tqdm
 
 STRACT_ENDPOINT = "localhost:3000"
-NUM_SHUFFLES = 5
+NUM_SHUFFLES = 3
 NUM_QUERIES = 100
-TOP_N_RESULTS = 20
+TOP_N_RESULTS = 10
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -17,7 +17,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 def search(q):
     url = f"http://{STRACT_ENDPOINT}/beta/api/search"
     r = requests.post(
-        url, json={"query": q, "offset": 0, "num_results": TOP_N_RESULTS})
+        url, json={"query": q, "page": 0, "num_results": TOP_N_RESULTS, "return_ranking_signals": True})
     return r.json()['webpages']
 
 
@@ -47,44 +47,57 @@ def score(query, results):
 queries = requests.get(
     "https://s3.trystract.com/public/queries_us_big.csv").text.splitlines()
 random.shuffle(queries)
-queries = queries[:NUM_QUERIES]
 
+ranking_signals = {}
 scores = {'query': [], 'url': [], 'score': []}
 
-for query in tqdm(queries):
-    search_result = search(query)
+queries_taken = 0
 
-    res = []
+with tqdm(total=NUM_QUERIES) as pbar:
+    for query in queries:
+        if queries_taken >= NUM_QUERIES:
+            break
 
-    for r in search_result:
-        if 'Normal' not in r['snippet']:
+        search_result = search(query)
+
+        res = []
+
+        for r in search_result:
+            if 'Normal' not in r['snippet']:
+                continue
+
+            snip = r['snippet']['Normal']
+            res.append({"domain": r['domain'], "title": r['title'], "url": r['url'], "ranking_signals": r['ranking_signals'],
+                        "snippet": snip['text']})
+
+        if len(res) < TOP_N_RESULTS:
             continue
 
-        snip = r['snippet']['Normal']
-        res.append({"domain": r['domain'], "title": r['title'], "url": r['url'],
-                    "snippet": snip['text']})
+        for _ in range(NUM_SHUFFLES):
+            random.shuffle(res)
+            try:
+                s = score(query, res)
+                for i, s in enumerate(s.split(',')):
+                    s = float(s)
+                    url = res[i]['url']
+                    signals = res[i]['ranking_signals']
 
-    if len(res) == 0:
-        continue
+                    scores['query'].append(query)
+                    scores['url'].append(url)
+                    scores['score'].append(s)
+                    ranking_signals[url] = signals
+            except Exception as e:
+                print('Error', e)
+                pass
 
-    for _ in range(NUM_SHUFFLES):
-        random.shuffle(res)
-        try:
-            s = score(query, res)
-            for i, s in enumerate(s.split(',')):
-                s = float(s)
-                url = res[i]['url']
-
-                scores['query'].append(query)
-                scores['url'].append(url)
-                scores['score'].append(s)
-        except:
-            pass
+        queries_taken += 1
+        pbar.update(1)
 
 df = pd.DataFrame(scores)
 df = df.groupby(['query', 'url'])
 df = df.mean().sort_values(by='score', ascending=False).reset_index()
 df['rank'] = df.groupby('query')['score'].rank(ascending=False)
+df['ranking_signals'] = df['url'].map(ranking_signals)
 
 print(df.head())
 df.to_csv('ltr_scores.csv', index=False)
