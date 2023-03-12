@@ -17,11 +17,11 @@
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
 use tantivy::{
-    query::{BooleanQuery, BoostQuery, Occur, QueryClone},
+    query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
 };
 
-use crate::{fastfield_reader::FastFieldReader, ranking::optics::SCALE, schema::TextField};
+use crate::{fastfield_reader::FastFieldReader, schema::TextField};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -54,16 +54,10 @@ impl AsMultipleTantivyQuery for Optic {
                     self.rules
                         .iter()
                         .chain(self.site_rankings.rules().iter())
-                        .filter_map(|rule| {
-                            let queries = rule.as_multiple_tantivy(schema, fastfields);
-
-                            if queries.is_empty() {
-                                None
-                            } else {
-                                Some(queries)
-                            }
+                        .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
+                        .map(|(occur, rule)| {
+                            BooleanQuery::from(vec![(occur, rule.query)]).box_clone()
                         })
-                        .map(|queries| BooleanQuery::from(queries).box_clone())
                         .collect_vec(),
                 )
                 .box_clone(),
@@ -72,18 +66,32 @@ impl AsMultipleTantivyQuery for Optic {
             self.rules
                 .iter()
                 .chain(self.site_rankings.rules().iter())
-                .filter_map(|rule| rule.as_multiple_tantivy(schema, fastfields).pop())
+                .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
+                .map(|(occur, rule)| (occur, rule.query))
                 .collect()
         }
     }
 }
 
-impl AsMultipleTantivyQuery for Rule {
-    fn as_multiple_tantivy(
+pub struct SearchableRule {
+    pub query: Box<dyn tantivy::query::Query>,
+    pub boost: f64,
+}
+
+pub trait AsSearchableRule {
+    fn as_searchable_rule(
         &self,
         schema: &Schema,
         fastfield_reader: &FastFieldReader,
-    ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
+    ) -> Option<(Occur, SearchableRule)>;
+}
+
+impl AsSearchableRule for Rule {
+    fn as_searchable_rule(
+        &self,
+        schema: &Schema,
+        fastfield_reader: &FastFieldReader,
+    ) -> Option<(Occur, SearchableRule)> {
         let mut subqueries: Vec<_> = self
             .matches
             .iter()
@@ -91,7 +99,7 @@ impl AsMultipleTantivyQuery for Rule {
             .collect();
 
         if subqueries.is_empty() {
-            return vec![];
+            return None;
         }
 
         let subquery = if subqueries.len() == 1 {
@@ -101,23 +109,27 @@ impl AsMultipleTantivyQuery for Rule {
         };
 
         match &self.action {
-            Action::Boost(boost) => vec![(
+            Action::Boost(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(
-                    ConstQuery::new(subquery, 1.0).box_clone(),
-                    *boost as f32 * SCALE,
-                )
-                .box_clone(),
-            )],
-            Action::Downrank(boost) => vec![(
+                SearchableRule {
+                    query: ConstQuery::new(subquery, 1.0).box_clone(),
+                    boost: *boost as f64,
+                },
+            )),
+            Action::Downrank(boost) => Some((
                 Occur::Should,
-                BoostQuery::new(
-                    ConstQuery::new(subquery, 1.0).box_clone(),
-                    *boost as f32 * -SCALE,
-                )
-                .box_clone(),
-            )],
-            Action::Discard => vec![(Occur::MustNot, subquery)],
+                SearchableRule {
+                    query: ConstQuery::new(subquery, 1.0).box_clone(),
+                    boost: *boost as f64 * -1.0,
+                },
+            )),
+            Action::Discard => Some((
+                Occur::MustNot,
+                SearchableRule {
+                    query: subquery,
+                    boost: 0.0,
+                },
+            )),
         }
     }
 }

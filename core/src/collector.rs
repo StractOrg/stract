@@ -463,10 +463,7 @@ mod tests {
             collector.insert(SegmentDoc {
                 hashes: doc.0,
                 id: doc.1,
-                score: Score {
-                    bm25: 0.0,
-                    total: doc.2,
-                },
+                score: Score { total: doc.2 },
                 segment: 0,
             });
         }

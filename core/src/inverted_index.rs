@@ -226,7 +226,6 @@ impl InvertedIndex {
 
             if update_segment {
                 let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
-                let fastfield_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
                 aggregator.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
             }
 

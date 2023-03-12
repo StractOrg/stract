@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::fastfield_reader::FieldValue;
+use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::Result;
 use crate::{
@@ -31,6 +32,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
+use tantivy::query::Scorer;
 use thiserror::Error;
 
 use tantivy::DocSet;
@@ -172,7 +174,7 @@ impl Signal {
             Signal::Bm25StemmedCleanBody => 0.5,
             Signal::Bm25AllBody => 1.0,
             Signal::Bm25Url => 1.0,
-            Signal::Bm25Site => 10.0,
+            Signal::Bm25Site => 1.0,
             Signal::Bm25Domain => 1.0,
             Signal::Bm25SiteNoTokenizer => 1.0,
             Signal::Bm25DomainNoTokenizer => 1.0,
@@ -545,13 +547,17 @@ struct TextFieldData {
     fieldnorm_reader: FieldNormReader,
 }
 
-#[derive(Clone)]
+struct RuleBoost {
+    docset: Box<dyn Scorer>,
+    boost: f64,
+}
+
 struct SegmentReader {
     text_fields: EnumMap<TextField, TextFieldData>,
+    optic_rule_boosts: Vec<RuleBoost>,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
 
-#[derive(Clone)]
 pub struct SignalAggregator {
     query: Option<Query>,
     signal_coefficients: SignalCoefficient,
@@ -565,6 +571,25 @@ pub struct SignalAggregator {
     region_count: Option<Arc<RegionCount>>,
     selected_region: Option<Region>,
     current_timestamp: Option<usize>,
+}
+
+impl Clone for SignalAggregator {
+    fn clone(&self) -> Self {
+        Self {
+            query: self.query.clone(),
+            signal_coefficients: self.signal_coefficients.clone(),
+            segment_reader: None,
+            personal_centrality: self.personal_centrality.clone(),
+            inbound_similariy: self.inbound_similariy.clone(),
+            fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
+            update_time_cache: self.update_time_cache.clone(),
+            topic_scorer: self.topic_scorer.clone(),
+            query_centrality: self.query_centrality.clone(),
+            region_count: self.region_count.clone(),
+            selected_region: self.selected_region,
+            current_timestamp: self.current_timestamp,
+        }
+    }
 }
 
 impl std::fmt::Debug for SignalAggregator {
@@ -610,10 +635,12 @@ impl SignalAggregator {
         &mut self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-        fastfield_reader: Arc<fastfield_reader::SegmentReader>,
+        fastfield_reader: &fastfield_reader::FastFieldReader,
     ) -> Result<()> {
+        let fastfield_segment_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
         let mut text_fields = EnumMap::new();
         let schema = tv_searcher.schema();
+        let mut optic_rule_boosts = Vec::new();
 
         if let Some(query) = &self.query {
             if !query.simple_terms().is_empty() {
@@ -651,11 +678,31 @@ impl SignalAggregator {
                     }
                 }
             }
+
+            if let Some(optic) = query.optic() {
+                optic_rule_boosts = optic
+                    .rules
+                    .iter()
+                    .filter_map(|rule| {
+                        rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader)
+                    })
+                    .map(|(_, rule)| RuleBoost {
+                        docset: rule
+                            .query
+                            .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                            .unwrap()
+                            .scorer(segment_reader, 0.0)
+                            .unwrap(),
+                        boost: rule.boost,
+                    })
+                    .collect();
+            }
         }
 
         self.segment_reader = Some(SegmentReader {
             text_fields,
-            fastfield_reader,
+            fastfield_reader: fastfield_segment_reader,
+            optic_rule_boosts,
         });
 
         Ok(())
@@ -722,6 +769,27 @@ impl SignalAggregator {
         ALL_SIGNALS
             .into_iter()
             .map(move |signal| signal.compute(self, doc))
+    }
+
+    pub fn boosts(&mut self, doc: DocId) -> Option<f64> {
+        self.segment_reader.as_mut().and_then(|segment_reader| {
+            let mut res = 0.0;
+            for rule in &mut segment_reader.optic_rule_boosts {
+                if rule.docset.doc() > doc {
+                    continue;
+                }
+
+                if rule.docset.doc() == doc || rule.docset.seek(doc) == doc {
+                    res += rule.boost;
+                }
+            }
+
+            if res == 0.0 {
+                None
+            } else {
+                Some(res)
+            }
+        })
     }
 
     pub fn precompute_score(&self, webpage: &Webpage) -> f64 {

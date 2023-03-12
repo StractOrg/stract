@@ -199,6 +199,10 @@ impl Query {
         &self.terms
     }
 
+    pub fn optic(&self) -> Option<&Optic> {
+        self.optic.as_ref()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.terms.is_empty()
     }

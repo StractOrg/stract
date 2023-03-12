@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub const SCALE: f32 = 10.0;
-
 #[cfg(test)]
 mod tests {
     use optics::SiteRankings;

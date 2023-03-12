@@ -115,7 +115,12 @@ struct PrioritizeText {}
 impl<T: AsRankingWebsite> Scorer<T> for PrioritizeText {
     fn score(&self, websites: &mut [T]) {
         for website in websites {
-            let bm25 = website.as_ranking().pointer.score.bm25 as f64;
+            let bm25 = website
+                .as_ranking()
+                .signals
+                .get(Signal::Bm25)
+                .copied()
+                .unwrap_or(0.0);
             website.as_mut_ranking().score += bm25;
         }
     }
@@ -287,10 +292,7 @@ mod tests {
             .map(|i| -> RankingWebsite {
                 RankingWebsite {
                     pointer: WebsitePointer {
-                        score: Score {
-                            bm25: 0.0,
-                            total: 0.0,
-                        },
+                        score: Score { total: 0.0 },
                         hashes: Hashes {
                             site: Prehashed(0),
                             title: Prehashed(0),

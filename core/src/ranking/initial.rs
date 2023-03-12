@@ -28,6 +28,12 @@ pub(crate) struct InitialScoreTweaker {
     aggregator: SignalAggregator,
 }
 
+/// SAFETY:
+/// InitialScoreTweaker is thread-safe because it never mutates it's internal state.
+/// It only ever spawns InitialSegmentScoreTweakers which are not thread-safe.
+unsafe impl Sync for InitialScoreTweaker {}
+unsafe impl Send for InitialScoreTweaker {}
+
 impl InitialScoreTweaker {
     pub fn new(
         tv_searcher: tantivy::Searcher,
@@ -42,46 +48,45 @@ impl InitialScoreTweaker {
     }
 }
 
-pub(crate) struct InitialSegmentScoreTweaker {
-    aggregator: SignalAggregator,
-}
-
 impl ScoreTweaker<Score> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
         let mut aggregator = self.aggregator.clone();
 
-        let fastfield_segment_reader = self
-            .fastfield_reader
-            .get_segment(&segment_reader.segment_id());
-
-        aggregator
-            .register_segment(&self.tv_searcher, segment_reader, fastfield_segment_reader)
-            .unwrap();
-
         let current_timestamp = Utc::now().timestamp() as usize;
         aggregator.set_current_timestamp(current_timestamp);
+
+        aggregator
+            .register_segment(&self.tv_searcher, segment_reader, &self.fastfield_reader)
+            .unwrap();
 
         Ok(InitialSegmentScoreTweaker { aggregator })
     }
 }
 
+pub(crate) struct InitialSegmentScoreTweaker {
+    aggregator: SignalAggregator,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Score {
-    pub bm25: tantivy::Score,
     pub total: f64,
 }
 
 impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
-    fn score(&mut self, doc: DocId, score: tantivy::Score) -> Score {
-        let total = self
+    fn score(&mut self, doc: DocId, _score: tantivy::Score) -> Score {
+        let mut total = self
             .aggregator
             .compute_signals(doc)
             .flatten()
             .map(|computed| computed.coefficient * computed.value)
             .sum();
 
-        Score { bm25: score, total }
+        if let Some(boost) = self.aggregator.boosts(doc) {
+            total *= boost;
+        }
+
+        Score { total }
     }
 }
