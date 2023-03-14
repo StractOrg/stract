@@ -515,7 +515,7 @@ impl DistributedSearcher {
             .collect();
 
         let median = if scores.len() % 2 == 0 {
-            (scores[(scores.len() / 2) - 1] + scores[(scores.len() / 2)]) / 2.0
+            (scores[(scores.len() / 2) - 1] + scores[scores.len() / 2]) / 2.0
         } else {
             scores[scores.len() / 2]
         };

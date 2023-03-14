@@ -32,7 +32,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     let mut n = 0;
     let mut max_dist = 0;
 
-    let nodes: Vec<_> = graph.nodes().take(100_000).collect();
+    let nodes: Vec<_> = graph.nodes().cloned().take(100_000).collect();
 
     let pb =
         if with_progress {
@@ -128,7 +128,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (graph.id2node(&id).unwrap(), centrality / norm))
+            .map(|(id, centrality)| (graph.id2node(&id).unwrap().clone(), centrality / norm))
             .collect(),
         max_dist,
     )

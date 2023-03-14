@@ -14,6 +14,38 @@ TOP_N_RESULTS = 10
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
+"""
+NEW PROMPT:
+
+You are a search engine evaluator. Evaluate the following result based on the query. A good search result is relevant to the query and comes from a reputable source. The score should be between 0.0 and 1.0.
+
+query: england politics
+
+result: {domain: "https://abingdonrowcondos.com", title: "Gareth Southgate hails hat-trick hero Harry Kane’s return to form", snippet: "Plus, Nesbitt Realty will pay a down-payment assistance of $1,903 toward your funds for your down-payment. Please get in touch with Will Nesbitt for learn more about our first-time buyer's credit or 607 Bashford Ln #1 or any ."}
+
+score: 0.7
+
+query: q learning algorithm
+
+result: {domain: "datascience.stackexchange.com", title: "Q-learning why do we subtract the Q(s, a) term during update? - Data Science Stack Exchange", snippet: "The q-learning algorithm is an off-policy algorithm , unlike SARSA . The Bellman equation describes q-learning as follows: "The q value for action $a$ taken in state $s$ at time $t$ becomes equal to: that same q-value plus small amount of: currently"}
+
+score: 1.0
+
+query: learn python
+
+result: {domain: "jqxxj.fulltime-abbigliamento.it", title: "Vim plugins python", snippet: "In fact, VimL can be learned fast, but using. omplete Python syntax highlighter for Vim. shows what I get with default Vim that illustrates … Upgrade to PyCharm, the leading Python IDE: best in class debugging, code navigation, refactoring."}
+
+score: 0.1
+
+query: savings interest formula
+
+result: {domain: "readingrockets.org", title: "Choosing Words to Teach | Reading Rockets", snippet: "15. Oct. 2020 Only a sobering revelation (that essential detail) saves him, his marriage, and his wife. A couple of points should be emphasized here. The words were selected not so much because they are essential to comprehension of the story but because they seem..."}
+
+score: 
+
+"""
+
+
 def search(q):
     url = f"http://{STRACT_ENDPOINT}/beta/api/search"
     r = requests.post(

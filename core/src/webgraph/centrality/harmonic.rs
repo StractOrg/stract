@@ -150,7 +150,7 @@ fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
         .filter(|(_, centrality)| *centrality > 0.0)
         .map(|(node_id, centrality)| {
             (
-                graph.id2node(&NodeID::from(node_id)).unwrap(),
+                graph.id2node(&NodeID::from(node_id)).unwrap().clone(),
                 centrality / norm_factor,
             )
         })

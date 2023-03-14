@@ -552,9 +552,13 @@ struct RuleBoost {
     boost: f64,
 }
 
+struct OpticBoosts {
+    rules: Vec<RuleBoost>,
+}
+
 struct SegmentReader {
     text_fields: EnumMap<TextField, TextFieldData>,
-    optic_rule_boosts: Vec<RuleBoost>,
+    optic_boosts: OpticBoosts,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
 
@@ -702,7 +706,9 @@ impl SignalAggregator {
         self.segment_reader = Some(SegmentReader {
             text_fields,
             fastfield_reader: fastfield_segment_reader,
-            optic_rule_boosts,
+            optic_boosts: OpticBoosts {
+                rules: optic_rule_boosts,
+            },
         });
 
         Ok(())
@@ -772,22 +778,29 @@ impl SignalAggregator {
     }
 
     pub fn boosts(&mut self, doc: DocId) -> Option<f64> {
-        self.segment_reader.as_mut().and_then(|segment_reader| {
-            let mut res = 0.0;
-            for rule in &mut segment_reader.optic_rule_boosts {
+        self.segment_reader.as_mut().map(|segment_reader| {
+            let mut downrank = 0.0;
+            let mut boost = 0.0;
+
+            for rule in &mut segment_reader.optic_boosts.rules {
                 if rule.docset.doc() > doc {
                     continue;
                 }
 
                 if rule.docset.doc() == doc || rule.docset.seek(doc) == doc {
-                    res += rule.boost;
+                    if rule.boost < 0.0 {
+                        downrank += rule.boost.abs();
+                    } else {
+                        boost += rule.boost;
+                    }
                 }
             }
 
-            if res == 0.0 {
-                None
+            if downrank > boost {
+                let diff = downrank - boost;
+                1.0 / (1.0 + diff)
             } else {
-                Some(res)
+                boost - downrank + 1.0
             }
         })
     }

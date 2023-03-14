@@ -151,7 +151,7 @@ impl TopicCentrality {
             TopDocs::with_limit(1000, index.inverted_index.fastfield_reader(&tv_searcher))
                 .tweak_score(score_tweaker);
 
-        let mut nodes: Vec<_> = webgraph.nodes().collect();
+        let mut nodes: Vec<_> = webgraph.nodes().copied().collect();
         nodes.sort();
 
         let mut node_scores = vec![vec![0.0; NUM_TOPICS]; nodes.len()];
@@ -179,7 +179,7 @@ impl TopicCentrality {
 
             let top_sites: Vec<_> = top_sites
                 .into_iter()
-                .filter_map(|node| webgraph.node2id(&node))
+                .filter_map(|node| webgraph.node2id(node).copied())
                 .collect();
 
             if top_sites.is_empty() {

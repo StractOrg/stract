@@ -267,7 +267,7 @@ where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
 {
-    let source_id = graph.node2id(&source);
+    let source_id = graph.node2id(&source).copied();
 
     if source_id.is_none() {
         return BTreeMap::new();
@@ -358,7 +358,7 @@ impl OnlineHarmonicCentrality {
         // as an estimate
 
         let mut nodes: BinaryHeap<ProxyNodeCandidate> = BinaryHeap::new();
-        for (node, node_id) in graph.node_ids() {
+        for (node, node_id) in graph.node_ids().map(|(node, id)| (node.clone(), *id)) {
             let score = centrality.host.get(&node_id).unwrap_or(0.0);
             let candidate = ProxyNodeCandidate { node, score };
 
@@ -389,7 +389,7 @@ impl OnlineHarmonicCentrality {
                     .collect();
 
                 Arc::new(ProxyNode {
-                    id: graph.node2id(&node).unwrap(),
+                    id: *graph.node2id(&node).unwrap(),
                     dist_to_node,
                     dist_from_node,
                 })
@@ -476,7 +476,7 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(graph.node2id(&node).unwrap(), centrality);
+                .insert(*graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -485,23 +485,23 @@ mod tests {
 
         let liked_nodes: Vec<_> = vec![Node::from("B".to_string()), Node::from("E".to_string())]
             .into_iter()
-            .filter_map(|node| graph.node2id(&node))
+            .filter_map(|node| graph.node2id(&node).copied())
             .collect();
 
         let scorer = centrality.scorer(&liked_nodes, &[]);
 
         assert!(
-            scorer.score(graph.node2id(&Node::from("E".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("E".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
         );
         assert!(
-            scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("A".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("A".to_string())).unwrap())
         );
     }
 
@@ -514,7 +514,7 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(graph.node2id(&node).unwrap(), centrality);
+                .insert(*graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -523,7 +523,7 @@ mod tests {
 
         let disliked_nodes: Vec<_> = vec![Node::from("D".to_string()), Node::from("E".to_string())]
             .into_iter()
-            .map(|node| graph.node2id(&node).unwrap())
+            .map(|node| *graph.node2id(&node).unwrap())
             .collect();
 
         let scorer = centrality.scorer(&[], &disliked_nodes);
@@ -542,7 +542,7 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(graph.node2id(&node).unwrap(), centrality);
+                .insert(*graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -551,29 +551,29 @@ mod tests {
 
         let liked_nodes: Vec<_> = vec![Node::from("B".to_string()), Node::from("E".to_string())]
             .into_iter()
-            .filter_map(|node| graph.node2id(&node))
+            .filter_map(|node| graph.node2id(&node).copied())
             .collect();
 
         let disliked_nodes: Vec<_> = vec![Node::from("F".to_string())]
             .into_iter()
-            .filter_map(|node| graph.node2id(&node))
+            .filter_map(|node| graph.node2id(&node).copied())
             .collect();
 
         let scorer = centrality.scorer(&liked_nodes, &disliked_nodes);
 
         assert!(
-            scorer.score(graph.node2id(&Node::from("E".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("E".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(graph.node2id(&Node::from("H".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(graph.node2id(&Node::from("C".to_string())).unwrap())
-                > scorer.score(graph.node2id(&Node::from("A".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("A".to_string())).unwrap())
         );
     }
 }

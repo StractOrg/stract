@@ -110,11 +110,11 @@ fn print_top_nodes(
 
 pub fn main() {
     const TOP_N: usize = 50;
-    let graph = WebgraphBuilder::new("data/webgraph").read_only(true).open();
-    let nodes: Vec<_> = graph.nodes().collect();
+    let graph = WebgraphBuilder::new("data/webgraph").open();
+    let nodes: Vec<_> = graph.nodes().cloned().collect();
     let id2node: HashMap<_, _> = nodes
         .iter()
-        .map(|id| (*id, graph.id2node(id).unwrap()))
+        .map(|id| (*id, graph.id2node(id).unwrap().clone()))
         .collect();
 
     let store = CentralityStore::open("data/centrality");

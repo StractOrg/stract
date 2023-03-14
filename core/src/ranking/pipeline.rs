@@ -100,6 +100,7 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
 
         for (website, score) in websites.iter_mut().zip(scores.into_iter()) {
             let website = website.as_mut_ranking();
+            website.signals.insert(Signal::CrossEncoder, score);
             website.score += score;
         }
     }

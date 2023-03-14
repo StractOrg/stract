@@ -78,6 +78,7 @@ impl Executor {
                     // This is important as it makes it possible for the rx iteration to
                     // terminate.
                 };
+
                 let mut result_placeholders: Vec<Option<R>> =
                     std::iter::repeat_with(|| None).take(num_jobs).collect();
 

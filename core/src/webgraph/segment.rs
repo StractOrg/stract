@@ -14,19 +14,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use rkyv::{Archive, Deserialize};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
-    marker::PhantomData,
     path::Path,
-    sync::{Arc, RwLock},
 };
 
-use super::{Edge, NodeID, Store, StoredEdge};
-use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+use super::{open_bin, save_bin, store::Store, Edge, Loaded, NodeID, StoredEdge};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
+#[archive_attr(derive(Eq, Hash, PartialEq, Debug))]
 pub struct SegmentNodeID(u64);
 
 impl From<u64> for SegmentNodeID {
@@ -35,234 +47,115 @@ impl From<u64> for SegmentNodeID {
     }
 }
 
-pub(crate) struct Adjacency {
-    pub(crate) tree: CachedStore<SegmentNodeID, HashSet<StoredEdge>>,
-}
-
-impl Adjacency {
-    fn insert(&mut self, from: SegmentNodeID, to: SegmentNodeID, label: String) {
-        let edge = StoredEdge { other: to, label };
-
-        if let Some(existing) = self.tree.get(&from) {
-            existing.write().unwrap().insert(edge);
-        } else {
-            let mut set = HashSet::new();
-            set.insert(edge);
-            self.tree.insert(from, set);
-        }
-    }
-
-    fn edges(&self, node: &SegmentNodeID) -> Vec<StoredEdge> {
-        self.tree
-            .get(node)
-            .map(|r| r.read().unwrap().clone())
-            .unwrap_or_default()
-            .into_iter()
-            .collect()
-    }
-}
-
-pub struct CachedStore<K, V>
-where
-    K: Ord + Eq + Serialize + DeserializeOwned + Clone,
-    V: Serialize + DeserializeOwned + Clone,
-{
-    store: Box<dyn Kv<K, V> + Send + Sync>,
-    cache: RwLock<BTreeMap<K, Arc<RwLock<V>>>>,
-    cache_size: usize,
-}
-
-impl<K, V> CachedStore<K, V>
-where
-    K: Ord + Eq + Serialize + DeserializeOwned + Clone,
-    V: Serialize + DeserializeOwned + Clone + Debug,
-{
-    pub fn new(store: Box<dyn Kv<K, V> + Send + Sync>, cache_size: usize) -> Self {
-        Self {
-            store,
-            cache_size,
-            cache: RwLock::new(BTreeMap::new()),
-        }
-    }
-
-    fn update_cache(&self, key: &K) {
-        if !self.cache.read().unwrap().contains_key(key) {
-            let mut cache = self.cache.write().unwrap();
-
-            while cache.len() >= self.cache_size {
-                cache.pop_first();
-            }
-
-            let val = self.store.get(key);
-
-            if let Some(val) = val {
-                cache.insert(key.clone(), Arc::new(RwLock::new(val)));
-            }
-        }
-    }
-
-    pub fn get(&self, key: &K) -> Option<Arc<RwLock<V>>> {
-        self.update_cache(key);
-        let guard = self.cache.read().unwrap();
-        guard.get(key).cloned()
-    }
-
-    pub fn insert(&mut self, key: K, value: V) {
-        let cache = self.cache.get_mut().unwrap();
-
-        cache.insert(key, Arc::new(RwLock::new(value)));
-
-        if cache.len() >= self.cache_size {
-            while cache.len() > self.cache_size / 2 {
-                if let Some((key, value)) = cache.pop_first() {
-                    self.store.insert(key, value.write().unwrap().clone());
-                }
-            }
-
-            self.store.flush();
-        }
-    }
-
-    pub fn flush(&mut self) {
-        let cache = self.cache.get_mut().unwrap();
-
-        while let Some((key, value)) = cache.pop_first() {
-            self.store.insert(key, value.write().unwrap().clone());
-        }
-
-        self.store.flush();
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
-        self.store.iter()
-    }
-
-    pub fn delete(&mut self, key: &K) {
-        self.store.delete(key);
-        self.cache.write().unwrap().remove(key);
-    }
-}
-
-pub struct Segment<S: Store> {
-    adjacency: Adjacency,
-    reversed_adjacency: Adjacency,
-    id_mapping: CachedStore<NodeID, SegmentNodeID>,
-    rev_id_mapping: CachedStore<SegmentNodeID, NodeID>,
-    meta: CachedStore<String, u64>,
-    store: PhantomData<S>,
+pub struct StoredSegment {
+    adjacency: Store<SegmentNodeID, HashSet<StoredEdge>>,
+    reversed_adjacency: Store<SegmentNodeID, HashSet<StoredEdge>>,
+    id_mapping: BTreeMap<NodeID, SegmentNodeID>,
+    rev_id_mapping: BTreeMap<SegmentNodeID, NodeID>,
+    meta: Meta,
     id: String,
-    path: String,
+    folder_path: String,
 }
 
-impl<S: Store> Segment<S> {
-    #[cfg(test)]
-    pub(crate) fn temporary() -> Segment<S> {
-        S::temporary()
-    }
-
-    pub fn open<P: AsRef<Path>>(path: P, id: String) -> Self {
-        S::open(path, id)
-    }
-
-    pub fn open_read_only<P: AsRef<Path>>(path: P, id: String) -> Self {
-        S::open_read_only(path, id)
-    }
-
-    fn next_id(&self) -> SegmentNodeID {
-        let key = &"next_id".to_string();
-        self.meta
-            .get(key)
-            .map(|arc| *arc.read().unwrap())
-            .unwrap_or(0)
-            .into()
+impl StoredSegment {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+        StoredSegment {
+            adjacency: Store::open(folder_path.as_ref().join("adjacency"), &id).unwrap(),
+            reversed_adjacency: Store::open(folder_path.as_ref().join("reversed_adjacency"), &id)
+                .unwrap(),
+            id_mapping: open_bin(folder_path.as_ref().join("id_mapping.bin")),
+            rev_id_mapping: open_bin(folder_path.as_ref().join("rev_id_mapping.bin")),
+            meta: open_bin(folder_path.as_ref().join("meta.bin")),
+            folder_path: folder_path
+                .as_ref()
+                .as_os_str()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            id,
+        }
     }
 
     pub fn num_nodes(&self) -> usize {
-        self.next_id().0 as usize
-    }
-
-    fn increment_next_id(&mut self) {
-        let current_id = self.next_id().0;
-        let next_id = current_id + 1;
-        self.meta.insert("next_id".to_string(), next_id);
-    }
-
-    fn id_and_increment(&mut self) -> SegmentNodeID {
-        let id = self.next_id();
-        self.increment_next_id();
-        id
+        self.meta.num_nodes as usize
     }
 
     fn id_mapping(&self, node: &NodeID) -> Option<SegmentNodeID> {
-        self.id_mapping.get(node).map(|lock| *lock.read().unwrap())
+        self.id_mapping.get(node).copied()
     }
 
     fn rev_id_mapping(&self, node: &SegmentNodeID) -> Option<NodeID> {
-        self.rev_id_mapping
-            .get(node)
-            .map(|lock| *lock.read().unwrap())
+        self.rev_id_mapping.get(node).copied()
     }
 
-    pub fn outgoing_edges(&self, node: &NodeID) -> Vec<Edge> {
-        match self.id_mapping(node) {
-            Some(segment_id) => self
-                .adjacency
-                .edges(&segment_id)
-                .into_iter()
-                .map(|edge| Edge {
-                    from: *node,
-                    to: self.rev_id_mapping(&edge.other).unwrap(),
-                    label: edge.label,
+    pub fn outgoing_edges(&self, node: &NodeID, load_label: bool) -> Vec<Edge> {
+        self.id_mapping(node)
+            .and_then(|segment_id| {
+                self.adjacency.get(&segment_id).map(|edges| {
+                    edges
+                        .iter()
+                        .map(move |edge| {
+                            if load_label {
+                                Edge {
+                                    from: *node,
+                                    to: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
+                                    label: Loaded::Some(
+                                        edge.label.deserialize(&mut rkyv::Infallible).unwrap(),
+                                    ),
+                                }
+                            } else {
+                                Edge {
+                                    from: *node,
+                                    to: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
+                                    label: Loaded::NotYet,
+                                }
+                            }
+                        })
+                        .collect()
                 })
-                .collect(),
-            None => Vec::new(),
-        }
+            })
+            .unwrap_or_default()
     }
 
-    pub fn ingoing_edges(&self, node: &NodeID) -> Vec<Edge> {
-        match self.id_mapping(node) {
-            Some(segment_id) => self
-                .reversed_adjacency
-                .edges(&segment_id)
-                .into_iter()
-                .map(|edge| Edge {
-                    from: self.rev_id_mapping(&edge.other).unwrap(),
-                    to: *node,
-                    label: edge.label,
+    pub fn ingoing_edges(&self, node: &NodeID, load_label: bool) -> Vec<Edge> {
+        self.id_mapping(node)
+            .and_then(|segment_id| {
+                self.reversed_adjacency.get(&segment_id).map(|edges| {
+                    edges
+                        .iter()
+                        .map(move |edge| {
+                            if load_label {
+                                Edge {
+                                    from: self
+                                        .rev_id_mapping(&SegmentNodeID(edge.other.0))
+                                        .unwrap(),
+                                    to: *node,
+                                    label: Loaded::Some(
+                                        edge.label.deserialize(&mut rkyv::Infallible).unwrap(),
+                                    ),
+                                }
+                            } else {
+                                Edge {
+                                    from: self
+                                        .rev_id_mapping(&SegmentNodeID(edge.other.0))
+                                        .unwrap(),
+                                    to: *node,
+                                    label: Loaded::NotYet,
+                                }
+                            }
+                        })
+                        .collect()
                 })
-                .collect(),
-            None => Vec::new(),
-        }
+            })
+            .unwrap_or_default()
     }
 
-    fn id_or_assign(&mut self, node: &NodeID) -> SegmentNodeID {
-        match self.id_mapping(node) {
-            Some(id) => id,
-            None => {
-                let id = self.id_and_increment();
-
-                self.id_mapping.insert(*node, id);
-                self.rev_id_mapping.insert(id, *node);
-
-                id
-            }
-        }
-    }
-
-    pub fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
-        let from_id = self.id_or_assign(&from);
-        let to_id = self.id_or_assign(&to);
-
-        self.adjacency.insert(from_id, to_id, label.clone());
-        self.reversed_adjacency.insert(to_id, from_id, label);
-    }
-
-    pub fn flush(&mut self) {
-        self.adjacency.tree.flush();
-        self.reversed_adjacency.tree.flush();
-        self.id_mapping.flush();
-        self.rev_id_mapping.flush();
-        self.meta.flush();
+    fn flush(&mut self) {
+        self.adjacency.flush().unwrap();
+        self.reversed_adjacency.flush().unwrap();
+        save_bin(&self.id_mapping, self.path().join("id_mapping.bin"));
+        save_bin(&self.rev_id_mapping, self.path().join("rev_id_mapping.bin"));
+        save_bin(&self.meta, self.path().join("meta.bin"));
     }
 
     pub fn id(&self) -> String {
@@ -270,32 +163,203 @@ impl<S: Store> Segment<S> {
     }
 
     pub fn path(&self) -> &Path {
-        Path::new(&self.path)
+        Path::new(&self.folder_path)
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.adjacency
-            .tree
-            .iter()
-            .flat_map(move |(node_id, edges)| {
-                let from = self.rev_id_mapping(&node_id).unwrap();
+        self.adjacency.iter().flat_map(move |(node_id, edges)| {
+            let from = self.rev_id_mapping(node_id).unwrap();
 
-                edges.into_iter().map(move |stored_edge| Edge {
-                    from,
-                    to: self.rev_id_mapping(&stored_edge.other).unwrap(),
-                    label: stored_edge.label,
-                })
+            edges.iter().map(move |stored_edge| Edge {
+                from,
+                to: self
+                    .rev_id_mapping(&SegmentNodeID(stored_edge.other.0))
+                    .unwrap(),
+                label: Loaded::NotYet,
             })
+        })
     }
 
-    pub fn merge(&mut self, mut other: Segment<S>) {
-        other.flush();
+    #[allow(clippy::too_many_arguments)]
+    fn merge_adjacency<F1, F2>(
+        &self,
+        self_edges_fn: F1,
+        other: &Self,
+        other_edges_fn: F2,
+        next_segment_id: &mut SegmentNodeID,
+        new_id_mapping: &mut BTreeMap<NodeID, SegmentNodeID>,
+        new_rev_id_mapping: &mut BTreeMap<SegmentNodeID, NodeID>,
+        new_adjacency: &mut Store<SegmentNodeID, HashSet<StoredEdge>>,
+    ) where
+        F1: Fn(&Self, &SegmentNodeID) -> HashSet<StoredEdge>,
+        F2: Fn(&Self, &SegmentNodeID) -> HashSet<StoredEdge>,
+    {
+        for (node_id, segment_id) in &self.id_mapping {
+            let mut edges = self_edges_fn(self, segment_id);
 
-        for edge in other.edges() {
-            self.insert(edge.from, edge.to, edge.label);
+            if let Some(other_segment_id) = other.id_mapping.get(node_id) {
+                let other_edges = other_edges_fn(other, other_segment_id);
+
+                for other_edge in other_edges {
+                    let node = other.rev_id_mapping(&other_edge.other).unwrap();
+
+                    if let Some(segment_id) = new_id_mapping.get(&node).copied() {
+                        edges.insert(StoredEdge {
+                            other: segment_id,
+                            label: other_edge.label,
+                        });
+                    } else {
+                        let r = new_id_mapping.insert(node, *next_segment_id);
+                        debug_assert!(r.is_none());
+                        let r = new_rev_id_mapping.insert(*next_segment_id, node);
+                        debug_assert!(r.is_none());
+
+                        edges.insert(StoredEdge {
+                            other: *next_segment_id,
+                            label: other_edge.label,
+                        });
+
+                        *next_segment_id = SegmentNodeID(next_segment_id.0 + 1);
+                    }
+                }
+            }
+
+            if !edges.is_empty() {
+                let segment_id = new_id_mapping.get(node_id).copied().unwrap();
+                println!("{:?} -> {:?}", node_id, segment_id);
+                new_adjacency.insert(segment_id, &edges).unwrap();
+            }
         }
 
-        self.flush();
+        for (node_id, segment_id) in &other.id_mapping {
+            if self.id_mapping.get(node_id).is_none() {
+                let this_segment_id = if let Some(segment_id) = new_id_mapping.get(node_id) {
+                    *segment_id
+                } else {
+                    let r = new_id_mapping.insert(*node_id, *next_segment_id);
+                    debug_assert!(r.is_none());
+
+                    let r = new_rev_id_mapping.insert(*next_segment_id, *node_id);
+                    debug_assert!(r.is_none());
+                    let this = *next_segment_id;
+
+                    *next_segment_id = SegmentNodeID(next_segment_id.0 + 1);
+
+                    this
+                };
+
+                let edges = other_edges_fn(other, segment_id);
+
+                let edges: HashSet<_> = edges
+                    .into_iter()
+                    .map(|edge| {
+                        let other_node = other.rev_id_mapping(&edge.other).unwrap();
+                        if let Some(segment_id) = new_id_mapping.get(&other_node) {
+                            StoredEdge {
+                                other: *segment_id,
+                                label: edge.label,
+                            }
+                        } else {
+                            let new_segment_id = *next_segment_id;
+                            *next_segment_id = SegmentNodeID(next_segment_id.0 + 1);
+
+                            new_id_mapping.insert(other_node, new_segment_id);
+                            new_rev_id_mapping.insert(new_segment_id, other_node);
+
+                            StoredEdge {
+                                other: new_segment_id,
+                                label: edge.label,
+                            }
+                        }
+                    })
+                    .collect();
+
+                if !edges.is_empty() {
+                    new_adjacency.insert(this_segment_id, &edges).unwrap();
+                }
+            }
+        }
+    }
+
+    pub fn merge(self, other: StoredSegment) -> Self {
+        let new_segment_id = uuid::Uuid::new_v4().to_string();
+
+        let mut new_adjacency = Store::open(
+            self.path().join(&new_segment_id).join("adjacency"),
+            &new_segment_id,
+        )
+        .unwrap();
+
+        let mut next_segment_id = SegmentNodeID(self.meta.num_nodes);
+
+        let mut new_id_mapping = self.id_mapping.clone();
+        let mut new_rev_id_mapping = self.rev_id_mapping.clone();
+
+        self.merge_adjacency(
+            |_self: &StoredSegment, segment_id: &SegmentNodeID| {
+                _self
+                    .adjacency
+                    .get(segment_id)
+                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                    .unwrap_or_default()
+            },
+            &other,
+            |_other: &StoredSegment, segment_id: &SegmentNodeID| {
+                _other
+                    .adjacency
+                    .get(segment_id)
+                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                    .unwrap_or_default()
+            },
+            &mut next_segment_id,
+            &mut new_id_mapping,
+            &mut new_rev_id_mapping,
+            &mut new_adjacency,
+        );
+
+        let mut new_reversed_adjacency = Store::open(
+            self.path().join(&new_segment_id).join("reversed_adjacency"),
+            &new_segment_id,
+        )
+        .unwrap();
+
+        self.merge_adjacency(
+            |_self: &StoredSegment, segment_id: &SegmentNodeID| {
+                _self
+                    .reversed_adjacency
+                    .get(segment_id)
+                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                    .unwrap_or_default()
+            },
+            &other,
+            |_other: &StoredSegment, segment_id: &SegmentNodeID| {
+                _other
+                    .reversed_adjacency
+                    .get(segment_id)
+                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                    .unwrap_or_default()
+            },
+            &mut next_segment_id,
+            &mut new_id_mapping,
+            &mut new_rev_id_mapping,
+            &mut new_reversed_adjacency,
+        );
+
+        let mut res = Self {
+            adjacency: new_adjacency,
+            reversed_adjacency: new_reversed_adjacency,
+            id_mapping: new_id_mapping,
+            rev_id_mapping: new_rev_id_mapping,
+            meta: Meta {
+                num_nodes: next_segment_id.0,
+            },
+            id: new_segment_id,
+            folder_path: self.folder_path,
+        };
+
+        res.flush();
+
+        res
     }
 
     pub fn update_id_mapping(&mut self, mapping: Vec<(NodeID, NodeID)>) {
@@ -303,8 +367,8 @@ impl<S: Store> Segment<S> {
 
         for (old_id, new_id) in mapping {
             if let Some(segment_id) = self.id_mapping(&old_id) {
-                self.id_mapping.delete(&old_id);
-                self.rev_id_mapping.delete(&segment_id);
+                self.id_mapping.remove(&old_id);
+                self.rev_id_mapping.remove(&segment_id);
 
                 new_mappings.push((segment_id, new_id));
             }
@@ -319,52 +383,86 @@ impl<S: Store> Segment<S> {
     }
 }
 
-impl Store for RocksDbStore {
-    fn open<P: AsRef<std::path::Path>>(path: P, id: String) -> Segment<Self> {
-        let adjacency = RocksDbStore::open(path.as_ref().join("adjacency"));
-        let reversed_adjacency = RocksDbStore::open(path.as_ref().join("reversed_adjacency"));
-        let id_mapping = RocksDbStore::open(path.as_ref().join("id_mapping"));
-        let rev_id_mapping = RocksDbStore::open(path.as_ref().join("rev_id_mapping"));
-        let meta = RocksDbStore::open(path.as_ref().join("meta"));
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+struct Meta {
+    num_nodes: u64,
+}
 
-        Segment {
-            adjacency: Adjacency {
-                tree: CachedStore::new(adjacency, 100),
-            },
-            reversed_adjacency: Adjacency {
-                tree: CachedStore::new(reversed_adjacency, 100),
-            },
-            id_mapping: CachedStore::new(id_mapping, 100),
-            rev_id_mapping: CachedStore::new(rev_id_mapping, 100),
-            meta: CachedStore::new(meta, 1_000),
-            store: Default::default(),
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            id,
+#[derive(Default)]
+pub struct LiveSegment {
+    adjacency: BTreeMap<SegmentNodeID, HashSet<StoredEdge>>,
+    reversed_adjacency: BTreeMap<SegmentNodeID, HashSet<StoredEdge>>,
+    id_mapping: BTreeMap<NodeID, SegmentNodeID>,
+    rev_id_mapping: BTreeMap<SegmentNodeID, NodeID>,
+    next_id: u64,
+}
+
+impl LiveSegment {
+    fn get_or_create_id(&mut self, id: NodeID) -> SegmentNodeID {
+        if let Some(segment_id) = self.id_mapping.get(&id) {
+            *segment_id
+        } else {
+            let segment_id = SegmentNodeID(self.next_id);
+            self.next_id += 1;
+
+            self.id_mapping.insert(id, segment_id);
+            self.rev_id_mapping.insert(segment_id, id);
+
+            segment_id
         }
     }
 
-    fn open_read_only<P: AsRef<Path>>(path: P, id: String) -> Segment<Self> {
-        let adjacency = RocksDbStore::open_read_only(path.as_ref().join("adjacency"));
-        let reversed_adjacency =
-            RocksDbStore::open_read_only(path.as_ref().join("reversed_adjacency"));
-        let id_mapping = RocksDbStore::open_read_only(path.as_ref().join("id_mapping"));
-        let rev_id_mapping = RocksDbStore::open_read_only(path.as_ref().join("rev_id_mapping"));
-        let meta = RocksDbStore::open_read_only(path.as_ref().join("meta"));
+    pub fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
+        let from = self.get_or_create_id(from);
+        let to = self.get_or_create_id(to);
 
-        Segment {
-            adjacency: Adjacency {
-                tree: CachedStore::new(adjacency, 100),
-            },
-            reversed_adjacency: Adjacency {
-                tree: CachedStore::new(reversed_adjacency, 100),
-            },
-            id_mapping: CachedStore::new(id_mapping, 100),
-            rev_id_mapping: CachedStore::new(rev_id_mapping, 100),
-            meta: CachedStore::new(meta, 1_000),
-            store: Default::default(),
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            id,
+        self.adjacency.entry(from).or_default().insert(StoredEdge {
+            other: to,
+            label: label.clone(),
+        });
+
+        self.reversed_adjacency
+            .entry(to)
+            .or_default()
+            .insert(StoredEdge { other: from, label });
+    }
+
+    pub fn commit<P: AsRef<Path>>(self, folder_path: P) -> StoredSegment {
+        let segment_id = uuid::Uuid::new_v4().to_string();
+        let path = folder_path.as_ref().join(&segment_id);
+
+        let mut adjacency = Store::open(path.join("adjacency"), &segment_id).unwrap();
+
+        for (from, edges) in self.adjacency {
+            adjacency.insert(from, &edges).unwrap();
         }
+
+        let mut reversed_adjacency =
+            Store::open(path.join("reversed_adjacency"), &segment_id).unwrap();
+
+        for (to, edges) in self.reversed_adjacency {
+            reversed_adjacency.insert(to, &edges).unwrap();
+        }
+
+        let mut stored_segment = StoredSegment {
+            adjacency,
+            reversed_adjacency,
+            id_mapping: self.id_mapping,
+            rev_id_mapping: self.rev_id_mapping,
+            meta: Meta {
+                num_nodes: self.next_id,
+            },
+            folder_path: path.as_os_str().to_str().unwrap().to_string(),
+            id: segment_id,
+        };
+
+        stored_segment.flush();
+
+        stored_segment
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.id_mapping.is_empty()
     }
 }
 
@@ -381,7 +479,7 @@ mod test {
         // ▼      │ │
         // 1─────►2◄┘
 
-        let mut store: Segment<RocksDbStore> = Segment::temporary();
+        let mut store = LiveSegment::default();
 
         let a = NodeID(0);
         let b = NodeID(1);
@@ -392,10 +490,11 @@ mod test {
         store.insert(c, a, String::new());
         store.insert(a, c, String::new());
 
-        store.flush();
+        let store: StoredSegment = store.commit(crate::gen_temp_path());
 
-        let mut out = store.outgoing_edges(&a);
-        out.sort();
+        let mut out: Vec<Edge> = store.outgoing_edges(&a, false);
+
+        out.sort_by(|a, b| a.to.cmp(&b.to));
 
         assert_eq!(
             out,
@@ -403,61 +502,74 @@ mod test {
                 Edge {
                     from: a,
                     to: b,
-                    label: String::new()
+                    label: Loaded::NotYet
                 },
                 Edge {
                     from: a,
                     to: c,
-                    label: String::new()
+                    label: Loaded::NotYet
                 },
             ]
         );
 
-        let mut out = store.outgoing_edges(&b);
-        out.sort();
+        let mut out: Vec<Edge> = store.outgoing_edges(&b, false);
+        out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
             vec![Edge {
                 from: b,
                 to: c,
-                label: String::new()
+                label: Loaded::NotYet
             },]
         );
 
-        let mut out = store.ingoing_edges(&c);
-        out.sort();
+        let mut out: Vec<Edge> = store.outgoing_edges(&c, false);
+        out.sort_by(|a, b| a.to.cmp(&b.to));
+        assert_eq!(
+            out,
+            vec![Edge {
+                from: c,
+                to: a,
+                label: Loaded::NotYet
+            },]
+        );
+
+        let out: Vec<Edge> = store.ingoing_edges(&a, false);
+        assert_eq!(
+            out,
+            vec![Edge {
+                from: c,
+                to: a,
+                label: Loaded::NotYet
+            },]
+        );
+
+        let out: Vec<Edge> = store.ingoing_edges(&b, false);
+        assert_eq!(
+            out,
+            vec![Edge {
+                from: a,
+                to: b,
+                label: Loaded::NotYet
+            },]
+        );
+
+        let mut out: Vec<Edge> = store.ingoing_edges(&c, false);
+        out.sort_by(|a, b| a.from.cmp(&b.from));
         assert_eq!(
             out,
             vec![
                 Edge {
                     from: a,
                     to: c,
-                    label: String::new()
+                    label: Loaded::NotYet
                 },
                 Edge {
                     from: b,
                     to: c,
-                    label: String::new()
+                    label: Loaded::NotYet
                 },
             ]
-        );
-
-        assert_eq!(
-            store.ingoing_edges(&a),
-            vec![Edge {
-                from: c,
-                to: a,
-                label: String::new()
-            },]
-        );
-
-        assert_eq!(
-            store.ingoing_edges(&b),
-            vec![Edge {
-                from: a,
-                to: b,
-                label: String::new()
-            },]
         );
     }
 }

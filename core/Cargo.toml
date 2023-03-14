@@ -75,6 +75,8 @@ async-stream = { workspace = true }
 tokio-stream = { workspace = true }
 scylla = { workspace = true }
 chitchat = { workspace = true }
+memmap2 = { workspace = true }
+rkyv = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

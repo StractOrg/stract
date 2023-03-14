@@ -15,25 +15,23 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
+use rkyv::Archive;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
-use uuid::Uuid;
-
-use segment::Segment;
 
 use crate::directory::{self, DirEntry};
 use crate::executor::Executor;
 use crate::webpage::Url;
 
-use crate::kv::rocksdb_store::RocksDbStore;
-
 pub mod centrality;
-use self::segment::{CachedStore, SegmentNodeID};
+mod store;
+use self::segment::{LiveSegment, SegmentNodeID, StoredSegment};
 
 const MAX_NUM_SEGMENTS: usize = 400;
 
@@ -46,7 +44,8 @@ impl From<u64> for NodeID {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Archive, rkyv::Serialize, rkyv::Deserialize, PartialEq, Eq, Hash)]
+#[archive_attr(derive(Eq, Hash, PartialEq, Debug))]
 pub(crate) struct StoredEdge {
     other: SegmentNodeID,
     label: String,
@@ -106,11 +105,25 @@ impl From<Url> for Node {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Edge {
     pub from: NodeID,
     pub to: NodeID,
-    pub label: String,
+    pub label: Loaded<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Loaded<T> {
+    Some(T),
+    NotYet,
+}
+impl<T> Loaded<T> {
+    fn loaded(self) -> Option<T> {
+        match self {
+            Loaded::Some(t) => Some(t),
+            Loaded::NotYet => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +135,6 @@ pub struct FullEdge {
 
 pub struct WebgraphBuilder {
     path: Box<Path>,
-    read_only: bool,
 }
 
 impl WebgraphBuilder {
@@ -137,34 +149,11 @@ impl WebgraphBuilder {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self {
             path: path.as_ref().into(),
-            read_only: false,
         }
-    }
-
-    pub fn read_only(mut self, read_only: bool) -> Self {
-        self.read_only = read_only;
-
-        self
     }
 
     pub fn open(self) -> Webgraph {
-        if self.read_only {
-            Webgraph::open_read_only(self.path)
-        } else {
-            Webgraph::open(self.path)
-        }
-    }
-}
-
-pub trait Store
-where
-    Self: Sized + Send + Sync,
-{
-    fn open<P: AsRef<Path>>(path: P, id: String) -> Segment<Self>;
-    fn open_read_only<P: AsRef<Path>>(path: P, id: String) -> Segment<Self>;
-
-    fn temporary() -> Segment<Self> {
-        Self::open(crate::gen_temp_path(), "id123".to_string())
+        Webgraph::open(self.path)
     }
 }
 
@@ -195,8 +184,8 @@ where
 
     let mut queue = BinaryHeap::new();
 
-    queue.push(cmp::Reverse((0, source_id)));
-    distances.insert(source_id, 0);
+    queue.push(cmp::Reverse((0, *source_id)));
+    distances.insert(*source_id, 0);
 
     while let Some(state) = queue.pop() {
         let (cost, v) = state.0;
@@ -225,7 +214,7 @@ impl ShortestPaths for Webgraph {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
+            .map(|(id, dist)| (self.id2node(&id).expect("unknown node").clone(), dist))
             .collect()
     }
 
@@ -250,7 +239,7 @@ impl ShortestPaths for Webgraph {
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_reversed_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
+            .map(|(id, dist)| (self.id2node(&id).expect("unknown node").clone(), dist))
             .collect()
     }
 }
@@ -263,22 +252,53 @@ struct Meta {
     next_node_id: u64,
 }
 
-struct SegmentMergeCandidate<S: Store> {
-    segment: Segment<S>,
-    merges: Vec<Segment<S>>,
+struct SegmentMergeCandidate {
+    segment: StoredSegment,
+    merges: Vec<StoredSegment>,
 }
 
-pub struct Webgraph<S: Store = RocksDbStore> {
+fn open_bin<T, P>(path: P) -> T
+where
+    P: AsRef<Path>,
+    T: DeserializeOwned + Default,
+{
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+
+    let reader = BufReader::new(f);
+
+    bincode::deserialize_from(reader).unwrap_or_default()
+}
+
+fn save_bin<T, P>(val: &T, path: P)
+where
+    P: AsRef<Path>,
+    T: Serialize,
+{
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+
+    bincode::serialize_into(f, val).unwrap();
+}
+pub struct Webgraph {
     pub path: String,
-    live_segment: Option<Segment<S>>,
-    segments: Vec<Segment<S>>,
+    live_segment: LiveSegment,
+    segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
-    node2id: CachedStore<Node, NodeID>,
-    id2node: CachedStore<NodeID, Node>,
+    node2id: BTreeMap<Node, NodeID>,
+    id2node: BTreeMap<NodeID, Node>,
     meta: Meta,
 }
 
-impl<S: Store> Webgraph<S> {
+impl Webgraph {
     fn meta<P: AsRef<Path>>(path: P) -> Meta {
         let meta_path = path.as_ref().join("metadata.json");
         let mut reader = BufReader::new(
@@ -316,7 +336,7 @@ impl<S: Store> Webgraph<S> {
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
         let mut segments = Vec::new();
         for segment in &meta.comitted_segments {
-            segments.push(Segment::open(
+            segments.push(StoredSegment::open(
                 path.as_ref().join("segments").join(segment),
                 segment.clone(),
             ));
@@ -324,41 +344,11 @@ impl<S: Store> Webgraph<S> {
 
         Self {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            live_segment: None,
+            live_segment: LiveSegment::default(),
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
-            node2id: CachedStore::new(RocksDbStore::open(path.as_ref().join("node2id")), 100_000),
-            id2node: CachedStore::new(RocksDbStore::open(path.as_ref().join("id2node")), 100_000),
-            meta,
-        }
-    }
-
-    fn open_read_only<P: AsRef<Path>>(path: P) -> Self {
-        fs::create_dir_all(&path).unwrap();
-        let meta = Self::meta(&path);
-
-        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
-        let mut segments = Vec::new();
-        for segment in &meta.comitted_segments {
-            segments.push(Segment::open(
-                path.as_ref().join("segments").join(segment),
-                segment.clone(),
-            ));
-        }
-
-        Self {
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            live_segment: None,
-            segments,
-            executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
-            node2id: CachedStore::new(
-                RocksDbStore::open_read_only(path.as_ref().join("node2id")),
-                100_000,
-            ),
-            id2node: CachedStore::new(
-                RocksDbStore::open_read_only(path.as_ref().join("id2node")),
-                100_000,
-            ),
+            node2id: open_bin(path.as_ref().join("node2id.bin")),
+            id2node: open_bin(path.as_ref().join("id2node.bin")),
             meta,
         }
     }
@@ -371,7 +361,7 @@ impl<S: Store> Webgraph<S> {
 
     fn id_or_assign(&mut self, node: &Node) -> NodeID {
         match self.node2id(node) {
-            Some(id) => id,
+            Some(id) => *id,
             None => {
                 let id = self.id_and_increment();
 
@@ -390,30 +380,19 @@ impl<S: Store> Webgraph<S> {
         let (from, to) = (from.into_host(), to.into_host());
         let (from_id, to_id) = (self.id_or_assign(&from), self.id_or_assign(&to));
 
-        match &mut self.live_segment {
-            Some(segment) => segment.insert(from_id, to_id, label),
-            None => {
-                let segment_id = Uuid::new_v4().to_string();
-                let path = Path::new(&self.path).join("segments").join(&segment_id);
-                let mut segment: Segment<S> = Segment::open(path, segment_id);
-
-                segment.insert(from_id, to_id, label);
-
-                self.live_segment = Some(segment);
-            }
-        }
+        self.live_segment.insert(from_id, to_id, label);
     }
 
-    pub fn merge(&mut self, mut other: Webgraph<S>) {
+    pub fn merge(&mut self, mut other: Webgraph) {
         other.commit();
         let mut mapping = Vec::new();
 
         for (node, other_id) in other.node2id.iter() {
-            match self.node2id(&node) {
-                Some(this_id) => mapping.push((other_id, this_id)),
+            match self.node2id(node) {
+                Some(this_id) => mapping.push((*other_id, *this_id)),
                 None => {
-                    let new_id = self.id_or_assign(&node);
-                    mapping.push((other_id, new_id));
+                    let new_id = self.id_or_assign(node);
+                    mapping.push((*other_id, new_id));
                 }
             }
         }
@@ -425,30 +404,31 @@ impl<S: Store> Webgraph<S> {
             )
             .expect("failed to merge webgraphs");
 
-        for mut segment in other.segments {
-            segment.flush();
+        for segment in other.segments {
             let id = segment.id();
             let new_path = Path::new(&self.path).join("segments").join(segment.id());
             std::fs::rename(segment.path(), &new_path).unwrap();
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments.push(Segment::open(new_path, id));
+            self.segments.push(StoredSegment::open(new_path, id));
         }
 
         self.commit();
     }
 
     pub fn commit(&mut self) {
-        if let Some(mut segment) = self.live_segment.take() {
-            segment.flush();
+        if !self.live_segment.is_empty() {
+            let live_segment = std::mem::take(&mut self.live_segment);
+            let segment = live_segment.commit(Path::new(&self.path).join("segments"));
+
             self.meta.comitted_segments.push(segment.id());
             self.segments.push(segment);
         }
 
         self.save_metadata();
-        self.node2id.flush();
-        self.id2node.flush();
+        save_bin(&self.node2id, Path::new(&self.path).join("node2id.bin"));
+        save_bin(&self.id2node, Path::new(&self.path).join("id2node.bin"));
 
         if self.segments.len() > MAX_NUM_SEGMENTS {
             self.merge_segments((MAX_NUM_SEGMENTS / 2).max(1));
@@ -457,12 +437,12 @@ impl<S: Store> Webgraph<S> {
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
         if let Some(node_id) = self.node2id(&node) {
-            self.raw_ingoing_edges(&node_id)
+            self.inner_ingoing_edges(node_id, true)
                 .into_iter()
                 .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap(),
-                    to: self.id2node(&edge.to).unwrap(),
-                    label: edge.label,
+                    from: self.id2node(&edge.from).unwrap().clone(),
+                    to: self.id2node(&edge.to).unwrap().clone(),
+                    label: edge.label.loaded().unwrap(),
                 })
                 .collect()
         } else {
@@ -471,8 +451,15 @@ impl<S: Store> Webgraph<S> {
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge> {
+        self.inner_ingoing_edges(node, false)
+    }
+
+    fn inner_ingoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
         self.executor
-            .map(|segment| segment.ingoing_edges(node), self.segments.iter())
+            .map(
+                |segment| segment.ingoing_edges(node, load_labels),
+                self.segments.iter(),
+            )
             .unwrap()
             .into_iter()
             .flatten()
@@ -480,8 +467,15 @@ impl<S: Store> Webgraph<S> {
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge> {
+        self.inner_outgoing_edges(node, false)
+    }
+
+    fn inner_outgoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
         self.executor
-            .map(|segment| segment.outgoing_edges(node), self.segments.iter())
+            .map(
+                |segment| segment.outgoing_edges(node, load_labels),
+                self.segments.iter(),
+            )
             .unwrap()
             .into_iter()
             .flatten()
@@ -490,12 +484,12 @@ impl<S: Store> Webgraph<S> {
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
         if let Some(node_id) = self.node2id(&node) {
-            self.raw_outgoing_edges(&node_id)
+            self.inner_outgoing_edges(node_id, true)
                 .into_iter()
                 .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap(),
-                    to: self.id2node(&edge.to).unwrap(),
-                    label: edge.label,
+                    from: self.id2node(&edge.from).unwrap().clone(),
+                    to: self.id2node(&edge.to).unwrap().clone(),
+                    label: edge.label.loaded().unwrap(),
                 })
                 .collect()
         } else {
@@ -503,23 +497,19 @@ impl<S: Store> Webgraph<S> {
         }
     }
 
-    pub fn node2id(&self, node: &Node) -> Option<NodeID> {
-        self.node2id
-            .get(node)
-            .map(|lock| lock.read().unwrap().0.into())
+    pub fn node2id(&self, node: &Node) -> Option<&NodeID> {
+        self.node2id.get(node)
     }
 
-    pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node
-            .get(id)
-            .map(|lock| lock.read().unwrap().clone())
+    pub fn id2node(&self, id: &NodeID) -> Option<&Node> {
+        self.id2node.get(id)
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
-        self.node2id.iter().map(|(_, id)| id)
+    pub fn nodes(&self) -> impl Iterator<Item = &NodeID> + '_ {
+        self.node2id.values()
     }
 
-    pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
+    pub fn node_ids(&self) -> impl Iterator<Item = (&Node, &NodeID)> + '_ {
         self.node2id.iter()
     }
 
@@ -557,7 +547,7 @@ impl<S: Store> Webgraph<S> {
             .map(
                 |mut candidate| {
                     for other in candidate.merges {
-                        candidate.segment.merge(other);
+                        candidate.segment = candidate.segment.merge(other);
                     }
 
                     candidate.segment
@@ -699,19 +689,68 @@ mod test {
 
     #[test]
     fn merge() {
-        let mut graph1 = WebgraphBuilder::new_memory().open();
+        let mut graphs = Vec::new();
+        for (from, to, label) in &[
+            (Node::from("A"), Node::from("B"), String::new()),
+            (Node::from("B"), Node::from("C"), String::new()),
+            (Node::from("C"), Node::from("D"), String::new()),
+            (Node::from("D"), Node::from("E"), String::new()),
+            (Node::from("E"), Node::from("F"), String::new()),
+            (Node::from("F"), Node::from("G"), String::new()),
+            (Node::from("G"), Node::from("H"), String::new()),
+        ] {
+            let mut graph = WebgraphBuilder::new_memory().open();
+            graph.insert(from.clone(), to.clone(), label.clone());
+            graph.commit();
+            graphs.push(graph);
+        }
 
-        graph1.insert(Node::from("A"), Node::from("B"), String::new());
-        graph1.commit();
+        let mut graph = graphs.pop().unwrap();
 
-        let mut graph2 = WebgraphBuilder::new_memory().open();
-        graph2.insert(Node::from("B"), Node::from("C"), String::new());
-        graph2.commit();
-
-        graph1.merge(graph2);
+        for other in graphs {
+            graph.merge(other);
+        }
 
         assert_eq!(
-            graph1.distances(Node::from("A")).get(&Node::from("C")),
+            graph.distances(Node::from("A")).get(&Node::from("H")),
+            Some(&7)
+        );
+
+        graph.merge_segments(1);
+        assert_eq!(
+            graph.distances(Node::from("A")).get(&Node::from("H")),
+            Some(&7)
+        )
+    }
+    #[test]
+    fn merge_cycle() {
+        let mut graphs = Vec::new();
+        for (from, to, label) in &[
+            (Node::from("A"), Node::from("B"), String::new()),
+            (Node::from("B"), Node::from("B"), String::new()),
+            (Node::from("B"), Node::from("C"), String::new()),
+            (Node::from("C"), Node::from("A"), String::new()),
+        ] {
+            let mut graph = WebgraphBuilder::new_memory().open();
+            graph.insert(from.clone(), to.clone(), label.clone());
+            graph.commit();
+            graphs.push(graph);
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other);
+        }
+
+        assert_eq!(
+            graph.distances(Node::from("A")).get(&Node::from("C")),
+            Some(&2)
+        );
+
+        graph.merge_segments(1);
+        assert_eq!(
+            graph.distances(Node::from("A")).get(&Node::from("C")),
             Some(&2)
         )
     }
@@ -721,6 +760,7 @@ mod test {
         let graph = test_graph();
 
         let path = graph.path.clone();
+        dbg!(&path);
         let frozen: FrozenWebgraph = graph.into();
         let bytes = bincode::serialize(&frozen).unwrap();
 
@@ -728,6 +768,7 @@ mod test {
 
         let deserialized_frozen: FrozenWebgraph = bincode::deserialize(&bytes).unwrap();
         let graph: Webgraph = deserialized_frozen.into();
+        dbg!(&graph.path);
 
         let distances = graph.distances(Node::from("D"));
 
@@ -840,12 +881,6 @@ mod test {
         graph.merge_segments(2);
         assert_eq!(graph.segments.len(), 2);
 
-        let distances = graph.distances(Node::from("D"));
-
-        assert_eq!(distances.get(&Node::from("C")), Some(&1));
-        assert_eq!(distances.get(&Node::from("A")), Some(&2));
-        assert_eq!(distances.get(&Node::from("B")), Some(&3));
-
         let mut res = graph.outgoing_edges(Node::from("A"));
         res.sort_by(|a, b| a.to.name.cmp(&b.to.name));
 
@@ -888,5 +923,22 @@ mod test {
                 },
             ]
         );
+
+        let res = graph.outgoing_edges(Node::from("D"));
+
+        assert_eq!(
+            res,
+            vec![FullEdge {
+                from: Node::from("D"),
+                to: Node::from("C"),
+                label: String::new()
+            },]
+        );
+
+        let distances = graph.distances(Node::from("D"));
+
+        assert_eq!(distances.get(&Node::from("C")), Some(&1));
+        assert_eq!(distances.get(&Node::from("A")), Some(&2));
+        assert_eq!(distances.get(&Node::from("B")), Some(&3));
     }
 }

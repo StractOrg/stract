@@ -1233,7 +1233,7 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(webgraph.node2id(&node).unwrap(), centrality);
+                .insert(*webgraph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 

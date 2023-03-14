@@ -74,7 +74,7 @@ impl IndexingWorker {
     ) -> Self {
         Self {
             centrality_store: IndexerCentralityStore::open(centrality_store_path),
-            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).read_only(true).open()),
+            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).open()),
             crawl_stabilty: crawl_stability_path.map(CrawlStability::open),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
