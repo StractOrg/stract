@@ -438,7 +438,10 @@ impl Indexer {
         let mut threads = Vec::new();
 
         for _ in 0..(num_cores + 1) {
-            let indexes = it.by_ref().take(num_indexes / num_cores).collect_vec();
+            let indexes = it
+                .by_ref()
+                .take(((num_indexes as f64) / (num_cores as f64)).ceil() as usize)
+                .collect_vec();
 
             if indexes.is_empty() {
                 break;
@@ -468,8 +471,11 @@ impl Indexer {
 
         let mut it = indexes.into_iter();
         let mut index = it.next().unwrap();
+
         for other in it {
+            let other_path = other.path.clone();
             index = index.merge(other);
+            std::fs::remove_dir_all(other_path).unwrap();
         }
 
         Ok(())

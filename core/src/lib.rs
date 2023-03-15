@@ -171,7 +171,6 @@ pub struct FrontendConfig {
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
-    pub search_servers: Vec<Vec<String>>,
     pub query_store_db_host: Option<String>,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,

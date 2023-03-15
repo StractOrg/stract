@@ -2,7 +2,6 @@ cluster_id = "dev_frontend"
 queries_csv_path = "data/queries_us.csv"
 host = "0.0.0.0:3000"
 prometheus_host = "0.0.0.0:3001"
-search_servers = [["0.0.0.0:3002"]]
 gossip_addr = "0.0.0.0:3003"
 gossip_seed_nodes = ["0.0.0.0:3004"]
 crossencoder_model_path = "data/cross_encoder"
