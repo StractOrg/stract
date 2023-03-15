@@ -1,4 +1,3 @@
-use chrono::Utc;
 // Stract is an open source web search engine.
 // Copyright (C) 2023 Stract ApS
 //
@@ -14,9 +13,11 @@ use chrono::Utc;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use chrono::Utc;
 use futures::StreamExt;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::thread;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -55,7 +56,6 @@ pub struct Job {
     pub base_path: String,
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,
-    pub max_num_segments: u32,
 }
 
 pub struct IndexingWorker {
@@ -231,10 +231,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
         std::fs::remove_file(path).unwrap();
     }
 
-    index
-        .inverted_index
-        .merge_into_max_segments(job.max_num_segments)
-        .unwrap();
+    index.inverted_index.merge_into_max_segments(1).unwrap();
 
     info!("{} done", name);
 
@@ -339,7 +336,6 @@ impl Indexer {
                                 .index_base_path
                                 .clone()
                                 .unwrap_or_else(|| "data/index".to_string()),
-                            max_num_segments: config.final_num_segments.unwrap_or(20),
                             minimum_clean_words: config.minimum_clean_words,
                         })
                         .collect_vec()
@@ -354,7 +350,7 @@ impl Indexer {
 
                 index
                     .inverted_index
-                    .merge_into_max_segments(config.final_num_segments.unwrap_or(20))
+                    .merge_into_max_segments(num_cpus::get() as u32)
                     .unwrap();
             });
 
@@ -425,27 +421,55 @@ impl Indexer {
                             .output_path
                             .clone()
                             .unwrap_or_else(|| "data/index".to_string()),
-                        max_num_segments: config.final_num_segments.unwrap_or(20),
                         minimum_clean_words: config.minimum_clean_words,
                     }),
             )
             .unwrap_or_default();
 
-        Self::merge(indexes, config.final_num_segments.unwrap_or(20))?;
+        Self::merge(indexes)?;
         Ok(())
     }
 
-    pub fn merge(indexes: Vec<IndexPointer>, num_segments: u32) -> Result<()> {
+    pub fn merge(indexes: Vec<IndexPointer>) -> Result<()> {
+        let num_indexes = indexes.len();
         let mut it = indexes.into_iter();
-        let mut index = Index::open(it.next().unwrap().0)?;
+        let num_cores = num_cpus::get();
 
+        let mut threads = Vec::new();
+
+        for _ in 0..(num_cores + 1) {
+            let indexes = it.by_ref().take(num_indexes / num_cores).collect_vec();
+
+            if indexes.is_empty() {
+                break;
+            }
+
+            threads.push(thread::spawn(move || {
+                let mut it = indexes.into_iter();
+                let mut index = Index::open(it.next().unwrap().0).unwrap();
+
+                for other in it {
+                    let other_path = other.0;
+                    let other = Index::open(&other_path).unwrap();
+                    index = index.merge(other);
+
+                    std::fs::remove_dir_all(other_path).unwrap();
+                    index.inverted_index.merge_into_max_segments(1).unwrap();
+                }
+
+                index
+            }));
+        }
+
+        let mut indexes = Vec::new();
+        for thread in threads {
+            indexes.push(thread.join().unwrap());
+        }
+
+        let mut it = indexes.into_iter();
+        let mut index = it.next().unwrap();
         for other in it {
-            let other_path = other.0;
-            let other = Index::open(&other_path)?;
             index = index.merge(other);
-
-            std::fs::remove_dir_all(other_path)?;
-            index.inverted_index.merge_into_max_segments(num_segments)?;
         }
 
         Ok(())

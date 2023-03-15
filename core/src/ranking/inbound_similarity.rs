@@ -121,7 +121,6 @@ impl InboundSimilarity {
         num_top_nodes: usize,
     ) -> Self {
         let mut vectors = IntMap::new();
-        let nodes: Vec<_> = graph.nodes().collect();
 
         let mut top_nodes: BinaryHeap<Reverse<ScoredNode>> =
             BinaryHeap::with_capacity(num_top_nodes);
@@ -143,19 +142,14 @@ impl InboundSimilarity {
             }
         }
 
-        if let Some(max_node) = nodes.iter().max().copied() {
-            let mut buf = vec![false; max_node.0 as usize + 1];
+        for node_id in top_nodes.into_iter().map(|n| n.0.node) {
+            let mut ranks = Vec::new();
 
-            for node_id in top_nodes.into_iter().map(|n| n.0.node) {
-                buf.clear();
-                buf.resize(max_node.0 as usize + 1, false);
-
-                for edge in graph.raw_ingoing_edges(&node_id) {
-                    buf[edge.from.0 as usize] = true;
-                }
-
-                vectors.insert(node_id.0, bitvec_similarity::BitVec::new(&buf));
+            for edge in graph.raw_ingoing_edges(&node_id) {
+                ranks.push(edge.from.0 as usize);
             }
+
+            vectors.insert(node_id.0, bitvec_similarity::BitVec::new(ranks));
         }
 
         Self {

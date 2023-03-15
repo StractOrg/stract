@@ -88,6 +88,7 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum CentralityType {
+    All,
     Harmonic,
     OnlineHarmonic,
     Similarity,
@@ -132,7 +133,6 @@ enum IndexingOptions {
         output_path: String,
     },
     Merge {
-        num_segments: u32,
         indexes: Vec<String>,
     },
 }
@@ -179,13 +179,9 @@ fn main() -> Result<()> {
                 wikipedia_dump_path,
                 output_path,
             } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
-            IndexingOptions::Merge {
-                num_segments,
-                indexes,
-            } => entrypoint::Indexer::merge(
-                indexes.into_iter().map(IndexPointer::from).collect(),
-                num_segments,
-            )?,
+            IndexingOptions::Merge { indexes } => {
+                entrypoint::Indexer::merge(indexes.into_iter().map(IndexPointer::from).collect())?
+            }
         },
         Commands::Centrality {
             mode,
@@ -200,6 +196,11 @@ fn main() -> Result<()> {
             }
             CentralityType::Similarity => {
                 entrypoint::Centrality::build_similarity(webgraph_path, output_path)
+            }
+            CentralityType::All => {
+                entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
+                entrypoint::Centrality::build_online(&webgraph_path, &output_path);
+                entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
             }
         },
         Commands::Webgraph { options } => match options {

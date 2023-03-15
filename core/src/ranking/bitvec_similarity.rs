@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,33 +24,15 @@ struct Block {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
-    blocks: Vec<Block>,
+    ranks: Vec<usize>,
     sqrt_len: f64,
 }
 
 impl BitVec {
-    pub fn new(data: &[bool]) -> Self {
-        let mut blocks = Vec::new();
-        let mut len = 0;
-
-        for (offset, chunk) in data.iter().chunks(64).into_iter().enumerate() {
-            let mut data = 0u64;
-            for (i, b) in chunk.into_iter().enumerate() {
-                if *b {
-                    data |= 1u64 << (63 - i);
-                    len += 1;
-                }
-            }
-
-            if data == 0 {
-                continue;
-            }
-
-            blocks.push(Block { data, offset })
-        }
-
+    pub fn new(ranks: Vec<usize>) -> Self {
+        let len = ranks.len();
         Self {
-            blocks,
+            ranks,
             sqrt_len: (len as f64).sqrt(),
         }
     }
@@ -62,12 +43,12 @@ impl BitVec {
 
         let mut dot: u64 = 0;
 
-        while i < self.blocks.len() && j < other.blocks.len() {
-            match self.blocks[i].offset.cmp(&other.blocks[j].offset) {
+        while i < self.ranks.len() && j < other.ranks.len() {
+            match self.ranks[i].cmp(&other.ranks[j]) {
                 std::cmp::Ordering::Less => i += 1,
                 std::cmp::Ordering::Greater => j += 1,
                 std::cmp::Ordering::Equal => {
-                    dot += (self.blocks[i].data & other.blocks[j].data).count_ones() as u64;
+                    dot += 1;
                     i += 1;
                     j += 1;
                 }
@@ -85,7 +66,16 @@ impl BitVec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
     use std::iter::repeat;
+
+    fn into_ranks(a: &[bool]) -> Vec<usize> {
+        a.iter()
+            .enumerate()
+            .filter(|(_, b)| **b)
+            .map(|(i, _)| i)
+            .collect()
+    }
 
     fn naive_sim(a: &[bool], b: &[bool]) -> f64 {
         let dot = a
@@ -117,8 +107,8 @@ mod tests {
 
         assert!(expected > 0.894);
 
-        let a = BitVec::new(&a);
-        let b = BitVec::new(&b);
+        let a = BitVec::new(into_ranks(&a));
+        let b = BitVec::new(into_ranks(&b));
 
         assert!((expected - a.sim(&b)).abs() < 0.00001);
     }
@@ -129,8 +119,8 @@ mod tests {
 
         let b: Vec<_> = repeat(true).take(1000).collect();
 
-        let a = BitVec::new(&a);
-        let b = BitVec::new(&b);
+        let a = BitVec::new(into_ranks(&a));
+        let b = BitVec::new(into_ranks(&b));
 
         assert_eq!(a.sim(&b), 0.0);
     }
@@ -140,8 +130,8 @@ mod tests {
         let a: Vec<_> = Vec::new();
         let b: Vec<_> = Vec::new();
 
-        let a = BitVec::new(&a);
-        let b = BitVec::new(&b);
+        let a = BitVec::new(into_ranks(&a));
+        let b = BitVec::new(into_ranks(&b));
 
         assert_eq!(a.sim(&b), 0.0);
     }
@@ -163,8 +153,8 @@ mod tests {
 
         assert!(expected < 0.01);
 
-        let a = BitVec::new(&a);
-        let b = BitVec::new(&b);
+        let a = BitVec::new(into_ranks(&a));
+        let b = BitVec::new(into_ranks(&b));
 
         assert!((expected - a.sim(&b)).abs() < 0.00001);
     }

@@ -122,7 +122,6 @@ fn create_inverted_index() -> Result<()> {
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         base_path: out_path_tmp.to_str().unwrap().to_string(),
         host_centrality_threshold: None,
-        max_num_segments: 1,
         minimum_clean_words: Some(40),
     };
 

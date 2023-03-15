@@ -81,7 +81,6 @@ mod widgets;
 pub struct IndexingMasterConfig {
     limit_warc_files: Option<usize>,
     skip_num_warc_files: Option<usize>,
-    final_num_segments: Option<u32>,
     warc_source: WarcSource,
     workers: Vec<String>,
     batch_size: Option<usize>,
@@ -96,7 +95,6 @@ pub struct IndexingLocalConfig {
     crawl_stability_path: Option<String>,
     limit_warc_files: Option<usize>,
     skip_num_warc_files: Option<usize>,
-    final_num_segments: Option<u32>,
     warc_source: WarcSource,
     batch_size: Option<usize>,
     webgraph_path: Option<String>,

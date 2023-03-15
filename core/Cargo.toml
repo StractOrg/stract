@@ -105,3 +105,7 @@ harness = false
 [[bench]]
 name = "abstractive-summarizer"
 harness = false
+
+[[bench]]
+name = "build-similarity"
+harness = false
