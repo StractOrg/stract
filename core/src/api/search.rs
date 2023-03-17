@@ -26,7 +26,7 @@ use crate::{
         thousand_sep_number, CodeOrText, DisplayedAnswer, DisplayedWebpage,
         HighlightedSpellCorrection, Sidebar, Snippet,
     },
-    searcher::{self, SearchQuery, SearchResult, NUM_RESULTS_PER_PAGE},
+    searcher::{self, SearchQuery, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
     widgets::Widget,
     Error,
@@ -59,8 +59,8 @@ struct SearchTemplate {
     next_page_url: String,
     prev_page_url: Option<String>,
     default_optics: Vec<OpticLink>,
-    current_optic_url: Option<String>,
     has_more_results: bool,
+    has_code: bool,
 }
 
 enum RegionSelection {
@@ -105,15 +105,12 @@ pub async fn route(
         .unwrap_or_default();
 
     let mut optic = None;
-    // should only be set if optic was successfully downloaded
-    let mut current_optic_url = None;
 
     if let Some(url) = params.get("optic") {
         if !url.is_empty() {
             if let Ok(res) = reqwest::get(url).await {
                 if let Ok(text) = res.text().await {
                     optic = Some(text);
-                    current_optic_url = Some(url.to_string());
                 }
             }
         }
@@ -152,6 +149,7 @@ pub async fn route(
                 let all_regions = generate_regions(selected_region);
                 let next_page_url = next_page_url(&uri, params.clone(), skip_pages);
                 let prev_page_url = prev_page_url(&uri, params, skip_pages);
+                let has_code = has_code(&result);
 
                 let current_page = skip_pages + 1;
 
@@ -170,8 +168,8 @@ pub async fn route(
                     next_page_url,
                     prev_page_url,
                     default_optics: DEFAULT_OPTICS.to_vec(),
-                    current_optic_url,
                     has_more_results: result.has_more_results,
+                    has_code,
                 };
 
                 Ok(HtmlTemplate(template).into_response())
@@ -189,6 +187,17 @@ pub async fn route(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+fn has_code(result: &WebsitesResult) -> bool {
+    if let Some(Sidebar::StackOverflow { .. }) = result.sidebar.as_ref() {
+        return true;
+    }
+
+    result
+        .webpages
+        .iter()
+        .any(|page| matches!(page.snippet, Snippet::StackOverflowQA { .. }))
 }
 
 fn generate_regions(selected_region: Option<Region>) -> Vec<RegionSelection> {

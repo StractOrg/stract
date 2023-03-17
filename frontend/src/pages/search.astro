@@ -221,8 +221,15 @@ import { askama } from "../askama";
   </style>
 </noscript>
 
-<link rel="stylesheet" href="/css/highlightjs-default.min.css" />
-<script is:inline src="/js/highlight.min.js"></script>
+{
+  askama.if_("has_code", () => {
+    <link rel="stylesheet" href="/css/highlightjs-default.min.css" />
+    <script is:inline src="/js/highlight.min.js"></script>
+    <script is:inline>
+      hljs.highlightAll();
+    </script>
+  })
+}
 <script is:inline>
   var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
   var titleLinks = document.querySelectorAll(".sr-title-link");
@@ -253,7 +260,6 @@ import { askama } from "../askama";
         "urls": urls
       })
     }).then((response) => response.text()).then((data) => {
-      console.log(data);
       qid = data;
     });
   }
@@ -295,7 +301,4 @@ import { askama } from "../askama";
       improvementSent.add(idx);
     }
   }
-</script>
-<script is:inline>
-  hljs.highlightAll();
 </script>

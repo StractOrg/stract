@@ -14,32 +14,35 @@ import { askama } from "$/askama";
     name="optic"
     onchange="document.getElementById('searchbar-form').submit()"
     class="m-0 max-w-[100px] border-0 bg-transparent p-0 text-sm hover:cursor-pointer"
-    x-data="{ items: $persist([]).as('optics') }"
   >
     <option value="">Optic</option>
     {
       askama.for_(
         "optic in default_optics",
-        askama.match("current_optic_url", {
-          "Some(current_optic)": askama.if_(
-            "current_optic == optic.url",
-            () => (
-              <option selected value="{{ optic.url }}">
-                {askama`optic.name`}
-              </option>
-            ),
-            () => <option value="{{ optic.url }}">{askama`optic.name`}</option>
-          ),
-          None: <option value="{{ optic.url }}">{askama`optic.name`}</option>,
-        })
+        <option value="{{ optic.url }}">{askama`optic.name`}</option>
       )
     }
-    <template x-for="item in items">
-      <option x-value="item.url" x-text="item.name"></option>
-    </template>
   </select>
 </div>
 
 <script>
-  import "$/alpine";
+  const optics: {url: string, name: string}[] = JSON.parse(window.localStorage.getItem("optics") || "[]");
+
+  for (const optic of optics) {
+    const option = document.createElement("option");
+    option.value = optic.url;
+    option.text = optic.name;
+    document.getElementById("optics-selector")!.appendChild(option);
+  }
+
+  var searchParams = new URLSearchParams(window.location.search);
+  const currentOpticUrl = searchParams.get("optic");
+
+  if (currentOpticUrl) {
+    Array.from(document.getElementById("optics-selector")!.getElementsByTagName("option")).forEach((option) => {
+      if (option.value === currentOpticUrl) {
+        option.selected = true;
+      }
+    });
+  }
 </script>

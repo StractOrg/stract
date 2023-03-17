@@ -5,12 +5,11 @@ import SettingsLayout from "../../layouts/Settings.astro";
   <div>
     <h1 class="mb-2 text-2xl font-medium">Liked Sites</h1>
     <div class="text-sm">
-      These sites receive a boost during search. Results from these and similar sites
-      are more likely to appear in your search results.
+      Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.
     </div>
-    <div class="mt-5">
+    <div>
       <div
-        class="grid w-full grid-cols-[auto_1fr] space-y-5"
+        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
         id="liked-list"
       >
         <div class="w-10"></div>
@@ -22,12 +21,11 @@ import SettingsLayout from "../../layouts/Settings.astro";
   <div>
     <h1 class="mb-2 text-2xl font-medium">Disliked Sites</h1>
     <div class="text-sm">
-      These sites get de-prioritized during search. Results from these and similar
-      sites are less likely to appear in your search results.
+      Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.
     </div>
-    <div class="mt-5">
+    <div>
       <div
-        class="grid w-full grid-cols-[auto_1fr] space-y-5"
+        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
         id="disliked-list"
       >
         <div class="w-10"></div>
@@ -42,9 +40,9 @@ import SettingsLayout from "../../layouts/Settings.astro";
       These are the sites you have blocked. They won't appear in any of
       your searches.
     </div>
-    <div class="mt-5">
+    <div>
       <div
-        class="grid w-full grid-cols-[auto_1fr] space-y-5"
+        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
         id="blocked-list"
       >
         <div class="w-10"></div>
