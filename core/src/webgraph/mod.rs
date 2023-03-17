@@ -33,8 +33,6 @@ pub mod centrality;
 mod store;
 use self::segment::{LiveSegment, SegmentNodeID, StoredSegment};
 
-const MAX_NUM_SEGMENTS: usize = 400;
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(pub u64);
 
@@ -430,8 +428,8 @@ impl Webgraph {
         save_bin(&self.node2id, Path::new(&self.path).join("node2id.bin"));
         save_bin(&self.id2node, Path::new(&self.path).join("id2node.bin"));
 
-        if self.segments.len() > MAX_NUM_SEGMENTS {
-            self.merge_segments((MAX_NUM_SEGMENTS / 2).max(1));
+        if self.segments.len() > 2 * num_cpus::get() {
+            self.merge_segments(num_cpus::get());
         }
     }
 
