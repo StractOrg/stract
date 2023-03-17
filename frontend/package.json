@@ -23,6 +23,7 @@
     "@faker-js/faker": "^7.6.0",
     "@fontsource/montserrat": "^4.5.14",
     "@tailwindcss/typography": "^0.5.9",
+    "@tailwindcss/line-clamp": "^0.4.2",
     "prettier": "^2.8.3",
     "prettier-plugin-astro": "^0.8.0",
     "prettier-plugin-tailwindcss": "^0.2.2"

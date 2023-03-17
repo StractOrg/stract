@@ -34,8 +34,8 @@ use whatlang::Lang;
 /// This might require us to store each paragraph of the webpage separately to get adequate performance (maybe we can split passages online with adequate performance
 /// but we need to test this).
 
-const DESIRED_NUM_CHARS: usize = 225;
-const DELTA_NUM_CHARS: usize = 25;
+const DESIRED_NUM_CHARS: usize = 275;
+const DELTA_NUM_CHARS: usize = 50;
 const MIN_PASSAGE_WIDTH: usize = 20;
 
 const K1: f64 = 1.2;
@@ -131,16 +131,10 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
         .collect();
 
     if passages.is_empty() {
-        let above_upper = text.len() > DESIRED_NUM_CHARS + DELTA_NUM_CHARS;
-
         let mut snippet = SnippetString {
             fragment: text.chars().take(DESIRED_NUM_CHARS).collect(),
             highlighted: Vec::new(),
         };
-
-        if !snippet.fragment.is_empty() && above_upper {
-            snippet.fragment += "...";
-        }
 
         snippet.highlight(&terms, lang);
 
@@ -205,7 +199,6 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
             .chars()
             .take(DESIRED_NUM_CHARS + DELTA_NUM_CHARS)
             .collect();
-        snippet.fragment += "...";
     } else {
         let mut next_passage_idx = best_idx + 1;
 
@@ -223,7 +216,6 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
                 .chars()
                 .take(DESIRED_NUM_CHARS + DELTA_NUM_CHARS)
                 .collect();
-            snippet.fragment += "...";
         }
     }
     snippet.highlight(&terms, lang);

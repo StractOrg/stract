@@ -760,7 +760,6 @@ mod test {
         let graph = test_graph();
 
         let path = graph.path.clone();
-        dbg!(&path);
         let frozen: FrozenWebgraph = graph.into();
         let bytes = bincode::serialize(&frozen).unwrap();
 
@@ -768,7 +767,6 @@ mod test {
 
         let deserialized_frozen: FrozenWebgraph = bincode::deserialize(&bytes).unwrap();
         let graph: Webgraph = deserialized_frozen.into();
-        dbg!(&graph.path);
 
         let distances = graph.distances(Node::from("D"));
 
