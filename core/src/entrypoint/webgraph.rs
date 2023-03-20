@@ -105,11 +105,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
 }
 
 pub fn process_job(job: &Job) -> webgraph::Webgraph {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async { async_process_job(job).await })
+    futures::executor::block_on(async_process_job(job))
 }
 
 impl Map<StatelessWorker, FrozenWebgraph> for Job {

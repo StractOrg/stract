@@ -239,11 +239,7 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
 }
 
 pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async { async_process_job(job, worker).await })
+    futures::executor::block_on(async_process_job(job, worker))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
