@@ -8,13 +8,11 @@ export interface Props {
 }
 ---
 
-<div>
-  {
-    askama.match("sidebar", {
-      "Sidebar::Entity(entity)": <Entity entity="entity" />,
-      "Sidebar::StackOverflow{title, answer}": (
-        <StackOverflow title="title" answer="answer" />
-      ),
-    })
-  }
-</div>
+{
+  askama.match("sidebar", {
+    "Sidebar::Entity(entity)": <Entity entity="entity" />,
+    "Sidebar::StackOverflow{title, answer}": (
+      <StackOverflow title="title" answer="answer" />
+    ),
+  })
+}
