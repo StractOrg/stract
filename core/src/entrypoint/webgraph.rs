@@ -25,7 +25,7 @@ use futures::StreamExt;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::Path};
+use std::{net::SocketAddr, path::Path, thread};
 use tokio::pin;
 use tracing::{info, trace};
 
@@ -97,6 +97,7 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
 
         std::fs::remove_file(path).unwrap();
     }
+    graph.merge_segments(1);
 
     info!("{} done", name);
 
@@ -249,7 +250,7 @@ impl Webgraph {
         };
         let worker = StatelessWorker::default();
 
-        let mut graphs: Vec<_> = warc_paths
+        let graphs: Vec<_> = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -268,14 +269,51 @@ impl Webgraph {
             .collect();
 
         if graphs.len() > 1 {
-            let pointer = graphs.pop().unwrap();
-            let mut graph = open_graph(pointer.path);
-
-            for other in graphs {
-                graph = graph.reduce(other);
-            }
+            Self::merge(graphs);
         }
 
         Ok(())
+    }
+
+    fn merge(graphs: Vec<GraphPointer>) {
+        let num_graphs = graphs.len();
+        let mut it = graphs.into_iter();
+        let num_cores = num_cpus::get();
+
+        let mut threads = Vec::new();
+
+        for _ in 0..(num_cores + 1) {
+            let graphs = it
+                .by_ref()
+                .take(((num_graphs as f64) / (num_cores as f64)).ceil() as usize)
+                .collect_vec();
+
+            if graphs.is_empty() {
+                break;
+            }
+
+            threads.push(thread::spawn(move || {
+                let mut it = graphs.into_iter();
+                let mut graph = open_graph(it.next().unwrap().path);
+
+                for other in it {
+                    graph = graph.reduce(other);
+                    graph.merge_segments(1);
+                }
+
+                graph
+            }));
+        }
+
+        let mut graphs = Vec::new();
+        for thread in threads {
+            graphs.push(thread.join().unwrap());
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph = graph.reduce(other);
+        }
     }
 }
