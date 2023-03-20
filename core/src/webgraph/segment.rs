@@ -260,8 +260,6 @@ impl StoredSegment {
                         j += 1;
                     }
 
-                    dbg!(&edges);
-
                     if !edges.is_empty() {
                         let segment_node_id = packet.new_id_mapping.get(node_id).copied().unwrap();
                         packet
