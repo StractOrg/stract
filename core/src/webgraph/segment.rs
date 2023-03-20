@@ -187,143 +187,110 @@ impl StoredSegment {
         })
     }
 
-    fn merge_adjacency<F1, F2>(
-        &self,
-        self_edges_fn: F1,
-        other: &Self,
-        other_edges_fn: F2,
-        packet: &mut MergePacket,
-    ) where
-        F1: Fn(&Self, &SegmentNodeID) -> HashSet<StoredEdge>,
-        F2: Fn(&Self, &SegmentNodeID) -> HashSet<StoredEdge>,
+    fn merge_adjacency<F1>(edges_fn: F1, packet: &mut MergePacket, segments: &[Self])
+    where
+        F1: Fn(&Self, &NodeID) -> Option<HashSet<StoredEdge>>,
     {
-        for (node_id, segment_node_id) in &self.id_mapping {
-            let mut edges = self_edges_fn(self, segment_node_id);
-
-            if let Some(other_segment_node_id) = other.id_mapping.get(node_id) {
-                let other_edges = other_edges_fn(other, other_segment_node_id);
-
-                for other_edge in other_edges {
-                    let node = other.rev_id_mapping(&other_edge.other).unwrap();
-
-                    let new_segment_node_id =
-                        if let Some(segment_node_id) = packet.new_id_mapping.get(&node).copied() {
-                            segment_node_id
-                        } else {
-                            let r = packet
-                                .new_id_mapping
-                                .insert(node, packet.next_segment_node_id);
-                            debug_assert!(r.is_none());
-                            let r = packet
-                                .new_rev_id_mapping
-                                .insert(packet.next_segment_node_id, node);
-                            debug_assert!(r.is_none());
-
-                            let segment_node_id = packet.next_segment_node_id;
-
-                            packet.next_segment_node_id =
-                                SegmentNodeID(packet.next_segment_node_id.0 + 1);
-
-                            segment_node_id
-                        };
-
-                    edges.insert(StoredEdge {
-                        other: new_segment_node_id,
-                        label: other_edge.label,
-                    });
-                }
-            }
-
-            if !edges.is_empty() {
-                let segment_node_id = packet.new_id_mapping.get(node_id).copied().unwrap();
-                packet
-                    .new_adjacency
-                    .insert(segment_node_id, &edges)
-                    .unwrap();
-            }
+        if segments.is_empty() {
+            return;
         }
 
-        for (node_id, segment_node_id) in &other.id_mapping {
-            if self.id_mapping.get(node_id).is_none() {
-                let new_segment_node_id = if let Some(segment_node_id) =
-                    packet.new_id_mapping.get(node_id)
-                {
-                    *segment_node_id
-                } else {
+        let mut i = 0;
+
+        while i < segments.len() {
+            let segment = &segments[i];
+
+            for node_id in segment.id_mapping.keys() {
+                let mut node_seen_before = false;
+                let mut j = 0;
+                while j < i {
+                    if segments[j].id_mapping.contains_key(node_id) {
+                        node_seen_before = true;
+                        break;
+                    }
+                    j += 1;
+                }
+
+                if !packet.new_id_mapping.contains_key(node_id) {
                     let r = packet
                         .new_id_mapping
                         .insert(*node_id, packet.next_segment_node_id);
                     debug_assert!(r.is_none());
-
                     let r = packet
                         .new_rev_id_mapping
                         .insert(packet.next_segment_node_id, *node_id);
                     debug_assert!(r.is_none());
+                    packet.next_segment_node_id.0 += 1;
+                }
 
-                    let this = packet.next_segment_node_id;
+                if !node_seen_before {
+                    let mut edges = HashSet::new();
 
-                    packet.next_segment_node_id = SegmentNodeID(packet.next_segment_node_id.0 + 1);
+                    let mut j = i;
 
-                    this
-                };
+                    while j < segments.len() {
+                        let segment = &segments[j];
+                        if let Some(edges_j) = edges_fn(segment, node_id) {
+                            for edge in edges_j {
+                                let node = segment.rev_id_mapping(&edge.other).unwrap();
 
-                let edges = other_edges_fn(other, segment_node_id);
+                                if let std::collections::btree_map::Entry::Vacant(e) =
+                                    packet.new_id_mapping.entry(node)
+                                {
+                                    e.insert(packet.next_segment_node_id);
+                                    let r = packet
+                                        .new_rev_id_mapping
+                                        .insert(packet.next_segment_node_id, node);
+                                    debug_assert!(r.is_none());
+                                    packet.next_segment_node_id.0 += 1;
+                                }
 
-                let edges: HashSet<_> = edges
-                    .into_iter()
-                    .map(|edge| {
-                        let other_node = other.rev_id_mapping(&edge.other).unwrap();
-                        let segment_node_id =
-                            if let Some(segment_node_id) = packet.new_id_mapping.get(&other_node) {
-                                *segment_node_id
-                            } else {
-                                let new_segment_node_id = packet.next_segment_node_id;
-                                packet.next_segment_node_id =
-                                    SegmentNodeID(packet.next_segment_node_id.0 + 1);
+                                let new_segment_node_id =
+                                    packet.new_id_mapping.get(&node).copied().unwrap();
 
-                                let r = packet
-                                    .new_id_mapping
-                                    .insert(other_node, new_segment_node_id);
-                                debug_assert!(r.is_none());
+                                let new_edge = StoredEdge {
+                                    other: new_segment_node_id,
+                                    label: edge.label,
+                                };
 
-                                let r = packet
-                                    .new_rev_id_mapping
-                                    .insert(new_segment_node_id, other_node);
-                                debug_assert!(r.is_none());
-
-                                new_segment_node_id
-                            };
-
-                        StoredEdge {
-                            other: segment_node_id,
-                            label: edge.label,
+                                edges.insert(new_edge);
+                            }
                         }
-                    })
-                    .collect();
 
-                if !edges.is_empty() {
-                    packet
-                        .new_adjacency
-                        .insert(new_segment_node_id, &edges)
-                        .unwrap();
+                        j += 1;
+                    }
+
+                    dbg!(&edges);
+
+                    if !edges.is_empty() {
+                        let segment_node_id = packet.new_id_mapping.get(node_id).copied().unwrap();
+                        packet
+                            .new_adjacency
+                            .insert(segment_node_id, &edges)
+                            .unwrap();
+                    }
                 }
             }
+            i += 1;
         }
     }
 
-    pub fn merge(self, other: StoredSegment) -> Self {
+    pub fn merge(segments: Vec<StoredSegment>) -> Self {
+        debug_assert!(segments.len() > 1);
+
         let new_segment_id = uuid::Uuid::new_v4().to_string();
 
         let new_adjacency = Store::open(
-            self.path().join(&new_segment_id).join("adjacency"),
+            segments[0].path().join(&new_segment_id).join("adjacency"),
             &new_segment_id,
         )
         .unwrap();
+        let folder_path = segments[0].folder_path.clone();
 
-        let next_segment_node_id = SegmentNodeID(self.meta.num_nodes);
+        let next_segment_node_id = SegmentNodeID(0);
 
-        let new_id_mapping = self.id_mapping.clone();
-        let new_rev_id_mapping = self.rev_id_mapping.clone();
+        let new_id_mapping = BTreeMap::new();
+        let new_rev_id_mapping = BTreeMap::new();
         let mut packet = MergePacket {
             next_segment_node_id,
             new_id_mapping,
@@ -331,28 +298,26 @@ impl StoredSegment {
             new_adjacency,
         };
 
-        self.merge_adjacency(
-            |segment: &StoredSegment, segment_node_id: &SegmentNodeID| {
-                segment
-                    .adjacency
-                    .get(segment_node_id)
-                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
-                    .unwrap_or_default()
-            },
-            &other,
-            |other: &StoredSegment, segment_node_id: &SegmentNodeID| {
-                other
-                    .adjacency
-                    .get(segment_node_id)
-                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
-                    .unwrap_or_default()
+        Self::merge_adjacency(
+            |segment: &StoredSegment, node_id: &NodeID| {
+                segment.id_mapping.get(node_id).map(|segment_node_id| {
+                    segment
+                        .adjacency
+                        .get(segment_node_id)
+                        .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                        .unwrap_or_default()
+                })
             },
             &mut packet,
+            &segments,
         );
         let new_adjacency = packet.new_adjacency;
 
         let new_reversed_adjacency = Store::open(
-            self.path().join(&new_segment_id).join("reversed_adjacency"),
+            segments[0]
+                .path()
+                .join(&new_segment_id)
+                .join("reversed_adjacency"),
             &new_segment_id,
         )
         .unwrap();
@@ -364,23 +329,18 @@ impl StoredSegment {
             new_adjacency: new_reversed_adjacency,
         };
 
-        self.merge_adjacency(
-            |segment: &StoredSegment, segment_node_id: &SegmentNodeID| {
-                segment
-                    .reversed_adjacency
-                    .get(segment_node_id)
-                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
-                    .unwrap_or_default()
-            },
-            &other,
-            |other: &StoredSegment, segment_node_id: &SegmentNodeID| {
-                other
-                    .reversed_adjacency
-                    .get(segment_node_id)
-                    .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
-                    .unwrap_or_default()
+        Self::merge_adjacency(
+            |segment: &StoredSegment, node_id: &NodeID| {
+                segment.id_mapping.get(node_id).map(|segment_node_id| {
+                    segment
+                        .reversed_adjacency
+                        .get(segment_node_id)
+                        .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
+                        .unwrap_or_default()
+                })
             },
             &mut packet,
+            &segments,
         );
 
         let mut res = Self {
@@ -392,7 +352,7 @@ impl StoredSegment {
                 num_nodes: packet.next_segment_node_id.0,
             },
             id: new_segment_id,
-            folder_path: self.folder_path,
+            folder_path,
         };
 
         res.flush();

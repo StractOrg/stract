@@ -544,11 +544,10 @@ impl Webgraph {
             .executor
             .map(
                 |mut candidate| {
-                    for other in candidate.merges {
-                        candidate.segment = candidate.segment.merge(other);
-                    }
+                    let mut segments = vec![candidate.segment];
+                    segments.append(&mut candidate.merges);
 
-                    candidate.segment
+                    StoredSegment::merge(segments)
                 },
                 candidates.into_iter(),
             )

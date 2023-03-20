@@ -50,7 +50,7 @@ fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
     WebgraphBuilder::new(path).open()
 }
 
-async fn async_process_job(job: &Job) -> webgraph::Webgraph {
+pub fn process_job(job: &Job) -> webgraph::Webgraph {
     let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
     info!("processing {}", name);
@@ -100,14 +100,6 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
     info!("{} done", name);
 
     graph
-}
-
-pub fn process_job(job: &Job) -> webgraph::Webgraph {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async { async_process_job(job).await })
 }
 
 impl Map<StatelessWorker, FrozenWebgraph> for Job {
