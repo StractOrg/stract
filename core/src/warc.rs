@@ -20,11 +20,10 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
 use std::path::Path;
+use std::thread::sleep;
 use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
-use futures::StreamExt;
-use tokio::time::sleep;
 use tracing::{debug, trace};
 
 pub(crate) struct WarcFile {
@@ -81,9 +80,9 @@ impl WarcFile {
     }
 
     #[allow(unused)]
-    pub(crate) async fn download(source: &WarcSource, warc_path: &str) -> Result<Self> {
+    pub(crate) fn download(source: &WarcSource, warc_path: &str) -> Result<Self> {
         let mut cursor = Cursor::new(Vec::new());
-        Self::download_into_buf(source, warc_path, &mut cursor).await?;
+        Self::download_into_buf(source, warc_path, &mut cursor)?;
 
         let mut buf = Vec::new();
         cursor.read_to_end(&mut buf)?;
@@ -91,7 +90,7 @@ impl WarcFile {
         Ok(Self::new(buf))
     }
 
-    pub(crate) async fn download_into_buf<W: Write + Seek>(
+    pub(crate) fn download_into_buf<W: Write + Seek>(
         source: &WarcSource,
         warc_path: &str,
         buf: &mut W,
@@ -102,7 +101,7 @@ impl WarcFile {
         {
             let res = match source.clone() {
                 WarcSource::HTTP(config) => {
-                    WarcFile::download_from_http(warc_path, config.base_url, buf).await
+                    WarcFile::download_from_http(warc_path, config.base_url, buf)
                 }
                 WarcSource::Local(config) => {
                     WarcFile::load_from_folder(warc_path, &config.folder, buf)
@@ -118,7 +117,7 @@ impl WarcFile {
             debug!("warc download failed: {:?}", res.err().unwrap());
             debug!("retrying in {} ms", dur.as_millis());
 
-            sleep(dur).await;
+            sleep(dur);
         }
 
         Err(Error::DownloadFailed)
@@ -133,7 +132,7 @@ impl WarcFile {
         Ok(())
     }
 
-    async fn download_from_http<W: Write + Seek>(
+    fn download_from_http<W: Write + Seek>(
         warc_path: &str,
         base_url: String,
         buf: &mut W,
@@ -144,24 +143,22 @@ impl WarcFile {
         }
         url += warc_path;
 
-        let client = reqwest::ClientBuilder::new()
+        let client = reqwest::blocking::ClientBuilder::new()
             .tcp_keepalive(None)
             .pool_idle_timeout(Duration::from_secs(30 * 60))
             .timeout(Duration::from_secs(30 * 60))
             .connect_timeout(Duration::from_secs(30 * 60))
             .build()?;
-        let res = client.get(url).send().await?;
+        let res = client.get(url).send()?;
 
         if res.status().as_u16() != 200 {
             return Err(Error::DownloadFailed);
         }
 
-        let mut stream = res.bytes_stream();
+        let bytes = res.bytes()?;
 
         buf.rewind()?;
-        while let Some(chunk) = stream.next().await {
-            std::io::copy(&mut &chunk?[..], buf)?;
-        }
+        std::io::copy(&mut &bytes[..], buf)?;
 
         Ok(())
     }

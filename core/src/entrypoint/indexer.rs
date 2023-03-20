@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chrono::Utc;
-use futures::StreamExt;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
@@ -24,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use tokio::pin;
 use tracing::{debug, info, trace};
 
-use crate::entrypoint::async_download_all_warc_files;
+use crate::entrypoint::download_all_warc_files;
 use crate::executor::Executor;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Manager, Map, Reduce, Worker};
@@ -81,7 +80,7 @@ impl IndexingWorker {
     }
 }
 
-async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
+pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
     info!("processing {}", name);
@@ -93,12 +92,12 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
         JobConfig::Local(config) => WarcSource::Local(config),
     };
 
-    let warc_files = async_download_all_warc_files(&job.warc_paths, &source, &job.base_path).await;
+    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
     pin!(warc_files);
 
     let current_timestamp = Utc::now().timestamp().max(0) as usize;
 
-    while let Some(file) = warc_files.next().await {
+    for file in warc_files.by_ref() {
         let name = file.split('/').last().unwrap();
         let path = Path::new(&job.base_path).join("warc_files").join(name);
 
@@ -236,10 +235,6 @@ async fn async_process_job(job: &Job, worker: &IndexingWorker) -> Index {
     info!("{} done", name);
 
     index
-}
-
-pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
-    futures::executor::block_on(async_process_job(job, worker))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -30,18 +30,17 @@ use std::{fs::File, path::Path};
 
 pub use centrality::Centrality;
 pub use entity::EntityIndexer;
-use futures::{Stream, StreamExt};
 pub use indexer::Indexer;
-use tracing::debug;
+use tracing::{debug, log::error};
 pub use webgraph::Webgraph;
 
 use crate::{warc::WarcFile, WarcSource};
 
-async fn async_download_all_warc_files<'a>(
+fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
     source: &'a WarcSource,
     base_path: &'a str,
-) -> impl Stream<Item = String> + 'a {
+) -> impl Iterator<Item = String> + 'a {
     let download_path = Path::new(base_path).join("warc_files");
 
     if !download_path.exists() {
@@ -53,9 +52,7 @@ async fn async_download_all_warc_files<'a>(
         .map(|warc_path| warc_path.to_string())
         .collect();
 
-    let num_files = warc_paths.len();
-
-    futures::stream::iter(warc_paths.into_iter().map(|warc_path| async {
+    warc_paths.into_iter().map(|warc_path| {
         let download_path = Path::new(base_path).join("warc_files");
         let name = warc_path.split('/').last().unwrap();
         let mut file = File::options()
@@ -65,15 +62,14 @@ async fn async_download_all_warc_files<'a>(
             .open(download_path.join(name))
             .unwrap();
         debug!("downloading warc file {}", &warc_path);
-        let res = WarcFile::download_into_buf(source, &warc_path, &mut file).await;
+        let res = WarcFile::download_into_buf(source, &warc_path, &mut file);
 
         if let Err(err) = res {
-            debug!("error while downloading: {:?}", err);
+            error!("error while downloading: {:?}", err);
         }
 
         debug!("finished downloading");
 
         warc_path
-    }))
-    .buffer_unordered(num_files)
+    })
 }

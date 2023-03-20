@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    entrypoint::async_download_all_warc_files,
+    entrypoint::download_all_warc_files,
     mapreduce::{Manager, Map, Reduce, StatelessWorker, Worker},
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
     HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
 };
-use futures::StreamExt;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -63,11 +62,10 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
         JobConfig::Local(config) => WarcSource::Local(config),
     };
 
-    let warc_files =
-        async_download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path).await;
+    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
     pin!(warc_files);
 
-    while let Some(warc_path) = warc_files.next().await {
+    for warc_path in warc_files.by_ref() {
         let name = warc_path.split('/').last().unwrap();
         let path = Path::new(&job.graph_base_path)
             .join("warc_files")
@@ -105,7 +103,11 @@ async fn async_process_job(job: &Job) -> webgraph::Webgraph {
 }
 
 pub fn process_job(job: &Job) -> webgraph::Webgraph {
-    futures::executor::block_on(async_process_job(job))
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async { async_process_job(job).await })
 }
 
 impl Map<StatelessWorker, FrozenWebgraph> for Job {
