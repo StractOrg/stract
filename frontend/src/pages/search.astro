@@ -15,12 +15,11 @@ import { askama } from "../askama";
 
 <Layout title="{{ query }} - Stract">
   <main class="flex w-full flex-col">
-    <div class="border-b bg-neutral-50">
-      <Header searchbar={{ query: askama`query` }} />
-    </div>
+    <Header searchbar={{ query: askama`query` }} />
+    <div class="w-full h-[1px] bg-gradient-to-r from-cyan-400 via-brand to-cyan-400"></div>
 
     <div
-      class="search-content mx-1 grid gap-y-6 pt-3 sm:px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:mx-0 lg:px-36"
+      class="search-content mx-1 grid gap-y-6 pt-4 px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:mx-0 lg:px-36"
     >
       <!-- Stats and settings -->
       <div class="mx-auto flex w-full justify-between">
@@ -31,7 +30,7 @@ import { askama } from "../askama";
             } seconds
           </p>
         </div>
-        <div class="flex">
+        <div class="flex space-x-2">
           <OpticSelector
             current_optic_url="current_optic_url"
             default_optics="default_optics"
@@ -41,7 +40,7 @@ import { askama } from "../askama";
               form="searchbar-form"
               name="gl"
               onchange="document.getElementById('searchbar-form').submit()"
-              class="max-w-[100px] border-0 bg-transparent text-sm hover:cursor-pointer"
+              class="styled-selector"
             >
               {
                 askama.for_("region_selection in all_regions", () =>
@@ -159,7 +158,7 @@ import { askama } from "../askama";
       {
         askama.if_(
           "let Some(sidebar) = sidebar",
-          <div class="row-start-2 flex justify-center pt-10 md:col-start-2 md:row-span-2 md:row-start-1">
+          <div class="row-start-2 flex justify-center md:pt-10 md:col-start-2 md:row-span-2 md:row-start-1">
             <Sidebar sidebar="sidebar" />
           </div>
         )
@@ -201,7 +200,8 @@ import { askama } from "../askama";
 
   .search-content {
     text-rendering: optimizeLegibility;
-    font-smooth: grayscale;
+    font-smooth: always;
+    -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 

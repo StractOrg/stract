@@ -12,7 +12,7 @@ const { autofocus, query } = Astro.props;
 <style is:global>
   .suggestion-item {
     @apply hidden group-focus-within:flex group-focus-within:peer-placeholder-shown:hidden;
-    @apply col-span-3 py-2 pl-5;
+    @apply col-span-3 py-1.5 pl-5;
   }
   .suggestion-item:nth-child(4) {
     @apply relative;
@@ -33,10 +33,10 @@ const { autofocus, query } = Astro.props;
   action="/search"
   autocomplete="off"
 >
-  <div class="relative h-12">
+  <div class="h-10">
     <div
       id="searchbar"
-      class="group absolute inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[3rem] rounded-3xl border bg-white transition-shadow focus-within:shadow"
+      class="group absolute inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border bg-white transition-shadow focus-within:shadow"
     >
       <Hero
         class="col-[1/2] row-start-1 w-5 self-center ml-5 text-gray-400"
@@ -50,25 +50,14 @@ const { autofocus, query } = Astro.props;
         class="searchbar-input peer inset-y-0 col-[1/3] row-start-1 flex h-full w-full grow border-none bg-transparent py-0 pl-12 outline-none focus:ring-0"
         placeholder="Search"
       />
-      <div class="flex w-12 items-center justify-center">
+      <div class="flex items-center justify-center p-[2px]">
         <button
           type="submit"
-          class="m-0 bg-transparent p-0"
+          class="rounded-full group-focus-within:rounded-b-none h-full px-5 bg-brand opacity-75 text-white hover:opacity-100 transition-colors duration-50"
           style="border: none"
           title="Search"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            class="w-7 cursor-pointer bg-transparent stroke-brand"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M8.25 4.5l7.5 7.5-7.5 7.5"></path>
-          </svg>
+          search
         </button>
       </div>
     </div>

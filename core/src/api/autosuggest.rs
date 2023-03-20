@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use axum::{extract, response::IntoResponse, Extension, Json};
+use axum::{extract, response::IntoResponse, Json};
 use serde::Serialize;
 
 use super::State;
@@ -46,8 +46,8 @@ struct Suggestion {
 
 #[allow(clippy::unused_async)]
 pub async fn route(
+    extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     if let Some(query) = params.get("q") {
         let mut suggestions = Vec::new();
@@ -68,8 +68,8 @@ pub async fn route(
 
 #[allow(clippy::unused_async)]
 pub async fn browser(
+    extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     if let Some(query) = params.get("q") {
         Json((query.clone(), state.autosuggest.suggestions(query).unwrap()))

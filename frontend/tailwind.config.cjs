@@ -11,8 +11,6 @@ module.exports = {
       },
       fontFamily: {
         sans: [
-          // "MontserratVariable",
-          // "Montserrat",
           "Helvetica",
           "Arial",
           "sans-serif",
