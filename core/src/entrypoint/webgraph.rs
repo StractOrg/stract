@@ -288,8 +288,8 @@ impl Webgraph {
 
                 for other in it {
                     graph = graph.reduce(other);
-                    graph.merge_segments(1);
                 }
+                graph.merge_segments(1);
 
                 graph
             }));
