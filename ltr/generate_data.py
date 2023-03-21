@@ -29,13 +29,13 @@ query: q learning algorithm
 
 result: {domain: "datascience.stackexchange.com", title: "Q-learning why do we subtract the Q(s, a) term during update? - Data Science Stack Exchange", snippet: "The q-learning algorithm is an off-policy algorithm , unlike SARSA . The Bellman equation describes q-learning as follows: "The q value for action $a$ taken in state $s$ at time $t$ becomes equal to: that same q-value plus small amount of: currently"}
 
-score: 1.0
+score: 0.9
 
 query: learn python
 
 result: {domain: "jqxxj.fulltime-abbigliamento.it", title: "Vim plugins python", snippet: "In fact, VimL can be learned fast, but using. omplete Python syntax highlighter for Vim. shows what I get with default Vim that illustrates … Upgrade to PyCharm, the leading Python IDE: best in class debugging, code navigation, refactoring."}
 
-score: 0.1
+score: 0.0
 
 query: savings interest formula
 

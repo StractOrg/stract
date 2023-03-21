@@ -20,10 +20,6 @@ const { title } = Astro.props;
       href="/opensearch.xml"
     />
     <title>{title}</title>
-  </head>
-  <body class="font-light">
-    <slot />
-
     <style>
       html,
       body {
@@ -82,5 +78,9 @@ const { title } = Astro.props;
         appearance: none;
       }
     </style>
+  </head>
+  <body class="font-light">
+    <slot />
+
   </body>
 </html>

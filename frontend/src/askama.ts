@@ -47,11 +47,11 @@ const if_ = (pat: string, then: Component, else_: null | Component = null) => {
 export const askama = Object.assign(
   (input: TemplateStringsArray) => {
     const str = input.raw.join("");
-    const segmetns = str.split("$");
-    if (passthrough && segmetns.length > 1) {
-      return faker.helpers.fake(segmetns.slice(1).join("$"));
+    const segments = str.split("$");
+    if (passthrough && segments.length > 1) {
+      return faker.helpers.fake(segments.slice(1).join("$"));
     } else {
-      return `{{ ${segmetns[0]} }}`;
+      return `{{ ${segments[0]} }}`;
     }
   },
   { fake, match, for_, if_ }

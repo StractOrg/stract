@@ -1,4 +1,4 @@
-limit_warc_files = 5
+limit_warc_files = 10
 graph_base_path = "data/webgraph"
 batch_size = 1
 
