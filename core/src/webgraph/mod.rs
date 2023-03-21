@@ -319,6 +319,7 @@ impl Webgraph {
                 .create(true)
                 .write(true)
                 .read(true)
+                .truncate(true)
                 .open(path)
                 .unwrap(),
         );
@@ -554,6 +555,7 @@ impl Webgraph {
             .unwrap();
 
         self.meta.comitted_segments = self.segments.iter().map(|segment| segment.id()).collect();
+        self.save_metadata();
 
         self.garbage_collect();
     }

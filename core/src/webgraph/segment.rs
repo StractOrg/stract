@@ -278,12 +278,9 @@ impl StoredSegment {
 
         let new_segment_id = uuid::Uuid::new_v4().to_string();
 
-        let new_adjacency = Store::open(
-            segments[0].path().join(&new_segment_id).join("adjacency"),
-            &new_segment_id,
-        )
-        .unwrap();
-        let folder_path = segments[0].folder_path.clone();
+        let new_path = segments[0].path().parent().unwrap().join(&new_segment_id);
+
+        let new_adjacency = Store::open(new_path.join("adjacency"), &new_segment_id).unwrap();
 
         let next_segment_node_id = SegmentNodeID(0);
 
@@ -311,14 +308,8 @@ impl StoredSegment {
         );
         let new_adjacency = packet.new_adjacency;
 
-        let new_reversed_adjacency = Store::open(
-            segments[0]
-                .path()
-                .join(&new_segment_id)
-                .join("reversed_adjacency"),
-            &new_segment_id,
-        )
-        .unwrap();
+        let new_reversed_adjacency =
+            Store::open(new_path.join("reversed_adjacency"), &new_segment_id).unwrap();
 
         let mut packet = MergePacket {
             next_segment_node_id: packet.next_segment_node_id,
@@ -350,7 +341,7 @@ impl StoredSegment {
                 num_nodes: packet.next_segment_node_id.0,
             },
             id: new_segment_id,
-            folder_path,
+            folder_path: new_path.to_str().unwrap().to_string(),
         };
 
         res.flush();
