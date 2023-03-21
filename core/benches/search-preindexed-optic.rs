@@ -4,7 +4,7 @@ use stract::{
     searcher::{LocalSearcher, SearchQuery},
 };
 
-const INDEX_PATH: &str = "../data/index";
+const INDEX_PATH: &str = "data/index";
 
 macro_rules! bench {
     ($query:tt, $searcher:ident, $optic:ident, $c:ident) => {
@@ -31,12 +31,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let searcher = LocalSearcher::new(index);
     let optic = include_str!("../../optics/testcases/hacker_news.optic");
 
-    // for _ in 0..10 {
-    bench!("the", searcher, optic, c);
-    bench!("dtu", searcher, optic, c);
-    bench!("the best", searcher, optic, c);
-    bench!("the circle of life", searcher, optic, c);
-    // }
+    for _ in 0..10 {
+        bench!("the", searcher, optic, c);
+        bench!("dtu", searcher, optic, c);
+        bench!("the best", searcher, optic, c);
+        bench!("the circle of life", searcher, optic, c);
+    }
 }
 
 criterion_group!(benches, criterion_benchmark);

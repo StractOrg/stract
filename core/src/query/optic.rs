@@ -105,21 +105,21 @@ impl AsSearchableRule for Rule {
         let subquery = if subqueries.len() == 1 {
             subqueries.pop().unwrap().1
         } else {
-            BooleanQuery::from(subqueries).box_clone()
+            Box::new(BooleanQuery::from(subqueries))
         };
 
         match &self.action {
             Action::Boost(boost) => Some((
                 Occur::Should,
                 SearchableRule {
-                    query: ConstQuery::new(subquery, 1.0).box_clone(),
+                    query: Box::new(ConstQuery::new(subquery, 1.0)),
                     boost: *boost as f64,
                 },
             )),
             Action::Downrank(boost) => Some((
                 Occur::Should,
                 SearchableRule {
-                    query: ConstQuery::new(subquery, 1.0).box_clone(),
+                    query: Box::new(ConstQuery::new(subquery, 1.0)),
                     boost: *boost as f64 * -1.0,
                 },
             )),

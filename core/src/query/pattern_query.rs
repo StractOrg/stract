@@ -143,11 +143,10 @@ impl PatternWeight {
         reader: &SegmentReader,
         boost: Score,
     ) -> tantivy::Result<Option<PatternScorer>> {
-        let similarity_weight = if let Some(weight) = &self.similarity_weight {
-            weight.boost_by(boost)
-        } else {
-            return Ok(None);
-        };
+        let similarity_weight = self
+            .similarity_weight
+            .as_ref()
+            .map(|weight| weight.boost_by(boost));
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
         let mut term_postings_list = Vec::new();
@@ -246,7 +245,7 @@ impl tantivy::query::Weight for PatternWeight {
 }
 
 struct PatternScorer {
-    similarity_weight: Bm25Weight,
+    similarity_weight: Option<Bm25Weight>,
     fieldnorm_reader: FieldNormReader,
     intersection_docset: Intersection<SegmentPostings>,
     pattern: Vec<SmallPatternPart>,
@@ -260,7 +259,7 @@ struct PatternScorer {
 
 impl PatternScorer {
     fn new(
-        similarity_weight: Bm25Weight,
+        similarity_weight: Option<Bm25Weight>,
         term_postings_list: Vec<SegmentPostings>,
         fieldnorm_reader: FieldNormReader,
         pattern: Vec<SmallPatternPart>,
@@ -368,10 +367,14 @@ impl PatternScorer {
 
 impl Scorer for PatternScorer {
     fn score(&mut self) -> Score {
-        let doc = self.doc();
-        let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
         self.similarity_weight
-            .score(fieldnorm_id, self.phrase_count())
+            .as_ref()
+            .map(|scorer| {
+                let doc = self.doc();
+                let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
+                scorer.score(fieldnorm_id, self.phrase_count())
+            })
+            .unwrap_or_default()
     }
 }
 

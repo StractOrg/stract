@@ -24,13 +24,18 @@ use crate::{
 };
 
 #[derive(Default, Clone)]
-pub struct FastFieldReader {
+struct InnerFastFieldReader {
     segments: HashMap<SegmentId, Arc<SegmentReader>>,
+}
+
+#[derive(Default, Clone)]
+pub struct FastFieldReader {
+    inner: Arc<InnerFastFieldReader>,
 }
 
 impl FastFieldReader {
     pub fn get_segment(&self, segment: &SegmentId) -> Arc<SegmentReader> {
-        Arc::clone(self.segments.get(segment).unwrap())
+        Arc::clone(self.inner.segments.get(segment).unwrap())
     }
 }
 
@@ -72,7 +77,9 @@ impl FastFieldReader {
             );
         }
 
-        Self { segments }
+        Self {
+            inner: Arc::new(InnerFastFieldReader { segments }),
+        }
     }
 }
 
