@@ -32,7 +32,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
-use tantivy::query::Scorer;
+use tantivy::query::{PhraseQuery, Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 
@@ -75,6 +75,11 @@ pub enum Signal {
     Bm25TitleIfHomepage,
     Bm25BacklinkText,
     Bm25Description,
+    ProximitySlop0,
+    ProximitySlop1,
+    ProximitySlop2,
+    ProximitySlop4,
+    ProximitySlop8,
     CrossEncoder,
     HostCentrality,
     PageCentrality,
@@ -97,7 +102,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 34] = [
+pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -118,6 +123,11 @@ pub const ALL_SIGNALS: [Signal; 34] = [
     Signal::Bm25TitleIfHomepage,
     Signal::Bm25BacklinkText,
     Signal::Bm25Description,
+    Signal::ProximitySlop0,
+    Signal::ProximitySlop1,
+    Signal::ProximitySlop2,
+    Signal::ProximitySlop4,
+    Signal::ProximitySlop8,
     Signal::CrossEncoder,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -196,8 +206,13 @@ impl Signal {
             Signal::Bm25TitleIfHomepage => 3.0,
             Signal::Bm25BacklinkText => 4.0,
             Signal::Bm25Description => 1.0,
+            Signal::ProximitySlop0 => 32.0,
+            Signal::ProximitySlop1 => 16.0,
+            Signal::ProximitySlop2 => 8.0,
+            Signal::ProximitySlop4 => 4.0,
+            Signal::ProximitySlop8 => 2.0,
             Signal::CrossEncoder => 100.0,
-            Signal::HostCentrality => 10_000.0,
+            Signal::HostCentrality => 6_000.0,
             Signal::PageCentrality => 4_500.0,
             Signal::TopicCentrality => 2_500.0,
             Signal::QueryCentrality => 1_000.0,
@@ -347,6 +362,28 @@ impl Signal {
                     .map(|field| bm25(field, doc))
                     .unwrap_or(0.0)
             }),
+
+            Signal::ProximitySlop0
+            | Signal::ProximitySlop1
+            | Signal::ProximitySlop2
+            | Signal::ProximitySlop4
+            | Signal::ProximitySlop8 => {
+                signal_aggregator
+                    .segment_reader
+                    .as_mut()
+                    .and_then(|reader| {
+                        reader.proximity_scorers.get_mut(self).map(|scorer| {
+                            let docset = &mut scorer.docset;
+                            if docset.doc() == doc
+                                || (docset.doc() < doc && docset.seek(doc) == doc)
+                            {
+                                docset.score() as f64
+                            } else {
+                                0.0
+                            }
+                        })
+                    })
+            }
             Signal::CrossEncoder => None, // this is calculated in a later step
             Signal::LambdaMART => None,
         };
@@ -417,6 +454,11 @@ impl Signal {
             | Signal::Bm25TitleIfHomepage
             | Signal::Bm25BacklinkText
             | Signal::Bm25Description
+            | Signal::ProximitySlop0
+            | Signal::ProximitySlop1
+            | Signal::ProximitySlop2
+            | Signal::ProximitySlop4
+            | Signal::ProximitySlop8
             | Signal::CrossEncoder
             | Signal::PersonalCentrality
             | Signal::TopicCentrality
@@ -433,6 +475,17 @@ impl Signal {
             coefficient: signal_aggregator.coefficients().get(&self),
             value,
         })
+    }
+
+    fn proximity_slop(&self) -> Option<u32> {
+        match self {
+            Signal::ProximitySlop0 => Some(0),
+            Signal::ProximitySlop1 => Some(1),
+            Signal::ProximitySlop2 => Some(2),
+            Signal::ProximitySlop4 => Some(4),
+            Signal::ProximitySlop8 => Some(8),
+            _ => None,
+        }
     }
 
     fn as_fastfield(&self) -> Option<FastField> {
@@ -585,8 +638,13 @@ struct OpticBoosts {
     rules: Vec<RuleBoost>,
 }
 
+struct ProximityScorer {
+    docset: Box<dyn Scorer>,
+}
+
 struct SegmentReader {
     text_fields: EnumMap<TextField, TextFieldData>,
+    proximity_scorers: EnumMap<Signal, ProximityScorer>,
     optic_boosts: OpticBoosts,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
@@ -664,16 +722,13 @@ impl SignalAggregator {
         }
     }
 
-    pub fn register_segment(
-        &mut self,
+    fn prepare_textfields(
+        &self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-        fastfield_reader: &fastfield_reader::FastFieldReader,
-    ) -> Result<()> {
-        let fastfield_segment_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
+    ) -> Result<EnumMap<TextField, TextFieldData>> {
         let mut text_fields = EnumMap::new();
         let schema = tv_searcher.schema();
-        let mut optic_rule_boosts = Vec::new();
 
         if let Some(query) = &self.query {
             if !query.simple_terms().is_empty() {
@@ -723,7 +778,19 @@ impl SignalAggregator {
                     }
                 }
             }
+        }
 
+        Ok(text_fields)
+    }
+
+    fn prepare_optic(
+        &self,
+        tv_searcher: &tantivy::Searcher,
+        segment_reader: &tantivy::SegmentReader,
+        fastfield_reader: &fastfield_reader::FastFieldReader,
+    ) -> Vec<RuleBoost> {
+        let mut optic_rule_boosts = Vec::new();
+        if let Some(query) = &self.query {
             if let Some(optic) = query.optic() {
                 optic_rule_boosts = optic
                     .rules
@@ -744,12 +811,72 @@ impl SignalAggregator {
             }
         }
 
+        optic_rule_boosts
+    }
+
+    fn prepare_proximity_scorers(
+        &self,
+        tv_searcher: &tantivy::Searcher,
+        segment_reader: &tantivy::SegmentReader,
+    ) -> EnumMap<Signal, ProximityScorer> {
+        let mut proximity_scorers = EnumMap::new();
+        let proximity_fields = [TextField::Title, TextField::CleanBody];
+        let schema = tv_searcher.schema();
+
+        if let Some(query) = &self.query {
+            let simple_terms = query.simple_terms().to_vec();
+
+            if simple_terms.len() < 2 {
+                return proximity_scorers;
+            }
+
+            for signal in ALL_SIGNALS {
+                if let Some(slop) = signal.proximity_slop() {
+                    for field in proximity_fields {
+                        let tv_field = schema.get_field(field.name()).unwrap();
+                        let mut terms = Vec::with_capacity(simple_terms.len());
+
+                        for term in &simple_terms {
+                            let term = tantivy::Term::from_field_text(tv_field, term);
+                            terms.push(term);
+                        }
+
+                        let mut phrase_query = PhraseQuery::new(terms);
+                        phrase_query.set_slop(slop);
+
+                        let docset = phrase_query
+                            .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                            .unwrap()
+                            .scorer(segment_reader, 1.0)
+                            .unwrap();
+
+                        proximity_scorers.insert(signal, ProximityScorer { docset });
+                    }
+                }
+            }
+        }
+
+        proximity_scorers
+    }
+
+    pub fn register_segment(
+        &mut self,
+        tv_searcher: &tantivy::Searcher,
+        segment_reader: &tantivy::SegmentReader,
+        fastfield_reader: &fastfield_reader::FastFieldReader,
+    ) -> Result<()> {
+        let fastfield_segment_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
+        let text_fields = self.prepare_textfields(tv_searcher, segment_reader)?;
+        let optic_rule_boosts = self.prepare_optic(tv_searcher, segment_reader, fastfield_reader);
+        let proximity_scorers = self.prepare_proximity_scorers(tv_searcher, segment_reader);
+
         self.segment_reader = Some(SegmentReader {
             text_fields,
             fastfield_reader: fastfield_segment_reader,
             optic_boosts: OpticBoosts {
                 rules: optic_rule_boosts,
             },
+            proximity_scorers,
         });
 
         Ok(())
