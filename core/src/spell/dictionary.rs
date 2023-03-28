@@ -291,8 +291,12 @@ impl InnerDictionary {
     #[inline]
     pub fn score(&self, before: &[&str], term: &str, after: &[&str]) -> Option<f64> {
         self.terms.get(term).map(|id| {
-            let mut d = 1;
-            let mut total_score = self.monograms[&Monogram(*id)] as f64 / self.total_freq as f64;
+            let mut d = 0;
+            let mut total_score = 0.0;
+            if let Some(mono) = self.monograms.get(&Monogram(*id)) {
+                total_score += *mono as f64 / self.total_freq as f64;
+                d += 1;
+            }
 
             if !before.is_empty() {
                 if let Some(id_before) = self.terms.get(before[before.len() - 1]) {
@@ -357,7 +361,11 @@ impl InnerDictionary {
                 }
             }
 
-            total_score / d as f64
+            if d == 0 {
+                0.0
+            } else {
+                total_score / d as f64
+            }
         })
     }
 
