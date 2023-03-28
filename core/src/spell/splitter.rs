@@ -15,12 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::Dictionary;
 
-pub struct TermSplitter<'a, const DICT_N: usize> {
-    dict: &'a Dictionary<DICT_N>,
+pub struct TermSplitter<'a> {
+    dict: &'a Dictionary,
 }
 
-impl<'a, const DICT_N: usize> TermSplitter<'a, DICT_N> {
-    pub fn new(dict: &'a Dictionary<DICT_N>) -> Self {
+impl<'a> TermSplitter<'a> {
+    pub fn new(dict: &'a Dictionary) -> Self {
         TermSplitter { dict }
     }
     pub fn split(&self, text: &'a str) -> Vec<&'a str> {
@@ -36,7 +36,7 @@ impl<'a, const DICT_N: usize> TermSplitter<'a, DICT_N> {
                     continue;
                 }
 
-                if let Some(prob) = &self.dict.probability(&text[j..i]) {
+                if let Some(prob) = &self.dict.score(&[], &text[j..i], &[]) {
                     let new_prob = probs[j] * prob;
                     if new_prob > best_prob_k {
                         best_prob_k = new_prob;
@@ -67,16 +67,14 @@ impl<'a, const DICT_N: usize> TermSplitter<'a, DICT_N> {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::spell::dictionary;
+
     use super::*;
 
     #[test]
     fn test_split() {
-        let mut dictionary = Dictionary::default();
-
-        dictionary.insert("wicked");
-        dictionary.insert("weather");
-
-        dictionary.commit().unwrap();
+        let dictionary = dictionary::build_from_str("wicked weather");
 
         assert_eq!(
             TermSplitter::new(&dictionary).split("wickedweather"),
@@ -84,21 +82,12 @@ mod tests {
         );
 
         assert_eq!(TermSplitter::new(&dictionary).split("wicked").len(), 0);
-
         assert_eq!(TermSplitter::new(&dictionary).split("udlæg").len(), 0);
     }
 
     #[test]
     fn test_most_probable() {
-        let mut dictionary = Dictionary::default();
-
-        dictionary.insert("wicked");
-        dictionary.insert("wicked");
-        dictionary.insert("weather");
-        dictionary.insert("weather");
-        dictionary.insert("eat"); // "eat" is a substring of "weather"
-
-        dictionary.commit().unwrap();
+        let dictionary = dictionary::build_from_str("wicked weather wicked weather eat");
 
         assert_eq!(
             TermSplitter::new(&dictionary).split("wickedweather"),

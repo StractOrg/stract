@@ -33,6 +33,7 @@ use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::Scorer;
+use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 
 use tantivy::DocSet;
@@ -56,7 +57,11 @@ pub enum Error {
 pub enum Signal {
     Bm25,
     Bm25Title,
+    Bm25TitleBigrams,
+    Bm25TitleTrigrams,
     Bm25CleanBody,
+    Bm25CleanBodyBigrams,
+    Bm25CleanBodyTrigrams,
     Bm25StemmedTitle,
     Bm25StemmedCleanBody,
     Bm25AllBody,
@@ -92,10 +97,14 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 30] = [
+pub const ALL_SIGNALS: [Signal; 34] = [
     Signal::Bm25,
     Signal::Bm25Title,
+    Signal::Bm25TitleBigrams,
+    Signal::Bm25TitleTrigrams,
     Signal::Bm25CleanBody,
+    Signal::Bm25CleanBodyBigrams,
+    Signal::Bm25CleanBodyTrigrams,
     Signal::Bm25StemmedTitle,
     Signal::Bm25StemmedCleanBody,
     Signal::Bm25AllBody,
@@ -169,7 +178,11 @@ impl Signal {
         match self {
             Signal::Bm25 => 1.0,
             Signal::Bm25Title => 15.0,
+            Signal::Bm25TitleBigrams => 15.0,
+            Signal::Bm25TitleTrigrams => 15.0,
             Signal::Bm25CleanBody => 4.0,
+            Signal::Bm25CleanBodyBigrams => 4.0,
+            Signal::Bm25CleanBodyTrigrams => 4.0,
             Signal::Bm25StemmedTitle => 0.5,
             Signal::Bm25StemmedCleanBody => 0.5,
             Signal::Bm25AllBody => 1.0,
@@ -310,7 +323,11 @@ impl Signal {
                     .sum()
             }),
             Signal::Bm25Title
+            | Signal::Bm25TitleBigrams
+            | Signal::Bm25TitleTrigrams
             | Signal::Bm25CleanBody
+            | Signal::Bm25CleanBodyBigrams
+            | Signal::Bm25CleanBodyTrigrams
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
             | Signal::Bm25AllBody
@@ -382,7 +399,11 @@ impl Signal {
             }
             Signal::Bm25
             | Signal::Bm25Title
+            | Signal::Bm25TitleBigrams
+            | Signal::Bm25TitleTrigrams
             | Signal::Bm25CleanBody
+            | Signal::Bm25CleanBodyBigrams
+            | Signal::Bm25CleanBodyTrigrams
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
             | Signal::Bm25AllBody
@@ -431,7 +452,11 @@ impl Signal {
     fn as_textfield(&self) -> Option<TextField> {
         match self {
             Signal::Bm25Title => Some(TextField::Title),
+            Signal::Bm25TitleBigrams => Some(TextField::TitleBigrams),
+            Signal::Bm25TitleTrigrams => Some(TextField::TitleTrigrams),
             Signal::Bm25CleanBody => Some(TextField::CleanBody),
+            Signal::Bm25CleanBodyBigrams => Some(TextField::CleanBodyBigrams),
+            Signal::Bm25CleanBodyTrigrams => Some(TextField::CleanBodyTrigrams),
             Signal::Bm25StemmedTitle => Some(TextField::StemmedTitle),
             Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
             Signal::Bm25AllBody => Some(TextField::AllBody),
@@ -459,7 +484,11 @@ impl FromStr for Signal {
         match name {
             "bm25" => Ok(Signal::Bm25),
             "bm25_title" => Ok(Signal::Bm25Title),
+            "bm25_title_bigrams" => Ok(Signal::Bm25TitleBigrams),
+            "bm25_title_trigrams" => Ok(Signal::Bm25TitleTrigrams),
             "bm25_clean_body" => Ok(Signal::Bm25CleanBody),
+            "bm25_clean_body_bigrams" => Ok(Signal::Bm25CleanBodyBigrams),
+            "bm25_clean_body_trigrams" => Ok(Signal::Bm25CleanBodyTrigrams),
             "bm25_stemmed_title" => Ok(Signal::Bm25StemmedTitle),
             "bm25_stemmed_clean_body" => Ok(Signal::Bm25StemmedCleanBody),
             "bm25_all_body" => Ok(Signal::Bm25AllBody),
@@ -651,11 +680,23 @@ impl SignalAggregator {
                 for signal in ALL_SIGNALS {
                     if let Some(text_field) = signal.as_textfield() {
                         let tv_field = schema.get_field(text_field.name()).unwrap();
-                        let terms: Vec<_> = query
-                            .simple_terms()
-                            .iter()
-                            .map(|text| tantivy::Term::from_field_text(tv_field, text))
-                            .collect();
+                        let simple_query = itertools::intersperse(
+                            query.simple_terms().iter().map(|s| s.as_str()),
+                            " ",
+                        )
+                        .collect::<String>();
+
+                        let mut terms = Vec::new();
+                        let mut stream = text_field.tokenizer().token_stream(&simple_query);
+
+                        while let Some(token) = stream.next() {
+                            let term = tantivy::Term::from_field_text(tv_field, &token.text);
+                            terms.push(term);
+                        }
+
+                        if terms.is_empty() {
+                            continue;
+                        }
 
                         let weight = Bm25Weight::for_terms(tv_searcher, &terms)?;
 

@@ -18,7 +18,7 @@ use tantivy::schema::{
     BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{Identity, JsonField, Tokenizer};
+use crate::tokenizer::{BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer};
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
@@ -47,6 +47,10 @@ pub enum TextField {
     DmozDescription,
     SchemaOrgJson,
     FlattenedSchemaOrgJson,
+    CleanBodyBigrams,
+    TitleBigrams,
+    CleanBodyTrigrams,
+    TitleTrigrams,
 }
 
 impl From<TextField> for usize {
@@ -78,6 +82,10 @@ impl TextField {
             TextField::DmozDescription => Tokenizer::default(),
             TextField::SchemaOrgJson => Tokenizer::Identity(Identity {}),
             TextField::FlattenedSchemaOrgJson => Tokenizer::Json(JsonField),
+            TextField::CleanBodyBigrams => Tokenizer::Bigram(BigramTokenizer::default()),
+            TextField::TitleBigrams => Tokenizer::Bigram(BigramTokenizer::default()),
+            TextField::CleanBodyTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
+            TextField::TitleTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
         }
     }
 
@@ -111,6 +119,10 @@ impl TextField {
             TextField::DmozDescription => true,
             TextField::SchemaOrgJson => false,
             TextField::FlattenedSchemaOrgJson => true,
+            TextField::CleanBodyBigrams => false,
+            TextField::TitleBigrams => false,
+            TextField::CleanBodyTrigrams => false,
+            TextField::TitleTrigrams => false,
         }
     }
 
@@ -136,6 +148,10 @@ impl TextField {
             TextField::DmozDescription => "dmoz_description",
             TextField::SchemaOrgJson => "schema_org_json",
             TextField::FlattenedSchemaOrgJson => "flattened_schema_org_json",
+            TextField::CleanBodyBigrams => "clean_body_bigrams",
+            TextField::TitleBigrams => "title_bigrams",
+            TextField::CleanBodyTrigrams => "clean_body_trigrams",
+            TextField::TitleTrigrams => "title_trigrams",
         }
     }
 }
@@ -219,7 +235,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 48] = [
+pub static ALL_FIELDS: [Field; 52] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -240,6 +256,10 @@ pub static ALL_FIELDS: [Field; 48] = [
     Field::Text(TextField::DmozDescription),
     Field::Text(TextField::SchemaOrgJson),
     Field::Text(TextField::FlattenedSchemaOrgJson),
+    Field::Text(TextField::CleanBodyBigrams),
+    Field::Text(TextField::TitleBigrams),
+    Field::Text(TextField::CleanBodyTrigrams),
+    Field::Text(TextField::TitleTrigrams),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -342,6 +362,18 @@ impl Field {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::CleanBodyBigrams) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::TitleBigrams) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::CleanBodyTrigrams) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::TitleTrigrams) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
@@ -484,6 +516,10 @@ impl Field {
                 | Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::HostTopic)
                 | Field::Text(TextField::SchemaOrgJson)
+                | Field::Text(TextField::CleanBodyBigrams)
+                | Field::Text(TextField::TitleBigrams)
+                | Field::Text(TextField::CleanBodyTrigrams)
+                | Field::Text(TextField::TitleTrigrams)
         ) && !self.is_fast()
     }
 

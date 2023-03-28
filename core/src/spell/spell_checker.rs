@@ -14,174 +14,249 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::dictionary::EditStrategy;
-use crate::spell::{Dictionary, DictionaryResult};
-use std::iter::FromIterator;
+use crate::spell::Dictionary;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 
-pub struct SpellChecker<'a, T: EditStrategy, const DICT_N: usize> {
-    dict: &'a Dictionary<DICT_N>,
+use super::dictionary::TermId;
+use super::distance::LevenshteinDistance;
+
+pub struct SpellChecker<T: EditStrategy> {
+    dict: Dictionary,
     edit_strategy: T,
+    deletes: BTreeMap<String, Vec<TermId>>,
 }
 
-impl<'a, T: EditStrategy, const DICT_N: usize> SpellChecker<'a, T, DICT_N> {
-    pub fn new(dict: &'a Dictionary<DICT_N>, edit_strategy: T) -> Self {
-        SpellChecker {
-            dict,
-            edit_strategy,
+fn deletes_rec(
+    word: &str,
+    edit_distance: usize,
+    max_edit_distance: usize,
+    delete_words: &mut HashSet<String>,
+) {
+    let edit_distance = edit_distance + 1;
+    let word_len = word.chars().count();
+
+    if word_len > 1 {
+        for i in 0..word_len {
+            let delete = word
+                .char_indices()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, c)| c)
+                .collect::<String>();
+
+            if !delete_words.contains(&delete) {
+                delete_words.insert(delete.clone());
+
+                if edit_distance < max_edit_distance {
+                    deletes_rec(&delete, edit_distance, max_edit_distance, delete_words);
+                }
+            }
         }
     }
+}
 
-    pub fn correct_top(&self, term: &str, top_n: usize) -> Vec<String> {
-        let mut res = Vec::new();
+fn deletes(term: &str, edit_strategy: &impl EditStrategy) -> Vec<String> {
+    let mut res = HashSet::new();
+    deletes_rec(term, 0, edit_strategy.dist().distance(), &mut res);
 
-        if term.chars().any(|c| !c.is_alphabetic()) {
-            return Vec::new();
+    res.into_iter().collect()
+}
+
+#[derive(Debug)]
+struct Suggestion {
+    term: String,
+    distance: usize,
+    score: f64,
+}
+
+impl Ord for Suggestion {
+    fn cmp(&self, other: &Suggestion) -> Ordering {
+        let distance_cmp = self.distance.cmp(&other.distance);
+        if distance_cmp == Ordering::Equal {
+            return self
+                .score
+                .partial_cmp(&other.score)
+                .unwrap_or(Ordering::Equal)
+                .reverse();
         }
+        distance_cmp
+    }
+}
 
-        // this is sorted by increasing edit distance
-        for corrections in self
-            .dict
-            .all_probabilities(term, self.edit_strategy.distance_for_string(term))
-            .iter_mut()
-        {
-            let mut corrections: Vec<&DictionaryResult> = Vec::from_iter(corrections.iter());
-            corrections.sort_by(|a, b| b.prob.partial_cmp(&a.prob).unwrap());
+impl PartialOrd for Suggestion {
+    fn partial_cmp(&self, other: &Suggestion) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-            res.extend(
-                corrections
-                    .into_iter()
-                    .map(|dict_result| dict_result.correction.clone())
-                    .take(top_n - res.len()),
-            );
+impl PartialEq for Suggestion {
+    fn eq(&self, other: &Suggestion) -> bool {
+        self.distance == other.distance && self.score == other.score
+    }
+}
+impl Eq for Suggestion {}
 
-            if res.len() >= top_n {
-                return res;
+impl<T: EditStrategy> SpellChecker<T> {
+    pub fn new(dict: Dictionary, edit_strategy: T) -> Self {
+        let mut deletes_map = BTreeMap::new();
+        for (term, id) in dict.terms() {
+            let term = term.to_ascii_lowercase();
+            for delete in deletes(&term, &edit_strategy) {
+                deletes_map.entry(delete).or_insert_with(Vec::new).push(*id);
             }
         }
 
-        res
+        SpellChecker {
+            dict,
+            edit_strategy,
+            deletes: deletes_map,
+        }
     }
 
-    pub fn correct(&self, term: &str) -> Option<String> {
-        self.correct_top(term, 1)
+    fn suggestions(&self, before: &[&str], term: &str, after: &[&str]) -> Vec<Suggestion> {
+        let mut suggestions = Vec::new();
+        let mut suggestion_terms = HashSet::new();
+
+        let mut candidates = VecDeque::new();
+        candidates.push_back(term.to_ascii_lowercase());
+        for delete in deletes(term, &self.edit_strategy) {
+            candidates.push_back(delete.to_ascii_lowercase());
+        }
+        let max_dist = self.edit_strategy.distance_for_string(term);
+
+        while let Some(candidate) = candidates.pop_front() {
+            if suggestion_terms.contains(&candidate) {
+                continue;
+            }
+
+            let distance = LevenshteinDistance::compare(term, &candidate);
+            if distance <= max_dist {
+                if let Some(score) = self.dict.score(before, &candidate, after) {
+                    suggestions.push(Suggestion {
+                        term: candidate.clone(),
+                        distance,
+                        score,
+                    });
+                    suggestion_terms.insert(candidate.clone());
+                }
+
+                if let Some(deletes) = self.deletes.get(&candidate) {
+                    for delete in deletes {
+                        candidates.push_back(self.dict.term(delete).unwrap().to_string());
+                    }
+                }
+            }
+        }
+
+        suggestions.sort();
+        suggestions
+    }
+
+    pub fn correct(&self, before: &[&str], term: &str, after: &[&str]) -> Option<String> {
+        if self.dict.term_id(term).is_some() {
+            return None;
+        }
+
+        if term.chars().any(|c| !c.is_ascii_alphabetic()) {
+            return None;
+        }
+
+        self.suggestions(before, term, after)
             .into_iter()
+            .map(|suggestion| suggestion.term)
             .next()
-            .filter(|correction| correction.to_ascii_lowercase() != term.to_ascii_lowercase())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spell::{dictionary::MaxEdit, LogarithmicEdit};
+    use crate::spell::{
+        dictionary::{self, MaxEdit},
+        LogarithmicEdit,
+    };
 
     #[test]
     fn simple_corrections() {
-        let mut dict = Dictionary::default();
+        let dict = dictionary::build_from_str("this is a test test pest");
 
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("test");
-        dict.insert("pest");
+        let spell_checker = SpellChecker::new(dict, MaxEdit::new(1));
 
-        dict.commit().unwrap();
-
-        let spell_checker = SpellChecker::new(&dict, MaxEdit::new(1));
-
-        assert_eq!(spell_checker.correct("tst"), Some("test".to_string()));
-        assert_eq!(spell_checker.correct("ths"), Some("this".to_string()));
-        assert_eq!(spell_checker.correct("thes"), Some("this".to_string()));
-        assert_eq!(spell_checker.correct("is"), None);
         assert_eq!(
-            spell_checker.correct_top("thes", 3),
-            vec!["this".to_string()]
+            spell_checker.correct(&[], "tst", &[]),
+            Some("test".to_string())
         );
         assert_eq!(
-            spell_checker.correct_top("dest", 3),
-            vec!["test".to_string(), "pest".to_string()]
+            spell_checker.correct(&[], "ths", &[]),
+            Some("this".to_string())
         );
         assert_eq!(
-            spell_checker.correct_top("dest", 1),
-            vec!["test".to_string()]
+            spell_checker.correct(&[], "thes", &[]),
+            Some("this".to_string())
+        );
+        assert_eq!(spell_checker.correct(&[], "is", &[]), None);
+        assert_eq!(
+            spell_checker.correct(&[], "dest", &[]),
+            Some("test".to_string())
         );
     }
 
     #[test]
     fn correct_uncontained_word() {
-        let mut dict = Dictionary::default();
+        let dict = dictionary::build_from_str("this is a test test");
 
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("test");
+        let spell_checker = SpellChecker::new(dict, MaxEdit::new(1));
 
-        dict.commit().unwrap();
-
-        let spell_checker = SpellChecker::new(&dict, MaxEdit::new(1));
-
-        assert_eq!(spell_checker.correct("what"), None);
-        assert!(spell_checker.correct_top("what", 2).is_empty());
+        assert_eq!(spell_checker.correct(&[], "what", &[]), None);
     }
 
     #[test]
     fn prioritise_low_distance_words() {
-        let mut dict = Dictionary::default();
+        let dict = dictionary::build_from_str("this is a test test contest contest");
 
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("contest");
-        dict.insert("contest");
+        let spell_checker = SpellChecker::new(dict, MaxEdit::new(4));
 
-        dict.commit().unwrap();
-
-        let spell_checker = SpellChecker::new(&dict, MaxEdit::new(4));
-
-        assert_eq!(spell_checker.correct("dest"), Some("test".to_string()));
         assert_eq!(
-            spell_checker.correct_top("dest", 3),
-            vec!["test".to_string(), "is".to_string(), "contest".to_string()]
+            spell_checker.correct(&[], "dest", &[]),
+            Some("test".to_string())
         );
     }
 
     #[test]
     fn correct_sorting_multiple_hits() {
-        let mut dict = Dictionary::default();
+        let dict = dictionary::build_from_str("the the the he");
 
-        dict.insert("the");
-        dict.insert("the");
-        dict.insert("the");
-        dict.insert("he");
+        let spell_checker = SpellChecker::new(dict, LogarithmicEdit::new(4));
 
-        dict.commit().unwrap();
-
-        let spell_checker = SpellChecker::new(&dict, LogarithmicEdit::new(4));
-
-        assert_eq!(spell_checker.correct("fhe"), Some("the".to_string()));
         assert_eq!(
-            spell_checker.correct_top("fhe", 3),
-            vec!["the".to_string(), "he".to_string()]
+            spell_checker.correct(&[], "fhe", &[]),
+            Some("the".to_string())
         );
     }
 
     #[test]
     fn dont_correct_non_alphabet() {
-        let mut dict = Dictionary::default();
+        let dict = dictionary::build_from_str("this is a test c");
 
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("c");
+        let spell_checker = SpellChecker::new(dict, MaxEdit::new(1));
 
-        dict.commit().unwrap();
+        assert_eq!(spell_checker.correct(&[], "c++", &[]), None);
+        assert_eq!(spell_checker.correct(&[], "c#", &[]), None);
+    }
 
-        let spell_checker = SpellChecker::new(&dict, MaxEdit::new(1));
+    #[test]
+    fn context_correction() {
+        let dict = dictionary::build_from_str("abraham lincoln was the 16th president of the united states. A wrong way to spell hist last name would be linculn linculn");
 
-        assert_eq!(spell_checker.correct("c++"), None);
-        assert_eq!(spell_checker.correct("c#"), None);
+        let spell_checker = SpellChecker::new(dict, MaxEdit::new(1));
+
+        assert_eq!(
+            spell_checker.correct(&[], "lincln", &[]),
+            Some("linculn".to_string())
+        );
+        assert_eq!(
+            spell_checker.correct(&["abraham"], "lincln", &[]),
+            Some("lincoln".to_string())
+        );
     }
 }

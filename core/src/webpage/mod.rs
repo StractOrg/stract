@@ -775,6 +775,24 @@ impl Html {
                         },
                     );
                 }
+                Field::Text(TextField::CleanBodyBigrams) => {
+                    doc.add_text(
+                        tantivy_field,
+                        self.clean_text().cloned().unwrap_or_default(),
+                    );
+                }
+                Field::Text(TextField::CleanBodyTrigrams) => {
+                    doc.add_text(
+                        tantivy_field,
+                        self.clean_text().cloned().unwrap_or_default(),
+                    );
+                }
+                Field::Text(TextField::TitleBigrams) => {
+                    doc.add_text(tantivy_field, title.text.clone());
+                }
+                Field::Text(TextField::TitleTrigrams) => {
+                    doc.add_text(tantivy_field, title.text.clone());
+                }
                 Field::Text(TextField::Description) => {
                     doc.add_pre_tokenized_text(tantivy_field, description.clone());
                 }

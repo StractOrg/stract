@@ -26,6 +26,10 @@ impl LevenshteinDistance {
         LevenshteinDistance { dist: distance }
     }
 
+    pub fn distance(&self) -> usize {
+        self.dist
+    }
+
     /// Function taken from https://github.com/febeling/edit-distance/blob/5597816456e7153cf69092f6ab5d0b4edb5e3797/src/lib.rs#L31
     ///
     /// The [Levenshtein edit distance][wikipedia] between two strings is

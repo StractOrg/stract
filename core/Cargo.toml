@@ -109,3 +109,7 @@ harness = false
 [[bench]]
 name = "build-similarity"
 harness = false
+
+[[bench]]
+name = "spell-correction"
+harness = false

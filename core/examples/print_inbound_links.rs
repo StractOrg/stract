@@ -23,10 +23,10 @@ pub fn main() {
     let graph = WebgraphBuilder::new("data/webgraph").open();
     let inbound = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
 
-    for host in ["archwaypublishing.com", "wordpressfoundation.org"] {
+    for host in ["apache.org", "yyhelyhalvin.weebly.com"] {
         println!("{host}:");
 
-        let node = Node::from(host);
+        let node = Node::from(host).into_host();
         let node_id = graph.node2id(&node).unwrap();
         let inbound_vec = inbound.get(node_id).unwrap();
         println!("{:?}", inbound_vec);

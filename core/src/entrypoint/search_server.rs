@@ -16,6 +16,8 @@
 
 use std::net::SocketAddr;
 
+use tracing::info;
+
 use crate::{
     cluster::{
         member::{Member, Service},
@@ -32,7 +34,6 @@ use crate::{
 pub async fn run(config: SearchServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
     let server = sonic::Server::bind(addr).await.unwrap();
-    tracing::info!("listening on {}", addr);
 
     let entity_index = config
         .entity_index_path
@@ -65,6 +66,8 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
         config.gossip_seed_nodes.unwrap_or_default(),
     )
     .await?;
+
+    info!("search server is ready to accept requests on {}", addr);
 
     loop {
         if let Ok(req) = server.accept::<searcher::distributed::Request>().await {

@@ -34,7 +34,7 @@ use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
 use crate::snippet;
-use crate::tokenizer::Identity;
+use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{schema_org, StoredPrimaryImage, Webpage};
@@ -133,12 +133,22 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
+        let tokenizer = Tokenizer::Bigram(BigramTokenizer::default());
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
+
+        let tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
+
         let writer = tantivy_index.writer_with_num_threads(1, 1_000_000_000)?;
 
         let merge_policy = NoMergePolicy::default();
         writer.set_merge_policy(Box::new(merge_policy));
 
-        let reader = tantivy_index.reader_builder().try_into()?;
+        let reader: IndexReader = tantivy_index.reader_builder().try_into()?;
 
         Ok(InvertedIndex {
             writer,

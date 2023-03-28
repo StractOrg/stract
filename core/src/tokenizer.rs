@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::str::CharIndices;
+use std::{array, ops::Range, str::CharIndices};
 
 use logos::{Lexer, Logos};
 use tantivy::tokenizer::{
@@ -55,6 +55,8 @@ pub enum Tokenizer {
     Normal(Normal),
     Identity(Identity),
     Stemmed(Stemmed),
+    Bigram(BigramTokenizer),
+    Trigram(TrigramTokenizer),
     Json(JsonField),
 }
 
@@ -68,6 +70,8 @@ impl Tokenizer {
             Tokenizer::Normal(_) => Normal::as_str(),
             Tokenizer::Stemmed(_) => Stemmed::as_str(),
             Tokenizer::Identity(_) => Identity::as_str(),
+            Tokenizer::Bigram(_) => BigramTokenizer::as_str(),
+            Tokenizer::Trigram(_) => TrigramTokenizer::as_str(),
             Tokenizer::Json(_) => JsonField::as_str(),
         }
     }
@@ -93,6 +97,24 @@ impl Normal {
         Self {
             stopwords: Some(stopwords),
         }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct BigramTokenizer {}
+
+impl BigramTokenizer {
+    pub fn as_str() -> &'static str {
+        "bigram_tokenizer"
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct TrigramTokenizer {}
+
+impl TrigramTokenizer {
+    pub fn as_str() -> &'static str {
+        "trigram_tokenizer"
     }
 }
 
@@ -128,6 +150,8 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
             Tokenizer::Stemmed(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Identity(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Json(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Bigram(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Trigram(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }
@@ -165,6 +189,22 @@ impl tantivy::tokenizer::Tokenizer for Stemmed {
 impl tantivy::tokenizer::Tokenizer for Identity {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         BoxTokenStream::from(IdentityTokenStream::from(text.to_string()))
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+        let inner = Normal::default().token_stream(text);
+        let stream: NGramTokenStream<2> = NGramTokenStream::new(text, inner);
+        BoxTokenStream::from(stream)
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for TrigramTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+        let inner = Normal::default().token_stream(text);
+        let stream: NGramTokenStream<3> = NGramTokenStream::new(text, inner);
+        BoxTokenStream::from(stream)
     }
 }
 
@@ -263,6 +303,161 @@ impl<'a> tantivy::tokenizer::TokenStream for SimpleTokenStream<'a> {
 
     fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
         self.token.as_mut().unwrap()
+    }
+}
+
+#[derive(Default)]
+struct TokenRef {
+    range: Range<usize>,
+    position: usize,
+}
+
+impl From<&tantivy::tokenizer::Token> for TokenRef {
+    fn from(token: &tantivy::tokenizer::Token) -> Self {
+        Self {
+            range: token.offset_from..token.offset_to,
+            position: token.position,
+        }
+    }
+}
+
+struct NGramTokenStream<'a, const N: usize> {
+    inner: BoxTokenStream<'a>,
+    text: &'a str,
+    token: tantivy::tokenizer::Token,
+    token_refs: [TokenRef; N],
+    is_first: bool,
+    next_pos: usize,
+}
+
+impl<'a, const N: usize> NGramTokenStream<'a, N> {
+    fn new(text: &'a str, inner: BoxTokenStream<'a>) -> Self {
+        Self {
+            inner,
+            text,
+            token: tantivy::tokenizer::Token::default(),
+            token_refs: array::from_fn(|_| TokenRef::default()),
+            is_first: true,
+            next_pos: 0,
+        }
+    }
+}
+
+impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 1> {
+    fn advance(&mut self) -> bool {
+        self.is_first = false;
+        let res = self.inner.advance();
+
+        if res {
+            self.token_refs[0].range = self.inner.token().offset_from..self.inner.token().offset_to;
+            self.token_refs[0].position = self.next_pos;
+            self.next_pos += 1;
+        }
+
+        self.token = tantivy::tokenizer::Token {
+            offset_from: self.token_refs[0].range.start,
+            offset_to: self.token_refs[0].range.end,
+            position: self.token_refs[0].position,
+            text: self.text[self.token_refs[0].range.clone()].to_string(),
+            position_length: 1,
+        };
+
+        res
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        &self.token
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        &mut self.token
+    }
+}
+
+impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 2> {
+    fn advance(&mut self) -> bool {
+        if self.is_first {
+            if !self.inner.advance() {
+                return false;
+            }
+
+            self.token_refs[0] = self.inner.token().into();
+
+            if !self.inner.advance() {
+                return false;
+            }
+            self.token_refs[1] = self.inner.token().into();
+        } else {
+            if !self.inner.advance() {
+                return false;
+            }
+
+            self.token_refs.rotate_left(1);
+            self.token_refs[1] = self.inner.token().into();
+        }
+        self.is_first = false;
+
+        self.next_pos += 1;
+
+        self.token.position = self.next_pos;
+        self.token.text =
+            self.text[self.token_refs[0].range.start..self.token_refs[1].range.end].to_string();
+        self.token.position_length = 2;
+        true
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        &self.token
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        &mut self.token
+    }
+}
+
+impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 3> {
+    fn advance(&mut self) -> bool {
+        if self.is_first {
+            if !self.inner.advance() {
+                return false;
+            }
+
+            self.token_refs[0] = self.inner.token().into();
+
+            if !self.inner.advance() {
+                return false;
+            }
+            self.token_refs[1] = self.inner.token().into();
+
+            if !self.inner.advance() {
+                return false;
+            }
+            self.token_refs[2] = self.inner.token().into();
+        } else {
+            if !self.inner.advance() {
+                return false;
+            }
+
+            self.token_refs.rotate_left(1);
+            self.token_refs[2] = self.inner.token().into();
+        }
+        self.is_first = false;
+
+        self.next_pos += 1;
+
+        self.token.position = self.next_pos;
+        self.token.text =
+            self.text[self.token_refs[0].range.start..self.token_refs[2].range.end].to_string();
+        self.token.position_length = 3;
+        true
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        &self.token
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        &mut self.token
     }
 }
 
@@ -443,7 +638,7 @@ impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
 
 #[cfg(test)]
 mod tests {
-    use tantivy::tokenizer::Tokenizer;
+    use tantivy::tokenizer::Tokenizer as _;
 
     use super::*;
 
@@ -461,6 +656,28 @@ mod tests {
     fn tokenize_json(s: &str) -> Vec<String> {
         let mut res = Vec::new();
         let mut stream = JsonField.token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
+    fn tokenize_bigram(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut stream = Tokenizer::Bigram(BigramTokenizer::default()).token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
+    fn tokenize_trigram(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut stream = Tokenizer::Trigram(TrigramTokenizer::default()).token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -670,6 +887,39 @@ key1.key3="123""#;
 key1.key2="this\" is @ a # test""#;
 
         flattened_json_helper(json, expected);
+    }
+
+    #[test]
+    fn bigram_tokenizer() {
+        assert!(tokenize_bigram("").is_empty());
+        assert!(tokenize_bigram("test").is_empty());
+
+        assert_eq!(tokenize_bigram("this is"), vec!["this is".to_string()]);
+        assert_eq!(
+            tokenize_bigram("this is a"),
+            vec!["this is".to_string(), "is a".to_string()]
+        );
+        assert_eq!(
+            tokenize_bigram("this is a test"),
+            vec![
+                "this is".to_string(),
+                "is a".to_string(),
+                "a test".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn trigram_tokenizer() {
+        assert!(tokenize_trigram("").is_empty());
+        assert!(tokenize_trigram("test").is_empty());
+        assert!(tokenize_trigram("this is").is_empty());
+
+        assert_eq!(tokenize_trigram("this is a"), vec!["this is a".to_string()]);
+        assert_eq!(
+            tokenize_trigram("this is a test"),
+            vec!["this is a".to_string(), "is a test".to_string(),]
+        );
     }
 
     #[test]

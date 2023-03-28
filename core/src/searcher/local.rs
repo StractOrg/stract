@@ -22,15 +22,14 @@ use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
-use crate::query::parser::Term;
-use crate::query::{self, Query};
+use crate::query::Query;
 use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
 use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
-use crate::spell::Correction;
+use crate::spell::Spell;
 use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
@@ -42,6 +41,7 @@ use super::{InitialWebsiteResult, SearchQuery};
 
 pub struct LocalSearcher {
     index: Index,
+    spell: Spell,
     entity_index: Option<EntityIndex>,
     centrality_store: Option<SearchCentralityStore>,
     topic_centrality: Option<TopicCentrality>,
@@ -61,8 +61,10 @@ struct InvertedIndexResult {
 
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
+        let spell = Spell::for_index(&index);
         LocalSearcher {
             index,
+            spell,
             entity_index: None,
             centrality_store: None,
             topic_centrality: None,
@@ -226,18 +228,6 @@ impl LocalSearcher {
         })
     }
 
-    fn spell_correction(&self, query: &SearchQuery) -> Option<Correction> {
-        let terms: Vec<_> = query::parser::parse(&query.query)
-            .into_iter()
-            .filter_map(|term| match *term {
-                Term::Simple(s) => Some(s),
-                _ => None,
-            })
-            .collect();
-
-        self.index.spell_correction(&terms)
-    }
-
     fn entity_sidebar(&self, query: &SearchQuery) -> Option<StoredEntity> {
         self.entity_index
             .as_ref()
@@ -251,7 +241,7 @@ impl LocalSearcher {
     ) -> Result<InitialWebsiteResult> {
         let ctx = self.index.inverted_index.local_search_ctx();
         let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
-        let correction = self.spell_correction(query);
+        let correction = self.spell.correction(query);
         let sidebar = self
             .entity_sidebar(query)
             .map(|entity| DisplayedEntity::from(entity, self));
@@ -437,5 +427,51 @@ mod tests {
                 )
             }
         }
+    }
+
+    #[test]
+    fn sentence_spell_correction() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                    r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+    this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever
+                </body>
+            </html>
+            "#
+                ,
+                "https://www.example.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().unwrap();
+
+        let searcher = LocalSearcher::new(index);
+
+        assert_eq!(
+            String::from(
+                searcher
+                    .spell
+                    .correction(&SearchQuery {
+                        query: "th best".to_string(),
+                        ..Default::default()
+                    })
+                    .unwrap()
+            ),
+            "the best".to_string()
+        );
+        assert_eq!(
+            searcher.spell.correction(&SearchQuery {
+                query: "the best".to_string(),
+                ..Default::default()
+            }),
+            None
+        );
     }
 }

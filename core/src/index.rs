@@ -33,9 +33,6 @@ use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
-use crate::spell::{
-    Correction, CorrectionTerm, Dictionary, LogarithmicEdit, SpellChecker, TermSplitter,
-};
 use crate::subdomain_count::SubdomainCounter;
 use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
@@ -45,7 +42,6 @@ use crate::Result;
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
 const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
-const SPELL_SUBFOLDER_NAME: &str = "primary_image_store";
 const REGION_COUNT_FILE_NAME: &str = "region_count.json";
 const SUBDOMAIN_COUNT_SUBFOLDER_NAME: &str = "subdomain_count";
 const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
@@ -56,7 +52,6 @@ pub struct Index {
     primary_image_store: PrimaryImageStore,
     favicon_downloader: ImageDownloader<String>,
     primary_image_downloader: ImageDownloader<Uuid>,
-    spell_dictionary: Dictionary<100_000>,
     pub region_count: RegionCount,
     pub subdomain_counter: SubdomainCounter,
     pub path: String,
@@ -84,7 +79,6 @@ impl Index {
             region_count,
             primary_image_downloader: ImageDownloader::new(),
             favicon_downloader: ImageDownloader::new(),
-            spell_dictionary: Dictionary::open(Some(path.as_ref().join(SPELL_SUBFOLDER_NAME)))?,
             subdomain_counter: SubdomainCounter::open(
                 path.as_ref().join(SUBDOMAIN_COUNT_SUBFOLDER_NAME),
             ),
@@ -105,7 +99,6 @@ impl Index {
     pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
         self.maybe_insert_favicon(&webpage);
         self.maybe_insert_primary_image(&mut webpage);
-        self.spell_dictionary.insert_page(&webpage);
         self.subdomain_counter.increment(webpage.html.url().clone());
 
         if let Ok(region) = Region::guess_from(&webpage) {
@@ -116,7 +109,6 @@ impl Index {
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.spell_dictionary.commit()?;
         self.inverted_index.commit()?;
         self.region_count.commit();
         self.subdomain_counter.commit();
@@ -169,8 +161,6 @@ impl Index {
 
         self.primary_image_store.merge(other.primary_image_store);
         drop(self.primary_image_store);
-
-        self.spell_dictionary.merge(other.spell_dictionary);
 
         self.region_count.merge(other.region_count);
 
@@ -240,71 +230,6 @@ impl Index {
         self.favicon_downloader.download(&mut self.favicon_store);
         self.primary_image_downloader
             .download(&mut self.primary_image_store);
-    }
-
-    fn spell_check(&self, terms: &[String]) -> Option<Correction> {
-        let spellchecker = SpellChecker::new(&self.spell_dictionary, LogarithmicEdit::new(4));
-
-        let mut original = String::new();
-
-        for term in terms {
-            original.push_str(term);
-            original.push(' ');
-        }
-        original = original.trim_end().to_string();
-
-        let mut possible_correction = Correction::empty(original);
-
-        for term in terms {
-            match spellchecker.correct(term.to_ascii_lowercase().as_str()) {
-                Some(correction) => possible_correction
-                    .push(CorrectionTerm::Corrected(correction.to_ascii_lowercase())),
-                None => possible_correction
-                    .push(CorrectionTerm::NotCorrected(term.to_ascii_lowercase())),
-            }
-        }
-
-        if possible_correction.is_all_orig() {
-            None
-        } else {
-            Some(possible_correction)
-        }
-    }
-
-    fn split_words(&self, terms: &[String]) -> Option<Correction> {
-        let splitter = TermSplitter::new(&self.spell_dictionary);
-
-        let mut original = String::new();
-
-        for term in terms {
-            original.push_str(term);
-            original.push(' ');
-        }
-        original = original.trim_end().to_string();
-
-        let mut possible_correction = Correction::empty(original);
-
-        for term in terms {
-            let t = term.to_ascii_lowercase();
-            let split = splitter.split(t.as_str());
-            if split.is_empty() {
-                possible_correction.push(CorrectionTerm::NotCorrected(t));
-            } else {
-                for s in split {
-                    possible_correction.push(CorrectionTerm::Corrected(s.to_string()))
-                }
-            }
-        }
-
-        if possible_correction.is_all_orig() {
-            None
-        } else {
-            Some(possible_correction)
-        }
-    }
-
-    pub fn spell_correction(&self, terms: &[String]) -> Option<Correction> {
-        self.spell_check(terms).or_else(|| self.split_words(terms))
     }
 
     pub fn num_segments(&self) -> usize {
@@ -405,43 +330,5 @@ mod tests {
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn sentence_spell_correction() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                ),
-                "https://www.example.com",
-            ))
-            .expect("failed to insert webpage");
-
-        index.commit().unwrap();
-
-        assert_eq!(
-            String::from(
-                index
-                    .spell_correction(&["th".to_string(), "best".to_string()])
-                    .unwrap()
-            ),
-            "the best".to_string()
-        );
-        assert_eq!(
-            index.spell_correction(&["the".to_string(), "best".to_string()]),
-            None
-        );
     }
 }

@@ -14,18 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::spell::distance::LevenshteinDistance;
-use crate::tokenizer::Normal;
-use crate::webpage::Webpage;
-use fst::map::Union;
-use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
-use memmap::Mmap;
-use std::collections::{BTreeMap, BinaryHeap, HashSet};
-use std::fs::{self, File, OpenOptions};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap};
 use std::hash::{Hash, Hasher};
-use std::ops::AddAssign;
-use std::path::Path;
-use std::{cmp, io, mem};
-use tantivy::tokenizer::Tokenizer;
+use std::ops::Deref;
+use std::sync::Arc;
+use std::{cmp, io};
 use thiserror::Error;
 
 pub trait EditStrategy: Send + Sync {
@@ -110,370 +104,331 @@ pub enum DictionaryError {
 
 pub type Result<T> = std::result::Result<T, DictionaryError>;
 
-enum InnerMap {
-    Memory(Map<Vec<u8>>),
-    File(Map<Mmap>),
+pub type TermId = u64;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Monogram(TermId);
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Bigram(TermId, TermId);
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Trigram(TermId, TermId, TermId);
+
+type HeavyMonogram = String;
+type HeavyBigram = (String, String);
+type HeavyTrigram = (String, String, String);
+
+pub struct DictionaryBuilder {
+    monograms: BinaryHeap<Reverse<(u64, HeavyMonogram)>>,
+    bigrams: BinaryHeap<Reverse<(u64, HeavyBigram)>>,
+    trigrams: BinaryHeap<Reverse<(u64, HeavyTrigram)>>,
+    top_n: usize,
 }
 
-impl InnerMap {
-    fn total_freq(&self) -> u64 {
-        let mut stream = match self {
-            InnerMap::Memory(map) => map.into_stream(),
-            InnerMap::File(map) => map.into_stream(),
-        };
-
-        let mut total_freq = 0;
-        while let Some((_, freq)) = stream.next() {
-            total_freq += freq;
+impl DictionaryBuilder {
+    pub fn new(top_n: usize) -> Self {
+        Self {
+            monograms: BinaryHeap::new(),
+            bigrams: BinaryHeap::new(),
+            trigrams: BinaryHeap::new(),
+            top_n,
         }
+    }
 
-        total_freq
+    pub fn add_monogram(&mut self, term: HeavyMonogram, freq: u64) {
+        if self.monograms.len() < self.top_n {
+            self.monograms.push(Reverse((freq, term)));
+        } else if self.monograms.peek().unwrap().0 .0 < freq {
+            let mut worst = self.monograms.peek_mut().unwrap();
+            *worst = Reverse((freq, term));
+        }
+    }
+
+    pub fn add_bigram(&mut self, term: HeavyBigram, freq: u64) {
+        if self.bigrams.len() < self.top_n {
+            self.bigrams.push(Reverse((freq, term)));
+        } else if self.bigrams.peek().unwrap().0 .0 < freq {
+            let mut worst = self.bigrams.peek_mut().unwrap();
+            *worst = Reverse((freq, term));
+        }
+    }
+
+    pub fn add_trigram(&mut self, term: HeavyTrigram, freq: u64) {
+        if self.trigrams.len() < self.top_n {
+            self.trigrams.push(Reverse((freq, term)));
+        } else if self.trigrams.peek().unwrap().0 .0 < freq {
+            let mut worst = self.trigrams.peek_mut().unwrap();
+            *worst = Reverse((freq, term));
+        }
+    }
+
+    pub fn build(self) -> Dictionary {
+        Dictionary::build(
+            self.monograms
+                .into_iter()
+                .map(|Reverse((freq, term))| (term, freq)),
+            self.bigrams
+                .into_iter()
+                .map(|Reverse((freq, term))| (term, freq)),
+            self.trigrams
+                .into_iter()
+                .map(|Reverse((freq, term))| (term, freq)),
+        )
+    }
+}
+
+#[derive(Clone)]
+pub struct Dictionary {
+    inner: Arc<InnerDictionary>,
+}
+
+impl Dictionary {
+    pub fn build(
+        monograms: impl Iterator<Item = (String, u64)>,
+        bigrams: impl Iterator<Item = ((String, String), u64)>,
+        trigrams: impl Iterator<Item = ((String, String, String), u64)>,
+    ) -> Self {
+        let inner = InnerDictionary::build(monograms, bigrams, trigrams);
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+}
+
+impl Deref for Dictionary {
+    type Target = InnerDictionary;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
 /// Dictionary that contains term frequency information
-pub struct Dictionary<const TOP_N: usize> {
-    cache: BTreeMap<String, u64>,
-    map: InnerMap,
-    folder_path: Option<String>,
+pub struct InnerDictionary {
     total_freq: u64,
+    monograms: BTreeMap<Monogram, u64>,
+    bigrams: BTreeMap<Bigram, u64>,
+    trigrams: BTreeMap<Trigram, u64>,
+    terms: BTreeMap<String, TermId>,
+    rev_terms: BTreeMap<TermId, String>,
 }
 
-#[cfg(test)]
-impl Default for Dictionary<1_000> {
-    fn default() -> Self {
-        Dictionary::open::<&str>(None).unwrap()
-    }
-}
-
-impl<const TOP_N: usize> Dictionary<TOP_N> {
-    pub fn open<P: AsRef<Path>>(folder_path: Option<P>) -> Result<Self> {
-        if let Some(path) = folder_path.as_ref() {
-            fs::create_dir_all(path)?;
-        }
-
-        let folder_path = folder_path.map(|path| path.as_ref().to_str().unwrap().to_string());
-
-        let map = match &folder_path {
-            Some(path) => {
-                let dictionary_path = Path::new(path).join("dictionary");
-
-                if !dictionary_path.exists() {
-                    let file = File::create(dictionary_path.clone())?;
-                    let builder = MapBuilder::new(io::BufWriter::new(file))?;
-                    builder.finish()?;
-                }
-
-                let dictionary_file = OpenOptions::new().read(true).open(dictionary_path)?;
-
-                let mmap = unsafe { Mmap::map(&dictionary_file)? };
-                InnerMap::File(Map::new(mmap)?)
-            }
-            None => InnerMap::Memory(Map::default()),
+impl InnerDictionary {
+    fn build(
+        monograms: impl Iterator<Item = (String, u64)>,
+        bigrams: impl Iterator<Item = ((String, String), u64)>,
+        trigrams: impl Iterator<Item = ((String, String, String), u64)>,
+    ) -> Self {
+        let mut dict = InnerDictionary {
+            total_freq: 0,
+            monograms: BTreeMap::new(),
+            bigrams: BTreeMap::new(),
+            trigrams: BTreeMap::new(),
+            terms: BTreeMap::new(),
+            rev_terms: BTreeMap::new(),
         };
 
-        Ok(Dictionary {
-            total_freq: map.total_freq(),
-            map,
-            folder_path,
-            cache: BTreeMap::default(),
+        dict.load_monograms(monograms);
+        dict.load_bigrams(bigrams);
+        dict.load_trigrams(trigrams);
+
+        dict
+    }
+
+    fn load_monograms(&mut self, monograms: impl Iterator<Item = (String, u64)>) {
+        for (term, freq) in monograms {
+            let l = self.terms.len();
+            let id = *self.terms.entry(term.clone()).or_insert_with(|| l as u64);
+            self.rev_terms.insert(id, term);
+            *self.monograms.entry(Monogram(id)).or_insert(0) += freq;
+            self.total_freq += freq;
+        }
+    }
+
+    fn load_bigrams(&mut self, bigrams: impl Iterator<Item = ((String, String), u64)>) {
+        for ((a, b), freq) in bigrams {
+            let l = self.terms.len();
+            let id_a = *self.terms.entry(a.clone()).or_insert_with(|| l as u64);
+            if self.rev_terms.get(&id_a).is_none() {
+                self.rev_terms.insert(id_a, a);
+            }
+
+            let l = self.terms.len();
+            let id_b = *self.terms.entry(b.clone()).or_insert_with(|| l as u64);
+            if self.rev_terms.get(&id_b).is_none() {
+                self.rev_terms.insert(id_b, b);
+            }
+
+            *self.bigrams.entry(Bigram(id_a, id_b)).or_insert(0) += freq;
+        }
+    }
+
+    fn load_trigrams(&mut self, trigrams: impl Iterator<Item = ((String, String, String), u64)>) {
+        for ((a, b, c), freq) in trigrams {
+            let l = self.terms.len();
+            let id_a = *self.terms.entry(a.clone()).or_insert_with(|| l as u64);
+            if self.rev_terms.get(&id_a).is_none() {
+                self.rev_terms.insert(id_a, a);
+            }
+
+            let l = self.terms.len();
+            let id_b = *self.terms.entry(b.clone()).or_insert_with(|| l as u64);
+            if self.rev_terms.get(&id_b).is_none() {
+                self.rev_terms.insert(id_b, b);
+            }
+
+            let l = self.terms.len();
+            let id_c = *self.terms.entry(c.clone()).or_insert_with(|| l as u64);
+            if self.rev_terms.get(&id_c).is_none() {
+                self.rev_terms.insert(id_c, c);
+            }
+
+            *self.trigrams.entry(Trigram(id_a, id_b, id_c)).or_insert(0) += freq;
+        }
+    }
+
+    #[inline]
+    pub fn score(&self, before: &[&str], term: &str, after: &[&str]) -> Option<f64> {
+        self.terms.get(term).map(|id| {
+            let mut d = 1;
+            let mut total_score = self.monograms[&Monogram(*id)] as f64 / self.total_freq as f64;
+
+            if !before.is_empty() {
+                if let Some(id_before) = self.terms.get(before[before.len() - 1]) {
+                    if let Some(bigram_freq) = self.bigrams.get(&Bigram(*id_before, *id)) {
+                        total_score +=
+                            *bigram_freq as f64 / self.monograms[&Monogram(*id_before)] as f64;
+                        d += 1;
+                    }
+
+                    if before.len() > 1 {
+                        if let Some(id_before_before) = self.terms.get(before[before.len() - 2]) {
+                            if let Some(trigram_freq) =
+                                self.trigrams
+                                    .get(&Trigram(*id_before_before, *id_before, *id))
+                            {
+                                if let Some(c_freq) =
+                                    self.bigrams.get(&Bigram(*id_before_before, *id_before))
+                                {
+                                    total_score += *trigram_freq as f64 / *c_freq as f64;
+                                    d += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !after.is_empty() {
+                if let Some(id_after) = self.terms.get(after[0]) {
+                    if let Some(bigram_freq) = self.bigrams.get(&Bigram(*id, *id_after)) {
+                        total_score += *bigram_freq as f64 / self.monograms[&Monogram(*id)] as f64;
+                        d += 1;
+                    }
+
+                    if after.len() > 1 {
+                        if let Some(id_after_after) = self.terms.get(after[1]) {
+                            if let Some(trigram_freq) =
+                                self.trigrams.get(&Trigram(*id, *id_after, *id_after_after))
+                            {
+                                if let Some(c_freq) = self.bigrams.get(&Bigram(*id, *id_after)) {
+                                    total_score += *trigram_freq as f64 / *c_freq as f64;
+                                    d += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !after.is_empty() && !before.is_empty() {
+                if let Some(id_after) = self.terms.get(after[after.len() - 1]) {
+                    if let Some(id_before) = self.terms.get(before[before.len() - 1]) {
+                        if let Some(trigram_freq) =
+                            self.trigrams.get(&Trigram(*id_before, *id, *id_after))
+                        {
+                            if let Some(c_freq) = self.bigrams.get(&Bigram(*id_before, *id)) {
+                                total_score += *trigram_freq as f64 / *c_freq as f64;
+                                d += 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            total_score / d as f64
         })
     }
 
-    fn store_union(&mut self, mut union: Union) -> Result<()> {
-        match &self.folder_path {
-            Some(path) => {
-                let path = Path::new(path);
-                let wrt = io::BufWriter::new(File::create(path.join("new_dictionary"))?);
-                let mut builder = MapBuilder::new(wrt)?;
-
-                let mut heap = BinaryHeap::with_capacity(TOP_N + 1);
-
-                while let Some((key, values)) = union.next() {
-                    let val: u64 = values.iter().map(|idx_val| idx_val.value).sum();
-
-                    heap.push((
-                        std::cmp::Reverse(val),
-                        String::from_utf8_lossy(key).to_string(),
-                    ));
-
-                    if heap.len() > TOP_N {
-                        heap.pop();
-                    }
-                }
-
-                let top_values: BTreeMap<_, _> =
-                    heap.into_iter().map(|(val, key)| (key, val.0)).collect();
-
-                for (key, value) in top_values {
-                    builder.insert(key, value)?;
-                }
-
-                let path = Path::new(path);
-                builder.finish()?;
-                std::fs::rename(path.join("new_dictionary"), path.join("dictionary"))?;
-                let mmap = unsafe { Mmap::map(&File::open(path.join("dictionary"))?)? };
-                self.map = InnerMap::File(Map::new(mmap)?);
-            }
-            None => {
-                let mut builder = MapBuilder::memory();
-
-                let mut heap = BinaryHeap::with_capacity(TOP_N + 1);
-
-                while let Some((key, values)) = union.next() {
-                    let val: u64 = values.iter().map(|idx_val| idx_val.value).sum();
-
-                    heap.push((
-                        std::cmp::Reverse(val),
-                        String::from_utf8_lossy(key).to_string(),
-                    ));
-
-                    if heap.len() > TOP_N {
-                        heap.pop();
-                    }
-                }
-
-                let top_values: BTreeMap<_, _> =
-                    heap.into_iter().map(|(val, key)| (key, val.0)).collect();
-
-                for (key, value) in top_values {
-                    builder.insert(key, value)?;
-                }
-
-                let bytes = builder.into_inner().unwrap();
-                self.map = InnerMap::Memory(Map::new(bytes)?);
-            }
-        };
-
-        Ok(())
+    pub fn terms(&self) -> impl Iterator<Item = (&String, &TermId)> {
+        self.terms.iter()
     }
 
-    pub fn commit(&mut self) -> Result<()> {
-        let cache = mem::take(&mut self.cache);
-        let cache_map = Map::from_iter(cache.into_iter())?;
-        let map = mem::replace(&mut self.map, InnerMap::Memory(Map::default()));
-
-        let union = match &map {
-            InnerMap::File(map) => map.op().add(&cache_map).union(),
-            InnerMap::Memory(map) => map.op().add(&cache_map).union(),
-        };
-        self.store_union(union)?;
-
-        self.total_freq = self.map.total_freq();
-
-        Ok(())
+    pub fn term_id(&self, term: &str) -> Option<&TermId> {
+        self.terms.get(term)
     }
 
-    pub fn insert(&mut self, term: &str) {
-        self.cache
-            .entry(
-                term.chars()
-                    .map(|c| c.to_ascii_lowercase())
-                    .filter(|c| !matches!(c, ',' | '.' | '\\' | '=' | '*' | '(' | ')'))
-                    .collect(),
+    pub fn term(&self, term_id: &u64) -> Option<&str> {
+        self.rev_terms.get(term_id).map(|s| s.as_str())
+    }
+}
+
+#[cfg(test)]
+pub fn build_from_str(text: &str) -> Dictionary {
+    use itertools::Itertools;
+    use std::collections::HashMap;
+    let mut mono_freqs = HashMap::new();
+    let mut bi_freqs = HashMap::new();
+    let mut tri_freqs = HashMap::new();
+
+    for word in text.split_ascii_whitespace() {
+        *mono_freqs.entry(word.to_string()).or_insert(0) += 1;
+    }
+
+    for (a, b) in text.split_ascii_whitespace().tuple_windows() {
+        *bi_freqs.entry((a.to_string(), b.to_string())).or_insert(0) += 1;
+    }
+
+    for (a, b, c) in text.split_ascii_whitespace().tuple_windows() {
+        *tri_freqs
+            .entry((a.to_string(), b.to_string(), c.to_string()))
+            .or_insert(0) += 1;
+    }
+
+    Dictionary::build(
+        text.split_ascii_whitespace()
+            .map(|word| (word.to_string(), mono_freqs[word])),
+        text.split_ascii_whitespace().tuple_windows().map(|(a, b)| {
+            (
+                (a.to_string(), b.to_string()),
+                bi_freqs[&(a.to_string(), b.to_string())],
             )
-            .or_insert(0)
-            .add_assign(1);
-    }
-
-    #[inline]
-    pub fn all_probabilities(
-        &self,
-        term: &str,
-        edit_distance: usize,
-    ) -> Vec<HashSet<DictionaryResult>> {
-        let searcher = fst::automaton::Levenshtein::new(term, edit_distance as u32);
-        let mut res = Vec::with_capacity(edit_distance + 1);
-
-        if searcher.is_err() {
-            return res;
-        }
-
-        for _ in 0..edit_distance + 1 {
-            res.push(HashSet::new());
-        }
-
-        let searcher = searcher.unwrap();
-
-        let mut matches = self.perform_search(&searcher);
-
-        while let Some((correction, freq)) = matches.next() {
-            let correction = std::str::from_utf8(correction).unwrap().to_owned();
-            let dist = LevenshteinDistance::compare(term, &correction);
-
-            let prob = freq as f64 / self.total_freq as f64;
-
-            res[dist].insert(DictionaryResult { correction, prob });
-        }
-
-        res
-    }
-
-    fn perform_search<A: Automaton>(&self, searcher: A) -> fst::map::Stream<'_, A> {
-        match &self.map {
-            InnerMap::File(map) => map.search(searcher).into_stream(),
-            InnerMap::Memory(map) => map.search(searcher).into_stream(),
-        }
-    }
-
-    #[inline]
-    pub fn probability(&self, term: &str) -> Option<f64> {
-        let searcher = fst::automaton::Str::new(term);
-        let mut matches = self.perform_search(&searcher);
-
-        matches
-            .next()
-            .map(|(_key, frequency)| frequency as f64 / self.total_freq as f64)
-    }
-
-    #[cfg(test)]
-    pub fn contains(&self, term: &str) -> bool {
-        self.probability(term).is_some()
-    }
-
-    pub fn insert_page(&mut self, webpage: &Webpage) {
-        let text = webpage.html.clean_text().cloned().unwrap_or_default();
-
-        let mut stream = Normal::default().token_stream(text.as_str());
-
-        while let Some(token) = stream.next() {
-            self.insert(&token.text);
-        }
-    }
-
-    pub fn merge(mut self, mut other: Dictionary<TOP_N>) -> Self {
-        self.commit().unwrap();
-        other.commit().unwrap();
-
-        let map = mem::replace(&mut self.map, InnerMap::Memory(Map::default()));
-
-        let union = match (&map, &other.map) {
-            (InnerMap::Memory(map), InnerMap::Memory(other_map)) => map.op().add(other_map).union(),
-            (InnerMap::Memory(map), InnerMap::File(other_map)) => map.op().add(other_map).union(),
-            (InnerMap::File(map), InnerMap::Memory(other_map)) => map.op().add(other_map).union(),
-            (InnerMap::File(map), InnerMap::File(other_map)) => map.op().add(other_map).union(),
-        };
-
-        self.store_union(union).unwrap();
-        self.total_freq = self.map.total_freq();
-
-        self
-    }
+        }),
+        text.split_ascii_whitespace()
+            .tuple_windows()
+            .map(|(a, b, c)| {
+                (
+                    (a.to_string(), b.to_string(), c.to_string()),
+                    tri_freqs[&(a.to_string(), b.to_string(), c.to_string())],
+                )
+            }),
+    )
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
     fn test_probability() {
-        let mut dict = Dictionary::default();
+        let dict = build_from_str("this is a test test");
 
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("test");
-
-        dict.commit().unwrap();
-
-        assert_eq!(dict.probability("this"), Some(0.2));
-        assert_eq!(dict.probability("is"), Some(0.2));
-        assert_eq!(dict.probability("a"), Some(0.2));
-        assert_eq!(dict.probability("test"), Some(0.4));
-    }
-
-    #[test]
-    fn test_uncontained_term() {
-        let mut dict = Dictionary::default();
-
-        dict.insert("this");
-        dict.insert("is");
-        dict.insert("a");
-        dict.insert("test");
-        dict.insert("test");
-
-        dict.commit().unwrap();
-
-        assert_eq!(dict.probability("the"), None);
-
-        assert!(dict.contains("this"));
-        assert!(dict.contains("is"));
-        assert!(dict.contains("test"));
-        assert!(!dict.contains("the"));
-    }
-
-    #[test]
-    fn test_probability_edit_3() {
-        let mut dict = Dictionary::default();
-
-        dict.insert("test");
-        dict.insert("twst");
-        dict.insert("kage");
-
-        dict.commit().unwrap();
-        let res = dict.all_probabilities("test", 2);
-
-        let mut num_elements = 0;
-
-        for set in res {
-            num_elements += set.len();
-        }
-
-        assert_eq!(num_elements, 2);
-    }
-
-    #[test]
-    fn merge() {
-        let mut dict1 = Dictionary::default();
-
-        dict1.insert("test");
-        dict1.insert("kage");
-
-        let mut dict2 = Dictionary::default();
-
-        dict2.insert("yay");
-        dict2.insert("ay");
-
-        let res = dict1.merge(dict2);
-
-        assert!(res.contains("test"));
-        assert!(res.contains("kage"));
-        assert!(res.contains("yay"));
-        assert!(res.contains("ay"));
-
-        assert_eq!(res.probability("test"), Some(1.0 / 4.0));
-        assert_eq!(res.probability("kage"), Some(1.0 / 4.0));
-        assert_eq!(res.probability("yay"), Some(1.0 / 4.0));
-        assert_eq!(res.probability("ay"), Some(1.0 / 4.0));
-    }
-
-    #[test]
-    fn only_store_top_n() {
-        let mut dict: Dictionary<2> = Dictionary::open::<&str>(None).unwrap();
-
-        dict.insert("test");
-        dict.insert("test");
-        dict.insert("hej");
-        dict.insert("kage");
-        dict.insert("kage");
-
-        dict.commit().unwrap();
-
-        assert!(dict.contains("test"));
-        assert!(dict.contains("kage"));
-        assert!(!dict.contains("hej"));
-    }
-
-    #[test]
-    fn weird_characters_ignored() {
-        let mut dict = Dictionary::default();
-
-        dict.insert("lennon,");
-
-        dict.commit().unwrap();
-
-        assert!(dict.contains("lennon"));
-        assert!(!dict.contains("lennon,"));
+        assert_eq!(
+            dict.score(&[], "this", &[]).unwrap(),
+            dict.score(&[], "is", &[]).unwrap()
+        );
+        assert!(dict.score(&[], "test", &[]).unwrap() > dict.score(&[], "this", &[]).unwrap());
     }
 }

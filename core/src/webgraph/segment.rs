@@ -211,19 +211,19 @@ impl StoredSegment {
                     j += 1;
                 }
 
-                if !packet.new_id_mapping.contains_key(node_id) {
-                    let r = packet
-                        .new_id_mapping
-                        .insert(*node_id, packet.next_segment_node_id);
-                    debug_assert!(r.is_none());
-                    let r = packet
-                        .new_rev_id_mapping
-                        .insert(packet.next_segment_node_id, *node_id);
-                    debug_assert!(r.is_none());
-                    packet.next_segment_node_id.0 += 1;
-                }
-
                 if !node_seen_before {
+                    if !packet.new_id_mapping.contains_key(node_id) {
+                        let r = packet
+                            .new_id_mapping
+                            .insert(*node_id, packet.next_segment_node_id);
+                        debug_assert!(r.is_none());
+                        let r = packet
+                            .new_rev_id_mapping
+                            .insert(packet.next_segment_node_id, *node_id);
+                        debug_assert!(r.is_none());
+                        packet.next_segment_node_id.0 += 1;
+                    }
+
                     let mut edges = HashSet::new();
 
                     let mut j = i;

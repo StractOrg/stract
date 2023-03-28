@@ -231,7 +231,6 @@ mod tests {
     #[test]
     fn harmonic_centrality() {
         let graph = test_graph();
-
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
@@ -280,5 +279,29 @@ mod tests {
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 
         assert_eq!(centrality.host, centrality_extra.host);
+    }
+
+    #[test]
+    fn same_centrality_after_segment_merge() {
+        let mut graph = WebgraphBuilder::new_memory().open();
+
+        graph.insert(Node::from("A"), Node::from("B"), String::new());
+        graph.commit();
+        graph.insert(Node::from("B"), Node::from("C"), String::new());
+        graph.commit();
+        graph.insert(Node::from("A"), Node::from("C"), String::new());
+        graph.commit();
+        graph.insert(Node::from("C"), Node::from("A"), String::new());
+        graph.commit();
+        graph.insert(Node::from("D"), Node::from("C"), String::new());
+        graph.commit();
+
+        graph.merge_segments(1);
+        let centrality = HarmonicCentrality::calculate(&graph);
+
+        let orig_graph = test_graph();
+        let orig_centrality = HarmonicCentrality::calculate(&orig_graph);
+
+        assert_eq!(centrality.host, orig_centrality.host);
     }
 }
