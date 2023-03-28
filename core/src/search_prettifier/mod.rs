@@ -17,12 +17,15 @@
 mod entity;
 mod stack_overflow;
 
+use std::collections::HashMap;
+
 use chrono::{NaiveDateTime, Utc};
 use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     inverted_index::RetrievedWebpage,
+    ranking::Signal,
     spell::{self, CorrectionTerm},
     webpage::Url,
 };
@@ -160,7 +163,7 @@ pub struct DisplayedWebpage {
     pub snippet: Snippet,
     pub body: String,
     pub primary_image_uuid: Option<String>,
-    pub ranking_signals: Option<Vec<Option<f64>>>,
+    pub ranking_signals: Option<HashMap<Signal, f64>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

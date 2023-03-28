@@ -10,3 +10,4 @@ notes
 /data/**/*
 *.tar.gz
 *.csv
+ltr_scores.json

@@ -583,10 +583,12 @@ impl DistributedSearcher {
 
         if query.return_ranking_signals {
             for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {
-                let mut signals = Vec::with_capacity(ALL_SIGNALS.len());
+                let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
 
                 for signal in ALL_SIGNALS {
-                    signals.push(pointer.website.signals.get(signal).copied());
+                    if let Some(value) = pointer.website.signals.get(signal) {
+                        signals.insert(signal, *value);
+                    }
                 }
 
                 website.ranking_signals = Some(signals);

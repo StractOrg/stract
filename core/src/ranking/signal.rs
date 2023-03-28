@@ -53,7 +53,7 @@ pub enum Error {
     UnknownSignal(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
     Bm25,
     Bm25Title,
@@ -197,7 +197,7 @@ impl Signal {
             Signal::Bm25BacklinkText => 4.0,
             Signal::Bm25Description => 1.0,
             Signal::CrossEncoder => 100.0,
-            Signal::HostCentrality => 2_500.0,
+            Signal::HostCentrality => 10_000.0,
             Signal::PageCentrality => 4_500.0,
             Signal::TopicCentrality => 2_500.0,
             Signal::QueryCentrality => 1_000.0,
@@ -241,7 +241,7 @@ impl Signal {
         })
     }
 
-    pub fn compute(
+    fn compute(
         self,
         signal_aggregator: &mut SignalAggregator,
         doc: DocId,

@@ -17,19 +17,14 @@
 use crate::{
     inverted_index::InvertedIndex,
     ranking::{Signal, SignalCoefficient},
-    schema::{Field, TextField},
     search_ctx::Ctx,
     searcher::SearchQuery,
     webpage::region::Region,
     Result,
 };
 use optics::{ast::RankingTarget, Optic, SiteRankings};
-use std::{collections::HashMap, str::FromStr, sync::Arc};
-use tantivy::{
-    query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, QueryClone},
-    schema::Schema,
-    tokenizer::TokenizerManager,
-};
+use std::{collections::HashMap, str::FromStr};
+use tantivy::query::{BooleanQuery, Occur, QueryClone};
 
 mod const_query;
 pub mod intersection;
@@ -57,56 +52,6 @@ pub struct Query {
     top_n: usize,
 }
 
-fn proximity_queries(
-    simple_terms_text: Vec<String>,
-    schema: &Arc<Schema>,
-    tokenizer_manager: &TokenizerManager,
-) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
-    let mut proximity_queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = Vec::new();
-
-    let proxmity_fields = [
-        Field::Text(TextField::Title),
-        Field::Text(TextField::CleanBody),
-    ];
-
-    for field in &proxmity_fields {
-        let tantivy_field = schema.get_field(field.name()).unwrap();
-        let tantivy_entry = schema.get_field_entry(tantivy_field);
-
-        for (boost, slop) in [(32, 0), (16, 1), (8, 2), (4, 4), (2, 8), (1, 32)] {
-            let mut terms = Vec::new();
-
-            let mut num_terms = 0;
-            for term in &simple_terms_text {
-                let analyzer = Term::get_tantivy_analyzer(tantivy_entry, tokenizer_manager);
-                num_terms += 1;
-                terms.append(&mut Term::process_tantivy_term(
-                    term,
-                    analyzer,
-                    tantivy_field,
-                ));
-            }
-
-            if num_terms < 2 {
-                continue;
-            }
-
-            let terms = terms.into_iter().enumerate().collect();
-
-            proximity_queries.push((
-                Occur::Should,
-                BoostQuery::new(
-                    PhraseQuery::new_with_offset_and_slop(terms, slop).box_clone(),
-                    boost as f32,
-                )
-                .box_clone(),
-            ))
-        }
-    }
-
-    proximity_queries
-}
-
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
         let parsed_terms = parser::parse(&query.query);
@@ -130,7 +75,7 @@ impl Query {
         let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
             schema.fields().collect();
 
-        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
+        let queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
             .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
             .collect();
@@ -145,12 +90,6 @@ impl Query {
                 }
             })
             .collect();
-
-        queries.append(&mut proximity_queries(
-            simple_terms_text.clone(),
-            &schema,
-            tokenizer_manager,
-        ));
 
         let mut tantivy_query = Box::new(BooleanQuery::new(queries));
 
