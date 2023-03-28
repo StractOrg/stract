@@ -16,7 +16,7 @@ flate2 = "1.0.23"
 indicatif = { version = "0.16.2", features = ["rayon"] }
 itertools = "0.10.3"
 rayon = "1.5.3"
-reqwest = { version = "0.11.10", features = ["blocking", "stream"] }
+reqwest = { version = "0.11.16", features = ["blocking", "stream"] }
 serde = { version = "1.0.137", features = ["rc", "derive"] }
 serde_json = "1.0.81"
 tantivy = { git = "https://github.com/quickwit-oss/tantivy.git", rev = "5d4535de83d214765c29501f0418f1ff38a607b1" }
