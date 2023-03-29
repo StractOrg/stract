@@ -1120,8 +1120,9 @@ checksum = "25c7df09945d65ea8d70b3321547ed414bbc540aad5bac6883d021b970f35b04"
 
 [[package]]
 name = "fastfield_codecs"
-version = "0.3.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "374a3a53c1bd5fb31b10084229290eafb0a05f260ec90f1f726afffda4877a8a"
 dependencies = [
  "fastdivide",
  "itertools 0.10.5",
@@ -2491,7 +2492,8 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "ownedbytes"
 version = "0.4.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e957eaa64a299f39755416e5b3128c505e9d63a91d0453771ad2ccd3907f8db"
 dependencies = [
  "stable_deref_trait",
 ]
@@ -3674,8 +3676,9 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 
 [[package]]
 name = "tantivy"
-version = "0.19.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bb26a6b22c84d8be41d99a14016d6f04d30d8d31a2ea411a8ab553af5cc490d"
 dependencies = [
  "aho-corasick",
  "arc-swap",
@@ -3726,12 +3729,14 @@ dependencies = [
 [[package]]
 name = "tantivy-bitpacker"
 version = "0.3.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e71a0c95b82d4292b097a09b989a6380d28c3a86800c841a2d03bae1fc8b9fa6"
 
 [[package]]
 name = "tantivy-common"
 version = "0.4.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14fef4182bb60df9a4b92cd8ecab39ba2e50a05542934af17eef1f49660705cb"
 dependencies = [
  "byteorder",
  "ownedbytes",
@@ -3751,7 +3756,8 @@ dependencies = [
 [[package]]
 name = "tantivy-query-grammar"
 version = "0.19.0"
-source = "git+https://github.com/quickwit-oss/tantivy.git?rev=5d4535de83d214765c29501f0418f1ff38a607b1#5d4535de83d214765c29501f0418f1ff38a607b1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "343e3ada4c1c480953f6960f8a21ce9c76611480ffdd4f4e230fdddce0fc5331"
 dependencies = [
  "combine",
  "once_cell",

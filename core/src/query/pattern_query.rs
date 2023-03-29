@@ -221,7 +221,7 @@ impl tantivy::query::Weight for PatternWeight {
         let scorer_opt = self.pattern_scorer(reader, 1.0)?;
         if scorer_opt.is_none() {
             return Err(TantivyError::InvalidArgument(format!(
-                "Document #({doc}) does not match"
+                "Document #({doc}) does not match (empty scorer)"
             )));
         }
         let mut scorer = scorer_opt.unwrap();

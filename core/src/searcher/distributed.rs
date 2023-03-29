@@ -486,6 +486,7 @@ impl DistributedSearcher {
             num_results: NUM_RESULTS,
             optic_program: Some(include_str!("discussions.optic").to_string()),
             site_rankings: query.site_rankings.clone(),
+            return_ranking_signals: query.return_ranking_signals,
             ..Default::default()
         };
 
@@ -524,14 +525,36 @@ impl DistributedSearcher {
             return Ok(None);
         }
 
-        let result: Vec<DisplayedWebpage> = self
+        let mut result: Vec<DisplayedWebpage> = self
             .retrieve_webpages(&top_websites, &query.query)
             .await
             .into_iter()
             .map(DisplayedWebpage::from)
             .collect();
 
+        if query.return_ranking_signals {
+            self.add_ranking_signals(&mut result, &top_websites);
+        }
+
         Ok(Some(result))
+    }
+
+    fn add_ranking_signals(
+        &self,
+        websites: &mut [DisplayedWebpage],
+        pointers: &[ScoredWebsitePointer],
+    ) {
+        for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
+            let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
+
+            for signal in ALL_SIGNALS {
+                if let Some(value) = pointer.website.signals.get(signal) {
+                    signals.insert(signal, *value);
+                }
+            }
+
+            website.ranking_signals = Some(signals);
+        }
     }
 
     async fn search_websites(&self, query: &SearchQuery) -> Result<WebsitesResult> {
@@ -582,17 +605,7 @@ impl DistributedSearcher {
         }
 
         if query.return_ranking_signals {
-            for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {
-                let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
-
-                for signal in ALL_SIGNALS {
-                    if let Some(value) = pointer.website.signals.get(signal) {
-                        signals.insert(signal, *value);
-                    }
-                }
-
-                website.ranking_signals = Some(signals);
-            }
+            self.add_ranking_signals(&mut retrieved_webpages, &top_websites);
         }
 
         let direct_answer = self.answer(&query.query, &mut retrieved_webpages);

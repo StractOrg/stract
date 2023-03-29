@@ -195,7 +195,8 @@ impl InvertedIndex {
     where
         C: Collector<Fruit = Vec<WebsitePointer>>,
     {
-        let (count, pointers) = ctx.tv_searcher.search(query, &(Count, collector))?;
+        let collector = (Count, collector);
+        let (count, pointers) = ctx.tv_searcher.search(query, &collector)?;
 
         Ok(InitialSearchResult {
             num_websites: count,

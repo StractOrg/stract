@@ -320,6 +320,7 @@ impl<T: Doc> BucketCollector<T> {
                 self.count.update_counts(&best_doc);
                 self.update_best_doc();
             }
+
             res.push(best_doc.doc);
 
             if res.len() == self.top_n {

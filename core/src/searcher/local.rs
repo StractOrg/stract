@@ -213,9 +213,13 @@ impl LocalSearcher {
                     .unwrap_or_default(),
             );
             website.clean_body = Some(
-                doc.get_first(schema.get_field(TextField::CleanBody.name()).unwrap())
-                    .map(|text| text.as_text().unwrap().to_string())
-                    .unwrap_or_default(),
+                doc.get_first(
+                    schema
+                        .get_field(TextField::StemmedCleanBody.name())
+                        .unwrap(),
+                )
+                .map(|text| text.as_text().unwrap().to_string())
+                .unwrap_or_default(),
             );
         }
 

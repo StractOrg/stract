@@ -212,7 +212,7 @@ impl Signal {
             Signal::ProximitySlop4 => 4.0,
             Signal::ProximitySlop8 => 2.0,
             Signal::CrossEncoder => 100.0,
-            Signal::HostCentrality => 6_000.0,
+            Signal::HostCentrality => 10_000.0,
             Signal::PageCentrality => 4_500.0,
             Signal::TopicCentrality => 2_500.0,
             Signal::QueryCentrality => 1_000.0,
@@ -832,6 +832,7 @@ impl SignalAggregator {
 
             for signal in ALL_SIGNALS {
                 if let Some(slop) = signal.proximity_slop() {
+                    let mut queries = Vec::new();
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
                         let mut terms = Vec::with_capacity(simple_terms.len());
@@ -843,15 +844,20 @@ impl SignalAggregator {
 
                         let mut phrase_query = PhraseQuery::new(terms);
                         phrase_query.set_slop(slop);
-
-                        let docset = phrase_query
-                            .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
-                            .unwrap()
-                            .scorer(segment_reader, 1.0)
-                            .unwrap();
-
-                        proximity_scorers.insert(signal, ProximityScorer { docset });
+                        queries.push((
+                            tantivy::query::Occur::Should,
+                            Box::new(phrase_query) as Box<dyn tantivy::query::Query>,
+                        ));
                     }
+
+                    let query = tantivy::query::BooleanQuery::new(queries);
+                    let docset = query
+                        .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                        .unwrap()
+                        .scorer(segment_reader, 1.0)
+                        .unwrap();
+
+                    proximity_scorers.insert(signal, ProximityScorer { docset });
                 }
             }
         }

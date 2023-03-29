@@ -1073,4 +1073,51 @@ mod tests {
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://b.com");
     }
+
+    #[test]
+    fn discussion_optic() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    include_str!("../../testcases/schema_org/infinity_war.html"),
+                    "https://a.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+        let res = searcher
+            .search(&SearchQuery {
+                query: "avengers endgame".to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+
+        assert!(!res.is_empty());
+        assert_eq!(&res[0].url, "https://a.com");
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "avengers endgame".to_string(),
+                optic_program: Some(include_str!("../searcher/discussions.optic").to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert!(res.is_empty());
+    }
 }
