@@ -94,34 +94,6 @@ impl<T: DocSet> DocSet for Union<T> {
         self.docsets.peek_min().unwrap().min_doc
     }
 
-    fn seek(&mut self, target: DocId) -> DocId {
-        let old_min = self.doc();
-
-        if old_min > target {
-            return old_min;
-        }
-
-        if old_min == TERMINATED {
-            return TERMINATED;
-        }
-
-        {
-            loop {
-                let head = self.docsets.peek_min().unwrap();
-
-                if head.min_doc != old_min || head.min_doc == target {
-                    break;
-                }
-
-                let mut head = self.docsets.peek_min_mut().unwrap();
-
-                head.min_doc = head.docset.get_mut().seek(target);
-            }
-        }
-
-        self.docsets.peek_min().unwrap().min_doc
-    }
-
     fn doc(&self) -> tantivy::DocId {
         self.docsets
             .peek_min()
