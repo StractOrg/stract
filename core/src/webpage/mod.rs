@@ -331,6 +331,11 @@ impl Html {
         html
     }
 
+    #[cfg(test)]
+    pub fn set_clean_text(&mut self, text: String) {
+        self.clean_text = Some(text);
+    }
+
     pub fn parse_without_text(html: &str, url: &str) -> Self {
         let root = kuchiki::parse_html().one(html);
         let mut url: Url = url.to_string().into();

@@ -835,15 +835,20 @@ impl SignalAggregator {
                     let mut queries = Vec::new();
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
+                        let tokenizer = field.tokenizer();
                         let mut terms = Vec::with_capacity(simple_terms.len());
 
                         for term in &simple_terms {
-                            let term = tantivy::Term::from_field_text(tv_field, term);
-                            terms.push(term);
+                            let mut stream = tokenizer.token_stream(term);
+                            while let Some(term) = stream.next() {
+                                let term = tantivy::Term::from_field_text(tv_field, &term.text);
+                                terms.push(term);
+                            }
                         }
 
                         let mut phrase_query = PhraseQuery::new(terms);
                         phrase_query.set_slop(slop);
+
                         queries.push((
                             tantivy::query::Occur::Should,
                             Box::new(phrase_query) as Box<dyn tantivy::query::Query>,
@@ -997,4 +1002,100 @@ pub struct ComputedSignal {
     pub signal: Signal,
     pub coefficient: f64,
     pub value: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::{
+        index::Index,
+        searcher::{LocalSearcher, SearchQuery},
+    };
+
+    use super::*;
+
+    fn signals_for_query(searcher: &LocalSearcher, q: &str) -> HashMap<Signal, f64> {
+        let res = searcher
+            .search(&SearchQuery {
+                query: q.to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        res[0].ranking_signals.clone().unwrap()
+    }
+    #[test]
+    fn test_proximity() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut webpage = Webpage::new(
+            &format!(
+                r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    {}
+                </body>
+            </html>
+            "#,
+                crate::rand_words(1_000)
+            ),
+            "https://www.example.com",
+        );
+
+        webpage
+            .html
+            .set_clean_text("a b c d e f g h i j k l m n o p q r s t u v w x y z".to_string());
+
+        index.insert(webpage).expect("failed to insert webpage");
+
+        index.commit().unwrap();
+
+        let searcher = LocalSearcher::new(index);
+
+        let signals = signals_for_query(&searcher, "a b");
+        assert!(signals[&Signal::ProximitySlop8] > 0.0);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop4]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop2]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop1]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop0]);
+
+        let signals = signals_for_query(&searcher, "a c");
+        assert!(signals[&Signal::ProximitySlop8] > 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop0], 0.0);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop4]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop2]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop1]);
+
+        let signals = signals_for_query(&searcher, "a d");
+        assert!(signals[&Signal::ProximitySlop8] > 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop0], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop1], 0.0);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop4]);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop2]);
+
+        let signals = signals_for_query(&searcher, "a e");
+        assert!(signals[&Signal::ProximitySlop8] > 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop0], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop1], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop2], 0.0);
+        assert!(signals[&Signal::ProximitySlop8] == signals[&Signal::ProximitySlop4]);
+
+        let signals = signals_for_query(&searcher, "a g");
+        assert!(signals[&Signal::ProximitySlop8] > 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop0], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop1], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop2], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop4], 0.0);
+
+        let signals = signals_for_query(&searcher, "a k");
+        assert_eq!(signals[&Signal::ProximitySlop0], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop1], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop2], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop4], 0.0);
+        assert_eq!(signals[&Signal::ProximitySlop8], 0.0);
+    }
 }

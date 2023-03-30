@@ -7,8 +7,8 @@ import pandas as pd
 from tqdm import tqdm
 
 STRACT_ENDPOINT = "localhost:3000"
-NUM_QUERIES = 10
-TOP_N_RESULTS = 10
+NUM_QUERIES = 1
+TOP_N_RESULTS = 2
 
 CENTRALITY_BOOST_OPTIC = 'Ranking(Signal("host_centrality"), 100000000);'
 

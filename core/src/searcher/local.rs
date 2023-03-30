@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use uuid::Uuid;
@@ -25,7 +26,7 @@ use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
 use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
-use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator};
+use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator, ALL_SIGNALS};
 use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
@@ -307,21 +308,33 @@ impl LocalSearcher {
         let has_more_results = search_len != top_websites.len();
 
         let pointers: Vec<_> = top_websites
-            .into_iter()
-            .map(|website| website.pointer)
+            .iter()
+            .map(|website| website.pointer.clone())
             .collect();
 
         let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
+
+        let mut webpages: Vec<_> = retrieved_sites
+            .into_iter()
+            .map(DisplayedWebpage::from)
+            .collect();
+
+        for (webpage, ranking) in webpages.iter_mut().zip(top_websites.into_iter()) {
+            let mut ranking_signals = HashMap::new();
+
+            for signal in ALL_SIGNALS {
+                ranking_signals.insert(signal, *ranking.signals.get(signal).unwrap_or(&0.0));
+            }
+
+            webpage.ranking_signals = Some(ranking_signals);
+        }
 
         Ok(WebsitesResult {
             spell_corrected_query: search_result
                 .spell_corrected_query
                 .map(HighlightedSpellCorrection::from),
             num_hits: search_result.num_websites,
-            webpages: retrieved_sites
-                .into_iter()
-                .map(DisplayedWebpage::from)
-                .collect(),
+            webpages,
             discussions: None,
             widget: None,
             direct_answer: None,
