@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
 use crate::ranking::centrality_store::SearchCentralityStore;
+use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator, ALL_SIGNALS};
 use crate::schema::TextField;
@@ -46,6 +48,7 @@ pub struct LocalSearcher {
     entity_index: Option<EntityIndex>,
     centrality_store: Option<SearchCentralityStore>,
     topic_centrality: Option<TopicCentrality>,
+    linear_regression: Option<Arc<LinearRegression>>,
 }
 
 impl From<Index> for LocalSearcher {
@@ -69,6 +72,7 @@ impl LocalSearcher {
             entity_index: None,
             centrality_store: None,
             topic_centrality: None,
+            linear_regression: None,
         }
     }
 
@@ -82,6 +86,10 @@ impl LocalSearcher {
 
     pub fn set_topic_centrality(&mut self, topic_centrality: TopicCentrality) {
         self.topic_centrality = Some(topic_centrality);
+    }
+
+    pub fn set_linear_model(&mut self, model: LinearRegression) {
+        self.linear_regression = Some(Arc::new(model));
     }
 
     fn parse_query(&self, ctx: &Ctx, query: &SearchQuery) -> Result<Query> {
@@ -185,6 +193,10 @@ impl LocalSearcher {
 
         aggregator.set_region_count(self.index.region_count.clone());
 
+        if let Some(model) = self.linear_regression.as_ref() {
+            aggregator.set_linear_model(model.clone());
+        }
+
         let ranker = self.ranker(&parsed_query, ctx, de_rank_similar, aggregator)?;
 
         let res = self.index.inverted_index.search_initial(
@@ -281,7 +293,7 @@ impl LocalSearcher {
 
     /// This function is mainly used for tests and benchmarks
     pub fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
-        use std::{sync::Arc, time::Instant};
+        use std::time::Instant;
 
         use crate::{
             ranking::models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},

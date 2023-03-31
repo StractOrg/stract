@@ -46,6 +46,7 @@ use crate::{
 
 use super::bm25::Bm25Weight;
 use super::inbound_similarity;
+use super::models::linear::LinearRegression;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -390,7 +391,7 @@ impl Signal {
 
         value.map(|value| ComputedSignal {
             signal: self,
-            coefficient: signal_aggregator.coefficients().get(&self),
+            coefficient: signal_aggregator.coefficient(&self),
             value,
         })
     }
@@ -472,7 +473,7 @@ impl Signal {
 
         value.map(|value| ComputedSignal {
             signal: self,
-            coefficient: signal_aggregator.coefficients().get(&self),
+            coefficient: signal_aggregator.coefficient(&self),
             value,
         })
     }
@@ -593,32 +594,24 @@ fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SignalCoefficient(Vec<Option<f64>>);
+#[derive(Debug, Clone)]
+pub struct SignalCoefficient {
+    map: EnumMap<Signal, f64>,
+}
 
 impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> f64 {
-        self.0
-            .get((*signal) as usize)
-            .copied()
-            .flatten()
-            .unwrap_or_else(|| signal.default_coefficient())
+    pub fn get(&self, signal: &Signal) -> Option<f64> {
+        self.map.get(*signal).copied()
     }
 
     pub fn new(coefficients: impl Iterator<Item = (Signal, f64)>) -> Self {
-        let mut fast_coefficients = Vec::new();
+        let mut map = EnumMap::default();
 
         for (signal, coefficient) in coefficients {
-            let idx = signal as usize;
-
-            while idx >= fast_coefficients.len() {
-                fast_coefficients.push(None);
-            }
-
-            fast_coefficients[idx] = Some(coefficient);
+            map.insert(signal, coefficient);
         }
 
-        Self(fast_coefficients)
+        Self { map }
     }
 }
 
@@ -651,7 +644,7 @@ struct SegmentReader {
 
 pub struct SignalAggregator {
     query: Option<Query>,
-    signal_coefficients: SignalCoefficient,
+    query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
     personal_centrality: Option<Arc<online_harmonic::Scorer>>,
     inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
@@ -662,13 +655,14 @@ pub struct SignalAggregator {
     region_count: Option<Arc<RegionCount>>,
     selected_region: Option<Region>,
     current_timestamp: Option<usize>,
+    linear_regression: Option<Arc<LinearRegression>>,
 }
 
 impl Clone for SignalAggregator {
     fn clone(&self) -> Self {
         Self {
             query: self.query.clone(),
-            signal_coefficients: self.signal_coefficients.clone(),
+            query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
             personal_centrality: self.personal_centrality.clone(),
             inbound_similariy: self.inbound_similariy.clone(),
@@ -679,6 +673,7 @@ impl Clone for SignalAggregator {
             region_count: self.region_count.clone(),
             selected_region: self.selected_region,
             current_timestamp: self.current_timestamp,
+            linear_regression: self.linear_regression.clone(),
         }
     }
 }
@@ -693,10 +688,7 @@ impl std::fmt::Debug for SignalAggregator {
 
 impl SignalAggregator {
     pub fn new(query: Option<Query>) -> Self {
-        let signal_coefficients = query
-            .as_ref()
-            .map(|q| q.signal_coefficients())
-            .unwrap_or_default();
+        let query_signal_coefficients = query.as_ref().and_then(|q| q.signal_coefficients());
 
         let fetch_time_ms_cache: Vec<_> = (0..1000)
             .map(|fetch_time| 1.0 / (fetch_time as f64 + 1.0))
@@ -710,7 +702,7 @@ impl SignalAggregator {
             segment_reader: None,
             personal_centrality: None,
             inbound_similariy: None,
-            signal_coefficients,
+            query_signal_coefficients,
             fetch_time_ms_cache,
             update_time_cache,
             topic_scorer: None,
@@ -718,6 +710,7 @@ impl SignalAggregator {
             region_count: None,
             selected_region: None,
             current_timestamp: None,
+            linear_regression: None,
             query,
         }
     }
@@ -921,6 +914,10 @@ impl SignalAggregator {
         self.current_timestamp = Some(current_timestamp);
     }
 
+    pub fn set_linear_model(&mut self, linear_model: Arc<LinearRegression>) {
+        self.linear_regression = Some(linear_model);
+    }
+
     pub fn topic_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.topic_scorer
             .as_ref()
@@ -992,8 +989,16 @@ impl SignalAggregator {
             .sum()
     }
 
-    fn coefficients(&self) -> &SignalCoefficient {
-        &self.signal_coefficients
+    fn coefficient(&self, signal: &Signal) -> f64 {
+        self.query_signal_coefficients
+            .as_ref()
+            .and_then(|coefficients| coefficients.get(signal))
+            .or_else(|| {
+                self.linear_regression
+                    .as_ref()
+                    .and_then(|model| model.weights.get(*signal).copied())
+            })
+            .unwrap_or(signal.default_coefficient())
     }
 }
 

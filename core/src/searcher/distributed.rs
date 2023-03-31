@@ -548,9 +548,10 @@ impl DistributedSearcher {
             let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
 
             for signal in ALL_SIGNALS {
-                if let Some(value) = pointer.website.signals.get(signal) {
-                    signals.insert(signal, *value);
-                }
+                signals.insert(
+                    signal,
+                    pointer.website.signals.get(signal).copied().unwrap_or(0.0),
+                );
             }
 
             website.ranking_signals = Some(signals);

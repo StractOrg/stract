@@ -162,19 +162,16 @@ impl Query {
         &self.site_rankings
     }
 
-    pub fn signal_coefficients(&self) -> SignalCoefficient {
-        self.optic
-            .as_ref()
-            .map(|optic| {
-                SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
-                    match &coeff.target {
-                        RankingTarget::Signal(signal) => Signal::from_str(signal)
-                            .ok()
-                            .map(|signal| (signal, coeff.value)),
-                    }
-                }))
-            })
-            .unwrap_or_default()
+    pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {
+        self.optic.as_ref().map(|optic| {
+            SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
+                match &coeff.target {
+                    RankingTarget::Signal(signal) => Signal::from_str(signal)
+                        .ok()
+                        .map(|signal| (signal, coeff.value)),
+                }
+            }))
+        })
     }
 }
 
