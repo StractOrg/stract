@@ -26,6 +26,7 @@ use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
 use crate::ranking::centrality_store::SearchCentralityStore;
+use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator, ALL_SIGNALS};
@@ -49,6 +50,7 @@ pub struct LocalSearcher {
     centrality_store: Option<SearchCentralityStore>,
     topic_centrality: Option<TopicCentrality>,
     linear_regression: Option<Arc<LinearRegression>>,
+    lambda_model: Option<Arc<LambdaMART>>,
 }
 
 impl From<Index> for LocalSearcher {
@@ -73,6 +75,7 @@ impl LocalSearcher {
             centrality_store: None,
             topic_centrality: None,
             linear_regression: None,
+            lambda_model: None,
         }
     }
 
@@ -90,6 +93,10 @@ impl LocalSearcher {
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
         self.linear_regression = Some(Arc::new(model));
+    }
+
+    pub fn set_lambda_model(&mut self, model: LambdaMART) {
+        self.lambda_model = Some(Arc::new(model));
     }
 
     fn parse_query(&self, ctx: &Ctx, query: &SearchQuery) -> Result<Query> {
@@ -156,7 +163,8 @@ impl LocalSearcher {
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::ltr_for_query(&mut query);
+        let pipeline: RankingPipeline<RankingWebsite> =
+            RankingPipeline::ltr_for_query(&mut query, self.lambda_model.clone());
         let parsed_query = self.parse_query(ctx, &query)?;
 
         let mut aggregator = SignalAggregator::new(Some(parsed_query.clone()));
@@ -304,10 +312,13 @@ impl LocalSearcher {
         let mut search_query = query.clone();
 
         let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
-            Ok(model) => RankingPipeline::reranking_for_query(&mut search_query, Arc::new(model))?,
+            Ok(model) => {
+                RankingPipeline::reranking_for_query(&mut search_query, Arc::new(model), None)?
+            }
             Err(_) => RankingPipeline::reranking_for_query(
                 &mut search_query,
                 Arc::new(DummyCrossEncoder {}),
+                None,
             )?,
         };
 

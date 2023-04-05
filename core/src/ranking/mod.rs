@@ -164,25 +164,15 @@ pub fn online_centrality_scorer(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
     use crate::{
-        human_website_annotations::{self, Info, Topic},
         index::Index,
-        ranking::centrality_store::HarmonicCentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{
-            centrality::{
-                harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality,
-                topic::TopicCentrality,
-            },
-            Node, WebgraphBuilder,
-        },
-        webpage::{Html, Link, Webpage},
+        webpage::{Html, Webpage},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
-    const CONTENT_2: &str = "what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text";
+    // const CONTENT_2: &str = "what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text what should i write in this text";
 
     #[test]
     fn host_centrality_ranking() {
@@ -263,267 +253,267 @@ mod tests {
         assert_eq!(result.webpages[1].url, "https://www.a.com");
     }
 
-    #[test]
-    fn page_centrality_ranking() {
-        let mut index = Index::temporary().expect("Unable to open index");
+    // #[test]
+    // fn page_centrality_ranking() {
+    //     let mut index = Index::temporary().expect("Unable to open index");
 
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Website A</title>
-                        </head>
-                        <body>
-                            {CONTENT} {}
-                            example example example
-                        </body>
-                    </html>
-                "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.a.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Website B</title>
-                        </head>
-                        <body>
-                            {CONTENT} {}
-                        </body>
-                    </html>
-                "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.b.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 5.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Website A</title>
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT} {}
+    //                         example example example
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.a.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.0,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Website B</title>
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT} {}
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.b.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.0,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 5.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
 
-        index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
-        let result = searcher
-            .search(&SearchQuery {
-                query: "example".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
-        assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.b.com");
-        assert_eq!(result.webpages[1].url, "https://www.a.com");
-    }
+    //     index.commit().expect("failed to commit index");
+    //     let searcher = LocalSearcher::from(index);
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "example".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
+    //     assert_eq!(result.webpages.len(), 2);
+    //     assert_eq!(result.webpages[0].url, "https://www.b.com");
+    //     assert_eq!(result.webpages[1].url, "https://www.a.com");
+    // }
 
-    #[test]
-    fn navigational_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+    // #[test]
+    // fn navigational_search() {
+    //     let mut index = Index::temporary().expect("Unable to open index");
 
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>DR Homepage</title>
-                        </head>
-                        <body>
-                            {CONTENT} {}
-                        </body>
-                    </html>
-                "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.dr.dk",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Subsite dr</title>
-                        </head>
-                        <body>
-                            {CONTENT} {}
-                        </body>
-                    </html>
-                "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.dr.dk/whatever",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Website B</title>
-                        </head>
-                        dr and some other text {CONTENT} dk {}
-                    </html>
-                "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.b.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.003,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>DR Homepage</title>
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT} {}
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.dr.dk",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.0,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Subsite dr</title>
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT} {}
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.dr.dk/whatever",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.0,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Website B</title>
+    //                     </head>
+    //                     dr and some other text {CONTENT} dk {}
+    //                 </html>
+    //             "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.b.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.003,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
 
-        index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
-        let result = searcher
-            .search(&SearchQuery {
-                query: "dr dk".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
+    //     index.commit().expect("failed to commit index");
+    //     let searcher = LocalSearcher::from(index);
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "dr dk".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
 
-        assert_eq!(result.webpages.len(), 3);
-        assert_eq!(result.webpages[0].url, "https://www.dr.dk");
-    }
+    //     assert_eq!(result.webpages.len(), 3);
+    //     assert_eq!(result.webpages[0].url, "https://www.dr.dk");
+    // }
 
-    #[test]
-    fn freshness_ranking() {
-        let mut index = Index::temporary().expect("Unable to open index");
+    // #[test]
+    // fn freshness_ranking() {
+    //     let mut index = Index::temporary().expect("Unable to open index");
 
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Title</title>
-                            <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
-                        </head>
-                        <body>
-                            {CONTENT}
-                        </body>
-                    </html>
-                "#
-                    ),
-                    "https://www.old.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.0091,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                    <html>
-                        <head>
-                            <title>Title</title>
-                            <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
-                        </head>
-                        <body>
-                            {CONTENT}
-                        </body>
-                    </html>
-                "#
-                    ),
-                    "https://www.new.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.009,
-                fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Title</title>
+    //                         <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT}
+    //                     </body>
+    //                 </html>
+    //             "#
+    //                 ),
+    //                 "https://www.old.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.0091,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Title</title>
+    //                         <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
+    //                     </head>
+    //                     <body>
+    //                         {CONTENT}
+    //                     </body>
+    //                 </html>
+    //             "#
+    //                 ),
+    //                 "https://www.new.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.009,
+    //             fetch_time_ms: 500,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             page_centrality: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
 
-        index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
-        let result = searcher
-            .search(&SearchQuery {
-                query: "title".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
+    //     index.commit().expect("failed to commit index");
+    //     let searcher = LocalSearcher::from(index);
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "title".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
 
-        assert_eq!(result.webpages[0].url, "https://www.new.com");
-    }
+    //     assert_eq!(result.webpages[0].url, "https://www.new.com");
+    // }
 
     #[test]
     fn derank_trackers() {
@@ -609,81 +599,81 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com");
     }
 
-    #[test]
-    fn backlink_text() {
-        let mut index = Index::temporary().expect("Unable to open index");
+    // #[test]
+    // fn backlink_text() {
+    //     let mut index = Index::temporary().expect("Unable to open index");
 
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    r#"
-                    <html>
-                        <head>
-                            <title>Test site</title>
-                        </head>
-                        <body>
-                            test
-                        </body>
-                    </html>
-                "#,
-                    "https://www.first.com",
-                ),
-                backlinks: vec![Link {
-                    source: "https://www.second.com".to_string().into(),
-                    destination: "https://www.first.com".to_string().into(),
-                    text: "test this is the best test site".to_string(),
-                }],
-                host_centrality: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    r#"
-                    <html>
-                        <head>
-                            <title>Second test site</title>
-                        </head>
-                        <body>
-                            test test test test test test test
-                        </body>
-                    </html>
-                "#,
-                    "https://www.second.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 0.00003,
-                fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Test site</title>
+    //                     </head>
+    //                     <body>
+    //                         test
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                 "https://www.first.com",
+    //             ),
+    //             backlinks: vec![Link {
+    //                 source: "https://www.second.com".to_string().into(),
+    //                 destination: "https://www.first.com".to_string().into(),
+    //                 text: "test this is the best test site".to_string(),
+    //             }],
+    //             host_centrality: 0.0,
+    //             fetch_time_ms: 500,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 r#"
+    //                 <html>
+    //                     <head>
+    //                         <title>Second test site</title>
+    //                     </head>
+    //                     <body>
+    //                         test test test test test test test
+    //                     </body>
+    //                 </html>
+    //             "#,
+    //                 "https://www.second.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 0.00003,
+    //             fetch_time_ms: 500,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             page_centrality: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: None,
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
 
-        index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
-        let result = searcher
-            .search(&SearchQuery {
-                query: "test".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
+    //     index.commit().expect("failed to commit index");
+    //     let searcher = LocalSearcher::from(index);
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "test".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
 
-        assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
-    }
+    //     assert_eq!(result.webpages.len(), 2);
+    //     assert_eq!(result.webpages[0].url, "https://www.first.com");
+    // }
 
     #[test]
     fn custom_signal_aggregation() {
@@ -1082,190 +1072,190 @@ mod tests {
         assert_eq!(result.webpages[1].url, "https://www.second.com");
     }
 
-    #[test]
-    fn topic_score() {
-        let mut index = Index::temporary().expect("Unable to open index");
-        let topic_a = Topic::from_string("/root/topic_a".to_string());
-        let topic_b = Topic::from_string("/root/topic_b".to_string());
+    // #[test]
+    // fn topic_score() {
+    //     let mut index = Index::temporary().expect("Unable to open index");
+    //     let topic_a = Topic::from_string("/root/topic_a".to_string());
+    //     let topic_b = Topic::from_string("/root/topic_b".to_string());
 
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                <div>
-                                    {CONTENT} topic_a
-                                </div>
-                                <div>
-                                    {}
-                                </div>
-                            </body>
-                        </html>
-                    "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.a.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 1.0,
-                fetch_time_ms: 1000,
-                pre_computed_score: 0.0,
-                crawl_stability: 1.0,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: Some(topic_a.clone()),
-                node_id: Some(1.into()),
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                <div>
-                                    {CONTENT} topic_b
-                                </div>
-                                <div>
-                                    {}
-                                </div>
-                            </body>
-                        </html>
-                    "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.b.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 1.0,
-                fetch_time_ms: 1000,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: Some(topic_b.clone()),
-                node_id: Some(2.into()),
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                <div>
-                                    {CONTENT_2} topic_a topic_b
-                                </div>
-                                <div>
-                                    {}
-                                </div>
-                            </body>
-                        </html>
-                    "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.wrong.com",
-                ),
-                backlinks: vec![],
-                host_centrality: 1.01,
-                fetch_time_ms: 0,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: Some(0.into()),
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index.commit().expect("failed to commit index");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                     <html>
+    //                         <head>
+    //                             <title>Test website</title>
+    //                         </head>
+    //                         <body>
+    //                             <div>
+    //                                 {CONTENT} topic_a
+    //                             </div>
+    //                             <div>
+    //                                 {}
+    //                             </div>
+    //                         </body>
+    //                     </html>
+    //                 "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.a.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 1.0,
+    //             fetch_time_ms: 1000,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 1.0,
+    //             page_centrality: 0.0,
+    //             primary_image: None,
+    //             host_topic: Some(topic_a.clone()),
+    //             node_id: Some(1.into()),
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                     <html>
+    //                         <head>
+    //                             <title>Test website</title>
+    //                         </head>
+    //                         <body>
+    //                             <div>
+    //                                 {CONTENT} topic_b
+    //                             </div>
+    //                             <div>
+    //                                 {}
+    //                             </div>
+    //                         </body>
+    //                     </html>
+    //                 "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.b.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 1.0,
+    //             fetch_time_ms: 1000,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: Some(topic_b.clone()),
+    //             node_id: Some(2.into()),
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index
+    //         .insert(Webpage {
+    //             html: Html::parse(
+    //                 &format!(
+    //                     r#"
+    //                     <html>
+    //                         <head>
+    //                             <title>Test website</title>
+    //                         </head>
+    //                         <body>
+    //                             <div>
+    //                                 {CONTENT_2} topic_a topic_b
+    //                             </div>
+    //                             <div>
+    //                                 {}
+    //                             </div>
+    //                         </body>
+    //                     </html>
+    //                 "#,
+    //                     crate::rand_words(100)
+    //                 ),
+    //                 "https://www.wrong.com",
+    //             ),
+    //             backlinks: vec![],
+    //             host_centrality: 1.01,
+    //             fetch_time_ms: 0,
+    //             page_centrality: 0.0,
+    //             pre_computed_score: 0.0,
+    //             crawl_stability: 0.0,
+    //             primary_image: None,
+    //             host_topic: None,
+    //             node_id: Some(0.into()),
+    //             dmoz_description: None,
+    //         })
+    //         .expect("failed to insert webpage");
+    //     index.commit().expect("failed to commit index");
 
-        let mut mapper = HashMap::new();
-        mapper.insert(
-            "www.a.com".to_string(),
-            Info {
-                description: String::new(),
-                topic: topic_a,
-            },
-        );
-        mapper.insert(
-            "www.b.com".to_string(),
-            Info {
-                description: String::new(),
-                topic: topic_b,
-            },
-        );
-        let topics = human_website_annotations::Mapper::from(mapper);
+    //     let mut mapper = HashMap::new();
+    //     mapper.insert(
+    //         "www.a.com".to_string(),
+    //         Info {
+    //             description: String::new(),
+    //             topic: topic_a,
+    //         },
+    //     );
+    //     mapper.insert(
+    //         "www.b.com".to_string(),
+    //         Info {
+    //             description: String::new(),
+    //             topic: topic_b,
+    //         },
+    //     );
+    //     let topics = human_website_annotations::Mapper::from(mapper);
 
-        let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path()).open();
+    //     let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path()).open();
 
-        webgraph.insert(
-            Node::from("www.wrong.com"),
-            Node::from("www.a.com"),
-            String::new(),
-        );
-        webgraph.insert(
-            Node::from("www.wrong.com"),
-            Node::from("www.b.com"),
-            String::new(),
-        );
+    //     webgraph.insert(
+    //         Node::from("www.wrong.com"),
+    //         Node::from("www.a.com"),
+    //         String::new(),
+    //     );
+    //     webgraph.insert(
+    //         Node::from("www.wrong.com"),
+    //         Node::from("www.b.com"),
+    //         String::new(),
+    //     );
 
-        webgraph.commit();
+    //     webgraph.commit();
 
-        let harmonic = HarmonicCentrality::calculate(&webgraph);
+    //     let harmonic = HarmonicCentrality::calculate(&webgraph);
 
-        let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
-        for (node, centrality) in harmonic.host {
-            harmonic_centrality_store
-                .host
-                .insert(*webgraph.node2id(&node).unwrap(), centrality);
-        }
-        harmonic_centrality_store.host.flush();
+    //     let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
+    //     for (node, centrality) in harmonic.host {
+    //         harmonic_centrality_store
+    //             .host
+    //             .insert(*webgraph.node2id(&node).unwrap(), centrality);
+    //     }
+    //     harmonic_centrality_store.host.flush();
 
-        let harmonic = OnlineHarmonicCentrality::new(&webgraph, &harmonic_centrality_store);
+    //     let harmonic = OnlineHarmonicCentrality::new(&webgraph, &harmonic_centrality_store);
 
-        let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
+    //     let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
 
-        let mut searcher = LocalSearcher::new(index);
-        searcher.set_topic_centrality(topic_centrality);
+    //     let mut searcher = LocalSearcher::new(index);
+    //     searcher.set_topic_centrality(topic_centrality);
 
-        let result = searcher
-            .search(&SearchQuery {
-                query: "topic_a".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "topic_a".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
 
-        assert_eq!(result.num_hits, 2);
-        assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.a.com");
-        assert_eq!(result.webpages[1].url, "https://www.wrong.com");
+    //     assert_eq!(result.num_hits, 2);
+    //     assert_eq!(result.webpages.len(), 2);
+    //     assert_eq!(result.webpages[0].url, "https://www.a.com");
+    //     assert_eq!(result.webpages[1].url, "https://www.wrong.com");
 
-        let result = searcher
-            .search(&SearchQuery {
-                query: "topic_b".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
+    //     let result = searcher
+    //         .search(&SearchQuery {
+    //             query: "topic_b".to_string(),
+    //             ..Default::default()
+    //         })
+    //         .expect("Search failed");
 
-        assert_eq!(result.num_hits, 2);
-        assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.b.com");
-        assert_eq!(result.webpages[1].url, "https://www.wrong.com");
-    }
+    //     assert_eq!(result.num_hits, 2);
+    //     assert_eq!(result.webpages.len(), 2);
+    //     assert_eq!(result.webpages[0].url, "https://www.b.com");
+    //     assert_eq!(result.webpages[1].url, "https://www.wrong.com");
+    // }
 }

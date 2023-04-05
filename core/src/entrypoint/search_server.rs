@@ -26,7 +26,10 @@ use crate::{
     entity_index::EntityIndex,
     index::Index,
     inverted_index,
-    ranking::{centrality_store::SearchCentralityStore, models::linear::LinearRegression},
+    ranking::{
+        centrality_store::SearchCentralityStore,
+        models::{lambdamart::LambdaMART, linear::LinearRegression},
+    },
     searcher::{self, LocalSearcher},
     sonic, Result, SearchServerConfig,
 };
@@ -55,6 +58,10 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
 
     if let Some(model_path) = config.linear_model_path {
         local_searcher.set_linear_model(LinearRegression::open(model_path)?);
+    }
+
+    if let Some(model_path) = config.lambda_model_path {
+        local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
     }
 
     // dropping the handle leaves the cluster

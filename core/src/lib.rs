@@ -168,6 +168,7 @@ pub struct FrontendConfig {
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: String,
+    pub lambda_model_path: Option<String>,
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
@@ -186,6 +187,7 @@ pub struct SearchServerConfig {
     pub entity_index_path: Option<String>,
     pub centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
+    pub lambda_model_path: Option<String>,
     pub host: SocketAddr,
 }
 
@@ -283,6 +285,9 @@ pub enum Error {
 
     #[error("Cluster")]
     Cluster(#[from] cluster::Error),
+
+    #[error("Lambdamart")]
+    LambdaMART(#[from] ranking::models::lambdamart::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

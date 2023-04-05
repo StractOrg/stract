@@ -20,7 +20,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{enum_map::EnumMap, inverted_index::WebsitePointer, searcher::SearchQuery, Result};
 
-use super::{models::cross_encoder::CrossEncoder, Signal, SignalAggregator};
+use super::{
+    models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
+    Signal, SignalAggregator, SignalCoefficient,
+};
 
 pub trait AsRankingWebsite: Clone {
     fn as_ranking(&self) -> &RankingWebsite;
@@ -43,6 +46,7 @@ pub struct RankingWebsite {
     pub signals: EnumMap<Signal, f64>,
     pub title: Option<String>,
     pub clean_body: Option<String>,
+    pub optic_boost: Option<f64>,
     pub score: f64,
 }
 
@@ -53,12 +57,21 @@ impl RankingWebsite {
             title: None,
             clean_body: None,
             score: pointer.score.total,
+            optic_boost: None,
             pointer: pointer.clone(),
         };
 
+        let mut total = 0.0;
         for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
             res.signals
                 .insert(computed_signal.signal, computed_signal.value);
+            total += computed_signal.value * computed_signal.coefficient;
+        }
+
+        res.signals.insert(Signal::LinearRegression, total);
+
+        if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
+            res.optic_boost = Some(boost);
         }
 
         res
@@ -71,21 +84,23 @@ trait Scorer<T: AsRankingWebsite>: Send + Sync {
 }
 
 struct ReRanker<M: CrossEncoder> {
-    model: Arc<M>,
-    query: String,
+    crossencoder: Arc<M>,
+    lambda_mart: Option<Arc<LambdaMART>>,
+    query: Option<SearchQuery>,
+    signal_coefficients: Option<SignalCoefficient>,
 }
 
 impl<M: CrossEncoder> ReRanker<M> {
-    fn new(model: Arc<M>) -> Self {
+    fn new(crossencoder: Arc<M>, lambda: Option<Arc<LambdaMART>>) -> Self {
         Self {
-            model,
-            query: String::new(),
+            crossencoder,
+            lambda_mart: lambda,
+            query: None,
+            signal_coefficients: None,
         }
     }
-}
 
-impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
-    fn score(&self, websites: &mut [T]) {
+    fn crossencoder_score_websites<T: AsRankingWebsite>(&self, websites: &mut [T]) {
         let mut bodies = Vec::with_capacity(websites.len());
 
         for website in websites.iter_mut() {
@@ -96,34 +111,128 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
             bodies.push(text);
         }
 
-        let scores = self.model.run(&self.query, &bodies);
+        let query = &self.query.as_ref().unwrap().query;
+        let scores = self.crossencoder.run(query, &bodies);
 
         for (website, score) in websites.iter_mut().zip(scores.into_iter()) {
             let website = website.as_mut_ranking();
             website.signals.insert(Signal::CrossEncoder, score);
-            website.score += score;
+        }
+    }
+}
+
+impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
+    fn score(&self, websites: &mut [T]) {
+        self.crossencoder_score_websites(websites);
+
+        for website in websites.iter_mut() {
+            let mut website = website.as_mut_ranking();
+            let score = calculate_score(
+                &self.lambda_mart,
+                &self.signal_coefficients,
+                &website.signals,
+            );
+
+            if let Some(coeffs) = &self.signal_coefficients {
+                if let Some(coeff) = coeffs.get(&Signal::CrossEncoder) {
+                    website.score =
+                        score + coeff * website.signals.get(Signal::CrossEncoder).unwrap();
+                } else {
+                    website.score = score;
+                }
+            } else {
+                website.score = score;
+            }
         }
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
-        self.query = query.query.clone();
+        self.query = Some(query.clone());
+
+        self.signal_coefficients = query
+            .optic_program
+            .as_ref()
+            .and_then(|p| optics::parse(p.as_str()).ok())
+            .map(|optic| SignalCoefficient::from_optic(&optic));
     }
 }
 
-#[derive(Default)]
-struct PrioritizeText {}
+fn calculate_score(
+    model: &Option<Arc<LambdaMART>>,
+    signal_coefficients: &Option<SignalCoefficient>,
+    signals: &EnumMap<Signal, f64>,
+) -> f64 {
+    let lambda_score = match model {
+        Some(model) => match signal_coefficients {
+            Some(coefficients) => match coefficients.get(&Signal::LambdaMART) {
+                Some(coeff) => {
+                    if coeff == 0.0 {
+                        signals
+                            .get(Signal::LinearRegression)
+                            .copied()
+                            .unwrap_or(0.0)
+                    } else {
+                        coeff * model.predict(signals)
+                    }
+                }
+                None => Signal::LambdaMART.default_coefficient() * model.predict(signals),
+            },
+            None => Signal::LambdaMART.default_coefficient() * model.predict(signals),
+        },
+        None => signals
+            .get(Signal::LinearRegression)
+            .copied()
+            .unwrap_or(0.0),
+    };
 
-impl<T: AsRankingWebsite> Scorer<T> for PrioritizeText {
+    let inbound_sim = signals
+        .get(Signal::InboundSimilarity)
+        .copied()
+        .unwrap_or(0.0);
+    let inbound_sim_score = match signal_coefficients {
+        Some(coeffs) => match coeffs.get(&Signal::InboundSimilarity) {
+            Some(coeff) => coeff * inbound_sim,
+            None => Signal::InboundSimilarity.default_coefficient() * inbound_sim,
+        },
+        None => Signal::InboundSimilarity.default_coefficient() * inbound_sim,
+    };
+
+    let personal_cent = signals
+        .get(Signal::PersonalCentrality)
+        .copied()
+        .unwrap_or(0.0);
+    let personal_cent_score = match signal_coefficients {
+        Some(coeffs) => match coeffs.get(&Signal::PersonalCentrality) {
+            Some(coeff) => coeff * personal_cent,
+            None => Signal::PersonalCentrality.default_coefficient() * personal_cent,
+        },
+        None => Signal::PersonalCentrality.default_coefficient() * personal_cent,
+    };
+
+    lambda_score + inbound_sim_score + personal_cent_score
+}
+
+#[derive(Default)]
+struct Initial {
+    model: Option<Arc<LambdaMART>>,
+    signal_coefficients: Option<SignalCoefficient>,
+}
+
+impl<T: AsRankingWebsite> Scorer<T> for Initial {
     fn score(&self, websites: &mut [T]) {
         for website in websites {
-            let bm25 = website
-                .as_ranking()
-                .signals
-                .get(Signal::Bm25)
-                .copied()
-                .unwrap_or(0.0);
-            website.as_mut_ranking().score += bm25;
+            let website = website.as_mut_ranking();
+            website.score =
+                calculate_score(&self.model, &self.signal_coefficients, &website.signals);
         }
+    }
+
+    fn set_query_info(&mut self, query: &SearchQuery) {
+        self.signal_coefficients = query
+            .optic_program
+            .as_ref()
+            .and_then(|p| optics::parse(p.as_str()).ok())
+            .map(|optic| SignalCoefficient::from_optic(&optic));
     }
 }
 
@@ -167,6 +276,13 @@ impl<T: AsRankingWebsite> RankingStage<T> {
         let page = page - next_page;
 
         self.scorer.score(&mut websites);
+        for website in websites.iter_mut() {
+            let boost = website.as_ranking().optic_boost;
+            if let Some(boost) = boost {
+                website.as_mut_ranking().score *= boost;
+            }
+        }
+
         websites.sort_by(|a, b| {
             b.as_ranking()
                 .score
@@ -197,9 +313,12 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 }
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
-    fn create_reranking<M: CrossEncoder + 'static>(crossencoder: Arc<M>) -> Result<Self> {
+    fn create_reranking<M: CrossEncoder + 'static>(
+        crossencoder: Arc<M>,
+        lambda: Option<Arc<LambdaMART>>,
+    ) -> Result<Self> {
         let last_stage = RankingStage {
-            scorer: Box::new(ReRanker::new(crossencoder)),
+            scorer: Box::new(ReRanker::new(crossencoder, lambda)),
             prev: Prev::Initial,
             memory: None,
             top_n: 20,
@@ -215,16 +334,20 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     pub fn reranking_for_query<M: CrossEncoder + 'static>(
         query: &mut SearchQuery,
         crossencoder: Arc<M>,
+        lambda: Option<Arc<LambdaMART>>,
     ) -> Result<Self> {
-        let mut pipeline = Self::create_reranking(crossencoder)?;
+        let mut pipeline = Self::create_reranking(crossencoder, lambda)?;
         pipeline.set_query_info(query);
 
         Ok(pipeline)
     }
 
-    fn create_ltr() -> Self {
+    fn create_ltr(model: Option<Arc<LambdaMART>>) -> Self {
         let last_stage = RankingStage {
-            scorer: Box::<PrioritizeText>::default(),
+            scorer: Box::new(Initial {
+                model,
+                signal_coefficients: None,
+            }),
             prev: Prev::Initial,
             memory: None,
             top_n: 10_000,
@@ -237,8 +360,8 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         }
     }
 
-    pub fn ltr_for_query(query: &mut SearchQuery) -> Self {
-        let mut pipeline = Self::create_ltr();
+    pub fn ltr_for_query(query: &mut SearchQuery, model: Option<Arc<LambdaMART>>) -> Self {
+        let mut pipeline = Self::create_ltr(model);
         pipeline.set_query_info(query);
 
         pipeline
@@ -306,6 +429,7 @@ mod tests {
                         },
                     },
                     signals: EnumMap::new(),
+                    optic_boost: None,
                     title: None,
                     clean_body: None,
                     score: 1.0 / i as f64,
@@ -321,6 +445,7 @@ mod tests {
                 ..Default::default()
             },
             Arc::new(DummyCrossEncoder {}),
+            None,
         )
         .unwrap();
         assert_eq!(pipeline.collector_top_n(), 20);
@@ -351,6 +476,7 @@ mod tests {
                 ..Default::default()
             },
             Arc::new(DummyCrossEncoder {}),
+            None,
         )
         .unwrap();
 
@@ -367,6 +493,7 @@ mod tests {
                     ..Default::default()
                 },
                 Arc::new(DummyCrossEncoder {}),
+                None,
             )
             .unwrap();
 

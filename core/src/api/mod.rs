@@ -28,7 +28,7 @@ use crate::{
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
     query_store::{self, ImprovementEvent},
-    ranking::models::cross_encoder::CrossEncoderModel,
+    ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
     searcher::DistributedSearcher,
     summarizer::Summarizer,
     FrontendConfig,
@@ -101,6 +101,11 @@ pub async fn router(
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
     let crossencoder = CrossEncoderModel::open(&config.crossencoder_model_path)?;
 
+    let lambda_model = match &config.lambda_model_path {
+        Some(path) => Some(LambdaMART::open(path)?),
+        None => None,
+    };
+
     let qa_model = match &config.qa_model_path {
         Some(path) => Some(QaModel::open(path)?),
         None => None,
@@ -126,7 +131,7 @@ pub async fn router(
         config.gossip_seed_nodes.clone().unwrap_or_default(),
     )
     .await?;
-    let searcher = DistributedSearcher::new(cluster, crossencoder, qa_model, bangs);
+    let searcher = DistributedSearcher::new(cluster, crossencoder, lambda_model, qa_model, bangs);
 
     let state = Arc::new(State {
         searcher,

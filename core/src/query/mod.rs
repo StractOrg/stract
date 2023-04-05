@@ -15,15 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    inverted_index::InvertedIndex,
-    ranking::{Signal, SignalCoefficient},
-    search_ctx::Ctx,
-    searcher::SearchQuery,
-    webpage::region::Region,
-    Result,
+    inverted_index::InvertedIndex, ranking::SignalCoefficient, search_ctx::Ctx,
+    searcher::SearchQuery, webpage::region::Region, Result,
 };
-use optics::{ast::RankingTarget, Optic, SiteRankings};
-use std::{collections::HashMap, str::FromStr};
+use optics::{Optic, SiteRankings};
+use std::collections::HashMap;
 use tantivy::query::{BooleanQuery, Occur, QueryClone};
 
 mod const_query;
@@ -163,15 +159,7 @@ impl Query {
     }
 
     pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {
-        self.optic.as_ref().map(|optic| {
-            SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
-                match &coeff.target {
-                    RankingTarget::Signal(signal) => Signal::from_str(signal)
-                        .ok()
-                        .map(|signal| (signal, coeff.value)),
-                }
-            }))
-        })
+        self.optic.as_ref().map(SignalCoefficient::from_optic)
     }
 }
 

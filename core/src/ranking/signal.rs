@@ -28,6 +28,8 @@ use crate::{
     },
     webpage::Webpage,
 };
+use optics::ast::RankingTarget;
+use optics::Optic;
 use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
@@ -51,50 +53,91 @@ use super::models::linear::LinearRegression;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("unknown signal: {0}")]
-    UnknownSignal(String),
+    UnknownSignal(#[from] serde_json::Error),
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
+    #[serde(rename = "bm25")]
     Bm25,
+    #[serde(rename = "bm25_title")]
     Bm25Title,
+    #[serde(rename = "bm25_title_bigrams")]
     Bm25TitleBigrams,
+    #[serde(rename = "bm25_title_trigrams")]
     Bm25TitleTrigrams,
+    #[serde(rename = "bm25_clean_body")]
     Bm25CleanBody,
+    #[serde(rename = "bm25_clean_body_bigrams")]
     Bm25CleanBodyBigrams,
+    #[serde(rename = "bm25_clean_body_trigrams")]
     Bm25CleanBodyTrigrams,
+    #[serde(rename = "bm25_stemmed_title")]
     Bm25StemmedTitle,
+    #[serde(rename = "bm25_stemmed_clean_body")]
     Bm25StemmedCleanBody,
+    #[serde(rename = "bm25_all_body")]
     Bm25AllBody,
+    #[serde(rename = "bm25_url")]
     Bm25Url,
+    #[serde(rename = "bm25_site")]
     Bm25Site,
+    #[serde(rename = "bm25_domain")]
     Bm25Domain,
+    #[serde(rename = "bm25_site_no_tokenizer")]
     Bm25SiteNoTokenizer,
+    #[serde(rename = "bm25_domain_no_tokenizer")]
     Bm25DomainNoTokenizer,
+    #[serde(rename = "bm25_domain_if_homepage")]
     Bm25DomainIfHomepage,
+    #[serde(rename = "bm25_domain_name_if_homepage_no_tokenizer")]
     Bm25DomainNameIfHomepageNoTokenizer,
+    #[serde(rename = "bm25_title_if_homepage")]
     Bm25TitleIfHomepage,
+    #[serde(rename = "bm25_backlink_text")]
     Bm25BacklinkText,
+    #[serde(rename = "bm25_description")]
     Bm25Description,
+    #[serde(rename = "proximity_slop_0")]
     ProximitySlop0,
+    #[serde(rename = "proximity_slop_1")]
     ProximitySlop1,
+    #[serde(rename = "proximity_slop_2")]
     ProximitySlop2,
+    #[serde(rename = "proximity_slop_4")]
     ProximitySlop4,
+    #[serde(rename = "proximity_slop_8")]
     ProximitySlop8,
+    #[serde(rename = "cross_encoder")]
     CrossEncoder,
+    #[serde(rename = "host_centrality")]
     HostCentrality,
+    #[serde(rename = "page_centrality")]
     PageCentrality,
+    #[serde(rename = "is_homepage")]
     IsHomepage,
+    #[serde(rename = "fetch_time_ms")]
     FetchTimeMs,
+    #[serde(rename = "update_timestamp")]
     UpdateTimestamp,
+    #[serde(rename = "tracker_score")]
     TrackerScore,
+    #[serde(rename = "region")]
     Region,
+    #[serde(rename = "personal_centrality")]
     PersonalCentrality,
+    #[serde(rename = "crawl_stability")]
     CrawlStability,
+    #[serde(rename = "topic_centrality")]
     TopicCentrality,
+    #[serde(rename = "query_centrality")]
     QueryCentrality,
+    #[serde(rename = "inbound_similarity")]
     InboundSimilarity,
+    #[serde(rename = "lambda_mart")]
     LambdaMART,
+    #[serde(rename = "linear_regression")]
+    LinearRegression,
 }
 
 impl From<Signal> for usize {
@@ -185,47 +228,48 @@ impl Signal {
         self.as_fastfield().is_some()
     }
 
-    fn default_coefficient(&self) -> f64 {
+    pub fn default_coefficient(&self) -> f64 {
         match self {
-            Signal::Bm25 => 1.0,
-            Signal::Bm25Title => 15.0,
-            Signal::Bm25TitleBigrams => 15.0,
-            Signal::Bm25TitleTrigrams => 15.0,
-            Signal::Bm25CleanBody => 4.0,
-            Signal::Bm25CleanBodyBigrams => 4.0,
-            Signal::Bm25CleanBodyTrigrams => 4.0,
-            Signal::Bm25StemmedTitle => 0.5,
-            Signal::Bm25StemmedCleanBody => 0.5,
-            Signal::Bm25AllBody => 1.0,
-            Signal::Bm25Url => 1.0,
-            Signal::Bm25Site => 1.0,
-            Signal::Bm25Domain => 1.0,
-            Signal::Bm25SiteNoTokenizer => 1.0,
-            Signal::Bm25DomainNoTokenizer => 1.0,
-            Signal::Bm25DomainIfHomepage => 6.0,
-            Signal::Bm25DomainNameIfHomepageNoTokenizer => 30.0,
-            Signal::Bm25TitleIfHomepage => 3.0,
-            Signal::Bm25BacklinkText => 4.0,
-            Signal::Bm25Description => 1.0,
-            Signal::ProximitySlop0 => 32.0,
-            Signal::ProximitySlop1 => 16.0,
-            Signal::ProximitySlop2 => 8.0,
-            Signal::ProximitySlop4 => 4.0,
-            Signal::ProximitySlop8 => 2.0,
-            Signal::CrossEncoder => 100.0,
-            Signal::HostCentrality => 10_000.0,
-            Signal::PageCentrality => 4_500.0,
-            Signal::TopicCentrality => 2_500.0,
-            Signal::QueryCentrality => 1_000.0,
-            Signal::IsHomepage => 0.1,
-            Signal::FetchTimeMs => 0.001,
-            Signal::UpdateTimestamp => 80.0,
-            Signal::TrackerScore => 20.0,
-            Signal::Region => 60.0,
-            Signal::CrawlStability => 20.0,
-            Signal::PersonalCentrality => 5_000.0,
-            Signal::InboundSimilarity => 5_000.0,
-            Signal::LambdaMART => 10_000.0,
+            Signal::Bm25 => 0.0,
+            Signal::Bm25Title => 0.0008039427148688406,
+            Signal::Bm25TitleBigrams => 0.0,
+            Signal::Bm25TitleTrigrams => 0.0,
+            Signal::Bm25CleanBody => 0.002066156371091165,
+            Signal::Bm25CleanBodyBigrams => 0.0019046569525999434,
+            Signal::Bm25CleanBodyTrigrams => 0.0,
+            Signal::Bm25StemmedTitle => 0.0017847043967517168,
+            Signal::Bm25StemmedCleanBody => 0.0,
+            Signal::Bm25AllBody => 0.0,
+            Signal::Bm25Url => 0.0005788170648336828,
+            Signal::Bm25Site => 0.0,
+            Signal::Bm25Domain => 0.0,
+            Signal::Bm25SiteNoTokenizer => 0.0,
+            Signal::Bm25DomainNoTokenizer => 0.0,
+            Signal::Bm25DomainIfHomepage => 0.0,
+            Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0,
+            Signal::Bm25TitleIfHomepage => 0.0,
+            Signal::Bm25BacklinkText => 0.0,
+            Signal::Bm25Description => 5.99679347128802e-05,
+            Signal::ProximitySlop0 => 0.0,
+            Signal::ProximitySlop1 => 0.0,
+            Signal::ProximitySlop2 => 0.0,
+            Signal::ProximitySlop4 => 0.0,
+            Signal::ProximitySlop8 => 0.003435930677879231,
+            Signal::CrossEncoder => 0.16801589371906178,
+            Signal::HostCentrality => 15.233546236366237,
+            Signal::PageCentrality => 0.0,
+            Signal::TopicCentrality => 0.0,
+            Signal::QueryCentrality => 0.0,
+            Signal::IsHomepage => 0.0,
+            Signal::FetchTimeMs => 0.0,
+            Signal::UpdateTimestamp => 0.0,
+            Signal::TrackerScore => 0.019542120533715634,
+            Signal::Region => 0.06437975586036043,
+            Signal::CrawlStability => 0.0,
+            Signal::PersonalCentrality => 10.0,
+            Signal::InboundSimilarity => 10.0,
+            Signal::LambdaMART => 10.0,
+            Signal::LinearRegression => 1.0,
         }
     }
 
@@ -387,6 +431,7 @@ impl Signal {
             }
             Signal::CrossEncoder => None, // this is calculated in a later step
             Signal::LambdaMART => None,
+            Signal::LinearRegression => None, // this is calculated just before input to lambdamart
         };
 
         value.map(|value| ComputedSignal {
@@ -465,6 +510,7 @@ impl Signal {
             | Signal::TopicCentrality
             | Signal::InboundSimilarity
             | Signal::LambdaMART
+            | Signal::LinearRegression
             | Signal::QueryCentrality => {
                 tracing::error!("signal {self:?} cannot be precomputed");
                 None
@@ -535,45 +581,9 @@ impl FromStr for Signal {
     type Err = Error;
 
     fn from_str(name: &str) -> std::result::Result<Self, Self::Err> {
-        match name {
-            "bm25" => Ok(Signal::Bm25),
-            "bm25_title" => Ok(Signal::Bm25Title),
-            "bm25_title_bigrams" => Ok(Signal::Bm25TitleBigrams),
-            "bm25_title_trigrams" => Ok(Signal::Bm25TitleTrigrams),
-            "bm25_clean_body" => Ok(Signal::Bm25CleanBody),
-            "bm25_clean_body_bigrams" => Ok(Signal::Bm25CleanBodyBigrams),
-            "bm25_clean_body_trigrams" => Ok(Signal::Bm25CleanBodyTrigrams),
-            "bm25_stemmed_title" => Ok(Signal::Bm25StemmedTitle),
-            "bm25_stemmed_clean_body" => Ok(Signal::Bm25StemmedCleanBody),
-            "bm25_all_body" => Ok(Signal::Bm25AllBody),
-            "bm25_url" => Ok(Signal::Bm25Url),
-            "bm25_site" => Ok(Signal::Bm25Site),
-            "bm25_domain" => Ok(Signal::Bm25Domain),
-            "bm25_site_no_tokenizer" => Ok(Signal::Bm25SiteNoTokenizer),
-            "bm25_domain_no_tokenizer" => Ok(Signal::Bm25DomainNoTokenizer),
-            "bm25_domain_if_homepage" => Ok(Signal::Bm25DomainIfHomepage),
-            "bm25_domain_name_if_homepage_no_tokenizer" => {
-                Ok(Signal::Bm25DomainNameIfHomepageNoTokenizer)
-            }
-            "bm25_title_if_homepage" => Ok(Signal::Bm25TitleIfHomepage),
-            "bm25_backlink_text" => Ok(Signal::Bm25BacklinkText),
-            "bm25_description" => Ok(Signal::Bm25Description),
-            "cross_encoder" => Ok(Signal::CrossEncoder),
-            "host_centrality" => Ok(Signal::HostCentrality),
-            "page_centrality" => Ok(Signal::PageCentrality),
-            "is_homepage" => Ok(Signal::IsHomepage),
-            "fetch_time_ms" => Ok(Signal::FetchTimeMs),
-            "update_timestamp" => Ok(Signal::UpdateTimestamp),
-            "tracker_score" => Ok(Signal::TrackerScore),
-            "region" => Ok(Signal::Region),
-            "personal_centrality" => Ok(Signal::PersonalCentrality),
-            "topic_centrality" => Ok(Signal::TopicCentrality),
-            "query_centrality" => Ok(Signal::QueryCentrality),
-            "inbound_similarity" => Ok(Signal::InboundSimilarity),
-            "crawl_stability" => Ok(Signal::CrawlStability),
-            "lambda_mart" => Ok(Signal::LambdaMART),
-            _ => Err(Error::UnknownSignal(name.to_string())),
-        }
+        let s = "\"".to_string() + name + "\"";
+        let signal = serde_json::from_str(&s)?;
+        Ok(signal)
     }
 }
 
@@ -612,6 +622,16 @@ impl SignalCoefficient {
         }
 
         Self { map }
+    }
+
+    pub fn from_optic(optic: &Optic) -> Self {
+        SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
+            match &coeff.target {
+                RankingTarget::Signal(signal) => Signal::from_str(signal)
+                    .ok()
+                    .map(|signal| (signal, coeff.value)),
+            }
+        }))
     }
 }
 

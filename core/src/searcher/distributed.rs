@@ -25,7 +25,7 @@ use crate::{
     qa_model::QaModel,
     query,
     ranking::{
-        models::cross_encoder::CrossEncoderModel,
+        models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
         pipeline::{AsRankingWebsite, RankingPipeline, RankingWebsite},
         ALL_SIGNALS,
     },
@@ -238,6 +238,7 @@ pub enum Request {
 pub struct DistributedSearcher {
     cluster: Cluster,
     cross_encoder: Arc<CrossEncoderModel>,
+    lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
 }
@@ -275,13 +276,15 @@ impl collector::Doc for ScoredWebsitePointer {
 impl DistributedSearcher {
     pub fn new(
         cluster: Cluster,
-        model: CrossEncoderModel,
+        cross_encoder: CrossEncoderModel,
+        lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,
         bangs: Bangs,
     ) -> Self {
         Self {
             cluster,
-            cross_encoder: Arc::new(model),
+            cross_encoder: Arc::new(cross_encoder),
+            lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
             bangs,
         }
@@ -490,8 +493,11 @@ impl DistributedSearcher {
             ..Default::default()
         };
 
-        let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::reranking_for_query(&mut query, self.cross_encoder.clone())?;
+        let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
+            &mut query,
+            self.cross_encoder.clone(),
+            self.lambda_model.clone(),
+        )?;
 
         let initial_results = self.search_initial(&query).await;
 
@@ -566,8 +572,11 @@ impl DistributedSearcher {
         }
 
         let mut search_query = query.clone();
-        let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::reranking_for_query(&mut search_query, self.cross_encoder.clone())?;
+        let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
+            &mut search_query,
+            self.cross_encoder.clone(),
+            self.lambda_model.clone(),
+        )?;
 
         let initial_results = self.search_initial(&search_query).await;
 
