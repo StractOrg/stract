@@ -18,7 +18,7 @@ use crate::{
     bangs::{Bang, BangHit, Bangs},
     ceil_char_boundary,
     cluster::{member::Service, Cluster},
-    collector::{self, BucketCollector},
+    collector::BucketCollector,
     exponential_backoff::ExponentialBackoff,
     floor_char_boundary,
     inverted_index::{self, RetrievedWebpage},
@@ -256,20 +256,6 @@ impl AsRankingWebsite for ScoredWebsitePointer {
 
     fn as_mut_ranking(&mut self) -> &mut RankingWebsite {
         &mut self.website
-    }
-}
-
-impl collector::Doc for ScoredWebsitePointer {
-    fn score(&self) -> &f64 {
-        &self.website.pointer.score.total
-    }
-
-    fn id(&self) -> &tantivy::DocId {
-        &self.website.pointer.address.doc_id
-    }
-
-    fn hashes(&self) -> collector::Hashes {
-        self.website.pointer.hashes
     }
 }
 

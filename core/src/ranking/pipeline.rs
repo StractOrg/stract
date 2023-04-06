@@ -14,11 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, sync::Arc};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{enum_map::EnumMap, inverted_index::WebsitePointer, searcher::SearchQuery, Result};
+use crate::{
+    collector::{self, BucketCollector},
+    enum_map::EnumMap,
+    inverted_index::WebsitePointer,
+    searcher::SearchQuery,
+    Result,
+};
 
 use super::{
     models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
@@ -28,6 +34,23 @@ use super::{
 pub trait AsRankingWebsite: Clone {
     fn as_ranking(&self) -> &RankingWebsite;
     fn as_mut_ranking(&mut self) -> &mut RankingWebsite;
+}
+
+impl<T> collector::Doc for T
+where
+    T: AsRankingWebsite,
+{
+    fn score(&self) -> &f64 {
+        &self.as_ranking().score
+    }
+
+    fn id(&self) -> &tantivy::DocId {
+        &self.as_ranking().pointer.address.doc_id
+    }
+
+    fn hashes(&self) -> collector::Hashes {
+        self.as_ranking().pointer.hashes
+    }
 }
 
 impl AsRankingWebsite for RankingWebsite {
@@ -247,6 +270,7 @@ struct RankingStage<T: AsRankingWebsite> {
     prev: Prev<T>,
     top_n: usize,
     memory: Option<Vec<T>>,
+    derank_similar: bool,
 }
 
 impl<T: AsRankingWebsite> RankingStage<T> {
@@ -279,18 +303,20 @@ impl<T: AsRankingWebsite> RankingStage<T> {
         for website in websites.iter_mut() {
             let boost = website.as_ranking().optic_boost;
             if let Some(boost) = boost {
-                website.as_mut_ranking().score *= boost;
+                if boost != 0.0 {
+                    website.as_mut_ranking().score *= boost;
+                }
             }
         }
 
-        websites.sort_by(|a, b| {
-            b.as_ranking()
-                .score
-                .partial_cmp(&a.as_ranking().score)
-                .unwrap_or(Ordering::Equal)
-        });
+        let mut collector = BucketCollector::new((page + 1) * top_n);
 
-        websites
+        for website in websites {
+            collector.insert(website);
+        }
+
+        collector
+            .into_sorted_vec(self.derank_similar)
             .into_iter()
             .skip(page * top_n)
             .take(top_n)
@@ -322,6 +348,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
             prev: Prev::Initial,
             memory: None,
             top_n: 20,
+            derank_similar: false,
         };
 
         Ok(Self {
@@ -351,6 +378,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
             prev: Prev::Initial,
             memory: None,
             top_n: 10_000,
+            derank_similar: true,
         };
 
         Self {
@@ -414,6 +442,8 @@ mod tests {
     fn sample_websites(n: usize) -> Vec<RankingWebsite> {
         (0..n)
             .map(|i| -> RankingWebsite {
+                let mut signals = EnumMap::new();
+                signals.insert(Signal::LinearRegression, 1.0 / i as f64);
                 RankingWebsite {
                     pointer: WebsitePointer {
                         score: Score { total: 0.0 },
@@ -428,7 +458,7 @@ mod tests {
                             doc_id: i as u32,
                         },
                     },
-                    signals: EnumMap::new(),
+                    signals,
                     optic_boost: None,
                     title: None,
                     clean_body: None,

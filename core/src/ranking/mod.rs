@@ -805,11 +805,10 @@ mod tests {
     #[test]
     fn term_proximity_ranking() {
         let mut index = Index::temporary().expect("Unable to open index");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
+        let mut w = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -819,27 +818,31 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.first.com",
+                    crate::rand_words(100)
                 ),
-                backlinks: vec![],
-                host_centrality: 1.0,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                fetch_time_ms: 500,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
+                "https://www.first.com",
+            ),
+            backlinks: vec![],
+            host_centrality: 1.0,
+            pre_computed_score: 0.0,
+            crawl_stability: 0.0,
+            fetch_time_ms: 500,
+            page_centrality: 0.0,
+            primary_image: None,
+            host_topic: None,
+            node_id: None,
+            dmoz_description: None,
+        };
+        w.html.set_clean_text(format!(
+            "{CONTENT} termA termB d d d d d d d d d {}",
+            crate::rand_words(100)
+        ));
+
+        index.insert(w).expect("failed to insert webpage");
+        let mut w = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -849,27 +852,31 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.third.com",
+                    crate::rand_words(100)
                 ),
-                backlinks: vec![],
-                host_centrality: 1.0,
-                fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
+                "https://www.third.com",
+            ),
+            backlinks: vec![],
+            host_centrality: 1.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            crawl_stability: 0.0,
+            page_centrality: 0.0,
+            primary_image: None,
+            host_topic: None,
+            node_id: None,
+            dmoz_description: None,
+        };
+        w.html.set_clean_text(format!(
+            "{CONTENT} termA d d d d d d d d d termB {}",
+            crate::rand_words(100)
+        ));
+        index.insert(w).expect("failed to insert webpage");
+
+        let mut w = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -879,22 +886,27 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                        crate::rand_words(100)
-                    ),
-                    "https://www.second.com",
+                    crate::rand_words(100)
                 ),
-                backlinks: vec![],
-                host_centrality: 1.0,
-                fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                crawl_stability: 0.0,
-                page_centrality: 0.0,
-                primary_image: None,
-                host_topic: None,
-                node_id: None,
-                dmoz_description: None,
-            })
-            .expect("failed to insert webpage");
+                "https://www.second.com",
+            ),
+            backlinks: vec![],
+            host_centrality: 1.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            crawl_stability: 0.0,
+            page_centrality: 0.0,
+            primary_image: None,
+            host_topic: None,
+            node_id: None,
+            dmoz_description: None,
+        };
+        w.html.set_clean_text(format!(
+            "{CONTENT} termA d d d d termB d d d d d {}",
+            crate::rand_words(100)
+        ));
+
+        index.insert(w).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::new(index);
 
