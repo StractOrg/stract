@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use optics::SiteRankings;
 use stract::{
     index::Index,
     ranking::centrality_store::CentralityStore,
@@ -18,6 +19,15 @@ macro_rules! bench {
                 $searcher
                     .search(&SearchQuery {
                         query: $query.to_string(),
+                        site_rankings: Some(SiteRankings {
+                            liked: vec![
+                                "docs.rs".to_string(),
+                                "news.ycombinator.com".to_string(),
+                                "pubmed.ncbi.nlm.nih.gov".to_string(),
+                            ],
+                            disliked: vec!["www.pinterest.com".to_string()],
+                            blocked: vec![],
+                        }),
                         ..Default::default()
                     })
                     .unwrap()
@@ -31,7 +41,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut searcher = LocalSearcher::new(index);
     searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
 
-    for _ in 0..100 {
+    for _ in 0..10 {
         bench!("the", searcher, c);
         bench!("dtu", searcher, c);
         bench!("the best", searcher, c);

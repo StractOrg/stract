@@ -208,31 +208,7 @@ fn calculate_score(
             .unwrap_or(0.0),
     };
 
-    let inbound_sim = signals
-        .get(Signal::InboundSimilarity)
-        .copied()
-        .unwrap_or(0.0);
-    let inbound_sim_score = match signal_coefficients {
-        Some(coeffs) => match coeffs.get(&Signal::InboundSimilarity) {
-            Some(coeff) => coeff * inbound_sim,
-            None => Signal::InboundSimilarity.default_coefficient() * inbound_sim,
-        },
-        None => Signal::InboundSimilarity.default_coefficient() * inbound_sim,
-    };
-
-    let personal_cent = signals
-        .get(Signal::PersonalCentrality)
-        .copied()
-        .unwrap_or(0.0);
-    let personal_cent_score = match signal_coefficients {
-        Some(coeffs) => match coeffs.get(&Signal::PersonalCentrality) {
-            Some(coeff) => coeff * personal_cent,
-            None => Signal::PersonalCentrality.default_coefficient() * personal_cent,
-        },
-        None => Signal::PersonalCentrality.default_coefficient() * personal_cent,
-    };
-
-    lambda_score + inbound_sim_score + personal_cent_score
+    lambda_score
 }
 
 #[derive(Default)]

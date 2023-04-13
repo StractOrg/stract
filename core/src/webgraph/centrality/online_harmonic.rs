@@ -28,8 +28,9 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::intmap::IntMap;
@@ -91,7 +92,7 @@ pub struct Scorer {
     fixed_scores: HashMap<NodeID, f64>,
     liked_nodes: Vec<UserNode>,
     disliked_nodes: Vec<UserNode>,
-    cache: Mutex<HashMap<NodeID, f64>>,
+    cache: DashMap<NodeID, f64>,
 }
 
 fn create_user_nodes(nodes: &[NodeID], proxy_nodes: &[Arc<ProxyNode>]) -> Vec<UserNode> {
@@ -127,7 +128,7 @@ impl Scorer {
             fixed_scores,
             liked_nodes: create_user_nodes(liked_nodes, proxy_nodes),
             disliked_nodes: create_user_nodes(disliked_nodes, proxy_nodes),
-            cache: Mutex::new(HashMap::new()),
+            cache: DashMap::new(),
         }
     }
 
@@ -135,7 +136,7 @@ impl Scorer {
         if let Some(score) = self.fixed_scores.get(&node) {
             *score
         } else {
-            if let Some(cached) = self.cache.lock().unwrap().get(&node) {
+            if let Some(cached) = self.cache.get(&node) {
                 return *cached;
             }
 
@@ -162,7 +163,7 @@ impl Scorer {
                         .sum::<f64>()))
             .max(0.0);
 
-            self.cache.lock().unwrap().insert(node, res);
+            self.cache.insert(node, res);
 
             res
         }

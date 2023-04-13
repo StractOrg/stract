@@ -3534,6 +3534,7 @@ dependencies = [
  "criterion",
  "crossbeam-channel",
  "csv",
+ "dashmap",
  "encoding_rs",
  "flate2",
  "fst",

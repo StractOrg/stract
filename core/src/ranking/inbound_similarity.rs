@@ -240,6 +240,7 @@ mod tests {
         graph.insert(Node::from("z.com"), Node::from("b.com"), String::new());
         graph.insert(Node::from("z.com"), Node::from("c.com"), String::new());
         graph.insert(Node::from("z.com"), Node::from("d.com"), String::new());
+        graph.insert(Node::from("z.com"), Node::from("e.com"), String::new());
 
         graph.commit();
 

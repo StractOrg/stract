@@ -23,7 +23,7 @@ pub fn main() {
     let graph = WebgraphBuilder::new("data/webgraph").open();
     let inbound = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
 
-    for host in ["apache.org", "yyhelyhalvin.weebly.com"] {
+    for host in ["www.homedepot.com", "doc.rust-lang.org"] {
         println!("{host}:");
 
         let node = Node::from(host).into_host();

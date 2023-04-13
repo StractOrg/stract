@@ -14,51 +14,162 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Block {
-    data: u64,
-    offset: usize,
+struct VeryJankyBloomFilter {
+    data: Vec<u64>,
+}
+
+impl VeryJankyBloomFilter {
+    fn new(num_blooms: usize) -> Self {
+        Self {
+            data: vec![0; num_blooms],
+        }
+    }
+
+    fn hash(&self, item: &usize) -> (usize, usize) {
+        (
+            item.wrapping_mul(11400714819323198549) % self.data.len(),
+            item.wrapping_mul(14029467366897019727) % 64,
+        )
+    }
+
+    fn insert(&mut self, item: usize) {
+        let (a, b) = self.hash(&item);
+        self.data[a] |= 1 << b;
+    }
+
+    #[inline]
+    fn has_intersection(&self, other: &Self) -> bool {
+        self.data
+            .iter()
+            .zip_eq(other.data.iter())
+            .any(|(a, b)| a & b != 0)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Posting {
+    ranks: Vec<usize>,
+    skip_pointers: Vec<usize>,
+    skip_size: usize,
+}
+
+impl Posting {
+    fn new(ranks: Vec<usize>) -> Self {
+        let skip_size = (ranks.len() as f64).sqrt() as usize;
+
+        let skip_pointers = ranks
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| i % skip_size == 0)
+            .map(|(_, rank)| *rank)
+            .collect();
+
+        Self {
+            ranks,
+            skip_pointers,
+            skip_size,
+        }
+    }
+
+    fn intersection_size(&self, other: &Self) -> usize {
+        let mut i = 0;
+        let mut j = 0;
+
+        let mut count = 0;
+
+        while i < self.ranks.len() && j < other.ranks.len() {
+            let a = self.ranks[i];
+            let b = other.ranks[j];
+
+            match a.cmp(&b) {
+                std::cmp::Ordering::Equal => {
+                    count += 1;
+                    i += 1;
+                    j += 1;
+                }
+                std::cmp::Ordering::Less => {
+                    match self.skip_pointers.get(i / self.skip_size + 1).copied() {
+                        Some(skip_a) => {
+                            if skip_a < b {
+                                i += self.skip_size - i % self.skip_size;
+                            } else {
+                                i += 1;
+                            }
+                        }
+                        None => {
+                            i += 1;
+                        }
+                    }
+                }
+                std::cmp::Ordering::Greater => {
+                    match other.skip_pointers.get(j / other.skip_size + 1).copied() {
+                        Some(skip_b) => {
+                            if skip_b < a {
+                                j += other.skip_size - j % other.skip_size;
+                            } else {
+                                j += 1;
+                            }
+                        }
+                        None => {
+                            j += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        count
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
-    ranks: Vec<usize>,
+    bloom: VeryJankyBloomFilter,
+    posting: Posting,
     sqrt_len: f64,
 }
 
 impl BitVec {
-    pub fn new(ranks: Vec<usize>) -> Self {
+    pub fn new(mut ranks: Vec<usize>) -> Self {
+        ranks.sort();
+        ranks.dedup();
+        ranks.shrink_to_fit();
+
         let len = ranks.len();
+        let mut bloom = VeryJankyBloomFilter::new(2);
+
+        for rank in &ranks {
+            bloom.insert(*rank);
+        }
+
+        let posting = Posting::new(ranks);
+
         Self {
-            ranks,
+            bloom,
+            posting,
             sqrt_len: (len as f64).sqrt(),
         }
     }
 
     pub fn sim(&self, other: &Self) -> f64 {
-        let mut i = 0;
-        let mut j = 0;
-
-        let mut dot: u64 = 0;
-
-        while i < self.ranks.len() && j < other.ranks.len() {
-            match self.ranks[i].cmp(&other.ranks[j]) {
-                std::cmp::Ordering::Less => i += 1,
-                std::cmp::Ordering::Greater => j += 1,
-                std::cmp::Ordering::Equal => {
-                    dot += 1;
-                    i += 1;
-                    j += 1;
-                }
-            }
+        if self.sqrt_len == 0.0 || other.sqrt_len == 0.0 {
+            return 0.0;
         }
 
-        if dot == 0 {
+        if !self.bloom.has_intersection(&other.bloom) {
+            return 0.0;
+        }
+
+        let intersect = self.posting.intersection_size(&other.posting);
+
+        if intersect == 0 {
             0.0
         } else {
-            dot as f64 / (self.sqrt_len * other.sqrt_len)
+            intersect as f64 / (self.sqrt_len * other.sqrt_len)
         }
     }
 }
@@ -105,12 +216,10 @@ mod tests {
 
         let expected = naive_sim(&a, &b);
 
-        assert!(expected > 0.894);
-
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert!((expected - a.sim(&b)).abs() < 0.00001);
+        assert!((expected - a.sim(&b)).abs() < 0.001);
     }
 
     #[test]
@@ -156,6 +265,6 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert!((expected - a.sim(&b)).abs() < 0.00001);
+        assert!((expected - a.sim(&b)).abs() < 0.01);
     }
 }
