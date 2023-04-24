@@ -25,8 +25,6 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 # Development
 ## Setup
 * Install rust by following the steps outlined [here](https://www.rust-lang.org/tools/install)
-    * Install the beta toolchain `rustup toolchain install beta`
-    * Set beta as default `rustup default beta`
 * Install clang and npm
 * Update ulimit. RocksDB tends to exceed the max number of allowed open files, so you will have to run `ulimit -n 10240` to increase the allowed max number of open files.
 * Build the frontend `cd frontend && npm install && npm run build`

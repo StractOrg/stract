@@ -15,7 +15,7 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.13.1/onnx
     && tar -xf /tmp/onnxruntime-linux-x64-1.13.1.tgz -C /tmp \ 
     && mv /tmp/onnxruntime-linux-x64-1.13.1/lib/* /usr/lib
 
-RUN rustup toolchain install beta && rustup default beta && rustup component add rustfmt
+RUN rustup component add rustfmt
 
 COPY . .
 
