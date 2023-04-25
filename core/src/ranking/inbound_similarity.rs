@@ -23,6 +23,7 @@ use std::{
     sync::Arc,
 };
 
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -38,6 +39,7 @@ pub struct Scorer {
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
     vectors: Arc<IntMap<bitvec_similarity::BitVec>>,
+    cache: DashMap<NodeID, f64>,
 }
 
 #[derive(Debug)]
@@ -57,7 +59,7 @@ impl NodeScorer {
 }
 
 impl Scorer {
-    pub fn score(&self, node: &NodeID) -> f64 {
+    fn calculate_score(&self, node: &NodeID) -> f64 {
         match self.vectors.get(&node.0) {
             Some(vec) => (self.disliked.len() as f64
                 + (self
@@ -73,6 +75,15 @@ impl Scorer {
             .max(0.0),
             None => 0.0,
         }
+    }
+    pub fn score(&self, node: &NodeID) -> f64 {
+        if let Some(cached) = self.cache.get(node) {
+            return *cached;
+        }
+
+        let score = self.calculate_score(node);
+        self.cache.insert(*node, score);
+        score
     }
 }
 
@@ -180,6 +191,7 @@ impl InboundSimilarity {
             liked,
             disliked,
             vectors: self.vectors.clone(),
+            cache: DashMap::new(),
         }
     }
 
