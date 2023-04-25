@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use rkyv::{Archive, Deserialize};
+use rkyv::Archive;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -100,15 +100,13 @@ impl StoredSegment {
             .and_then(|segment_id| {
                 self.adjacency.get(&segment_id).map(|edges| {
                     edges
-                        .iter()
+                        .into_iter()
                         .map(move |edge| {
                             if load_label {
                                 Edge {
                                     from: *node,
                                     to: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
-                                    label: Loaded::Some(
-                                        edge.label.deserialize(&mut rkyv::Infallible).unwrap(),
-                                    ),
+                                    label: Loaded::Some(edge.label),
                                 }
                             } else {
                                 Edge {
@@ -129,7 +127,7 @@ impl StoredSegment {
             .and_then(|segment_id| {
                 self.reversed_adjacency.get(&segment_id).map(|edges| {
                     edges
-                        .iter()
+                        .into_iter()
                         .map(move |edge| {
                             if load_label {
                                 Edge {
@@ -137,9 +135,7 @@ impl StoredSegment {
                                         .rev_id_mapping(&SegmentNodeID(edge.other.0))
                                         .unwrap(),
                                     to: *node,
-                                    label: Loaded::Some(
-                                        edge.label.deserialize(&mut rkyv::Infallible).unwrap(),
-                                    ),
+                                    label: Loaded::Some(edge.label),
                                 }
                             } else {
                                 Edge {
@@ -177,7 +173,7 @@ impl StoredSegment {
         self.adjacency.iter().flat_map(move |(node_id, edges)| {
             let from = self.rev_id_mapping(node_id).unwrap();
 
-            edges.iter().map(move |stored_edge| Edge {
+            edges.into_iter().map(move |stored_edge| Edge {
                 from,
                 to: self
                     .rev_id_mapping(&SegmentNodeID(stored_edge.other.0))
@@ -296,11 +292,7 @@ impl StoredSegment {
         Self::merge_adjacency(
             |segment: &StoredSegment, node_id: &NodeID| {
                 segment.id_mapping.get(node_id).map(|segment_node_id| {
-                    segment
-                        .adjacency
-                        .get(segment_node_id)
-                        .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
-                        .unwrap_or_default()
+                    segment.adjacency.get(segment_node_id).unwrap_or_default()
                 })
             },
             &mut packet,
@@ -324,7 +316,6 @@ impl StoredSegment {
                     segment
                         .reversed_adjacency
                         .get(segment_node_id)
-                        .map(|edges| edges.deserialize(&mut rkyv::Infallible).unwrap())
                         .unwrap_or_default()
                 })
             },

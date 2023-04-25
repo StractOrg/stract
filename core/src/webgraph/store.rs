@@ -22,7 +22,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rkyv::{ser::serializers::AllocSerializer, Archived};
+use rkyv::{ser::serializers::AllocSerializer, AlignedVec};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -55,7 +55,8 @@ pub struct Store<K, V> {
 impl<K, V> Store<K, V>
 where
     K: serde::de::DeserializeOwned + serde::Serialize + Ord,
-    V: rkyv::Archive,
+    V: rkyv::Archive + 'static,
+    V::Archived: rkyv::Deserialize<V, rkyv::de::deserializers::SharedDeserializeMap> + 'static,
 {
     pub fn open<P: AsRef<Path>>(folder_path: P, segment_name: &str) -> Result<Self> {
         if folder_path.as_ref().is_file() {
@@ -110,19 +111,34 @@ where
         })
     }
 
-    pub fn get(&self, key: &K) -> Option<&Archived<V>> {
+    pub fn get(&self, key: &K) -> Option<V> {
         let range = self.locations.get(key)?;
         let bytes = &self.map[range.clone()];
 
-        let archived = unsafe { rkyv::archived_root::<V>(bytes) };
-        Some(archived)
+        let mut aligned = AlignedVec::with_capacity(bytes.len());
+        aligned.extend_from_slice(bytes);
+
+        // SAFETY:
+        //      We ensure the target `V` is `'static` and contains only owned data so it's safe to
+        //      temporarily extend the lifetime so we can allocate the type entirely.
+        let v = unsafe { rkyv::util::from_bytes_unchecked::<V>(&aligned).unwrap() };
+
+        Some(v)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &Archived<V>)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (&K, V)> + '_ {
         self.locations.iter().map(move |(key, range)| {
             let bytes = &self.map[range.clone()];
-            let archived = unsafe { rkyv::archived_root::<V>(bytes) };
-            (key, archived)
+
+            let mut aligned = AlignedVec::with_capacity(bytes.len());
+            aligned.extend_from_slice(bytes);
+
+            // SAFETY:
+            //      We ensure the target `V` is `'static` and contains only owned data so it's safe to
+            //      temporarily extend the lifetime so we can allocate the type entirely.
+            let v = unsafe { rkyv::util::from_bytes_unchecked::<V>(&aligned).unwrap() };
+
+            (key, v)
         })
     }
 
@@ -135,11 +151,12 @@ where
         }
 
         let bytes = rkyv::to_bytes::<_, SCRATCH_SIZE>(value).unwrap();
-        self.insert_raw(key, &bytes)
+        self.insert_raw(key, &bytes[..])
     }
 
     fn insert_raw(&mut self, key: K, bytes: &[u8]) -> Result<()> {
         let old_end = self.cur_end_range;
+
         let new_end = bytes.len() + self.cur_end_range;
 
         if new_end > self.map.len() {
@@ -240,7 +257,7 @@ mod tests {
         kv.flush().unwrap();
 
         let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(&test_struct, archived);
+        assert_eq!(test_struct, archived);
     }
 
     #[test]
@@ -264,7 +281,7 @@ mod tests {
         let kv = Store::<String, TestStruct>::open(path, segment_name).unwrap();
 
         let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(&test_struct, archived);
+        assert_eq!(test_struct, archived);
     }
 
     #[test]
@@ -283,7 +300,7 @@ mod tests {
         kv.flush().unwrap();
 
         let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(&test_struct, archived);
+        assert_eq!(test_struct, archived);
 
         let test_struct = TestStruct {
             a: "test".to_string(),
