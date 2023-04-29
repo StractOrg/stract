@@ -60,7 +60,7 @@ pub struct SearchQuery {
     pub page: usize,
     pub num_results: usize,
     pub selected_region: Option<Region>,
-    pub optic_program: Option<String>,
+    pub optic: Option<String>,
     pub site_rankings: Option<SiteRankings>,
     pub return_ranking_signals: bool,
 }
@@ -84,7 +84,7 @@ impl Default for SearchQuery {
             page: Default::default(),
             num_results: NUM_RESULTS_PER_PAGE,
             selected_region: Default::default(),
-            optic_program: Default::default(),
+            optic: Default::default(),
             site_rankings: Default::default(),
             return_ranking_signals: false,
         }

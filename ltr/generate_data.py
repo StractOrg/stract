@@ -41,7 +41,7 @@ def search(q: str, top_n, optic=None):
 
     url = f"http://{STRACT_ENDPOINT}/beta/api/search"
     r = requests.post(
-        url, json={"query": q, "page": 0, "num_results": top_n, "return_ranking_signals": True, "optic_program": optic})
+        url, json={"query": q, "page": 0, "num_results": top_n, "return_ranking_signals": True, "optic": optic})
     search_result = r.json()['webpages']
     res = []
 

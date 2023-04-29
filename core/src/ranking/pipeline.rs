@@ -173,7 +173,7 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
         self.query = Some(query.clone());
 
         self.signal_coefficients = query
-            .optic_program
+            .optic
             .as_ref()
             .and_then(|p| optics::parse(p.as_str()).ok())
             .map(|optic| SignalCoefficient::from_optic(&optic));
@@ -228,7 +228,7 @@ impl<T: AsRankingWebsite> Scorer<T> for Initial {
 
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.signal_coefficients = query
-            .optic_program
+            .optic
             .as_ref()
             .and_then(|p| optics::parse(p.as_str()).ok())
             .map(|optic| SignalCoefficient::from_optic(&optic));

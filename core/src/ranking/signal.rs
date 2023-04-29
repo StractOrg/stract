@@ -663,7 +663,7 @@ struct SegmentReader {
 }
 
 pub struct SignalAggregator {
-    query: Option<Query>,
+    query: Option<Arc<Query>>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
     personal_centrality: Option<Arc<online_harmonic::Scorer>>,
@@ -731,7 +731,7 @@ impl SignalAggregator {
             selected_region: None,
             current_timestamp: None,
             linear_regression: None,
-            query,
+            query: query.map(Arc::new),
         }
     }
 
@@ -808,6 +808,10 @@ impl SignalAggregator {
                 optic_rule_boosts = optic
                     .rules
                     .iter()
+                    .filter(|rule| match rule.action {
+                        optics::Action::Downrank(b) | optics::Action::Boost(b) => b != 0,
+                        optics::Action::Discard => false,
+                    })
                     .filter_map(|rule| {
                         rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader)
                     })

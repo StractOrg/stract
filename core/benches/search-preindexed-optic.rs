@@ -17,7 +17,7 @@ macro_rules! bench {
                 $searcher
                     .search(&SearchQuery {
                         query: $query.to_string(),
-                        optic_program: Some($optic.to_string()),
+                        optic: Some($optic.to_string()),
                         ..Default::default()
                     })
                     .unwrap()

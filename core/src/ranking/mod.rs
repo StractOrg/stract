@@ -771,7 +771,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         Ranking(Signal("bm25_title"), 20000000);
                         Ranking(Signal("host_centrality"), 0);
@@ -788,7 +788,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         Ranking(Signal("host_centrality"), 2000000)
                     "#

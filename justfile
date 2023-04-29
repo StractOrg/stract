@@ -18,7 +18,7 @@
     cd frontend; npm run dev
 
 @configure *ARGS:
-    pip3 install -r scripts/requirements.txt
+    pip install -r scripts/requirements.txt
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model

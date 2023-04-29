@@ -131,7 +131,7 @@ pub async fn route(
         .search(&SearchQuery {
             query: query.clone(),
             selected_region,
-            optic_program: optic,
+            optic: optic,
             page: skip_pages,
             site_rankings,
             num_results: NUM_RESULTS_PER_PAGE,

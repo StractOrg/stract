@@ -94,7 +94,7 @@ impl Query {
             .clone()
             .map(|site_rankings| site_rankings.into_optic());
 
-        if let Some(optic_program) = &query.optic_program {
+        if let Some(optic_program) = &query.optic {
             match optic.as_mut() {
                 Some(inner) => {
                     optic = Some(inner.clone().try_merge(Optic::parse(optic_program)?)?);

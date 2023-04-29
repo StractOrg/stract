@@ -373,7 +373,7 @@ impl DistributedSearcher {
         let query = SearchQuery {
             query: query.query.clone(),
             num_results: 1,
-            optic_program: Some(include_str!("stackoverflow.optic").to_string()),
+            optic: Some(include_str!("stackoverflow.optic").to_string()),
             ..Default::default()
         };
 
@@ -464,7 +464,7 @@ impl DistributedSearcher {
         &self,
         query: &SearchQuery,
     ) -> Result<Option<Vec<DisplayedWebpage>>> {
-        if query.optic_program.is_some() || query.page > 0 {
+        if query.optic.is_some() || query.page > 0 {
             return Ok(None);
         }
 
@@ -473,7 +473,7 @@ impl DistributedSearcher {
         let mut query = SearchQuery {
             query: query.query.clone(),
             num_results: NUM_RESULTS,
-            optic_program: Some(include_str!("discussions.optic").to_string()),
+            optic: Some(include_str!("discussions.optic").to_string()),
             site_rankings: query.site_rankings.clone(),
             return_ranking_signals: query.return_ranking_signals,
             ..Default::default()

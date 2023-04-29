@@ -61,6 +61,7 @@ impl PatternQuery {
         let mut raw_terms = Vec::new();
 
         let tv_field = schema.get_field(Field::Text(field).name()).unwrap();
+        let mut new_patterns = Vec::with_capacity(patterns.len());
 
         for pattern in &patterns {
             match pattern {
@@ -68,17 +69,18 @@ impl PatternQuery {
                     let mut stream = field.tokenizer().token_stream(text);
 
                     while let Some(token) = stream.next() {
+                        new_patterns.push(PatternPart::Raw(token.text.clone()));
                         let term = tantivy::Term::from_field_text(tv_field, &token.text);
                         raw_terms.push(term);
                     }
                 }
-                PatternPart::Wildcard => {}
-                PatternPart::Anchor => {}
+                PatternPart::Wildcard => new_patterns.push(PatternPart::Wildcard),
+                PatternPart::Anchor => new_patterns.push(PatternPart::Anchor),
             }
         }
 
         Self {
-            patterns,
+            patterns: new_patterns,
             field: tv_field,
             raw_terms,
             fastfield_reader,
@@ -114,6 +116,7 @@ impl tantivy::query::Query for PatternQuery {
     }
 }
 
+#[derive(Debug)]
 enum SmallPatternPart {
     Term,
     Wildcard,
@@ -143,14 +146,78 @@ impl PatternWeight {
         reader: &SegmentReader,
         boost: Score,
     ) -> tantivy::Result<Option<PatternScorer>> {
+        if self.patterns.is_empty() {
+            return Ok(None);
+        }
+
         let similarity_weight = self
             .similarity_weight
             .as_ref()
             .map(|weight| weight.boost_by(boost));
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
-        let mut term_postings_list = Vec::new();
 
+        // if pattern is of form Site("|site|") or Domain("|domain|")
+        // we can use the field without tokenization to speed up the query significantly
+        if self.patterns.len() >= 2
+            && matches!(&self.patterns[0], PatternPart::Anchor)
+            && matches!(&self.patterns[self.patterns.len() - 1], PatternPart::Anchor)
+            && self.patterns[1..self.patterns.len() - 1]
+                .iter()
+                .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
+            && (matches!(
+                ALL_FIELDS[self.field.field_id() as usize],
+                Field::Text(TextField::Site)
+            ) || matches!(
+                ALL_FIELDS[self.field.field_id() as usize],
+                Field::Text(TextField::Domain)
+            ))
+        {
+            let term: String = self
+                .patterns
+                .iter()
+                .filter_map(|p| match p {
+                    PatternPart::Raw(s) => Some(s.clone()),
+                    PatternPart::Wildcard => None,
+                    PatternPart::Anchor => None,
+                })
+                .collect();
+
+            let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
+                Field::Text(TextField::Site) => Field::Text(TextField::SiteNoTokenizer),
+                Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
+                _ => unreachable!(),
+            };
+
+            let tv_field = reader
+                .schema()
+                .get_field(field_no_tokenizer.name())
+                .unwrap();
+
+            let term = tantivy::Term::from_field_text(tv_field, &term);
+
+            let opt = match field_no_tokenizer {
+                Field::Text(t) => t.index_option(),
+                Field::Fast(_) => unreachable!(),
+            };
+
+            match reader.inverted_index(tv_field)?.read_postings(&term, opt)? {
+                Some(posting) => {
+                    return Ok(Some(PatternScorer::FastSiteDomain(
+                        FastSiteDomainPatternScorer {
+                            similarity_weight,
+                            posting,
+                            fieldnorm_reader,
+                        },
+                    )));
+                }
+                None => {
+                    return Ok(None);
+                }
+            }
+        }
+
+        let mut term_postings_list = Vec::with_capacity(self.raw_terms.len());
         for term in &self.raw_terms {
             if let Some(postings) = reader
                 .inverted_index(term.field())?
@@ -188,7 +255,7 @@ impl PatternWeight {
             ))),
         }?;
 
-        Ok(Some(PatternScorer::new(
+        Ok(Some(PatternScorer::Normal(NormalPatternScorer::new(
             similarity_weight,
             term_postings_list,
             fieldnorm_reader,
@@ -196,7 +263,7 @@ impl PatternWeight {
             reader.segment_id(),
             num_tokens_fastfield,
             self.fastfield_reader.clone(),
-        )))
+        ))))
     }
 }
 
@@ -232,19 +299,111 @@ impl tantivy::query::Weight for PatternWeight {
         }
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
         let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
-        let phrase_count = scorer.phrase_count();
+        let term_freq = scorer.term_freq();
         let mut explanation = Explanation::new("Pattern Scorer", scorer.score());
         explanation.add_detail(
             self.similarity_weight
                 .as_ref()
                 .unwrap()
-                .explain(fieldnorm_id, phrase_count),
+                .explain(fieldnorm_id, term_freq),
         );
         Ok(explanation)
     }
 }
 
-struct PatternScorer {
+enum PatternScorer {
+    Normal(NormalPatternScorer),
+    FastSiteDomain(FastSiteDomainPatternScorer),
+}
+
+impl Scorer for PatternScorer {
+    fn score(&mut self) -> Score {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.score(),
+            PatternScorer::FastSiteDomain(scorer) => scorer.score(),
+        }
+    }
+}
+
+impl DocSet for PatternScorer {
+    fn advance(&mut self) -> DocId {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.advance(),
+            PatternScorer::FastSiteDomain(scorer) => scorer.advance(),
+        }
+    }
+
+    fn seek(&mut self, target: DocId) -> DocId {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.seek(target),
+            PatternScorer::FastSiteDomain(scorer) => scorer.seek(target),
+        }
+    }
+
+    fn doc(&self) -> DocId {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.doc(),
+            PatternScorer::FastSiteDomain(scorer) => scorer.doc(),
+        }
+    }
+
+    fn size_hint(&self) -> u32 {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.size_hint(),
+            PatternScorer::FastSiteDomain(scorer) => scorer.size_hint(),
+        }
+    }
+}
+
+impl PatternScorer {
+    fn term_freq(&self) -> u32 {
+        match self {
+            PatternScorer::Normal(scorer) => scorer.phrase_count(),
+            PatternScorer::FastSiteDomain(scorer) => scorer.term_freq(),
+        }
+    }
+}
+
+struct FastSiteDomainPatternScorer {
+    similarity_weight: Option<Bm25Weight>,
+    posting: SegmentPostings,
+    fieldnorm_reader: FieldNormReader,
+}
+impl FastSiteDomainPatternScorer {
+    fn term_freq(&self) -> u32 {
+        self.posting.term_freq()
+    }
+}
+
+impl Scorer for FastSiteDomainPatternScorer {
+    fn score(&mut self) -> Score {
+        self.similarity_weight
+            .as_ref()
+            .map(|w| {
+                w.score(
+                    self.fieldnorm_reader.fieldnorm_id(self.doc()),
+                    self.posting.term_freq(),
+                )
+            })
+            .unwrap_or_default()
+    }
+}
+
+impl DocSet for FastSiteDomainPatternScorer {
+    fn advance(&mut self) -> DocId {
+        self.posting.advance()
+    }
+
+    fn doc(&self) -> DocId {
+        self.posting.doc()
+    }
+
+    fn size_hint(&self) -> u32 {
+        self.posting.size_hint()
+    }
+}
+
+struct NormalPatternScorer {
     similarity_weight: Option<Bm25Weight>,
     fieldnorm_reader: FieldNormReader,
     intersection_docset: Intersection<SegmentPostings>,
@@ -257,7 +416,7 @@ struct PatternScorer {
     segment_reader: Arc<fastfield_reader::SegmentReader>,
 }
 
-impl PatternScorer {
+impl NormalPatternScorer {
     fn new(
         similarity_weight: Option<Bm25Weight>,
         term_postings_list: Vec<SegmentPostings>,
@@ -270,7 +429,7 @@ impl PatternScorer {
         let num_query_terms = term_postings_list.len();
         let segment_reader = fastfield_reader.get_segment(&segment);
 
-        Self {
+        let mut s = Self {
             intersection_docset: Intersection::new(term_postings_list),
             num_query_terms,
             similarity_weight,
@@ -281,7 +440,13 @@ impl PatternScorer {
             phrase_count: 0,
             num_tokens_field,
             segment_reader,
+        };
+
+        if !s.pattern_match() {
+            s.advance();
         }
+
+        s
     }
     fn phrase_count(&self) -> u32 {
         self.phrase_count
@@ -303,7 +468,7 @@ impl PatternScorer {
         let mut intersection_len = self.left.len();
         let mut out = Vec::new();
 
-        let mut current_right_term = 1;
+        let mut current_right_term = 0;
         let mut slop = 1;
         let num_tokens_doc: Option<u64> = self
             .segment_reader
@@ -312,9 +477,14 @@ impl PatternScorer {
             .into();
         let num_tokens_doc = num_tokens_doc.unwrap();
 
-        for (i, pattern_part) in self.pattern.iter().enumerate().skip(1) {
+        for (i, pattern_part) in self.pattern.iter().enumerate() {
             match pattern_part {
                 SmallPatternPart::Term => {
+                    if current_right_term == 0 {
+                        current_right_term = 1;
+                        continue;
+                    }
+
                     {
                         self.intersection_docset
                             .docset_mut_specialized(current_right_term)
@@ -365,7 +535,7 @@ impl PatternScorer {
     }
 }
 
-impl Scorer for PatternScorer {
+impl Scorer for NormalPatternScorer {
     fn score(&mut self) -> Score {
         self.similarity_weight
             .as_ref()
@@ -378,7 +548,7 @@ impl Scorer for PatternScorer {
     }
 }
 
-impl DocSet for PatternScorer {
+impl DocSet for NormalPatternScorer {
     fn advance(&mut self) -> DocId {
         loop {
             let doc = self.intersection_docset.advance();
@@ -386,15 +556,6 @@ impl DocSet for PatternScorer {
                 return doc;
             }
         }
-    }
-
-    fn seek(&mut self, target: DocId) -> DocId {
-        debug_assert!(target >= self.doc());
-        let doc = self.intersection_docset.seek(target);
-        if doc == TERMINATED || self.pattern_match() {
-            return doc;
-        }
-        self.advance()
     }
 
     fn doc(&self) -> tantivy::DocId {

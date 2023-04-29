@@ -303,7 +303,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         Rule {
                             Matches {
@@ -325,7 +325,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         Rule {
                             Matches {
@@ -416,9 +416,7 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
-                    include_str!("../../../optics/testcases/quickstart.optic").to_string(),
-                ),
+                optic: Some(include_str!("../../../optics/testcases/quickstart.optic").to_string()),
                 ..Default::default()
             })
             .unwrap()
@@ -427,7 +425,7 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     include_str!("../../../optics/testcases/hacker_news.optic").to_string(),
                 ),
                 ..Default::default()
@@ -438,7 +436,7 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     include_str!("../../../optics/testcases/copycats_removal.optic").to_string(),
                 ),
                 ..Default::default()
@@ -549,7 +547,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                     DiscardNonMatching;
                     Rule {
@@ -698,7 +696,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                     Like(Site("www.a.com"));
                     Like(Site("www.b.com"));
@@ -816,7 +814,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         DiscardNonMatching;
                         Rule {
@@ -838,7 +836,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         DiscardNonMatching;
                         Rule {
@@ -860,7 +858,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         DiscardNonMatching;
                         Rule {
@@ -882,7 +880,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                         DiscardNonMatching;
                         Rule {
@@ -944,7 +942,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "site:stackoverflow.com".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                     DiscardNonMatching;
                     Rule {
@@ -1049,7 +1047,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic_program: Some(
+                optic: Some(
                     r#"
                     DiscardNonMatching;
                     Rule {
@@ -1113,11 +1111,162 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "avengers endgame".to_string(),
-                optic_program: Some(include_str!("../searcher/discussions.optic").to_string()),
+                optic: Some(include_str!("../searcher/discussions.optic").to_string()),
                 ..Default::default()
             })
             .unwrap()
             .webpages;
         assert!(res.is_empty());
+    }
+
+    #[test]
+    fn special_pattern_syntax() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>This is an example website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                                This is an example
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(1000)
+                    ),
+                    "https://example.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://example.com");
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"is\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"|is\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"|This\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"|This an\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"|This * an\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Site(\"example.com\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Site(\"|example.com\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"website.com|\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
     }
 }

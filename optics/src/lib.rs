@@ -20,7 +20,6 @@ mod lexer;
 use std::convert::TryFrom;
 
 use ast::RankingCoeff;
-use logos::Logos;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -154,21 +153,19 @@ impl TryFrom<RawMatchPart> for Matching {
         let mut pattern = Vec::new();
 
         if matches!(&loc, MatchLocation::Schema) {
-            for tok in PatternToken::lexer(&s) {
+            for tok in PatternToken::lex(&s) {
                 match tok {
                     PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
                     PatternToken::Wildcard => return Err(Error::Pattern),
                     PatternToken::Anchor => return Err(Error::Pattern),
-                    PatternToken::Error => unreachable!("no patterns should fail lexing"),
                 }
             }
         } else {
-            for tok in PatternToken::lexer(&s) {
+            for tok in PatternToken::lex(&s) {
                 match tok {
                     PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
                     PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
                     PatternToken::Anchor => pattern.push(PatternPart::Anchor),
-                    PatternToken::Error => unreachable!("no patterns should fail lexing"),
                 }
             }
         }
@@ -180,19 +177,57 @@ impl TryFrom<RawMatchPart> for Matching {
     }
 }
 
-#[derive(Logos, Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum PatternToken {
-    #[regex(".*", |lex| lex.slice().to_string())]
     Raw(String),
 
-    #[token("*")]
     Wildcard,
 
-    #[token("|")]
     Anchor,
+}
+impl PatternToken {
+    fn lex(s: &str) -> Vec<Self> {
+        let mut tokens = Vec::new();
 
-    #[error]
-    Error,
+        let mut raw: Option<String> = None;
+
+        for c in s.chars() {
+            match c {
+                '*' => {
+                    if let Some(cur_raw) = raw {
+                        let cur_raw = cur_raw.trim().to_string();
+                        tokens.push(Self::Raw(cur_raw));
+                        raw = None;
+                    }
+
+                    tokens.push(Self::Wildcard);
+                }
+                '|' => {
+                    if let Some(cur_raw) = raw {
+                        let cur_raw = cur_raw.trim().to_string();
+                        tokens.push(Self::Raw(cur_raw));
+                        raw = None;
+                    }
+
+                    tokens.push(Self::Anchor);
+                }
+                _ => {
+                    if raw.is_none() {
+                        raw = Some(String::new());
+                    }
+
+                    raw.as_mut().unwrap().push(c);
+                }
+            }
+        }
+
+        if let Some(raw) = raw {
+            let raw = raw.trim().to_string();
+            tokens.push(Self::Raw(raw));
+        }
+
+        tokens
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -288,5 +323,33 @@ impl SiteRankings {
             site_rankings: self,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn pattern_part() {
+        let lex = PatternToken::lex("|test|");
+
+        assert_eq!(
+            lex,
+            vec![
+                PatternToken::Anchor,
+                PatternToken::Raw("test".to_string()),
+                PatternToken::Anchor
+            ]
+        );
+        let lex = PatternToken::lex("test * string");
+
+        assert_eq!(
+            lex,
+            vec![
+                PatternToken::Raw("test".to_string()),
+                PatternToken::Wildcard,
+                PatternToken::Raw("string".to_string()),
+            ]
+        );
     }
 }

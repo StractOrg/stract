@@ -20,6 +20,7 @@ use tantivy::{DocId, DocSet, Score, TERMINATED};
 /// Creates a `DocSet` that iterate through the intersection of two or more `DocSet`s.
 pub struct Intersection<TDocSet: DocSet = Box<dyn Scorer>> {
     docsets: Vec<TDocSet>,
+    old_idx: Vec<usize>,
 }
 
 fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
@@ -39,9 +40,18 @@ fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
 
 impl<TDocSet: DocSet> Intersection<TDocSet> {
     pub(crate) fn new(mut docsets: Vec<TDocSet>) -> Intersection<TDocSet> {
-        docsets.sort_by_key(|docset| docset.size_hint());
+        let mut docsets: Vec<(usize, TDocSet)> = docsets.drain(..).enumerate().collect();
+        docsets.sort_by_key(|(_, docset)| docset.size_hint());
+        let (tmp, mut docsets): (Vec<usize>, Vec<TDocSet>) = docsets.into_iter().unzip();
+
+        let mut old_idx = vec![0; docsets.len()];
+
+        for (new_idx, t) in tmp.into_iter().enumerate() {
+            old_idx[t] = new_idx;
+        }
+
         go_to_first_doc(&mut docsets);
-        Intersection { docsets }
+        Intersection { docsets, old_idx }
     }
 }
 
@@ -106,6 +116,6 @@ where
 
 impl<TDocSet: DocSet> Intersection<TDocSet> {
     pub(crate) fn docset_mut_specialized(&mut self, ord: usize) -> &mut TDocSet {
-        &mut self.docsets[ord]
+        &mut self.docsets[self.old_idx[ord]]
     }
 }
