@@ -288,7 +288,11 @@ impl SiteRankings {
             .iter()
             .map(|site| Rule {
                 matches: vec![Matching {
-                    pattern: vec![PatternPart::Raw(site.clone())],
+                    pattern: vec![
+                        PatternPart::Anchor,
+                        PatternPart::Raw(site.clone()),
+                        PatternPart::Anchor,
+                    ],
                     location: MatchLocation::Site,
                 }],
                 action: Action::Discard,
