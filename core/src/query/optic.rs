@@ -1269,4 +1269,336 @@ mod tests {
             .webpages;
         assert_eq!(res.len(), 1);
     }
+
+    #[test]
+    fn active_optic_with_blocked_sites() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>This is an example website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                                This is an example
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(1000)
+                    ),
+                    "https://example.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }"
+                        .to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }"
+                        .to_string(),
+                ),
+                site_rankings: Some(SiteRankings {
+                    liked: vec![],
+                    disliked: vec![],
+                    blocked: vec![String::from("example.com")],
+                }),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+    }
+
+    #[test]
+    fn empty_optic_noop() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>This is an example website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                                This is an example
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(1000)
+                    ),
+                    "https://example.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+    }
+
+    #[test]
+    fn wildcard_edge_cases() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>This is an example website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                                This is an example
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(1000)
+                    ),
+                    "https://example.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Another thing with no words in common</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                                This is an example
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(1000)
+                    ),
+                    "https://example.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                page_centrality: 0.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                crawl_stability: 0.0,
+                primary_image: None,
+                node_id: None,
+                host_topic: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"*\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some("Rule { Matches { Title(\"* is\") }, Action(Discard) }".to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"* This is\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"example *\") }, Action(Discard) }".to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "Rule { Matches { Title(\"example website *\") }, Action(Discard) }"
+                        .to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+    }
+
+    #[test]
+    fn empty_double_anchor() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>This is an example website</title>
+                            </head>
+                            <body>
+                                Test
+                            </body>
+                        </html>
+                    "#,
+                "https://example.com",
+            ),
+            backlinks: vec![],
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            crawl_stability: 0.0,
+            primary_image: None,
+            node_id: None,
+            host_topic: None,
+            dmoz_description: None,
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "DiscardNonMatching; Rule { Matches { Content(\"||\") }, Action(Boost(0)) }"
+                        .to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    "DiscardNonMatching; Rule { Matches { Content(\"|\") }, Action(Boost(0)) }"
+                        .to_string(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+    }
 }

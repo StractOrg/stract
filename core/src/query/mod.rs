@@ -44,7 +44,7 @@ pub struct Query {
     site_rankings: SiteRankings,
     offset: usize,
     region: Option<Region>,
-    optic: Option<Optic>,
+    optics: Vec<Optic>,
     top_n: usize,
 }
 
@@ -89,23 +89,17 @@ impl Query {
 
         let mut tantivy_query = Box::new(BooleanQuery::new(queries));
 
-        let mut optic = query
-            .site_rankings
-            .clone()
-            .map(|site_rankings| site_rankings.into_optic());
-
-        if let Some(optic_program) = &query.optic {
-            match optic.as_mut() {
-                Some(inner) => {
-                    optic = Some(inner.clone().try_merge(Optic::parse(optic_program)?)?);
-                }
-                None => {
-                    optic = Some(Optic::parse(optic_program)?);
-                }
-            }
+        let mut optics = Vec::new();
+        if let Some(site_rankigns_optic) = query.site_rankings.clone().map(|sr| sr.into_optic()) {
+            optics.push(site_rankigns_optic);
         }
 
-        if let Some(optic) = &optic {
+        if let Some(optic_program) = &query.optic {
+            let optic = Optic::parse(optic_program)?;
+            optics.push(optic);
+        }
+
+        for optic in &optics {
             let mut subqueries = vec![(Occur::Must, tantivy_query.box_clone())];
             subqueries.append(&mut optic.as_multiple_tantivy(&schema, &ctx.fastfield_reader));
             tantivy_query = Box::new(BooleanQuery::new(subqueries));
@@ -113,13 +107,16 @@ impl Query {
 
         Ok(Query {
             terms,
-            site_rankings: optic
-                .as_ref()
-                .map(|optic| optic.site_rankings.clone())
-                .unwrap_or_default(),
+            site_rankings: optics.clone().into_iter().fold(
+                SiteRankings::default(),
+                |mut acc, el| {
+                    acc.merge_into(el.site_rankings);
+                    acc
+                },
+            ),
             simple_terms_text,
             tantivy_query,
-            optic,
+            optics,
             offset: query.num_results * query.page,
             region: query.selected_region,
             top_n: query.num_results,
@@ -134,8 +131,8 @@ impl Query {
         &self.terms
     }
 
-    pub fn optic(&self) -> Option<&Optic> {
-        self.optic.as_ref()
+    pub fn optics(&self) -> &[Optic] {
+        &self.optics
     }
 
     pub fn is_empty(&self) -> bool {
@@ -159,7 +156,19 @@ impl Query {
     }
 
     pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {
-        self.optic.as_ref().map(SignalCoefficient::from_optic)
+        if self.optics.is_empty() {
+            return None;
+        }
+
+        Some(
+            self.optics
+                .iter()
+                .fold(SignalCoefficient::default(), |mut acc, optic| {
+                    let coeffs = SignalCoefficient::from_optic(optic);
+                    acc.merge_into(coeffs);
+                    acc
+                }),
+        )
     }
 }
 

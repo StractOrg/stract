@@ -95,7 +95,11 @@ impl tantivy::query::Query for PatternQuery {
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
         let bm25_weight = match scoring {
             tantivy::query::EnableScoring::Enabled(searcher) => {
-                Some(Bm25Weight::for_terms(searcher, &self.raw_terms)?)
+                if self.raw_terms.is_empty() {
+                    None
+                } else {
+                    Some(Bm25Weight::for_terms(searcher, &self.raw_terms)?)
+                }
             }
             tantivy::query::EnableScoring::Disabled(_) => None,
         };
@@ -148,6 +152,53 @@ impl PatternWeight {
     ) -> tantivy::Result<Option<PatternScorer>> {
         if self.patterns.is_empty() {
             return Ok(None);
+        }
+
+        let num_tokens_fastfield = match &ALL_FIELDS[self.field.field_id() as usize] {
+            Field::Text(TextField::Title) => Ok(FastField::NumTitleTokens),
+            Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
+            Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
+            Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
+            Field::Text(TextField::Site) => Ok(FastField::NumSiteTokens),
+            Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
+            Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                Ok(FastField::NumFlattenedSchemaTokens)
+            }
+            field => Err(TantivyError::InvalidArgument(format!(
+                "{} is not supported in pattern query",
+                field.name()
+            ))),
+        }?;
+
+        // "*" matches everything
+        if self.raw_terms.is_empty()
+            && self
+                .patterns
+                .iter()
+                .any(|p| matches!(p, PatternPart::Wildcard))
+        {
+            return Ok(Some(PatternScorer::Everything(AllScorer {
+                doc: 0,
+                max_doc: reader.max_doc(),
+            })));
+        }
+
+        // "||" and "|" matches empty string
+
+        if self.raw_terms.is_empty()
+            && self
+                .patterns
+                .iter()
+                .all(|p| matches!(p, PatternPart::Anchor))
+        {
+            return Ok(Some(PatternScorer::EmptyField(EmptyFieldScorer {
+                num_tokens_fastfield,
+                segment_reader: self.fastfield_reader.get_segment(&reader.segment_id()),
+                all_scorer: AllScorer {
+                    doc: 0,
+                    max_doc: reader.max_doc(),
+                },
+            })));
         }
 
         let similarity_weight = self
@@ -239,22 +290,6 @@ impl PatternWeight {
             })
             .collect();
 
-        let num_tokens_fastfield = match &ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::Title) => Ok(FastField::NumTitleTokens),
-            Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
-            Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
-            Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
-            Field::Text(TextField::Site) => Ok(FastField::NumSiteTokens),
-            Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
-            Field::Text(TextField::FlattenedSchemaOrgJson) => {
-                Ok(FastField::NumFlattenedSchemaTokens)
-            }
-            field => Err(TantivyError::InvalidArgument(format!(
-                "{} is not supported in pattern query",
-                field.name()
-            ))),
-        }?;
-
         Ok(Some(PatternScorer::Normal(NormalPatternScorer::new(
             similarity_weight,
             term_postings_list,
@@ -314,6 +349,8 @@ impl tantivy::query::Weight for PatternWeight {
 enum PatternScorer {
     Normal(NormalPatternScorer),
     FastSiteDomain(FastSiteDomainPatternScorer),
+    Everything(AllScorer),
+    EmptyField(EmptyFieldScorer),
 }
 
 impl Scorer for PatternScorer {
@@ -321,6 +358,8 @@ impl Scorer for PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.score(),
             PatternScorer::FastSiteDomain(scorer) => scorer.score(),
+            PatternScorer::Everything(scorer) => scorer.score(),
+            PatternScorer::EmptyField(scorer) => scorer.score(),
         }
     }
 }
@@ -330,6 +369,8 @@ impl DocSet for PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.advance(),
             PatternScorer::FastSiteDomain(scorer) => scorer.advance(),
+            PatternScorer::Everything(scorer) => scorer.advance(),
+            PatternScorer::EmptyField(scorer) => scorer.advance(),
         }
     }
 
@@ -337,6 +378,8 @@ impl DocSet for PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.seek(target),
             PatternScorer::FastSiteDomain(scorer) => scorer.seek(target),
+            PatternScorer::Everything(scorer) => scorer.seek(target),
+            PatternScorer::EmptyField(scorer) => scorer.seek(target),
         }
     }
 
@@ -344,6 +387,8 @@ impl DocSet for PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.doc(),
             PatternScorer::FastSiteDomain(scorer) => scorer.doc(),
+            PatternScorer::Everything(scorer) => scorer.doc(),
+            PatternScorer::EmptyField(scorer) => scorer.doc(),
         }
     }
 
@@ -351,6 +396,8 @@ impl DocSet for PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.size_hint(),
             PatternScorer::FastSiteDomain(scorer) => scorer.size_hint(),
+            PatternScorer::Everything(scorer) => scorer.size_hint(),
+            PatternScorer::EmptyField(scorer) => scorer.size_hint(),
         }
     }
 }
@@ -360,7 +407,101 @@ impl PatternScorer {
         match self {
             PatternScorer::Normal(scorer) => scorer.phrase_count(),
             PatternScorer::FastSiteDomain(scorer) => scorer.term_freq(),
+            PatternScorer::Everything(_) => 0,
+            PatternScorer::EmptyField(_) => 0,
         }
+    }
+}
+
+struct AllScorer {
+    doc: DocId,
+    max_doc: DocId,
+}
+
+impl DocSet for AllScorer {
+    fn advance(&mut self) -> DocId {
+        if self.doc + 1 >= self.max_doc {
+            self.doc = TERMINATED;
+            return TERMINATED;
+        }
+        self.doc += 1;
+        self.doc
+    }
+
+    fn seek(&mut self, target: DocId) -> DocId {
+        if target >= self.max_doc {
+            self.doc = TERMINATED;
+            return TERMINATED;
+        }
+        self.doc = target;
+        self.doc
+    }
+
+    fn doc(&self) -> DocId {
+        self.doc
+    }
+
+    fn size_hint(&self) -> u32 {
+        self.max_doc
+    }
+}
+
+impl Scorer for AllScorer {
+    fn score(&mut self) -> Score {
+        1.0
+    }
+}
+
+struct EmptyFieldScorer {
+    segment_reader: Arc<fastfield_reader::SegmentReader>,
+    num_tokens_fastfield: FastField,
+    all_scorer: AllScorer,
+}
+
+impl EmptyFieldScorer {
+    fn num_tokes(&self, doc: DocId) -> u64 {
+        let s: Option<u64> = self
+            .segment_reader
+            .get_field_reader(&self.num_tokens_fastfield)
+            .get(&doc)
+            .into();
+        s.unwrap_or_default()
+    }
+}
+
+impl DocSet for EmptyFieldScorer {
+    fn advance(&mut self) -> DocId {
+        let mut doc = self.all_scorer.advance();
+
+        while doc != TERMINATED && self.num_tokes(doc) > 0 {
+            doc = self.all_scorer.advance();
+        }
+
+        doc
+    }
+
+    fn doc(&self) -> DocId {
+        self.all_scorer.doc()
+    }
+
+    fn seek(&mut self, target: DocId) -> DocId {
+        self.all_scorer.seek(target);
+
+        if self.doc() != TERMINATED && self.num_tokes(self.all_scorer.doc()) > 0 {
+            self.advance()
+        } else {
+            self.doc()
+        }
+    }
+
+    fn size_hint(&self) -> u32 {
+        self.all_scorer.size_hint()
+    }
+}
+
+impl Scorer for EmptyFieldScorer {
+    fn score(&mut self) -> Score {
+        1.0
     }
 }
 

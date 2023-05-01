@@ -604,7 +604,7 @@ fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SignalCoefficient {
     map: EnumMap<Signal, f64>,
 }
@@ -632,6 +632,19 @@ impl SignalCoefficient {
                     .map(|signal| (signal, coeff.value)),
             }
         }))
+    }
+
+    pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
+        for signal in ALL_SIGNALS {
+            if let Some(coeff) = coeffs.get(&signal) {
+                match self.map.get_mut(signal) {
+                    Some(existing_coeff) => *existing_coeff += coeff,
+                    None => {
+                        self.map.insert(signal, coeff);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -803,29 +816,27 @@ impl SignalAggregator {
         fastfield_reader: &fastfield_reader::FastFieldReader,
     ) -> Vec<RuleBoost> {
         let mut optic_rule_boosts = Vec::new();
+
         if let Some(query) = &self.query {
-            if let Some(optic) = query.optic() {
-                optic_rule_boosts = optic
-                    .rules
-                    .iter()
-                    .filter(|rule| match rule.action {
-                        optics::Action::Downrank(b) | optics::Action::Boost(b) => b != 0,
-                        optics::Action::Discard => false,
-                    })
-                    .filter_map(|rule| {
-                        rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader)
-                    })
-                    .map(|(_, rule)| RuleBoost {
-                        docset: rule
-                            .query
-                            .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
-                            .unwrap()
-                            .scorer(segment_reader, 0.0)
-                            .unwrap(),
-                        boost: rule.boost,
-                    })
-                    .collect();
-            }
+            optic_rule_boosts = query
+                .optics()
+                .iter()
+                .flat_map(|o| o.rules.iter())
+                .filter(|rule| match rule.action {
+                    optics::Action::Downrank(b) | optics::Action::Boost(b) => b != 0,
+                    optics::Action::Discard => false,
+                })
+                .filter_map(|rule| rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader))
+                .map(|(_, rule)| RuleBoost {
+                    docset: rule
+                        .query
+                        .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                        .unwrap()
+                        .scorer(segment_reader, 0.0)
+                        .unwrap(),
+                    boost: rule.boost,
+                })
+                .collect();
         }
 
         optic_rule_boosts

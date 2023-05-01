@@ -267,28 +267,6 @@ impl Optic {
     pub fn parse(optic: &str) -> Result<Self> {
         parse(optic)
     }
-
-    pub fn try_merge(mut self, mut other: Self) -> Result<Self> {
-        self.rules.append(&mut other.rules);
-
-        self.rankings.append(&mut other.rankings);
-
-        self.discard_non_matching |= other.discard_non_matching;
-
-        self.site_rankings
-            .liked
-            .append(&mut other.site_rankings.liked);
-
-        self.site_rankings
-            .disliked
-            .append(&mut other.site_rankings.disliked);
-
-        self.site_rankings
-            .blocked
-            .append(&mut other.site_rankings.blocked);
-
-        Ok(self)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -323,6 +301,12 @@ impl SiteRankings {
             site_rankings: self,
             ..Default::default()
         }
+    }
+
+    pub fn merge_into(&mut self, site_rankings: SiteRankings) {
+        self.liked.extend(site_rankings.liked);
+        self.disliked.extend(site_rankings.disliked);
+        self.blocked.extend(site_rankings.blocked);
     }
 }
 
