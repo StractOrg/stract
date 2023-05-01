@@ -11,6 +11,7 @@ import Discussions from "../components/Discussions.astro";
 import Widget from "../components/Widget.astro";
 import DirectAnswer from "../components/DirectAnswer.astro";
 import { askama } from "../askama";
+import type { AstroCookies } from "astro/dist/core/cookies";
 ---
 
 <Layout title="{{ query }} - Stract">
@@ -167,6 +168,18 @@ import { askama } from "../askama";
 
     <!-- Modal -->
     <Modal />
+
+    <!-- Error alerts (failed optic parsing etc.) -->
+    <div class="sticky w-fit left-full right-0 bottom-0">
+      {
+        askama.for_("alert in alerts", () => (
+          <div class="bg-red-700 text-white py-2 pl-2 pr-4 mr-2 mb-2 rounded-xl">
+            <span class="cursor-pointer mr-2" onclick="this.parentElement.style.display='none';">&times;</span>
+            {askama`alert $ {{lorem.sentence}}`}
+          </div>
+        ))
+      }
+    </div>
   </main>
 
   <Footer />

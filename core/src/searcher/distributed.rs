@@ -50,6 +50,7 @@ use std::{
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use itertools::intersperse;
+use optics::Optic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -373,7 +374,7 @@ impl DistributedSearcher {
         let query = SearchQuery {
             query: query.query.clone(),
             num_results: 1,
-            optic: Some(include_str!("stackoverflow.optic").to_string()),
+            optic: Some(Optic::parse(include_str!("stackoverflow.optic")).unwrap()),
             ..Default::default()
         };
 
@@ -473,7 +474,7 @@ impl DistributedSearcher {
         let mut query = SearchQuery {
             query: query.query.clone(),
             num_results: NUM_RESULTS,
-            optic: Some(include_str!("discussions.optic").to_string()),
+            optic: Some(Optic::parse(include_str!("discussions.optic")).unwrap()),
             site_rankings: query.site_rankings.clone(),
             return_ranking_signals: query.return_ranking_signals,
             ..Default::default()

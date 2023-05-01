@@ -94,9 +94,8 @@ impl Query {
             optics.push(site_rankigns_optic);
         }
 
-        if let Some(optic_program) = &query.optic {
-            let optic = Optic::parse(optic_program)?;
-            optics.push(optic);
+        if let Some(optic) = &query.optic {
+            optics.push(optic.clone());
         }
 
         for optic in &optics {

@@ -19,7 +19,7 @@ pub mod local;
 
 pub use distributed::*;
 pub use local::*;
-use optics::SiteRankings;
+use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -60,7 +60,7 @@ pub struct SearchQuery {
     pub page: usize,
     pub num_results: usize,
     pub selected_region: Option<Region>,
-    pub optic: Option<String>,
+    pub optic: Option<Optic>,
     pub site_rankings: Option<SiteRankings>,
     pub return_ranking_signals: bool,
 }

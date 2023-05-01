@@ -206,7 +206,7 @@ impl AsTantivyQuery for Matching {
 
 #[cfg(test)]
 mod tests {
-    use optics::SiteRankings;
+    use optics::{Optic, SiteRankings};
 
     use crate::{
         gen_temp_path,
@@ -304,15 +304,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         Rule {
                             Matches {
                                 Domain("b.com")
                             },
                             Action(Discard)
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -326,15 +328,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         Rule {
                             Matches {
                                 Domain("a.com")
                             },
                             Action(Boost(10))
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -416,17 +420,9 @@ mod tests {
         let _ = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic: Some(include_str!("../../../optics/testcases/quickstart.optic").to_string()),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-
-        let _ = searcher
-            .search(&SearchQuery {
-                query: "website".to_string(),
                 optic: Some(
-                    include_str!("../../../optics/testcases/hacker_news.optic").to_string(),
+                    Optic::parse(include_str!("../../../optics/testcases/quickstart.optic"))
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -437,7 +433,22 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    include_str!("../../../optics/testcases/copycats_removal.optic").to_string(),
+                    Optic::parse(include_str!("../../../optics/testcases/hacker_news.optic"))
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+
+        let _ = searcher
+            .search(&SearchQuery {
+                query: "website".to_string(),
+                optic: Some(
+                    Optic::parse(include_str!(
+                        "../../../optics/testcases/copycats_removal.optic"
+                    ))
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -548,7 +559,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                     DiscardNonMatching;
                     Rule {
                         Matches {
@@ -562,8 +574,9 @@ mod tests {
                         },
                         Action(Boost(1))
                     };
-                "#
-                    .to_string(),
+                "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -697,12 +710,14 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                     Like(Site("www.a.com"));
                     Like(Site("www.b.com"));
                     Dislike(Site("www.c.com"));
-                "#
-                    .to_string(),
+                "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -815,15 +830,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         DiscardNonMatching;
                         Rule {
                             Matches {
                                 Schema("BlogPosting")
                             }
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -837,15 +854,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         DiscardNonMatching;
                         Rule {
                             Matches {
                                 Schema("BlogPosting.comment")
                             }
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -859,15 +878,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         DiscardNonMatching;
                         Rule {
                             Matches {
                                 Schema("ImageObject")
                             }
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -881,15 +902,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         DiscardNonMatching;
                         Rule {
                             Matches {
                                 Schema("Person")
                             }
                         }
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -943,7 +966,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "site:stackoverflow.com".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                     DiscardNonMatching;
                     Rule {
                         Matches {
@@ -963,8 +987,9 @@ mod tests {
                         },
                         Action(Boost(1))
                     };
-                "#
-                    .to_string(),
+                "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1048,15 +1073,17 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                     DiscardNonMatching;
                     Rule {
                         Matches {
                             Site("b.com")
                         }
                     };
-                "#
-                    .to_string(),
+                "#,
+                    )
+                    .unwrap(),
                 ),
                 site_rankings: Some(SiteRankings {
                     liked: vec!["a.com".to_string()],
@@ -1111,7 +1138,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "avengers endgame".to_string(),
-                optic: Some(include_str!("../searcher/discussions.optic").to_string()),
+                optic: Some(Optic::parse(include_str!("../searcher/discussions.optic")).unwrap()),
                 ..Default::default()
             })
             .unwrap()
@@ -1170,27 +1197,9 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"is\") }, Action(Discard) }".to_string()),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-        assert_eq!(res.len(), 0);
-
-        let res = searcher
-            .search(&SearchQuery {
-                query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"|is\") }, Action(Discard) }".to_string()),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-        assert_eq!(res.len(), 1);
-
-        let res = searcher
-            .search(&SearchQuery {
-                query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"|This\") }, Action(Discard) }".to_string()),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"is\") }, Action(Discard) }").unwrap(),
+                ),
                 ..Default::default()
             })
             .unwrap()
@@ -1201,7 +1210,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"|This an\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Title(\"|is\") }, Action(Discard) }").unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1213,7 +1222,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"|This * an\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Title(\"|This\") }, Action(Discard) }").unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1225,7 +1234,21 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Site(\"example.com\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Title(\"|This an\") }, Action(Discard) }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"|This * an\") }, Action(Discard) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1237,7 +1260,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Site(\"|example.com\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Site(\"example.com\") }, Action(Discard) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1249,7 +1273,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Site(\"|example.com\") }, Action(Discard) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1261,7 +1286,21 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"website.com|\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"website.com|\") }, Action(Discard) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1313,8 +1352,10 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }"
-                        .to_string(),
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }",
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1326,8 +1367,10 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }"
-                        .to_string(),
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Title(\"is\") }, Action(Boost(0)) }",
+                    )
+                    .unwrap(),
                 ),
                 site_rankings: Some(SiteRankings {
                     liked: vec![],
@@ -1383,7 +1426,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some("".to_string()),
+                optic: Some(Optic::parse("").unwrap()),
                 ..Default::default()
             })
             .unwrap()
@@ -1393,7 +1436,9 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"\") }, Action(Discard) }".to_string()),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"\") }, Action(Discard) }").unwrap(),
+                ),
                 ..Default::default()
             })
             .unwrap()
@@ -1474,7 +1519,9 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"*\") }, Action(Discard) }".to_string()),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"*\") }, Action(Discard) }").unwrap(),
+                ),
                 ..Default::default()
             })
             .unwrap()
@@ -1484,18 +1531,8 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some("Rule { Matches { Title(\"* is\") }, Action(Discard) }".to_string()),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-        assert_eq!(res.len(), 1);
-
-        let res = searcher
-            .search(&SearchQuery {
-                query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"* This is\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Title(\"* is\") }, Action(Discard) }").unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1507,7 +1544,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"example *\") }, Action(Discard) }".to_string(),
+                    Optic::parse("Rule { Matches { Title(\"* This is\") }, Action(Discard) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1519,8 +1557,23 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "Rule { Matches { Title(\"example website *\") }, Action(Discard) }"
-                        .to_string(),
+                    Optic::parse("Rule { Matches { Title(\"example *\") }, Action(Discard) }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse(
+                        "Rule { Matches { Title(\"example website *\") }, Action(Discard) }",
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1579,8 +1632,8 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "DiscardNonMatching; Rule { Matches { Content(\"||\") }, Action(Boost(0)) }"
-                        .to_string(),
+                    Optic::parse("DiscardNonMatching; Rule { Matches { Content(\"||\") }, Action(Boost(0)) }")
+                        .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -1592,8 +1645,10 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    "DiscardNonMatching; Rule { Matches { Content(\"|\") }, Action(Boost(0)) }"
-                        .to_string(),
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Content(\"|\") }, Action(Boost(0)) }",
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })

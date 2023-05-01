@@ -130,7 +130,7 @@ impl From<RawAction> for Action {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Matching {
     pub pattern: Vec<PatternPart>,
     pub location: MatchLocation,
@@ -177,7 +177,7 @@ impl TryFrom<RawMatchPart> for Matching {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 enum PatternToken {
     Raw(String),
 
@@ -230,14 +230,14 @@ impl PatternToken {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum PatternPart {
     Raw(String),
     Wildcard,
     Anchor,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum MatchLocation {
     Site,
     Url,
@@ -248,14 +248,14 @@ pub enum MatchLocation {
     Schema,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum Action {
     Boost(u64),
     Downrank(u64),
     Discard,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Optic {
     pub rankings: Vec<RankingCoeff>,
     pub site_rankings: SiteRankings,
@@ -269,7 +269,7 @@ impl Optic {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Rule {
     pub matches: Vec<Matching>,
     pub action: Action,

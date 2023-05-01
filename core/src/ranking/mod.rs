@@ -165,6 +165,8 @@ pub fn online_centrality_scorer(
 #[cfg(test)]
 mod tests {
 
+    use optics::Optic;
+
     use crate::{
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
@@ -772,11 +774,13 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         Ranking(Signal("bm25_title"), 20000000);
                         Ranking(Signal("host_centrality"), 0);
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -789,10 +793,12 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    r#"
+                    Optic::parse(
+                        r#"
                         Ranking(Signal("host_centrality"), 2000000)
-                    "#
-                    .to_string(),
+                    "#,
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })

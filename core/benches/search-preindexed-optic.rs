@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use optics::Optic;
 use stract::{
     index::Index,
     searcher::{LocalSearcher, SearchQuery},
@@ -17,7 +18,7 @@ macro_rules! bench {
                 $searcher
                     .search(&SearchQuery {
                         query: $query.to_string(),
-                        optic: Some($optic.to_string()),
+                        optic: Some(Optic::parse($optic).unwrap()),
                         ..Default::default()
                     })
                     .unwrap()

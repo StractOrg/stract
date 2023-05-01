@@ -17,6 +17,8 @@
 use super::Error;
 use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
+use serde::Deserialize;
+use serde::Serialize;
 
 use super::lexer;
 
@@ -25,12 +27,12 @@ lalrpop_mod!(pub parser, "/parser.rs");
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum RankingTarget {
     Signal(String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct RankingCoeff {
     pub target: RankingTarget,
     pub value: f64,

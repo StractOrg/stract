@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use http::{StatusCode, Uri};
-use optics::SiteRankings;
+use optics::{Optic, SiteRankings};
 use std::{collections::HashMap, sync::Arc};
 
 use axum::Json;
@@ -61,6 +61,7 @@ struct SearchTemplate {
     default_optics: Vec<OpticLink>,
     has_more_results: bool,
     has_code: bool,
+    alerts: Vec<String>,
 }
 
 enum RegionSelection {
@@ -105,13 +106,23 @@ pub async fn route(
         .unwrap_or_default();
 
     let mut optic = None;
+    let mut alerts = Vec::new();
 
     if let Some(url) = params.get("optic") {
         if !url.is_empty() {
             if let Ok(res) = reqwest::get(url).await {
                 if let Ok(text) = res.text().await {
-                    optic = Some(text);
+                    match Optic::parse(&text) {
+                        Ok(parsed_optic) => optic = Some(parsed_optic),
+                        Err(err) => {
+                            alerts.push(format!("Could not parse optic: {}", err));
+                        }
+                    }
+                } else {
+                    alerts.push("Could not retrieve optic as text".to_string());
                 }
+            } else {
+                alerts.push("Could not retrieve optic".to_string());
             }
         }
     }
@@ -170,6 +181,7 @@ pub async fn route(
                     default_optics: DEFAULT_OPTICS.to_vec(),
                     has_more_results: result.has_more_results,
                     has_code,
+                    alerts,
                 };
 
                 Ok(HtmlTemplate(template).into_response())
@@ -183,7 +195,6 @@ pub async fn route(
         }
         Err(err) => {
             tracing::error!("{:?}", err);
-
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -245,23 +256,66 @@ fn next_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) 
     next_page_url
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ApiSearchQuery {
+    pub query: String,
+    pub page: usize,
+    pub num_results: usize,
+    pub selected_region: Option<Region>,
+    pub optic: Option<String>,
+    pub site_rankings: Option<SiteRankings>,
+    pub return_ranking_signals: bool,
+}
+
+impl TryFrom<ApiSearchQuery> for SearchQuery {
+    type Error = crate::Error;
+
+    fn try_from(api: ApiSearchQuery) -> Result<Self, Self::Error> {
+        let optic = if let Some(optic) = &api.optic {
+            Some(Optic::parse(optic)?)
+        } else {
+            None
+        };
+
+        Ok(SearchQuery {
+            query: api.query,
+            page: api.page,
+            num_results: api.num_results,
+            selected_region: api.selected_region,
+            optic,
+            site_rankings: api.site_rankings,
+            return_ranking_signals: api.return_ranking_signals,
+        })
+    }
+}
+
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 pub async fn api(
     extract::State(state): extract::State<Arc<State>>,
-    extract::Json(mut query): extract::Json<SearchQuery>,
-) -> impl IntoResponse {
+    extract::Json(mut query): extract::Json<ApiSearchQuery>,
+) -> Result<impl IntoResponse, StatusCode> {
     query.num_results = query.num_results.min(50 * NUM_RESULTS_PER_PAGE);
+    let query = SearchQuery::try_from(query);
+
+    if let Err(err) = query {
+        tracing::error!("{:?}", err);
+        return Ok(err.to_string().into_response());
+    }
+
+    let query = query.unwrap();
 
     match state.searcher.search(&query).await {
-        Ok(result) => match result {
-            SearchResult::Websites(result) => Json(result).into_response(),
-            SearchResult::Bang(result) => Redirect::to(&result.redirect_to.full()).into_response(),
-        },
+        Ok(result) => Ok(Json(result).into_response()),
         Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
-            Redirect::to("/").into_response()
+            Ok(searcher::distributed::Error::EmptyQuery
+                .to_string()
+                .into_response())
         }
-        Err(_) => panic!("Search failed"), // TODO: show 500 status to user here
+        Err(err) => {
+            tracing::error!("{:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
