@@ -27,23 +27,26 @@ import { askama } from "../../askama";
     </div>
     <div
       class="mt-16"
-      x-data="{ items: $persist([]).as('optics'), name: '', url: '' }"
+      x-data="{ items: $persist([]).as('optics'), name: '', description: '', url: '' }"
     >
-      <div class="flex w-full justify-between pl-5 pr-5">
+      <div class="flex w-full justify-between px-5 h-10">
         <input id="name" type="text" placeholder="Name" x-model="name" />
         <input id="url" type="text" placeholder="Url" x-model="url" />
         <button
-          x-on:click="if (name != '' && url != '') {items.push({ name, url }); name = url = ''}"
-          class="h-10 w-20 rounded-full border-0 bg-brand text-sm text-white"
+          x-on:click="if (name != '' && url != '') {items.push({ name, description, url }); name = url = description = ''}"
+          class="w-20 rounded-full border-0 bg-brand text-sm text-white"
           >Add</button
         >
       </div>
+      <div class="flex w-full px-5 h-10 mt-2">
+        <input id="description" type="text" placeholder="Description" x-model="description" />
+      </div>
       <div class="mt-5">
         <div class="grid w-full space-y-5" id="optics-list">
-          <div class="flex">
-            <div class="w-10"></div>
-            <div class="flex-1 font-medium">Name</div>
-            <div class="flex-1 font-medium">Url</div>
+          <div class="flex pl-10">
+            <div class="flex-1 font-medium mr-5">Name</div>
+            <div class="flex-1 font-medium mr-5">Description</div>
+            <div class="flex-1 font-medium">Link</div>
           </div>
           {
             askama.for_("optic in default_optics", () => (
@@ -51,8 +54,9 @@ import { askama } from "../../askama";
                 <div class="mr-5 w-5">
                   <img src="/images/disabled-delete.svg" class="h-5 w-5" />
                 </div>
-                <div class="flex-1 text-sm">{askama`optic.name $ {{random.words}}`}</div>
-                <div class="flex-1 text-sm">{askama`optic.url $ {{internet.url}}`}</div>
+                <div class="flex-1 text-sm mr-5">{askama`optic.name $ {{random.words}}`}</div>
+                <div class="flex-1 text-sm mr-5">{askama`optic.description $ {{random.words}}`}</div>
+                <div class="flex-1 text-sm"><a href={askama`optic.url $ {{internet.url}}`}>Source</a></div>
               </div>
             ))
           }
@@ -65,9 +69,12 @@ import { askama } from "../../askama";
                   x-on:click="items.splice(index, 1)"
                 />
               </div>
-              <div class="user-optic flex-1 text-sm" x-text="item.name">
+              <div class="user-optic flex-1 text-sm mr-5" x-text="item.name">
               </div>
-              <div class="user-optic flex-1 text-sm" x-text="item.url">
+              <div class="user-optic flex-1 text-sm mr-5" x-text="item.description">
+              </div>
+              <div class="user-optic flex-1 text-sm">
+                <a x-bind:href="item.url">Source</a>
               </div>
             </div>
           </template>
@@ -76,6 +83,12 @@ import { askama } from "../../askama";
     </div>
   </div>
 </SettingsLayout>
+
+<style>
+  a {
+    @apply underline font-medium;
+  }
+</style>
 
 <script>
   import "$/alpine";

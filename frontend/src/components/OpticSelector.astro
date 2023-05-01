@@ -1,8 +1,12 @@
 ---
 export interface Props {
-  current_optic_url: string;
   default_optics: string;
+  search_on_change: boolean;
 }
+
+const { search_on_change } = Astro.props;
+
+const onChange = search_on_change ? "document.getElementById('searchbar-form').submit()" : "";
 
 import { askama } from "$/askama";
 ---
@@ -12,26 +16,29 @@ import { askama } from "$/askama";
     form="searchbar-form"
     id="optics-selector"
     name="optic"
-    onchange="document.getElementById('searchbar-form').submit()"
+    onchange={onChange}
     class="styled-selector m-0"
   >
-    <option value="">Optic</option>
+    <option value="">No Optic</option>
     {
       askama.for_(
         "optic in default_optics",
-        <option value="{{ optic.url }}">{askama`optic.name`}</option>
+        <option value="{{ optic.url }}" title="{{ optic.description }}">{askama`optic.name`}</option>
       )
     }
   </select>
 </div>
 
 <script>
-  const optics: {url: string, name: string}[] = JSON.parse(window.localStorage.getItem("optics") || "[]");
+  const optics: {url: string, name: string, description: string}[] = JSON.parse(window.localStorage.getItem("optics") || "[]");
 
   for (const optic of optics) {
     const option = document.createElement("option");
+
     option.value = optic.url;
     option.text = optic.name;
+    option.setAttribute("title", optic.description);
+
     document.getElementById("optics-selector")!.appendChild(option);
   }
 

@@ -3,6 +3,7 @@ import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
 import Searchbar from "../components/Searchbar.astro";
 import Layout from "../layouts/Layout.astro";
+import OpticSelector from "../components/OpticSelector.astro";
 ---
 
 <Layout title="Stract">
@@ -16,6 +17,9 @@ import Layout from "../layouts/Layout.astro";
           <img src="/images/biglogo.svg" class="h-full w-full" />
         </div>
         <Searchbar autofocus />
+        <div class="mt-2 text-gray-600 flex space-x-2">
+            <div>Customise your search with an <a class="underline font-medium" href="/settings">optic</a>:</div><OpticSelector default_optics="default_optics" search_on_change={false}/>
+        </div>
       </div>
     </div>
 

@@ -23,14 +23,17 @@ pub const DEFAULT_OPTICS: [OpticLink; 3] = [
         name: "Copycats removal",
         url:
             "https://raw.githubusercontent.com/StractOrg/sample-optics/main/copycats_removal.optic",
+        description: "Remove common copycat websites from search results.",
     },
     OpticLink {
         name: "Hacker News",
         url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/hacker_news.optic",
+        description: "Only return results from websites that are popular on Hacker News.",
     },
     OpticLink {
         name: "Discussions",
         url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/discussions.optic",
+        description: "Only return results from forums or similar types of QA pages.",
     },
 ];
 
@@ -38,6 +41,7 @@ pub const DEFAULT_OPTICS: [OpticLink; 3] = [
 pub struct OpticLink {
     pub name: &'static str,
     pub url: &'static str,
+    pub description: &'static str,
 }
 
 #[allow(clippy::unused_async)]

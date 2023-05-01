@@ -14,16 +14,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::HtmlTemplate;
+use super::{
+    optics::{OpticLink, DEFAULT_OPTICS},
+    HtmlTemplate,
+};
 use askama::Template;
 use axum::response::IntoResponse;
 
 #[allow(clippy::unused_async)]
 pub async fn route() -> impl IntoResponse {
-    let template = IndexTemplate {};
+    let template = IndexTemplate {
+        default_optics: DEFAULT_OPTICS.to_vec(),
+    };
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
 #[template(path = "index.html")]
-struct IndexTemplate {}
+struct IndexTemplate {
+    default_optics: Vec<OpticLink>,
+}
