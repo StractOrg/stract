@@ -303,4 +303,14 @@ mod tests {
     fn copycats_parse() {
         assert!(parse(include_str!("../testcases/copycats_removal.optic")).is_ok());
     }
+
+    #[test]
+    fn optics_10kshort_parse() {
+        assert!(parse(include_str!("../testcases/10k_short.optic")).is_ok());
+    }
+
+    #[test]
+    fn blogroll_parse() {
+        assert!(parse(include_str!("../testcases/blogroll.optic")).is_ok());
+    }
 }
