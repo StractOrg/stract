@@ -141,65 +141,83 @@ impl AsTantivyQuery for Matching {
         fastfield_reader: &FastFieldReader,
     ) -> Box<dyn tantivy::query::Query> {
         match &self.location {
-            MatchLocation::Site => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::Site,
-                schema,
-                fastfield_reader.clone(),
+            MatchLocation::Site => ConstQuery::new(
+                PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::Site,
+                    schema,
+                    fastfield_reader.clone(),
+                )
+                .box_clone(),
+                1.0,
             )
             .box_clone(),
-            MatchLocation::Url => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::Url,
-                schema,
-                fastfield_reader.clone(),
-            )
-            .box_clone(),
-            MatchLocation::Domain => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::Domain,
-                schema,
-                fastfield_reader.clone(),
-            )
-            .box_clone(),
-            MatchLocation::Title => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::Title,
-                schema,
-                fastfield_reader.clone(),
-            )
-            .box_clone(),
+            MatchLocation::Url => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::Url,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
+            MatchLocation::Domain => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::Domain,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
+            MatchLocation::Title => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::Title,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
             MatchLocation::Description => UnionQuery::from(vec![
-                PatternQuery::new(
-                    self.pattern.clone(),
-                    TextField::Description,
-                    schema,
-                    fastfield_reader.clone(),
-                )
-                .box_clone(),
-                PatternQuery::new(
-                    self.pattern.clone(),
-                    TextField::DmozDescription,
-                    schema,
-                    fastfield_reader.clone(),
-                )
-                .box_clone(),
+                Box::new(ConstQuery::new(
+                    Box::new(PatternQuery::new(
+                        self.pattern.clone(),
+                        TextField::Description,
+                        schema,
+                        fastfield_reader.clone(),
+                    )),
+                    1.0,
+                )) as Box<dyn tantivy::query::Query>,
+                Box::new(ConstQuery::new(
+                    Box::new(PatternQuery::new(
+                        self.pattern.clone(),
+                        TextField::DmozDescription,
+                        schema,
+                        fastfield_reader.clone(),
+                    )),
+                    1.0,
+                )) as Box<dyn tantivy::query::Query>,
             ])
             .box_clone(),
-            MatchLocation::Content => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::CleanBody,
-                schema,
-                fastfield_reader.clone(),
-            )
-            .box_clone(),
-            MatchLocation::Schema => PatternQuery::new(
-                self.pattern.clone(),
-                TextField::FlattenedSchemaOrgJson,
-                schema,
-                fastfield_reader.clone(),
-            )
-            .box_clone(),
+            MatchLocation::Content => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::CleanBody,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
+            MatchLocation::Schema => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::FlattenedSchemaOrgJson,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
         }
     }
 }

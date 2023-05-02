@@ -675,8 +675,14 @@ struct SegmentReader {
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
 
+#[derive(Clone)]
+struct QueryData {
+    simple_terms: Vec<String>,
+    optic_rules: Vec<optics::Rule>,
+}
+
 pub struct SignalAggregator {
-    query: Option<Arc<Query>>,
+    query: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
     personal_centrality: Option<Arc<online_harmonic::Scorer>>,
@@ -714,13 +720,20 @@ impl Clone for SignalAggregator {
 impl std::fmt::Debug for SignalAggregator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SignalAggregator")
-            .field("query", &self.query)
+            .field(
+                "query",
+                &self
+                    .query
+                    .as_ref()
+                    .map(|q| q.simple_terms.clone())
+                    .unwrap_or_default(),
+            )
             .finish()
     }
 }
 
 impl SignalAggregator {
-    pub fn new(query: Option<Query>) -> Self {
+    pub fn new(query: Option<&Query>) -> Self {
         let query_signal_coefficients = query.as_ref().and_then(|q| q.signal_coefficients());
 
         let fetch_time_ms_cache: Vec<_> = (0..1000)
@@ -730,6 +743,20 @@ impl SignalAggregator {
         let update_time_cache = (0..(3 * 365 * 24))
             .map(|hours_since_update| 1.0 / ((hours_since_update as f64 + 1.0).log2()))
             .collect();
+
+        let query = query.as_ref().map(|q| QueryData {
+            simple_terms: q.simple_terms().to_vec(),
+            optic_rules: q
+                .optics()
+                .iter()
+                .flat_map(|o| o.rules.iter())
+                .filter(|rule| match rule.action {
+                    optics::Action::Downrank(b) | optics::Action::Boost(b) => b != 0,
+                    optics::Action::Discard => false,
+                })
+                .cloned()
+                .collect(),
+        });
 
         Self {
             segment_reader: None,
@@ -744,7 +771,7 @@ impl SignalAggregator {
             selected_region: None,
             current_timestamp: None,
             linear_regression: None,
-            query: query.map(Arc::new),
+            query,
         }
     }
 
@@ -757,12 +784,12 @@ impl SignalAggregator {
         let schema = tv_searcher.schema();
 
         if let Some(query) = &self.query {
-            if !query.simple_terms().is_empty() {
+            if !query.simple_terms.is_empty() {
                 for signal in ALL_SIGNALS {
                     if let Some(text_field) = signal.as_textfield() {
                         let tv_field = schema.get_field(text_field.name()).unwrap();
                         let simple_query = itertools::intersperse(
-                            query.simple_terms().iter().map(|s| s.as_str()),
+                            query.simple_terms.iter().map(|s| s.as_str()),
                             " ",
                         )
                         .collect::<String>();
@@ -819,13 +846,8 @@ impl SignalAggregator {
 
         if let Some(query) = &self.query {
             optic_rule_boosts = query
-                .optics()
+                .optic_rules
                 .iter()
-                .flat_map(|o| o.rules.iter())
-                .filter(|rule| match rule.action {
-                    optics::Action::Downrank(b) | optics::Action::Boost(b) => b != 0,
-                    optics::Action::Discard => false,
-                })
                 .filter_map(|rule| rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader))
                 .map(|(_, rule)| RuleBoost {
                     docset: rule
@@ -852,9 +874,7 @@ impl SignalAggregator {
         let schema = tv_searcher.schema();
 
         if let Some(query) = &self.query {
-            let simple_terms = query.simple_terms().to_vec();
-
-            if simple_terms.len() < 2 {
+            if query.simple_terms.len() < 2 {
                 return proximity_scorers;
             }
 
@@ -864,9 +884,9 @@ impl SignalAggregator {
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
                         let tokenizer = field.tokenizer();
-                        let mut terms = Vec::with_capacity(simple_terms.len());
+                        let mut terms = Vec::with_capacity(query.simple_terms.len());
 
-                        for term in &simple_terms {
+                        for term in &query.simple_terms {
                             let mut stream = tokenizer.token_stream(term);
                             while let Some(term) = stream.next() {
                                 let term = tantivy::Term::from_field_text(tv_field, &term.text);

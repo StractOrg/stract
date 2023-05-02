@@ -167,7 +167,7 @@ impl LocalSearcher {
             RankingPipeline::ltr_for_query(&mut query, self.lambda_model.clone());
         let parsed_query = self.parse_query(ctx, &query)?;
 
-        let mut aggregator = SignalAggregator::new(Some(parsed_query.clone()));
+        let mut aggregator = SignalAggregator::new(Some(&parsed_query));
 
         if let Some(store) = &self.centrality_store {
             aggregator.set_personal_harmonic(online_centrality_scorer(

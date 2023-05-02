@@ -640,7 +640,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
         let result =
@@ -669,7 +669,7 @@ mod tests {
         let ctx = index.local_search_ctx();
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -715,7 +715,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -759,7 +759,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -803,7 +803,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -880,7 +880,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -934,7 +934,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -977,7 +977,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1045,7 +1045,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1072,7 +1072,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1102,7 +1102,7 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
         let result =
@@ -1151,7 +1151,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1223,7 +1223,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1287,7 +1287,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 
@@ -1337,7 +1337,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(query.clone())),
+            SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
         );
 

@@ -36,6 +36,7 @@ use crate::{
 #[derive(Clone)]
 pub struct PatternQuery {
     patterns: Vec<PatternPart>,
+    can_optimize_site_domain: bool,
     field: tantivy::schema::Field,
     raw_terms: Vec<tantivy::Term>,
     fastfield_reader: FastFieldReader,
@@ -58,15 +59,49 @@ impl PatternQuery {
         schema: &tantivy::schema::Schema,
         fastfield_reader: FastFieldReader,
     ) -> Self {
-        let mut raw_terms = Vec::new();
+        let field = Field::Text(field);
+        let tv_field = schema.get_field(field.name()).unwrap();
 
-        let tv_field = schema.get_field(Field::Text(field).name()).unwrap();
+        if can_optimize_site_domain(&patterns, field) {
+            if patterns.len() == 3 {
+                if let PatternPart::Raw(term) = &patterns[1] {
+                    return Self {
+                        patterns: Vec::new(),
+                        field: tv_field,
+                        can_optimize_site_domain: true,
+                        raw_terms: vec![tantivy::Term::from_field_text(tv_field, term.as_str())],
+                        fastfield_reader,
+                    };
+                } else {
+                    unreachable!()
+                }
+            } else {
+                let term: String = patterns
+                    .iter()
+                    .filter_map(|p| match p {
+                        PatternPart::Raw(s) => Some(s.clone()),
+                        PatternPart::Wildcard => None,
+                        PatternPart::Anchor => None,
+                    })
+                    .collect();
+
+                return Self {
+                    patterns,
+                    field: tv_field,
+                    can_optimize_site_domain: true,
+                    raw_terms: vec![tantivy::Term::from_field_text(tv_field, &term)],
+                    fastfield_reader,
+                };
+            }
+        }
+
+        let mut raw_terms = Vec::with_capacity(patterns.len());
         let mut new_patterns = Vec::with_capacity(patterns.len());
 
         for pattern in &patterns {
             match pattern {
                 PatternPart::Raw(text) => {
-                    let mut stream = field.tokenizer().token_stream(text);
+                    let mut stream = field.as_text().unwrap().tokenizer().token_stream(text);
 
                     while let Some(token) = stream.next() {
                         new_patterns.push(PatternPart::Raw(token.text.clone()));
@@ -79,10 +114,13 @@ impl PatternQuery {
             }
         }
 
+        raw_terms.shrink_to_fit();
+
         Self {
             patterns: new_patterns,
             field: tv_field,
             raw_terms,
+            can_optimize_site_domain: false,
             fastfield_reader,
         }
     }
@@ -103,6 +141,14 @@ impl tantivy::query::Query for PatternQuery {
             }
             tantivy::query::EnableScoring::Disabled(_) => None,
         };
+
+        if self.can_optimize_site_domain {
+            return Ok(Box::new(FastSiteDomainPatternWeight {
+                term: self.raw_terms[0].clone(),
+                field: self.field,
+                similarity_weight: bm25_weight,
+            }));
+        }
 
         Ok(Box::new(PatternWeight {
             similarity_weight: bm25_weight,
@@ -125,6 +171,121 @@ enum SmallPatternPart {
     Term,
     Wildcard,
     Anchor,
+}
+
+/// if pattern is of form Site("|site|") or Domain("|domain|")
+/// we can use the field without tokenization to speed up the query significantly
+fn can_optimize_site_domain(patterns: &[PatternPart], field: Field) -> bool {
+    patterns.len() >= 2
+        && matches!(&patterns[0], PatternPart::Anchor)
+        && matches!(&patterns[patterns.len() - 1], PatternPart::Anchor)
+        && patterns[1..patterns.len() - 1]
+            .iter()
+            .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
+        && (matches!(field, Field::Text(TextField::Site))
+            || matches!(field, Field::Text(TextField::Domain)))
+}
+
+struct FastSiteDomainPatternWeight {
+    term: tantivy::Term,
+    field: tantivy::schema::Field,
+    similarity_weight: Option<Bm25Weight>,
+}
+
+impl FastSiteDomainPatternWeight {
+    fn fieldnorm_reader(&self, reader: &SegmentReader) -> tantivy::Result<FieldNormReader> {
+        if self.similarity_weight.is_some() {
+            if let Some(fieldnorm_reader) = reader.fieldnorms_readers().get_field(self.field)? {
+                return Ok(fieldnorm_reader);
+            }
+        }
+        Ok(FieldNormReader::constant(reader.max_doc(), 1))
+    }
+
+    fn pattern_scorer(
+        &self,
+        reader: &SegmentReader,
+        boost: Score,
+    ) -> tantivy::Result<Option<FastSiteDomainPatternScorer>> {
+        let similarity_weight = self
+            .similarity_weight
+            .as_ref()
+            .map(|weight| weight.boost_by(boost));
+
+        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
+
+        let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
+            Field::Text(TextField::Site) => Field::Text(TextField::SiteNoTokenizer),
+            Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
+            _ => unreachable!(),
+        };
+
+        let tv_field = reader
+            .schema()
+            .get_field(field_no_tokenizer.name())
+            .unwrap();
+
+        let opt = match field_no_tokenizer {
+            Field::Text(t) => t.index_option(),
+            Field::Fast(_) => unreachable!(),
+        };
+
+        match reader
+            .inverted_index(tv_field)?
+            .read_postings(&self.term, opt)?
+        {
+            Some(posting) => Ok(Some(FastSiteDomainPatternScorer {
+                similarity_weight,
+                posting,
+                fieldnorm_reader,
+            })),
+            None => Ok(None),
+        }
+    }
+}
+
+impl tantivy::query::Weight for FastSiteDomainPatternWeight {
+    fn scorer(
+        &self,
+        reader: &tantivy::SegmentReader,
+        boost: tantivy::Score,
+    ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
+        if let Some(scorer) = self.pattern_scorer(reader, boost)? {
+            Ok(Box::new(PatternScorer::FastSiteDomain(scorer)))
+        } else {
+            Ok(Box::new(EmptyScorer))
+        }
+    }
+
+    fn explain(
+        &self,
+        reader: &tantivy::SegmentReader,
+        doc: tantivy::DocId,
+    ) -> tantivy::Result<tantivy::query::Explanation> {
+        let scorer_opt = self.pattern_scorer(reader, 1.0)?;
+        if scorer_opt.is_none() {
+            return Err(TantivyError::InvalidArgument(format!(
+                "Document #({doc}) does not match (empty scorer)"
+            )));
+        }
+        let mut scorer = scorer_opt.unwrap();
+        if scorer.seek(doc) != doc {
+            return Err(TantivyError::InvalidArgument(format!(
+                "Document #({doc}) does not match"
+            )));
+        }
+        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
+        let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
+        let term_freq = scorer.term_freq();
+        let mut explanation = Explanation::new("Pattern Scorer", scorer.score());
+        explanation.add_detail(
+            self.similarity_weight
+                .as_ref()
+                .unwrap()
+                .explain(fieldnorm_id, term_freq),
+        );
+        Ok(explanation)
+    }
 }
 
 struct PatternWeight {
@@ -208,65 +369,7 @@ impl PatternWeight {
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
-        // if pattern is of form Site("|site|") or Domain("|domain|")
-        // we can use the field without tokenization to speed up the query significantly
-        if self.patterns.len() >= 2
-            && matches!(&self.patterns[0], PatternPart::Anchor)
-            && matches!(&self.patterns[self.patterns.len() - 1], PatternPart::Anchor)
-            && self.patterns[1..self.patterns.len() - 1]
-                .iter()
-                .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
-            && (matches!(
-                ALL_FIELDS[self.field.field_id() as usize],
-                Field::Text(TextField::Site)
-            ) || matches!(
-                ALL_FIELDS[self.field.field_id() as usize],
-                Field::Text(TextField::Domain)
-            ))
-        {
-            let term: String = self
-                .patterns
-                .iter()
-                .filter_map(|p| match p {
-                    PatternPart::Raw(s) => Some(s.clone()),
-                    PatternPart::Wildcard => None,
-                    PatternPart::Anchor => None,
-                })
-                .collect();
-
-            let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
-                Field::Text(TextField::Site) => Field::Text(TextField::SiteNoTokenizer),
-                Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
-                _ => unreachable!(),
-            };
-
-            let tv_field = reader
-                .schema()
-                .get_field(field_no_tokenizer.name())
-                .unwrap();
-
-            let term = tantivy::Term::from_field_text(tv_field, &term);
-
-            let opt = match field_no_tokenizer {
-                Field::Text(t) => t.index_option(),
-                Field::Fast(_) => unreachable!(),
-            };
-
-            match reader.inverted_index(tv_field)?.read_postings(&term, opt)? {
-                Some(posting) => {
-                    return Ok(Some(PatternScorer::FastSiteDomain(
-                        FastSiteDomainPatternScorer {
-                            similarity_weight,
-                            posting,
-                            fieldnorm_reader,
-                        },
-                    )));
-                }
-                None => {
-                    return Ok(None);
-                }
-            }
-        }
+        if can_optimize_site_domain(&self.patterns, ALL_FIELDS[self.field.field_id() as usize]) {}
 
         let mut term_postings_list = Vec::with_capacity(self.raw_terms.len());
         for term in &self.raw_terms {

@@ -106,13 +106,10 @@ impl Query {
 
         Ok(Query {
             terms,
-            site_rankings: optics.clone().into_iter().fold(
-                SiteRankings::default(),
-                |mut acc, el| {
-                    acc.merge_into(el.site_rankings);
-                    acc
-                },
-            ),
+            site_rankings: optics.iter().fold(SiteRankings::default(), |mut acc, el| {
+                acc.merge_into(el.site_rankings.clone());
+                acc
+            }),
             simple_terms_text,
             tantivy_query,
             optics,

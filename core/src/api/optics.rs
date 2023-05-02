@@ -18,7 +18,7 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
-pub const DEFAULT_OPTICS: [OpticLink; 3] = [
+pub const DEFAULT_OPTICS: [OpticLink; 4] = [
     OpticLink {
         name: "Copycats removal",
         url:
@@ -34,6 +34,11 @@ pub const DEFAULT_OPTICS: [OpticLink; 3] = [
         name: "Discussions",
         url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/discussions.optic",
         description: "Only return results from forums or similar types of QA pages.",
+    },
+    OpticLink {
+        name: "10K Short",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/10k_short.optic",
+        description: "Remove the top 10,000 most popular websites from search results.",
     },
 ];
 
