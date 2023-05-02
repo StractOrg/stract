@@ -313,4 +313,9 @@ mod tests {
     fn blogroll_parse() {
         assert!(parse(include_str!("../testcases/blogroll.optic")).is_ok());
     }
+
+    #[test]
+    fn devdocs_parse() {
+        assert!(parse(include_str!("../testcases/devdocs.optic")).is_ok());
+    }
 }

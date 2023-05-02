@@ -153,7 +153,7 @@ impl OpticsBackend {
                                 optics::Token::Rule => Some("A rule specifies how a particular search result should be treated. \
                                 It consists of a `Matches` block and an optional `Action`. Any search result that matches the `Matches` block \
                                 will have the `Action` applied to it. The action can either `Boost`, `Downrank` or `Discard` a result. An empty `Action` is \
-                                equivalent to a `Boost` of 1.".to_string()),
+                                equivalent to a `Boost` of 0.".to_string()),
 
                                 optics::Token::RankingPipeline => Some("The final ranking consists of multiple stages in a pipeline. Each stage receives the 
                                 best scoring webpages from the stage before it, and uses more accurate yet computationally expensive algorithms to rank 

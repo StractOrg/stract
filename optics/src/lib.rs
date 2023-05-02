@@ -115,7 +115,7 @@ impl TryFrom<RawRule> for Rule {
 
         Ok(Rule {
             matches,
-            action: raw.action.map(Action::from).unwrap_or(Action::Boost(1)),
+            action: raw.action.map(Action::from).unwrap_or(Action::Boost(0)),
         })
     }
 }
