@@ -43,6 +43,11 @@ pub struct StoredQuery {
     timestamp: Option<DateTime<Utc>>, // it is extremely important that we strip minutes, seconds and nanoseconds here for privacy
 }
 
+pub enum ImprovementEvent {
+    StoreQuery(StoredQuery),
+    Click { qid: Uuid, idx: usize },
+}
+
 impl StoredQuery {
     pub fn new(query: String, urls: Vec<Url>) -> Self {
         let timestamp = Utc::now()
@@ -63,11 +68,6 @@ impl StoredQuery {
     pub fn qid(&self) -> &Uuid {
         &self.qid
     }
-}
-
-pub enum ImprovementEvent {
-    StoreQuery(StoredQuery),
-    Click { qid: Uuid, idx: usize },
 }
 
 async fn dump_queue(queue: &Mutex<LeakyQueue<ImprovementEvent>>) -> Vec<ImprovementEvent> {
