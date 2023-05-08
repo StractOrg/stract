@@ -318,4 +318,9 @@ mod tests {
     fn devdocs_parse() {
         assert!(parse(include_str!("../testcases/devdocs.optic")).is_ok());
     }
+
+    #[test]
+    fn academic_parse() {
+        assert!(parse(include_str!("../testcases/academic.optic")).is_ok());
+    }
 }

@@ -18,7 +18,7 @@ use super::HtmlTemplate;
 use askama::Template;
 use axum::response::IntoResponse;
 
-pub const DEFAULT_OPTICS: [OpticLink; 6] = [
+pub const DEFAULT_OPTICS: [OpticLink; 7] = [
     OpticLink {
         name: "Copycats removal",
         url:
@@ -49,6 +49,11 @@ pub const DEFAULT_OPTICS: [OpticLink; 6] = [
         name: "Devdocs",
         url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/devdocs.optic",
         description: "Only return results from some of the developer documentation sites listed on devdocs.io. This is a non-exhaustive list.",
+    },
+    OpticLink {
+        name: "Academic",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/academic.optic",
+        description: "Search exclusively in academic sites (.edu, .ac.uk, arxiv.org etc.). This is a non-exhaustive list.",
     },
 ];
 

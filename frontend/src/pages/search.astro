@@ -287,6 +287,8 @@ import type { AstroCookies } from "astro/dist/core/cookies";
 
   var rankingModalHeight = modal.clientHeight;
 
+  var prevButtonClickIdx = -1;
+
   rankingAdjustButtons.forEach((btn) => {
     btn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -305,8 +307,15 @@ import type { AstroCookies } from "astro/dist/core/cookies";
         "px";
 
       setTimeout(() => {
-        modal.classList.remove("modal-closed");
-        modal.classList.add("modal-open");
+        if (prevButtonClickIdx == elem.dataset.idx && modal.classList.contains("modal-open")) {
+          modal.classList.add("modal-closed");
+          modal.classList.remove("modal-open");
+        } else {
+          modal.classList.remove("modal-closed");
+          modal.classList.add("modal-open");
+        }
+
+        prevButtonClickIdx = elem.dataset.idx;
       }, 0);
     });
   });
