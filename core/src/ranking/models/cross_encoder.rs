@@ -14,21 +14,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Mutex};
+use std::path::Path;
 
 use itertools::Itertools;
-use onnxruntime::{ndarray::ArrayBase, tensor::OrtOwnedTensor, GraphOptimizationLevel, TypedArray};
+use tch::Tensor;
 use tokenizers::PaddingParams;
 use tokenizers::TruncationParams;
 
-use crate::Result;
-
-use crate::ONNX_ENVIRONMENT;
 const TRUNCATE_INPUT: usize = 128;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Tokenizer error")]
+    Tokenizer(#[from] tokenizers::Error),
+    #[error("Torch error")]
+    Torch(#[from] tch::TchError),
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 pub struct CrossEncoderModel {
     tokenizer: tokenizers::Tokenizer,
-    session: Mutex<onnxruntime::session::Session<'static>>,
+    model: tch::CModule,
 }
 
 impl CrossEncoderModel {
@@ -48,15 +55,9 @@ impl CrossEncoderModel {
         tokenizer.with_truncation(Some(truncation));
         tokenizer.with_padding(Some(padding));
 
-        let session = Mutex::new(
-            ONNX_ENVIRONMENT
-                .new_session_builder()?
-                .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(5)?
-                .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
-        );
+        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
 
-        Ok(Self { tokenizer, session })
+        Ok(Self { tokenizer, model })
     }
 }
 
@@ -125,32 +126,20 @@ impl CrossEncoder for CrossEncoderModel {
             })
             .collect_vec();
 
-        let mut sess = self.session.lock().unwrap();
+        let ids = Tensor::of_slice(&ids).reshape(&[bs as i64, num_tokens as i64]);
+        let attention_mask =
+            Tensor::of_slice(&attention_mask).reshape(&[bs as i64, num_tokens as i64]);
+        let type_ids = Tensor::of_slice(&type_ids).reshape(&[bs as i64, num_tokens as i64]);
 
-        let output: Vec<OrtOwnedTensor<f32, _>> = sess
-            .run(vec![
-                TypedArray::I64(
-                    ArrayBase::from_vec(ids)
-                        .into_shape((bs, num_tokens))
-                        .unwrap(),
-                ),
-                TypedArray::I64(
-                    ArrayBase::from_vec(attention_mask)
-                        .into_shape((bs, num_tokens))
-                        .unwrap(),
-                ),
-                TypedArray::I64(
-                    ArrayBase::from_vec(type_ids)
-                        .into_shape((bs, num_tokens))
-                        .unwrap(),
-                ),
-            ])
+        let output = self
+            .model
+            .forward_ts(&[ids, attention_mask, type_ids])
             .unwrap();
 
         let mut res = Vec::with_capacity(bs);
 
         for i in 0..bs {
-            let s = output[0][[i, 0]] as f64;
+            let s = output.double_value(&[i as i64, 0]);
             let s = s.exp();
             let s = s / (s + 1.0);
             res.push(s);

@@ -67,7 +67,6 @@ once_cell = { workspace = true }
 optics = { path = "../optics" }
 crossbeam-channel = { workspace = true }
 num_cpus = { workspace = true }
-onnxruntime = { workspace = true }
 tokenizers = { workspace = true }
 lalrpop-util = { workspace = true }
 byteorder = { workspace = true }
@@ -78,6 +77,9 @@ chitchat = { workspace = true }
 memmap2 = { workspace = true }
 rkyv = { workspace = true }
 dashmap = { workspace = true }
+tch = { workspace = true }
+torch-sys = { workspace = true }
+libc = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

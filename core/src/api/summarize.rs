@@ -14,20 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::convert::Infallible;
 use std::sync::Arc;
 
-use axum::response::sse::KeepAlive;
-use axum::response::{sse::Event, Sse};
 use axum::{extract, Extension};
-use futures::stream::Stream;
 use http::StatusCode;
 use serde::Deserialize;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio_stream::StreamExt as _;
 
 use super::State;
-use crate::Result;
 
 #[derive(Deserialize)]
 pub struct Params {
@@ -35,44 +28,18 @@ pub struct Params {
     pub query: String,
 }
 
-fn summarize_blocking(iter: impl Iterator<Item = String>, tx: UnboundedSender<String>) {
-    for tok in iter {
-        tx.send(tok).unwrap();
-    }
-}
-
-async fn summarize(
-    params: Params,
-    state: Arc<State>,
-) -> Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>> {
-    let webpage = state.searcher.get_webpage(&params.url).await?;
-    let (tx, mut rx) = unbounded_channel();
-
-    let summarizer = Arc::clone(&state.summarizer);
-    tokio::task::spawn_blocking(move || {
-        summarize_blocking(summarizer.summarize_iter(&params.query, &webpage.body), tx)
-    });
-
-    let stream = async_stream::stream! {
-        while let Some(item) = rx.recv().await {
-            yield item;
-        }
-    };
-
-    Ok(
-        Sse::new(stream.map(|term| Event::default().data(term)).map(Ok))
-            .keep_alive(KeepAlive::default()),
-    )
-}
-
 #[allow(clippy::unused_async)]
 pub async fn route(
     extract::Query(params): extract::Query<Params>,
     Extension(state): Extension<Arc<State>>,
-) -> std::result::Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>, StatusCode>
-{
-    match summarize(params, state).await {
-        Ok(stream) => Ok(stream),
-        Err(_) => Err(StatusCode::NO_CONTENT),
-    }
+) -> std::result::Result<String, StatusCode> {
+    let webpage = state
+        .searcher
+        .get_webpage(&params.url)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(state
+        .summarizer
+        .abstractive_summary(&params.query, &webpage.body))
 }

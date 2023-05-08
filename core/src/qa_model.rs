@@ -14,23 +14,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, ops::Range, path::Path, sync::Mutex};
+use std::{cmp::Ordering, ops::Range, path::Path};
 
-use crate::{softmax, Result, ONNX_ENVIRONMENT};
 use itertools::Itertools;
-use onnxruntime::{
-    ndarray::{Array2, Axis},
-    tensor::OrtOwnedTensor,
-    GraphOptimizationLevel, TypedArray,
-};
+use tch::{IValue, Tensor};
 use tokenizers::{PaddingParams, TruncationParams};
 
 const TRUNCATE_INPUT: usize = 128;
 const DEFAULT_SCORE_THRESHOLD: f64 = 0.7;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Tokenizer error")]
+    Tokenizer(#[from] tokenizers::Error),
+    #[error("Torch error")]
+    Torch(#[from] tch::TchError),
+}
+
+type Result<T> = std::result::Result<T, Error>;
+
 pub struct QaModel {
     tokenizer: tokenizers::Tokenizer,
-    session: Mutex<onnxruntime::session::Session<'static>>,
+    model: tch::CModule,
     score_threshold: f64,
 }
 
@@ -56,17 +61,10 @@ impl QaModel {
         tokenizer.with_truncation(Some(truncation));
         tokenizer.with_padding(Some(padding));
 
-        let session = Mutex::new(
-            ONNX_ENVIRONMENT
-                .new_session_builder()?
-                .with_optimization_level(GraphOptimizationLevel::All)?
-                .with_number_threads(1)?
-                .with_model_from_file(folder.as_ref().join("model_quantized.onnx"))?,
-        );
-
+        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
         Ok(Self {
             tokenizer,
-            session,
+            model,
             score_threshold: DEFAULT_SCORE_THRESHOLD,
         })
     }
@@ -76,71 +74,76 @@ impl QaModel {
             return None;
         }
 
-        let mut batches = Vec::with_capacity(contexts.len());
+        let bs = contexts.len();
+        let mut batches = Vec::with_capacity(bs);
 
         for context in contexts {
             batches.push((question.to_string(), context.to_string()));
         }
         let encoded = self.tokenizer.encode_batch(batches, true).unwrap();
 
-        let encoded_ids: Vec<_> = encoded
+        let num_tokens = encoded
             .iter()
-            .map(|encoding| encoding.get_ids().to_vec())
-            .collect();
+            .map(|enc| enc.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
-        let mut ids = Array2::zeros((encoded_ids.len(), encoded_ids.first().unwrap().len()));
-        for i in 0..encoded_ids.len() {
-            for j in 0..encoded_ids[i].len() {
-                ids[[i, j]] = encoded_ids[i][j] as i64;
-            }
-        }
-
-        let encoded_masks: Vec<_> = encoded
+        let ids = encoded
             .iter()
-            .map(|encoding| encoding.get_attention_mask().to_vec())
-            .collect();
+            .flat_map(|enc| enc.get_ids().iter().map(|i| *i as i64).take(TRUNCATE_INPUT))
+            .collect_vec();
 
-        let mut masks = Array2::zeros((encoded_masks.len(), encoded_masks.first().unwrap().len()));
-        for i in 0..encoded_masks.len() {
-            for j in 0..encoded_masks[i].len() {
-                masks[[i, j]] = encoded_masks[i][j] as i64;
-            }
-        }
+        let attention_mask = encoded
+            .iter()
+            .flat_map(|enc| {
+                enc.get_attention_mask()
+                    .iter()
+                    .map(|i| *i as i64)
+                    .take(TRUNCATE_INPUT)
+            })
+            .collect_vec();
 
-        let mut sess = self.session.lock().unwrap();
+        let ids = Tensor::of_slice(&ids).reshape(&[bs as i64, num_tokens as i64]);
+        let attention_mask =
+            Tensor::of_slice(&attention_mask).reshape(&[bs as i64, num_tokens as i64]);
 
-        let mut res: Vec<OrtOwnedTensor<f32, _>> = sess
-            .run(vec![TypedArray::I64(ids), TypedArray::I64(masks)])
+        let output = self
+            .model
+            .forward_is(&[IValue::Tensor(ids), IValue::Tensor(attention_mask)])
             .unwrap();
 
-        if res.len() != 2 {
-            return None;
-        }
+        let (start_logits, end_logits) = if let IValue::Tuple(mut tup) = output {
+            if tup.len() != 2 {
+                return None;
+            }
 
-        let start_logits = res.remove(0);
-        let end_logits = res.remove(0);
+            let end = tup.pop().unwrap();
+            let start = tup.pop().unwrap();
 
-        if start_logits.shape()[0] != start_logits.shape()[0] {
+            if let (IValue::Tensor(start), IValue::Tensor(end)) = (start, end) {
+                (start, end)
+            } else {
+                return None;
+            }
+        } else {
             return None;
-        }
+        };
+
+        debug_assert_eq!(start_logits.size(), end_logits.size());
 
         let mut best_answer: Option<Answer> = None;
 
         #[allow(clippy::needless_range_loop)]
-        for idx in 0..start_logits.shape()[0] {
-            let mut start: Vec<f32> = start_logits
-                .index_axis(Axis(0), idx)
-                .into_iter()
-                .copied()
+        for idx in 0..bs {
+            let start: Vec<f64> = start_logits
+                .get(idx as i64)
+                .iter::<f64>()
+                .unwrap()
                 .collect();
-            softmax(&mut start);
+            // softmax(&mut start);
 
-            let mut end: Vec<f32> = end_logits
-                .index_axis(Axis(0), idx)
-                .into_iter()
-                .copied()
-                .collect();
-            softmax(&mut end);
+            let end: Vec<f64> = end_logits.get(idx as i64).iter::<f64>().unwrap().collect();
+            // softmax(&mut end);
 
             let best_start = start
                 .iter()
@@ -155,7 +158,7 @@ impl QaModel {
                 continue;
             }
 
-            let score = (start[best_start] * end[best_end]) as f64;
+            let score = start[best_start] * end[best_end];
 
             if score < self.score_threshold {
                 continue;

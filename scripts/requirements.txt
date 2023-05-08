@@ -1,6 +1,5 @@
-transformers[onnx]
+transformers
 tensorboard>1.15.0
-torch
-optimum>=1.6.3
+torch>=2.0.0
 datasets
 gensim

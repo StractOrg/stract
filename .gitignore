@@ -11,3 +11,4 @@ notes
 *.tar.gz
 *.csv
 ltr_scores.json
+.venv

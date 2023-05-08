@@ -271,15 +271,6 @@ pub enum Error {
     #[error("Internal error")]
     InternalError(String),
 
-    #[error("Huggingface tokenizer")]
-    HuggingfaceTokenizer(#[from] tokenizers::Error),
-
-    #[error("Onnx")]
-    Onnx(#[from] onnxruntime::OrtError),
-
-    #[error("Word2Vec")]
-    Word2Vec(#[from] spell::word2vec::Error),
-
     #[error("Distributed searcher")]
     DistributedSearcher(#[from] distributed::Error),
 
@@ -288,6 +279,9 @@ pub enum Error {
 
     #[error("Lambdamart")]
     LambdaMART(#[from] ranking::models::lambdamart::Error),
+
+    #[error("Summarizer")]
+    Summarizer(#[from] crate::summarizer::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -358,19 +352,3 @@ fn floor_char_boundary(str: &str, index: usize) -> usize {
 
     res
 }
-
-fn softmax(vec: &mut [f32]) {
-    let s: f32 = vec.iter().map(|z| z.exp()).sum();
-
-    for z in vec {
-        *z = z.exp() / s
-    }
-}
-
-pub static ONNX_ENVIRONMENT: once_cell::sync::Lazy<onnxruntime::environment::Environment> =
-    once_cell::sync::Lazy::new(|| {
-        onnxruntime::environment::Environment::builder()
-            .with_log_level(onnxruntime::LoggingLevel::Info)
-            .build()
-            .unwrap()
-    });

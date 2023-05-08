@@ -27,8 +27,8 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 * Install rust by following the steps outlined [here](https://www.rust-lang.org/tools/install)
 * Install clang and npm
 * Update ulimit. RocksDB tends to exceed the max number of allowed open files, so you will have to run `ulimit -n 10240` to increase the allowed max number of open files.
-* Build the frontend `cd frontend && npm install && npm run build`
+* Install just by running `cargo install just`. This allows you to run the scripts in the `justfile` file. A justfile is basically a simple Makefile, so this is just for convenience.
+* Run the command `just configure` which should automatically configures the rest of your dev environment. The script creates a python virtual environment, installs relevant dependencies, traces and exports the ML models and creates a small local index which you can use for development.
 * (Optional) Install cargo-watch by running `cargo install cargo-watch`. This makes frontend development easier.
-* (Optional) Install just by running `cargo install just`. This allows you to run the scripts in the Justfile. A Justfile is basically a simple Makefile, so this is just for convenience.
   
-After the non optional steps you can now run `cargo test` and should see all tests passing. If you have followed the optional steps, you should be able to run `just configure` which will setup a small local index. You can run `just frontend` to start the search server and launch the frontend at `0.0.0.0:3000`.
+After the non optional steps you can now run `cargo test` and should see all tests passing. If you have followed the optional steps, you should be able to run `just frontend` to start the search server and launch the frontend at `0.0.0.0:3000`.

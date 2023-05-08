@@ -1,3 +1,5 @@
+#!.venv/bin/python3
+
 # blogs from https://blogroll.org/
 blogroll_org = [
     '50watts.com',

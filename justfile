@@ -18,7 +18,7 @@
     cd frontend; npm run dev
 
 @configure *ARGS:
-    pip install -r scripts/requirements.txt
+    just setup_python_env
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
@@ -32,3 +32,7 @@
 @entity:
     rm -rf data/entity
     cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
+
+@setup_python_env:
+    python3 -m venv .venv
+    .venv/bin/pip install -r scripts/requirements.txt
