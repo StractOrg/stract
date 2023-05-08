@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use axum::{extract, Extension};
+use axum::extract;
 use http::StatusCode;
 use serde::Deserialize;
 
@@ -31,7 +31,7 @@ pub struct Params {
 #[allow(clippy::unused_async)]
 pub async fn route(
     extract::Query(params): extract::Query<Params>,
-    Extension(state): Extension<Arc<State>>,
+    extract::State(state): extract::State<Arc<State>>,
 ) -> std::result::Result<String, StatusCode> {
     let webpage = state
         .searcher
@@ -39,7 +39,5 @@ pub async fn route(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(state
-        .summarizer
-        .abstractive_summary(&params.query, &webpage.body))
+    Ok(state.summarizer.summarize(&params.query, &webpage.body))
 }

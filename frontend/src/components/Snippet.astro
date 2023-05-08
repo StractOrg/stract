@@ -16,9 +16,18 @@ export interface Props {
           {askama.if_("let Some(date) = date", () => (
             <span class="text-gray-500">{askama`date $ 2. May 2022`}</span>
           ))}
-          <span id={"snippet-text-" + askama`loop.index0`} class="[&:nth-child(2)]:before:content-['—'] snippet-text">
-            {askama`text|safe $ {{lorem.lines}}`}
-          </span>
+          <div id={"snippet-" + askama`loop.index0`}>
+            <span id="snippet-text" class="[&:nth-child(2)]:before:content-['—'] snippet-text">
+              {askama`text|safe $ {{lorem.lines}}`}
+            </span>
+            <div class="chat-bubble hidden">
+              <div class="typing">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+              </div>
+            </div>
+          </div>
         </div>
       ),
       "Snippet::StackOverflowQA { question, answers }": (
@@ -84,18 +93,50 @@ export interface Props {
 </div>
 
 <style>
-  @keyframes cursor-blink {
-    0% {
-      opacity: 0;
-    }
+  .chat-bubble {
+    padding-top: 5px;
+    padding-left: 10px;
   }
 
-  .blinking-cursor::after {
-    content: "";
-    width: 2px;
-    height: 1rem;
-    background: #292d30;
-    display: inline-block;
-    animation: cursor-blink 1s steps(2) infinite;
+  .typing {
+    align-items: center;
+    display: flex;
+    height: 17px;
+  }
+  .typing .dot {
+    animation: mercuryTypingAnimation 1.8s infinite ease-in-out;
+    background-color: rgba(20, 105, 69, .7);
+    border-radius: 50%;
+    height: 7px;
+    margin-right: 4px;
+    vertical-align: middle;
+    width: 7px;
+  }
+  .typing .dot:nth-child(1) {
+    animation-delay: 200ms;
+  }
+  .typing .dot:nth-child(2) {
+    animation-delay: 300ms;
+  }
+  .typing .dot:nth-child(3) {
+    animation-delay: 400ms;
+  }
+  .typing .dot:last-child {
+    margin-right: 0;
+  }
+
+  @keyframes mercuryTypingAnimation {
+    0% {
+      transform: translateY(0px);
+      background-color:rgba(20, 105, 69, .7);
+    }
+    28% {
+      transform: translateY(-7px);
+      background-color:rgba(20, 105, 69, .4);
+    }
+    44% {
+      transform: translateY(0px);
+      background-color: rgba(20, 105, 69, .2);
+    }
   }
 </style>

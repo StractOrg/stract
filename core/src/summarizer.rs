@@ -26,7 +26,10 @@ use itertools::{intersperse, Itertools};
 use tch::{IValue, Kind, Tensor};
 use tokenizers::{PaddingParams, TruncationParams};
 
-use crate::{ceil_char_boundary, spell::word2vec::Word2Vec};
+use crate::{
+    ceil_char_boundary,
+    spell::word2vec::{Word2Vec, WordVec},
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -163,8 +166,64 @@ impl<'a> Iterator for OverlappingSents<'a> {
         Some((res, range))
     }
 }
+
+trait PassageScorer {
+    type QueryEmbedding;
+    type PassageEmbedding;
+
+    fn embed_query(&self, query: &str) -> Option<Self::QueryEmbedding>;
+    fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding>;
+
+    fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32;
+}
+
+impl PassageScorer for Word2Vec {
+    type QueryEmbedding = Vec<WordVec>;
+
+    type PassageEmbedding = Self::QueryEmbedding;
+
+    fn embed_query(&self, query: &str) -> Option<Self::QueryEmbedding> {
+        let res: Self::QueryEmbedding = query
+            .split_whitespace()
+            .filter_map(|word| self.get(word).cloned())
+            .collect();
+
+        if res.is_empty() {
+            return None;
+        }
+
+        Some(res)
+    }
+
+    fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding> {
+        let res: Self::PassageEmbedding = passage
+            .split_whitespace()
+            .filter_map(|word| self.get(word).cloned())
+            .collect();
+
+        if res.is_empty() {
+            return None;
+        }
+
+        Some(res)
+    }
+
+    fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32 {
+        let mut score = 0.0;
+        let mut count = 0;
+
+        for passage_vec in passage {
+            score += query.iter().map(|vec| vec.sim(passage_vec)).sum::<f32>();
+
+            count += 1;
+        }
+
+        score / count as f32
+    }
+}
+
 pub struct Summarizer {
-    word2vec: Word2Vec,
+    extractive_summarizer: DualEncoder,
     top_n_extractive_passages: usize,
     abstractive_summarizer: AbstractiveSummarizer,
 }
@@ -172,7 +231,7 @@ pub struct Summarizer {
 impl Summarizer {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self {
-            word2vec: Word2Vec::open(path.as_ref().join("word2vec.bin.gz").as_path())?,
+            extractive_summarizer: DualEncoder::open(path.as_ref().join("dual_encoder").as_path())?,
             top_n_extractive_passages: 10,
             abstractive_summarizer: AbstractiveSummarizer {
                 model: Arc::new(AbstractiveModel::open(
@@ -183,14 +242,7 @@ impl Summarizer {
     }
 
     fn extractive_query_specific(&self, query: &str, text: &str) -> Option<String> {
-        let query_vectors: Vec<_> = query
-            .split_whitespace()
-            .filter_map(|word| self.word2vec.get(word))
-            .collect();
-
-        if query_vectors.is_empty() {
-            return None;
-        }
+        let query_vectors = self.extractive_summarizer.embed_query(query)?;
 
         let mut best_passages: BinaryHeap<Reverse<CandidatePassage<'_>>> =
             BinaryHeap::with_capacity(self.top_n_extractive_passages);
@@ -198,38 +250,27 @@ impl Summarizer {
         let overlap_sents = OverlappingSents::new(text, 100, 10);
 
         for (index, (passage, range)) in overlap_sents.enumerate() {
-            let mut score = 0.0;
-            let mut count = 0;
+            if let Some(passage_vec) = self.extractive_summarizer.embed_passage(passage) {
+                let score = self
+                    .extractive_summarizer
+                    .score(&query_vectors, &passage_vec);
 
-            for passage_vec in passage
-                .split_whitespace()
-                .filter_map(|word| self.word2vec.get(word))
-            {
-                score += query_vectors
-                    .iter()
-                    .map(|vec| vec.sim(passage_vec))
-                    .sum::<f32>();
+                let candidate = CandidatePassage {
+                    passage,
+                    index,
+                    score,
+                    range,
+                };
 
-                count += 1;
-            }
-
-            score /= count as f32;
-
-            let candidate = CandidatePassage {
-                passage,
-                index,
-                score,
-                range,
-            };
-
-            if best_passages.len() >= self.top_n_extractive_passages {
-                if let Some(mut worst) = best_passages.peek_mut() {
-                    if worst.0.score < candidate.score {
-                        *worst = Reverse(candidate);
+                if best_passages.len() >= self.top_n_extractive_passages {
+                    if let Some(mut worst) = best_passages.peek_mut() {
+                        if worst.0.score < candidate.score {
+                            *worst = Reverse(candidate);
+                        }
                     }
+                } else {
+                    best_passages.push(Reverse(candidate));
                 }
-            } else {
-                best_passages.push(Reverse(candidate));
             }
         }
 
@@ -285,7 +326,82 @@ impl Summarizer {
     }
 }
 
-const TRUNCATE_INPUT: usize = 1024;
+pub struct DualEncoder {
+    model: tch::CModule,
+    tokenizer: tokenizers::Tokenizer,
+}
+
+impl DualEncoder {
+    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        let truncation = TruncationParams {
+            max_length: 256,
+            ..Default::default()
+        };
+
+        let padding = PaddingParams {
+            ..Default::default()
+        };
+
+        let mut tokenizer =
+            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+
+        tokenizer.with_truncation(Some(truncation));
+        tokenizer.with_padding(Some(padding));
+
+        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
+        Ok(Self { model, tokenizer })
+    }
+
+    fn embed(&self, text: &str) -> Result<Tensor> {
+        let query = self.tokenizer.encode(text, false).unwrap();
+
+        let ids = query
+            .get_ids()
+            .iter()
+            .map(|&id| id as i64)
+            .collect::<Vec<_>>();
+
+        let types = query
+            .get_type_ids()
+            .iter()
+            .map(|&id| id as i64)
+            .collect::<Vec<_>>();
+
+        let mask = query
+            .get_attention_mask()
+            .iter()
+            .map(|&id| id as i64)
+            .collect::<Vec<_>>();
+
+        let ids = Tensor::of_slice(&ids).reshape(&[1, -1]);
+        let types = Tensor::of_slice(&types).reshape(&[1, -1]);
+        let mask = Tensor::of_slice(&mask).reshape(&[1, -1]);
+
+        Ok(self.model.forward_ts(&[ids, types, mask])?.squeeze())
+    }
+}
+
+impl PassageScorer for DualEncoder {
+    type QueryEmbedding = Tensor;
+
+    type PassageEmbedding = Tensor;
+
+    fn embed_query(&self, query: &str) -> Option<Self::QueryEmbedding> {
+        self.embed(query).ok()
+    }
+
+    fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding> {
+        self.embed(passage).ok()
+    }
+
+    fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32 {
+        let score = query.dot(&passage.transpose(0, 0));
+
+        score.double_value(&[]) as f32
+    }
+}
+
+const TRUNCATE_INPUT_ABSTRACTIVE: usize = 1024;
 pub struct AbstractiveModel {
     encoder: tch::CModule,
     decoder: tch::CModule,
@@ -300,7 +416,7 @@ pub struct AbstractiveModel {
 impl AbstractiveModel {
     pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
         let truncation = TruncationParams {
-            max_length: TRUNCATE_INPUT,
+            max_length: TRUNCATE_INPUT_ABSTRACTIVE,
             ..Default::default()
         };
 
@@ -754,7 +870,7 @@ impl Default for GenerationConfig {
             banned_tokens: vec![],
             force_min_tokens: None,
             length_penalty: 1.0,
-            num_beams: 10,
+            num_beams: 3,
         }
     }
 }

@@ -115,7 +115,7 @@ impl<R: BufRead> Iterator for WordVectorReader<R> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WordVec(Vec<f32>);
 impl WordVec {
     fn magnitude(&self) -> f32 {

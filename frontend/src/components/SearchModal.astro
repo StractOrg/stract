@@ -127,6 +127,7 @@ import Hero from "./Hero.astro";
     updateSelection();
     updateSummaryBtn();
   }
+
   function updateSummaryBtn() {
     var idx = parseInt(currentIdx);
     var snip = snippets[idx];
@@ -207,23 +208,10 @@ import Hero from "./Hero.astro";
         "summaryShown": false,
         "summary": {
           "text": "",
-          "shownUpto": 0,
           "hasStarted": false,
         }};
     }
   }
-
-  function displayPreviousStreamed(summary, elem) {
-    let s = ""
-
-    for (i = 0; i < summary["shownUpto"]; i++) {
-      s += summary["text"][i];
-    }
-
-    elem.innerHTML = s;
-  }
-
-  var previousDisplayStreams = {};
 
   // called from button
   function summarizeBtn() {
@@ -231,57 +219,37 @@ import Hero from "./Hero.astro";
       return;
     }
 
-    var snippetElem = document.getElementById("snippet-text-" + currentIdx);
+    var snippetElem = document.getElementById("snippet-" + currentIdx);
 
     if (snippetElem == null) {
       return;
     }
+    var snippetText = snippetElem.querySelector(".snippet-text");
+    var snippetBubble = snippetElem.querySelector(".chat-bubble");
 
     var idx = parseInt(currentIdx);
     var snip = snippets[idx];
 
     snip["summaryShown"] = !snip["summaryShown"];
     if (snip["summaryShown"]) {
-      if (!btnSummarize.classList.contains("active")) {
-        btnSummarize.classList.add("active");
-      }
-      summarize(idx, snippetElem);
+      btnSummarize.classList.add("active");
+      summarize(idx, snippetBubble, snippetText);
     } else {
-      if (snippetElem.classList.contains("blinking-cursor")) {
-        snippetElem.classList.remove("blinking-cursor");
-      }
-      if (btnSummarize.classList.contains("active")) {
-        btnSummarize.classList.remove("active");
-      }
+      snippetBubble.classList.add("hidden");
+      btnSummarize.classList.remove("active");
 
-      snippetElem.innerHTML = snip["origSnippet"];
+      snippetText.innerHTML = snip["origSnippet"];
     }
 
   }
 
 
-  function summarize(idx, snippetElem) {
-    if (previousDisplayStreams[idx] != null) {
-      clearInterval(previousDisplayStreams[idx]);
-    }
-
+  function summarize(idx, snippetBubble, snippetText) {
     var snip = snippets[idx];
-    displayPreviousStreamed(snip["summary"], snippetElem);
+    snippetText.innerHTML = snip['summary']["text"];
 
     var searchParams = new URLSearchParams(window.location.search);
     var query = searchParams.get("q");
-
-    var displayChars = setInterval(() => {
-      if (snip["summary"]["shownUpto"] < snip["summary"]["text"].length) {
-        if (snip["summaryShown"]) {
-          snippetElem.innerHTML += snip["summary"]["text"][snip["summary"]["shownUpto"]];
-        }
-
-        snip["summary"]["shownUpto"] += 1;
-      }
-    }, 20);
-
-    previousDisplayStreams[idx] = displayChars;
 
     var reqData = {
         'query': query,
@@ -290,34 +258,29 @@ import Hero from "./Hero.astro";
 
     var queryData = new URLSearchParams(reqData).toString();
 
+    if (snip["summary"]["text"] == "") {
+      snippetBubble.classList.remove("hidden");
+    }
+
     if (!snip["summary"]["hasStarted"]) {
       snip["summary"]["hasStarted"] = true;
-      snippetElem.classList.add("blinking-cursor");
-      var source = new EventSource("/summarize?" + queryData);
-      source.onmessage = function(event) {
-        if (event.data == "") {
-          setTimeout(() => {
-            clearInterval(displayChars);
-            snip["summary"]["shownUpto"] = snip["summary"]["text"].length;
-            if (snip["summaryShown"]) {
-              displayPreviousStreamed(snip["summary"], snippetElem);
-            }
-          }, 10000);
-          snippetElem.classList.remove("blinking-cursor");
-          source.close();
+
+      fetch("/summarize?" + queryData, {
+        method: "GET",
+      }).then((e) => {
+        snippetBubble.classList.add("hidden");
+
+        if (e.status != 200) {
+          console.log("summarization error", e);
+          snippetText.innerHTML = snip["origSnippet"];
           return;
         }
 
-        snip["summary"]["text"] += event.data;
-      }
-
-      source.onerror = function(e) {
-        console.log("summarization error", e);
-        clearInterval(displayChars);
-        snippetElem.classList.remove("blinking-cursor");
-        snippetElem.innerHTML = snip["origSnippet"];
-        source.close();
-      }
+        return e.text();
+      }).then((text) => {
+        snip["summary"]["text"] = text;
+        snippetText.innerHTML = snip["summary"]["text"];
+      });
     }
   }
 </script>

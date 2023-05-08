@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use askama::Template;
-use axum::{extract, response::IntoResponse, Extension};
+use axum::{extract, response::IntoResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -40,7 +40,7 @@ pub struct StoreParams {
 #[allow(clippy::unused_async)]
 pub async fn click(
     extract::Query(params): extract::Query<ClickParams>,
-    Extension(state): Extension<Arc<State>>,
+    extract::State(state): extract::State<Arc<State>>,
 ) {
     if let Some(q) = state.improvement_queue.as_ref() {
         q.lock().await.push(ImprovementEvent::Click {
@@ -61,7 +61,7 @@ impl From<StoreParams> for StoredQuery {
 
 #[allow(clippy::unused_async)]
 pub async fn store(
-    Extension(state): Extension<Arc<State>>,
+    extract::State(state): extract::State<Arc<State>>,
     extract::Json(params): extract::Json<StoreParams>,
 ) -> impl IntoResponse {
     match state.improvement_queue.as_ref() {
