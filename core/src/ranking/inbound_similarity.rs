@@ -61,7 +61,7 @@ impl NodeScorer {
 impl Scorer {
     fn calculate_score(&self, node: &NodeID) -> f64 {
         match self.vectors.get(&node.0) {
-            Some(vec) => (self.disliked.len() as f64
+            Some(vec) => ((self.disliked.len() as f64
                 + (self
                     .liked
                     .iter()
@@ -72,7 +72,8 @@ impl Scorer {
                         .iter()
                         .map(|disliked| disliked.sim(node, vec))
                         .sum::<f64>()))
-            .max(0.0),
+                / self.liked.len() as f64)
+                .max(0.0),
             None => 0.0,
         }
     }

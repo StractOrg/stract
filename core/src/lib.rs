@@ -64,6 +64,7 @@ mod search_ctx;
 mod search_prettifier;
 pub mod searcher;
 mod simhash;
+pub mod similar_sites;
 mod snippet;
 mod sonic;
 pub mod spell;
