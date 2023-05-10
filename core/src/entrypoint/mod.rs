@@ -25,6 +25,7 @@ pub mod indexer;
 pub mod search_server;
 pub mod topic_centrality;
 mod webgraph;
+pub mod webgraph_server;
 
 use std::{fs::File, path::Path};
 

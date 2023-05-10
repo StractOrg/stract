@@ -24,7 +24,7 @@ use thiserror::Error;
 pub use worker::StatelessWorker;
 pub use worker::Worker;
 
-use crate::sonic;
+use crate::distributed::sonic;
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 

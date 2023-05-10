@@ -281,9 +281,9 @@ mod tests {
     fn it_ranks_search_results() {
         let mut graph = WebgraphBuilder::new_memory().open();
 
-        graph.insert(Node::from("a.com"), Node::from("b.com"), String::new());
+        graph.insert(Node::from("b.com"), Node::from("a.com"), String::new());
         graph.insert(Node::from("c.com"), Node::from("d.com"), String::new());
-        graph.insert(Node::from("a.com"), Node::from("e.com"), String::new());
+        graph.insert(Node::from("b.com"), Node::from("e.com"), String::new());
 
         graph.commit();
 

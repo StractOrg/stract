@@ -19,9 +19,10 @@ use std::net::SocketAddr;
 use tracing::info;
 
 use crate::{
-    cluster::{
+    distributed::{
+        cluster::Cluster,
         member::{Member, Service},
-        Cluster,
+        sonic,
     },
     entity_index::EntityIndex,
     index::Index,
@@ -31,7 +32,7 @@ use crate::{
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{self, LocalSearcher},
-    sonic, Result, SearchServerConfig,
+    Result, SearchServerConfig,
 };
 
 pub async fn run(config: SearchServerConfig) -> Result<()> {

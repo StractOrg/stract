@@ -22,6 +22,7 @@
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
+    ./scripts/export_dual_encoder
     cd frontend; npm install; npm run build
     cargo run --release --all-features -- configure {{ARGS}}
 

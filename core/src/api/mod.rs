@@ -21,9 +21,9 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
-    cluster::{
+    distributed::{
+        cluster::Cluster,
         member::{Member, Service},
-        Cluster,
     },
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
@@ -44,6 +44,8 @@ use axum::{
     routing::post,
 };
 
+use self::webgraph::RemoteWebgraph;
+
 mod about;
 mod autosuggest;
 mod improvement;
@@ -55,11 +57,13 @@ mod privacy;
 pub mod search;
 mod sites;
 mod summarize;
+mod webgraph;
 
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
     pub searcher: DistributedSearcher,
+    pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub search_counter_success: crate::metrics::Counter,
     pub search_counter_fail: crate::metrics::Counter,
@@ -122,15 +126,18 @@ pub async fn router(
 
     let bangs = Bangs::from_path(&config.bangs_path);
 
-    let cluster = Cluster::join(
-        Member {
-            id: config.cluster_id.clone(),
-            service: Service::Frontend { host: config.host },
-        },
-        config.gossip_addr,
-        config.gossip_seed_nodes.clone().unwrap_or_default(),
-    )
-    .await?;
+    let cluster = Arc::new(
+        Cluster::join(
+            Member {
+                id: config.cluster_id.clone(),
+                service: Service::Frontend { host: config.host },
+            },
+            config.gossip_addr,
+            config.gossip_seed_nodes.clone().unwrap_or_default(),
+        )
+        .await?,
+    );
+    let remote_webgraph = RemoteWebgraph::new(cluster.clone());
     let searcher = DistributedSearcher::new(cluster, crossencoder, lambda_model, qa_model, bangs);
 
     let state = Arc::new(State {
@@ -138,6 +145,7 @@ pub async fn router(
         autosuggest,
         search_counter_success,
         search_counter_fail,
+        remote_webgraph,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
         improvement_queue: query_store_queue,
     });
@@ -164,7 +172,11 @@ pub async fn router(
         .route("/improvement/store", post(improvement::store))
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
-        .merge(Router::new().route("/summarize", get(summarize::route)))
+        .merge(
+            Router::new()
+                .route("/beta/api/summarize", get(summarize::route))
+                .route("/beta/api/similar_sites", post(webgraph::similar_sites)),
+        )
         .with_state(state))
 }
 

@@ -24,6 +24,7 @@ use crate::{
     webgraph::{Node, NodeID, Webgraph},
 };
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ScoredNode {
     pub node: Node,
     pub score: f64,

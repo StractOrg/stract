@@ -22,9 +22,9 @@ use stract::entrypoint::autosuggest_scrape::{self, Gl};
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
 use stract::entrypoint::indexer::IndexPointer;
-use stract::entrypoint::{self, frontend, search_server};
+use stract::entrypoint::{self, frontend, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use stract::{FrontendConfig, SearchServerConfig};
+use stract::{FrontendConfig, SearchServerConfig, WebgraphServerConfig};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -110,6 +110,9 @@ enum WebgraphOptions {
         paths: Vec<String>,
         #[clap(long)]
         num_segments: Option<usize>,
+    },
+    Server {
+        config_path: String,
     },
 }
 
@@ -230,6 +233,14 @@ fn main() -> Result<()> {
                 if let Some(num_segments) = num_segments {
                     webgraph.merge_segments(num_segments)
                 }
+            }
+            WebgraphOptions::Server { config_path } => {
+                let config: WebgraphServerConfig = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(webgraph_server::run(config))?
             }
         },
         Commands::Frontend { config_path } => {

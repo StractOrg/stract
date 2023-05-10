@@ -13,21 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-use std::net::SocketAddr;
-
-use serde::{Deserialize, Serialize};
-
-use crate::searcher::ShardId;
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
-pub enum Service {
-    Searcher { host: SocketAddr, shard: ShardId },
-    Frontend { host: SocketAddr },
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct Member {
-    pub id: String,
-    pub service: Service,
-}
+pub mod cluster;
+pub mod member;
+pub mod retry_strategy;
+pub mod sonic;

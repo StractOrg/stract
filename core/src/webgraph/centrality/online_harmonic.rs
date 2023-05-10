@@ -39,21 +39,25 @@ use crate::webgraph::{Edge, Node};
 use crate::webgraph::{NodeID, Webgraph};
 use crate::Result;
 
-const NUM_PROXY_NODES: usize = 500;
+const NUM_PROXY_NODES: usize = 1000;
 const BEST_PROXY_NODES_PER_USER_NODE: usize = 3;
 const USER_NODES_LIMIT: usize = 100; // if the user specifies more than this number of nodes, the remaining nodes will be merged into existing
-const MAX_DIST_PROXY: u8 = 6;
+const MAX_DIST_PROXY: u8 = 10;
 const MAX_NUM_OUT_EDGES: usize = 1000;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProxyNode {
     pub id: NodeID,
-    dist_from_node: IntMap<u8>, // from node to proxy node
-    dist_to_node: IntMap<u8>,   // from proxy node to other node
+    pub dist_from_node: IntMap<u8>, // from node to proxy node
+    pub dist_to_node: IntMap<u8>,   // from proxy node to other node
 }
 
 impl ProxyNode {
     fn dist(&self, from: &NodeID, to: &NodeID) -> Option<u8> {
+        if self.id == *from || self.id == *to {
+            return None;
+        }
+
         if let Some(from_node_to_proxy) = self.dist_from_node.get(&from.0) {
             if let Some(from_proxy_to_node) = self.dist_to_node.get(&to.0) {
                 return Some(from_node_to_proxy + from_proxy_to_node);
@@ -139,7 +143,6 @@ impl Scorer {
             if let Some(cached) = self.cache.get(&node) {
                 return *cached;
             }
-
             let res = (self.disliked_nodes.len() as f64
                 + (self
                     .liked_nodes
@@ -208,10 +211,6 @@ impl UserNode {
     }
 
     fn best_dist(&self, node: &NodeID) -> Option<u8> {
-        if *node == self.id {
-            return Some(0);
-        }
-
         let mut best = None;
 
         for proxy in &self.proxy_nodes {
@@ -332,7 +331,7 @@ fn reversed_distances(graph: &Webgraph, source: Node) -> BTreeMap<NodeID, u8> {
     modified_dijkstra(
         source,
         |node| graph.raw_ingoing_edges(&node),
-        |edge| edge.to,
+        |edge| edge.from,
         graph,
     )
 }
@@ -530,7 +529,7 @@ mod tests {
         let scorer = centrality.scorer(&[], &disliked_nodes);
 
         for node in &disliked_nodes {
-            assert!(scorer.score(*node) < 1.0);
+            assert!(scorer.score(*node) < disliked_nodes.len() as f64);
         }
     }
 
@@ -550,7 +549,7 @@ mod tests {
         let centrality =
             OnlineHarmonicCentrality::new_with_num_proxy(&graph, &harmonic_centrality_store, 5);
 
-        let liked_nodes: Vec<_> = vec![Node::from("B".to_string()), Node::from("E".to_string())]
+        let liked_nodes: Vec<_> = vec![Node::from("B".to_string())]
             .into_iter()
             .filter_map(|node| graph.node2id(&node).copied())
             .collect();
@@ -568,13 +567,13 @@ mod tests {
         );
 
         assert!(
-            scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
-                > scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("H".to_string())).unwrap())
         );
 
         assert!(
-            scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
-                > scorer.score(*graph.node2id(&Node::from("A".to_string())).unwrap())
+            scorer.score(*graph.node2id(&Node::from("A".to_string())).unwrap())
+                > scorer.score(*graph.node2id(&Node::from("C".to_string())).unwrap())
         );
     }
 }

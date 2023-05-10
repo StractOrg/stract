@@ -1,8 +1,8 @@
 use super::{Error, Result, Worker};
 use super::{Map, Reduce};
-use crate::exponential_backoff::ExponentialBackoff;
+use crate::distributed::retry_strategy::ExponentialBackoff;
+use crate::distributed::sonic;
 use crate::mapreduce::Task;
-use crate::sonic;
 use futures::StreamExt;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
@@ -48,7 +48,7 @@ impl RemoteWorker {
         O: Serialize + DeserializeOwned + Send,
     {
         let conn = self.connect().await?;
-        match conn.send(Task::Job(job)).await {
+        match conn.send(&Task::Job(job)).await {
             Ok(sonic::Response::Content(res)) => Ok(res),
             _ => Err(Error::NoResponse),
         }
@@ -62,7 +62,7 @@ impl RemoteWorker {
     {
         debug!("closing worker {:}", self.addr);
         let conn = self.connect().await?;
-        let res: sonic::Response<O> = conn.send(Task::<I>::AllFinished).await?;
+        let res: sonic::Response<O> = conn.send(&Task::<I>::AllFinished).await?;
 
         debug_assert!(matches!(res, sonic::Response::Empty));
 

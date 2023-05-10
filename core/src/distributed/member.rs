@@ -14,27 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use stract::{
-    ranking::inbound_similarity::InboundSimilarity,
-    webgraph::{Node, WebgraphBuilder},
-};
+use std::net::SocketAddr;
 
-pub fn main() {
-    let graph = WebgraphBuilder::new("data/webgraph").open();
-    let inbound = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
+use serde::{Deserialize, Serialize};
 
-    for host in ["www.homedepot.com"] {
-        println!("{host}:");
+use crate::searcher::ShardId;
 
-        let node = Node::from(host).into_host();
-        let node_id = graph.node2id(&node).unwrap();
-        let inbound_vec = inbound.get(node_id).unwrap();
-        println!("{:?}", inbound_vec);
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
+pub enum Service {
+    Searcher { host: SocketAddr, shard: ShardId },
+    Frontend { host: SocketAddr },
+    Webgraph { host: SocketAddr },
+}
 
-        for edge in graph.ingoing_edges(node) {
-            println!("{} -> {} ({})", edge.from.name, edge.to.name, edge.label);
-        }
-
-        println!();
-    }
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct Member {
+    pub id: String,
+    pub service: Service,
 }

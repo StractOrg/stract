@@ -265,7 +265,7 @@ import Hero from "./Hero.astro";
     if (!snip["summary"]["hasStarted"]) {
       snip["summary"]["hasStarted"] = true;
 
-      fetch("/summarize?" + queryData, {
+      fetch("/beta/api/summarize?" + queryData, {
         method: "GET",
       }).then((e) => {
         snippetBubble.classList.add("hidden");

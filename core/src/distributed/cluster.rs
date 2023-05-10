@@ -22,13 +22,11 @@ use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 use tracing::error;
 
-use self::member::{Member, Service};
+use crate::distributed::member::{Member, Service};
 
 const CLUSTER_ID: &str = "stract-cluster";
 const GOSSIP_INTERVAL: Duration = Duration::from_secs(1);
 const SERVICE_KEY: &str = "service";
-
-pub mod member;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -55,13 +53,14 @@ impl Cluster {
     ) -> Result<Self> {
         let transport = UdpTransport;
         let failure_detector_config = FailureDetectorConfig {
-            phi_threshold: 10.0, // TODO: choose this value based on tests
             initial_interval: GOSSIP_INTERVAL,
             ..Default::default()
         };
 
+        let uuid = uuid::Uuid::new_v4().to_string();
+
         let node_id = NodeId {
-            id: self_node.id.clone(),
+            id: format!("{}_{}", self_node.id, uuid),
             gossip_public_address: gossip_addr,
         };
 
@@ -125,6 +124,7 @@ impl Cluster {
                         }
                     }
 
+                    tracing::info!("new members: {:#?}", new_members);
                     let mut write = alive_nodes_ref.write().await;
                     write.clear();
 

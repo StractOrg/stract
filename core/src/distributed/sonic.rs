@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
@@ -132,7 +132,7 @@ impl Connection {
 
     pub async fn send_without_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
         mut self,
-        request: T,
+        request: &T,
     ) -> Result<Response<R>> {
         let bytes = bincode::serialize(&request).unwrap();
 
@@ -160,7 +160,7 @@ impl Connection {
 
     pub async fn send<T: Serialize, R: DeserializeOwned + Serialize>(
         self,
-        request: T,
+        request: &T,
     ) -> Result<Response<R>> {
         self.send_with_timeout(request, Duration::from_secs(30))
             .await
@@ -168,12 +168,50 @@ impl Connection {
 
     pub async fn send_with_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
         self,
-        request: T,
+        request: &T,
         timeout: Duration,
     ) -> Result<Response<R>> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::ConnectionTimeout),
+        }
+    }
+}
+
+pub struct ResilientConnection<Rt: Iterator<Item = Duration>> {
+    addr: SocketAddr,
+    retry: Rt,
+}
+
+impl<Rt: Iterator<Item = Duration>> ResilientConnection<Rt> {
+    pub fn create(addr: SocketAddr, retry: Rt) -> Self {
+        Self { addr, retry }
+    }
+
+    pub async fn send_with_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
+        &mut self,
+        request: &T,
+        timeout: Duration,
+    ) -> Result<Response<R>> {
+        loop {
+            match Connection::create_with_timeout(&self.addr, timeout).await {
+                Ok(conn) => {
+                    let response = conn.send_with_timeout(request, timeout).await;
+                    if let Err(Error::ConnectionTimeout) = response {
+                        continue;
+                    }
+                    return response;
+                }
+                Err(Error::ConnectionTimeout) => {
+                    if let Some(timeout) = self.retry.next() {
+                        tokio::time::sleep(timeout).await;
+                        continue;
+                    } else {
+                        return Err(Error::ConnectionTimeout);
+                    }
+                }
+                Err(e) => return Err(e),
+            }
         }
     }
 }

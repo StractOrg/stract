@@ -612,14 +612,30 @@ mod tests {
         let mut graph = WebgraphBuilder::new_memory().open();
 
         graph.insert(
+            Node::from("https://www.e.com").into_host(),
             Node::from("https://www.a.com").into_host(),
-            Node::from("https://www.b.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("https://www.a.com").into_host(),
+            Node::from("https://www.e.com").into_host(),
             String::new(),
         );
 
         graph.insert(
             Node::from("https://www.c.com").into_host(),
             Node::from("https://www.c.com").into_host(),
+            String::new(),
+        );
+
+        graph.insert(
+            Node::from("https://www.b.com").into_host(),
+            Node::from("https://www.e.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("https://www.e.com").into_host(),
+            Node::from("https://www.b.com").into_host(),
             String::new(),
         );
 
@@ -695,7 +711,7 @@ mod tests {
                         r#"
                     <html>
                         <head>
-                            <title>Website B</title>
+                            <title>Website C</title>
                         </head>
                         <body>
                             {CONTENT} {}

@@ -16,7 +16,7 @@
 
 use std::net::SocketAddr;
 
-use crate::sonic;
+use crate::distributed::sonic;
 
 use super::{Map, Result, Task};
 use async_trait::async_trait;

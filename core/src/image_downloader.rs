@@ -19,7 +19,7 @@ use std::{collections::HashSet, hash::Hash, time::Duration};
 use serde::Serialize;
 
 use crate::{
-    exponential_backoff::ExponentialBackoff,
+    distributed::retry_strategy::ExponentialBackoff,
     image_store::{Image, ImageStore},
     webpage::Url,
 };

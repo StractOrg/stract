@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::exponential_backoff::ExponentialBackoff;
+use crate::distributed::retry_strategy::ExponentialBackoff;
 use crate::{Error, Result, WarcSource};
 use std::collections::BTreeMap;
 use std::fs::File;

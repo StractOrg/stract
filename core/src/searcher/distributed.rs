@@ -17,9 +17,8 @@
 use crate::{
     bangs::{Bang, BangHit, Bangs},
     ceil_char_boundary,
-    cluster::{member::Service, Cluster},
     collector::BucketCollector,
-    exponential_backoff::ExponentialBackoff,
+    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
     floor_char_boundary,
     inverted_index::{self, RetrievedWebpage},
     qa_model::QaModel,
@@ -54,7 +53,7 @@ use optics::Optic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::sonic;
+use crate::distributed::sonic;
 
 use super::{InitialWebsiteResult, SearchQuery, SearchResult};
 
@@ -79,18 +78,13 @@ pub enum Error {
 
 impl RemoteSearcher {
     async fn search(&self, query: &SearchQuery) -> Result<InitialWebsiteResult> {
-        for timeout in ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5)
+        let mut conn = self.conn();
+
+        if let Ok(sonic::Response::Content(body)) = conn
+            .send_with_timeout(&Request::Search(query.clone()), Duration::from_secs(1))
+            .await
         {
-            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
-            {
-                if let Ok(sonic::Response::Content(body)) =
-                    connection.send(Request::Search(query.clone())).await
-                {
-                    return Ok(body);
-                }
-            }
+            return Ok(body);
         }
 
         Err(Error::SearchFailed.into())
@@ -101,46 +95,47 @@ impl RemoteSearcher {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
-        for timeout in ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5)
-        {
-            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
-            {
-                if let Ok(sonic::Response::Content(body)) = connection
-                    .send(Request::RetrieveWebsites {
-                        websites: pointers.to_vec(),
-                        query: original_query.to_string(),
-                    })
-                    .await
-                {
-                    return Ok(body);
-                }
-            }
-        }
+        let mut conn = self.conn();
 
+        if let Ok(sonic::Response::Content(body)) = conn
+            .send_with_timeout(
+                &Request::RetrieveWebsites {
+                    websites: pointers.to_vec(),
+                    query: original_query.to_string(),
+                },
+                Duration::from_secs(1),
+            )
+            .await
+        {
+            return Ok(body);
+        }
         Err(Error::SearchFailed.into())
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        for timeout in ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5)
+        let mut conn = self.conn();
+
+        if let Ok(sonic::Response::Content(body)) = conn
+            .send_with_timeout(
+                &Request::GetWebpage {
+                    url: url.to_string(),
+                },
+                Duration::from_secs(1),
+            )
+            .await
         {
-            if let Ok(connection) = sonic::Connection::create_with_timeout(self.addr, timeout).await
-            {
-                if let Ok(sonic::Response::Content(body)) = connection
-                    .send(Request::GetWebpage {
-                        url: url.to_string(),
-                    })
-                    .await
-                {
-                    return Ok(body);
-                }
-            }
+            return Ok(body);
         }
 
         Err(Error::WebpageNotFound.into())
+    }
+
+    fn conn(&self) -> sonic::ResilientConnection<impl Iterator<Item = Duration>> {
+        let retry = ExponentialBackoff::from_millis(30)
+            .with_limit(Duration::from_millis(200))
+            .take(5);
+
+        sonic::ResilientConnection::create(self.addr, retry)
     }
 }
 
@@ -237,7 +232,7 @@ pub enum Request {
 }
 
 pub struct DistributedSearcher {
-    cluster: Cluster,
+    cluster: Arc<Cluster>,
     cross_encoder: Arc<CrossEncoderModel>,
     lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
@@ -262,7 +257,7 @@ impl AsRankingWebsite for ScoredWebsitePointer {
 
 impl DistributedSearcher {
     pub fn new(
-        cluster: Cluster,
+        cluster: Arc<Cluster>,
         cross_encoder: CrossEncoderModel,
         lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,

@@ -18,7 +18,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
-use searcher::{distributed, ShardId};
+use searcher::ShardId;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -36,13 +36,12 @@ pub mod mapreduce;
 mod api;
 mod autosuggest;
 mod bangs;
-mod cluster;
 mod collector;
 mod directory;
+mod distributed;
 mod entity_index;
 mod enum_map;
 mod executor;
-mod exponential_backoff;
 mod fastfield_reader;
 mod human_website_annotations;
 mod hyperloglog;
@@ -66,7 +65,6 @@ pub mod searcher;
 mod simhash;
 pub mod similar_sites;
 mod snippet;
-mod sonic;
 pub mod spell;
 mod subdomain_count;
 pub mod summarizer;
@@ -164,7 +162,6 @@ pub struct HttpConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FrontendConfig {
-    pub cluster_id: String,
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
@@ -174,6 +171,7 @@ pub struct FrontendConfig {
     pub bangs_path: String,
     pub summarizer_path: String,
     pub query_store_db_host: Option<String>,
+    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 }
@@ -190,6 +188,16 @@ pub struct SearchServerConfig {
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub host: SocketAddr,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebgraphServerConfig {
+    pub host: SocketAddr,
+    pub graph_path: String,
+    pub inbound_similarity_path: String,
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
 }
 
 #[derive(Error, Debug)]
@@ -273,10 +281,10 @@ pub enum Error {
     InternalError(String),
 
     #[error("Distributed searcher")]
-    DistributedSearcher(#[from] distributed::Error),
+    DistributedSearcher(#[from] searcher::distributed::Error),
 
     #[error("Cluster")]
-    Cluster(#[from] cluster::Error),
+    Cluster(#[from] crate::distributed::cluster::Error),
 
     #[error("Lambdamart")]
     LambdaMART(#[from] ranking::models::lambdamart::Error),
