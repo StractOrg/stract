@@ -1,7 +1,4 @@
 ---
-import Hero from "./Hero.astro";
-import { Icon } from "astro-icon";
-
 const links = [
   { url: "/search", title: "Search" },
   { url: "/explore", title: "Explore" },
@@ -9,19 +6,25 @@ const links = [
 
 export interface Props {
   active?: number | null;
+  queryUrlPart?: string;
 }
 
-const { active = null } = Astro.props;
+const { queryUrlPart: query, active = null } = Astro.props;
 ---
 {
     links.map((l, idx) => (
     <div class="inline relative z-0">
-        <a href={l.url}>
+        <a class="link px-2 py-1 rounded-full text-sm" href={l.url + (query ? "?" + query : "")}>
             {l.title}
         </a>
         {active === idx && (
-            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-1px] bg-brand_contrast"></div>
+            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-brand_contrast"></div>
         )}
     </div>
     ))
 }
+<style>
+  .link {
+    @apply transition hover:bg-brand/5 hover:text-brand hover:no-underline;
+  }
+</style>

@@ -3,21 +3,35 @@ import Navbar from "./Navbar.astro";
 import IndexBar from "./IndexBar.astro";
 
 export interface Props {
-  activeIndex?: number;
+  activeIndex?: number | null;
+  showDivider?: boolean;
+  showLogo?: boolean;
+  queryUrlPart?: string;
 }
 
-const { activeIndex = null } = Astro.props;
+const { activeIndex, queryUrlPart, showDivider = false, showLogo = true } = Astro.props;
 ---
 
 <div
-  class="grid shrink-0 h-16 grid-cols-[auto_1fr_auto] items-center px-4 sm:grid-cols-[3rem_1fr_auto] sm:gap-4 md:gap-5 lg:gap-10 lg:pr-8 lg:pl-14"
+  class="flex shrink-0 h-10 justify-between items-center px-4 sm:gap-4 md:gap-5 lg:gap-10"
 >
-  <div class="col-start-1 space-x-4 flex text-sm">
-    <IndexBar active={activeIndex} />
+  <div>
+    <div class="flex md:space-x-2 lg:space-x-4 text-sm relative z-0 bottom-0">
+      <IndexBar active={activeIndex} queryUrlPart={queryUrlPart} />
+    </div>
   </div>
-
-  <div class="col-start-3">
+  {showLogo && (
+  <div class="w-24 absolute left-1/2 translate-x-[-50%]">
+    <a href="/">
+      <img src="/images/biglogo.svg" />
+    </a>
+  </div>
+  )}
+  <div>
     <Navbar />
   </div>
-
 </div>
+
+{showDivider && (
+  <div class="w-full h-[1px] bg-gradient-to-r from-cyan-400 via-brand to-cyan-400"></div>
+)}

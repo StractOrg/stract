@@ -3,11 +3,12 @@ import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
 import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
+import { askama } from "../askama";
 ---
 
 <Layout title="Stract">
+  <Header showDivider={true} activeIndex={1} queryUrlPart={askama`query_url_part $ ""`} />
   <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
-    <Header activeIndex={1} />
     <div class="flex mt-10 px-5 justify-center">
       <div class="flex flex-col grow max-w-3xl">
         <noscript>
@@ -29,17 +30,19 @@ import Hero from "../components/Hero.astro";
 
         <div class="hidden" id="result-container">
           <div class="flex items-center justify-between mb-5">
-            <div class="flex items-center space-x-2">
-              <select id="limit" class="styled-selector">
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="125">125</option>
-                <option value="250">250</option>
-                <option value="500">500</option>
-                <option value="1000">1000</option>
-              </select>
+            <div class="flex items-center space-x-5">
               <h2 class="text-2xl font-bold">Similar sites</h2>
+              <div class="flex space-x-1">
+                <select id="limit" class="styled-selector">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="125">125</option>
+                  <option value="250">250</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
+                </select>
+              </div>
             </div>
             <a href="#" download="exported.optic" class="bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5" id="export-optic">Export as optic</a>
           </div>
@@ -244,6 +247,7 @@ import Hero from "../components/Hero.astro";
       similar_sites: similarSites,
     };
 
+    // @ts-ignore
     const compressed = LZString.compressToBase64(JSON.stringify(data));
     const url = window.location.origin + "/explore/export?data=" + compressed;
     exportButton.href = url;

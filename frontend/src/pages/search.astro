@@ -6,60 +6,66 @@ import Snippet from "../components/Snippet.astro";
 import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
 import Modal from "../components/SearchModal.astro";
-import Header from "../components/HeaderWithSearchbar.astro";
+import Header from "../components/Header.astro";
 import Discussions from "../components/Discussions.astro";
 import Widget from "../components/Widget.astro";
 import DirectAnswer from "../components/DirectAnswer.astro";
 import { askama } from "../askama";
-import type { AstroCookies } from "astro/dist/core/cookies";
+import Searchbar from "../components/Searchbar.astro";
 ---
 
 <Layout title="{{ query }} - Stract">
   <main class="flex w-full flex-col">
-    <Header activeIndex={0} searchbar={{ query: askama`query` }} />
-    <div class="w-full h-[1px] bg-gradient-to-r from-cyan-400 via-brand to-cyan-400"></div>
+    <Header showDivider={true} activeIndex={0} queryUrlPart={askama`query_url_part $ ""`} />
 
     <div
       class="search-content flex w-screen m-0 grid gap-y-6 pt-4 px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36"
     >
-      <!-- Stats and settings -->
-      <div class="mx-auto flex w-full justify-between">
-        <div class="flex space-x-2 h-full flex-col justify-center text-sm text-gray-600">
-          <p class="h-fit">
-            Found {askama`num_matches $ 24`} results in {
-              askama`search_duration_sec $ 0.42s`
-            } seconds
-          </p>
-        </div>
-        <div class="flex space-x-2">
-          <OpticSelector
-            default_optics="default_optics"
-            search_on_change={true}
+      <div class="flex flex-col space-y-5 max-w-2xl">
+        <div class="w-full">
+          <Searchbar
+            query={ askama`query` }
           />
-          <div class="select-region flex h-full flex-col justify-center">
-            <select
-              form="searchbar-form"
-              name="gl"
-              onchange="document.getElementById('searchbar-form').submit()"
-              class="styled-selector"
-            >
-              {
-                askama.for_("region_selection in all_regions", () =>
-                  askama.match("region_selection", {
-                    "RegionSelection::Selected(region)": (
-                      <option value="{{ region.gl() }}" selected>
-                        {askama`region.name() $ {{address.country}}`}
-                      </option>
-                    ),
-                    "RegionSelection::Unselected(region)": (
-                      <option value="{{ region.gl() }}">
-                        {askama`region.name() $ {{address.country}}`}
-                      </option>
-                    ),
-                  })
-                )
-              }
-            </select>
+        </div>
+        <!-- Stats and settings -->
+        <div class="mx-auto flex w-full justify-between">
+          <div class="flex space-x-2 h-full flex-col justify-center text-sm text-gray-600">
+            <p class="h-fit">
+              Found {askama`num_matches $ 24`} results in {
+                askama`search_duration_sec $ 0.42s`
+              } seconds
+            </p>
+          </div>
+          <div class="flex space-x-2">
+            <OpticSelector
+              default_optics="default_optics"
+              search_on_change={true}
+            />
+            <div class="select-region flex h-full flex-col justify-center">
+              <select
+                form="searchbar-form"
+                name="gl"
+                onchange="document.getElementById('searchbar-form').submit()"
+                class="styled-selector"
+              >
+                {
+                  askama.for_("region_selection in all_regions", () =>
+                    askama.match("region_selection", {
+                      "RegionSelection::Selected(region)": (
+                        <option value="{{ region.gl() }}" selected>
+                          {askama`region.name() $ {{address.country}}`}
+                        </option>
+                      ),
+                      "RegionSelection::Unselected(region)": (
+                        <option value="{{ region.gl() }}">
+                          {askama`region.name() $ {{address.country}}`}
+                        </option>
+                      ),
+                    })
+                  )
+                }
+              </select>
+            </div>
           </div>
         </div>
       </div>

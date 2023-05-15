@@ -16,7 +16,7 @@
 
 use http::{StatusCode, Uri};
 use optics::{Optic, SiteRankings};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use axum::Json;
 use axum_macros::debug_handler;
@@ -63,6 +63,7 @@ struct SearchTemplate {
     has_more_results: bool,
     has_code: bool,
     alerts: Vec<String>,
+    query_url_part: String,
 }
 
 enum RegionSelection {
@@ -70,8 +71,8 @@ enum RegionSelection {
     Unselected(Region),
 }
 
-fn extract_site_rankings(params: &HashMap<String, String>) -> Option<SiteRankings> {
-    match params.get("sr") {
+fn extract_site_rankings(params: &SearchParams) -> Option<SiteRankings> {
+    match &params.sr {
         Some(sr) => {
             if !sr.is_empty() {
                 let sr = sr.replace(' ', "+");
@@ -92,25 +93,31 @@ fn extract_site_rankings(params: &HashMap<String, String>) -> Option<SiteRanking
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+pub struct SearchParams {
+    pub q: Option<String>,
+    pub p: Option<usize>,
+    pub gl: Option<String>,
+    pub optic: Option<String>,
+    pub sr: Option<String>,
+}
+
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 pub async fn route(
-    extract::Query(params): extract::Query<HashMap<String, String>>,
+    extract::Query(params): extract::Query<SearchParams>,
     extract::State(state): extract::State<Arc<State>>,
     extract::OriginalUri(uri): extract::OriginalUri,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let query = params.get("q").cloned().unwrap_or_default();
+    let query = params.q.clone().unwrap_or_default();
 
-    let skip_pages: usize = params
-        .get("p")
-        .and_then(|p| p.parse().ok())
-        .unwrap_or_default();
+    let skip_pages = params.p.unwrap_or_default();
 
     let mut optic = None;
     let mut alerts = Vec::new();
 
-    if let Some(url) = params.get("optic") {
+    if let Some(url) = &params.optic {
         if !url.is_empty() {
             if let Ok(res) = reqwest::get(url).await {
                 if let Ok(text) = res.text().await {
@@ -129,7 +136,7 @@ pub async fn route(
         }
     }
 
-    let selected_region = params.get("gl").and_then(|gl| {
+    let selected_region = params.gl.as_ref().and_then(|gl| {
         if let Ok(region) = Region::from_gl(gl) {
             Some(region)
         } else {
@@ -161,7 +168,7 @@ pub async fn route(
 
                 let all_regions = generate_regions(selected_region);
                 let next_page_url = next_page_url(&uri, params.clone(), skip_pages);
-                let prev_page_url = prev_page_url(&uri, params, skip_pages);
+                let prev_page_url = prev_page_url(&uri, params.clone(), skip_pages);
                 let has_code = has_code(&result);
 
                 let current_page = skip_pages + 1;
@@ -184,6 +191,7 @@ pub async fn route(
                     has_more_results: result.has_more_results,
                     has_code,
                     alerts,
+                    query_url_part: serde_urlencoded::to_string(&params).unwrap(),
                 };
 
                 Ok(HtmlTemplate(template).into_response())
@@ -230,10 +238,10 @@ fn generate_regions(selected_region: Option<Region>) -> Vec<RegionSelection> {
         .collect()
 }
 
-fn prev_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) -> Option<String> {
+fn prev_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> Option<String> {
     if skip_pages > 0 {
         let mut prev_page_params = params;
-        prev_page_params.insert("p".to_string(), (skip_pages - 1).to_string());
+        prev_page_params.p = Some(skip_pages - 1);
         Some(
             uri.path().to_string()
                 + "?"
@@ -246,9 +254,9 @@ fn prev_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) 
     }
 }
 
-fn next_page_url(uri: &Uri, params: HashMap<String, String>, skip_pages: usize) -> String {
+fn next_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> String {
     let mut next_page_params = params;
-    next_page_params.insert("p".to_string(), (skip_pages + 1).to_string());
+    next_page_params.p = Some(skip_pages + 1);
     let next_page_url = uri.path().to_string()
         + "?"
         + serde_urlencoded::to_string(&next_page_params)

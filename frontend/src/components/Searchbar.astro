@@ -13,15 +13,15 @@ const { autofocus, query } = Astro.props;
   .suggestion-item {
     @apply hidden group-focus-within:flex group-focus-within:peer-placeholder-shown:hidden;
     @apply col-span-3 py-1.5 pl-5;
-    @apply z-50;
+    @apply z-40;
   }
   .suggestion-item:nth-child(4) {
     @apply relative;
-    @apply z-50;
+    @apply z-40;
   }
   .suggestion-item:nth-child(4)::before {
     @apply absolute inset-4 -top-px h-px bg-gray-200;
-    @apply z-50;
+    @apply z-40;
     content: "";
   }
   .suggestion-item-hover {
@@ -39,7 +39,7 @@ const { autofocus, query } = Astro.props;
   <div class="h-10">
     <div
       id="searchbar"
-      class="group absolute z-50 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border bg-white transition-shadow focus-within:shadow"
+      class="group absolute z-40 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border bg-white transition-shadow focus-within:shadow"
     >
       <Hero
         class="col-[1/2] row-start-1 w-5 self-center ml-5 text-gray-400"
@@ -292,6 +292,7 @@ const { autofocus, query } = Astro.props;
       }
     }
 
+    // @ts-ignore
     let compressed = LZString.compressToBase64(
       JSON.stringify(rankings)
     );

@@ -8,13 +8,13 @@ import OpticSelector from "../components/OpticSelector.astro";
 
 <Layout title="Stract">
   <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
-    <Header />
+    <Header showLogo={false} />
     <div class="absolute top-1/4 grid w-full place-items-center">
       <div
         class="flex w-full flex-col items-center justify-center px-2 md:max-w-2xl md:px-0"
       >
         <div class="flex w-64 mb-6">
-          <img src="/images/biglogo.svg" class="h-full w-full" />
+          <img src="/images/biglogo-with-text.svg" class="h-full w-full" />
         </div>
         <Searchbar autofocus />
         <div class="mt-3 text-gray-600 flex space-x-2">
