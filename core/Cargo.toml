@@ -80,6 +80,7 @@ dashmap = { workspace = true }
 tch = { workspace = true }
 torch-sys = { workspace = true }
 libc = { workspace = true }
+lz-str = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

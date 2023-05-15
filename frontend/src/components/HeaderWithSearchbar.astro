@@ -1,0 +1,40 @@
+---
+import Searchbar from "./Searchbar.astro";
+import Navbar from "./Navbar.astro";
+import IndexBar from "./IndexBar.astro";
+
+export interface Props {
+  activeIndex: number;
+  searchbar?: boolean | { query: string };
+}
+
+const { activeIndex, searchbar } = Astro.props;
+---
+
+<div
+  class="grid shrink-0 h-16 grid-cols-[auto_1fr_auto] items-center px-4 sm:grid-cols-[3rem_1fr_auto] sm:gap-4 md:gap-5 lg:gap-10 lg:pr-8 lg:pl-14"
+>
+  <div class="col-start-1 mr-4 sm:mr-0 h-12">
+    <a href="/">
+      <img src="/images/logo_beta.svg" class="h-full" />
+    </a>
+  </div>
+  <div>
+    {
+      searchbar && (
+        <div class="col-start-2 w-full max-w-xl">
+          <Searchbar
+            query={typeof searchbar == "object" ? searchbar.query : void 0}
+          />
+        </div>
+      )
+    }
+  </div>
+  <div class="col-start-3">
+    <Navbar />
+  </div>
+</div>
+
+<div class="flex space-x-4 text-sm ml-5 md:ml-20 lg:ml-36 relative z-0 bottom-0">
+  <IndexBar active={activeIndex} />
+</div>

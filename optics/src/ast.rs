@@ -38,6 +38,26 @@ pub struct RankingCoeff {
     pub value: f64,
 }
 
+impl ToString for RankingCoeff {
+    fn to_string(&self) -> String {
+        let mut res = String::new();
+
+        res.push_str("Ranking(");
+
+        match &self.target {
+            RankingTarget::Signal(signal) => {
+                res.push_str(&format!("Signal(\"{}\")", signal));
+            }
+        }
+
+        res.push_str(", ");
+        res.push_str(&self.value.to_string());
+        res.push(')');
+
+        res
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct RawOptic {
     pub rules: Vec<RawRule>,

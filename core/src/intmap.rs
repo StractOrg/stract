@@ -119,7 +119,7 @@ impl<V> IntMap<V> {
         self.bins.iter().flat_map(|bin| bin.iter())
     }
 
-    pub fn contains(&self, key: &Key) -> bool {
+    pub fn contains_key(&self, key: &Key) -> bool {
         self.get(key).is_some()
     }
 }
@@ -147,6 +147,24 @@ impl<V> std::iter::FromIterator<(u64, V)> for IntMap<V> {
 impl<V> Default for IntMap<V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+pub struct IntSet {
+    map: IntMap<()>,
+}
+
+impl IntSet {
+    pub fn new() -> Self {
+        Self { map: IntMap::new() }
+    }
+
+    pub fn insert(&mut self, key: Key) {
+        self.map.insert(key, ());
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = Key> {
+        self.map.into_iter().map(|(key, _)| key)
     }
 }
 

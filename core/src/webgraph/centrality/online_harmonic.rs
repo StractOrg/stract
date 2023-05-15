@@ -137,6 +137,11 @@ impl Scorer {
     }
 
     pub fn score(&self, node: NodeID) -> f64 {
+        let norm = self.liked_nodes.len() as f64 + self.disliked_nodes.len() as f64;
+        if norm == 0.0 {
+            return 0.0;
+        }
+
         if let Some(score) = self.fixed_scores.get(&node) {
             *score
         } else {
@@ -164,8 +169,10 @@ impl Scorer {
                             disliked_node.weight as f64 / (dist as f64 + 1.0)
                         })
                         .sum::<f64>()))
-            .max(0.0);
+            .max(0.0)
+                / norm;
 
+            let res = if res.is_finite() { res } else { 0.0 };
             self.cache.insert(node, res);
 
             res

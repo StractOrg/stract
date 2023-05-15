@@ -136,6 +136,32 @@ pub struct Matching {
     pub location: MatchLocation,
 }
 
+impl ToString for Matching {
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        match self.location {
+            MatchLocation::Site => s.push_str("Site"),
+            MatchLocation::Url => s.push_str("Url"),
+            MatchLocation::Domain => s.push_str("Domain"),
+            MatchLocation::Title => s.push_str("Title"),
+            MatchLocation::Description => s.push_str("Description"),
+            MatchLocation::Content => s.push_str("Content"),
+            MatchLocation::Schema => s.push_str("Schema"),
+        }
+        s.push('(');
+        s.push('"');
+
+        for part in &self.pattern {
+            s.push_str(&part.to_string());
+        }
+
+        s.push('"');
+        s.push(')');
+
+        s
+    }
+}
+
 impl TryFrom<RawMatchPart> for Matching {
     type Error = Error;
 
@@ -237,6 +263,16 @@ pub enum PatternPart {
     Anchor,
 }
 
+impl ToString for PatternPart {
+    fn to_string(&self) -> String {
+        match self {
+            PatternPart::Raw(s) => s.to_string(),
+            PatternPart::Wildcard => "*".to_string(),
+            PatternPart::Anchor => "|".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum MatchLocation {
     Site,
@@ -255,7 +291,24 @@ pub enum Action {
     Discard,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+impl ToString for Action {
+    fn to_string(&self) -> String {
+        let mut res = String::new();
+        res.push_str("Action(");
+
+        match self {
+            Action::Boost(b) => res.push_str(&format!("Boost({})", b)),
+            Action::Downrank(d) => res.push_str(&format!("Downrank({})", d)),
+            Action::Discard => res.push_str("Discard"),
+        }
+
+        res.push(')');
+
+        res
+    }
+}
+
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize)]
 pub struct Optic {
     pub rankings: Vec<RankingCoeff>,
     pub site_rankings: SiteRankings,
@@ -269,17 +322,91 @@ impl Optic {
     }
 }
 
+impl ToString for Optic {
+    fn to_string(&self) -> String {
+        let mut res = String::new();
+
+        if self.discard_non_matching {
+            res.push_str("DiscardNonMatching;\n");
+        }
+
+        for rule in &self.rules {
+            res.push_str(&rule.to_string());
+        }
+
+        for ranking in &self.rankings {
+            res.push_str(&format!("{};\n", ranking.to_string()));
+        }
+
+        res.push_str(&self.site_rankings.to_string());
+
+        res
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Rule {
     pub matches: Vec<Matching>,
     pub action: Action,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+impl ToString for Rule {
+    fn to_string(&self) -> String {
+        let mut res = String::new();
+
+        res.push_str("Rule {\n");
+        if !self.matches.is_empty() {
+            res.push_str("\tMatches {\n");
+            for m in &self.matches {
+                res.push_str(&format!("\t\t{},\n", m.to_string()));
+            }
+            res.push_str("\t}")
+        }
+
+        res.push_str(&format!("\t{}\n", self.action.to_string()));
+        res.push_str("};\n");
+
+        res
+    }
+}
+
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct SiteRankings {
     pub liked: Vec<String>,
     pub disliked: Vec<String>,
     pub blocked: Vec<String>,
+}
+
+impl ToString for SiteRankings {
+    fn to_string(&self) -> String {
+        let mut res = String::new();
+
+        for liked in &self.liked {
+            res.push_str(&format!("Like(Site(\"{}\"));\n", liked));
+        }
+
+        for disliked in &self.disliked {
+            res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
+        }
+
+        for blocked in &self.blocked {
+            let rule = Rule {
+                matches: vec![Matching {
+                    pattern: vec![
+                        PatternPart::Anchor,
+                        PatternPart::Raw(blocked.clone()),
+                        PatternPart::Anchor,
+                    ],
+                    location: MatchLocation::Site,
+                }],
+                action: Action::Discard,
+            };
+
+            res.push_str(&rule.to_string());
+        }
+
+        res
+    }
 }
 
 impl SiteRankings {
@@ -316,6 +443,8 @@ impl SiteRankings {
 
 #[cfg(test)]
 mod tests {
+    use crate::ast::RankingTarget;
+
     use super::*;
     #[test]
     fn pattern_part() {
@@ -339,5 +468,40 @@ mod tests {
                 PatternToken::Raw("string".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn export() {
+        let optic = Optic {
+            rankings: vec![RankingCoeff {
+                target: RankingTarget::Signal("bm25".to_string()),
+                value: 1.0,
+            }],
+            site_rankings: SiteRankings {
+                liked: vec!["liked.com".to_string()],
+                disliked: vec!["disliked.com".to_string()],
+                blocked: vec![],
+            },
+            rules: vec![Rule {
+                matches: vec![Matching {
+                    pattern: vec![
+                        PatternPart::Anchor,
+                        PatternPart::Raw("test".to_string()),
+                        PatternPart::Anchor,
+                    ],
+                    location: MatchLocation::Site,
+                }],
+                action: Action::Boost(0),
+            }],
+            discard_non_matching: true,
+        };
+
+        let exported = optic.to_string();
+
+        println!("{:}", exported);
+
+        let parsed = Optic::parse(&exported).unwrap();
+
+        assert_eq!(optic, parsed);
     }
 }

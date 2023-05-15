@@ -73,7 +73,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
             for edge in graph.raw_outgoing_edges(&v) {
                 let w = edge.to;
 
-                if !distances.contains(&w.0) {
+                if !distances.contains_key(&w.0) {
                     let dist_v = distances.get(&v.0).unwrap();
                     q.push_back(w);
                     distances.insert(w.0, dist_v + 1);
@@ -82,12 +82,12 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
                 if *distances.get(&w.0).unwrap() == distances.get(&v.0).unwrap() + 1 {
                     let sigma_v = *sigma.get(&v.0).unwrap_or(&0);
 
-                    if !sigma.contains(&w.0) {
+                    if !sigma.contains_key(&w.0) {
                         sigma.insert(w.0, 0);
                     }
                     *sigma.get_mut(&w.0).unwrap() += sigma_v;
 
-                    if !predecessors.contains(&w.0) {
+                    if !predecessors.contains_key(&w.0) {
                         predecessors.insert(w.0, Vec::new());
                     }
 

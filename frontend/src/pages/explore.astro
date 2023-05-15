@@ -1,0 +1,251 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Layout from "../layouts/Layout.astro";
+import Hero from "../components/Hero.astro";
+---
+
+<Layout title="Stract">
+  <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
+    <Header activeIndex={1} />
+    <div class="flex mt-10 px-5 justify-center">
+      <div class="flex flex-col grow max-w-3xl">
+        <noscript>
+          <div class="text-red-600">Unfortunately, this site requires javascript to function.</div>
+        </noscript>
+
+        <div class="flex flex-col mb-4 items-center">
+          <div class="flex flex-col space-y-1 items-center mb-5">
+            <h1 class="text-2xl font-bold">Explore the web</h1>
+            <p class="text-center">Find sites similar to your favorites and discover hidden gems you never knew existed.</p>
+          </div>
+          <div class="flex border rounded-full w-full max-w-lg p-[2px] pl-3 mb-2" id="site-input-container">
+            <input class="outline-none focus:ring-0 grow" type="text" id="site-input" name="site" autofocus placeholder="www.example.com" />
+            <button id="add-site-btn" class="bg-brand text-sm text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5">Add</button>
+          </div>
+          <label class="text-red-600 mb-4 hidden" for="site-input" id="site-input-error">Unfortunately, we don't know about that site yet.</label>
+          <div class="flex flex-wrap gap-x-5 gap-y-2" id="sites-list"></div>
+        </div>
+
+        <div class="hidden" id="result-container">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center space-x-2">
+              <select id="limit" class="styled-selector">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="125">125</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+              </select>
+              <h2 class="text-2xl font-bold">Similar sites</h2>
+            </div>
+            <a href="#" download="exported.optic" class="bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5" id="export-optic">Export as optic</a>
+          </div>
+          <div id="result" class="grid grid-cols-[1fr_1fr_6fr]"></div>
+          <div class="w-full flex justify-center">
+            <div class="w-6 h-6 cursor-pointer rounded-full text-brand_contrast" id="more-btn">
+              <Hero icon={"chevron-down"} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row-start-3">
+      <Footer />
+    </div>
+  </div>
+</Layout>
+
+<style is:inline>
+  .site {
+    padding: 0.5rem;
+    background-color: rgba(11, 123, 255, 0.05);
+    color: rgb(11, 123, 255);
+    border-radius: 0.5rem;
+  }
+</style>
+
+<script is:inline src="/js/lz-string.min.js"></script>
+<script>
+  const siteInput: HTMLInputElement = document.querySelector("#site-input")!;
+  const siteInputContainer: HTMLDivElement = document.querySelector("#site-input-container")!;
+  const siteInputError: HTMLLabelElement = document.querySelector("#site-input-error")!;
+  const origSiteInputBorderColor = siteInputContainer.style.borderColor;
+  const sitesList: HTMLDivElement = document.querySelector("#sites-list")!;
+  const result: HTMLDivElement = document.querySelector("#result")!;
+  const limit: HTMLSelectElement = document.querySelector("#limit")!;
+  const submitButton: HTMLButtonElement = document.querySelector("#add-site-btn")!;
+  const resultContainer: HTMLHeadingElement = document.querySelector("#result-container")!;
+  const moreButton: HTMLDivElement = document.querySelector("#more-btn")!;
+  const exportButton: HTMLAnchorElement = document.querySelector("#export-optic")!;
+
+  const origMoreButtonColor = moreButton.style.color;
+
+  const API = "/beta/api/webgraph/similar_sites";
+  const KNOWS_SITE_API = "/beta/api/webgraph/knows_site";
+
+  let sites: string[] = [];
+  let similarSites: string[] = [];
+
+  siteInput.addEventListener("keyup", function(event) {
+    if (event.key === "Enter") {
+      if (siteInput.value === "") {
+        updateSimilarSites();
+        return;
+      }
+
+      addSiteIfKnown();
+    }
+
+    siteInputError.classList.add("hidden");
+    siteInputContainer.style.borderColor = origSiteInputBorderColor;
+  });
+
+  limit.addEventListener("change", function() {
+    if (sites.length > 0) updateSimilarSites();
+    updateMoreButton();
+  });
+
+  moreButton.addEventListener("click", function() {
+    if (limit.selectedIndex === limit.options.length-1) return;
+
+    limit.selectedIndex++;
+    limit.value = limit.options[limit.selectedIndex].value;
+    updateSimilarSites();
+    updateMoreButton();
+  });
+
+  function updateMoreButton() {
+    if (limit.selectedIndex === limit.options.length-1) {
+      moreButton.style.color = "rgba(0, 0, 0, 0.25)";
+      moreButton.style.cursor = "default";
+    } else {
+      moreButton.style.color = origMoreButtonColor;
+      moreButton.style.cursor = "pointer";
+    }
+  }
+
+  document.addEventListener("click", function(event) {
+    if (event.target instanceof HTMLElement) {
+      if (event.target.closest(".remove-site") && event.target.dataset.index) {
+        removeSite(parseInt(event.target.dataset.index));
+      }
+    }
+  });
+
+  function addSiteIfKnown() {
+    const site = siteInput.value;
+
+    fetch(KNOWS_SITE_API+ "?site=" + site)
+      .then(response => response.json())
+      .then(data => {
+        if (data["@type"] === "known") {
+          addSite(data["site"]);
+          siteInput.value = "";
+        } else {
+          siteInputError.classList.remove("hidden");
+          siteInputContainer.style.borderColor = "red";
+        }
+      });
+  }
+
+  function addSite(site: string) {
+    sites.push(site);
+    displayChosenSites();
+    updateSimilarSites();
+  }
+  
+  function removeSite(index: number) {
+    sites.splice(index, 1);
+    displayChosenSites();
+    updateSimilarSites();
+  }
+
+  function displayChosenSites() {
+    sitesList.innerHTML = "";
+
+    sites.forEach((site, index) => {
+      const siteDiv = document.createElement("div");
+      siteDiv.classList.add("site");
+      siteDiv.innerHTML = "<a target=\"_blank\" href=\"https://" + site + "\">" + site + "</a><span class=\"remove-site\" style=\"margin-left: 0.5rem; cursor: pointer;\" data-index=\"" + index + "\">×</span>";
+      sitesList.appendChild(siteDiv);
+    });
+  }
+
+  submitButton.addEventListener("click", function() {
+    if (siteInput.value != "") {
+      addSiteIfKnown();
+    } else {
+      updateSimilarSites();
+    }
+  });
+
+  function updateSimilarSites() {
+    if (sites.length === 0) {
+      resultContainer.classList.add("hidden");
+      result.innerHTML = "";
+      return;
+    };
+
+    fetch(API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sites: sites,
+        top_n: parseInt(limit.value)
+      })
+    })
+      .then(response => response.json())
+      .then(data => {
+        resultContainer.classList.remove("hidden");
+        result.innerHTML = "";
+
+
+        similarSites = data.map((res: {site: string, score: number}) => res.site);
+
+
+        data.forEach((res: {site: string, score: number}) => {
+          const addSiteDiv = document.createElement("div");
+          addSiteDiv.style.width = "1rem";
+
+          if (sites.includes(res.site)) {
+            addSiteDiv.innerHTML = "<img src=\"/images/disabled-add.svg\" />";
+          } else {
+            addSiteDiv.innerHTML = "<img src=\"/images/add.svg\" />";
+            addSiteDiv.style.cursor = "pointer";
+
+            addSiteDiv.addEventListener("click", function() {
+              addSite(res.site);
+            });
+          }
+
+          result.appendChild(addSiteDiv);
+
+          const scoreDiv = document.createElement("div");
+          scoreDiv.innerHTML = res.score.toFixed(2);
+          result.appendChild(scoreDiv);
+
+          const siteDiv = document.createElement("div");
+          siteDiv.innerHTML = "<a target=\"_blank\" class=\"underline\" href=\"https://" + res.site + "\">" + res.site + "</a>";
+          result.appendChild(siteDiv);
+        });
+
+        updateExportLink();
+      });
+  }
+
+  function updateExportLink() {
+    const data = {
+      chosen_sites: sites,
+      similar_sites: similarSites,
+    };
+
+    const compressed = LZString.compressToBase64(JSON.stringify(data));
+    const url = window.location.origin + "/explore/export?data=" + compressed;
+    exportButton.href = url;
+  }
+</script>

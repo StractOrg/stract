@@ -223,6 +223,10 @@ impl InboundSimilarity {
 
         Ok(bincode::deserialize(&buf)?)
     }
+
+    pub fn knows_about(&self, node_id: NodeID) -> bool {
+        self.vectors.contains_key(&node_id.0)
+    }
 }
 
 #[cfg(test)]

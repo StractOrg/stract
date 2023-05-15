@@ -7,6 +7,7 @@ module.exports = {
     extend: {
       colors: {
         brand: "rgb(11 123 255 / <alpha-value>)",
+        brand_contrast: "rgb(255 105 11 / <alpha-value>)",
         snippet: "#4d5156",
       },
       fontFamily: {

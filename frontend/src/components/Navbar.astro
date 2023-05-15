@@ -20,10 +20,10 @@ const icons = [
 ];
 ---
 
-<navbar class="hidden items-center space-x-2 sm:flex md:space-x-4 lg:space-x-8">
+<navbar class="hidden items-center space-x-1 sm:flex md:space-x-2 lg:space-x-4">
   {
     links.map((l) => (
-      <a class="link rounded-full px-2 py-1" href={l.url}>
+      <a class="link rounded-full text-sm px-2 py-1" href={l.url}>
         {l.title}
       </a>
     ))
@@ -31,7 +31,7 @@ const icons = [
   {
     icons.map((i) => (
       <a class="icon" href={i.url}>
-        <Icon class="w-6" title={i.title} name={i.icon} />
+        <Icon class="w-4" title={i.title} name={i.icon} />
       </a>
     ))
   }

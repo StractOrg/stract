@@ -6,7 +6,7 @@ import Snippet from "../components/Snippet.astro";
 import Hero from "../components/Hero.astro";
 import OpticSelector from "../components/OpticSelector.astro";
 import Modal from "../components/SearchModal.astro";
-import Header from "../components/Header.astro";
+import Header from "../components/HeaderWithSearchbar.astro";
 import Discussions from "../components/Discussions.astro";
 import Widget from "../components/Widget.astro";
 import DirectAnswer from "../components/DirectAnswer.astro";
@@ -16,7 +16,7 @@ import type { AstroCookies } from "astro/dist/core/cookies";
 
 <Layout title="{{ query }} - Stract">
   <main class="flex w-full flex-col">
-    <Header searchbar={{ query: askama`query` }} />
+    <Header activeIndex={0} searchbar={{ query: askama`query` }} />
     <div class="w-full h-[1px] bg-gradient-to-r from-cyan-400 via-brand to-cyan-400"></div>
 
     <div

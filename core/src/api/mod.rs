@@ -48,6 +48,7 @@ use self::webgraph::RemoteWebgraph;
 
 mod about;
 mod autosuggest;
+mod explore;
 mod improvement;
 mod index;
 mod metrics;
@@ -161,6 +162,8 @@ pub async fn router(
         .route("/autosuggest", get(autosuggest::route))
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
+        .route("/explore", get(explore::route))
+        .route("/explore/export", get(explore::export))
         .route("/about", get(about::route))
         .route("/settings", get(optics::route))
         .route("/settings/optics", get(optics::route))
@@ -175,7 +178,11 @@ pub async fn router(
         .merge(
             Router::new()
                 .route("/beta/api/summarize", get(summarize::route))
-                .route("/beta/api/similar_sites", post(webgraph::similar_sites)),
+                .route(
+                    "/beta/api/webgraph/similar_sites",
+                    post(webgraph::similar_sites),
+                )
+                .route("/beta/api/webgraph/knows_site", get(webgraph::knows_site)),
         )
         .with_state(state))
 }

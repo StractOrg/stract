@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -26,6 +27,7 @@ use crate::distributed::member::Service;
 use crate::distributed::sonic;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::similar_sites::SimilarSitesFinder;
+use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 use crate::WebgraphServerConfig;
@@ -33,6 +35,7 @@ use crate::WebgraphServerConfig;
 #[derive(Serialize, Deserialize)]
 pub enum Request {
     SimilarSites { sites: Vec<String>, top_n: usize },
+    Knows { site: String },
 }
 
 pub async fn run(config: WebgraphServerConfig) -> Result<()> {
@@ -49,10 +52,10 @@ pub async fn run(config: WebgraphServerConfig) -> Result<()> {
     )
     .await?;
 
-    let graph = WebgraphBuilder::new(config.graph_path).open();
+    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
-    let similar_sites_finder = SimilarSitesFinder::new(graph, inbound_similarity);
+    let similar_sites_finder = SimilarSitesFinder::new(Arc::clone(&graph), inbound_similarity);
 
     let server = sonic::Server::bind(addr).await.unwrap();
 
@@ -66,6 +69,17 @@ pub async fn run(config: WebgraphServerConfig) -> Result<()> {
                     req.respond(sonic::Response::Content(similar_sites))
                         .await
                         .ok();
+                }
+                Request::Knows { site } => {
+                    let node = Node::from(site.to_string()).into_host();
+
+                    if similar_sites_finder.knows_about(&node) {
+                        req.respond(sonic::Response::Content(Some(node))).await.ok();
+                    } else {
+                        req.respond::<Option<Node>>(sonic::Response::Content(None))
+                            .await
+                            .ok();
+                    }
                 }
             }
         }

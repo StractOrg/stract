@@ -22,6 +22,7 @@ use axum::Json;
 use axum_macros::debug_handler;
 
 use crate::{
+    bangs::BangHit,
     search_prettifier::{
         thousand_sep_number, CodeOrText, DisplayedAnswer, DisplayedWebpage,
         HighlightedSpellCorrection, Sidebar, Snippet,
@@ -73,9 +74,10 @@ fn extract_site_rankings(params: &HashMap<String, String>) -> Option<SiteRanking
     match params.get("sr") {
         Some(sr) => {
             if !sr.is_empty() {
-                if let Ok(site_rankings) = base64::decode(sr) {
-                    if let Ok(site_rankings) = std::str::from_utf8(&site_rankings) {
-                        serde_json::from_str(site_rankings).ok()
+                let sr = sr.replace(' ', "+");
+                if let Some(uncompressed) = lz_str::decompress_from_base64(&sr) {
+                    if let Ok(site_rankings) = String::from_utf16(&uncompressed) {
+                        serde_json::from_str(&site_rankings).ok()
                     } else {
                         None
                     }
@@ -289,6 +291,22 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
     }
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "@type", rename_all = "camelCase")]
+pub enum ApiSearchResult {
+    Websites(WebsitesResult),
+    Bang(BangHit),
+}
+
+impl From<SearchResult> for ApiSearchResult {
+    fn from(result: SearchResult) -> Self {
+        match result {
+            SearchResult::Websites(result) => ApiSearchResult::Websites(result),
+            SearchResult::Bang(result) => ApiSearchResult::Bang(result),
+        }
+    }
+}
+
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
@@ -307,7 +325,7 @@ pub async fn api(
     let query = query.unwrap();
 
     match state.searcher.search(&query).await {
-        Ok(result) => Ok(Json(result).into_response()),
+        Ok(result) => Ok(Json(ApiSearchResult::from(result)).into_response()),
         Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
             Ok(searcher::distributed::Error::EmptyQuery
                 .to_string()

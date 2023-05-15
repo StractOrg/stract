@@ -216,9 +216,8 @@ impl JustText {
     pub fn paragraphs(root: NodeRef) -> Vec<Paragraph> {
         let mut res = Vec::new();
 
-        let mut preprocessor = Preprocessor::new([
-            "script", "style", "embed", "form", "head", "noscript", "iframe",
-        ]);
+        let mut preprocessor =
+            Preprocessor::new(["script", "style", "embed", "head", "noscript", "iframe"]);
 
         let mut br = false;
         let mut link = false;
@@ -613,6 +612,7 @@ impl JustText {
             .join(" ")
     }
 }
+
 impl Classification {
     fn is_short(&self) -> bool {
         matches!(

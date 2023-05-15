@@ -23,6 +23,7 @@ use itertools::Itertools;
 use crate::{
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
     similar_sites::ScoredNode,
+    webgraph::Node,
 };
 
 use super::State;
@@ -50,7 +51,7 @@ impl RemoteWebgraph {
 }
 
 #[derive(serde::Deserialize)]
-pub struct Params {
+pub struct SimilarSitesParams {
     pub sites: Vec<String>,
     pub top_n: usize,
 }
@@ -64,7 +65,7 @@ struct ScoredSite {
 #[allow(clippy::unused_async)]
 pub async fn similar_sites(
     extract::State(state): extract::State<Arc<State>>,
-    extract::Json(params): extract::Json<Params>,
+    extract::Json(params): extract::Json<SimilarSitesParams>,
 ) -> std::result::Result<impl IntoResponse, StatusCode> {
     let host = state.remote_webgraph.host().await;
 
@@ -74,13 +75,11 @@ pub async fn similar_sites(
 
     let mut conn = sonic::ResilientConnection::create(host, retry);
 
-    let top_n = params.top_n.min(1000);
-
     match conn
         .send_with_timeout::<_, Vec<ScoredNode>>(
             &crate::entrypoint::webgraph_server::Request::SimilarSites {
                 sites: params.sites,
-                top_n,
+                top_n: params.top_n,
             },
             Duration::from_secs(30),
         )
@@ -100,5 +99,46 @@ pub async fn similar_sites(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
         _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct KnowsSiteParams {
+    pub site: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(tag = "@type", rename_all = "camelCase")]
+pub enum KnowsSite {
+    Known { site: String },
+    Unknown,
+}
+
+#[allow(clippy::unused_async)]
+pub async fn knows_site(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Query(params): extract::Query<KnowsSiteParams>,
+) -> std::result::Result<impl IntoResponse, StatusCode> {
+    let host = state.remote_webgraph.host().await;
+
+    let retry = ExponentialBackoff::from_millis(30)
+        .with_limit(Duration::from_millis(200))
+        .take(5);
+
+    let mut conn = sonic::ResilientConnection::create(host, retry);
+
+    match conn
+        .send_with_timeout::<_, Option<Node>>(
+            &crate::entrypoint::webgraph_server::Request::Knows { site: params.site },
+            Duration::from_secs(2),
+        )
+        .await
+    {
+        Ok(sonic::Response::Content(Some(node))) => Ok(Json(KnowsSite::Known { site: node.name })),
+        Err(err) => {
+            tracing::error!("Failed to send request to webgraph: {}", err);
+            Ok(Json(KnowsSite::Unknown))
+        }
+        _ => Ok(Json(KnowsSite::Unknown)),
     }
 }

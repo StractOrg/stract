@@ -1,0 +1,27 @@
+---
+import Hero from "./Hero.astro";
+import { Icon } from "astro-icon";
+
+const links = [
+  { url: "/search", title: "Search" },
+  { url: "/explore", title: "Explore" },
+];
+
+export interface Props {
+  active?: number | null;
+}
+
+const { active = null } = Astro.props;
+---
+{
+    links.map((l, idx) => (
+    <div class="inline relative z-0">
+        <a href={l.url}>
+            {l.title}
+        </a>
+        {active === idx && (
+            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-1px] bg-brand_contrast"></div>
+        )}
+    </div>
+    ))
+}

@@ -579,7 +579,7 @@ impl Html {
 
     fn calculate_all_text(paragraphs: &[Paragraph], lang: &Lang) -> Option<String> {
         let text = JustText {
-            max_link_density: 2.0,
+            max_link_density: 20.0,
             length_low: 0,
             length_high: 0,
             stopwords_low: -1.0,
@@ -1414,6 +1414,18 @@ mod tests {
         );
         assert!(webpage.all_text().is_some());
         assert!(!webpage.all_text().unwrap().is_empty());
+    }
+
+    #[test]
+    fn reddit_comments() {
+        let webpage = Html::parse(include_str!("../../testcases/parsing/reddit.html"), "");
+
+        assert!(webpage.clean_text().is_some());
+        assert!(webpage.clean_text().unwrap().len() > 1000);
+        assert!(webpage
+            .all_text()
+            .unwrap()
+            .contains("They immediately moved outta striking range"));
     }
 
     #[test]
