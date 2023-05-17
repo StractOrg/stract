@@ -29,7 +29,7 @@ use crate::{
     qa_model::QaModel,
     query_store::{self, ImprovementEvent},
     ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
-    searcher::DistributedSearcher,
+    searcher::frontend::FrontendSearcher,
     summarizer::Summarizer,
     FrontendConfig,
 };
@@ -63,7 +63,7 @@ mod webgraph;
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
-    pub searcher: DistributedSearcher,
+    pub searcher: FrontendSearcher,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub search_counter_success: crate::metrics::Counter,
@@ -139,7 +139,7 @@ pub async fn router(
         .await?,
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-    let searcher = DistributedSearcher::new(cluster, crossencoder, lambda_model, qa_model, bangs);
+    let searcher = FrontendSearcher::new(cluster, crossencoder, lambda_model, qa_model, bangs);
 
     let state = Arc::new(State {
         searcher,

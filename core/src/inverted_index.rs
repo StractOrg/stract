@@ -20,7 +20,7 @@ use tantivy::collector::{Collector, Count};
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
-use tantivy::tokenizer::{Tokenizer as _, TokenizerManager};
+use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
@@ -37,7 +37,7 @@ use crate::snippet;
 use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
-use crate::webpage::{schema_org, StoredPrimaryImage, Webpage};
+use crate::webpage::{schema_org, StoredPrimaryImage, Url, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
@@ -443,18 +443,33 @@ impl InvertedIndex {
         let tv_searcher = self.reader.searcher();
         let field = tv_searcher
             .schema()
-            .get_field(Field::Text(TextField::Url).name())
+            .get_field(Field::Text(TextField::UrlNoTokenizer).name())
             .unwrap();
-        let tokenizer = Tokenizer::default();
-        let mut stream = tokenizer.token_stream(url);
-        let mut term_queries = Vec::new();
 
-        while let Some(tok) = stream.next() {
-            let term = tantivy::Term::from_field_text(field, &tok.text);
-            term_queries.push(term);
-        }
+        let term = tantivy::Term::from_field_text(field, url);
 
-        let query = tantivy::query::PhraseQuery::new(term_queries);
+        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+
+        let mut res = tv_searcher
+            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
+            .unwrap();
+
+        res.pop()
+            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
+    }
+
+    pub(crate) fn get_homepage(&self, url: &str) -> Option<RetrievedWebpage> {
+        let url = Url::from(url.to_string());
+        let tv_searcher = self.reader.searcher();
+        let field = tv_searcher
+            .schema()
+            .get_field(Field::Text(TextField::SiteNoTokenizer).name())
+            .unwrap();
+
+        let term = tantivy::Term::from_field_text(field, url.site());
+
+        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+
         let mut res = tv_searcher
             .search(&query, &tantivy::collector::TopDocs::with_limit(1))
             .unwrap();
@@ -485,6 +500,11 @@ pub struct RetrievedWebpage {
     pub host_topic: Option<Topic>,
     pub schema_org: Vec<schema_org::Item>,
     pub region: Region,
+}
+impl RetrievedWebpage {
+    pub fn description(&self) -> Option<&String> {
+        self.description.as_ref().or(self.dmoz_description.as_ref())
+    }
 }
 
 impl From<Document> for RetrievedWebpage {
@@ -1405,6 +1425,41 @@ mod tests {
         index.commit().expect("failed to commit index");
 
         let webpage = index.get_webpage("https://www.example.com").unwrap();
+        assert_eq!(webpage.title, "News website".to_string());
+        assert_eq!(webpage.url, "https://www.example.com".to_string());
+    }
+
+    #[test]
+    fn get_homepage() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                            <script type="application/ld+json">{{"@context":"http://schema.org","@type":"LiveBlogPosting","coverageStartTime":"2022-11-14T23:45:00+00:00","coverageEndTime":"2022-11-15T23:45:00.000Z","datePublished":"2022-11-14T23:45:00+00:00","articleBody":"","author":[{{"name":"DR"}}],"url":"https://www.example.com","mainEntityOfPage":"https://www.example.com"}}
+                            </script>
+                        </head>
+                        <body>
+                            {CONTENT} test
+                            <article itemscope="" itemType="http://schema.org/NewsArticle">
+                                <div itemProp="publisher" itemscope="" itemType="https://schema.org/Organization"><meta itemProp="name" content="DR"/>
+                                </div>
+                            </article>
+                        </body>
+                    </html>
+                "#
+                ),
+                "https://www.example.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let webpage = index.get_homepage("https://www.example.com").unwrap();
         assert_eq!(webpage.title, "News website".to_string());
         assert_eq!(webpage.url, "https://www.example.com".to_string());
     }

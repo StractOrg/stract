@@ -25,7 +25,7 @@ import { askama } from "../askama";
             <button id="add-site-btn" class="bg-brand text-sm text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5">Add</button>
           </div>
           <label class="text-red-600 mb-4 hidden" for="site-input" id="site-input-error">Unfortunately, we don't know about that site yet.</label>
-          <div class="flex flex-wrap gap-x-5 gap-y-2" id="sites-list"></div>
+          <div class="flex flex-wrap gap-x-5 gap-y-3" id="sites-list"></div>
         </div>
 
         <div class="hidden" id="result-container">
@@ -46,7 +46,7 @@ import { askama } from "../askama";
             </div>
             <a href="#" download="exported.optic" class="bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5" id="export-optic">Export as optic</a>
           </div>
-          <div id="result" class="grid grid-cols-[1fr_1fr_6fr]"></div>
+          <div id="result" class="grid grid-cols-[1fr_1fr_6fr] gap-y-2"></div>
           <div class="w-full flex justify-center">
             <div class="w-6 h-6 cursor-pointer rounded-full text-brand_contrast" id="more-btn">
               <Hero icon={"chevron-down"} />
@@ -204,6 +204,7 @@ import { askama } from "../askama";
     })
       .then(response => response.json())
       .then(data => {
+        console.log(data);
         resultContainer.classList.remove("hidden");
         result.innerHTML = "";
 
@@ -211,7 +212,7 @@ import { askama } from "../askama";
         similarSites = data.map((res: {site: string, score: number}) => res.site);
 
 
-        data.forEach((res: {site: string, score: number}) => {
+        data.forEach((res: {site: string, score: number, description: string | null}) => {
           const addSiteDiv = document.createElement("div");
           addSiteDiv.style.width = "1rem";
 
@@ -232,8 +233,11 @@ import { askama } from "../askama";
           scoreDiv.innerHTML = res.score.toFixed(2);
           result.appendChild(scoreDiv);
 
+          const desc = res.description === null ? "" : res.description;
+
           const siteDiv = document.createElement("div");
           siteDiv.innerHTML = "<a target=\"_blank\" class=\"underline\" href=\"https://" + res.site + "\">" + res.site + "</a>";
+          siteDiv.innerHTML += "<p class=\"text-sm\">" + desc + "</p>";
           result.appendChild(siteDiv);
         });
 

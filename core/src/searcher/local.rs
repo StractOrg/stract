@@ -393,6 +393,10 @@ impl LocalSearcher {
     pub fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
         self.index.get_webpage(url)
     }
+
+    pub fn get_homepage(&self, url: &str) -> Option<RetrievedWebpage> {
+        self.index.get_homepage(url)
+    }
 }
 
 #[cfg(test)]

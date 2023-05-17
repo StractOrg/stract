@@ -18,11 +18,10 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
-use itertools::Itertools;
 
 use crate::{
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
-    similar_sites::ScoredNode,
+    entrypoint::webgraph_server::ScoredSite,
     webgraph::Node,
 };
 
@@ -56,12 +55,6 @@ pub struct SimilarSitesParams {
     pub top_n: usize,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ScoredSite {
-    pub site: String,
-    pub score: f64,
-}
-
 #[allow(clippy::unused_async)]
 pub async fn similar_sites(
     extract::State(state): extract::State<Arc<State>>,
@@ -76,7 +69,7 @@ pub async fn similar_sites(
     let mut conn = sonic::ResilientConnection::create(host, retry);
 
     match conn
-        .send_with_timeout::<_, Vec<ScoredNode>>(
+        .send_with_timeout::<_, Vec<ScoredSite>>(
             &crate::entrypoint::webgraph_server::Request::SimilarSites {
                 sites: params.sites,
                 top_n: params.top_n,
@@ -85,15 +78,7 @@ pub async fn similar_sites(
         )
         .await
     {
-        Ok(sonic::Response::Content(nodes)) => Ok(Json(
-            nodes
-                .into_iter()
-                .map(|node| ScoredSite {
-                    site: node.node.name,
-                    score: node.score,
-                })
-                .collect_vec(),
-        )),
+        Ok(sonic::Response::Content(nodes)) => Ok(Json(nodes)),
         Err(err) => {
             tracing::error!("Failed to send request to webgraph: {}", err);
             Err(StatusCode::INTERNAL_SERVER_ERROR)

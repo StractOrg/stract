@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use tracing::info;
 
@@ -32,6 +32,7 @@ use crate::{
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{self, LocalSearcher},
+    webpage::Url,
     Result, SearchServerConfig,
 };
 
@@ -112,6 +113,20 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                 }
                 searcher::Request::GetWebpage { url } => {
                     let result = local_searcher.get_webpage(url);
+                    req.respond(sonic::Response::Content(result)).await.ok();
+                }
+                searcher::Request::GetHomepageDescriptions { urls } => {
+                    let mut result = HashMap::with_capacity(urls.len());
+
+                    for url in urls {
+                        if let Some(homepage) = local_searcher.get_homepage(url) {
+                            if let Some(desc) = homepage.description() {
+                                result.insert(Url::from(url.clone()), desc.clone());
+                            } else {
+                            }
+                        }
+                    }
+
                     req.respond(sonic::Response::Content(result)).await.ok();
                 }
             }

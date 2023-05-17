@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod distributed;
+pub mod frontend;
 pub mod local;
 
 pub use distributed::*;

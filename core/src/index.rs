@@ -239,6 +239,10 @@ impl Index {
     pub(crate) fn get_webpage(&self, url: &str) -> Option<inverted_index::RetrievedWebpage> {
         self.inverted_index.get_webpage(url)
     }
+
+    pub fn get_homepage(&self, url: &str) -> Option<inverted_index::RetrievedWebpage> {
+        self.inverted_index.get_homepage(url)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

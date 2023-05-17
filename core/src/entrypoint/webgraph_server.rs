@@ -17,6 +17,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::info;
@@ -26,9 +27,11 @@ use crate::distributed::member::Member;
 use crate::distributed::member::Service;
 use crate::distributed::sonic;
 use crate::ranking::inbound_similarity::InboundSimilarity;
+use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
 use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
+use crate::webpage::Url;
 use crate::Result;
 use crate::WebgraphServerConfig;
 
@@ -38,19 +41,31 @@ pub enum Request {
     Knows { site: String },
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ScoredSite {
+    pub site: String,
+    pub score: f64,
+    pub description: Option<String>,
+}
+
+const MAX_SITES: usize = 20;
+
 pub async fn run(config: WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
     // dropping the handle leaves the cluster
-    let _cluster_handle = Cluster::join(
-        Member {
-            id: config.cluster_id,
-            service: Service::Webgraph { host: addr },
-        },
-        config.gossip_addr,
-        config.gossip_seed_nodes.unwrap_or_default(),
-    )
-    .await?;
+    let cluster = Arc::new(
+        Cluster::join(
+            Member {
+                id: config.cluster_id,
+                service: Service::Webgraph { host: addr },
+            },
+            config.gossip_addr,
+            config.gossip_seed_nodes.unwrap_or_default(),
+        )
+        .await?,
+    );
+    let searcher = DistributedSearcher::new(cluster);
 
     let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
@@ -65,7 +80,31 @@ pub async fn run(config: WebgraphServerConfig) -> Result<()> {
         if let Ok(req) = server.accept::<Request>().await {
             match &req.body {
                 Request::SimilarSites { sites, top_n } => {
+                    let sites = &sites[..std::cmp::min(sites.len(), MAX_SITES)];
                     let similar_sites = similar_sites_finder.find_similar_sites(sites, *top_n);
+
+                    let urls = similar_sites
+                        .iter()
+                        .map(|s| s.node.name.clone())
+                        .collect_vec();
+
+                    let descriptions = searcher.get_homepage_descriptions(&urls).await;
+
+                    let similar_sites = similar_sites
+                        .into_iter()
+                        .map(|site| {
+                            let description = descriptions
+                                .get(&Url::from(site.node.name.clone()))
+                                .cloned();
+
+                            ScoredSite {
+                                site: site.node.name,
+                                score: site.score,
+                                description,
+                            }
+                        })
+                        .collect_vec();
+
                     req.respond(sonic::Response::Content(similar_sites))
                         .await
                         .ok();

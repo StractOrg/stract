@@ -414,6 +414,12 @@ impl Html {
         }
 
         while let Some((text, attributes)) = open_links.pop() {
+            if let Some(rel) = attributes.borrow().get("rel") {
+                if rel.contains("nofollow") {
+                    continue;
+                }
+            }
+
             if let Some(dest) = attributes.borrow().get("href") {
                 links.push(Link {
                     source: self.url.clone(),
@@ -426,7 +432,7 @@ impl Html {
         links
     }
 
-    fn links_tag(&self) -> Vec<Link> {
+    fn _links_tag(&self) -> Vec<Link> {
         let mut links = Vec::new();
 
         for node in self.root.select("link").unwrap() {
@@ -444,7 +450,7 @@ impl Html {
         links
     }
 
-    fn metadata_links(&self) -> Vec<Link> {
+    fn _metadata_links(&self) -> Vec<Link> {
         self.metadata()
             .into_iter()
             .filter_map(|metadata| {
@@ -498,30 +504,31 @@ impl Html {
     }
 
     pub fn links(&self) -> Vec<Link> {
-        let mut links = self.hyperlinks();
+        // let mut links = self.hyperlinks();
 
-        links.extend(self.scripts().into_iter().filter_map(|script| {
-            match script.attributes.get("src") {
-                Some(url) => {
-                    let script_url = Url::from(url.as_str());
-                    if self.url().domain() != script_url.domain() {
-                        Some(Link {
-                            source: self.url.clone(),
-                            destination: script_url,
-                            text: String::new(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                None => None,
-            }
-        }));
+        // links.extend(self.scripts().into_iter().filter_map(|script| {
+        //     match script.attributes.get("src") {
+        //         Some(url) => {
+        //             let script_url = Url::from(url.as_str());
+        //             if self.url().domain() != script_url.domain() {
+        //                 Some(Link {
+        //                     source: self.url.clone(),
+        //                     destination: script_url,
+        //                     text: String::new(),
+        //                 })
+        //             } else {
+        //                 None
+        //             }
+        //         }
+        //         None => None,
+        //     }
+        // }));
 
-        links.extend(self.links_tag().into_iter());
-        links.extend(self.metadata_links().into_iter());
+        // links.extend(self.links_tag().into_iter());
+        // links.extend(self.metadata_links().into_iter());
 
-        links
+        // links
+        self.hyperlinks()
     }
 
     pub fn favicon(&self) -> Option<FaviconLink> {
@@ -804,6 +811,23 @@ impl Html {
                 Field::Text(TextField::Url) => {
                     doc.add_pre_tokenized_text(tantivy_field, url.clone())
                 }
+                Field::Text(TextField::UrlNoTokenizer) => {
+                    let url = self.url().full();
+
+                    doc.add_pre_tokenized_text(
+                        tantivy_field,
+                        PreTokenizedString {
+                            text: url.clone(),
+                            tokens: vec![tantivy::tokenizer::Token {
+                                offset_from: 0,
+                                offset_to: url.len(),
+                                position: 0,
+                                text: url,
+                                position_length: 1,
+                            }],
+                        },
+                    );
+                }
                 Field::Text(TextField::Site) => {
                     doc.add_pre_tokenized_text(tantivy_field, site.clone())
                 }
@@ -823,6 +847,25 @@ impl Html {
                         }],
                     },
                 ),
+                Field::Text(TextField::SiteIfHomepageNoTokenizer) => {
+                    if self.url().is_homepage() {
+                        doc.add_pre_tokenized_text(
+                            tantivy_field,
+                            PreTokenizedString {
+                                text: self.url().site().to_string(),
+                                tokens: vec![tantivy::tokenizer::Token {
+                                    offset_from: 0,
+                                    offset_to: self.url().site().len(),
+                                    position: 0,
+                                    text: self.url().site().to_string(),
+                                    position_length: 1,
+                                }],
+                            },
+                        )
+                    } else {
+                        doc.add_text(tantivy_field, "");
+                    }
+                }
                 Field::Text(TextField::DomainNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
@@ -1908,16 +1951,16 @@ mod tests {
                     destination: "example.com".to_string().into(),
                     text: "Link to example".to_string()
                 },
-                Link {
-                    source: "https://www.example.com/whatever".to_string().into(),
-                    destination: "test.com".to_string().into(),
-                    text: String::new()
-                },
-                Link {
-                    source: "https://www.example.com/whatever".to_string().into(),
-                    destination: "link.com".to_string().into(),
-                    text: String::new()
-                },
+                // Link {
+                //     source: "https://www.example.com/whatever".to_string().into(),
+                //     destination: "test.com".to_string().into(),
+                //     text: String::new()
+                // },
+                // Link {
+                //     source: "https://www.example.com/whatever".to_string().into(),
+                //     destination: "link.com".to_string().into(),
+                //     text: String::new()
+                // },
             ]
         );
     }
