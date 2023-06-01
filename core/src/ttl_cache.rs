@@ -24,11 +24,14 @@ pub struct TTLCache<K, V> {
     data: HashMap<K, V>,
     insertion_order: VecDeque<K>,
     insertion_times: HashMap<K, SystemTime>,
-    max_size: usize,
+    max_size: Option<usize>,
 }
 
 impl<K: Hash + Eq + Clone, V> TTLCache<K, V> {
-    pub fn with_ttl_and_max_size(ttl: Duration, max_size: usize) -> Self {
+    pub fn with_ttl(ttl: Duration) -> Self {
+        Self::with_ttl_and_max_size(ttl, None)
+    }
+    pub fn with_ttl_and_max_size(ttl: Duration, max_size: Option<usize>) -> Self {
         Self {
             ttl,
             data: HashMap::new(),
@@ -72,10 +75,12 @@ impl<K: Hash + Eq + Clone, V> TTLCache<K, V> {
     fn prune_old_entries(&mut self) {
         let current_time = SystemTime::now();
 
-        while self.data.len() >= self.max_size {
-            let front = self.insertion_order.pop_front().unwrap();
-            self.insertion_times.remove(&front);
-            self.data.remove(&front);
+        if let Some(max_size) = self.max_size {
+            while self.data.len() >= max_size {
+                let front = self.insertion_order.pop_front().unwrap();
+                self.insertion_times.remove(&front);
+                self.data.remove(&front);
+            }
         }
 
         while let Some(front) = self.insertion_order.front() {
@@ -100,7 +105,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), 5);
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), None);
 
         cache.insert(0, 0);
         std::thread::sleep(Duration::from_millis(30));
@@ -128,7 +133,7 @@ mod tests {
 
     #[test]
     fn max_size() {
-        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), 1);
+        let mut cache = TTLCache::with_ttl_and_max_size(Duration::from_millis(50), Some(1));
 
         cache.insert(0, 0);
         cache.insert(1, 1);

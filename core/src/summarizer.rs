@@ -28,6 +28,7 @@ use tokenizers::{PaddingParams, TruncationParams};
 
 use crate::{
     ceil_char_boundary,
+    llm_utils::{self, ClonableTensor},
     spell::word2vec::{Word2Vec, WordVec},
 };
 
@@ -222,38 +223,38 @@ impl PassageScorer for Word2Vec {
     }
 }
 
-pub struct Summarizer {
-    extractive_summarizer: DualEncoder,
-    top_n_extractive_passages: usize,
-    abstractive_summarizer: AbstractiveSummarizer,
+pub struct ExtractiveSummarizer {
+    passage_scorer: DualEncoder,
+    top_n_passages: usize,
+    window_size: usize,
+    overlap: usize,
 }
 
-impl Summarizer {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+impl ExtractiveSummarizer {
+    pub fn open<P: AsRef<Path>>(path: P, top_n_passages: usize) -> Result<Self> {
         Ok(Self {
-            extractive_summarizer: DualEncoder::open(path.as_ref().join("dual_encoder").as_path())?,
-            top_n_extractive_passages: 10,
-            abstractive_summarizer: AbstractiveSummarizer {
-                model: Arc::new(AbstractiveModel::open(
-                    path.as_ref().join("abstractive").as_path(),
-                )?),
-            },
+            passage_scorer: DualEncoder::open(path)?,
+            top_n_passages,
+            window_size: 100,
+            overlap: 10,
         })
     }
 
-    fn extractive_query_specific(&self, query: &str, text: &str) -> Option<String> {
-        let query_vectors = self.extractive_summarizer.embed_query(query)?;
+    pub fn set_window_size(&mut self, window_size: usize) {
+        self.window_size = window_size;
+    }
+
+    fn query_specific(&self, query: &str, text: &str) -> Option<String> {
+        let query_vectors = self.passage_scorer.embed_query(query)?;
 
         let mut best_passages: BinaryHeap<Reverse<CandidatePassage<'_>>> =
-            BinaryHeap::with_capacity(self.top_n_extractive_passages);
+            BinaryHeap::with_capacity(self.top_n_passages);
 
-        let overlap_sents = OverlappingSents::new(text, 100, 10);
+        let overlap_sents = OverlappingSents::new(text, self.window_size, self.overlap);
 
         for (index, (passage, range)) in overlap_sents.enumerate() {
-            if let Some(passage_vec) = self.extractive_summarizer.embed_passage(passage) {
-                let score = self
-                    .extractive_summarizer
-                    .score(&query_vectors, &passage_vec);
+            if let Some(passage_vec) = self.passage_scorer.embed_passage(passage) {
+                let score = self.passage_scorer.score(&query_vectors, &passage_vec);
 
                 let candidate = CandidatePassage {
                     passage,
@@ -262,7 +263,7 @@ impl Summarizer {
                     range,
                 };
 
-                if best_passages.len() >= self.top_n_extractive_passages {
+                if best_passages.len() >= self.top_n_passages {
                     if let Some(mut worst) = best_passages.peek_mut() {
                         if worst.0.score < candidate.score {
                             *worst = Reverse(candidate);
@@ -310,19 +311,46 @@ impl Summarizer {
         Some(res)
     }
 
-    pub fn extractive_summary(&self, query: &str, text: &str) -> String {
-        self.extractive_query_specific(query, text)
+    pub fn summarize(&self, query: &str, text: &str) -> String {
+        self.query_specific(query, text)
             .unwrap_or_else(|| intersperse(text.split_whitespace().take(1000), " ").collect())
     }
+}
 
-    pub fn abstractive_summary(&self, _query: &str, text: &str) -> String {
-        self.abstractive_summarizer
-            .summarize(text, GenerationConfig::default())
+pub struct Summarizer {
+    extractive: ExtractiveSummarizer,
+    abstractive: AbstractiveSummarizer,
+}
+
+impl Summarizer {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Ok(Self {
+            extractive: ExtractiveSummarizer::open(
+                path.as_ref().join("dual_encoder").as_path(),
+                50,
+            )?,
+            abstractive: AbstractiveSummarizer {
+                model: Arc::new(AbstractiveModel::open(
+                    path.as_ref().join("abstractive").as_path(),
+                )?),
+            },
+        })
     }
 
     pub fn summarize(&self, query: &str, text: &str) -> String {
-        let summary = self.extractive_summary(query, text);
-        self.abstractive_summary(query, &summary)
+        let summary = self.extractive.summarize(query, text);
+        match self.abstractive.summarize(summary.as_str()) {
+            Ok(stream) => stream.collect(),
+            Err(err) => {
+                tracing::error!("Abstractive summarization failed: {}", err);
+                summary
+            }
+        }
+    }
+
+    pub fn summarize_iter(&self, query: &str, text: &str) -> Result<impl Iterator<Item = String>> {
+        let summary = self.extractive.summarize(query, text);
+        self.abstractive.summarize(&summary)
     }
 }
 
@@ -373,9 +401,9 @@ impl DualEncoder {
             .map(|&id| id as i64)
             .collect::<Vec<_>>();
 
-        let ids = Tensor::of_slice(&ids).reshape(&[1, -1]);
-        let types = Tensor::of_slice(&types).reshape(&[1, -1]);
-        let mask = Tensor::of_slice(&mask).reshape(&[1, -1]);
+        let ids = Tensor::from_slice(&ids).reshape([1, -1]);
+        let types = Tensor::from_slice(&types).reshape([1, -1]);
+        let mask = Tensor::from_slice(&mask).reshape([1, -1]);
 
         Ok(self.model.forward_ts(&[ids, types, mask])?.squeeze())
     }
@@ -445,6 +473,60 @@ impl AbstractiveModel {
             begin_decoder_token: 2,
         })
     }
+
+    fn parse_decoder_output(
+        &self,
+        output: IValue,
+    ) -> std::result::Result<(Tensor, Vec<Vec<ClonableTensor>>), Error> {
+        let mut output = if let IValue::Tuple(tup) = output {
+            Ok(tup)
+        } else {
+            Err(Error::UnexpectedOutputType)
+        }?;
+
+        if output.len() != 2 {
+            return Err(Error::UnexpectedOutputType);
+        }
+
+        let logits = if let IValue::Tensor(t) = output.remove(0) {
+            Ok(t)
+        } else {
+            Err(Error::UnexpectedOutputType)
+        }?;
+
+        let caches = if let IValue::Tuple(caches) = output.remove(0) {
+            Ok(caches)
+        } else {
+            Err(Error::UnexpectedOutputType)
+        }?;
+
+        let past_key_values = if caches.len() == 12 {
+            let mut new_caches = Vec::with_capacity(caches.len());
+
+            for cache in caches {
+                if let IValue::Tuple(cache) = cache {
+                    let mut c = Vec::with_capacity(2);
+                    for cache in cache.into_iter().take(2) {
+                        if let IValue::Tensor(cache) = cache {
+                            c.push(ClonableTensor(cache));
+                        } else {
+                            return Err(Error::UnexpectedOutputType);
+                        }
+                    }
+
+                    new_caches.push(c);
+                } else {
+                    return Err(Error::UnexpectedOutputType);
+                }
+            }
+
+            Ok(new_caches)
+        } else {
+            Err(Error::UnexpectedOutputType)
+        }?;
+
+        Ok((logits, past_key_values))
+    }
 }
 
 pub struct AbstractiveSummarizer {
@@ -457,7 +539,16 @@ impl AbstractiveSummarizer {
             model: Arc::new(model),
         }
     }
-    pub fn summarize(&self, text: &str, mut config: GenerationConfig) -> String {
+
+    pub fn summarize(&self, text: &str) -> Result<impl Iterator<Item = String>> {
+        self.summarize_with_max(text, Some(128))
+    }
+
+    pub fn summarize_with_max(
+        &self,
+        text: &str,
+        max_summary_tokens: Option<usize>,
+    ) -> Result<impl Iterator<Item = String>> {
         let ids = self
             .model
             .tokenizer
@@ -468,120 +559,61 @@ impl AbstractiveSummarizer {
             .map(|id| *id as i64)
             .collect_vec();
 
-        let ids = Tensor::of_slice(&ids).reshape(&[1, -1]);
+        let ids = Tensor::from_slice(&ids).reshape([1, -1]);
 
-        if !config
-            .banned_tokens
-            .contains(&(self.model.bos_token_id as i64))
-        {
-            config.banned_tokens.push(self.model.bos_token_id as i64);
-        }
+        let decoder_tokens = Tensor::from_slice(&[
+            self.model.begin_decoder_token as i64,
+            self.model.bos_token_id as i64,
+        ])
+        .reshape([1, -1]);
 
-        if !config
-            .end_tokens
-            .contains(&(self.model.eos_token_id as i64))
-        {
-            config.end_tokens.push(self.model.eos_token_id as i64);
-        }
-
-        match self.model.beam_search(
-            &ids,
-            &Tensor::of_slice(&[
-                self.model.begin_decoder_token as i64,
-                self.model.bos_token_id as i64,
-            ])
-            .reshape(&[1, -1]),
-            config,
-        ) {
-            Ok(res) => {
-                let tokens = res.tokens.into_iter().map(|tok| tok as u32).collect_vec();
-                self.model
-                    .tokenizer
-                    .decode(tokens, true)
-                    .unwrap_or_default()
-            }
-            Err(err) => {
-                tracing::error!("Error while summarizing: {:?}", err);
-                String::new()
-            }
-        }
+        self.generate(&ids, &decoder_tokens, max_summary_tokens)
     }
-}
 
-struct ClonableTensor(Tensor);
+    fn generate(
+        &self,
+        encoder_ids: &Tensor,
+        decoder_start_tokens: &Tensor,
+        max_new_tokens: Option<usize>,
+    ) -> Result<impl Iterator<Item = String>> {
+        let tau = 0.8;
+        let temp = 1.0;
 
-impl Clone for ClonableTensor {
-    fn clone(&self) -> Self {
-        let out = Tensor::empty(&self.0.size(), (Kind::Float, self.0.device()));
-        ClonableTensor(self.0.clone(&out))
+        let encoded = self.model.initial(encoder_ids, decoder_start_tokens)?;
+
+        let token_it = TokenStreamingGenerator {
+            model: Arc::clone(&self.model),
+            tau,
+            temp,
+            banned_tokens: vec![self.model.bos_token_id as i64],
+            end_tokens: vec![self.model.eos_token_id as i64],
+            next_token_logits: Some(encoded.next_token_logits),
+            memory: encoded.memory,
+            num_tokens_generated: 0,
+            max_new_tokens,
+        };
+
+        let it = StringStreamingGenerator {
+            token_streamer: token_it,
+            tokens: Vec::new(),
+        };
+
+        Ok(it)
     }
 }
 
 #[derive(Clone)]
-struct BartMemory {
+pub struct BartMemory {
     encoder_hidden_states: ClonableTensor,
     past_key_values: Vec<Vec<ClonableTensor>>,
 }
 
-fn parse_decoder_output(output: IValue) -> Result<(Tensor, Vec<Vec<ClonableTensor>>)> {
-    let mut output = if let IValue::Tuple(tup) = output {
-        Ok(tup)
-    } else {
-        Err(Error::UnexpectedOutputType)
-    }?;
-
-    if output.len() != 2 {
-        return Err(Error::UnexpectedOutputType);
-    }
-
-    let logits = if let IValue::Tensor(t) = output.remove(0) {
-        Ok(t)
-    } else {
-        Err(Error::UnexpectedOutputType)
-    }?;
-
-    let caches = if let IValue::Tuple(caches) = output.remove(0) {
-        Ok(caches)
-    } else {
-        Err(Error::UnexpectedOutputType)
-    }?;
-
-    let past_key_values = if caches.len() == 12 {
-        let mut new_caches = Vec::with_capacity(caches.len());
-
-        for cache in caches {
-            if let IValue::Tuple(cache) = cache {
-                let mut c = Vec::with_capacity(2);
-                for cache in cache.into_iter().take(2) {
-                    if let IValue::Tensor(cache) = cache {
-                        c.push(ClonableTensor(cache));
-                    } else {
-                        return Err(Error::UnexpectedOutputType);
-                    }
-                }
-
-                new_caches.push(c);
-            } else {
-                return Err(Error::UnexpectedOutputType);
-            }
-        }
-
-        Ok(new_caches)
-    } else {
-        Err(Error::UnexpectedOutputType)
-    }?;
-
-    Ok((logits, past_key_values))
-}
-
-impl BeamSearch for AbstractiveModel {
-    type Memory = BartMemory;
-
+impl AbstractiveModel {
     fn initial(
         &self,
         encoder_ids: &Tensor,
         decoder_ids: &Tensor,
-    ) -> Result<DecoderOutput<Self::Memory>> {
+    ) -> std::result::Result<DecoderOutput, Error> {
         let encoder_hidden_states = self.encoder.forward_ts(&[encoder_ids])?;
 
         let decoder_output = self.decoder.forward_is(&[
@@ -589,7 +621,7 @@ impl BeamSearch for AbstractiveModel {
             IValue::Tensor(encoder_hidden_states.shallow_clone()),
         ])?;
 
-        let (logits, past_key_values) = parse_decoder_output(decoder_output)?;
+        let (logits, past_key_values) = self.parse_decoder_output(decoder_output)?;
 
         // logits is [batch_size, seq_len, vocab_size]
         // get last token logits
@@ -606,13 +638,13 @@ impl BeamSearch for AbstractiveModel {
 
     fn step(
         &self,
-        prev_output: &DecoderInput<Self::Memory>,
-    ) -> Result<DecoderOutput<Self::Memory>> {
-        let ids = Tensor::of_slice(&[prev_output.last_token]).reshape(&[1, 1]);
+        last_token: i64,
+        memory: &BartMemory,
+    ) -> std::result::Result<DecoderOutput, Error> {
+        let ids = Tensor::from_slice(&[last_token]).reshape([1, 1]);
 
         let past_key_value: IValue = IValue::Tuple(
-            prev_output
-                .memory
+            memory
                 .past_key_values
                 .iter()
                 .map(|c| {
@@ -627,11 +659,11 @@ impl BeamSearch for AbstractiveModel {
 
         let decoder_output = self.decoder_with_past.forward_is(&[
             IValue::Tensor(ids),
-            IValue::Tensor(prev_output.memory.encoder_hidden_states.clone().0),
+            IValue::Tensor(memory.encoder_hidden_states.clone().0),
             past_key_value,
         ])?;
 
-        let (logits, past_key_values) = parse_decoder_output(decoder_output)?;
+        let (logits, past_key_values) = self.parse_decoder_output(decoder_output)?;
 
         // logits is [batch_size, seq_len, vocab_size]
         // get last token logits
@@ -640,243 +672,133 @@ impl BeamSearch for AbstractiveModel {
         Ok(DecoderOutput {
             next_token_logits,
             memory: BartMemory {
-                encoder_hidden_states: prev_output.memory.encoder_hidden_states.clone(),
+                encoder_hidden_states: memory.encoder_hidden_states.clone(),
                 past_key_values,
             },
         })
     }
 }
 
-struct DecoderOutput<M: Clone> {
-    next_token_logits: Tensor,
-    memory: M,
-}
-
-struct DecoderInput<M: Clone> {
-    last_token: i64,
-    memory: M,
-}
-
-#[derive(Clone)]
-struct Beam<M: Clone> {
-    log_score: f64,
-    length_penalty: f64,
-    tokens: Vec<i64>,
+pub struct TokenStreamingGenerator {
+    model: Arc<AbstractiveModel>,
+    tau: f64,
+    temp: f64,
+    banned_tokens: Vec<i64>,
     end_tokens: Vec<i64>,
-    memory: M,
+    next_token_logits: Option<Tensor>,
+    memory: BartMemory,
+    num_tokens_generated: usize,
+    max_new_tokens: Option<usize>,
 }
 
-impl<M: Clone> Beam<M> {
-    fn is_finished(&self, config: &GenerationConfig) -> bool {
-        if let Some(forced) = &config.force_min_tokens {
-            if self.tokens.len() < *forced as usize {
-                return false;
-            }
-        }
+impl Iterator for TokenStreamingGenerator {
+    type Item = i64;
 
-        if let Some(early_stopping) = &config.early_stopping {
-            match early_stopping {
-                EarlyStopping::MaxTokens { max_new_tokens } => {
-                    if self.tokens.len() >= *max_new_tokens as usize {
-                        return true;
+    fn next(&mut self) -> Option<Self::Item> {
+        match &self.next_token_logits {
+            Some(next_token_logits) => {
+                if let Some(max_new_tokens) = self.max_new_tokens {
+                    if self.num_tokens_generated >= max_new_tokens {
+                        self.next_token_logits = None;
+                        return None;
                     }
                 }
-            }
-        }
 
-        if let Some(tok) = self.tokens.last() {
-            if config.end_tokens.contains(tok) {
-                return true;
-            }
-        }
+                let mut probs = next_token_logits.softmax(-1, Kind::Float).squeeze();
 
-        false
-    }
-
-    fn score(&self) -> f64 {
-        let length = match self.tokens.last() {
-            Some(tok) => {
-                if self.end_tokens.contains(tok) {
-                    self.tokens.len() - 1
-                } else {
-                    self.tokens.len()
+                // remove banned tokens
+                for token in &self.banned_tokens {
+                    let _ = probs.index_fill_(0, &Tensor::from_slice(&[*token]), 0.0);
                 }
-            }
-            None => 0,
-        };
 
-        self.log_score / ((length as f64).powf(self.length_penalty))
-    }
-}
+                let next_token = llm_utils::sample_typical(probs, self.temp, self.tau);
 
-impl<M: Clone> PartialOrd for Beam<M> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.score().partial_cmp(&other.score())
-    }
-}
-
-impl<M: Clone> PartialEq for Beam<M> {
-    fn eq(&self, other: &Self) -> bool {
-        self.score() == other.score()
-    }
-}
-
-impl<M: Clone> Ord for Beam<M> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
-    }
-}
-
-impl<M: Clone> Eq for Beam<M> {}
-
-trait BeamSearch {
-    type Memory: Clone;
-
-    fn initial(
-        &self,
-        encoder_ids: &Tensor,
-        decoder_ids: &Tensor,
-    ) -> Result<DecoderOutput<Self::Memory>>;
-
-    fn step(&self, prev_output: &DecoderInput<Self::Memory>)
-        -> Result<DecoderOutput<Self::Memory>>;
-
-    fn beam_search(
-        &self,
-        encoder_ids: &Tensor,
-        decoder_start_tokens: &Tensor,
-        config: GenerationConfig,
-    ) -> Result<Beam<Self::Memory>> {
-        let encoded = self.initial(encoder_ids, decoder_start_tokens)?;
-        let decoder_start_tokens = decoder_start_tokens.squeeze().iter::<i64>()?.collect_vec();
-
-        let scores = encoded.next_token_logits.softmax(-1, Kind::Float).squeeze();
-
-        let (next_scores, next_tokens) = scores.topk(config.num_beams as i64, -1, true, true);
-
-        let mut beams = BinaryHeap::with_capacity(config.num_beams as usize);
-
-        for (score, token) in next_scores.iter::<f64>()?.zip(next_tokens.iter::<i64>()?) {
-            if config.banned_tokens.contains(&token) {
-                continue;
-            }
-
-            let mut toks = decoder_start_tokens.clone();
-            toks.push(token);
-
-            let beam = Reverse(Beam {
-                log_score: score.log2(),
-                tokens: toks,
-                memory: encoded.memory.clone(),
-                end_tokens: config.end_tokens.clone(),
-                length_penalty: config.length_penalty,
-            });
-
-            if beams.len() < config.num_beams as usize {
-                beams.push(beam);
-            } else {
-                let mut worst = beams.peek_mut().unwrap();
-                if beam.0 > worst.0 {
-                    *worst = beam;
+                if self.end_tokens.contains(&next_token) {
+                    self.next_token_logits = None;
+                    return None;
                 }
-            }
-        }
 
+                let encoded = self.model.step(next_token, &self.memory).ok()?;
+
+                self.next_token_logits = Some(encoded.next_token_logits);
+                self.memory = encoded.memory;
+
+                self.num_tokens_generated += 1;
+
+                Some(next_token)
+            }
+            None => None,
+        }
+    }
+}
+
+pub struct StringStreamingGenerator {
+    token_streamer: TokenStreamingGenerator,
+    tokens: Vec<u32>,
+}
+
+impl Iterator for StringStreamingGenerator {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let mut next_beams = BinaryHeap::with_capacity(config.num_beams as usize);
+            match self.token_streamer.next() {
+                Some(token) => {
+                    self.tokens.push(token as u32);
 
-            for beam in beams.iter() {
-                if beam.0.is_finished(&config) {
-                    if next_beams.len() < config.num_beams as usize {
-                        next_beams.push(beam.clone());
-                    } else {
-                        let mut worst = next_beams.peek_mut().unwrap();
-                        if beam.0 > worst.0 {
-                            *worst = beam.clone();
-                        }
+                    if let Some(s) = self
+                        .token_streamer
+                        .model
+                        .tokenizer
+                        .decode(self.tokens.clone(), true)
+                        .ok()
+                        .and_then(|s| {
+                            if !s.contains('\u{fffd}') {
+                                // valid utf-8 string
+                                Some(s)
+                            } else {
+                                None
+                            }
+                        })
+                    {
+                        self.tokens.clear();
+                        return Some(s);
                     }
-
-                    continue;
                 }
-
-                let prev_output = DecoderInput {
-                    last_token: *beam.0.tokens.last().unwrap(),
-                    memory: beam.0.memory.clone(),
-                };
-
-                let decoded = self.step(&prev_output)?;
-
-                let scores = decoded.next_token_logits.softmax(-1, Kind::Float);
-
-                let (next_scores, next_tokens) =
-                    scores.topk(config.num_beams as i64, -1, true, true);
-
-                for (score, token) in next_scores.iter::<f64>()?.zip(next_tokens.iter::<i64>()?) {
-                    let mut new_beam = beam.clone().0;
-                    new_beam.log_score += score.log2();
-                    new_beam.tokens.push(token);
-                    new_beam.memory = decoded.memory.clone();
-
-                    if next_beams.len() < config.num_beams as usize {
-                        next_beams.push(Reverse(new_beam));
+                None => {
+                    if self.tokens.is_empty() {
+                        return None;
                     } else {
-                        let mut worst = next_beams.peek_mut().unwrap();
-                        if new_beam > worst.0 {
-                            *worst = Reverse(new_beam);
+                        match self
+                            .token_streamer
+                            .model
+                            .tokenizer
+                            .decode(self.tokens.clone(), true)
+                        {
+                            Ok(s) => {
+                                self.tokens.clear();
+
+                                if !s.contains('\u{fffd}') {
+                                    return Some(s);
+                                } else {
+                                    return None;
+                                }
+                            }
+                            Err(_) => {
+                                self.tokens.clear();
+                                return None;
+                            }
                         }
                     }
                 }
             }
-
-            if next_beams.iter().all(|b| b.0.is_finished(&config)) {
-                break;
-            }
-
-            beams = next_beams;
-        }
-
-        let mut beams = beams
-            .into_sorted_vec()
-            .into_iter()
-            .map(|b| b.0)
-            .collect_vec();
-
-        beams.sort();
-
-        Ok(beams.pop().unwrap())
-    }
-}
-
-pub struct GenerationConfig {
-    pub early_stopping: Option<EarlyStopping>,
-    pub force_min_tokens: Option<u32>,
-    pub end_tokens: Vec<i64>,
-    pub banned_tokens: Vec<i64>,
-    /// Exponential penalty to the length that is used with beam-based generation.
-    /// It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence.
-    /// Since the score is the log likelihood of the sequence (i.e. negative),
-    /// length_penalty > 0.0 promotes longer sequences, while length_penalty < 0.0 encourages shorter sequences
-    pub length_penalty: f64,
-    pub num_beams: u32,
-}
-
-impl Default for GenerationConfig {
-    fn default() -> Self {
-        Self {
-            early_stopping: Some(EarlyStopping::MaxTokens {
-                max_new_tokens: 128,
-            }),
-            end_tokens: vec![],
-            banned_tokens: vec![],
-            force_min_tokens: None,
-            length_penalty: 1.0,
-            num_beams: 3,
         }
     }
 }
 
-pub enum EarlyStopping {
-    MaxTokens { max_new_tokens: u32 },
+struct DecoderOutput {
+    next_token_logits: Tensor,
+    memory: BartMemory,
 }
 
 #[cfg(test)]
@@ -938,19 +860,15 @@ mod tests {
         Though Aristotle wrote many elegant treatises and dialogues for publication, only around a third of his original output has survived, none of it intended for publication. Aristotle provided a complex synthesis of the various philosophies existing prior to him. It was above all from his teachings that the West inherited its intellectual lexicon, as well as problems and methods of inquiry. As a result, his philosophy has exerted a unique influence on almost every form of knowledge in the West and it continues to be a subject of contemporary philosophical discussion.
         Aristotle's views profoundly shaped medieval scholarship. The influence of physical science extended from Late Antiquity and the Early Middle Ages into the Renaissance, and were not replaced systematically until the Enlightenment and theories such as classical mechanics were developed. Some of Aristotle's zoological observations found in his biology, such as on the hectocotyl (reproductive) arm of the octopus, were disbelieved until the 19th century. He also influenced Judeo-Islamic philosophies during the Middle Ages, as well as Christian theology, especially the Neoplatonism of the Early Church and the scholastic tradition of the Catholic Church. Aristotle was revered among medieval Muslim scholars as "The First Teacher", and among medieval Christians like Thomas Aquinas as simply "The Philosopher", while the poet Dante called him "the master of those who know". His works contain the earliest known formal study of logic, and were studied by medieval scholars such as Peter Abelard and John Buridan. Aristotle's influence on logic continued well into the 19th century. In addition, his ethics, though always influential, gained renewed interest with the modern advent of virtue ethics."#;
 
-        let config = GenerationConfig {
-            num_beams: 2,
-            early_stopping: Some(EarlyStopping::MaxTokens { max_new_tokens: 16 }),
-            length_penalty: 1.0,
-            ..Default::default()
-        };
-
         let start = std::time::Instant::now();
-        let summary = summarizer.summarize(text, config);
+        let summary = summarizer
+            .summarize_with_max(text, Some(16))
+            .unwrap()
+            .collect::<String>();
+
         println!("Elapsed: {:?}", start.elapsed());
         println!("{:?}", &summary);
 
         assert!(summary.len() > 50);
-        assert!(summary.contains("Aristotle"));
     }
 }

@@ -16,12 +16,13 @@
 
 use std::collections::VecDeque;
 
-pub struct LeakyQueue<T> {
+#[derive(Clone)]
+pub struct LeakyQueue<T: Clone> {
     inner: VecDeque<T>,
     max_size: usize,
 }
 
-impl<T> LeakyQueue<T> {
+impl<T: Clone> LeakyQueue<T> {
     pub fn new(max_size: usize) -> Self {
         Self {
             inner: VecDeque::with_capacity(max_size),
@@ -39,6 +40,18 @@ impl<T> LeakyQueue<T> {
 
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop_front()
+    }
+
+    pub fn back(&self) -> Option<&T> {
+        self.inner.back()
+    }
+
+    pub fn front(&self) -> Option<&T> {
+        self.inner.front()
+    }
+
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        self.inner.front_mut()
     }
 }
 

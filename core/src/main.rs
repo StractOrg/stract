@@ -24,7 +24,7 @@ use stract::entrypoint::configure;
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, frontend, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use stract::{FrontendConfig, SearchServerConfig, WebgraphServerConfig};
+use stract::{AliceConfig, FrontendConfig, SearchServerConfig, WebgraphServerConfig};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -38,6 +38,10 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
+    Alice {
+        #[clap(subcommand)]
+        options: AliceOptions,
+    },
     Indexer {
         #[clap(subcommand)]
         options: IndexingOptions,
@@ -84,6 +88,12 @@ enum Commands {
         #[clap(long, takes_value = false)]
         skip_download: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum AliceOptions {
+    Serve { config_path: String },
+    GenerateKey,
 }
 
 #[derive(Subcommand)]
@@ -293,6 +303,17 @@ fn main() -> Result<()> {
             online_harmonic_path,
             output_path,
         ),
+        Commands::Alice { options } => match options {
+            AliceOptions::Serve { config_path } => {
+                let config: AliceConfig = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::alice::run(config))?
+            }
+            AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
+        },
     }
 
     Ok(())

@@ -357,4 +357,25 @@ mod tests {
         let url: Url = "test.example.com/test/test".to_string().into();
         assert_eq!(url.without_protocol(), "test.example.com/test/test");
     }
+
+    #[test]
+    fn url_is_homepage() {
+        let url: Url = "https://test.example.com".to_string().into();
+        assert!(url.is_homepage());
+
+        let url: Url = "https://test.example.com/".to_string().into();
+        assert!(url.is_homepage());
+
+        let url: Url = "https://test.example.com/test".to_string().into();
+        assert!(!url.is_homepage());
+
+        let url: Url = "https://podcasts.apple.com/fr/podcast/beyond-2-cest-quoi-un-planneur-strat%C3%A9gique/id1492683918?i=1000460534325".to_string().into();
+        assert!(!url.is_homepage());
+
+        let url: Url = "https://podcasts.apple.com".to_string().into();
+        assert!(url.is_homepage());
+
+        let url: Url = "podcasts.apple.com".to_string().into();
+        assert!(url.is_homepage());
+    }
 }

@@ -47,7 +47,9 @@ use axum::{
 use self::webgraph::RemoteWebgraph;
 
 mod about;
+mod alice;
 mod autosuggest;
+mod chat;
 mod explore;
 mod improvement;
 mod index;
@@ -70,6 +72,7 @@ pub struct State {
     pub search_counter_fail: crate::metrics::Counter,
     pub summarizer: Arc<Summarizer>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
+    pub cluster: Arc<Cluster>,
 }
 
 impl<T> IntoResponse for HtmlTemplate<T>
@@ -139,7 +142,8 @@ pub async fn router(
         .await?,
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-    let searcher = FrontendSearcher::new(cluster, crossencoder, lambda_model, qa_model, bangs);
+    let searcher =
+        FrontendSearcher::new(cluster.clone(), crossencoder, lambda_model, qa_model, bangs);
 
     let state = Arc::new(State {
         searcher,
@@ -149,6 +153,7 @@ pub async fn router(
         remote_webgraph,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
         improvement_queue: query_store_queue,
+        cluster,
     });
 
     Ok(Router::new()
@@ -163,6 +168,7 @@ pub async fn router(
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
         .route("/explore", get(explore::route))
+        .route("/chat", get(chat::route))
         .route("/explore/export", get(explore::export))
         .route("/about", get(about::route))
         .route("/settings", get(optics::route))
@@ -182,7 +188,9 @@ pub async fn router(
                     "/beta/api/webgraph/similar_sites",
                     post(webgraph::similar_sites),
                 )
-                .route("/beta/api/webgraph/knows_site", get(webgraph::knows_site)),
+                .route("/beta/api/webgraph/knows_site", get(webgraph::knows_site))
+                .route("/beta/api/alice", get(alice::route))
+                .route("/beta/api/alice/save_state", post(alice::save_state)),
         )
         .with_state(state))
 }

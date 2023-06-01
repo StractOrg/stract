@@ -14,22 +14,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use super::HtmlTemplate;
+use askama::Template;
+use axum::{extract, response::IntoResponse};
 
-use crate::searcher::ShardId;
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
-pub enum Service {
-    Searcher { host: SocketAddr, shard: ShardId },
-    Frontend { host: SocketAddr },
-    Webgraph { host: SocketAddr },
-    Alice { host: SocketAddr },
+#[allow(clippy::unused_async)]
+pub async fn route(
+    extract::Query(params): extract::Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let template = ChatTemplate {
+        query_url_part: serde_urlencoded::to_string(params).unwrap(),
+    };
+    HtmlTemplate(template)
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct Member {
-    pub id: String,
-    pub service: Service,
+#[derive(Template)]
+#[template(path = "chat/index.html")]
+struct ChatTemplate {
+    query_url_part: String,
 }

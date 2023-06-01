@@ -463,7 +463,7 @@ impl InvertedIndex {
         let tv_searcher = self.reader.searcher();
         let field = tv_searcher
             .schema()
-            .get_field(Field::Text(TextField::SiteNoTokenizer).name())
+            .get_field(Field::Text(TextField::SiteIfHomepageNoTokenizer).name())
             .unwrap();
 
         let term = tantivy::Term::from_field_text(field, url.site());

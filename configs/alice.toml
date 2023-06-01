@@ -1,0 +1,16 @@
+cluster_id = "dev_alice"
+gossip_addr = "0.0.0.0:3008"
+host = "0.0.0.0:3004"
+gossip_seed_nodes = ["0.0.0.0:3005", "0.0.0.0:3006"]
+alice_path = "data/alice"
+summarizer_path = "data/summarizer/dual_encoder/"
+encryption_key = "URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc="
+
+[accelerator]
+layer_fraction = 1.0
+
+[accelerator.device]
+type = "mps"
+
+[accelerator.dtype]
+type = "float"

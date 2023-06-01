@@ -8,7 +8,7 @@
 
 @frontend-rerun *ARGS:
     cd frontend; npm run build
-    bash scripts/run_frontend.sh {{ARGS}}
+    ./scripts/run_frontend.py {{ARGS}}
 
 @frontend *ARGS:
     cd frontend; npm install

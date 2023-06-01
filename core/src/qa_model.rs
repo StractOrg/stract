@@ -103,9 +103,9 @@ impl QaModel {
             })
             .collect_vec();
 
-        let ids = Tensor::of_slice(&ids).reshape(&[bs as i64, num_tokens as i64]);
+        let ids = Tensor::from_slice(&ids).reshape([bs as i64, num_tokens as i64]);
         let attention_mask =
-            Tensor::of_slice(&attention_mask).reshape(&[bs as i64, num_tokens as i64]);
+            Tensor::from_slice(&attention_mask).reshape([bs as i64, num_tokens as i64]);
 
         let output = self
             .model

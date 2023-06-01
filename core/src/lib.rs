@@ -33,6 +33,7 @@ mod inverted_index;
 
 pub mod mapreduce;
 
+pub mod alice;
 mod api;
 mod autosuggest;
 mod bangs;
@@ -52,6 +53,7 @@ mod intmap;
 mod kahan_sum;
 mod kv;
 mod leaky_queue;
+mod llm_utils;
 mod metrics;
 pub mod prehashed;
 mod qa_model;
@@ -191,6 +193,42 @@ pub struct SearchServerConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AcceleratorDevice {
+    Cpu,
+    Cuda(usize),
+    Mps,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AcceleratorDtype {
+    Float,
+    Bf16,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AliceAcceleratorConfig {
+    pub layer_fraction: f64,
+    pub device: AcceleratorDevice,
+    pub dtype: AcceleratorDtype,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AliceConfig {
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
+    pub host: SocketAddr,
+
+    pub alice_path: String,
+    pub summarizer_path: String,
+    pub accelerator: Option<AliceAcceleratorConfig>,
+    /// base64 encoded
+    pub encryption_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
     pub graph_path: String,
@@ -291,6 +329,9 @@ pub enum Error {
 
     #[error("Summarizer")]
     Summarizer(#[from] crate::summarizer::Error),
+
+    #[error("Alice")]
+    Alice(#[from] crate::alice::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

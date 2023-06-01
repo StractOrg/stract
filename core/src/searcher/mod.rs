@@ -36,13 +36,13 @@ use crate::{
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(BangHit),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,

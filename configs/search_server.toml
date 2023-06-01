@@ -1,5 +1,6 @@
 cluster_id = "dev_search"
-gossip_addr = "0.0.0.0:3005"
+gossip_addr = "0.0.0.0:3006"
+gossip_seed_nodes = ["0.0.0.0:3005"]
 shard_id = 0
 host = "0.0.0.0:3002"
 index_path = "data/index"

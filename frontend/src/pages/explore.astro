@@ -7,9 +7,11 @@ import { askama } from "../askama";
 ---
 
 <Layout title="Stract">
-  <Header showDivider={true} activeIndex={1} queryUrlPart={askama`query_url_part $ ""`} />
   <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
-    <div class="flex mt-10 px-5 justify-center">
+    <div class="row-start-1">
+      <Header showDivider={true} activeIndex={1} queryUrlPart={askama`query_url_part $ ""`} />
+    </div>
+    <div class="row-start-2 flex mt-10 px-5 justify-center">
       <div class="flex flex-col grow max-w-3xl">
         <noscript>
           <div class="text-red-600">Unfortunately, this site requires javascript to function.</div>

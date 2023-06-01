@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::summarizer::{AbstractiveModel, AbstractiveSummarizer, GenerationConfig};
+use stract::summarizer::{AbstractiveModel, AbstractiveSummarizer};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let model =
@@ -11,15 +11,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         Aristotle's views profoundly shaped medieval scholarship. The influence of physical science extended from Late Antiquity and the Early Middle Ages into the Renaissance, and were not replaced systematically until the Enlightenment and theories such as classical mechanics were developed. Some of Aristotle's zoological observations found in his biology, such as on the hectocotyl (reproductive) arm of the octopus, were disbelieved until the 19th century. He also influenced Judeo-Islamic philosophies during the Middle Ages, as well as Christian theology, especially the Neoplatonism of the Early Church and the scholastic tradition of the Catholic Church. Aristotle was revered among medieval Muslim scholars as "The First Teacher", and among medieval Christians like Thomas Aquinas as simply "The Philosopher", while the poet Dante called him "the master of those who know". His works contain the earliest known formal study of logic, and were studied by medieval scholars such as Peter Abelard and John Buridan. Aristotle's influence on logic continued well into the 19th century. In addition, his ethics, though always influential, gained renewed interest with the modern advent of virtue ethics."#;
 
     c.bench_function("Summarize Aristotles wiki text", |b| {
-        b.iter(|| {
-            model.summarize(
-                text,
-                GenerationConfig {
-                    num_beams: 10,
-                    ..Default::default()
-                },
-            )
-        })
+        b.iter(|| model.summarize(text))
     });
 }
 

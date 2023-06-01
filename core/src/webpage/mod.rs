@@ -1175,17 +1175,35 @@ impl Html {
             })
     }
 
-    pub fn description(&self) -> Option<String> {
+    pub fn og_description(&self) -> Option<String> {
         self.metadata()
             .into_iter()
             .find(|metadata| {
                 if let Some(property) = metadata.get("property") {
-                    property == &String::from("og:description")
+                    property.as_str() == "og:description"
                 } else {
                     false
                 }
             })
             .and_then(|metadata| metadata.get("content").cloned())
+    }
+
+    pub fn metadata_description(&self) -> Option<String> {
+        self.metadata()
+            .into_iter()
+            .find(|metadata| {
+                if let Some(name) = metadata.get("name") {
+                    name.as_str() == "description" || name.as_str() == "Description"
+                } else {
+                    false
+                }
+            })
+            .and_then(|metadata| metadata.get("content").cloned())
+    }
+
+    pub fn description(&self) -> Option<String> {
+        self.og_description()
+            .or_else(|| self.metadata_description())
     }
 
     pub fn og_title(&self) -> Option<String> {

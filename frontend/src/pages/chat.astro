@@ -1,0 +1,305 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Layout from "../layouts/Layout.astro";
+import Hero from "../components/Hero.astro";
+import ChatBubble from "../components/ChatBubble.astro";
+import { askama } from "../askama";
+---
+
+<Layout title="Stract">
+  <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
+    <div id="header" class="row-start-1">
+        <Header showDivider={true} activeIndex={2} queryUrlPart={askama`query_url_part $ ""`} />
+    </div>
+    <div class="flex flex-col row-start-2 mt-10 px-2 items-center">
+        <div class="max-w-3xl w-full gap-y-5 flex flex-col h-full">
+            <div id="message-container" class="flex px-5 flex-col gap-y-3 h-full">
+            </div>
+            <div class="flex w-full border rounded-xl p-2 pl-3">
+                <textarea id="message-input" autofocus class="grow resize-none outline-none focus:ring-0" style="max-height: 200px;" placeholder="Type a message..."></textarea>
+                <div class="flex place-items-end">
+                    <div id="send-button" class="w-6 h-6 rotate-90 text-brand_contrast/50 hover:text-brand_contrast cursor-pointer">
+                        <Hero icon="paper-airplane" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="footer" class="row-start-3">
+      <Footer />
+    </div>
+  </div>
+<div class="status-template hidden">
+    <ChatBubble />
+    <div id="info" class="text-gray-500"></div>
+</div>
+</Layout>
+
+<style is:inline>
+    .user-message-container {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        padding-left: 1.25rem;
+    }
+
+    .user-message {
+        padding: 0.5rem;
+        background-color: rgba(11, 123, 255, 0.05);
+        border-color: rgba(11, 123, 255, 0.3);
+        width: fit-content;
+        height: fit-content;
+        border-width: 1px;
+        border-radius: 0.75rem;
+        border-bottom-right-radius: 0;
+    }
+
+    .alice-message {
+        padding: 0.5rem;
+        background-color: rgba(0, 0, 0, 0.025);
+        border-color: rgba(0, 0, 0, 0.15);
+        width: fit-content;
+        height: fit-content;
+        border-width: 1px;
+        border-radius: 0.75rem;
+        border-bottom-left-radius: 0;
+    }
+
+    .alice-message-container {
+        width: 100%;
+        display: flex;
+        justify-content: flex-start;
+        padding-right: 1.25rem;
+    }
+</style>
+
+<script is:inline src="/js/marked.min.js"></script>
+<script is:inline src="/js/purify.min.js"></script>
+
+<link rel="stylesheet" href="/css/highlightjs-default.min.css" />
+<script is:inline src="/js/highlight.min.js"></script>
+
+<script>
+    const messageInput: HTMLTextAreaElement = document.querySelector("#message-input")!;
+    const sendButton: HTMLDivElement = document.querySelector("#send-button")!;
+    const messageContainer: HTMLDivElement = document.querySelector("#message-container")!;
+    const statusTemplate: HTMLDivElement = document.querySelector(".status-template")!;
+
+    // let prevState: number[][] | null = null;
+    let prevState: any | null = null;
+
+    let originalSendButtonColor = sendButton.style.color;
+
+    let numMessageLines = 1;
+    let messageInputHeight = 24;
+    let messages: {from: string, message: string, queries: {query: string, results: {text: string, url: string, domain: string}[]}[]}[] = [];
+    let aliceResponding = false;
+    let aliceStreamingMessage = "";
+    let currentQueries: {query: string, results: {text: string, url: string, domain: string}[]}[] = [];
+
+    function updateMessageInputHeight() {
+        const lines = messageInput.value.split("\n");
+        numMessageLines = lines.length;
+        messageInput.style.height = `${messageInputHeight*numMessageLines}px`;
+    }
+
+    updateMessageInputHeight();
+
+    function scrollToBottom() {
+        window.scrollTo(0, document.body.scrollHeight);}
+
+    sendButton.addEventListener("click", sendMessage);
+
+    messageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage().then(() => {
+                updateMessageInputHeight();
+            })
+        }
+    });
+
+    messageInput.addEventListener("input", (_) => {
+        updateMessageInputHeight();
+    });
+
+    async function sendMessage() {
+        const message = messageInput.value;
+
+        if (message.length == 0) {
+            return;
+        }
+
+        addMessage("user", message);
+        await sendMessageToAlice(message);
+        messageInput.value = "";
+    }
+
+    async function save_prev_state(): Promise<string> {
+        let url = "/beta/api/alice/save_state";
+        var reqData: Record<string, string> = {
+            'state': prevState,
+        };
+
+        // post request using fetch api
+        let response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(reqData),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        return await response.text();
+    }
+
+    function beginAliceStream() {
+        aliceResponding = true;
+        aliceStreamingMessage = "";
+
+        // disable input
+        messageInput.disabled = true;
+        sendButton.style.color = "rgba(0, 0, 0, 0.25)";
+
+        scrollToBottom();
+
+        // show status
+        const status = statusTemplate.cloneNode(true) as HTMLDivElement;
+        status.classList.remove("status-template");
+        status.classList.remove("hidden");
+
+        status.id = "active-status"
+
+        messageContainer.appendChild(status);
+    }
+
+    function streamMessage(data: any) {
+        if (!aliceResponding) {
+            return;
+        }
+
+        if (data["@type"] == "speaking") {
+            if (aliceStreamingMessage == "") {
+                addMessage("alice", "", currentQueries);
+                currentQueries = [];
+            }
+            aliceStreamingMessage += data["text"];
+
+            const lastMessage = messages[messages.length - 1];
+            lastMessage.message = aliceStreamingMessage;
+            renderMessages();
+        } else if (data["@type"] == "beginSearch") {
+            const status = document.querySelector("#active-status")!;
+            status.querySelector("#info")!.innerHTML = `Looking up <span style="font-weight: bold;">${data["query"]}</span>`;
+        } else if (data["@type"] == "searchResult") {
+            currentQueries.push({
+                query: data["query"],
+                results: data["result"]
+            });
+        } else if (data["@type"] == "done") {
+            prevState = data["state"];
+            endAliceStream();
+        }
+    }
+
+    function endAliceStream() {
+        aliceResponding = false;
+        aliceStreamingMessage = "";
+
+        // enable input
+        messageInput.disabled = false;
+        sendButton.style.color = originalSendButtonColor;
+        messageInput.focus();
+    }
+
+    async function sendMessageToAlice(message: string) {
+        beginAliceStream();
+
+        var reqData: Record<string, string> = {
+            'message': message,
+        };
+
+        if (prevState) {
+            let savedState = await save_prev_state();
+            reqData['prevState'] = savedState;
+        }
+
+        var queryData = new URLSearchParams(reqData).toString();
+        var source = new EventSource("/beta/api/alice?" + queryData);
+
+        source.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            streamMessage(data);
+        };
+
+        // also called when the connection is closed from the server
+        source.onerror = function(_) {
+            endAliceStream();
+            source.close();
+        };
+    }
+
+    function addMessage(from: string, message: string, queries: {query: string, results: {text: string, url: string, domain: string}[]}[] = []) {
+        messages.push({
+            from: from,
+            message: message,
+            queries: queries
+        });
+
+        renderMessages();
+        scrollToBottom();
+    }
+
+    function renderMessages() {
+        messageContainer.innerHTML = "";
+
+        for (const message of messages) {
+            let renderedMessage = renderMarkdown(message.message);
+
+            if (message.from === "user") {
+                const msg = document.createElement("div");
+                msg.classList.add("user-message-container");
+
+                const msgElem = document.createElement("div");
+                msgElem.classList.add("user-message");
+                msgElem.innerHTML = renderedMessage;
+
+                msg.appendChild(msgElem);
+
+                messageContainer.appendChild(msg);
+            } else {
+                const msg = document.createElement("div");
+                msg.classList.add("alice-message-container");
+
+                const msgElem = document.createElement("div");
+                msgElem.classList.add("alice-message");
+                msgElem.innerHTML = renderedMessage;
+
+                msg.appendChild(msgElem);
+
+                messageContainer.appendChild(msg);
+            }
+        }
+
+        // @ts-ignore
+        hljs.highlightAll();
+        removeBackgroundFromCode();
+    }
+
+    function renderMarkdown(markdown: string) {
+        // @ts-ignore
+        const html = marked.parse(markdown);
+        // @ts-ignore
+        const sanitized = DOMPurify.sanitize(html);
+        return sanitized;
+    }
+
+    function removeBackgroundFromCode() {
+        const codeBlocks = document.querySelectorAll("code");
+        for (const codeBlock of codeBlocks) {
+            codeBlock.style.background = "none";
+        }
+    }
+</script>

@@ -35,7 +35,7 @@ enum Error {
 
 /// Note that we don't store any information that can be used to link
 /// the query and result back to the user performing the query. This is extremely important!
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StoredQuery {
     qid: Uuid,
     query: String,
@@ -43,6 +43,7 @@ pub struct StoredQuery {
     timestamp: Option<DateTime<Utc>>, // it is extremely important that we strip minutes, seconds and nanoseconds here for privacy
 }
 
+#[derive(Clone)]
 pub enum ImprovementEvent {
     StoreQuery(StoredQuery),
     Click { qid: Uuid, idx: usize },

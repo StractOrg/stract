@@ -81,6 +81,11 @@ tch = { workspace = true }
 torch-sys = { workspace = true }
 libc = { workspace = true }
 lz-str = { workspace = true }
+safetensors = { workspace = true }
+eventsource-stream = { workspace = true }
+rand = { workspace = true }
+half = { workspace = true }
+aes-gcm = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }
@@ -88,7 +93,6 @@ lalrpop = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 maplit = { workspace = true }
-rand = { workspace = true }
 
 [[bench]]
 name = "search-preindexed"

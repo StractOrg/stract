@@ -269,12 +269,13 @@ fn next_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> String {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ApiSearchQuery {
     pub query: String,
-    pub page: usize,
-    pub num_results: usize,
+    pub page: Option<usize>,
+    pub num_results: Option<usize>,
     pub selected_region: Option<Region>,
     pub optic: Option<String>,
     pub site_rankings: Option<SiteRankings>,
-    pub return_ranking_signals: bool,
+    pub return_ranking_signals: Option<bool>,
+    pub flatten_response: Option<bool>,
 }
 
 impl TryFrom<ApiSearchQuery> for SearchQuery {
@@ -287,19 +288,23 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             None
         };
 
+        let default = SearchQuery::default();
+
         Ok(SearchQuery {
             query: api.query,
-            page: api.page,
-            num_results: api.num_results,
+            page: api.page.unwrap_or(default.page),
+            num_results: api.num_results.unwrap_or(default.num_results),
             selected_region: api.selected_region,
             optic,
             site_rankings: api.site_rankings,
-            return_ranking_signals: api.return_ranking_signals,
+            return_ranking_signals: api
+                .return_ranking_signals
+                .unwrap_or(default.return_ranking_signals),
         })
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "@type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
@@ -320,20 +325,27 @@ impl From<SearchResult> for ApiSearchResult {
 #[debug_handler]
 pub async fn api(
     extract::State(state): extract::State<Arc<State>>,
-    extract::Json(mut query): extract::Json<ApiSearchQuery>,
+    extract::Json(query): extract::Json<ApiSearchQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    query.num_results = query.num_results.min(50 * NUM_RESULTS_PER_PAGE);
+    let flatten_result = query.flatten_response.unwrap_or(true);
     let query = SearchQuery::try_from(query);
 
     if let Err(err) = query {
         tracing::error!("{:?}", err);
         return Ok(err.to_string().into_response());
     }
+    let mut query = query.unwrap();
 
-    let query = query.unwrap();
+    query.num_results = query.num_results.min(100);
 
     match state.searcher.search(&query).await {
-        Ok(result) => Ok(Json(ApiSearchResult::from(result)).into_response()),
+        Ok(result) => {
+            if flatten_result {
+                Ok(Json(ApiSearchResult::from(result)).into_response())
+            } else {
+                Ok(Json(result).into_response())
+            }
+        }
         Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
             Ok(searcher::distributed::Error::EmptyQuery
                 .to_string()
