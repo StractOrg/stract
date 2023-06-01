@@ -5,6 +5,7 @@ import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
 import ChatBubble from "../components/ChatBubble.astro";
 import { askama } from "../askama";
+import OpticSelector from "../components/OpticSelector.astro";
 ---
 
 <Layout title="Stract">
@@ -16,13 +17,16 @@ import { askama } from "../askama";
         <div class="max-w-3xl w-full gap-y-5 flex flex-col h-full">
             <div id="message-container" class="flex px-5 flex-col gap-y-3 h-full">
             </div>
-            <div class="flex w-full border rounded-xl p-2 pl-3">
-                <textarea id="message-input" autofocus class="grow resize-none outline-none focus:ring-0" style="max-height: 200px;" placeholder="Type a message..."></textarea>
-                <div class="flex place-items-end">
-                    <div id="send-button" class="w-6 h-6 rotate-90 text-brand_contrast/50 hover:text-brand_contrast cursor-pointer">
-                        <Hero icon="paper-airplane" />
+            <div class="w-full gap-y-2">
+                <div class="flex w-full border rounded-xl p-2 pl-3">
+                    <textarea id="message-input" autofocus class="grow resize-none outline-none focus:ring-0" style="max-height: 200px;" placeholder="Type a message..."></textarea>
+                    <div class="flex place-items-end">
+                        <div id="send-button" class="w-6 h-6 rotate-90 text-brand_contrast/50 hover:text-brand_contrast cursor-pointer">
+                            <Hero icon="paper-airplane" />
+                        </div>
                     </div>
                 </div>
+                <div class="w-full pt-2 text-gray-600 flex justify-end text-sm"><OpticSelector default_optics="default_optics" search_on_change={false} /></div>
             </div>
         </div>
     </div>
@@ -85,6 +89,7 @@ import { askama } from "../askama";
     const sendButton: HTMLDivElement = document.querySelector("#send-button")!;
     const messageContainer: HTMLDivElement = document.querySelector("#message-container")!;
     const statusTemplate: HTMLDivElement = document.querySelector(".status-template")!;
+    const opticSelector: HTMLSelectElement = document.querySelector("#optics-selector")!;
 
     // let prevState: number[][] | null = null;
     let prevState: any | null = null;
@@ -216,9 +221,15 @@ import { askama } from "../askama";
     async function sendMessageToAlice(message: string) {
         beginAliceStream();
 
+        let chosenOptic = opticSelector.value;
+
         var reqData: Record<string, string> = {
             'message': message,
         };
+
+        if (chosenOptic != "") {
+            reqData['optic'] = chosenOptic;
+        }
 
         if (prevState) {
             let savedState = await save_prev_state();

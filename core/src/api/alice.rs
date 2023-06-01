@@ -107,8 +107,9 @@ impl EncodedSavedState {
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Params {
-    pub message: String,
-    pub prev_state: Option<EncodedSavedState>,
+    message: String,
+    optic: Option<String>,
+    prev_state: Option<EncodedSavedState>,
 }
 
 pub async fn route(
@@ -166,6 +167,7 @@ pub async fn route(
     let params = entrypoint::alice::Params {
         message: params.message,
         prev_state: saved_state.map(|s| s.uuid),
+        optic: params.optic,
     };
 
     let mut events = client

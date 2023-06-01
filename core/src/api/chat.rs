@@ -16,7 +16,10 @@
 
 use std::collections::HashMap;
 
-use super::HtmlTemplate;
+use super::{
+    optics::{OpticLink, DEFAULT_OPTICS},
+    HtmlTemplate,
+};
 use askama::Template;
 use axum::{extract, response::IntoResponse};
 
@@ -26,6 +29,7 @@ pub async fn route(
 ) -> impl IntoResponse {
     let template = ChatTemplate {
         query_url_part: serde_urlencoded::to_string(params).unwrap(),
+        default_optics: DEFAULT_OPTICS.to_vec(),
     };
     HtmlTemplate(template)
 }
@@ -34,4 +38,5 @@ pub async fn route(
 #[template(path = "chat/index.html")]
 struct ChatTemplate {
     query_url_part: String,
+    default_optics: Vec<OpticLink>,
 }

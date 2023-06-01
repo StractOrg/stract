@@ -32,7 +32,7 @@ use tokio_stream::StreamExt as _;
 use tracing::info;
 
 use crate::{
-    alice::{Alice, EncryptedState},
+    alice::{Alice, EncodedEncryptedState, EncryptedState},
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -51,7 +51,7 @@ fn router(alice: Alice, cluster: Cluster) -> Router {
     let state = Arc::new(State {
         alice,
         cluster,
-        conv_states: Arc::new(Mutex::new(TTLCache::with_ttl(Duration::from_secs(60)))),
+        conv_states: Arc::new(Mutex::new(TTLCache::with_ttl(Duration::from_secs(10)))),
     });
 
     Router::new()
@@ -62,20 +62,15 @@ fn router(alice: Alice, cluster: Cluster) -> Router {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct SaveStateParams {
-    pub state: String,
+    pub state: EncodedEncryptedState,
 }
 
 pub async fn save_state(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(params): extract::Json<SaveStateParams>,
 ) -> Result<impl IntoResponse, http::StatusCode> {
-    let encrypted_state = base64::decode(params.state).map_err(|e| {
+    let encrypted_state = params.state.decode().map_err(|e| {
         info!("error decoding state: {}", e);
-        http::StatusCode::BAD_REQUEST
-    })?;
-
-    let encrypted_state: EncryptedState = bincode::deserialize(&encrypted_state).map_err(|e| {
-        info!("error deserializing state: {}", e);
         http::StatusCode::BAD_REQUEST
     })?;
 
@@ -90,6 +85,7 @@ pub async fn save_state(
 #[serde(rename_all = "camelCase")]
 pub struct Params {
     pub message: String,
+    pub optic: Option<String>,
     pub prev_state: Option<uuid::Uuid>,
 }
 
@@ -131,22 +127,23 @@ pub async fn route(
             http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let mut executor = state
+    let executor = state
         .alice
         .new_executor(
             &params.message,
             prev_state,
             format!("http://{}/beta/api/search", search_addr),
+            params.optic,
         )
         .map_err(|e| {
             info!("error creating executor: {}", e);
             http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    tokio::task::spawn(async move {
-        while let Some(msg) = executor.next().await {
+    tokio::task::spawn_blocking(move || {
+        for msg in executor {
             let msg = serde_json::to_string(&msg)
                 .map_err(|e| {
                     info!("error serializing message: {}", e);
@@ -154,7 +151,7 @@ pub async fn route(
                 })
                 .unwrap();
 
-            tx.send(msg).await.ok();
+            tx.send(msg).ok();
         }
     });
 

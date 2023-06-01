@@ -36,15 +36,16 @@ async fn main() {
         std::io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
 
-        let mut gen = model
+        let gen = model
             .new_executor(
                 input,
                 last_state.clone(),
                 "http://localhost:3000/beta/api/search".to_string(),
+                None,
             )
             .unwrap();
 
-        while let Some(n) = gen.next().await {
+        for n in gen {
             match n {
                 ExecutionState::BeginSearch { query: _ } => {}
                 ExecutionState::SearchResult {

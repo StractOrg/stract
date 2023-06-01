@@ -642,6 +642,7 @@ impl Alice {
         user_question: &str,
         last_state: Option<EncryptedState>,
         search_url: String,
+        optic_url: Option<String>,
     ) -> Result<ActionExecutor> {
         let mut state = None;
 
@@ -675,8 +676,10 @@ impl Alice {
 
         let raw_action_gen = RawActionGenerator::new(token_generator, self.tokenizer.clone());
         let action_gen = ActionGenerator::new(raw_action_gen);
+
         let searcher = Searcher {
             url: search_url,
+            optic_url,
             summarizer: Arc::clone(&self.summarizer),
         };
 
@@ -765,6 +768,7 @@ impl AliceTokenGenerator {
                 .softmax(-1, Kind::Float)
                 .squeeze()
                 .to(tch::Device::Cpu);
+
             let next_token = llm_utils::sample_typical(probs, TEMP, TAU);
             self.states.push(ModelState {
                 state: ClonableTensor(new_state),
@@ -797,6 +801,10 @@ impl AliceTokenGenerator {
             self.num_generated_tokens = 0;
             self.max_new_tokens = max_new_tokens;
         }
+    }
+
+    pub fn reset_tokens_counter(&mut self) {
+        self.num_generated_tokens = 0;
     }
 
     pub fn set_banned_tokens(&mut self, tokens: &[i64]) {
@@ -1102,24 +1110,28 @@ impl Iterator for RawActionGenerator {
             match &mut self.state {
                 State::Thought { search, speaking } => {
                     let token = self.token_generator.next()?;
-                    self.token_generator.set_max_new_tokens(None);
+                    self.token_generator.set_max_new_tokens(Some(1024));
 
                     if self.queries_performed >= self.max_num_queries {
+                        self.token_generator.reset_tokens_counter();
                         self.force_speaking();
                     } else if search.validate(token) {
+                        self.token_generator.reset_tokens_counter();
                         self.state = State::new_query_build(&self.tokenizer);
                     } else if speaking.validate(token) {
+                        self.token_generator.reset_tokens_counter();
                         self.state = State::new_speaking(vec![]);
                     }
                 }
                 State::QueryBuild { tokens, end } => {
                     let token = self.token_generator.next()?;
-                    self.token_generator.set_max_new_tokens(None);
+                    self.token_generator.set_max_new_tokens(Some(1024));
                     tokens.push(token);
 
                     if end.validate(token) {
                         let query = tokens.clone();
                         *tokens = Vec::new();
+                        self.token_generator.reset_tokens_counter();
                         self.state = State::new_thought(&self.tokenizer);
                         self.queries_performed += 1;
                         return Some(RawAction::Search { query });
@@ -1137,6 +1149,7 @@ impl Iterator for RawActionGenerator {
 
                     if end.validate(token) {
                         banned_tokens.reset_ttl();
+                        self.token_generator.reset_tokens_counter();
                         self.state = State::new_thought(&self.tokenizer);
                         return None;
                     } else {
@@ -1190,16 +1203,22 @@ impl From<SimplifiedWebsite> for ModelWebsite {
 
 struct Searcher {
     url: String,
+    optic_url: Option<String>,
     summarizer: Arc<ExtractiveSummarizer>,
 }
 
 impl Searcher {
-    async fn raw_search(&self, query: &str) -> Result<WebsitesResult> {
-        let client = reqwest::Client::new();
+    fn raw_search(&self, query: &str) -> Result<WebsitesResult> {
+        let optic = self
+            .optic_url
+            .as_ref()
+            .and_then(|url| reqwest::blocking::get(url).ok().and_then(|r| r.text().ok()));
+
+        let client = reqwest::blocking::Client::new();
         let query = ApiSearchQuery {
             query: query.trim().to_string(),
             num_results: Some(3),
-            optic: None, // TODO: let user specify optic
+            optic,
             page: None,
             selected_region: None,
             site_rankings: None,
@@ -1208,13 +1227,7 @@ impl Searcher {
         };
         tracing::debug!("searching at {:?}: {:#?}", self.url, query);
 
-        let res: SearchResult = client
-            .post(&self.url)
-            .json(&query)
-            .send()
-            .await?
-            .json()
-            .await?;
+        let res: SearchResult = client.post(&self.url).json(&query).send()?.json()?;
 
         match res {
             SearchResult::Websites(res) => Ok(res),
@@ -1222,8 +1235,8 @@ impl Searcher {
         }
     }
 
-    async fn search(&self, query: &str) -> Result<Vec<SimplifiedWebsite>> {
-        let res = self.raw_search(query).await?;
+    fn search(&self, query: &str) -> Result<Vec<SimplifiedWebsite>> {
+        let res = self.raw_search(query)?;
 
         let mut websites = Vec::new();
 
@@ -1422,8 +1435,12 @@ impl ActionExecutor {
             .unwrap();
         self.generator.raw.token_generator.load_tokens(&tokens);
     }
+}
 
-    pub async fn next(&mut self) -> Option<ExecutionState> {
+impl Iterator for ActionExecutor {
+    type Item = ExecutionState;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.has_finished {
             return None;
         }
@@ -1433,7 +1450,7 @@ impl ActionExecutor {
                 self.generator.raw.token_generator.go_to_last_search();
                 self.generator.raw.force_speaking();
             } else {
-                let res = self.searcher.search(&query).await.unwrap_or_default();
+                let res = self.searcher.search(&query).unwrap_or_default();
 
                 tracing::debug!("loading search results");
                 self.load_search_result(&res);
