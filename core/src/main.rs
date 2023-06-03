@@ -87,6 +87,8 @@ enum Commands {
     Configure {
         #[clap(long, takes_value = false)]
         skip_download: bool,
+
+        alice: bool,
     },
 }
 
@@ -278,7 +280,16 @@ fn main() -> Result<()> {
             autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
         #[cfg(feature = "dev")]
-        Commands::Configure { skip_download } => configure::run(skip_download)?,
+        Commands::Configure {
+            skip_download,
+            alice,
+        } => {
+            if alice && !skip_download {
+                configure::alice()?;
+            } else {
+                configure::run(skip_download)?;
+            }
+        }
         Commands::CrawlStability {
             output_path,
             host_rank_paths,
