@@ -29,8 +29,11 @@ use super::{
     ModelState, ModelWebsite, Result, Searcher, SimplifiedWebsite, Tokenizer, TransitionValidator,
 };
 
-const TAU: f64 = 0.8;
+// const TAU: f64 = 0.3;
 const TEMP: f64 = 0.4;
+const TOP_P: f64 = 0.5;
+
+const MAX_NUM_QUERIES: usize = 3;
 
 pub enum TokenGeneratorState {
     InProgress,
@@ -112,7 +115,7 @@ impl AliceTokenGenerator {
                 .squeeze()
                 .to(tch::Device::Cpu);
 
-            let next_token = llm_utils::sample_typical(probs, TEMP, TAU);
+            let next_token = llm_utils::sample_nucleus(probs, TEMP, TOP_P);
             self.states.push(ModelState {
                 state: ClonableTensor(new_state),
                 next_token,
@@ -155,6 +158,13 @@ impl AliceTokenGenerator {
     pub fn set_banned_tokens(&mut self, tokens: &[i64]) {
         if self.banned_tokens != tokens {
             self.banned_tokens = tokens.to_vec();
+        }
+    }
+
+    fn previous_state(&mut self) {
+        if let Some(f) = self.states.pop() {
+            self.states.push(f.clone());
+            self.states.push(f);
         }
     }
 }
@@ -209,7 +219,7 @@ impl Iterator for AliceTokenGenerator {
                             .copy_(&Tensor::from_slice(&[0.0]).squeeze());
                     }
 
-                    let next_token = llm_utils::sample_typical(probs, TEMP, TAU);
+                    let next_token = llm_utils::sample_nucleus(probs, TEMP, TOP_P);
                     token = next_token;
                     state = ClonableTensor(new_state);
                 }
@@ -228,7 +238,7 @@ impl Iterator for AliceTokenGenerator {
                         .copy_(&Tensor::from_slice(&[0.0]).squeeze());
                 }
 
-                let next_token = llm_utils::sample_typical(probs, TEMP, TAU);
+                let next_token = llm_utils::sample_nucleus(probs, TEMP, TOP_P);
                 self.states.push(ModelState {
                     state: ClonableTensor(state),
                     next_token,
@@ -305,9 +315,46 @@ enum State {
     },
     Speaking {
         banned_tokens: TTLBannedTokens,
-        end: AnyTransitionValidator,
+        single_end: AnyTransitionValidator,
+        double_newline: TransitionValidator,
         max_new_tokens: Option<usize>,
     },
+}
+
+impl State {
+    fn new_thought(tokenizer: &Tokenizer) -> Self {
+        let search = TransitionValidator::new(tokenizer.encode("Search:".to_string()).unwrap());
+        let speaking = TransitionValidator::new(tokenizer.encode("Alice:".to_string()).unwrap());
+
+        Self::Thought { search, speaking }
+    }
+
+    fn new_query_build(tokenizer: &Tokenizer) -> Self {
+        let new_line = TransitionValidator::new(tokenizer.encode("\n".to_string()).unwrap());
+        let end_of_text =
+            TransitionValidator::new(tokenizer.encode("<|endoftext|>".to_string()).unwrap());
+        let end = AnyTransitionValidator::new(vec![new_line, end_of_text]);
+
+        Self::QueryBuild {
+            tokens: Vec::new(),
+            end,
+        }
+    }
+
+    fn new_speaking(initially_banned_tokens: Vec<i64>) -> Self {
+        let end = TransitionValidator::new(vec![0]);
+        let double_newline_single_tok = TransitionValidator::new(vec![535]);
+        let single_end = AnyTransitionValidator::new(vec![end, double_newline_single_tok]);
+
+        let double_newline = TransitionValidator::new(vec![187, 187]);
+
+        Self::Speaking {
+            single_end,
+            double_newline,
+            max_new_tokens: Some(1024),
+            banned_tokens: TTLBannedTokens::new(initially_banned_tokens, 2), // the tokens should only be banned at the start of generation
+        }
+    }
 }
 
 struct TTLBannedTokens {
@@ -344,41 +391,6 @@ impl TTLBannedTokens {
     }
 }
 
-impl State {
-    fn new_thought(tokenizer: &Tokenizer) -> Self {
-        let search = TransitionValidator::new(tokenizer.encode("Search:".to_string()).unwrap());
-        let speaking = TransitionValidator::new(tokenizer.encode("Alice:".to_string()).unwrap());
-
-        Self::Thought { search, speaking }
-    }
-
-    fn new_query_build(tokenizer: &Tokenizer) -> Self {
-        let new_line = TransitionValidator::new(tokenizer.encode("\n".to_string()).unwrap());
-        let end_of_text =
-            TransitionValidator::new(tokenizer.encode("<|endoftext|>".to_string()).unwrap());
-        let end = AnyTransitionValidator::new(vec![new_line, end_of_text]);
-
-        Self::QueryBuild {
-            tokens: Vec::new(),
-            end,
-        }
-    }
-
-    fn new_speaking(initially_banned_tokens: Vec<i64>) -> Self {
-        let end = TransitionValidator::new(vec![0]);
-        let double_newline = TransitionValidator::new(vec![187, 187]);
-        let double_newline_single_tok = TransitionValidator::new(vec![535]);
-
-        let end = AnyTransitionValidator::new(vec![end, double_newline, double_newline_single_tok]);
-
-        Self::Speaking {
-            end,
-            max_new_tokens: Some(1024),
-            banned_tokens: TTLBannedTokens::new(initially_banned_tokens, 2), // the tokens should only be banned at the start of generation
-        }
-    }
-}
-
 pub struct RawActionGenerator {
     state: State,
     tokenizer: Arc<Tokenizer>,
@@ -399,7 +411,7 @@ impl RawActionGenerator {
             tokenizer,
             token_generator,
             queries_performed: 0,
-            max_num_queries: 3,
+            max_num_queries: MAX_NUM_QUERIES,
         }
     }
 
@@ -457,7 +469,8 @@ impl Iterator for RawActionGenerator {
                     }
                 }
                 State::Speaking {
-                    end,
+                    single_end,
+                    double_newline,
                     max_new_tokens,
                     banned_tokens,
                 } => {
@@ -466,9 +479,16 @@ impl Iterator for RawActionGenerator {
 
                     let token = self.token_generator.next()?;
 
-                    if end.validate(token) {
+                    if double_newline.validate(token) {
                         banned_tokens.reset_ttl();
                         self.token_generator.reset_tokens_counter();
+                        self.state = State::new_thought(&self.tokenizer);
+                        return None;
+                    } else if single_end.validate(token) {
+                        banned_tokens.reset_ttl();
+                        self.token_generator.reset_tokens_counter();
+                        self.token_generator.previous_state();
+                        self.token_generator.load_tokens(&[187, 187]);
                         self.state = State::new_thought(&self.tokenizer);
                         return None;
                     } else {
@@ -634,7 +654,7 @@ impl ActionExecutor {
             .generator
             .raw
             .tokenizer
-            .encode(format!("Result: {json}<|endoftext|>\n\n"))
+            .encode(format!("Result: {json}\n\n"))
             .unwrap();
         self.generator
             .raw

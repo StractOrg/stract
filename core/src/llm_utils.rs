@@ -39,6 +39,30 @@ pub fn sample_typical(probs: Tensor, temp: f64, tau: f64) -> i64 {
     probs.multinomial(1, true).int64_value(&[0])
 }
 
+pub fn sample_nucleus(probs: Tensor, temp: f64, top_p: f64) -> i64 {
+    debug_assert!(probs.dim() == 1, "batch support not implemented");
+    let mut probs = probs;
+
+    let sorted_ids = probs.argsort(-1, true);
+    let sorted_probs = probs.index_select(-1, &sorted_ids);
+    let cumulative_probs = sorted_probs.cumsum(-1, Kind::Float);
+
+    let ids_to_remove = cumulative_probs.ge(top_p).to_kind(Kind::Int64);
+
+    // let cutoff = sorted_probs
+    //     .index_select(-1, &cumulative_probs.gt(top_p).argmax(-1, true))
+    //     .double_value(&[]);
+
+    probs = probs.index_fill_(-1, &ids_to_remove, 0.0);
+
+    if temp != 1.0 {
+        let t = Tensor::from_slice(&[1.0 / temp]);
+        probs = probs.pow(&t);
+    }
+
+    probs.multinomial(1, true).int64_value(&[0])
+}
+
 pub struct ClonableTensor(pub Tensor);
 
 impl Clone for ClonableTensor {
