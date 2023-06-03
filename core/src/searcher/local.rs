@@ -29,7 +29,9 @@ use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
-use crate::ranking::{online_centrality_scorer, Ranker, SignalAggregator, ALL_SIGNALS};
+use crate::ranking::{
+    online_centrality_scorer, query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS,
+};
 use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
@@ -116,6 +118,8 @@ impl LocalSearcher {
         de_rank_similar: bool,
         aggregator: SignalAggregator,
     ) -> Result<Ranker> {
+        let query_centrality_coeff = aggregator.coefficient(&Signal::QueryCentrality);
+
         let mut ranker = Ranker::new(
             aggregator,
             self.index.inverted_index.fastfield_reader(&ctx.tv_searcher),
@@ -134,19 +138,28 @@ impl LocalSearcher {
 
         ranker.de_rank_similar(de_rank_similar);
 
-        if let Some(centrality_store) = self.centrality_store.as_ref() {
-            ranker = ranker
-                .with_max_docs(10_000, self.index.num_segments())
-                .with_num_results(100);
+        if query_centrality_coeff > 0.0 {
+            if let Some(centrality_store) = self.centrality_store.as_ref() {
+                ranker = ranker
+                    .with_max_docs(10_000, self.index.num_segments())
+                    .with_num_results(100);
 
-            let top_host_nodes = self
-                .index
-                .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
-            if !top_host_nodes.is_empty() {
-                let harmonic = centrality_store
-                    .online_harmonic
-                    .scorer(&top_host_nodes, &[]);
-                ranker.set_query_centrality(harmonic);
+                let top_host_nodes =
+                    self.index
+                        .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
+                if !top_host_nodes.is_empty() {
+                    let harmonic = centrality_store
+                        .online_harmonic
+                        .scorer(&top_host_nodes, &[]);
+
+                    let inbound = centrality_store
+                        .inbound_similarity
+                        .scorer(&top_host_nodes, &[]);
+
+                    let query_centrality = query_centrality::Scorer::new(harmonic, inbound);
+
+                    ranker.set_query_centrality(query_centrality);
+                }
             }
         }
 

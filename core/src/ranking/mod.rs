@@ -22,6 +22,7 @@ pub mod initial;
 pub mod models;
 pub mod optics;
 pub mod pipeline;
+pub mod query_centrality;
 pub mod signal;
 
 use std::collections::BTreeMap;
@@ -38,7 +39,7 @@ use crate::{
     searcher::NUM_RESULTS_PER_PAGE,
     webgraph::{
         centrality::{
-            online_harmonic::{self, OnlineHarmonicCentrality, Scorer},
+            online_harmonic::{OnlineHarmonicCentrality, Scorer},
             topic,
         },
         Node, NodeID,
@@ -134,8 +135,8 @@ impl Ranker {
         self.aggregator.set_topic_scorer(topic_scorer);
     }
 
-    pub fn set_query_centrality(&mut self, harmonic: online_harmonic::Scorer) {
-        self.aggregator.set_query_centrality(harmonic);
+    pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
+        self.aggregator.set_query_centrality(query_centrality);
     }
 }
 

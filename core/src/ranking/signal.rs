@@ -47,8 +47,8 @@ use crate::{
 };
 
 use super::bm25::Bm25Weight;
-use super::inbound_similarity;
 use super::models::linear::LinearRegression;
+use super::{inbound_similarity, query_centrality};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -690,7 +690,7 @@ pub struct SignalAggregator {
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
     topic_scorer: Option<topic::Scorer>,
-    query_centrality: Option<Arc<online_harmonic::Scorer>>,
+    query_centrality: Option<Arc<query_centrality::Scorer>>,
     region_count: Option<Arc<RegionCount>>,
     selected_region: Option<Region>,
     current_timestamp: Option<usize>,
@@ -945,7 +945,7 @@ impl SignalAggregator {
         self.topic_scorer = Some(topic_scorer);
     }
 
-    pub fn set_query_centrality(&mut self, query_centrality: online_harmonic::Scorer) {
+    pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
         self.query_centrality = Some(Arc::new(query_centrality));
     }
 
@@ -1044,7 +1044,7 @@ impl SignalAggregator {
             .sum()
     }
 
-    fn coefficient(&self, signal: &Signal) -> f64 {
+    pub fn coefficient(&self, signal: &Signal) -> f64 {
         self.query_signal_coefficients
             .as_ref()
             .and_then(|coefficients| coefficients.get(signal))
