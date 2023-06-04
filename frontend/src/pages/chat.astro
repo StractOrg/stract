@@ -58,6 +58,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         border-color: rgba(11, 123, 255, 0.3);
         width: fit-content;
         height: fit-content;
+        max-width: 100%;
         border-width: 1px;
         border-radius: 0.75rem;
         border-bottom-right-radius: 0;
@@ -69,6 +70,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         border-color: rgba(0, 0, 0, 0.15);
         width: fit-content;
         height: fit-content;
+        max-width: 100%;
         border-width: 1px;
         border-radius: 0.75rem;
         border-bottom-left-radius: 0;
@@ -95,17 +97,20 @@ import OpticSelector from "../components/OpticSelector.astro";
     const statusTemplate: HTMLDivElement = document.querySelector(".status-template")!;
     const opticSelector: HTMLSelectElement = document.querySelector("#optics-selector")!;
 
+    const allowStats = window.localStorage.getItem("allowStats") === "true";
+
     // let prevState: number[][] | null = null;
     let prevState: any | null = null;
+    let chatId: string | null = null;
 
     let originalSendButtonColor = sendButton.style.color;
 
     let numMessageLines = 1;
     let messageInputHeight = 24;
-    let messages: {from: string, message: string, queries: {query: string, results: {text: string, url: string, domain: string}[]}[]}[] = [];
+    let messages: {from: string, message: string, queries: {query: string, results: {text: string, url: string, title: string}[]}[]}[] = [];
     let aliceResponding = false;
     let aliceStreamingMessage = "";
-    let currentQueries: {query: string, results: {text: string, url: string, domain: string}[]}[] = [];
+    let currentQueries: {query: string, results: {text: string, url: string, title: string}[]}[] = [];
 
     function updateMessageInputHeight() {
         const lines = messageInput.value.split("\n");
@@ -220,6 +225,8 @@ import OpticSelector from "../components/OpticSelector.astro";
         messageInput.disabled = false;
         sendButton.style.color = originalSendButtonColor;
         messageInput.focus();
+
+        improvements();
     }
 
     async function sendMessageToAlice(message: string) {
@@ -256,7 +263,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         };
     }
 
-    function addMessage(from: string, message: string, queries: {query: string, results: {text: string, url: string, domain: string}[]}[] = []) {
+    function addMessage(from: string, message: string, queries: {query: string, results: {text: string, url: string, title: string}[]}[] = []) {
         messages.push({
             from: from,
             message: message,
@@ -317,4 +324,48 @@ import OpticSelector from "../components/OpticSelector.astro";
             codeBlock.style.background = "none";
         }
     }
+
+    // improvements
+    async function newChatId(): Promise<string> {
+        let url = "/improvement/alice/new_chat_id";
+
+        // post request using fetch api
+        let response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        return await response.text();
+    }
+
+    async function storeChat() {
+        if (chatId == null) {
+            chatId = await newChatId();
+        }
+
+        let chat = {
+            messages: messages,
+            id: chatId
+        };
+
+        let url = "/improvement/alice/store_chat";
+
+        await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(chat),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+
+    function improvements() {
+        if (allowStats) {
+            storeChat();
+        }
+    }
+
+
 </script>

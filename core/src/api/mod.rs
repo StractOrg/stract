@@ -25,9 +25,9 @@ use crate::{
         cluster::Cluster,
         member::{Member, Service},
     },
+    improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
-    query_store::{self, ImprovementEvent},
     ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
     searcher::frontend::FrontendSearcher,
     summarizer::Summarizer,
@@ -51,7 +51,7 @@ mod alice;
 mod autosuggest;
 mod chat;
 mod explore;
-mod improvement;
+pub mod improvement;
 mod index;
 mod metrics;
 mod opensearch;
@@ -121,10 +121,7 @@ pub async fn router(
 
     let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
         let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
-        tokio::spawn(query_store::store_queries_loop(
-            query_store_queue.clone(),
-            db_host,
-        ));
+        tokio::spawn(store_improvements_loop(query_store_queue.clone(), db_host));
         query_store_queue
     });
 
@@ -179,6 +176,14 @@ pub async fn router(
         .route("/opensearch.xml", get(opensearch::route))
         .route("/improvement/click", post(improvement::click))
         .route("/improvement/store", post(improvement::store))
+        .route(
+            "/improvement/alice/new_chat_id",
+            post(improvement::new_chat_id),
+        )
+        .route(
+            "/improvement/alice/store_chat",
+            post(improvement::store_chat),
+        )
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
         .merge(

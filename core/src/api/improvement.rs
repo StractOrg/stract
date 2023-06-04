@@ -21,7 +21,7 @@ use axum::{extract, response::IntoResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::query_store::{ImprovementEvent, StoredQuery};
+use crate::improvement::{AliceConversation, ImprovementEvent, StoredQuery};
 
 use super::{HtmlTemplate, State};
 
@@ -73,6 +73,21 @@ pub async fn store(
             qid.to_string()
         }
         None => String::new(),
+    }
+}
+
+#[allow(clippy::unused_async)]
+pub async fn new_chat_id() -> impl IntoResponse {
+    Uuid::new_v4().to_string()
+}
+
+#[allow(clippy::unused_async)]
+pub async fn store_chat(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Json(params): extract::Json<AliceConversation>,
+) {
+    if let Some(q) = state.improvement_queue.as_ref() {
+        q.lock().await.push(ImprovementEvent::Chat { chat: params })
     }
 }
 

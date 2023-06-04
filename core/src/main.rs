@@ -88,6 +88,7 @@ enum Commands {
         #[clap(long, takes_value = false)]
         skip_download: bool,
 
+        #[clap(long, takes_value = false)]
         alice: bool,
     },
 }
