@@ -215,17 +215,28 @@ pub struct AliceAcceleratorConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AliceConfig {
+pub struct AliceLocalConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub host: SocketAddr,
+    pub summarizer_path: String,
 
     pub alice_path: String,
-    pub summarizer_path: String,
     pub accelerator: Option<AliceAcceleratorConfig>,
     /// base64 encoded
     pub encryption_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AliceOpenaiConfig {
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
+    pub host: SocketAddr,
+    pub summarizer_path: String,
+
+    pub api_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

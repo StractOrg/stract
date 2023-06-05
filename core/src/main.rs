@@ -24,7 +24,7 @@ use stract::entrypoint::configure;
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, frontend, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use stract::{AliceConfig, FrontendConfig, SearchServerConfig, WebgraphServerConfig};
+use stract::{AliceLocalConfig, FrontendConfig, SearchServerConfig, WebgraphServerConfig};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -317,12 +317,12 @@ fn main() -> Result<()> {
         ),
         Commands::Alice { options } => match options {
             AliceOptions::Serve { config_path } => {
-                let config: AliceConfig = load_toml_config(config_path);
+                let config: AliceLocalConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::alice::run(config))?
+                    .block_on(entrypoint::alice::local::run(config))?
             }
             AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
         },

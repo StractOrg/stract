@@ -1,6 +1,9 @@
 use std::io::Write;
 
-use stract::alice::{generate::ExecutionState, AcceleratorConfig, Alice};
+use stract::alice::{
+    local::{AcceleratorConfig, Alice},
+    ExecutionState,
+};
 
 #[tokio::main]
 async fn main() {

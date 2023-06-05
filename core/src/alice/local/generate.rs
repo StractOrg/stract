@@ -20,14 +20,16 @@ use aes_gcm::{Aes256Gcm, Key};
 use tch::{IndexOp, Kind, Tensor};
 
 use crate::{
+    alice::ExecutionState,
     leaky_queue::LeakyQueue,
     llm_utils::{self, ClonableTensor},
 };
 
 use super::{
     raw_model::RawModel, AnyTransitionValidator, EncodedEncryptedState, EncryptedState, Error,
-    ModelState, ModelWebsite, Result, Searcher, SimplifiedWebsite, Tokenizer, TransitionValidator,
+    ModelState, Result, Searcher, Tokenizer, TransitionValidator,
 };
+use crate::alice::{ModelWebsite, SimplifiedWebsite};
 
 // const TAU: f64 = 0.3;
 const TEMP: f64 = 0.4;
@@ -584,24 +586,6 @@ impl Iterator for ActionGenerator {
             }
         }
     }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "@type", rename_all = "camelCase")]
-pub enum ExecutionState {
-    BeginSearch {
-        query: String,
-    },
-    SearchResult {
-        query: String,
-        result: Vec<SimplifiedWebsite>,
-    },
-    Speaking {
-        text: String,
-    },
-    Done {
-        state: EncodedEncryptedState,
-    },
 }
 
 pub struct ActionExecutor {
