@@ -16,10 +16,17 @@
 
 use std::{fmt::Display, time::Duration};
 
+use publicsuffix::Psl;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use super::URL_REGEX;
+
+pub static LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
+    include_str!("../../public_suffix_list.dat")
+        .parse()
+        .expect("Failed to parse public suffix list")
+});
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Hash)]
 pub struct Url(String);
@@ -78,33 +85,39 @@ impl Url {
     }
 
     pub fn domain(&self) -> &str {
-        let site = self.site();
-        let num_punctuations: usize = site.chars().map(|c| (c == '.') as usize).sum();
-        if num_punctuations > 1 {
-            let domain_index = site.rfind('.').unwrap();
-            let mut start_index = site[..domain_index].rfind('.').unwrap() + 1;
+        let site = self.site().as_bytes();
+        match LIST.domain(site) {
+            Some(domain) => match std::str::from_utf8(domain.as_bytes()) {
+                Ok(res) => res,
+                Err(_) => "",
+            },
+            None => "",
+        }
+    }
 
-            if &site[start_index..] == "co.uk" {
-                if let Some(new_start_index) = site[..start_index - 1].rfind('.') {
-                    start_index = new_start_index + 1;
-                } else {
-                    start_index = 0;
-                }
-            }
-
-            &site[start_index..]
-        } else {
-            site
+    fn tld(&self) -> &str {
+        let site = self.site().as_bytes();
+        match LIST.suffix(site) {
+            Some(tld) => match std::str::from_utf8(tld.as_bytes()) {
+                Ok(res) => res,
+                Err(_) => "",
+            },
+            None => "",
         }
     }
 
     pub fn domain_name(&self) -> &str {
         let domain = self.domain();
+        let tld = self.tld();
 
-        if let Some(tld_start) = domain.find('.') {
-            &domain[..tld_start]
+        if domain.is_empty() || tld.is_empty() {
+            ""
         } else {
-            domain
+            if tld.len() + 1 > domain.len() {
+                return "";
+            }
+
+            &domain[..domain.len() - tld.len() - 1]
         }
     }
 
