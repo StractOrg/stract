@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use aes_gcm::{aead::OsRng, Aes256Gcm, KeyInit};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
@@ -31,7 +32,7 @@ use tokio_stream::StreamExt as _;
 use tracing::info;
 
 use crate::{
-    alice::local::{Alice, EncodedEncryptedState, EncryptedState},
+    alice::{Alice, EncodedEncryptedState, EncryptedState},
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -196,4 +197,9 @@ pub async fn run(config: AliceLocalConfig) -> Result<(), crate::alice::Error> {
         .unwrap();
 
     Ok(())
+}
+
+pub fn generate_key() {
+    let key = Aes256Gcm::generate_key(OsRng);
+    println!("{}", base64::encode(key.as_slice()));
 }

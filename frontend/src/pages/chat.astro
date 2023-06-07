@@ -52,7 +52,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         padding-left: 1.25rem;
     }
 
-    .user-message {
+    .user-message-text {
         padding: 0.5rem;
         background-color: rgba(11, 123, 255, 0.05);
         border-color: rgba(11, 123, 255, 0.3);
@@ -64,7 +64,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         border-bottom-right-radius: 0;
     }
 
-    .alice-message {
+    .alice-message-text {
         padding: 0.5rem;
         background-color: rgba(0, 0, 0, 0.025);
         border-color: rgba(0, 0, 0, 0.15);
@@ -81,6 +81,38 @@ import OpticSelector from "../components/OpticSelector.astro";
         display: flex;
         justify-content: flex-start;
         padding-right: 1.25rem;
+    }
+
+    .inline-source {
+        display: inline-flex;
+        border-radius: 50%;
+        background-color: white;
+        text-align: center;
+        justify-content: center;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        padding-left: 0.22rem;
+        padding-right: 0.22rem;
+        font-size: 0.6rem;
+        height: 0.9rem;
+        line-height: 0.85rem;
+    }
+
+    .message-sources {
+        display: flex;
+        flex-wrap: wrap;
+        column-gap: 1.5rem;
+        row-gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .message-source {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    #message-container {
+        line-height: 22px;
     }
 </style>
 
@@ -105,12 +137,74 @@ import OpticSelector from "../components/OpticSelector.astro";
 
     let originalSendButtonColor = sendButton.style.color;
 
+    type Query = {
+        query: string,
+        results: {text: string, url: string, site: string, title: string}[]
+    }
+
+    type Message = {
+        from: "user" | "alice",
+        message: string,
+        queries: Query[]
+        sourceColors: Record<number, Record<number, string>> // queryId -> sourceId -> color
+    };
+    type MessageWithElement = Message & {element: HTMLDivElement | null};
+
     let numMessageLines = 1;
     let messageInputHeight = 24;
-    let messages: {from: string, message: string, queries: {query: string, results: {text: string, url: string, title: string}[]}[]}[] = [];
+    let firstMessage = true;
+    let messages: MessageWithElement[] = [];
+
     let aliceResponding = false;
     let aliceStreamingMessage = "";
-    let currentQueries: {query: string, results: {text: string, url: string, title: string}[]}[] = [];
+    let currentQueries: Query[] = [];
+
+    // messages = [
+    //     {
+    //         "from": "user",
+    //         "message": "how does a car work",
+    //         "queries": [],
+    //         "sourceColors": {},
+    //         "element": null
+    //     },
+    //     {
+    //         "from": "alice",
+    //         "message": " Yes, you can rent a car in Santa Cruz de la Sierra from $34 per day[query 1 source 1]. The car rental rates vary depending on the type of vehicle you choose, the duration of the rental, and any additional fees. You can also find cheap car rental deals in Santa Cruz de la Sierra from $24 - $35 per day[query 1 source 1]. Additionally, you can rent a car for a month for just $34[query 1 source 2]. It's important to note that driving in Santa Cruz de la Sierra can be challenging due to the country's challenging road conditions and drivers who may not follow traffic laws[query 1 source 3]. It's recommended that you hire a licensed driver and take extra precautions when driving in the city[query 1 source 3].",
+    //         "queries": [
+    //         {
+    //             "query": "how does a car work",
+    //             "results": [
+    //             {
+    //                 "title": "Cheap Car Rental Deals in Santa Cruz de la Sierra from $34 - Cheapflights.com",
+    //                 "text": "month, costing you anywhere between $24 and $35 to fill up a car’s gas tank. Can I rent a car for a month in Santa Cruz de la Sierra? Yes,",
+    //                 "url": "https://www.cheapflights.com/car-rentals/santa-cruz/",
+    //                 "site": "cheapflights.com"
+    //             },
+    //             {
+    //                 "title": "What a Character Blogathon: How Arthur Kennedy Changed my Cinematic Life – The Wonderful World of Cinema",
+    //                 "text": "us smile, he’s just driving a car, but simply the fact that he’s here and that I was beginning to know him more and more. You know, just as if",
+    //                 "url": "https://thewonderfulworldofcinema.wordpress.com/2016/12/17/what-a-character-blogathon-how-arthur-kennedy-changed-my-cinematic-life/",
+    //                 "site": "thewonderfulworldofcinema.wordpress.com"
+    //             },
+    //             {
+    //                 "title": "Cop Killer Shouts Obscenities In Court, He Also Killed His Baby Mama… – Conversations Of A Sistah",
+    //                 "text": "likely. The devil didn’t make him steal his dads car, the devil didn’t make him kill those folks BUT now that he is up chit creek he is free to",
+    //                 "url": "https://conversationsofasistah.com/2012/01/31/cop-killer-shouts-obscenities-in-court-he-also-killed-his-baby-mama/",
+    //                 "site": "conversationsofasistah.com"
+    //             }
+    //             ]
+    //         }
+    //         ],
+    //         "sourceColors": {},
+    //         "element": null
+    //     }
+    // ];
+    
+    // messageContainer.innerHTML = "";
+
+    // for (const message of messages) {
+    //     renderMessage(message);
+    // }
 
     function updateMessageInputHeight() {
         const lines = messageInput.value.split("\n");
@@ -145,12 +239,17 @@ import OpticSelector from "../components/OpticSelector.astro";
             return;
         }
 
+        if (firstMessage) {
+            firstMessage = false;
+            messageContainer.innerHTML = "";
+        }
+
         addMessage("user", message);
         await sendMessageToAlice(message);
         messageInput.value = "";
     }
 
-    async function save_prev_state(): Promise<string> {
+    async function savePrevState(): Promise<string> {
         let url = "/beta/api/alice/save_state";
         var reqData: Record<string, string> = {
             'state': prevState,
@@ -194,6 +293,12 @@ import OpticSelector from "../components/OpticSelector.astro";
         }
 
         if (data["@type"] == "speaking") {
+            const status = document.querySelector("#active-status");
+
+            if (status) {
+                status.remove();
+            }
+
             if (aliceStreamingMessage == "") {
                 addMessage("alice", "", currentQueries);
                 currentQueries = [];
@@ -202,7 +307,7 @@ import OpticSelector from "../components/OpticSelector.astro";
 
             const lastMessage = messages[messages.length - 1];
             lastMessage.message = aliceStreamingMessage;
-            renderMessages();
+            renderLastMessage();
         } else if (data["@type"] == "beginSearch") {
             const status = document.querySelector("#active-status")!;
             status.querySelector("#info")!.innerHTML = `Looking up <span style="font-weight: bold;">${data["query"]}</span>`;
@@ -243,7 +348,7 @@ import OpticSelector from "../components/OpticSelector.astro";
         }
 
         if (prevState) {
-            let savedState = await save_prev_state();
+            let savedState = await savePrevState();
             reqData['prevState'] = savedState;
         }
 
@@ -263,46 +368,157 @@ import OpticSelector from "../components/OpticSelector.astro";
         };
     }
 
-    function addMessage(from: string, message: string, queries: {query: string, results: {text: string, url: string, title: string}[]}[] = []) {
+    function addMessage(from: string, message: string, queries: Query[] = []) {
+        if (from != "user" && from != "alice") {
+            throw new Error("Invalid message sender");
+        }
+
         messages.push({
             from: from,
             message: message,
-            queries: queries
+            queries: queries,
+            sourceColors: {},
+            element: null
         });
 
-        renderMessages();
+        renderLastMessage();
         scrollToBottom();
     }
 
-    function renderMessages() {
-        messageContainer.innerHTML = "";
+    function renderLastMessage() {
+        if (messages.length == 0) {
+            return;
+        }
 
-        for (const message of messages) {
-            let renderedMessage = renderMarkdown(message.message);
+        const message = messages[messages.length - 1];
+        renderMessage(message);
+    }
 
-            if (message.from === "user") {
-                const msg = document.createElement("div");
-                msg.classList.add("user-message-container");
+    function renderMessage(message: MessageWithElement) {
+        if (message.element == null) {
+            message.element = document.createElement("div");
+            messageContainer.appendChild(message.element);
+        }
 
-                const msgElem = document.createElement("div");
-                msgElem.classList.add("user-message");
-                msgElem.innerHTML = renderedMessage;
+        message.element.innerHTML = "";
 
-                msg.appendChild(msgElem);
+        let renderedMessage = renderMarkdown(message.message);
 
-                messageContainer.appendChild(msg);
-            } else {
-                const msg = document.createElement("div");
-                msg.classList.add("alice-message-container");
+        // replace [query i source j] with a link to the source
+        // find using regex
+        const regex = /\[query (\d+) source (\d+)\]/g;
+        let match: RegExpExecArray | null;
+        let newRenderedMessage = renderedMessage;
+        let messageSources = [];
+        let nextSourceId = 1;
 
-                const msgElem = document.createElement("div");
-                msgElem.classList.add("alice-message");
-                msgElem.innerHTML = renderedMessage;
+        let source2Id: Record<number, Record<number, number>> = {}; // (i, j) -> id
 
-                msg.appendChild(msgElem);
+        while ((match = regex.exec(renderedMessage)) !== null) {
+            const queryNum = parseInt(match[1]);
+            const sourceNum = parseInt(match[2]);
 
-                messageContainer.appendChild(msg);
+            let i = queryNum - 1;
+            let j = sourceNum - 1;
+
+            const query = message.queries[i];
+            const source = query.results[j];
+
+            // find text from '.' to match[0]
+            let text = renderedMessage.substring(renderedMessage.lastIndexOf(".", match.index) + 1, match.index).trim();
+
+            if (text.startsWith("<p>")) {
+                text = text.substring(3);
             }
+
+
+            if (!(i in source2Id)) {
+                source2Id[i] = {};
+            }
+
+            if (!(j in source2Id[i])) {
+                source2Id[i][j] = nextSourceId;
+                nextSourceId += 1;
+            }
+
+            const id = source2Id[i][j];
+
+            messageSources.push({
+                query: query,
+                source: source,
+                claim: text,
+                id: id
+            })
+
+            const link = `<span class="inline-source"><a href="` + source.url + `">` + id + `</a></span>`;
+
+            newRenderedMessage = newRenderedMessage.replace(match[0], link);
+        }
+
+        // url and site of sources ordered by id
+        let sourceUrls: {url: string, site: string}[] = [];
+
+        for (let i = 0; i < nextSourceId; i++) {
+            const source = messageSources.find(s => s.id == i + 1);
+
+            if (source) {
+                sourceUrls.push({
+                    url: source.source.url,
+                    site : source.source.site
+                });
+            }
+        }
+
+        renderedMessage = newRenderedMessage;
+
+        if (message.from === "user") {
+            message.element.classList.add("user-message-container");
+
+            const msgElem = document.createElement("div");
+            msgElem.classList.add("user-message-text");
+            msgElem.innerHTML = renderedMessage;
+            message.element.appendChild(msgElem);
+        } else {
+            message.element.classList.add("alice-message-container");
+
+            const msgElem = document.createElement("div");
+            msgElem.classList.add("alice-message");
+
+            const msgText = document.createElement("div");
+            msgText.classList.add("alice-message-text");
+            msgText.innerHTML = renderedMessage;
+
+            msgElem.appendChild(msgText);
+
+            // add sources
+            if (sourceUrls.length > 0) {
+                const sources = document.createElement("div");
+                sources.classList.add("message-sources");
+
+                for (var i = 0; i < sourceUrls.length; i++) {
+                    let id = i + 1;
+                    const source = sourceUrls[i];
+
+                    const sourceLink = document.createElement("a");
+                    sourceLink.text = source.site;
+                    sourceLink.href = source.url;
+
+                    const sourceId = document.createElement("span");
+                    sourceId.classList.add("inline-source");
+                    sourceId.innerHTML = `<a href="` + source.url + `">` + id.toString() + `</a>`;
+
+                    const sourceContainer = document.createElement("div");
+                    sourceContainer.classList.add("message-source");
+                    sourceContainer.appendChild(sourceId);
+                    sourceContainer.appendChild(sourceLink);
+
+                    sources.appendChild(sourceContainer);
+                }
+
+                msgElem.appendChild(sources);
+            }
+
+            message.element.appendChild(msgElem);
         }
 
         // @ts-ignore
@@ -366,6 +582,4 @@ import OpticSelector from "../components/OpticSelector.astro";
             storeChat();
         }
     }
-
-
 </script>

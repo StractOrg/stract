@@ -32,8 +32,8 @@ use super::{
 use crate::alice::{ModelWebsite, SimplifiedWebsite};
 
 // const TAU: f64 = 0.3;
-const TEMP: f64 = 0.4;
-const TOP_P: f64 = 0.5;
+const TEMP: f64 = 0.4; // 0.4
+const TOP_P: f64 = 0.7; //0.5
 
 const MAX_NUM_QUERIES: usize = 3;
 

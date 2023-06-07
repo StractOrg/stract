@@ -1,8 +1,7 @@
 use std::io::Write;
 
 use stract::alice::{
-    local::{AcceleratorConfig, Alice},
-    ExecutionState,
+    ExecutionState, {AcceleratorConfig, Alice},
 };
 
 #[tokio::main]
@@ -12,7 +11,7 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    // dont use this in production
+    // dont use this key in production
     let key = base64::decode("URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc=").unwrap();
 
     let model = Alice::open(

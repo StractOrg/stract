@@ -16,13 +16,13 @@
 
 use std::{sync::Arc, time::Duration};
 
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, NaiveDate, Timelike, Utc};
 use scylla::{prepared_statement::PreparedStatement, SessionBuilder};
 use thiserror::Error;
 use tokio::{sync::Mutex, time};
 use uuid::Uuid;
 
-use crate::{leaky_queue::LeakyQueue, webpage::Url};
+use crate::{api::improvement::AliceConversation, leaky_queue::LeakyQueue, webpage::Url};
 
 #[derive(Debug, Error)]
 enum Error {
@@ -44,29 +44,42 @@ pub struct StoredQuery {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AliceConversation {
+pub struct StoredAliceConversation {
     pub id: Uuid,
     messages: Vec<AliceMessage>,
+    date: NaiveDate,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct AliceMessage {
+pub struct AliceMessage {
     from: String,
     message: String,
     queries: Vec<AliceQuery>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct AliceQuery {
+pub struct AliceQuery {
     query: String,
     results: Vec<crate::alice::SimplifiedWebsite>,
+}
+
+impl From<AliceConversation> for StoredAliceConversation {
+    fn from(value: AliceConversation) -> Self {
+        let date = chrono::Utc::now().date_naive();
+
+        Self {
+            id: value.id,
+            messages: value.messages,
+            date,
+        }
+    }
 }
 
 #[derive(Clone)]
 pub enum ImprovementEvent {
     StoreQuery(StoredQuery),
     Click { qid: Uuid, idx: usize },
-    Chat { chat: AliceConversation },
+    Chat { chat: StoredAliceConversation },
 }
 
 impl StoredQuery {
@@ -155,7 +168,7 @@ impl ScyllaConn {
 
         session
             .query(
-                "CREATE TABLE IF NOT EXISTS ks.chats (id uuid, json_encoded text, primary key (qid))",
+                "CREATE TABLE IF NOT EXISTS ks.chats (id uuid, json_encoded text, date date, primary key (qid))",
                 &[],
             )
             .await?;
@@ -169,7 +182,7 @@ impl ScyllaConn {
             .await?;
 
         let prepared_chat: PreparedStatement = session
-            .prepare("INSERT INTO ks.chats (id, json_encoded) VALUES(?, ?)")
+            .prepare("INSERT INTO ks.chats (id, json_encoded, date) VALUES(?, ?, ?)")
             .await?;
 
         Ok(Self {
@@ -214,11 +227,11 @@ impl ScyllaConn {
         }
     }
 
-    async fn store_chat(&self, chat: AliceConversation) {
+    async fn store_chat(&self, chat: StoredAliceConversation) {
         if let Ok(json_encoded) = serde_json::to_string(&chat) {
             let res = self
                 .session
-                .execute(&self.prepared_chat, (chat.id, json_encoded))
+                .execute(&self.prepared_chat, (chat.id, json_encoded, chat.date))
                 .await;
 
             if let Err(err) = res {

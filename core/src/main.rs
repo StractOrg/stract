@@ -322,7 +322,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::alice::local::run(config))?
+                    .block_on(entrypoint::alice::run(config))?
             }
             AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
         },

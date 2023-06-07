@@ -229,17 +229,6 @@ pub struct AliceLocalConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AliceOpenaiConfig {
-    pub cluster_id: String,
-    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
-    pub gossip_addr: SocketAddr,
-    pub host: SocketAddr,
-    pub summarizer_path: String,
-
-    pub api_key: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
     pub graph_path: String,

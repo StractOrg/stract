@@ -27,7 +27,7 @@ use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     distributed::member::Service,
-    entrypoint::{self, alice::openai::SaveStateParams},
+    entrypoint::{self, alice::SaveStateParams},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -164,7 +164,7 @@ pub async fn route(
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
     };
 
-    let params = entrypoint::alice::local::Params {
+    let params = entrypoint::alice::Params {
         message: params.message,
         prev_state: saved_state.map(|s| s.uuid),
         optic: params.optic,
