@@ -25,6 +25,7 @@ use crate::{
         cluster::Cluster,
         member::{Member, Service},
     },
+    fact_check_model::FactCheckModel,
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
@@ -51,6 +52,7 @@ mod alice;
 mod autosuggest;
 mod chat;
 mod explore;
+mod fact_check;
 pub mod improvement;
 mod index;
 mod metrics;
@@ -71,6 +73,7 @@ pub struct State {
     pub search_counter_success: crate::metrics::Counter,
     pub search_counter_fail: crate::metrics::Counter,
     pub summarizer: Arc<Summarizer>,
+    pub fact_checker: Arc<FactCheckModel>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub cluster: Arc<Cluster>,
 }
@@ -149,6 +152,7 @@ pub async fn router(
         search_counter_fail,
         remote_webgraph,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
+        fact_checker: Arc::new(FactCheckModel::open(&config.fact_check_model_path)?),
         improvement_queue: query_store_queue,
         cluster,
     });
@@ -195,7 +199,8 @@ pub async fn router(
                 )
                 .route("/beta/api/webgraph/knows_site", get(webgraph::knows_site))
                 .route("/beta/api/alice", get(alice::route))
-                .route("/beta/api/alice/save_state", post(alice::save_state)),
+                .route("/beta/api/alice/save_state", post(alice::save_state))
+                .route("/beta/api/fact_check", post(fact_check::route)),
         )
         .with_state(state))
 }

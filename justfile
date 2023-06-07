@@ -23,6 +23,7 @@
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
     ./scripts/export_dual_encoder
+    ./scripts/export_fact_model
     cd frontend; npm install; npm run build
     cargo run --release --all-features -- configure {{ARGS}}
 

@@ -1,0 +1,42 @@
+#!.venv/bin/python3
+import os
+import transformers
+import torch
+
+MODEL = "Dzeniks/roberta-fact-check"
+
+os.system("mkdir data/fact_model")
+
+model = transformers.AutoModelForSequenceClassification.from_pretrained(MODEL)
+
+model.eval()
+for p in model.parameters():
+    p.requires_grad_(False)
+
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
+features = tokenizer(
+    "Albert Einstein work in the field of computer science",
+    "Albert Einstein was a German-born theoretical physicist, widely acknowledged to be one of the greatest and most influential physicists of all time.",
+    padding="max_length",
+    truncation=True,
+    return_tensors="pt",
+)
+input_ids = features["input_ids"]
+attention_mask = features["attention_mask"]
+
+tokenizer.save_pretrained("data/fact_model")
+
+
+def run_model(input_ids, attention_mask):
+    res = model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        return_dict=False,
+    )[0]
+    res = torch.softmax(res, dim=1)
+    return res
+
+
+traced_model = torch.jit.trace(run_model, ((input_ids, attention_mask)))
+
+traced_model.save("data/fact_model/model.pt")

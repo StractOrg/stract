@@ -145,10 +145,28 @@ import OpticSelector from "../components/OpticSelector.astro";
     type Message = {
         from: "user" | "alice",
         message: string,
-        queries: Query[]
-        sourceColors: Record<number, Record<number, string>> // queryId -> sourceId -> color
+        queries: Query[],
+        sourceColors: Record<number, ScoredColor> // idx -> color
     };
     type MessageWithElement = Message & {element: HTMLDivElement | null};
+
+    type Color = {
+        r: number,
+        g: number,
+        b: number,
+        a: number
+    };
+
+    type ScoredColor = {
+        color: Color,
+        score: number
+    };
+
+    let colorGreen: Color = {r: 22, g: 163, b: 74, a: 1};
+    let colorYellow: Color = {r: 234, g: 179, b: 8, a: 1};
+    let colorRed: Color = {r: 220, g: 38, b: 38, a: 1};
+
+    let scoreGradient: Color[] = colorGradient(colorRed, colorYellow, 5).concat(colorGradient(colorYellow, colorGreen, 5));
 
     let numMessageLines = 1;
     let messageInputHeight = 24;
@@ -164,7 +182,7 @@ import OpticSelector from "../components/OpticSelector.astro";
     //         "from": "user",
     //         "message": "how does a car work",
     //         "queries": [],
-    //         "sourceColors": {},
+    //         "sourceColors": [],
     //         "element": null
     //     },
     //     {
@@ -195,7 +213,7 @@ import OpticSelector from "../components/OpticSelector.astro";
     //             ]
     //         }
     //         ],
-    //         "sourceColors": {},
+    //         "sourceColors": [],
     //         "element": null
     //     }
     // ];
@@ -205,6 +223,24 @@ import OpticSelector from "../components/OpticSelector.astro";
     // for (const message of messages) {
     //     renderMessage(message);
     // }
+
+    function colorGradient(start: Color, end: Color, steps: number): Color[] {
+        const gradient: Color[] = [];
+
+        for (let i = 0; i < steps; i++) {
+            const r = start.r + (end.r - start.r) * i / steps;
+            const g = start.g + (end.g - start.g) * i / steps;
+            const b = start.b + (end.b - start.b) * i / steps;
+            const a = start.a + (end.a - start.a) * i / steps;
+            gradient.push({r, g, b, a});
+        }
+
+        return gradient;
+    }
+
+    function colorToString(color: Color): string {
+        return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
+    }
 
     function updateMessageInputHeight() {
         const lines = messageInput.value.split("\n");
@@ -377,7 +413,7 @@ import OpticSelector from "../components/OpticSelector.astro";
             from: from,
             message: message,
             queries: queries,
-            sourceColors: {},
+            sourceColors: [],
             element: null
         });
 
@@ -414,6 +450,7 @@ import OpticSelector from "../components/OpticSelector.astro";
 
         let source2Id: Record<number, Record<number, number>> = {}; // (i, j) -> id
 
+        let sourceIdx = 0;
         while ((match = regex.exec(renderedMessage)) !== null) {
             const queryNum = parseInt(match[1]);
             const sourceNum = parseInt(match[2]);
@@ -425,10 +462,10 @@ import OpticSelector from "../components/OpticSelector.astro";
             const source = query.results[j];
 
             // find text from '.' to match[0]
-            let text = renderedMessage.substring(renderedMessage.lastIndexOf(".", match.index) + 1, match.index).trim();
+            let claim = renderedMessage.substring(renderedMessage.lastIndexOf(".", match.index) + 1, match.index).trim();
 
-            if (text.startsWith("<p>")) {
-                text = text.substring(3);
+            if (claim.startsWith("<p>")) {
+                claim = claim.substring(3);
             }
 
 
@@ -441,18 +478,39 @@ import OpticSelector from "../components/OpticSelector.astro";
                 nextSourceId += 1;
             }
 
+            // check if color is already assigned
+            if (!(sourceIdx in message.sourceColors)) {
+                factCheck(claim, source.text, sourceIdx).then((res) => {
+                    if (res != null) {
+                        let [score, sourceIdx] = res;
+                        // s is a score from 0 to 1
+                        let colorId = Math.floor(score * (scoreGradient.length - 1));
+                        let color = scoreGradient[colorId];
+
+
+                        message.sourceColors[sourceIdx] = {
+                            color: color,
+                            score: score
+                        };
+
+                        updateSourceColors(message);
+                    }
+                })
+            }
+
             const id = source2Id[i][j];
 
             messageSources.push({
                 query: query,
                 source: source,
-                claim: text,
+                claim: claim,
                 id: id
             })
 
-            const link = `<span class="inline-source"><a href="` + source.url + `">` + id + `</a></span>`;
+            const link = `<span class="inline-source inline-source-` + sourceIdx + `"><a href="` + source.url + `">` + id + `</a></span>`;
 
             newRenderedMessage = newRenderedMessage.replace(match[0], link);
+            sourceIdx += 1;
         }
 
         // url and site of sources ordered by id
@@ -521,9 +579,51 @@ import OpticSelector from "../components/OpticSelector.astro";
             message.element.appendChild(msgElem);
         }
 
+        updateSourceColors(message);
+
         // @ts-ignore
         hljs.highlightAll();
         removeBackgroundFromCode();
+    }
+
+    async function factCheck(claim: string, evidence: string, sourceIdx: number): Promise<[number, number] | null> {
+        let url = "/beta/api/fact_check";
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                claim: claim,
+                evidence: evidence
+            })
+        });
+
+        if (response.status == 200) {
+            const data = await response.json();
+            return [data.score, sourceIdx];
+        } else {
+            return null;
+        }
+    }
+
+    function updateSourceColors(message: MessageWithElement) {
+        if (message.element == null) {
+            return;
+        }
+
+        // loop through the sourceColors
+        for (const idx in message.sourceColors) {
+            const scoredColor = message.sourceColors[idx];
+            const source: HTMLSpanElement | null = message.element.querySelector(".inline-source-" + idx);
+
+            if (source) {
+                source.style.borderColor = colorToString(scoredColor.color);
+                source.title = Math.floor(scoredColor.score*100) + "% confidence that source supports claim";
+            }
+        }
+
     }
 
     function renderMarkdown(markdown: string) {

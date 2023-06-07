@@ -5,6 +5,7 @@ prometheus_host = "0.0.0.0:3001"
 gossip_addr = "0.0.0.0:3005"
 gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 crossencoder_model_path = "data/cross_encoder"
+fact_check_model_path = "data/fact_model"
 # lambda_model_path = "data/lambdamart.txt"
 # qa_model_path = "data/qa_model"
 bangs_path = "data/bangs.json"

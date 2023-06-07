@@ -287,7 +287,7 @@ impl Alice {
         }
 
         let mut summarizer = ExtractiveSummarizer::open(summarizer_path, 1)?;
-        summarizer.set_window_size(30);
+        summarizer.set_window_size(50);
 
         let summarizer = Arc::new(summarizer);
 

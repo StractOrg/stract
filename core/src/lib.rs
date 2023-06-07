@@ -43,6 +43,7 @@ mod distributed;
 mod entity_index;
 mod enum_map;
 mod executor;
+mod fact_check_model;
 mod fastfield_reader;
 mod human_website_annotations;
 mod hyperloglog;
@@ -172,6 +173,7 @@ pub struct FrontendConfig {
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
+    pub fact_check_model_path: String,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -332,6 +334,9 @@ pub enum Error {
 
     #[error("Alice")]
     Alice(#[from] crate::alice::Error),
+
+    #[error("Fact check model")]
+    FactCheckModel(#[from] crate::fact_check_model::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
