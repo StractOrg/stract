@@ -180,7 +180,7 @@ import OpticSelector from "../components/OpticSelector.astro";
     // messages = [
     //     {
     //         "from": "user",
-    //         "message": "how does a car work",
+    //         "message": "can i rent a car in santa cruz",
     //         "queries": [],
     //         "sourceColors": [],
     //         "element": null
@@ -190,7 +190,7 @@ import OpticSelector from "../components/OpticSelector.astro";
     //         "message": " Yes, you can rent a car in Santa Cruz de la Sierra from $34 per day[query 1 source 1]. The car rental rates vary depending on the type of vehicle you choose, the duration of the rental, and any additional fees. You can also find cheap car rental deals in Santa Cruz de la Sierra from $24 - $35 per day[query 1 source 1]. Additionally, you can rent a car for a month for just $34[query 1 source 2]. It's important to note that driving in Santa Cruz de la Sierra can be challenging due to the country's challenging road conditions and drivers who may not follow traffic laws[query 1 source 3]. It's recommended that you hire a licensed driver and take extra precautions when driving in the city[query 1 source 3].",
     //         "queries": [
     //         {
-    //             "query": "how does a car work",
+    //             "query": "rent car santa cruz",
     //             "results": [
     //             {
     //                 "title": "Cheap Car Rental Deals in Santa Cruz de la Sierra from $34 - Cheapflights.com",
@@ -458,7 +458,17 @@ import OpticSelector from "../components/OpticSelector.astro";
             let i = queryNum - 1;
             let j = sourceNum - 1;
 
+            if (i >= message.queries.length) {
+                newRenderedMessage = newRenderedMessage.replace(match[0], "");
+                continue;
+            }
+
             const query = message.queries[i];
+
+            if (j >= query.results.length) {
+                newRenderedMessage = newRenderedMessage.replace(match[0], "");
+                continue;
+            }
             const source = query.results[j];
 
             // find text from '.' to match[0]
