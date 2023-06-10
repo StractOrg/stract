@@ -149,7 +149,7 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
         self.crossencoder_score_websites(websites);
 
         for website in websites.iter_mut() {
-            let mut website = website.as_mut_ranking();
+            let website = website.as_mut_ranking();
             let score = calculate_score(
                 &self.lambda_mart,
                 &self.signal_coefficients,

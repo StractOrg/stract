@@ -505,7 +505,7 @@ impl JustText {
             let prev_neighbour = Self::get_prev_neighbour(paragraphs, i, true);
             let next_neighbour = Self::get_next_neighbour(paragraphs, i, true);
 
-            let mut paragraph = &mut paragraphs[i];
+            let paragraph = &mut paragraphs[i];
 
             match (prev_neighbour, next_neighbour) {
                 (

@@ -109,7 +109,7 @@ fn create_user_nodes(nodes: &[NodeID], proxy_nodes: &[Arc<ProxyNode>]) -> Vec<Us
         if res.len() < USER_NODES_LIMIT {
             res.push(user_node);
         } else {
-            let mut best = res
+            let best = res
                 .iter_mut()
                 .min_by_key(|curr| user_node.best_dist(&curr.id).unwrap_or(255))
                 .unwrap();

@@ -27,7 +27,6 @@ use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Borrow,
     collections::{HashMap, HashSet},
     panic,
 };
@@ -84,7 +83,7 @@ impl<const N: usize> Preprocessor<N> {
         match edge {
             NodeEdge::Start(node) => {
                 if let Some(element) = node.as_element() {
-                    let element_name: &str = element.name.local.borrow();
+                    let element_name: &str = &element.name.local;
                     if let Some((_, n)) = self
                         .removed_tags
                         .iter()
@@ -97,7 +96,7 @@ impl<const N: usize> Preprocessor<N> {
             }
             NodeEdge::End(node) => {
                 if let Some(element) = node.as_element() {
-                    let element_name: &str = element.name.local.borrow();
+                    let element_name: &str = &element.name.local;
                     if let Some((_, n)) = self
                         .removed_tags
                         .iter()
@@ -634,12 +633,7 @@ impl Html {
                         .borrow()
                         .map
                         .iter()
-                        .map(|(name, attr)| {
-                            (
-                                name.local.borrow().to_string(),
-                                attr.borrow().value.to_string(),
-                            )
-                        })
+                        .map(|(name, attr)| (name.local.to_string(), attr.value.to_string()))
                         .collect(),
                 );
             }
@@ -1018,12 +1012,7 @@ impl Html {
                 .borrow()
                 .map
                 .iter()
-                .map(|(name, attr)| {
-                    (
-                        name.local.borrow().to_string(),
-                        attr.borrow().value.to_string(),
-                    )
-                })
+                .map(|(name, attr)| (name.local.to_string(), attr.value.to_string()))
                 .collect();
 
             scripts.push(Script {
