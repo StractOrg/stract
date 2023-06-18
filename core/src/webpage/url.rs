@@ -39,7 +39,13 @@ impl Display for Url {
 
 impl From<String> for Url {
     fn from(url: String) -> Self {
-        Url(url)
+        let url = if url.ends_with('/') {
+            &url[..url.len() - 1]
+        } else {
+            &url
+        };
+
+        Url(url.trim().to_string())
     }
 }
 
@@ -161,10 +167,10 @@ impl Url {
     }
 
     pub fn is_full_path(&self) -> bool {
-        matches!(self.protocol(), "http" | "https" | "pdf")
+        matches!(self.protocol(), "http" | "https" | "pdf") || self.0.starts_with("//")
     }
 
-    pub fn prefix_with(&mut self, url: &Url) {
+    fn prefix_with(&mut self, url: &Url) {
         self.0 = match (url.0.ends_with('/'), self.0.starts_with('/')) {
             (true, true) => {
                 let prot = url.protocol().to_string();
@@ -193,6 +199,14 @@ impl Url {
         } else {
             self.0.clone()
         }
+    }
+
+    pub fn into_absolute(self, base: &Url) -> Self {
+        let mut url = self;
+        if !url.is_full_path() {
+            url.prefix_with(base);
+        }
+        url
     }
 
     pub async fn download_bytes(&self, timeout: Duration) -> Option<Vec<u8>> {
@@ -261,6 +275,14 @@ impl Url {
             .strip_prefix("://")
             .unwrap_or(&self.0)
     }
+
+    pub fn path_ends_with(&self, ending: &str) -> bool {
+        if self.is_homepage() {
+            false
+        } else {
+            self.without_query().ends_with(ending)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -297,31 +319,49 @@ mod tests {
     }
 
     #[test]
-    fn prefix_with() {
+    fn into_absolute() {
         let mut a: Url = "/test".to_string().into();
         let b: Url = "https://example.com".to_string().into();
-        a.prefix_with(&b);
+        a = a.into_absolute(&b);
         assert_eq!(a.full().as_str(), "https://example.com/test");
 
         let mut a: Url = "test".to_string().into();
         let b: Url = "https://example.com".to_string().into();
-        a.prefix_with(&b);
+        a = a.into_absolute(&b);
         assert_eq!(a.full().as_str(), "https://example.com/test");
 
         let mut a: Url = "test".to_string().into();
         let b: Url = "https://example.com/".to_string().into();
-        a.prefix_with(&b);
+        a = a.into_absolute(&b);
         assert_eq!(a.full().as_str(), "https://example.com/test");
 
         let mut a: Url = "/test".to_string().into();
         let b: Url = "https://example.com/".to_string().into();
-        a.prefix_with(&b);
+        a = a.into_absolute(&b);
         assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "https://example.com/test".to_string().into();
+        let b: Url = "https://example.com/".to_string().into();
+        a = a.into_absolute(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "https://example.com/test".to_string().into();
+        let b: Url = "example.com".to_string().into();
+        a = a.into_absolute(&b);
+        assert_eq!(a.full().as_str(), "https://example.com/test");
+
+        let mut a: Url = "https://a.com/test".to_string().into();
+        let b: Url = "b.com".to_string().into();
+        a = a.into_absolute(&b);
+        assert_eq!(a.full().as_str(), "https://a.com/test");
     }
 
     #[test]
     fn is_full_path() {
         let url: Url = "https://dailymail.co.uk".to_string().into();
+        assert!(url.is_full_path());
+
+        let url: Url = "//dailymail.co.uk".to_string().into();
         assert!(url.is_full_path());
     }
 
@@ -390,5 +430,29 @@ mod tests {
 
         let url: Url = "podcasts.apple.com".to_string().into();
         assert!(url.is_homepage());
+    }
+
+    #[test]
+    fn path_ends_with() {
+        let url: Url = "https://test.example.com/test/test".to_string().into();
+        assert!(url.path_ends_with("test"));
+
+        let url: Url = "https://test.example.com/test/test".to_string().into();
+        assert!(url.path_ends_with("test/test"));
+
+        let url: Url = "https://test.example.com".to_string().into();
+        assert!(!url.path_ends_with("/"));
+
+        let url: Url = "https://test.example.zip".to_string().into();
+        assert!(!url.path_ends_with(".zip"));
+
+        let url: Url = "https://test.example.com".to_string().into();
+        assert!(!url.path_ends_with(".com"));
+
+        let url: Url = "https://test.example.com/.com".to_string().into();
+        assert!(url.path_ends_with(".com"));
+
+        let url: Url = "https://test.example.com/test.png".to_string().into();
+        assert!(url.path_ends_with(".png"));
     }
 }

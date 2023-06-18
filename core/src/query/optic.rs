@@ -882,7 +882,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com/");
+        assert_eq!(res[0].url, "https://www.b.com");
 
         let res = searcher
             .search(&SearchQuery {
@@ -906,7 +906,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com/");
+        assert_eq!(res[0].url, "https://www.b.com");
 
         let res = searcher
             .search(&SearchQuery {
@@ -930,7 +930,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.a.com/");
+        assert_eq!(res[0].url, "https://www.a.com");
 
         let res = searcher
             .search(&SearchQuery {
@@ -954,7 +954,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com/");
+        assert_eq!(res[0].url, "https://www.b.com");
     }
 
     #[test]

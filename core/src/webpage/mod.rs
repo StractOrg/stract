@@ -369,7 +369,7 @@ impl Html {
         self.clean_text = Html::calculate_clean_text(&paragraphs, &self.lang.unwrap_or(Lang::Eng));
     }
 
-    fn hyperlinks(&self) -> Vec<Link> {
+    pub fn anchor_links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         let mut open_links = Vec::new();
 
@@ -387,9 +387,14 @@ impl Html {
                         if &element.name.local == "a" {
                             if let Some((text, attributes)) = open_links.pop() {
                                 if let Some(dest) = attributes.borrow().get("href") {
+                                    if dest.starts_with("mailto:") || dest.starts_with("tel:") {
+                                        continue;
+                                    }
+
                                     links.push(Link {
                                         source: self.url.clone(),
-                                        destination: dest.to_string().into(),
+                                        destination: Url::from(dest.to_string())
+                                            .into_absolute(self.url()),
                                         text: text.trim().to_string(),
                                     });
                                 }
@@ -422,7 +427,7 @@ impl Html {
             if let Some(dest) = attributes.borrow().get("href") {
                 links.push(Link {
                     source: self.url.clone(),
-                    destination: dest.to_string().into(),
+                    destination: Url::from(dest.to_string()).into_absolute(self.url()),
                     text: text.trim().to_string(),
                 });
             }
@@ -431,7 +436,7 @@ impl Html {
         links
     }
 
-    fn _links_tag(&self) -> Vec<Link> {
+    fn links_tag(&self) -> Vec<Link> {
         let mut links = Vec::new();
 
         for node in self.root.select("link").unwrap() {
@@ -439,7 +444,7 @@ impl Html {
                 if let Some(href) = element.attributes.borrow().get("href") {
                     links.push(Link {
                         source: self.url.clone(),
-                        destination: Url::from(href),
+                        destination: Url::from(href).into_absolute(self.url()),
                         text: String::new(),
                     })
                 }
@@ -449,7 +454,7 @@ impl Html {
         links
     }
 
-    fn _metadata_links(&self) -> Vec<Link> {
+    fn metadata_links(&self) -> Vec<Link> {
         self.metadata()
             .into_iter()
             .filter_map(|metadata| {
@@ -470,7 +475,7 @@ impl Html {
                         if let Some(content) = metadata.get("content") {
                             return Some(Link {
                                 source: self.url().clone(),
-                                destination: Url::from(content.as_str()),
+                                destination: Url::from(content.as_str()).into_absolute(self.url()),
                                 text: String::new(),
                             });
                         }
@@ -490,7 +495,7 @@ impl Html {
                         if let Some(content) = metadata.get("content") {
                             return Some(Link {
                                 source: self.url().clone(),
-                                destination: Url::from(content.as_str()),
+                                destination: Url::from(content.as_str()).into_absolute(self.url()),
                                 text: String::new(),
                             });
                         }
@@ -502,32 +507,31 @@ impl Html {
             .collect()
     }
 
-    pub fn links(&self) -> Vec<Link> {
-        // let mut links = self.hyperlinks();
+    pub fn all_links(&self) -> Vec<Link> {
+        let mut links = self.anchor_links();
 
-        // links.extend(self.scripts().into_iter().filter_map(|script| {
-        //     match script.attributes.get("src") {
-        //         Some(url) => {
-        //             let script_url = Url::from(url.as_str());
-        //             if self.url().domain() != script_url.domain() {
-        //                 Some(Link {
-        //                     source: self.url.clone(),
-        //                     destination: script_url,
-        //                     text: String::new(),
-        //                 })
-        //             } else {
-        //                 None
-        //             }
-        //         }
-        //         None => None,
-        //     }
-        // }));
+        links.extend(self.scripts().into_iter().filter_map(|script| {
+            match script.attributes.get("src") {
+                Some(url) => {
+                    let script_url = Url::from(url.as_str()).into_absolute(self.url());
+                    if self.url().domain() != script_url.domain() {
+                        Some(Link {
+                            source: self.url.clone(),
+                            destination: script_url,
+                            text: String::new(),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            }
+        }));
 
-        // links.extend(self.links_tag().into_iter());
-        // links.extend(self.metadata_links().into_iter());
+        links.extend(self.links_tag().into_iter());
+        links.extend(self.metadata_links().into_iter());
 
-        // links
-        self.hyperlinks()
+        links
     }
 
     pub fn favicon(&self) -> Option<FaviconLink> {
@@ -549,11 +553,7 @@ impl Html {
                 };
 
                 let image_type = node.attributes.borrow().get("type").map(|t| t.to_string());
-                let mut link: Url = link.to_string().into();
-
-                if !link.is_full_path() {
-                    link.prefix_with(&self.url);
-                }
+                let link = Url::from(link.to_string()).into_absolute(self.url());
 
                 let favicon = FaviconLink {
                     link,
@@ -1033,17 +1033,17 @@ impl Html {
 
         for script in self.scripts() {
             if let Some(link) = script.attributes.get("src") {
-                links.push(link.to_string().into());
+                links.push(Url::from(link.to_string()).into_absolute(self.url()));
             }
 
             for res in URL_REGEX.find_iter(&script.content) {
-                links.push(res.as_str().to_string().into());
+                links.push(Url::from(res.as_str().to_string()).into_absolute(self.url()));
             }
         }
 
         for node in self.root.select("link").unwrap() {
             if let Some(link) = node.attributes.borrow().get("href") {
-                links.push(link.to_string().into());
+                links.push(Url::from(link.to_string()).into_absolute(self.url()));
             }
         }
 
@@ -1156,9 +1156,7 @@ impl Html {
                     })
             })
             .map(|mut image| {
-                if !image.url.is_full_path() {
-                    image.url.prefix_with(&self.url);
-                }
+                image.url = image.url.into_absolute(&self.url);
 
                 image
             })
@@ -1277,8 +1275,9 @@ mod tests {
                     <meta name="meta1" content="value">
                 </head>
                 <body>
-                    <a href="example.com">Link to example</a>
+                    <a href="https://example.com">Link to example</a>
                     <p>{CONTENT}</p>
+                    <a href="mailto:hello@example.com">Email me</a>
                 </body>
             </html>
         "#
@@ -1289,10 +1288,10 @@ mod tests {
         assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         assert_eq!(
-            webpage.links(),
+            webpage.anchor_links(),
             vec![Link {
                 source: "https://www.example.com/whatever".to_string().into(),
-                destination: "example.com".to_string().into(),
+                destination: "https://example.com".to_string().into(),
                 text: "Link to example".to_string()
             }]
         );
@@ -1939,7 +1938,7 @@ mod tests {
                     <script src="test.com"></script>
                 </head>
                 <body>
-                    <a href="example.com">Link to example</a>
+                    <a href="https://example.com">Link to example</a>
                     <p>{CONTENT}</p>
                 </body>
             </html>
@@ -1951,11 +1950,11 @@ mod tests {
         assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         assert_eq!(
-            webpage.links(),
+            webpage.anchor_links(),
             vec![
                 Link {
                     source: "https://www.example.com/whatever".to_string().into(),
-                    destination: "example.com".to_string().into(),
+                    destination: "https://example.com".to_string().into(),
                     text: "Link to example".to_string()
                 },
                 // Link {

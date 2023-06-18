@@ -38,6 +38,7 @@ mod api;
 mod autosuggest;
 mod bangs;
 mod collector;
+mod crawler;
 mod directory;
 mod distributed;
 mod entity_index;
@@ -195,6 +196,32 @@ pub struct SearchServerConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct S3Config {
+    pub bucket: String,
+    pub folder: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub endpoint: String,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CrawlCoordinatorConfig {
+    pub crawldb_folder: String,
+    pub host: SocketAddr,
+    pub num_urls_to_crawl: u64,
+    pub seed_urls: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CrawlerConfig {
+    pub num_workers: usize,
+    pub user_agent: String,
+    pub politeness_factor: Option<f32>,
+    pub timeout_seconds: u64,
+    pub s3: S3Config,
+    pub coordinator_host: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AcceleratorDevice {
     Cpu,
@@ -337,6 +364,9 @@ pub enum Error {
 
     #[error("Fact check model")]
     FactCheckModel(#[from] crate::fact_check_model::Error),
+
+    #[error("Crawler")]
+    Crawler(#[from] crate::crawler::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

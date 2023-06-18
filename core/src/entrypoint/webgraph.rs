@@ -75,7 +75,7 @@ pub fn process_job(job: &Job) -> webgraph::Webgraph {
             for record in file.records().flatten() {
                 let webpage = Html::parse_without_text(&record.response.body, &record.request.url);
                 for link in webpage
-                    .links()
+                    .anchor_links()
                     .into_iter()
                     .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
                     .filter(|link| link.source.domain() != link.destination.domain())

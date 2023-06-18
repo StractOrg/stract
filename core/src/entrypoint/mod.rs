@@ -19,6 +19,7 @@ mod centrality;
 #[cfg(feature = "dev")]
 pub mod configure;
 pub mod crawl_stability;
+pub mod crawler;
 pub mod dmoz_parser;
 mod entity;
 pub mod frontend;

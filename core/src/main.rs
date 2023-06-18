@@ -24,7 +24,10 @@ use stract::entrypoint::configure;
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, frontend, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use stract::{AliceLocalConfig, FrontendConfig, SearchServerConfig, WebgraphServerConfig};
+use stract::{
+    AliceLocalConfig, CrawlCoordinatorConfig, CrawlerConfig, FrontendConfig, SearchServerConfig,
+    WebgraphServerConfig,
+};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -82,6 +85,12 @@ enum Commands {
         webgraph_path: String,
         online_harmonic_path: String,
         output_path: String,
+    },
+    CrawlCoordinator {
+        config_path: String,
+    },
+    Crawler {
+        config_path: String,
     },
     #[cfg(feature = "dev")]
     Configure {
@@ -326,6 +335,22 @@ fn main() -> Result<()> {
             }
             AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
         },
+        Commands::CrawlCoordinator { config_path } => {
+            let config: CrawlCoordinatorConfig = load_toml_config(config_path);
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(entrypoint::crawler::coordinator(config))?
+        }
+        Commands::Crawler { config_path } => {
+            let config: CrawlerConfig = load_toml_config(config_path);
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(entrypoint::crawler::worker(config))?
+        }
     }
 
     Ok(())

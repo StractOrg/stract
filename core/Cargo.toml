@@ -88,6 +88,9 @@ half = { workspace = true }
 aes-gcm = { workspace = true }
 reqwest-eventsource = { workspace = true }
 publicsuffix = { workspace = true }
+robotstxt-with-cache = { workspace = true }
+rust-s3 = { workspace = true }
+rusqlite = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

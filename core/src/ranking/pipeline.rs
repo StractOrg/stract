@@ -130,7 +130,7 @@ impl<M: CrossEncoder> ReRanker<M> {
             let website = website.as_mut_ranking();
             let title = website.title.clone().unwrap_or_default();
             let body = website.clean_body.clone().unwrap_or_default();
-            let text = title + ". " + &body;
+            let text = title + ". " + body.as_str();
             bodies.push(text);
         }
 

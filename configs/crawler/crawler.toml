@@ -1,0 +1,12 @@
+num_workers = 10
+user_agent = "Mozilla/5.0 (compatible; Stractbot/0.1; +https://trystract.com/bot)"
+politeness_factor = 1.0
+timeout_seconds = 30
+coordinator_host = "0.0.0.0:8080"
+
+[s3]
+bucket = "crawl"
+folder = "test1"
+access_key = "<access_key>"
+secret_key = "<secret_key>"
+endpoint = "https://s3.trystract.com"

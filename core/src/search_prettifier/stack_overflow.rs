@@ -92,7 +92,7 @@ fn parse_so_answer(
         .and_then(|prop| prop.try_into_string())
         .map(Url::from)
         .map(|mut url| {
-            url.prefix_with(&Url::from(webpage_url.site()));
+            url = url.into_absolute(&Url::from(webpage_url.site()));
             url
         })?;
 
