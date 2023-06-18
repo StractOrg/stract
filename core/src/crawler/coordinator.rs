@@ -14,94 +14,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use rusqlite::{
-    types::{FromSql, FromSqlError, FromSqlResult, ValueRef},
-    ToSql,
-};
-
 use crate::webpage::Url;
 
-use super::{Domain, Job, JobResponse, Result, UrlResponse};
+use super::{
+    crawl_db::{CrawlDb, DomainStatus},
+    Domain, Job, JobResponse, Result,
+};
 use std::{
     collections::HashSet,
     path::Path,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
 
 const DEFAULT_JOB_URLS: usize = 1000;
 
-enum UrlStatus {
-    Pending,
-    Crawling,
-    Failed,
-    Done,
-}
-
-impl ToSql for UrlStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        match self {
-            UrlStatus::Pending => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(0),
-            )),
-            UrlStatus::Crawling => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(1),
-            )),
-            UrlStatus::Failed => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(2),
-            )),
-            UrlStatus::Done => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(3),
-            )),
-        }
-    }
-}
-
-impl FromSql for UrlStatus {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value {
-            ValueRef::Integer(0) => Ok(UrlStatus::Pending),
-            ValueRef::Integer(1) => Ok(UrlStatus::Crawling),
-            ValueRef::Integer(2) => Ok(UrlStatus::Failed),
-            ValueRef::Integer(3) => Ok(UrlStatus::Done),
-            _ => Err(FromSqlError::InvalidType),
-        }
-    }
-}
-
-enum DomainStatus {
-    Pending,
-    CrawlInProgress,
-}
-
-impl ToSql for DomainStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        match self {
-            DomainStatus::Pending => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(0),
-            )),
-            DomainStatus::CrawlInProgress => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(1),
-            )),
-        }
-    }
-}
-
-impl FromSql for DomainStatus {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value {
-            ValueRef::Integer(0) => Ok(DomainStatus::Pending),
-            ValueRef::Integer(1) => Ok(DomainStatus::CrawlInProgress),
-            _ => Err(FromSqlError::InvalidType),
-        }
-    }
-}
-
 pub struct CrawlCoordinator {
-    conn: Arc<rusqlite::Connection>,
+    db: CrawlDb,
     num_crawled_urls: AtomicU64,
     num_urls_to_crawl: u64,
 }
@@ -112,203 +41,34 @@ impl CrawlCoordinator {
         num_urls_to_crawl: u64,
         seed_urls: Vec<String>,
     ) -> Result<Self> {
-        let conn = Arc::new(rusqlite::Connection::open(crawldb_folder)?);
+        let db = CrawlDb::open(crawldb_folder)?;
 
-        // create tables if not exists
-        // there should be one table that contains all known URLs
-        // when a URL is added to the table, it should be marked as `UrlStatus::Pending`
-        // when a URL is being fetched, it should be marked as `UrlStatus::Crawling`
-        // when a URL has been fetched, it should be marked as `UrlStatus::Done`.
-        // Each URL should have a counter that counts the number of incoming links
-        // from URLs on other domains.
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS url(
-            url TEXT NOT NULL UNIQUE,
-            domain TEXT NOT NULL,
-            status INTEGER NOT NULL,
-            error_code INTEGER,
-            incoming_links INTEGER NOT NULL,
-            PRIMARY KEY (url)
-        );",
-            [],
-        )?;
-
-        // index by url and status
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS url_url_status ON url (url, status);",
-            [],
-        )?;
-
-        // there should be one table that contains all known domains
-        // and whether a crawl is in progress for that domain.
-        // It should also contain a copy of the maximum count of incoming links
-        // for any URL in that domain.
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS domain (
-            domain TEXT NOT NULL UNIQUE,
-            max_incoming_links INTEGER NOT NULL,
-            status INTEGER NOT NULL,
-            PRIMARY KEY (domain)
-        );",
-            [],
-        )?;
-
-        // index by domain and status
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS domain_domain_status ON domain (domain, status);",
-            [],
-        )?;
-
-        // store redirects
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS redirect (
-            from_url INTEGER NOT NULL,
-            to_url INTEGER NOT NULL,
-            PRIMARY KEY (from_url, to_url)
-        );",
-            [],
-        )?;
-
-        // update performance stuff
-        // WAL mode
-        conn.pragma_update(None, "journal_mode", "'WAL'")?;
-
-        // sync OFF - if coordinator crashes, we are SOL anyway and will have to restart the crawl.
-        conn.pragma_update(None, "synchronous", 0)?;
-
-        // store temp tables in memory
-        conn.pragma_update(None, "temp_store", 2)?;
-
-        // set cache size to 512 MB
-        conn.pragma_update(None, "cache_size", -512_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
+        let seed_urls = seed_urls.into_iter().map(Url::from).collect::<Vec<_>>();
 
         let domain_seeds = seed_urls
             .iter()
-            .map(|url| Domain(Url::from(url.clone()).domain().to_string()))
+            .map(|url| Domain(url.domain().to_string()))
             .collect::<HashSet<_>>();
 
-        {
-            let mut prepared_insert_url = conn.prepare(
-                "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT (url) DO NOTHING;",
-            )?;
-            let mut prepared_insert_domain = conn.prepare(
-                "INSERT INTO domain (domain, max_incoming_links, status)
-            VALUES (?1, 0, ?2)
-            ON CONFLICT (domain) DO NOTHING;",
-            )?;
+        db.transaction()?.insert_seed_urls(&seed_urls)?;
+        db.transaction()?
+            .update_max_inlinks_domains(domain_seeds.iter())?;
 
-            // insert seed URLs
-            for url in seed_urls {
-                let url = Url::from(url);
-                prepared_insert_url.execute((
-                    url.full(),
-                    url.domain().to_string(),
-                    UrlStatus::Pending,
-                    0,
-                ))?;
-                prepared_insert_domain
-                    .execute((url.domain().to_string(), DomainStatus::Pending))?;
-            }
-        }
-
-        let coord = Self {
-            conn,
+        Ok(Self {
+            db,
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
-        };
-
-        coord.update_max_inlinks_domains(domain_seeds.iter())?;
-
-        Ok(coord)
+        })
     }
 
     pub fn add_response(&self, response: &JobResponse) -> Result<()> {
         self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
-        // begin transaction
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.db.transaction()?;
 
-        {
-            // insert discovered URLs if not already in database
-            // update incoming link counts for discovered URLs
-            // if count is above prev max for domain, update max
-            let domain = Url::from(response.domain.0.clone());
-            let mut prepared_diff_domain = tx.prepare(
-                "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, 1)
-            ON CONFLICT (url) DO UPDATE SET incoming_links = incoming_links + 1;",
-            )?;
-            let mut prepared_same_domain = tx.prepare(
-                "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, 0)
-            ON CONFLICT (url) DO NOTHING;",
-            )?;
-            let mut prepared_insert_domain = tx.prepare(
-                "INSERT INTO domain (domain, max_incoming_links, status)
-            VALUES (?1, 0, ?2)
-            ON CONFLICT (domain) DO NOTHING;",
-            )?;
+        tx.insert_urls(&response.domain, &response.discovered_urls)?;
+        tx.update_url_status(&response.url_responses)?;
 
-            for url in &response.discovered_urls {
-                if domain.domain() != url.domain() {
-                    prepared_diff_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
-                } else {
-                    prepared_same_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
-                }
-
-                prepared_insert_domain.execute((url.domain(), DomainStatus::Pending))?;
-            }
-
-            let mut prepared_update_status_url =
-                tx.prepare("UPDATE url SET status = ?1, error_code = ?2 WHERE url = ?3;")?;
-            let mut prepared_insert_redirect = tx.prepare(
-                "INSERT INTO redirect (from_url, to_url)
-            VALUES (?1, ?2)
-            ON CONFLICT (from_url, to_url) DO NOTHING;",
-            )?;
-
-            // update status of URLs
-            for url_res in &response.url_responses {
-                match url_res {
-                    UrlResponse::Success { url } => {
-                        prepared_update_status_url.execute((
-                            UrlStatus::Done,
-                            None::<u16>,
-                            url.full(),
-                        ))?;
-                    }
-                    UrlResponse::Failed { url, status_code } => {
-                        prepared_update_status_url.execute((
-                            UrlStatus::Failed,
-                            status_code,
-                            url.full(),
-                        ))?;
-                    }
-                    UrlResponse::Redirected { url, new_url } => {
-                        prepared_update_status_url.execute((
-                            UrlStatus::Done,
-                            None::<u16>,
-                            url.full(),
-                        ))?;
-                        prepared_insert_redirect.execute((url.full(), new_url.full()))?;
-                        prepared_same_domain.execute((
-                            new_url.full(),
-                            new_url.domain(),
-                            UrlStatus::Done,
-                            0,
-                        ))?;
-                    }
-                }
-            }
-
-            tx.execute(
-                "UPDATE domain SET status = ?1 WHERE domain = ?2;",
-                (DomainStatus::Pending, &response.domain.0),
-            )?;
-        }
-
-        tx.commit()?;
+        tx.set_domain_status(&response.domain, DomainStatus::Pending)?;
 
         let mut domains = HashSet::new();
         domains.insert(response.domain.clone());
@@ -319,34 +79,7 @@ impl CrawlCoordinator {
                 .map(|url| Domain(url.domain().to_string())),
         );
 
-        self.update_max_inlinks_domains(domains.iter())?;
-
-        Ok(())
-    }
-
-    fn update_max_inlinks_domains<'a, I: Iterator<Item = &'a Domain>>(
-        &self,
-        domains: I,
-    ) -> Result<()> {
-        let tx = self.conn.unchecked_transaction()?;
-
-        {
-            // update max_incoming_links for domain based on
-            // max_incoming_links for URLs in domain.
-            // if no pending URLs in domain, set max_incoming_links to 0
-            let mut prepared = tx.prepare(
-                "UPDATE domain SET max_incoming_links = IFNULL(( 
-                SELECT MAX(incoming_links) FROM url
-                WHERE domain = ?1 AND status = ?2
-            ), 0) WHERE domain = ?1;",
-            )?;
-
-            for domain in domains {
-                prepared.execute((&domain.0, UrlStatus::Pending))?;
-            }
-        }
-
-        tx.commit()?;
+        tx.update_max_inlinks_domains(domains.iter())?;
 
         Ok(())
     }
@@ -357,78 +90,11 @@ impl CrawlCoordinator {
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {
         let start = Instant::now();
-        let tx = self.conn.unchecked_transaction()?;
-        let mut jobs = Vec::new();
+        let tx = self.db.transaction()?;
 
-        {
-            // weighted sample from domains that are not currently being crawled
-            // see https://www.kaggle.com/code/kotamori/random-sample-with-weights-on-sql/notebook for details on math
-            let mut stmt = tx.prepare(
-            "SELECT domain, -log((abs(random()) % 1000000 + 0.5) / 1000000.0) / (max_incoming_links + 1) as priority FROM domain
-            WHERE status = ?1
-            ORDER BY priority DESC
-            LIMIT ?2;",
-        )?;
-
-            // dfs sample
-            // let mut stmt = tx.prepare(
-            //     "SELECT domain FROM domain
-            //     WHERE status = ?1
-            //     LIMIT ?2;",
-            // )?;
-
-            let rows = stmt.query_map((DomainStatus::Pending, num_jobs), |row| {
-                row.get::<_, String>(0)
-            })?;
-
-            let mut domains = Vec::new();
-            for domain in rows {
-                domains.push(Domain(domain?));
-            }
-
-            tracing::debug!("sampled domains: {:?}", domains);
-
-            // get URLs from sampled domains
-            let mut stmt = tx.prepare(
-                "SELECT url FROM url
-            WHERE domain = ?1 AND status = ?2
-            ORDER BY incoming_links DESC
-            LIMIT ?3;",
-            )?;
-
-            let mut prepared_update_status_url =
-                tx.prepare("UPDATE url SET status = ?1 WHERE url = ?2;")?;
-            let mut prepared_update_status_domain =
-                tx.prepare("UPDATE domain SET status = ?1 WHERE domain = ?2;")?;
-
-            for domain in domains {
-                let mut urls = Vec::new();
-
-                let rows = stmt
-                    .query_map((&domain.0, UrlStatus::Pending, DEFAULT_JOB_URLS), |row| {
-                        row.get::<_, String>(0)
-                    })?;
-
-                prepared_update_status_domain
-                    .execute((DomainStatus::CrawlInProgress, &domain.0))?;
-
-                for url in rows {
-                    let url = url?;
-
-                    prepared_update_status_url.execute((UrlStatus::Crawling, url.clone()))?;
-
-                    urls.push(url.into());
-                }
-
-                jobs.push(Job {
-                    domain,
-                    fetch_sitemap: true, // TODO: only fetch sitemap if we haven't already
-                    urls: urls.into(),
-                });
-            }
-        }
-        tx.commit()?;
-
+        let domains = tx.sample_domains(num_jobs)?;
+        tracing::debug!("sampled domains: {:?}", domains);
+        let jobs = tx.prepare_jobs(&domains, DEFAULT_JOB_URLS)?;
         tracing::debug!("sampled jobs: {:?}", jobs);
         tracing::info!("sampled {} jobs in {:?}", jobs.len(), start.elapsed());
 

@@ -31,6 +31,7 @@ use self::{
 };
 
 mod coordinator;
+mod crawl_db;
 mod robots_txt;
 mod warc_writer;
 mod worker;
@@ -87,7 +88,7 @@ pub struct Job {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-enum UrlResponse {
+pub enum UrlResponse {
     Success { url: Url },
     Failed { url: Url, status_code: Option<u16> },
     Redirected { url: Url, new_url: Url },
