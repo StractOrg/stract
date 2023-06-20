@@ -18,7 +18,11 @@ import OpticSelector from "../components/OpticSelector.astro";
             <div id="message-container" class="flex px-5 flex-col gap-y-3 h-full">
                 <div class="flex flex-col h-full items-center gap-y-3">
                     <h1 class="text-2xl font-bold">Chat with Alice</h1>
-                    <p class="text-sm">Alice is an AI that tries to answer your questions by searhing for information on the internet. Alice is <b class="font-bold">highly experimental</b> and might produce bad or downright wrong answers. As always, you should verify the information from multiple sources and make sure the sources supports the claims. Alice will most likely be a paid feature in the future.</p>
+                    <p class="text-sm">Alice is an AI that tries to answer your questions by searching for information on the internet. As always, you should verify the information from multiple sources and make sure the sources supports the claims. Alice will most likely be a paid feature in the future.</p>
+                    <div class="flex flex-col items-center pt-20 gap-y-3">
+                        <div class="w-20"><img src="/images/warning.svg"/></div>
+                        <p class="text-brand_contrast/75">Alice is <b class="font-bold">highly experimental</b> and might produce bad or downright wrong answers.</p>
+                    </div>
                 </div>
             </div>
             <div class="w-full gap-y-2">
