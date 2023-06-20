@@ -206,7 +206,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -236,7 +236,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -285,7 +285,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -315,7 +315,7 @@ mod tests {
     //             page_centrality: 5.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -363,7 +363,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -393,7 +393,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -421,7 +421,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -469,7 +469,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -499,7 +499,7 @@ mod tests {
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
     //             page_centrality: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -543,7 +543,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -582,7 +582,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -631,7 +631,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -658,7 +658,7 @@ mod tests {
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
     //             page_centrality: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
@@ -703,7 +703,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -731,7 +731,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -760,7 +760,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -835,7 +835,7 @@ mod tests {
             crawl_stability: 0.0,
             fetch_time_ms: 500,
             page_centrality: 0.0,
-            primary_image: None,
+            
             host_topic: None,
             node_id: None,
             dmoz_description: None,
@@ -869,7 +869,7 @@ mod tests {
             pre_computed_score: 0.0,
             crawl_stability: 0.0,
             page_centrality: 0.0,
-            primary_image: None,
+            
             host_topic: None,
             node_id: None,
             dmoz_description: None,
@@ -903,7 +903,7 @@ mod tests {
             pre_computed_score: 0.0,
             crawl_stability: 0.0,
             page_centrality: 0.0,
-            primary_image: None,
+            
             host_topic: None,
             node_id: None,
             dmoz_description: None,
@@ -959,7 +959,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -989,7 +989,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -1039,7 +1039,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 crawl_stability: 1.0,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -1069,7 +1069,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 node_id: None,
                 dmoz_description: None,
@@ -1126,7 +1126,7 @@ mod tests {
     //             pre_computed_score: 0.0,
     //             crawl_stability: 1.0,
     //             page_centrality: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: Some(topic_a.clone()),
     //             node_id: Some(1.into()),
     //             dmoz_description: None,
@@ -1161,7 +1161,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: Some(topic_b.clone()),
     //             node_id: Some(2.into()),
     //             dmoz_description: None,
@@ -1196,7 +1196,7 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             crawl_stability: 0.0,
-    //             primary_image: None,
+    //             
     //             host_topic: None,
     //             node_id: Some(0.into()),
     //             dmoz_description: None,

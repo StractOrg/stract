@@ -85,7 +85,7 @@ mod tests {
                 fetch_time_ms: 50,
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
-                primary_image: None,
+
                 crawl_stability: 0.0,
                 dmoz_description: None,
                 host_topic: None,
@@ -120,7 +120,7 @@ mod tests {
                 fetch_time_ms: 49,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
-                primary_image: None,
+
                 crawl_stability: 0.0,
                 host_topic: None,
                 dmoz_description: None,
@@ -155,7 +155,7 @@ mod tests {
                 fetch_time_ms: 0,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
-                primary_image: None,
+
                 crawl_stability: 0.0,
                 dmoz_description: None,
                 host_topic: None,

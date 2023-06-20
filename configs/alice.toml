@@ -4,7 +4,7 @@ host = "0.0.0.0:3004"
 gossip_seed_nodes = ["0.0.0.0:3005", "0.0.0.0:3006"]
 alice_path = "data/alice"
 summarizer_path = "data/summarizer/dual_encoder/"
-encryption_key = "URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc="
+encryption_key = "URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc=" # don't use this key for anything important
 
 [accelerator]
 layer_fraction = 1.0

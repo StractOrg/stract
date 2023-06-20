@@ -266,7 +266,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -293,7 +293,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.01,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -396,7 +396,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -422,7 +422,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -503,7 +503,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -530,7 +530,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -560,7 +560,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -668,7 +668,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 host_topic: None,
                 dmoz_description: None,
                 node_id: Some(*graph.node2id(&Node::from("www.a.com").into_host()).unwrap()),
@@ -695,7 +695,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -725,7 +725,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0002,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -805,7 +805,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -847,7 +847,7 @@ mod tests {
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                primary_image: None,
+                
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
                 fetch_time_ms: 500,
@@ -986,7 +986,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1062,7 +1062,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1093,7 +1093,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1149,7 +1149,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1209,7 +1209,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1372,7 +1372,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1447,7 +1447,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1509,7 +1509,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1540,7 +1540,7 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+                
                 node_id: None,
                 host_topic: None,
                 dmoz_description: None,
@@ -1640,7 +1640,7 @@ mod tests {
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
             crawl_stability: 0.0,
-            primary_image: None,
+            
             node_id: None,
             host_topic: None,
             dmoz_description: None,

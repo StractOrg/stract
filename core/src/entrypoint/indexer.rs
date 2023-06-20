@@ -50,7 +50,6 @@ pub enum JobConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
     pub source_config: JobConfig,
-    pub download_images: bool,
     pub warc_paths: Vec<String>,
     pub base_path: String,
     pub host_centrality_threshold: Option<f64>,
@@ -202,7 +201,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     page_centrality,
                     host_centrality,
                     fetch_time_ms,
-                    primary_image: None,
                     pre_computed_score: 0.0,
                     node_id,
                     crawl_stability,
@@ -218,10 +216,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 if let Err(err) = index.insert(webpage) {
                     debug!("{:?}", err);
                 }
-            }
-            if job.download_images {
-                info!("downloading images");
-                index.download_pending_images();
             }
         }
 
@@ -321,7 +315,6 @@ impl Indexer {
                         .map(|warc_paths| Job {
                             source_config: job_config.clone(),
                             warc_paths: warc_paths.collect_vec(),
-                            download_images: config.download_images.unwrap_or(true),
                             host_centrality_threshold: config.host_centrality_threshold,
                             base_path: config
                                 .index_base_path
@@ -406,7 +399,6 @@ impl Indexer {
                     .map(|warc_paths| Job {
                         source_config: job_config.clone(),
                         warc_paths: warc_paths.collect_vec(),
-                        download_images: config.download_images.unwrap_or(true),
                         host_centrality_threshold: config.host_centrality_threshold,
                         base_path: config
                             .output_path

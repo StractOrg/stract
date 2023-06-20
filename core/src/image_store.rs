@@ -19,12 +19,8 @@ use crate::Result;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageOutputFormat};
 use serde::{de, ser::SerializeStruct, Serialize};
-use std::collections::HashSet;
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
-use uuid::Uuid;
-
-const FAVICON_SIZE: u32 = 32;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Image(DynamicImage);
@@ -113,10 +109,6 @@ impl BaseImageStore {
         self.store.flush();
     }
 
-    fn contains(&self, key: &String) -> bool {
-        self.store.get(key).is_some()
-    }
-
     fn get(&self, key: &String) -> Option<Image> {
         self.store.get(key)
     }
@@ -144,97 +136,6 @@ impl ImageFilter for ResizeFilter {
                 .0
                 .resize(self.width, self.height, FilterType::Gaussian),
         )
-    }
-}
-
-pub struct FaviconStore(BaseImageStore);
-
-impl FaviconStore {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let store = BaseImageStore::open_with_filters(
-            path,
-            vec![Box::new(ResizeFilter {
-                width: FAVICON_SIZE,
-                height: FAVICON_SIZE,
-            })],
-        );
-
-        Self(store)
-    }
-
-    pub fn contains(&self, key: &String) -> bool {
-        self.0.contains(key)
-    }
-}
-
-impl ImageStore<String> for FaviconStore {
-    fn insert(&mut self, key: String, image: Image) {
-        self.0.insert(key, image)
-    }
-
-    fn get(&self, key: &String) -> Option<Image> {
-        self.0.get(key)
-    }
-
-    fn merge(&mut self, other: Self) {
-        self.0.merge(other.0)
-    }
-
-    fn flush(&self) {
-        self.0.flush()
-    }
-}
-
-pub struct PrimaryImageStore {
-    store: BaseImageStore,
-    promised_uuids: HashSet<Uuid>,
-}
-
-impl PrimaryImageStore {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let store = BaseImageStore::open_with_filters(
-            path,
-            vec![Box::new(ResizeFilter {
-                width: 200,
-                height: 100,
-            })],
-        );
-
-        Self {
-            store,
-            promised_uuids: HashSet::new(),
-        }
-    }
-
-    pub fn generate_uuid(&mut self) -> Uuid {
-        let mut uuid = Uuid::new_v4();
-
-        while self.store.contains(&uuid.to_string()) || self.promised_uuids.contains(&uuid) {
-            uuid = Uuid::new_v4();
-        }
-
-        self.promised_uuids.insert(uuid);
-
-        uuid
-    }
-}
-
-impl ImageStore<Uuid> for PrimaryImageStore {
-    fn insert(&mut self, uuid: Uuid, image: Image) {
-        self.promised_uuids.remove(&uuid);
-        self.store.insert(uuid.to_string(), image);
-    }
-
-    fn get(&self, uuid: &Uuid) -> Option<Image> {
-        self.store.get(&uuid.to_string())
-    }
-
-    fn merge(&mut self, other: Self) {
-        self.store.merge(other.store)
-    }
-
-    fn flush(&self) {
-        self.store.flush()
     }
 }
 
@@ -330,10 +231,8 @@ mod tests {
         let key = "test".to_string();
         let mut store = BaseImageStore::open(crate::gen_temp_path());
 
-        assert!(!store.contains(&key));
         assert_eq!(store.get(&key), None);
         store.insert(key.clone(), image.clone());
-        assert!(store.contains(&key));
         assert_eq!(store.get(&key), Some(image));
     }
 
@@ -354,32 +253,5 @@ mod tests {
 
         assert_eq!(transformed_image.0.width(), 16);
         assert_eq!(transformed_image.0.height(), 16);
-    }
-
-    #[test]
-    fn favicon_store() {
-        let image = Image(
-            ImageBuffer::from_pixel(
-                FAVICON_SIZE * 2,
-                FAVICON_SIZE * 2,
-                image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX]),
-            )
-            .into(),
-        );
-        assert_eq!(image.0.width(), FAVICON_SIZE * 2);
-        assert_eq!(image.0.height(), FAVICON_SIZE * 2);
-
-        let mut store = FaviconStore::open(crate::gen_temp_path());
-
-        let key = "test".to_string();
-
-        assert!(!store.contains(&key));
-        assert_eq!(store.get(&key), None);
-        store.insert(key.clone(), image);
-        assert!(store.contains(&key));
-
-        let retrieved_image = store.get(&key).unwrap();
-        assert_eq!(retrieved_image.0.width(), FAVICON_SIZE);
-        assert_eq!(retrieved_image.0.height(), FAVICON_SIZE);
     }
 }

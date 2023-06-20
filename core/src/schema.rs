@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::schema::{
-    BytesOptions, Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
 use crate::tokenizer::{BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer};
@@ -44,7 +44,6 @@ pub enum TextField {
     TitleIfHomepage,
     BacklinkText,
     Description,
-    PrimaryImage,
     HostTopic,
     DmozDescription,
     SchemaOrgJson,
@@ -80,7 +79,6 @@ impl TextField {
             TextField::DomainNameIfHomepageNoTokenizer => Tokenizer::Identity(Identity {}),
             TextField::TitleIfHomepage => Tokenizer::default(),
             TextField::BacklinkText => Tokenizer::default(),
-            TextField::PrimaryImage => Tokenizer::Identity(Identity {}),
             TextField::Description => Tokenizer::default(),
             TextField::HostTopic => Tokenizer::default(),
             TextField::DmozDescription => Tokenizer::default(),
@@ -119,7 +117,6 @@ impl TextField {
             TextField::DomainNameIfHomepageNoTokenizer => false,
             TextField::TitleIfHomepage => false,
             TextField::BacklinkText => false,
-            TextField::PrimaryImage => false,
             TextField::Description => true,
             TextField::HostTopic => false,
             TextField::DmozDescription => true,
@@ -149,7 +146,6 @@ impl TextField {
             TextField::DomainIfHomepage => "domain_if_homepage",
             TextField::DomainNameIfHomepageNoTokenizer => "domain_name_if_homepage_no_tokenizer",
             TextField::Description => "description",
-            TextField::PrimaryImage => "primary_image_uuid",
             TextField::TitleIfHomepage => "title_if_homepage",
             TextField::AllBody => "all_body",
             TextField::HostTopic => "host_topic",
@@ -243,7 +239,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 54] = [
+pub static ALL_FIELDS: [Field; 53] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -260,7 +256,6 @@ pub static ALL_FIELDS: [Field; 54] = [
     Field::Text(TextField::DomainNameIfHomepageNoTokenizer),
     Field::Text(TextField::TitleIfHomepage),
     Field::Text(TextField::BacklinkText),
-    Field::Text(TextField::PrimaryImage),
     Field::Text(TextField::Description),
     Field::Text(TextField::HostTopic),
     Field::Text(TextField::DmozDescription),
@@ -361,9 +356,6 @@ impl Field {
             }
             Field::Text(TextField::StemmedCleanBody) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
-            }
-            Field::Text(TextField::PrimaryImage) => {
-                IndexingOption::Bytes(BytesOptions::default().set_stored())
             }
             Field::Text(TextField::Description) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
@@ -528,8 +520,7 @@ impl Field {
     pub fn is_searchable(&self) -> bool {
         !matches!(
             self,
-            Field::Text(TextField::PrimaryImage)
-                | Field::Text(TextField::BacklinkText)
+            Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::HostTopic)
                 | Field::Text(TextField::SchemaOrgJson)
                 | Field::Text(TextField::CleanBodyBigrams)
@@ -566,7 +557,6 @@ pub fn create_schema() -> tantivy::schema::Schema {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
             IndexingOption::Float(options) => builder.add_f64_field(field.name(), options),
-            IndexingOption::Bytes(options) => builder.add_bytes_field(field.name(), options),
             IndexingOption::Facet(options) => builder.add_facet_field(field.name(), options),
         };
     }
@@ -578,7 +568,6 @@ pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Integer(tantivy::schema::NumericOptions),
     Float(tantivy::schema::NumericOptions),
-    Bytes(tantivy::schema::BytesOptions),
     Facet(tantivy::schema::FacetOptions),
 }
 

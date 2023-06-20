@@ -14,44 +14,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use uuid::Uuid;
 
 use crate::directory::{self, DirEntry};
-use crate::image_downloader::{ImageDownloadJob, ImageDownloader};
-use crate::image_store::{FaviconStore, Image, ImageStore, PrimaryImageStore};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
 use crate::subdomain_count::SubdomainCounter;
 use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
-use crate::webpage::{Url, Webpage};
+use crate::webpage::Webpage;
 use crate::Result;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
-const FAVICON_STORE_SUBFOLDER_NAME: &str = "favicon_store";
-const PRIMARY_IMAGE_STORE_SUBFOLDER_NAME: &str = "primary_image_store";
 const REGION_COUNT_FILE_NAME: &str = "region_count.json";
 const SUBDOMAIN_COUNT_SUBFOLDER_NAME: &str = "subdomain_count";
-const IMAGE_WEBPAGE_CENTRALITY_THRESHOLD: f64 = 0.0;
 
 pub struct Index {
     pub inverted_index: InvertedIndex,
-    favicon_store: FaviconStore,
-    primary_image_store: PrimaryImageStore,
-    favicon_downloader: ImageDownloader<String>,
-    primary_image_downloader: ImageDownloader<Uuid>,
     pub region_count: RegionCount,
     pub subdomain_counter: SubdomainCounter,
     pub path: String,
@@ -63,10 +51,6 @@ impl Index {
             fs::create_dir_all(path.as_ref())?;
         }
 
-        let favicon_store = FaviconStore::open(path.as_ref().join(FAVICON_STORE_SUBFOLDER_NAME));
-        let primary_image_store =
-            PrimaryImageStore::open(path.as_ref().join(PRIMARY_IMAGE_STORE_SUBFOLDER_NAME));
-
         let inverted_index =
             InvertedIndex::open(path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME))?;
 
@@ -74,11 +58,7 @@ impl Index {
 
         Ok(Self {
             inverted_index,
-            favicon_store,
-            primary_image_store,
             region_count,
-            primary_image_downloader: ImageDownloader::new(),
-            favicon_downloader: ImageDownloader::new(),
             subdomain_counter: SubdomainCounter::open(
                 path.as_ref().join(SUBDOMAIN_COUNT_SUBFOLDER_NAME),
             ),
@@ -96,9 +76,7 @@ impl Index {
         Self::open(path)
     }
 
-    pub fn insert(&mut self, mut webpage: Webpage) -> Result<()> {
-        self.maybe_insert_favicon(&webpage);
-        self.maybe_insert_primary_image(&mut webpage);
+    pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
         self.subdomain_counter.increment(webpage.html.url().clone());
 
         if let Ok(region) = Region::guess_from(&webpage) {
@@ -138,29 +116,11 @@ impl Index {
         websites: &[inverted_index::WebsitePointer],
         query: &Query,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let mut websites = self.inverted_index.retrieve_websites(websites, query)?;
-
-        for website in &mut websites {
-            let url = Url::from(website.url.clone());
-            website.favicon = self.retrieve_favicon(&url);
-            if let Some(uuid) = website.primary_image.as_ref().map(|image| &image.uuid) {
-                if self.retrieve_primary_image(uuid).is_none() {
-                    website.primary_image = None;
-                }
-            }
-        }
-
-        Ok(websites)
+        self.inverted_index.retrieve_websites(websites, query)
     }
 
     pub fn merge(mut self, other: Self) -> Self {
         self.inverted_index.merge(other.inverted_index);
-
-        self.favicon_store.merge(other.favicon_store);
-        drop(self.favicon_store);
-
-        self.primary_image_store.merge(other.primary_image_store);
-        drop(self.primary_image_store);
 
         self.region_count.merge(other.region_count);
 
@@ -170,66 +130,8 @@ impl Index {
         Self::open(&self.path).expect("failed to open index")
     }
 
-    fn maybe_insert_favicon(&mut self, webpage: &Webpage) {
-        if !webpage.html.url().is_homepage()
-            || self
-                .favicon_store
-                .contains(&webpage.html.url().domain().to_string())
-        {
-            return;
-        }
-
-        if let Some(favicon) = webpage.html.favicon() {
-            if favicon.link.is_valid_uri() {
-                self.favicon_downloader.schedule(ImageDownloadJob {
-                    key: favicon.link.domain().to_string(),
-                    urls: vec![favicon.link],
-                    timeout: Some(Duration::from_secs(1)),
-                });
-            }
-        }
-    }
-
-    fn maybe_insert_primary_image(&mut self, webpage: &mut Webpage) {
-        match webpage
-            .host_centrality
-            .partial_cmp(&IMAGE_WEBPAGE_CENTRALITY_THRESHOLD)
-        {
-            None | Some(Ordering::Greater) => {}
-            _ => return,
-        }
-
-        if let Some(image) = webpage.html.primary_image() {
-            let url = image.url.clone();
-            if url.is_valid_uri() {
-                let uuid = self.primary_image_store.generate_uuid();
-                webpage.set_primary_image(uuid, image);
-
-                self.primary_image_downloader.schedule(ImageDownloadJob {
-                    key: uuid,
-                    urls: vec![url],
-                    timeout: Some(Duration::from_secs(5)),
-                });
-            }
-        }
-    }
-
-    pub fn retrieve_favicon(&self, url: &Url) -> Option<Image> {
-        self.favicon_store.get(&url.domain().to_string())
-    }
-
-    pub fn retrieve_primary_image(&self, uuid: &Uuid) -> Option<Image> {
-        self.primary_image_store.get(uuid)
-    }
-
     pub fn schema(&self) -> Arc<Schema> {
         self.inverted_index.schema()
-    }
-
-    pub(crate) fn download_pending_images(&mut self) {
-        self.favicon_downloader.download(&mut self.favicon_store);
-        self.primary_image_downloader
-            .download(&mut self.primary_image_store);
     }
 
     pub fn num_segments(&self) -> usize {

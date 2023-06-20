@@ -25,13 +25,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    panic,
-};
+use std::{collections::HashMap, panic};
 use tantivy::tokenizer::{PreTokenizedString, Tokenizer};
-use uuid::Uuid;
 use whatlang::Lang;
 
 mod just_text;
@@ -115,13 +110,6 @@ impl<const N: usize> Preprocessor<N> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StoredPrimaryImage {
-    pub uuid: Uuid,
-    pub title_terms: HashSet<String>,
-    pub description_terms: HashSet<String>,
-}
-
 pub struct Webpage {
     pub html: Html,
     pub backlinks: Vec<Link>,
@@ -129,7 +117,6 @@ pub struct Webpage {
     pub page_centrality: f64,
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
-    pub primary_image: Option<StoredPrimaryImage>,
     pub node_id: Option<NodeID>,
     pub crawl_stability: f64,
     pub host_topic: Option<Topic>,
@@ -148,7 +135,6 @@ impl Webpage {
             page_centrality: 0.0,
             fetch_time_ms: 0,
             pre_computed_score: 0.0,
-            primary_image: None,
             node_id: None,
             host_topic: None,
             crawl_stability: 0.0,
@@ -236,14 +222,6 @@ impl Webpage {
             self.pre_computed_score,
         );
 
-        let image = bincode::serialize(&self.primary_image).unwrap();
-        doc.add_bytes(
-            schema
-                .get_field(Field::Text(TextField::PrimaryImage).name())
-                .expect("Failed to get primary_image field"),
-            image,
-        );
-
         doc.add_u64(
             schema
                 .get_field(Field::Fast(FastField::HostNodeID).name())
@@ -278,32 +256,6 @@ impl Webpage {
         );
 
         Ok(doc)
-    }
-
-    pub(crate) fn set_primary_image(&mut self, uuid: Uuid, image: ImageLink) {
-        let mut title_terms = HashSet::new();
-
-        if let Some(title) = image.title {
-            let mut tokenizer = tokenizer::Normal::default().token_stream(title.as_str());
-            while let Some(token) = tokenizer.next() {
-                title_terms.insert(token.text.clone());
-            }
-        }
-
-        let mut description_terms = HashSet::new();
-
-        if let Some(description) = image.description {
-            let mut tokenizer = tokenizer::Normal::default().token_stream(description.as_str());
-            while let Some(token) = tokenizer.next() {
-                description_terms.insert(token.text.clone());
-            }
-        }
-
-        self.primary_image = Some(StoredPrimaryImage {
-            uuid,
-            title_terms,
-            description_terms,
-        });
     }
 }
 
@@ -994,8 +946,7 @@ impl Html {
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
                 | Field::Fast(FastField::CrawlStability)
-                | Field::Text(TextField::DmozDescription)
-                | Field::Text(TextField::PrimaryImage) => {}
+                | Field::Text(TextField::DmozDescription) => {}
             }
         }
 
@@ -1880,7 +1831,6 @@ mod tests {
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            primary_image: None,
             node_id: None,
             crawl_stability: 0.0,
             host_topic: None,
@@ -1916,7 +1866,6 @@ mod tests {
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            primary_image: None,
             node_id: None,
             crawl_stability: 0.0,
             host_topic: None,

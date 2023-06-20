@@ -128,7 +128,7 @@ where
                 .drain()
                 .map(|job| async move { job.download().await }),
         )
-        .buffer_unordered(20);
+        .buffer_unordered(5);
 
         let mut inserts_since_flush = 0;
 

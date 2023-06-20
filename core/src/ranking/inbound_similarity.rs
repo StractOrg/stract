@@ -333,7 +333,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+
                 host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("e.com")).unwrap()),
                 dmoz_description: None,
@@ -363,7 +363,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 crawl_stability: 0.0,
-                primary_image: None,
+
                 host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("d.com")).unwrap()),
                 dmoz_description: None,

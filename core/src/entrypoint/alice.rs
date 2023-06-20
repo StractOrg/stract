@@ -171,6 +171,7 @@ pub async fn run(config: AliceLocalConfig) -> Result<(), crate::alice::Error> {
     let addr: SocketAddr = config.host;
     let key = base64::decode(config.encryption_key)?;
 
+    info!("starting alice");
     let alice = Alice::open(
         &config.alice_path,
         &config.summarizer_path,

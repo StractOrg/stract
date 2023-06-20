@@ -157,12 +157,10 @@ pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
     pub site: String,
-    pub favicon_base64: String,
     pub domain: String,
     pub pretty_url: String,
     pub snippet: Snippet,
     pub body: String,
-    pub primary_image_uuid: Option<String>,
     pub ranking_signals: Option<HashMap<Signal, f64>>,
 }
 
@@ -186,21 +184,14 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
         let title = html_escape(&webpage.title);
 
-        let favicon_bytes = webpage
-            .favicon
-            .map(|favicon| favicon.as_raw_bytes())
-            .unwrap_or_else(|| include_bytes!("../../../frontend/dist/images/globe.png").to_vec());
-
         Self {
             title,
             site: url.site().to_string(),
             url: webpage.url,
             pretty_url,
             domain,
-            favicon_base64: base64::encode(favicon_bytes),
             snippet,
             body: webpage.body,
-            primary_image_uuid: webpage.primary_image.map(|image| image.uuid.to_string()),
             ranking_signals: None,
         }
     }

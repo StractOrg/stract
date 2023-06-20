@@ -118,7 +118,6 @@ fn create_inverted_index() -> Result<()> {
             folder: ".".to_string(),
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
-        download_images: false,
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         base_path: out_path_tmp.to_str().unwrap().to_string(),
         host_centrality_threshold: None,

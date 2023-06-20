@@ -26,7 +26,6 @@ use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 use crate::collector::Hashes;
 use crate::fastfield_reader::FastFieldReader;
 use crate::human_website_annotations::Topic;
-use crate::image_store::Image;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
@@ -37,7 +36,7 @@ use crate::snippet;
 use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
-use crate::webpage::{schema_org, StoredPrimaryImage, Url, Webpage};
+use crate::webpage::{schema_org, Url, Webpage};
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
@@ -279,22 +278,6 @@ impl InvertedIndex {
             .iter()
             .map(|website| self.retrieve_doc(website.address, &tv_searcher))
             .filter_map(|res| res.ok())
-            .map(|mut doc| {
-                if let Some(image) = doc.primary_image.as_ref() {
-                    if !query.simple_terms().iter().all(|term| {
-                        image
-                            .title_terms
-                            .contains(term.to_ascii_lowercase().as_str())
-                            || image
-                                .description_terms
-                                .contains(term.to_ascii_lowercase().as_str())
-                    }) {
-                        doc.primary_image = None;
-                    }
-                }
-
-                doc
-            })
             .collect();
 
         for page in &mut webpages {
@@ -494,8 +477,6 @@ pub struct RetrievedWebpage {
     pub dirty_body: String,
     pub description: Option<String>,
     pub dmoz_description: Option<String>,
-    pub favicon: Option<Image>,
-    pub primary_image: Option<StoredPrimaryImage>,
     pub updated_time: Option<NaiveDateTime>,
     pub host_topic: Option<Topic>,
     pub schema_org: Vec<schema_org::Item>,
@@ -542,16 +523,6 @@ impl From<Document> for RetrievedWebpage {
                         .as_text()
                         .expect("Url field should be text")
                         .to_string();
-                }
-                Field::Text(TextField::PrimaryImage) => {
-                    webpage.primary_image = {
-                        let bytes = value
-                            .value
-                            .as_bytes()
-                            .expect("Primary image field should be bytes");
-
-                        bincode::deserialize(bytes).unwrap()
-                    }
                 }
                 Field::Fast(FastField::LastUpdated) => {
                     webpage.updated_time = {
@@ -611,7 +582,7 @@ impl From<Document> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
-    use maplit::{hashmap, hashset};
+    use maplit::hashmap;
 
     use crate::{
         ranking::{Ranker, SignalAggregator},
@@ -879,7 +850,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                primary_image: None,
                 node_id: None,
                 host_topic: None,
                 crawl_stability: 0.0,
@@ -1130,83 +1100,6 @@ mod tests {
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com");
-    }
-
-    #[test]
-    fn only_show_primary_images_when_relevant() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
-
-        let mut webpage = Webpage::new(
-            &format!(
-                r#"
-                    <html>
-                        <head>
-                            <meta property="og:image" content="https://example.com/link_to_image.html" />
-                            <meta property="og:description" content="This is an image for the test website" />
-                            <meta property="og:title" content="title" />
-                            <title>Test website</title>
-                        </head>
-                        <body>
-                            {CONTENT}
-                        </body>
-                    </html>
-                    "#
-            ),
-            "https://www.example.com",
-        );
-        let uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
-        webpage.set_primary_image(uuid, webpage.html.primary_image().unwrap());
-
-        index.insert(webpage).expect("failed to insert webpage");
-        index.commit().expect("failed to commit index");
-
-        let ctx = index.local_search_ctx();
-        let query = Query::parse(
-            &ctx,
-            &SearchQuery {
-                query: "website".to_string(),
-                ..Default::default()
-            },
-            &index,
-        )
-        .expect("Failed to parse query");
-        let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
-            ctx.fastfield_reader.clone(),
-        );
-
-        let result =
-            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-        assert_eq!(
-            result.documents[0].primary_image,
-            Some(StoredPrimaryImage {
-                uuid,
-                title_terms: hashset! {"title".to_string()},
-                description_terms: hashset! {"this".to_string(), "is".to_string(), "an".to_string(), "image".to_string(), "for".to_string(), "the".to_string(), "test".to_string(), "website".to_string()}
-            })
-        );
-
-        let query = Query::parse(
-            &ctx,
-            &SearchQuery {
-                query: "best website".to_string(),
-                ..Default::default()
-            },
-            &index,
-        )
-        .expect("Failed to parse query");
-
-        let result =
-            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-
-        assert_eq!(result.num_docs, 1);
-        assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-        assert_eq!(result.documents[0].primary_image, None);
     }
 
     #[test]

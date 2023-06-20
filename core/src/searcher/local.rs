@@ -15,10 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::Arc;
-
-use uuid::Uuid;
 
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
@@ -39,7 +36,6 @@ use crate::spell::Spell;
 use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
-use crate::webpage::Url;
 use crate::{inverted_index, Error, Result};
 
 use super::WebsitesResult;
@@ -380,17 +376,6 @@ impl LocalSearcher {
         })
     }
 
-    pub fn favicon(&self, site: &Url) -> Option<Image> {
-        self.index.retrieve_favicon(site)
-    }
-
-    pub fn primary_image(&self, uuid: String) -> Option<Image> {
-        if let Ok(uuid) = Uuid::from_str(uuid.as_str()) {
-            return self.index.retrieve_primary_image(&uuid);
-        }
-        None
-    }
-
     pub fn entity_image(&self, entity: String) -> Option<Image> {
         self.entity_index
             .as_ref()
@@ -449,7 +434,6 @@ mod tests {
                     fetch_time_ms: 500,
                     page_centrality: 0.0,
                     pre_computed_score: 0.0,
-                    primary_image: None,
                     node_id: None,
                     host_topic: None,
                     crawl_stability: 0.0,
