@@ -18,16 +18,160 @@ use std::{fs::OpenOptions, path::Path};
 use crate::alice::{Error, Result};
 use safetensors::SafeTensors;
 use tch::{
-    nn::{embedding, layer_norm, Embedding, LayerNorm, LayerNormConfig, Linear, ModuleT, VarStore},
+    nn::{embedding, layer_norm, Embedding, LayerNorm, LayerNormConfig, ModuleT, VarStore},
     IndexOp, Kind, Tensor,
 };
 
 const NUM_TOKENS: i64 = 50277;
 
+enum Linear {
+    Normal(tch::nn::Linear),
+    Quantized {
+        ws: Tensor,
+        bs: Option<Tensor>,
+        scale: Tensor,
+        zero_point: Tensor,
+    },
+}
+
+fn quantize_tensor_per_channel(tensor: &Tensor) -> (Tensor, Tensor, Tensor) {
+    let min_vals = tensor.amin(1, true);
+    let max_vals = tensor.amax(1, true);
+    let qmin: f64 = -127.0; // for qint8
+    let qmax: f64 = 127.0; // for qint8
+
+    // calculate scale and zero_point
+    let scale = (&max_vals - &min_vals) / (qmax - qmin);
+    let initial_zero_point = qmin - &min_vals / &scale;
+
+    // clamp zero_point to qint8 range
+    let zero_point = initial_zero_point
+        .clamp(qmin, qmax)
+        .round()
+        .to_kind(Kind::Float);
+
+    let scale = scale.to_kind(Kind::Float);
+
+    let quantized_weights = ((tensor / &scale) + &zero_point)
+        .clamp(qmin, qmax)
+        .round()
+        .to_kind(Kind::Int8);
+
+    (quantized_weights, scale, zero_point)
+}
+
+fn dequantize(tensor: &Tensor, scale: &Tensor, zero_point: &Tensor) -> Tensor {
+    (tensor.to_kind(Kind::Float) - zero_point) * scale
+}
+
+impl Linear {
+    fn forward_t(&self, x: &Tensor, train: bool) -> Tensor {
+        match self {
+            Linear::Normal(linear) => linear.forward_t(x, train),
+            Linear::Quantized {
+                ws,
+                bs,
+                scale,
+                zero_point,
+            } => {
+                let ws = dequantize(ws, scale, zero_point);
+                let mut output = x.matmul(&ws.transpose(-2, -1));
+                if let Some(bias) = bs {
+                    output += bias;
+                }
+                output
+            }
+        }
+    }
+
+    fn ws(&self) -> &Tensor {
+        match self {
+            Linear::Normal(linear) => &linear.ws,
+            Linear::Quantized { ws, .. } => ws,
+        }
+    }
+
+    fn set_ws(&mut self, ws: Tensor) {
+        match self {
+            Linear::Normal(linear) => linear.ws = ws,
+            Linear::Quantized { .. } => {
+                unimplemented!();
+            }
+        }
+    }
+
+    fn bs(&self) -> Option<&Tensor> {
+        match self {
+            Linear::Normal(linear) => linear.bs.as_ref(),
+            Linear::Quantized { bs, .. } => bs.as_ref(),
+        }
+    }
+
+    fn set_bs(&mut self, bs: Option<Tensor>) {
+        if let Some(bs) = bs {
+            match self {
+                Linear::Normal(linear) => linear.bs = Some(bs),
+                Linear::Quantized { bs: bs_, .. } => *bs_ = Some(bs),
+            }
+        }
+    }
+
+    fn quantize(&self) -> Self {
+        match self {
+            Self::Quantized {
+                ws,
+                bs,
+                scale,
+                zero_point,
+            } => {
+                let new_ws = Tensor::empty(ws.size(), (ws.kind(), ws.device()));
+                let _ = ws.clone(&new_ws);
+
+                let mut new_bs = None;
+
+                if let Some(bs) = bs {
+                    new_bs = Some(Tensor::empty(bs.size(), (bs.kind(), bs.device())));
+                    let _ = bs.clone(new_bs.as_mut().unwrap());
+                }
+
+                let new_scale = Tensor::empty(scale.size(), (scale.kind(), scale.device()));
+                let _ = scale.clone(&new_scale);
+
+                let new_zeropoint =
+                    Tensor::empty(zero_point.size(), (zero_point.kind(), zero_point.device()));
+                let _ = zero_point.clone(&new_zeropoint);
+
+                Self::Quantized {
+                    ws: new_ws,
+                    bs: new_bs,
+                    scale: new_scale,
+                    zero_point: new_zeropoint,
+                }
+            }
+            Self::Normal(linear) => {
+                let (ws, scale, zero_point) = quantize_tensor_per_channel(&linear.ws);
+
+                let mut new_bs = None;
+                if let Some(bs) = &linear.bs {
+                    new_bs = Some(Tensor::empty(bs.size(), (bs.kind(), bs.device())));
+                    let _ = bs.clone(new_bs.as_mut().unwrap());
+                }
+
+                Self::Quantized {
+                    ws,
+                    bs: new_bs,
+                    scale,
+                    zero_point,
+                }
+            }
+        }
+    }
+}
+
 fn load_linear(weights: &SafeTensors, prefix: &str) -> Result<Linear> {
     let ws = weights.tensor(&format!("{prefix}.weight"))?.try_into()?;
 
-    let mut linear = Linear { ws, bs: None };
+    let mut linear = tch::nn::Linear { ws, bs: None };
 
     if let Ok(bias_tensor) = weights.tensor(&format!("{prefix}.bias")) {
         linear.bs = Some(bias_tensor.try_into()?);
@@ -39,7 +183,7 @@ fn load_linear(weights: &SafeTensors, prefix: &str) -> Result<Linear> {
 
     linear.ws = linear.ws.to_kind(Kind::Float);
 
-    Ok(linear)
+    Ok(Linear::Normal(linear))
 }
 
 fn load_emb(weights: &SafeTensors, prefix: &str, emb_size: i64) -> Result<Embedding> {
@@ -109,10 +253,10 @@ struct TimeMix {
     time_mix_v: Tensor,
     time_mix_r: Tensor,
 
-    key: Linear,
-    value: Linear,
-    receptance: Linear,
-    output: Linear,
+    pub key: Linear,
+    pub value: Linear,
+    pub receptance: Linear,
+    pub output: Linear,
 
     block_idx: i64,
 }
@@ -165,21 +309,23 @@ impl TimeMix {
         self.time_mix_v = self.time_mix_v.to_kind(kind).to(device);
         self.time_mix_r = self.time_mix_r.to_kind(kind).to(device);
 
-        self.key.ws = self.key.ws.to_kind(kind).to(device);
-        self.key.bs = self.key.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+        self.key.set_ws(self.key.ws().to_kind(kind).to(device));
+        self.key
+            .set_bs(self.key.bs().map(|t| t.to_kind(kind).to(device)));
 
-        self.value.ws = self.value.ws.to_kind(kind).to(device);
-        self.value.bs = self.value.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+        self.value.set_ws(self.value.ws().to_kind(kind).to(device));
+        self.value
+            .set_bs(self.value.bs().map(|t| t.to_kind(kind).to(device)));
 
-        self.receptance.ws = self.receptance.ws.to_kind(kind).to(device);
-        self.receptance.bs = self
-            .receptance
-            .bs
-            .as_ref()
-            .map(|t| t.to_kind(kind).to(device));
+        self.receptance
+            .set_ws(self.receptance.ws().to_kind(kind).to(device));
+        self.receptance
+            .set_bs(self.receptance.bs().map(|t| t.to_kind(kind).to(device)));
 
-        self.output.ws = self.output.ws.to_kind(kind).to(device);
-        self.output.bs = self.output.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+        self.output
+            .set_ws(self.output.ws().to_kind(kind).to(device));
+        self.output
+            .set_bs(self.output.bs().map(|t| t.to_kind(kind).to(device)));
     }
 }
 
@@ -187,10 +333,9 @@ struct ChannelMix {
     time_mix_k: Tensor,
     time_mix_r: Tensor,
 
-    key: Linear,
-    value: Linear,
-
-    receptance: Linear,
+    pub key: Linear,
+    pub value: Linear,
+    pub receptance: Linear,
 
     block_idx: i64,
 }
@@ -212,18 +357,18 @@ impl ChannelMix {
         self.time_mix_k = self.time_mix_k.to_kind(kind).to(device);
         self.time_mix_r = self.time_mix_r.to_kind(kind).to(device);
 
-        self.key.ws = self.key.ws.to_kind(kind).to(device);
-        self.key.bs = self.key.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+        self.key.set_ws(self.key.ws().to_kind(kind).to(device));
+        self.key
+            .set_bs(self.key.bs().map(|t| t.to_kind(kind).to(device)));
 
-        self.value.ws = self.value.ws.to_kind(kind).to(device);
-        self.value.bs = self.value.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+        self.value.set_ws(self.value.ws().to_kind(kind).to(device));
+        self.value
+            .set_bs(self.value.bs().map(|t| t.to_kind(kind).to(device)));
 
-        self.receptance.ws = self.receptance.ws.to_kind(kind).to(device);
-        self.receptance.bs = self
-            .receptance
-            .bs
-            .as_ref()
-            .map(|t| t.to_kind(kind).to(device));
+        self.receptance
+            .set_ws(self.receptance.ws().to_kind(kind).to(device));
+        self.receptance
+            .set_bs(self.receptance.bs().map(|t| t.to_kind(kind).to(device)));
     }
 }
 
@@ -232,8 +377,8 @@ struct Block {
     ln1: LayerNorm,
     ln2: LayerNorm,
 
-    att: TimeMix,
-    ffn: ChannelMix,
+    pub att: TimeMix,
+    pub ffn: ChannelMix,
 
     device: tch::Device,
 }
@@ -340,6 +485,16 @@ impl Block {
         self.ln2.ws = self.ln2.ws.as_ref().map(|t| t.to_kind(kind).to(device));
         self.ln2.bs = self.ln2.bs.as_ref().map(|t| t.to_kind(kind).to(device));
     }
+
+    fn quantize(&mut self) {
+        self.att.key = self.att.key.quantize();
+        self.att.value = self.att.value.quantize();
+        self.att.receptance = self.att.receptance.quantize();
+
+        self.ffn.key = self.ffn.key.quantize();
+        self.ffn.value = self.ffn.value.quantize();
+        self.ffn.receptance = self.ffn.receptance.quantize();
+    }
 }
 
 pub struct RawModel {
@@ -396,23 +551,37 @@ impl RawModel {
         })
     }
 
-    pub fn load_to_device(&mut self, layer_fraction: f64, device: tch::Device, kind: tch::Kind) {
+    pub fn load_to_device(
+        &mut self,
+        layer_fraction: f64,
+        quantized_fraction: f64,
+        device: tch::Device,
+        kind: tch::Kind,
+    ) {
         let layer_fraction = layer_fraction.max(0.0).min(1.0);
+        let quantized_fraction = quantized_fraction.max(0.0).min(1.0);
 
         self.emb.ws = self.emb.ws.to_kind(kind).to(device);
 
         let layers_to_move = (self.blocks.len() as f64 * layer_fraction).ceil() as usize;
+        let layers_to_quantize = ((layers_to_move as f64) * quantized_fraction).ceil() as usize;
 
-        for block in self.blocks.iter_mut().take(layers_to_move) {
+        for (idx, block) in self.blocks.iter_mut().take(layers_to_move).enumerate() {
             block.load_to_device(device, kind);
+
+            // quantize the last layers
+            if idx > layers_to_move - layers_to_quantize {
+                block.quantize();
+            }
         }
 
         if layer_fraction == 1.0 {
             self.ln_out.ws = self.ln_out.ws.as_ref().map(|t| t.to_kind(kind).to(device));
             self.ln_out.bs = self.ln_out.bs.as_ref().map(|t| t.to_kind(kind).to(device));
 
-            self.head.ws = self.head.ws.to_kind(kind).to(device);
-            self.head.bs = self.head.bs.as_ref().map(|t| t.to_kind(kind).to(device));
+            self.head.set_ws(self.head.ws().to_kind(kind).to(device));
+            self.head
+                .set_bs(self.head.bs().map(|t| t.to_kind(kind).to(device)));
         }
     }
 
@@ -455,5 +624,19 @@ impl RawModel {
         x = self.head.forward_t(&x, false);
 
         (x, state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quantize() {
+        let t = tch::Tensor::randn([10, 10], (tch::Kind::Float, tch::Device::Cpu));
+        let (quantized, scale, zp) = quantize_tensor_per_channel(&t);
+        let dequantized = dequantize(&quantized, &scale, &zp);
+
+        assert!((t - &dequantized).abs().max().double_value(&[]) < 0.03);
     }
 }

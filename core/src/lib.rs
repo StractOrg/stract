@@ -237,6 +237,8 @@ pub enum AcceleratorDtype {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AliceAcceleratorConfig {
     pub layer_fraction: f64,
+    /// percentage of layers on accelerator to quantize
+    pub quantize_fraction: f64,
     pub device: AcceleratorDevice,
     pub dtype: AcceleratorDtype,
 }

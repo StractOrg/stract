@@ -19,6 +19,7 @@ async fn main() {
         "data/summarizer/dual_encoder",
         Some(AcceleratorConfig {
             layer_fraction: 1.0,
+            quantize_fraction: 0.0,
             device: tch::Device::Mps,
             kind: tch::Kind::Float,
         }),

@@ -8,6 +8,7 @@ encryption_key = "URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc=" # don't use this
 
 [accelerator]
 layer_fraction = 1.0
+quantize_fraction = 0.0 # percentage of layers on accelerator to quantize
 
 [accelerator.device]
 type = "mps"

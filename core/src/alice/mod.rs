@@ -235,6 +235,7 @@ unsafe impl Sync for Alice {}
 
 pub struct AcceleratorConfig {
     pub layer_fraction: f64,
+    pub quantize_fraction: f64,
     pub device: tch::Device,
     pub kind: tch::Kind,
 }
@@ -262,6 +263,7 @@ impl From<AliceAcceleratorConfig> for AcceleratorConfig {
     fn from(value: AliceAcceleratorConfig) -> Self {
         Self {
             layer_fraction: value.layer_fraction,
+            quantize_fraction: value.quantize_fraction,
             device: value.device.into(),
             kind: value.dtype.into(),
         }
@@ -281,6 +283,7 @@ impl Alice {
         if let Some(accelerator) = accelerator {
             model.load_to_device(
                 accelerator.layer_fraction,
+                accelerator.quantize_fraction,
                 accelerator.device,
                 accelerator.kind,
             );
