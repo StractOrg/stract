@@ -28,7 +28,7 @@
     cd frontend; npm install; npm run build
 
 @configure *ARGS:
-    just setup *ARGS
+    just setup {{ARGS}}
     cargo run --release --all-features -- configure {{ARGS}}
 
 @centrality webgraph output:
