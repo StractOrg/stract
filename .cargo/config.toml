@@ -2,6 +2,6 @@
 rustflags = ["-C", "target-cpu=native"]
 
 [env]
-LIBTORCH = {value = ".venv/lib/python3.11/site-packages/torch", force=true, relative=true}
-DYLD_LIBRARY_PATH = {value = ".venv/lib/python3.11/site-packages/torch/lib", force=true, relative=true}
+LIBTORCH = {value = ".venv/lib/python3/site-packages/torch", force=true, relative=true}
+DYLD_LIBRARY_PATH = {value = ".venv/lib/python3/site-packages/torch/lib", force=true, relative=true}
 LIBSQLITE3_FLAGS = { value = "-DSQLITE_ENABLE_MATH_FUNCTIONS", force=true }

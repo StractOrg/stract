@@ -36,5 +36,7 @@
     cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
 
 @setup_python_env:
+    rm -rf .venv
     python3 -m venv .venv
+    ln -s .venv/lib/python3* .venv/lib/python3
     .venv/bin/pip install -r scripts/requirements.txt
