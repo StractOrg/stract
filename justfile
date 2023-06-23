@@ -1,10 +1,10 @@
 @profile-indexer:
     sudo rm -rf data/index
-    cargo flamegraph --root -- indexer local configs/indexer/profile.toml
+    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo flamegraph --root -- indexer local configs/indexer/profile.toml
 
 @webgraph:
     rm -rf data/webgraph
-    cargo run --release -- webgraph local configs/webgraph/local.toml
+    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release -- webgraph local configs/webgraph/local.toml
 
 @frontend-rerun *ARGS:
     cd frontend; npm run build
@@ -29,14 +29,14 @@
 
 @configure *ARGS:
     just setup {{ARGS}}
-    cargo run --release --all-features -- configure {{ARGS}}
+    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release --all-features -- configure {{ARGS}}
 
 @centrality webgraph output:
     ./scripts/build_harmonic {{webgraph}} {{output}}
 
 @entity:
     rm -rf data/entity
-    cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
+    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
 
 @setup_python_env:
     rm -rf .venv
