@@ -17,7 +17,7 @@
 @astro:
     cd frontend; npm run dev
 
-@configure *ARGS:
+@setup *ARGS:
     just setup_python_env
     just download_libtorch {{ARGS}}
     ./scripts/export_crossencoder
@@ -26,6 +26,9 @@
     ./scripts/export_dual_encoder
     ./scripts/export_fact_model
     cd frontend; npm install; npm run build
+
+@configure *ARGS:
+    just setup *ARGS
     cargo run --release --all-features -- configure {{ARGS}}
 
 @centrality webgraph output:
