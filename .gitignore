@@ -12,3 +12,4 @@ notes
 *.csv
 ltr_scores.json
 .venv
+libtorch

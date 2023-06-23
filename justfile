@@ -19,6 +19,7 @@
 
 @configure *ARGS:
     just setup_python_env
+    just download_libtorch {{ARGS}}
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
@@ -30,7 +31,6 @@
 @centrality webgraph output:
     ./scripts/build_harmonic {{webgraph}} {{output}}
 
-
 @entity:
     rm -rf data/entity
     cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
@@ -38,5 +38,7 @@
 @setup_python_env:
     rm -rf .venv
     python3 -m venv .venv
-    ln -s .venv/lib/python3* .venv/lib/python3
     .venv/bin/pip install -r scripts/requirements.txt
+
+@download_libtorch *ARGS:
+    .venv/bin/python3 scripts/download_libtorch.py {{ARGS}}
