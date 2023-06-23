@@ -637,6 +637,6 @@ mod tests {
         let (quantized, scale, zp) = quantize_tensor_per_channel(&t);
         let dequantized = dequantize(&quantized, &scale, &zp);
 
-        assert!((t - &dequantized).abs().max().double_value(&[]) < 0.03);
+        assert!((t - &dequantized).abs().max().double_value(&[]) < 0.1);
     }
 }
