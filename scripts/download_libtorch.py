@@ -66,6 +66,14 @@ def install_libtorch(gpu=False):
         os.remove(filename)
 
 
+def create_symlinks():
+    # Create symlinks from libtorch to core/libtorch
+    if os.path.exists("./core/libtorch"):
+        return
+
+    os.symlink("../libtorch", "./core/libtorch")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download and install libtorch.")
     parser.add_argument(
@@ -74,3 +82,4 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     install_libtorch(args.gpu)
+    create_symlinks()
