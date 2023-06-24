@@ -381,6 +381,7 @@ struct Block {
     pub ffn: ChannelMix,
 
     device: tch::Device,
+    kind: tch::Kind,
 }
 
 impl Block {
@@ -439,6 +440,7 @@ impl Block {
             att,
             ffn,
             device: tch::Device::Cpu,
+            kind: tch::Kind::Float,
         })
     }
 
@@ -447,8 +449,16 @@ impl Block {
             x = x.to(self.device);
         }
 
+        if x.kind() != self.kind {
+            x = x.to_kind(self.kind);
+        }
+
         if state.device() != self.device {
             state = state.to(self.device);
+        }
+
+        if state.kind() != self.kind {
+            state = state.to_kind(self.kind);
         }
 
         x = match &self.ln0 {
@@ -470,6 +480,7 @@ impl Block {
 
     fn load_to_device(&mut self, device: tch::Device, kind: tch::Kind) {
         self.device = device;
+        self.kind = kind;
 
         if let Some(ln) = &mut self.ln0 {
             ln.ws = ln.ws.as_ref().map(|t| t.to_kind(kind).to(device));
@@ -607,6 +618,10 @@ impl RawModel {
 
         if self.emb.ws.device() != tokens.device() {
             tokens = tokens.to(self.emb.ws.device());
+        }
+
+        if self.emb.ws.kind() != tokens.kind() {
+            tokens = tokens.to_kind(self.emb.ws.kind());
         }
 
         let mut x = self.emb.forward_t(&tokens, false);
