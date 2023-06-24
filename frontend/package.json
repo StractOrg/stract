@@ -18,7 +18,7 @@
     "astro-icon": "^0.8.0"
   },
   "devDependencies": {
-    "@astrojs/mdx": "^0.15.1",
+    "@astrojs/mdx": "0.19.6",
     "@astrojs/tailwind": "^3.0.0",
     "@faker-js/faker": "^7.6.0",
     "@fontsource/montserrat": "^4.5.14",
