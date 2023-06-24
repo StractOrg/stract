@@ -1,10 +1,10 @@
 @profile-indexer:
     sudo rm -rf data/index
-    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo flamegraph --root -- indexer local configs/indexer/profile.toml
+    just cargo flamegraph --root -- indexer local configs/indexer/profile.toml
 
 @webgraph:
     rm -rf data/webgraph
-    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release -- webgraph local configs/webgraph/local.toml
+    just cargo run --release -- webgraph local configs/webgraph/local.toml
 
 @frontend-rerun *ARGS:
     cd frontend; npm run build
@@ -29,14 +29,14 @@
 
 @configure *ARGS:
     just setup {{ARGS}}
-    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release --all-features -- configure {{ARGS}}
+    just cargo run --release --all-features -- configure {{ARGS}}
 
 @centrality webgraph output:
     ./scripts/build_harmonic {{webgraph}} {{output}}
 
 @entity:
     rm -rf data/entity
-    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
+    just cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
 
 @setup_python_env:
     rm -rf .venv
@@ -45,3 +45,6 @@
 
 @download_libtorch *ARGS:
     .venv/bin/python3 scripts/download_libtorch.py {{ARGS}}
+
+@cargo *ARGS:
+    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo {{ARGS}}
