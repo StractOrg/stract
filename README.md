@@ -15,15 +15,16 @@ Stract is an open source web search engine hosted at [trystract.com](https://try
 # 💡 Features
 * Keyword search that respects your search query.
 * Advanced query syntax (`site:`, `intitle:` etc.).
-* Rank webpages based on their [harmonic centrality](https://en.wikipedia.org/wiki/Centrality#Harmonic_centrality)
 * DDG-style [!bang syntax](https://duckduckgo.com/bang)
-* Entity sidebar
+* Wikipedia and stackoverflow sidebar
 * De-rank websites with third-party trackers
-* Prioritize fresh content
-* Regional search
 * Use [optics](https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic) to almost endlessly customize your search results.
   * Customize how signals are combined during search for the final search result
 * Prioritize links (centrality) from the sites you trust.
+* Explore the web and find sites similar to the ones you like.
+* Chat with an AI assistant that searches the web for you and cites its sources.
+  * (This is currently not available on the hosted version due to resource limitations, but you can run it locally by following the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md))
+* And much more!
 
 # 👩‍💻 Setup
 We recommend everyone to use the hosted version at [trystract.com](https://trystract.com/), but you can also follow the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md) to setup the engine locally.

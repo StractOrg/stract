@@ -74,7 +74,12 @@ impl Linear {
                 scale,
                 zero_point,
             } => {
-                let ws = dequantize(ws, scale, zero_point);
+                let mut ws = dequantize(ws, scale, zero_point);
+
+                if x.kind() != ws.kind() {
+                    ws = ws.to_kind(x.kind());
+                }
+
                 let mut output = x.matmul(&ws.transpose(-2, -1));
                 if let Some(bias) = bs {
                     output += bias;
@@ -618,10 +623,6 @@ impl RawModel {
 
         if self.emb.ws.device() != tokens.device() {
             tokens = tokens.to(self.emb.ws.device());
-        }
-
-        if self.emb.ws.kind() != tokens.kind() {
-            tokens = tokens.to_kind(self.emb.ws.kind());
         }
 
         let mut x = self.emb.forward_t(&tokens, false);
