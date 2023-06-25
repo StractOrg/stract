@@ -16,7 +16,7 @@ import Searchbar from "../components/Searchbar.astro";
 
 <Layout title="{{ query }} - Stract">
   <main class="flex w-full flex-col">
-    <Header showDivider={true} activeIndex={0} queryUrlPart={askama`query_url_part $ ""`} />
+    <Header withAlice={askama`with_alice`} showDivider={true} activeIndex={0} queryUrlPart={askama`query_url_part $ ""`} />
 
     <div
       class="search-content flex w-screen m-0 grid gap-y-6 pt-4 px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36"

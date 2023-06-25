@@ -14,24 +14,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use super::{
     optics::{OpticLink, DEFAULT_OPTICS},
-    HtmlTemplate,
+    HtmlTemplate, State,
 };
 use askama::Template;
 use axum::{extract, response::IntoResponse};
 
 #[allow(clippy::unused_async)]
 pub async fn route(
+    extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, http::StatusCode> {
+    if !state.config.with_alice.unwrap_or(true) {
+        return Err(http::StatusCode::NOT_FOUND);
+    }
+
     let template = ChatTemplate {
         query_url_part: serde_urlencoded::to_string(params).unwrap(),
         default_optics: DEFAULT_OPTICS.to_vec(),
+        with_alice: state.config.with_alice,
     };
-    HtmlTemplate(template)
+    Ok(HtmlTemplate(template))
 }
 
 #[derive(Template)]
@@ -39,4 +45,5 @@ pub async fn route(
 struct ChatTemplate {
     query_url_part: String,
     default_optics: Vec<OpticLink>,
+    with_alice: Option<bool>,
 }

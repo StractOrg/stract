@@ -100,12 +100,16 @@ pub async fn store_chat(
 }
 
 #[allow(clippy::unused_async)]
-pub async fn settings() -> impl IntoResponse {
-    let template = SettingsTemplate {};
+pub async fn settings(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
+    let template = SettingsTemplate {
+        with_alice: state.config.with_alice,
+    };
 
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
 #[template(path = "settings/privacy/index.html")]
-struct SettingsTemplate {}
+struct SettingsTemplate {
+    with_alice: Option<bool>,
+}

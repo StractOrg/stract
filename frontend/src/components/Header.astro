@@ -4,12 +4,13 @@ import IndexBar from "./IndexBar.astro";
 
 export interface Props {
   activeIndex?: number | null;
+  withAlice?: string;
   showDivider?: boolean;
   showLogo?: boolean;
   queryUrlPart?: string;
 }
 
-const { activeIndex, queryUrlPart, showDivider = false, showLogo = true } = Astro.props;
+let { activeIndex, queryUrlPart, withAlice, showDivider = false, showLogo = true } = Astro.props;
 ---
 
 <div
@@ -17,7 +18,7 @@ const { activeIndex, queryUrlPart, showDivider = false, showLogo = true } = Astr
 >
   <div>
     <div class="flex md:space-x-2 lg:space-x-4 text-sm relative z-0 bottom-0">
-      <IndexBar active={activeIndex} queryUrlPart={queryUrlPart} />
+      <IndexBar active={activeIndex} queryUrlPart={queryUrlPart} withAlice={withAlice} />
     </div>
   </div>
   {showLogo && (

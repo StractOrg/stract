@@ -68,6 +68,7 @@ mod webgraph;
 pub struct HtmlTemplate<T>(T);
 
 pub struct State {
+    pub config: FrontendConfig,
     pub searcher: FrontendSearcher,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
@@ -147,6 +148,7 @@ pub async fn router(
         FrontendSearcher::new(cluster.clone(), crossencoder, lambda_model, qa_model, bangs);
 
     let state = Arc::new(State {
+        config: config.clone(),
         searcher,
         autosuggest,
         search_counter_success,
@@ -170,8 +172,8 @@ pub async fn router(
         .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
         .route("/explore", get(explore::route))
-        .route("/chat", get(chat::route))
         .route("/explore/export", get(explore::export))
+        .route("/chat", get(chat::route))
         .route("/about", get(about::route))
         .route("/settings", get(optics::route))
         .route("/settings/optics", get(optics::route))

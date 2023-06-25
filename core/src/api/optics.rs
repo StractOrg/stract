@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::HtmlTemplate;
+use std::sync::Arc;
+
+use super::{HtmlTemplate, State};
 use askama::Template;
-use axum::response::IntoResponse;
+use axum::{extract, response::IntoResponse};
 
 pub const DEFAULT_OPTICS: [OpticLink; 7] = [
     OpticLink {
@@ -65,9 +67,10 @@ pub struct OpticLink {
 }
 
 #[allow(clippy::unused_async)]
-pub async fn route() -> impl IntoResponse {
+pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
     let template = OpticsTemplate {
         default_optics: DEFAULT_OPTICS.to_vec(),
+        with_alice: state.config.with_alice,
     };
     HtmlTemplate(template)
 }
@@ -76,4 +79,5 @@ pub async fn route() -> impl IntoResponse {
 #[template(path = "settings/index.html")]
 struct OpticsTemplate {
     default_optics: Vec<OpticLink>,
+    with_alice: Option<bool>,
 }

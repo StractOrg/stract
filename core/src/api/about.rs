@@ -14,16 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::HtmlTemplate;
+use std::sync::Arc;
+
+use super::{HtmlTemplate, State};
 use askama::Template;
-use axum::response::IntoResponse;
+use axum::{extract, response::IntoResponse};
 
 #[allow(clippy::unused_async)]
-pub async fn route() -> impl IntoResponse {
-    let template = AboutTemplate {};
+pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
+    let template = AboutTemplate {
+        with_alice: state.config.with_alice,
+    };
     HtmlTemplate(template)
 }
 
 #[derive(Template)]
 #[template(path = "about/index.html")]
-struct AboutTemplate {}
+struct AboutTemplate {
+    with_alice: Option<bool>,
+}

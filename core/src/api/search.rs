@@ -64,6 +64,7 @@ struct SearchTemplate {
     has_code: bool,
     alerts: Vec<String>,
     query_url_part: String,
+    with_alice: Option<bool>,
 }
 
 enum RegionSelection {
@@ -174,6 +175,7 @@ pub async fn route(
                 let current_page = skip_pages + 1;
 
                 let template = SearchTemplate {
+                    with_alice: state.config.with_alice,
                     search_result: result.webpages,
                     discussions: result.discussions,
                     query,

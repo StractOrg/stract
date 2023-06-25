@@ -14,21 +14,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use askama::Template;
 use axum::{extract, response::IntoResponse};
 use http::StatusCode;
 use optics::{Optic, SiteRankings};
 
-use super::HtmlTemplate;
+use super::{HtmlTemplate, State};
 
 #[allow(clippy::unused_async)]
 pub async fn route(
+    extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
     let template = ExploreTemplate {
         query_url_part: serde_urlencoded::to_string(params).unwrap(),
+        with_alice: state.config.with_alice,
     };
     HtmlTemplate(template)
 }
@@ -37,6 +39,7 @@ pub async fn route(
 #[template(path = "explore/index.html")]
 struct ExploreTemplate {
     pub query_url_part: String,
+    with_alice: Option<bool>,
 }
 
 #[derive(serde::Deserialize)]

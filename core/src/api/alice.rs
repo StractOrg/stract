@@ -40,6 +40,10 @@ pub async fn save_state(
     extract::State(state): extract::State<Arc<super::State>>,
     extract::Json(params): extract::Json<SaveStateParams>,
 ) -> Result<impl IntoResponse, http::StatusCode> {
+    if !state.config.with_alice.unwrap_or(true) {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let client = reqwest::ClientBuilder::default()
         .build()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -119,6 +123,10 @@ pub async fn route(
     Sse<impl Stream<Item = std::result::Result<axum::response::sse::Event, Infallible>>>,
     StatusCode,
 > {
+    if !state.config.with_alice.unwrap_or(true) {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let mut saved_state: Option<SavedState> = None;
 
     if let Some(prev_state) = params.prev_state {
@@ -187,70 +195,3 @@ pub async fn route(
 
     Ok(Sse::new(stream))
 }
-
-// for openai alice
-// #[derive(serde::Serialize, serde::Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct Params {
-//     optic: Option<String>,
-//     conv: EncodedSavedState,
-// }
-//
-// pub async fn route(
-//     extract::State(state): extract::State<Arc<super::State>>,
-//     extract::Query(params): extract::Query<Params>,
-// ) -> std::result::Result<
-//     Sse<impl Stream<Item = std::result::Result<axum::response::sse::Event, Infallible>>>,
-//     StatusCode,
-// > {
-//     let saved_state: SavedState = params.conv.decode().map_err(|e| {
-//         tracing::error!("Error decoding saved state: {}", e);
-//         StatusCode::BAD_REQUEST
-//     })?;
-//
-//     let client = reqwest::ClientBuilder::default()
-//         .build()
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-//
-//     let mut members = state.cluster.members().await;
-//
-//     members.shuffle(&mut rand::thread_rng());
-//
-//     let id = saved_state.id.clone();
-//     let alice_addr = members
-//         .into_iter()
-//         .find_map(|m| {
-//             if m.id == id {
-//                 if let Service::Alice { host } = m.service {
-//                     Some(host)
-//                 } else {
-//                     None
-//                 }
-//             } else {
-//                 None
-//             }
-//         })
-//         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
-//
-//     let params = entrypoint::alice::openai::Params {
-//         conversation: saved_state.uuid,
-//         optic: params.optic,
-//     };
-//
-//     let mut events = client
-//         .get(format!("http://{}", alice_addr))
-//         .query(&params)
-//         .send()
-//         .await
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-//         .bytes_stream()
-//         .eventsource();
-//
-//     let stream = async_stream::stream! {
-//         while let Some(Ok(item)) = events.next().await {
-//             yield Ok(Event::default().data(item.data));
-//         }
-//     };
-//
-//     Ok(Sse::new(stream))
-// }

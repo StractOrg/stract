@@ -1,4 +1,5 @@
 ---
+import { askama } from "../askama";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
 import Searchbar from "../components/Searchbar.astro";
@@ -8,7 +9,7 @@ import OpticSelector from "../components/OpticSelector.astro";
 
 <Layout title="Stract">
   <div class="grid h-full grid-rows-[auto_1fr_auto]">
-    <Header showLogo={false} />
+    <Header withAlice={askama`with_alice`} showLogo={false} />
     <div class="absolute top-1/4 grid w-full place-items-center">
       <div
         class="flex w-full flex-col items-center justify-center px-2 md:max-w-2xl md:px-0"

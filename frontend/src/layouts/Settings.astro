@@ -1,4 +1,5 @@
 ---
+import { askama } from "../askama";
 import Footer from "../components/Footer.astro";
 import Layout from "./Layout.astro";
 import Header from "../components/Header.astro";
@@ -6,7 +7,7 @@ import SettingsMenu from "../components/SettingsMenu.astro";
 ---
 <Layout title="Stract">
     <div class="flex h-full w-full flex-col">
-        <Header />
+        <Header withAlice={askama`with_alice`} />
 
         <div class="flex h-fit w-full justify-center pt-10">
             <SettingsMenu />
