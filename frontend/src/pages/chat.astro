@@ -133,9 +133,8 @@ import OpticSelector from "../components/OpticSelector.astro";
     const statusTemplate: HTMLDivElement = document.querySelector(".status-template")!;
     const opticSelector: HTMLSelectElement = document.querySelector("#optics-selector")!;
 
-    const allowStats = window.localStorage.getItem("allowStats") === "true";
+    const allowStats = window.localStorage.getItem("allowAliceImprovements") === "true";
 
-    // let prevState: number[][] | null = null;
     let prevState: any | null = null;
     let chatId: string | null = null;
 
