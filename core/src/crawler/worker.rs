@@ -82,10 +82,9 @@ impl Worker {
         })
     }
 
-    fn coordinator_conn(&self) -> sonic::ResilientConnection<std::iter::Take<ExponentialBackoff>> {
-        let retry = ExponentialBackoff::from_millis(1_000)
-            .with_limit(Duration::from_millis(20_000))
-            .take(5);
+    fn coordinator_conn(&self) -> sonic::ResilientConnection<ExponentialBackoff> {
+        let retry =
+            ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_millis(20_000));
 
         sonic::ResilientConnection::create(self.coordinator_host, retry)
     }
@@ -119,7 +118,7 @@ impl Worker {
                         &Request::NewJobs {
                             num_jobs: self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(60),
+                        Duration::from_secs(60 * 60),
                     )
                     .await;
 
@@ -211,7 +210,7 @@ impl Worker {
         let _ = conn
             .send_with_timeout::<_, Response>(
                 &Request::CrawlResult { job_response },
-                Duration::from_secs(60 * 60),
+                Duration::from_secs(60),
             )
             .await
             .expect("Failed to send crawl result to coordinator");
@@ -284,7 +283,11 @@ impl Worker {
                         if self.politeness_factor > MAX_POLITENESS_FACTOR {
                             self.politeness_factor = MAX_POLITENESS_FACTOR;
                         }
+
+                        tracing::warn!("politeness factor increased to {}", self.politeness_factor);
                     }
+
+                    tracing::warn!("failed to fetch url ({}): {}", &url, datum.status_code);
                     ProcessedUrl {
                         new_urls: Vec::new(),
                         response: UrlResponse::Failed {
@@ -296,7 +299,7 @@ impl Worker {
                 }
             }
             Err(err) => {
-                tracing::warn!("failed to fetch url: {}", err);
+                tracing::warn!("failed to fetch url ({}): {}", &url, err);
 
                 ProcessedUrl {
                     new_urls: Vec::new(),
