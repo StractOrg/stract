@@ -60,14 +60,14 @@ pub enum Error {
     #[error("invalid politeness factor")]
     InvalidPolitenessFactor,
 
-    #[error("send error")]
-    SendError(#[from] tokio::sync::mpsc::error::SendError<WarcWriterMessage>),
-
     #[error("sqlite error")]
     Sqlite(#[from] rusqlite::Error),
 
     #[error("addr parse error: {0}")]
     AddrParse(#[from] std::net::AddrParseError),
+
+    #[error("async channel: {0}")]
+    SendError(#[from] async_channel::SendError<WarcWriterMessage>),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -137,7 +137,7 @@ pub struct Crawler {
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
         let pending_commands = Arc::new(Mutex::new(VecDeque::new()));
-        let writer = Arc::new(WarcWriter::new(config.s3));
+        let writer = Arc::new(WarcWriter::new(config.num_warc_writers, config.s3));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
         let coordinator_host = config.coordinator_host.parse()?;
@@ -165,7 +165,7 @@ impl Crawler {
 
     pub async fn wait(self) {
         for handle in self.handles {
-            handle.await.unwrap();
+            handle.await.ok();
         }
 
         self.writer.finish().await.unwrap();

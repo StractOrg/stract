@@ -21,7 +21,8 @@ use super::{CrawlDatum, Result};
 /// The WarcWriter is responsible for storing the crawl datums
 /// as WARC files on S3.
 pub struct WarcWriter {
-    tx: tokio::sync::mpsc::Sender<WarcWriterMessage>,
+    tx: async_channel::Sender<WarcWriterMessage>,
+    num_writers: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -70,10 +71,10 @@ async fn commit(writer: warc::WarcWriter, s3: S3Config) {
     }
 }
 
-async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3: S3Config) {
+async fn writer_task(rx: async_channel::Receiver<WarcWriterMessage>, s3: S3Config) {
     let mut writer = warc::WarcWriter::new();
 
-    while let Some(message) = rx.recv().await {
+    while let Ok(message) = rx.recv().await {
         match message {
             WarcWriterMessage::Crawl(datum) => {
                 let is_pdf = datum
@@ -119,12 +120,17 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
 }
 
 impl WarcWriter {
-    pub fn new(s3: S3Config) -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel(1000);
+    pub fn new(num_writers: Option<usize>, s3: S3Config) -> Self {
+        let (tx, rx) = async_channel::bounded(1000);
 
-        tokio::spawn(writer_task(rx, s3));
+        let num_writers = num_writers.unwrap_or(1);
 
-        Self { tx }
+        for _ in 0..num_writers {
+            let rx = rx.clone();
+            tokio::spawn(writer_task(rx, s3.clone()));
+        }
+
+        Self { tx, num_writers }
     }
 
     pub async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
@@ -134,8 +140,14 @@ impl WarcWriter {
     }
 
     pub async fn finish(&self) -> Result<()> {
-        self.tx.send(WarcWriterMessage::Finish).await?;
-        self.tx.closed().await;
+        for _ in 0..self.num_writers {
+            self.tx.send(WarcWriterMessage::Finish).await?;
+        }
+        self.tx.close();
+
+        while !self.tx.is_empty() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        }
 
         Ok(())
     }

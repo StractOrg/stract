@@ -47,6 +47,7 @@ pub async fn coordinator(config: CrawlCoordinatorConfig) -> Result<()> {
             match &req.body {
                 crate::crawler::Request::NewJobs { num_jobs } => {
                     if coordinator.is_done() {
+                        tracing::info!("Crawl is done. Waiting for workers to finish.");
                         req.respond(sonic::Response::Content(crate::crawler::Response::Done))
                             .await
                             .ok();
