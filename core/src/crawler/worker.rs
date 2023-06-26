@@ -286,7 +286,7 @@ impl Worker {
                         tracing::warn!("politeness factor increased to {}", self.politeness_factor);
                     }
 
-                    tracing::warn!("failed to fetch url ({}): {}", &url, datum.status_code);
+                    tracing::debug!("failed to fetch url ({}): {}", &url, datum.status_code);
                     ProcessedUrl {
                         new_urls: Vec::new(),
                         response: UrlResponse::Failed {
@@ -298,7 +298,7 @@ impl Worker {
                 }
             }
             Err(err) => {
-                tracing::warn!("failed to fetch url ({}): {}", &url, err);
+                tracing::debug!("failed to fetch url ({}): {}", &url, err);
 
                 ProcessedUrl {
                     new_urls: Vec::new(),
@@ -461,7 +461,7 @@ impl Worker {
                     }
                     Ok(Event::Eof) => break,
                     Err(e) => {
-                        tracing::warn!("failed to parse sitemap: {}", e);
+                        tracing::debug!("failed to parse sitemap: {}", e);
                         break;
                     }
                     _ => (),
