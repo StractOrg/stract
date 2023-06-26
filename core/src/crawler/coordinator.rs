@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webpage::Url;
+use crate::{call_counter::CallCounter, webpage::Url};
 
 use super::{
     crawl_db::{CrawlDb, DomainStatus},
@@ -23,8 +23,11 @@ use super::{
 use std::{
     collections::HashSet,
     path::Path,
-    sync::atomic::{AtomicU64, Ordering},
-    time::Instant,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
+    time::{Duration, Instant},
 };
 
 const DEFAULT_JOB_URLS: usize = 1000;
@@ -33,6 +36,7 @@ pub struct CrawlCoordinator {
     db: CrawlDb,
     num_crawled_urls: AtomicU64,
     num_urls_to_crawl: u64,
+    call_counter: Mutex<CallCounter>,
 }
 
 impl CrawlCoordinator {
@@ -58,10 +62,22 @@ impl CrawlCoordinator {
             db,
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
+            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(60))),
         })
     }
 
+    fn log_crawls_per_second(&self, num_urls: usize) {
+        let mut call_counter = self.call_counter.lock().unwrap();
+
+        for _ in 0..num_urls {
+            call_counter.count();
+        }
+
+        tracing::info!("avg crawls per second: {}", call_counter.avg_per_second());
+    }
+
     pub fn add_response(&self, response: &JobResponse) -> Result<()> {
+        self.log_crawls_per_second(response.url_responses.len());
         self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
         let tx = self.db.transaction()?;
 
