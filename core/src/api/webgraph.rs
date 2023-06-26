@@ -60,6 +60,7 @@ pub async fn similar_sites(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(params): extract::Json<SimilarSitesParams>,
 ) -> std::result::Result<impl IntoResponse, StatusCode> {
+    state.counters.explore_counter.inc();
     let host = state.remote_webgraph.host().await;
 
     let retry = ExponentialBackoff::from_millis(30)

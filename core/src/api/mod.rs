@@ -67,13 +67,18 @@ mod webgraph;
 
 pub struct HtmlTemplate<T>(T);
 
+pub struct Counters {
+    pub search_counter_success: crate::metrics::Counter,
+    pub search_counter_fail: crate::metrics::Counter,
+    pub explore_counter: crate::metrics::Counter,
+}
+
 pub struct State {
     pub config: FrontendConfig,
     pub searcher: FrontendSearcher,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
-    pub search_counter_success: crate::metrics::Counter,
-    pub search_counter_fail: crate::metrics::Counter,
+    pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
     pub fact_checker: Arc<FactCheckModel>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
@@ -106,11 +111,7 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub async fn router(
-    config: &FrontendConfig,
-    search_counter_success: crate::metrics::Counter,
-    search_counter_fail: crate::metrics::Counter,
-) -> Result<Router> {
+pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Router> {
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
     let crossencoder = CrossEncoderModel::open(&config.crossencoder_model_path)?;
 
@@ -151,8 +152,7 @@ pub async fn router(
         config: config.clone(),
         searcher,
         autosuggest,
-        search_counter_success,
-        search_counter_fail,
+        counters,
         remote_webgraph,
         summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
         fact_checker: Arc::new(FactCheckModel::open(&config.fact_check_model_path)?),
@@ -223,9 +223,9 @@ async fn search_metric<B>(
     let response = next.run(request).await;
 
     if response.status().is_success() {
-        state.search_counter_success.inc();
+        state.counters.search_counter_success.inc();
     } else {
-        state.search_counter_fail.inc();
+        state.counters.search_counter_fail.inc();
     }
 
     response

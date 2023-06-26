@@ -17,7 +17,7 @@
 use anyhow::Result;
 
 use crate::{
-    api::{metrics_router, router},
+    api::{metrics_router, router, Counters},
     metrics::Label,
     FrontendConfig,
 };
@@ -25,6 +25,8 @@ use crate::{
 pub async fn run(config: FrontendConfig) -> Result<()> {
     let search_counter_success = crate::metrics::Counter::default();
     let search_counter_fail = crate::metrics::Counter::default();
+    let explore_counter = crate::metrics::Counter::default();
+
     let mut registry = crate::metrics::PrometheusRegistry::default();
 
     let group = registry
@@ -49,7 +51,21 @@ pub async fn run(config: FrontendConfig) -> Result<()> {
         }],
     );
 
-    let app = router(&config, search_counter_success, search_counter_fail).await?;
+    let group = registry
+        .new_group(
+            "explore_requests".to_string(),
+            Some("Total number of incoming requests to explore api.".to_string()),
+        )
+        .unwrap();
+    group.register(explore_counter.clone(), vec![]);
+
+    let counters = Counters {
+        search_counter_success,
+        search_counter_fail,
+        explore_counter,
+    };
+
+    let app = router(&config, counters).await?;
     let metrics_app = metrics_router(registry);
 
     let addr = config.host;
