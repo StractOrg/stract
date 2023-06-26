@@ -83,8 +83,7 @@ impl Worker {
     }
 
     fn coordinator_conn(&self) -> sonic::ResilientConnection<ExponentialBackoff> {
-        let retry =
-            ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_millis(20_000));
+        let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
         sonic::ResilientConnection::create(self.coordinator_host, retry)
     }

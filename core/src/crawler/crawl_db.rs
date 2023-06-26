@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::{collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
+use itertools::Itertools;
 use rusqlite::{
-    types::{FromSql, FromSqlError, FromSqlResult, ValueRef},
+    types::{FromSql, FromSqlError, FromSqlResult, Value, ValueRef},
     ToSql,
 };
 
@@ -163,8 +164,7 @@ impl CrawlDb {
         // store temp tables in memory
         conn.pragma_update(None, "temp_store", 2)?;
 
-        // set cache size to 512 MB
-        conn.pragma_update(None, "cache_size", -512_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
+        rusqlite::vtab::array::load_module(&conn)?;
 
         Ok(Self { conn })
     }
@@ -218,21 +218,48 @@ impl Transaction<'_> {
 
     pub fn update_max_inlinks_domains<'a, I: Iterator<Item = &'a Domain>>(
         &self,
+        mut domains: I,
+    ) -> Result<()> {
+        for chunk in domains.by_ref().chunks(32_784).into_iter() {
+            self.update_max_inlinks_domains_chunk(chunk)?;
+        }
+
+        Ok(())
+    }
+
+    fn update_max_inlinks_domains_chunk<'a, I: Iterator<Item = &'a Domain>>(
+        &self,
         domains: I,
     ) -> Result<()> {
-        // update max_incoming_links for domain based on
-        // max_incoming_links for URLs in domain.
-        // if no pending URLs in domain, set max_incoming_links to 0
-        let mut prepared = self.tx().prepare(
-            "UPDATE domain SET max_incoming_links = IFNULL(( 
-                SELECT MAX(incoming_links) FROM url
-                WHERE domain = ?1 AND status = ?2
-            ), 0) WHERE domain = ?1;",
+        // Collect domains into a Vec to use them later in the SQL
+        let domains: Rc<Vec<Value>> =
+            Rc::new(domains.map(|d| d.0.to_string()).map(Value::from).collect());
+
+        // Start transaction
+        let tx = self.tx();
+
+        // Create a temporary table to hold the max incoming links for each domain
+        tx.execute(
+            "CREATE TEMPORARY TABLE IF NOT EXISTS temp_domain AS 
+            SELECT domain, MAX(incoming_links) as max_incoming_links
+            FROM url 
+            WHERE domain IN ?1 AND status = ?2
+            GROUP BY domain;",
+            (domains.clone(), UrlStatus::Pending),
         )?;
 
-        for domain in domains {
-            prepared.execute((&domain.0, UrlStatus::Pending))?;
-        }
+        // Update the domain table
+        tx.execute(
+            "UPDATE domain 
+            SET max_incoming_links = IFNULL(
+                (SELECT max_incoming_links FROM temp_domain WHERE temp_domain.domain = domain.domain), 0
+            ) 
+            WHERE domain IN ?1;",
+            (domains, ),
+        )?;
+
+        // Drop the temporary table
+        tx.execute("DROP TABLE temp_domain;", [])?;
 
         Ok(())
     }
@@ -258,6 +285,8 @@ impl Transaction<'_> {
             ON CONFLICT (domain) DO NOTHING;",
         )?;
 
+        let mut unique_domains = HashSet::new();
+
         for url in urls {
             if domain.domain() != url.domain() {
                 prepared_diff_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
@@ -265,8 +294,13 @@ impl Transaction<'_> {
                 prepared_same_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
             }
 
-            prepared_insert_domain.execute((url.domain(), DomainStatus::Pending))?;
+            unique_domains.insert(url.domain().to_string());
         }
+
+        for domain in unique_domains {
+            prepared_insert_domain.execute((domain, DomainStatus::Pending))?;
+        }
+
         Ok(())
     }
 

@@ -6,3 +6,4 @@ LIBTORCH = {value = "libtorch", force=true, relative=true}
 DYLD_LIBRARY_PATH = {value = "libtorch/lib", force=true, relative=true}
 LD_LIBRARY_PATH = {value = "libtorch/lib", force=true, relative=true}
 LIBSQLITE3_FLAGS = { value = "-DSQLITE_ENABLE_MATH_FUNCTIONS", force=true }
+SQLITE_MAX_VARIABLE_NUMBER = { value = "32784", force=true }
