@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, panic, time::Instant};
 
 use robotstxt_with_cache::matcher::{
     CachingRobotsMatcher, LongestMatchRobotsMatchStrategy, RobotsMatcher,
@@ -53,7 +53,10 @@ impl RobotsTxtManager {
 
         let body = res.text().await?;
 
-        RobotsTxt::new(body)
+        match panic::catch_unwind(|| RobotsTxt::new(body)) {
+            Ok(r) => r,
+            Err(_) => Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT)),
+        }
     }
 
     async fn get_mut(&mut self, url: &Url) -> Result<Option<&mut RobotsTxt>> {
