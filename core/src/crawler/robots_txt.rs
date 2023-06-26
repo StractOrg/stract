@@ -74,6 +74,7 @@ impl RobotsTxtManager {
                     self.cache.insert(site.clone(), None);
                 }
                 Err(err) => {
+                    self.cache.insert(site.clone(), None);
                     tracing::warn!("failed to fetch robots.txt for {}: {}", site.0, err);
                 }
             }

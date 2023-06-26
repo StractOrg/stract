@@ -62,7 +62,7 @@ impl CrawlCoordinator {
             db,
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
-            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(60))),
+            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(10))),
         })
     }
 

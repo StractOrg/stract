@@ -162,6 +162,10 @@ impl Worker {
 
         let num_urls = job.job.urls.len();
         for (i, url) in job.job.urls.into_iter().enumerate() {
+            if url.is_empty() || url.site().is_empty() {
+                continue;
+            }
+
             if !job.robotstxt.is_allowed(&url, &self.user_agent).await {
                 continue;
             }
@@ -207,7 +211,7 @@ impl Worker {
         let _ = conn
             .send_with_timeout::<_, Response>(
                 &Request::CrawlResult { job_response },
-                Duration::from_secs(60),
+                Duration::from_secs(60 * 60),
             )
             .await
             .expect("Failed to send crawl result to coordinator");

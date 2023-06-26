@@ -283,6 +283,10 @@ impl Url {
             self.without_query().ends_with(ending)
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 #[cfg(test)]
