@@ -69,10 +69,7 @@ impl CrawlCoordinator {
     fn log_crawls_per_second(&self, num_urls: usize) {
         let mut call_counter = self.call_counter.lock().unwrap();
 
-        for _ in 0..num_urls {
-            call_counter.count();
-        }
-
+        call_counter.count_with_weight(num_urls);
         tracing::info!("avg crawls per second: {}", call_counter.avg_per_second());
     }
 

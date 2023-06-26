@@ -16,9 +16,16 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, Copy)]
+struct WeightedInstant {
+    weight: usize,
+    instant: Instant,
+}
+
 pub struct CallCounter {
-    call_times: VecDeque<Instant>,
+    call_times: VecDeque<WeightedInstant>,
     window: Duration,
+    cur_weights: usize,
 }
 
 impl CallCounter {
@@ -27,23 +34,28 @@ impl CallCounter {
         CallCounter {
             call_times: VecDeque::new(),
             window,
+            cur_weights: 0,
         }
     }
 
-    // Count the method call.
-    pub fn count(&mut self) {
+    pub fn count_with_weight(&mut self, weight: usize) {
         let now = Instant::now();
-        self.call_times.push_back(now);
+        self.call_times.push_back(WeightedInstant {
+            weight,
+            instant: now,
+        });
+        self.cur_weights += weight;
     }
 
     fn prune(&mut self) {
         let now = Instant::now();
 
         while let Some(&old) = self.call_times.front() {
-            if now.duration_since(old) < self.window {
+            if now.duration_since(old.instant) < self.window {
                 break;
             }
 
+            self.cur_weights -= old.weight;
             self.call_times.pop_front();
         }
     }
@@ -51,6 +63,6 @@ impl CallCounter {
     // Calculate the average calls per second.
     pub fn avg_per_second(&mut self) -> f64 {
         self.prune();
-        self.call_times.len() as f64 / self.window.as_secs_f64()
+        self.cur_weights as f64 / self.window.as_secs_f64()
     }
 }
