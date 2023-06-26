@@ -156,13 +156,16 @@ impl CrawlDb {
 
         // update performance stuff
         // WAL mode
-        conn.pragma_update(None, "journal_mode", "'WAL'")?;
+        let _ = conn
+            .prepare("PRAGMA journal_mode = 'WAL';")?
+            .query([])?
+            .next();
 
         // sync OFF - if coordinator crashes, we are SOL anyway and will have to restart the crawl.
-        conn.pragma_update(None, "synchronous", 0)?;
+        let _ = conn.prepare("PRAGMA synchronous = OFF;")?.query([])?.next();
 
         // store temp tables in memory
-        conn.pragma_update(None, "temp_store", 2)?;
+        let _ = conn.prepare("PRAGMA temp_store = 2;")?.query([])?.next();
 
         // set cache size to 64 MB
         conn.pragma_update(None, "cache_size", -64_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
@@ -246,7 +249,7 @@ impl Transaction<'_> {
             "CREATE TEMPORARY TABLE IF NOT EXISTS temp_domain AS 
             SELECT domain, MAX(incoming_links) as max_incoming_links
             FROM url 
-            WHERE domain IN ?1 AND status = ?2
+            WHERE domain IN (?1) AND status = ?2
             GROUP BY domain;",
             (domains.clone(), UrlStatus::Pending),
         )?;
@@ -257,7 +260,7 @@ impl Transaction<'_> {
             SET max_incoming_links = IFNULL(
                 (SELECT max_incoming_links FROM temp_domain WHERE temp_domain.domain = domain.domain), 0
             ) 
-            WHERE domain IN ?1;",
+            WHERE domain IN (?1);",
             (domains, ),
         )?;
 
