@@ -51,7 +51,7 @@ pub enum Error {
     #[error("invalid content type: {0}")]
     InvalidContentType(String),
 
-    #[error("fetch failed")]
+    #[error("fetch failed: {0}")]
     FetchFailed(reqwest::StatusCode),
 
     #[error("content too large")]
