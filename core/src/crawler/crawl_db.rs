@@ -124,6 +124,16 @@ impl CrawlDb {
             [],
         )?;
 
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS url_domain_status ON url (domain, status);",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS url_incoming_links ON url (incoming_links);",
+            [],
+        )?;
+
         // there should be one table that contains all known domains
         // and whether a crawl is in progress for that domain.
         // It should also contain a copy of the maximum count of incoming links
