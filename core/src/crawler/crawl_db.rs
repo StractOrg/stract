@@ -164,6 +164,9 @@ impl CrawlDb {
         // store temp tables in memory
         conn.pragma_update(None, "temp_store", 2)?;
 
+        // set cache size to 64 MB
+        conn.pragma_update(None, "cache_size", -64_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
+
         rusqlite::vtab::array::load_module(&conn)?;
 
         Ok(Self { conn })
