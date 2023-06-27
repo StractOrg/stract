@@ -130,7 +130,6 @@ fn create_inverted_index() -> Result<()> {
     let worker = indexer::IndexingWorker::new(
         centrality_path.to_str().unwrap().to_string(),
         Some(webgraph_path.to_str().unwrap().to_string()),
-        None,
         Some(
             Path::new(DATA_PATH)
                 .join("human_annotations")
