@@ -53,7 +53,7 @@ md5 = { workspace = true }
 memmap = { workspace = true }
 regex = { workspace = true }
 http = { workspace = true }
-kuchiki = { workspace = true }
+kuchiki = { path = "../kuchiki" }
 serde_urlencoded = { workspace = true }
 rust-stemmers = { workspace = true }
 min-max-heap = { workspace = true }
