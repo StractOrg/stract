@@ -558,7 +558,7 @@ impl Html {
     }
 
     pub fn title(&self) -> Option<String> {
-        if let Ok(title) = self.root.select_first("title") {
+        if let Some(title) = self.root.select_first("title") {
             let title = title.text_contents().trim().to_string();
             if title.is_empty() {
                 None

@@ -2193,6 +2193,7 @@ dependencies = [
  "matches",
  "selectors",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
