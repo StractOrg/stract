@@ -95,7 +95,6 @@ pub struct IndexingMasterConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
-    crawl_stability_path: Option<String>,
     limit_warc_files: Option<usize>,
     skip_num_warc_files: Option<usize>,
     warc_source: WarcSource,

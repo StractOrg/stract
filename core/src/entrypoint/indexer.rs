@@ -37,8 +37,6 @@ use crate::{
     Result, WarcSource,
 };
 
-use super::crawl_stability::CrawlStability;
-
 pub struct Indexer {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -59,7 +57,6 @@ pub struct Job {
 pub struct IndexingWorker {
     centrality_store: IndexerCentralityStore,
     webgraph: Option<Webgraph>,
-    crawl_stabilty: Option<CrawlStability>,
     topics: Option<human_website_annotations::Mapper>,
 }
 
@@ -67,13 +64,11 @@ impl IndexingWorker {
     pub fn new(
         centrality_store_path: String,
         webgraph_path: Option<String>,
-        crawl_stability_path: Option<String>,
         topics_path: Option<String>,
     ) -> Self {
         Self {
             centrality_store: IndexerCentralityStore::open(centrality_store_path),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).open()),
-            crawl_stabilty: crawl_stability_path.map(CrawlStability::open),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
     }
@@ -141,12 +136,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     }
                 }
 
-                let crawl_stability = worker
-                    .crawl_stabilty
-                    .as_ref()
-                    .and_then(|stability| stability.get(&html.url().site().to_string()))
-                    .unwrap_or_default();
-
                 let backlinks: Vec<Link> = worker
                     .webgraph
                     .as_ref()
@@ -203,7 +192,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     fetch_time_ms,
                     pre_computed_score: 0.0,
                     node_id,
-                    crawl_stability,
                     host_topic,
                     dmoz_description,
                 };
@@ -345,7 +333,6 @@ impl Indexer {
         worker_addr: String,
         centrality_store_path: String,
         webgraph_path: Option<String>,
-        crawl_stability_path: Option<String>,
         topics_path: Option<String>,
     ) -> Result<()> {
         tokio::runtime::Builder::new_current_thread()
@@ -353,19 +340,14 @@ impl Indexer {
             .build()
             .unwrap()
             .block_on(async {
-                IndexingWorker::new(
-                    centrality_store_path,
-                    webgraph_path,
-                    crawl_stability_path,
-                    topics_path,
-                )
-                .run::<Job, FrozenIndex>(
-                    worker_addr
-                        .parse::<SocketAddr>()
-                        .expect("Could not parse worker address"),
-                )
-                .await
-                .unwrap();
+                IndexingWorker::new(centrality_store_path, webgraph_path, topics_path)
+                    .run::<Job, FrozenIndex>(
+                        worker_addr
+                            .parse::<SocketAddr>()
+                            .expect("Could not parse worker address"),
+                    )
+                    .await
+                    .unwrap();
             });
         Ok(())
     }
@@ -381,7 +363,6 @@ impl Indexer {
         let worker = IndexingWorker::new(
             config.centrality_store_path.clone(),
             config.webgraph_path.clone(),
-            config.crawl_stability_path.clone(),
             config.topics_path.clone(),
         );
 

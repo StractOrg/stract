@@ -188,7 +188,6 @@ pub enum FastField {
     PreComputedScore,
     HostNodeID,
     SimHash,
-    CrawlStability,
     NumFlattenedSchemaTokens,
 }
 
@@ -222,7 +221,6 @@ impl FastField {
             FastField::PreComputedScore => "pre_computed_score",
             FastField::HostNodeID => "host_node_id",
             FastField::SimHash => "sim_hash",
-            FastField::CrawlStability => "crawl_stability",
         }
     }
 }
@@ -239,7 +237,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 53] = [
+pub static ALL_FIELDS: [Field; 52] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -293,7 +291,6 @@ pub static ALL_FIELDS: [Field; 53] = [
     Field::Fast(FastField::PreComputedScore),
     Field::Fast(FastField::HostNodeID),
     Field::Fast(FastField::SimHash),
-    Field::Fast(FastField::CrawlStability),
 ];
 
 impl Field {
@@ -504,9 +501,6 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::CrawlStability) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
         }
     }
 
@@ -606,7 +600,6 @@ impl FastField {
             FastField::PreComputedScore => DataType::F64,
             FastField::HostNodeID => DataType::U64,
             FastField::SimHash => DataType::U64,
-            FastField::CrawlStability => DataType::U64,
         }
     }
 }

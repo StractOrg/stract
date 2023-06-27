@@ -290,6 +290,6 @@ mod tests {
         features.insert(Signal::HostCentrality, 0.031143193);
         features.insert(Signal::Bm25StemmedCleanBody, 52.1262779236);
 
-        assert_eq!((tree.predict(&features).unwrap() * 1000.0) as u64, 1017);
+        assert_eq!((tree.predict(&features).unwrap() * 1000.0) as u64, 1016);
     }
 }

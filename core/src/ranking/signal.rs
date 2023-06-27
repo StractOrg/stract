@@ -126,8 +126,6 @@ pub enum Signal {
     Region,
     #[serde(rename = "personal_centrality")]
     PersonalCentrality,
-    #[serde(rename = "crawl_stability")]
-    CrawlStability,
     #[serde(rename = "topic_centrality")]
     TopicCentrality,
     #[serde(rename = "query_centrality")]
@@ -146,7 +144,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 39] = [
+pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -181,7 +179,6 @@ pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::TrackerScore,
     Signal::Region,
     Signal::PersonalCentrality,
-    Signal::CrawlStability,
     Signal::TopicCentrality,
     Signal::QueryCentrality,
     Signal::InboundSimilarity,
@@ -265,7 +262,6 @@ impl Signal {
             Signal::UpdateTimestamp => 0.0,
             Signal::TrackerScore => 0.019542120533715634,
             Signal::Region => 0.06437975586036043,
-            Signal::CrawlStability => 0.0,
             Signal::PersonalCentrality => 10.0,
             Signal::InboundSimilarity => 10.0,
             Signal::LambdaMART => 10.0,
@@ -307,7 +303,7 @@ impl Signal {
         doc: DocId,
     ) -> Option<ComputedSignal> {
         let value: Option<f64> = match self {
-            Signal::HostCentrality | Signal::PageCentrality | Signal::CrawlStability => {
+            Signal::HostCentrality | Signal::PageCentrality => {
                 let field_value: Option<u64> = self
                     .fastfield_value(signal_aggregator, doc)
                     .and_then(|val| val.into());
@@ -454,7 +450,6 @@ impl Signal {
             Signal::HostCentrality => Some(webpage.host_centrality),
             Signal::PageCentrality => Some(webpage.page_centrality),
             Signal::IsHomepage => Some(webpage.html.url().is_homepage().into()),
-            Signal::CrawlStability => Some(webpage.crawl_stability),
             Signal::FetchTimeMs => {
                 let fetch_time_ms = webpage.fetch_time_ms as usize;
                 if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
@@ -544,7 +539,6 @@ impl Signal {
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),
             Signal::TrackerScore => Some(FastField::TrackerScore),
             Signal::Region => Some(FastField::Region),
-            Signal::CrawlStability => Some(FastField::CrawlStability),
             _ => None,
         }
     }

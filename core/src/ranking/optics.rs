@@ -86,7 +86,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
 
-                crawl_stability: 0.0,
                 dmoz_description: None,
                 host_topic: None,
                 node_id: Some(
@@ -121,7 +120,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                crawl_stability: 0.0,
                 host_topic: None,
                 dmoz_description: None,
                 node_id: Some(
@@ -156,7 +154,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                crawl_stability: 0.0,
                 dmoz_description: None,
                 host_topic: None,
                 node_id: Some(

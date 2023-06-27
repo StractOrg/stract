@@ -55,10 +55,6 @@ enum Commands {
         webgraph_path: String,
         output_path: String,
     },
-    CrawlStability {
-        output_path: String,
-        host_rank_paths: Vec<String>,
-    },
     DmozParser {
         dmoz_file: String,
         output_path: String,
@@ -147,7 +143,6 @@ enum IndexingOptions {
         address: String,
         centrality_store_path: String,
         webgraph_path: Option<String>,
-        crawl_stability_path: Option<String>,
         topics_path: Option<String>,
     },
     Local {
@@ -185,14 +180,12 @@ fn main() -> Result<()> {
                 address,
                 centrality_store_path,
                 webgraph_path,
-                crawl_stability_path,
                 topics_path,
             } => {
                 entrypoint::Indexer::run_worker(
                     address,
                     centrality_store_path,
                     webgraph_path,
-                    crawl_stability_path,
                     topics_path,
                 )?;
             }
@@ -299,13 +292,6 @@ fn main() -> Result<()> {
             } else {
                 configure::run(skip_download)?;
             }
-        }
-        Commands::CrawlStability {
-            output_path,
-            host_rank_paths,
-        } => {
-            entrypoint::crawl_stability::CrawlStability::build(host_rank_paths, output_path)
-                .unwrap();
         }
         Commands::DmozParser {
             dmoz_file,

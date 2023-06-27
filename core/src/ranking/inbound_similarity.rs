@@ -332,7 +332,6 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
 
                 host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("e.com")).unwrap()),
@@ -362,7 +361,6 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
 
                 host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("d.com")).unwrap()),

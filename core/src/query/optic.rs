@@ -265,7 +265,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -295,7 +294,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
                 host_topic: None,
@@ -395,7 +393,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -424,7 +421,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
                 host_topic: None,
@@ -502,7 +498,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -532,7 +527,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
@@ -562,7 +556,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
                 host_topic: None,
@@ -667,7 +660,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 host_topic: None,
                 dmoz_description: None,
@@ -697,7 +689,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
                 host_topic: None,
@@ -727,7 +718,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 host_topic: None,
                 dmoz_description: None,
@@ -804,7 +794,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -849,7 +838,6 @@ mod tests {
                 page_centrality: 0.0,
                 
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
@@ -985,7 +973,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1061,7 +1048,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1092,7 +1078,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1148,7 +1133,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1208,7 +1192,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1371,7 +1354,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1446,7 +1428,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1508,7 +1489,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1539,7 +1519,6 @@ mod tests {
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                crawl_stability: 0.0,
                 
                 node_id: None,
                 host_topic: None,
@@ -1639,7 +1618,6 @@ mod tests {
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            crawl_stability: 0.0,
             
             node_id: None,
             host_topic: None,

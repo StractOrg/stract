@@ -118,7 +118,6 @@ pub struct Webpage {
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
-    pub crawl_stability: f64,
     pub host_topic: Option<Topic>,
     pub dmoz_description: Option<String>,
 }
@@ -137,7 +136,6 @@ impl Webpage {
             pre_computed_score: 0.0,
             node_id: None,
             host_topic: None,
-            crawl_stability: 0.0,
             dmoz_description: None,
         }
     }
@@ -227,13 +225,6 @@ impl Webpage {
                 .get_field(Field::Fast(FastField::HostNodeID).name())
                 .expect("Failed to get node_id field"),
             self.node_id.map(|n| n.0).unwrap_or(u64::MAX),
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::CrawlStability).name())
-                .expect("failed to get crawl_stability field"),
-            (self.crawl_stability * FLOAT_SCALING as f64) as u64,
         );
 
         let facet = self
@@ -945,7 +936,6 @@ impl Html {
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
-                | Field::Fast(FastField::CrawlStability)
                 | Field::Text(TextField::DmozDescription) => {}
             }
         }
@@ -1832,7 +1822,6 @@ mod tests {
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
             node_id: None,
-            crawl_stability: 0.0,
             host_topic: None,
             dmoz_description: Some("dmoz description".to_string()),
         };
@@ -1867,7 +1856,6 @@ mod tests {
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
             node_id: None,
-            crawl_stability: 0.0,
             host_topic: None,
             dmoz_description: Some("dmoz description".to_string()),
         };
