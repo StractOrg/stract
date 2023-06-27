@@ -78,6 +78,8 @@ impl CrawlCoordinator {
     }
 
     pub fn add_response(&self, response: &JobResponse) -> Result<()> {
+        let start = Instant::now();
+
         self.log_crawls_per_second(response.url_responses.len());
         self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
         let tx = self.db.transaction()?;
@@ -97,6 +99,8 @@ impl CrawlCoordinator {
         );
 
         tx.update_max_inlinks_domains(domains.iter())?;
+
+        tracing::debug!("inserted response in {:?}", start.elapsed());
 
         Ok(())
     }

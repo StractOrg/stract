@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
     crawler::{CrawlCoordinator, Crawler},
@@ -31,11 +31,11 @@ pub async fn worker(config: CrawlerConfig) -> Result<()> {
 }
 
 pub async fn coordinator(config: CrawlCoordinatorConfig) -> Result<()> {
-    let coordinator = CrawlCoordinator::new(
+    let coordinator = Arc::new(CrawlCoordinator::new(
         config.crawldb_folder,
         config.num_urls_to_crawl,
         config.seed_urls,
-    )?;
+    )?);
 
     let addr: SocketAddr = config.host;
     let server = sonic::Server::bind(addr).await.unwrap();

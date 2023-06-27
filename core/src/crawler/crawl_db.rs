@@ -174,6 +174,12 @@ impl CrawlDb {
         // sync OFF - if coordinator crashes, we are SOL anyway and will have to restart the crawl.
         let _ = conn.prepare("PRAGMA synchronous = OFF;")?.query([])?.next();
 
+        // lock held by the SQLite connection is never released in EXCLUSIVE mode
+        let _ = conn
+            .prepare("PRAGMA locking_mode = EXCLUSIVE;")?
+            .query([])?
+            .next();
+
         // store temp tables in memory
         let _ = conn.prepare("PRAGMA temp_store = 2;")?.query([])?.next();
 
@@ -236,6 +242,8 @@ impl Transaction<'_> {
         &self,
         mut domains: I,
     ) -> Result<()> {
+        // 32_784 is the maximum number of parameters that SQLite supports.
+        // This is configured in the SQLITE_MAX_VARIABLE_NUMBER environment variable in .cargo/config.toml.
         for chunk in domains.by_ref().chunks(32_784).into_iter() {
             self.update_max_inlinks_domains_chunk(chunk)?;
         }
@@ -254,24 +262,25 @@ impl Transaction<'_> {
         // Start transaction
         let tx = self.tx();
 
+        tx.execute("DROP TABLE IF EXISTS temp_domain;", [])?;
         // Create a temporary table to hold the max incoming links for each domain
         tx.execute(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS temp_domain AS 
+            "CREATE TEMPORARY TABLE IF NOT EXISTS temp_domain AS
             SELECT domain, MAX(incoming_links) as max_incoming_links
-            FROM url 
-            WHERE domain IN (?1) AND status = ?2
+            FROM url
+            WHERE domain IN rarray(?1) AND status = ?2
             GROUP BY domain;",
             (domains.clone(), UrlStatus::Pending),
         )?;
 
         // Update the domain table
         tx.execute(
-            "UPDATE domain 
+            "UPDATE domain
             SET max_incoming_links = IFNULL(
                 (SELECT max_incoming_links FROM temp_domain WHERE temp_domain.domain = domain.domain), 0
-            ) 
-            WHERE domain IN (?1);",
-            (domains, ),
+            )
+            WHERE domain in rarray(?1);",
+            (domains,),
         )?;
 
         // Drop the temporary table
