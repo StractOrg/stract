@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Main library for Stract.
 // #![warn(clippy::pedantic)]
+// #![warn(missing_docs)]
+// #![warn(clippy::missing_docs_in_private_items)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 

@@ -41,16 +41,18 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Commands to deploy the Alice server
+    /// Commands to deploy the Alice server.
     Alice {
         #[clap(subcommand)]
         options: AliceOptions,
     },
-    /// Build the search index
+
+    /// Build the search index.
     Indexer {
         #[clap(subcommand)]
         options: IndexingOptions,
     },
+
     /// Calculate centrality metrics that estimates a websites importance. These metrics are used to rank search results.
     Centrality {
         #[clap(subcommand)]
@@ -58,32 +60,40 @@ enum Commands {
         webgraph_path: String,
         output_path: String,
     },
+
     /// Parse the DMOZ dataset. DMOZ contains a list of websites and their categories.
     /// It can be used to calculate the topic centrality for websites or augments website descriptions during indexing.
     DmozParser {
         dmoz_file: String,
         output_path: String,
     },
+
     /// Webgraph specific commands.
     Webgraph {
         #[clap(subcommand)]
         options: WebgraphOptions,
     },
+
     /// Deploy the search server.
-    SearchServer {
-        config_path: String,
-    },
+    SearchServer { config_path: String },
+
     /// Deploy the frontend. The frontend is a web server that serves the search UI and interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
-    Frontend {
-        config_path: String,
-    },
+    Frontend { config_path: String },
+
+    /// Scrape the Google autosuggest API for search queries.
     AutosuggestScrape {
         num_queries: usize,
         gl: Gl,
         ms_sleep_between_req: u64,
         output_dir: String,
     },
+
+    /// Calculate the topic centrality for websites. We use the DMOZ dataset to
+    /// determine set of representative websites for each topic. Harmonic centrality approximations
+    /// are then calculated for each website in the webgraph.
+    ///
+    /// This is currently not used in the search engine, so everything related to this might be buggy.
     TopicCentrality {
         index_path: String,
         topics_path: String,
@@ -91,12 +101,16 @@ enum Commands {
         online_harmonic_path: String,
         output_path: String,
     },
-    CrawlCoordinator {
-        config_path: String,
-    },
-    Crawler {
-        config_path: String,
-    },
+
+    /// Deploy the crawl coordinator. The crawl coordinator is responsible for
+    /// distributing crawl jobs to the crawles and deciding which urls to crawl next.
+    CrawlCoordinator { config_path: String },
+
+    /// Deploy the crawler. The crawler is responsible for downloading webpages, saving them to S3,
+    /// and sending newly discovered urls back to the crawl coordinator.
+    Crawler { config_path: String },
+
+    /// Setup dev environment.
     #[cfg(feature = "dev")]
     Configure {
         #[clap(long, takes_value = false)]
@@ -107,9 +121,12 @@ enum Commands {
     },
 }
 
+/// Commands to deploy Alice.
 #[derive(Subcommand)]
 enum AliceOptions {
+    /// Deploy Alice server.
     Serve { config_path: String },
+    /// Generate a new keypair for Alice to sign states.
     GenerateKey,
 }
 

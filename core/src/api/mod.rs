@@ -14,6 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! The api module contains the http api and frontend.
+//! All http requests are handled using axum.
+//! The frontend is served using a combination of axum, askama and astro
+//! (with some funky astro hacks to make askama and astro play nice together).
+
 use axum::{body::Body, extract, middleware, routing::get_service, Router};
 use tokio::sync::Mutex;
 use tower_http::{compression::CompressionLayer, services::ServeDir};

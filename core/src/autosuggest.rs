@@ -14,6 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Autosuggest provides the functionality for the little dropdown that appears
+//! when you type something into the search bar and queries are suggested.
+//! It uses a finite state transducer (fst) to store popular queries
+//! and performs a prefix search on the fst to find suggestions.
+
 use fst::{automaton::Str, Automaton, IntoStreamer};
 
 use crate::Result;

@@ -14,6 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Alice is an AI assistant that can help search the web to answer
+//! questions and cite sources. This module takes a trained model
+//! and uses it for inference. The training code can be found in another
+//! [repository](https://github.com/stractOrg/alice].
+//!
+//! The model is a hybrid between an RNN and a Transformer. It's therefore
+//! possible to save the hidden state and continue the conversation later.
+//! To make sure the state has not been tampered with, it is encrypted
+//! using an AES-GCM key.
+
 use std::{
     io::{Read, Write},
     path::Path,
@@ -152,6 +162,7 @@ pub enum ExecutionState {
     },
 }
 
+/// A simplified website that the model sees in the prompt.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ModelWebsite {
     pub title: String,

@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! MapReduce is a distributed computing framework for processing large data sets across
+//! clusters of computers using a master node to coordinate the work.
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 mod manager;
