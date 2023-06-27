@@ -77,32 +77,42 @@ async fn writer_task(rx: async_channel::Receiver<WarcWriterMessage>, s3: S3Confi
     while let Ok(message) = rx.recv().await {
         match message {
             WarcWriterMessage::Crawl(datum) => {
-                let is_pdf = datum
-                    .headers
-                    .get("content-type")
-                    .map(|ct| ct.contains("application/pdf"))
-                    .unwrap_or(false);
+                let w = &mut writer;
+                let (send, recv) = tokio::sync::oneshot::channel();
 
-                let payload = if is_pdf {
-                    Some("application/pdf".to_string())
-                } else {
-                    None
-                };
+                rayon::scope(move |s| {
+                    s.spawn(move |_| {
+                        let is_pdf = datum
+                            .headers
+                            .get("content-type")
+                            .map(|ct| ct.contains("application/pdf"))
+                            .unwrap_or(false);
 
-                let warc_record = warc::WarcRecord {
-                    request: warc::Request {
-                        url: datum.url.full(),
-                    },
-                    response: warc::Response {
-                        body: datum.body,
-                        payload_type: payload,
-                    },
-                    metadata: warc::Metadata {
-                        fetch_time_ms: datum.fetch_time_ms as usize,
-                    },
-                };
+                        let payload = if is_pdf {
+                            Some("application/pdf".to_string())
+                        } else {
+                            None
+                        };
 
-                writer.write(&warc_record).unwrap();
+                        let warc_record = warc::WarcRecord {
+                            request: warc::Request {
+                                url: datum.url.full(),
+                            },
+                            response: warc::Response {
+                                body: datum.body,
+                                payload_type: payload,
+                            },
+                            metadata: warc::Metadata {
+                                fetch_time_ms: datum.fetch_time_ms as usize,
+                            },
+                        };
+
+                        w.write(&warc_record).unwrap();
+                        send.send(()).unwrap();
+                    });
+                });
+
+                recv.await.unwrap();
 
                 if writer.num_bytes() > 1_000_000_000 {
                     commit(writer, s3.clone()).await;

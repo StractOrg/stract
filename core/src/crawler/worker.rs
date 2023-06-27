@@ -29,6 +29,7 @@ use crate::{
     crawler::{JobResponse, Request, Response},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     webpage::{Html, Url},
+    UserAgent,
 };
 
 use super::{Command, CrawlDatum, Error, Result, Site, UrlResponse, WarcWriter, WorkerJob};
@@ -43,7 +44,7 @@ pub struct Worker {
     pending_commands: Arc<Mutex<VecDeque<Command>>>,
     writer: Arc<WarcWriter>,
     client: reqwest::Client,
-    user_agent: String,
+    user_agent: UserAgent,
     default_politeness_factor: f32,
     politeness_factor: f32,
     coordinator_host: SocketAddr,
@@ -54,7 +55,7 @@ impl Worker {
     pub fn new(
         pending_commands: Arc<Mutex<VecDeque<Command>>>,
         writer: Arc<WarcWriter>,
-        user_agent: String,
+        user_agent: UserAgent,
         politeness_factor: f32,
         timeout: Duration,
         coordinator_host: SocketAddr,
@@ -72,7 +73,7 @@ impl Worker {
                 .timeout(timeout)
                 .connect_timeout(timeout)
                 .http2_keep_alive_interval(None)
-                .user_agent(&user_agent)
+                .user_agent(&user_agent.full)
                 .build()?,
             user_agent,
             politeness_factor,
@@ -164,7 +165,7 @@ impl Worker {
                 continue;
             }
 
-            if !job.robotstxt.is_allowed(&url, &self.user_agent).await {
+            if !job.robotstxt.is_allowed(&url, &self.user_agent.token).await {
                 continue;
             }
 

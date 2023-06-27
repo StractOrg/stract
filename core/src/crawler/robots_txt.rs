@@ -45,7 +45,7 @@ impl RobotsTxtManager {
     }
 
     async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
-        let res = reqwest::get(&format!("https://{}/robots.txt", site.0)).await?;
+        let res = reqwest::get(&format!("http://{}/robots.txt", site.0)).await?;
 
         if res.status() != reqwest::StatusCode::OK {
             return Err(Error::FetchFailed(res.status()));
@@ -121,5 +121,28 @@ impl RobotsTxt {
             matcher,
             sitemap,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let ua_token = "StractSearch";
+        let mut robots_txt = RobotsTxt::new(
+            r#"User-agent: StractSearch
+            Disallow: /test"#
+                .to_string(),
+        )
+        .unwrap();
+
+        assert!(!robots_txt
+            .matcher
+            .one_agent_allowed_by_robots(ua_token, "http://example.com/test"));
+        assert!(robots_txt
+            .matcher
+            .one_agent_allowed_by_robots(ua_token, "http://example.com/example"));
     }
 }

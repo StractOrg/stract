@@ -180,7 +180,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .route("/settings/sites", get(sites::route))
         .route("/settings/privacy", get(improvement::settings))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
-        .route("/bot", get(crawler::info_route))
+        .route("/webmasters", get(crawler::info_route))
         .route("/opensearch.xml", get(opensearch::route))
         .route("/improvement/click", post(improvement::click))
         .route("/improvement/store", post(improvement::store))

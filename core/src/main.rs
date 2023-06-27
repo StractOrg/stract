@@ -41,31 +41,40 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Commands to deploy the Alice server
     Alice {
         #[clap(subcommand)]
         options: AliceOptions,
     },
+    /// Build the search index
     Indexer {
         #[clap(subcommand)]
         options: IndexingOptions,
     },
+    /// Calculate centrality metrics that estimates a websites importance. These metrics are used to rank search results.
     Centrality {
         #[clap(subcommand)]
         mode: CentralityType,
         webgraph_path: String,
         output_path: String,
     },
+    /// Parse the DMOZ dataset. DMOZ contains a list of websites and their categories.
+    /// It can be used to calculate the topic centrality for websites or augments website descriptions during indexing.
     DmozParser {
         dmoz_file: String,
         output_path: String,
     },
+    /// Webgraph specific commands.
     Webgraph {
         #[clap(subcommand)]
         options: WebgraphOptions,
     },
+    /// Deploy the search server.
     SearchServer {
         config_path: String,
     },
+    /// Deploy the frontend. The frontend is a web server that serves the search UI and interacts with
+    /// the search servers, webgraph servers etc. to provide the necesarry functionality.
     Frontend {
         config_path: String,
     },

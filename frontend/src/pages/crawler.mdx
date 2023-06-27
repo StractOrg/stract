@@ -1,13 +1,18 @@
 ---
 layout: "../layouts/Markdown.astro"
-title: StractBot
+title: Stract Crawler
 ---
 
-# StractBot
-StractBot is the name of our crawler that is used to collect pages from the web in order to index them in the search engine. It is written in Rust and the source code can be found [here](https://github.com/StractOrg/stract/tree/main/core/src/crawler). The crawler uses the user agent `Mozilla/5.0 (compatible; Stractbot/0.1; +https://trystract.com/bot)`.
+# Stract Crawler
+StractSearch is the name of our crawler that is used to collect pages from the web in order to index them in the search engine. It is written in Rust and the source code can be found [here](https://github.com/StractOrg/stract/tree/main/core/src/crawler). The crawler uses the user agent `Mozilla/5.0 (compatible; StractSearch/0.1; +https://trystract.com/webmasters)`.
 
 ## Politeness
-StractBot is a polite crawler. This means that it respects the [robots.txt](https://en.wikipedia.org/wiki/Robots.txt) file of the website it is crawling and tries to not overload the server. It does this by waiting a certain amount of time between requests to the same domain. The waiting time is calculated by *min(max(fetchtime * politeness, 200 ms), 30 sec)* where *fetchtime* is the time it took to fetch the page. The crawler will wait at least 200 ms between requests and at most 30 seconds. This dynamic waiting time tries to prevent us from disrupting servers that cannot handle the load, while not giving unnecessary politeness to servers that can. The politeness factor starts at 1 and is doubled every time the crawler gets a 429 response from the server (to at most 128).
+StractSearch is a polite crawler. It respects the [robots.txt](https://en.wikipedia.org/wiki/Robots.txt) file of the website it is crawling and tries to not overload the server.
+It does this by waiting a certain amount of time between requests to the same domain. The waiting time is calculated by *min(max(fetchtime * politeness, 200 ms), 30 sec)* where *fetchtime* is the time it took to fetch the page. The crawler will wait at least 200 ms between requests and at most 30 seconds.
+This dynamic waiting time tries to prevent us from disrupting servers that cannot handle the load, while not giving unnecessary politeness to servers that can. The politeness factor starts at 1 and is doubled every time the crawler gets a 429 response from the server (to at most 128).
+
+The crawler looks for the token `StractSearch` in the robots.txt file to determine which pages (if any) the crawler is allowed to crawl.
+
 
 ## Contact us
-If you have any concerns or bad experiences with our crawler, please don't hesitate to reach out to us at [crawler@trystract.com](mailto:crawler@trystract.com).
+If you have any concerns or bad experiences with our crawler, please don't hesitate to reach out to us at [crawler@trystract.com](mailto:crawler@trystract.com). Chances are that others experience the same problems and we would love to fix them.

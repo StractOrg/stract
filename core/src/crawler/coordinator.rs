@@ -67,6 +67,10 @@ impl CrawlCoordinator {
     }
 
     fn log_crawls_per_second(&self, num_urls: usize) {
+        if self.is_done() {
+            return;
+        }
+
         let mut call_counter = self.call_counter.lock().unwrap();
 
         call_counter.count_with_weight(num_urls);

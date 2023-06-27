@@ -211,10 +211,16 @@ pub struct CrawlCoordinatorConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserAgent {
+    pub full: String,
+    pub token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlerConfig {
     pub num_warc_writers: Option<usize>,
     pub num_workers: usize,
-    pub user_agent: String,
+    pub user_agent: UserAgent,
     pub politeness_factor: Option<f32>,
     pub timeout_seconds: u64,
     pub s3: S3Config,
