@@ -30,7 +30,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const DEFAULT_JOB_URLS: usize = 100;
+const DEFAULT_JOB_URLS: usize = 200;
 
 pub struct CrawlCoordinator {
     db: CrawlDb,
@@ -81,15 +81,18 @@ impl CrawlCoordinator {
         let start = Instant::now();
 
         self.log_crawls_per_second(response.url_responses.len());
+
         self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
-        let tx = self.db.transaction()?;
 
-        tx.insert_urls(&response.domain, &response.discovered_urls)?;
-        tx.update_url_status(&response.url_responses)?;
-
-        tx.set_domain_status(&response.domain, DomainStatus::Pending)?;
-
+        let tx = self.db.transaction().unwrap();
         let mut domains = HashSet::new();
+        tx.insert_urls(&response.domain, &response.discovered_urls)
+            .unwrap();
+
+        tx.update_url_status(&response.url_responses).unwrap();
+
+        tx.set_domain_status(&response.domain, DomainStatus::Pending)
+            .unwrap();
         domains.insert(response.domain.clone());
         domains.extend(
             response
@@ -98,9 +101,9 @@ impl CrawlCoordinator {
                 .map(|url| Domain(url.domain().to_string())),
         );
 
-        tx.update_max_inlinks_domains(domains.iter())?;
+        tx.update_max_inlinks_domains(domains.iter()).unwrap();
 
-        tracing::debug!("inserted response in {:?}", start.elapsed());
+        tracing::debug!("inserted responses in {:?}", start.elapsed());
 
         Ok(())
     }

@@ -42,7 +42,7 @@ mod autosuggest;
 mod bangs;
 mod call_counter;
 mod collector;
-mod crawler;
+pub mod crawler;
 mod directory;
 mod distributed;
 mod entity_index;

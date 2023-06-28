@@ -159,8 +159,7 @@ impl Worker {
 
         let mut crawled_sitemaps: HashSet<Site> = HashSet::new();
 
-        let num_urls = job.job.urls.len();
-        for (i, url) in job.job.urls.into_iter().enumerate() {
+        for url in job.job.urls {
             if url.is_empty() || url.site().is_empty() {
                 continue;
             }
@@ -194,9 +193,7 @@ impl Worker {
                 delay = Duration::from_millis(MAX_CRAWL_DELAY_MS);
             }
 
-            if i < num_urls - 1 {
-                tokio::time::sleep(delay).await;
-            }
+            tokio::time::sleep(delay).await;
         }
 
         // send response to coordinator

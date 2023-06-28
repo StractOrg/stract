@@ -47,4 +47,4 @@
     .venv/bin/python3 scripts/download_libtorch.py {{ARGS}}
 
 @cargo *ARGS:
-    LIBTORCH="libtorch" LD_LIBRARY_PATH="libtorch/lib" DYLD_LIBRARY_PATH="libtorch/lib" cargo {{ARGS}}
+    LIBTORCH="{{justfile_directory()}}/libtorch" LD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" DYLD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" cargo {{ARGS}}

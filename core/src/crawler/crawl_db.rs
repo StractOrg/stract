@@ -26,6 +26,7 @@ use crate::webpage::Url;
 
 use super::{Domain, Job, Result, UrlResponse};
 
+#[derive(Clone)]
 pub enum UrlStatus {
     Pending,
     Crawling,
@@ -118,21 +119,18 @@ impl CrawlDb {
             [],
         )?;
 
-        // index by url and status
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS url_url_status ON url (url, status);",
-            [],
-        )?;
+        // // index by url and status
+        // conn.execute(
+        //     "CREATE INDEX IF NOT EXISTS url_url_status ON url (url, status);",
+        //     [],
+        // )?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS url_domain_status ON url (domain, status);",
-            [],
-        )?;
+        conn.execute("CREATE INDEX IF NOT EXISTS url_domain ON url (domain);", [])?;
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS url_incoming_links ON url (incoming_links);",
-            [],
-        )?;
+        // conn.execute(
+        //     "CREATE INDEX IF NOT EXISTS url_incoming_links ON url (incoming_links);",
+        //     [],
+        // )?;
 
         // there should be one table that contains all known domains
         // and whether a crawl is in progress for that domain.
@@ -167,7 +165,7 @@ impl CrawlDb {
         // update performance stuff
         // WAL mode
         let _ = conn
-            .prepare("PRAGMA journal_mode = 'WAL';")?
+            .prepare("PRAGMA journal_mode = WAL;")?
             .query([])?
             .next();
 
@@ -183,8 +181,10 @@ impl CrawlDb {
         // store temp tables in memory
         let _ = conn.prepare("PRAGMA temp_store = 2;")?.query([])?.next();
 
-        // set cache size to 64 MB
-        conn.pragma_update(None, "cache_size", -64_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
+        // set cache size to 128 MB
+        conn.pragma_update(None, "cache_size", -128_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
+
+        conn.pragma_update(None, "page_size", 32_768)?;
 
         rusqlite::vtab::array::load_module(&conn)?;
 

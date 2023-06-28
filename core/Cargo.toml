@@ -127,3 +127,7 @@ harness = false
 [[bench]]
 name = "spell-correction"
 harness = false
+
+[[bench]]
+name = "crawl-coordinator"
+harness = false

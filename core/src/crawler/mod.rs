@@ -30,7 +30,7 @@ use self::{
     worker::Worker,
 };
 
-mod coordinator;
+pub mod coordinator;
 mod crawl_db;
 mod robots_txt;
 mod warc_writer;
@@ -76,7 +76,7 @@ type Result<T> = std::result::Result<T, Error>;
 struct Site(String);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Domain(String);
+pub struct Domain(pub String);
 
 /// All urls in a job must be from the same domain and only one job per domain.
 /// at a time. This ensures that we stay polite when crawling.
@@ -87,18 +87,18 @@ pub struct Job {
     pub urls: VecDeque<Url>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum UrlResponse {
     Success { url: Url },
     Failed { url: Url, status_code: Option<u16> },
     Redirected { url: Url, new_url: Url },
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JobResponse {
-    domain: Domain,
-    url_responses: Vec<UrlResponse>,
-    discovered_urls: Vec<Url>,
+    pub domain: Domain,
+    pub url_responses: Vec<UrlResponse>,
+    pub discovered_urls: Vec<Url>,
 }
 
 struct WorkerJob {
