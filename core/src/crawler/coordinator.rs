@@ -30,7 +30,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const DEFAULT_JOB_URLS: usize = 1000;
+const DEFAULT_JOB_URLS: usize = 100;
 
 pub struct CrawlCoordinator {
     db: CrawlDb,
