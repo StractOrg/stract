@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, panic, time::Instant};
+use std::{collections::HashMap, panic};
 
 use robotstxt_with_cache::matcher::{
     CachingRobotsMatcher, LongestMatchRobotsMatchStrategy, RobotsMatcher,
@@ -62,13 +62,7 @@ impl RobotsTxtManager {
     async fn get_mut(&mut self, url: &Url) -> Result<Option<&mut RobotsTxt>> {
         let site = Site(url.site().to_string());
 
-        let should_fetch = match self.cache.get(&site) {
-            Some(Some(robots_txt)) => Instant::now() > robots_txt.valid_until,
-            Some(None) => false, // robots.txt does not exist
-            None => true,
-        };
-
-        if should_fetch {
+        if self.cache.get(&site).is_none() {
             match self.fetch_robots_txt(&site).await {
                 Ok(robots_txt) => {
                     self.cache.insert(site.clone(), Some(robots_txt));
@@ -98,7 +92,6 @@ impl RobotsTxtManager {
 }
 
 struct RobotsTxt {
-    valid_until: Instant,
     matcher: CachingRobotsMatcher<LongestMatchRobotsMatchStrategy>,
     sitemap: Option<Url>,
 }
@@ -116,11 +109,7 @@ impl RobotsTxt {
             .map(|line| line.split(':').nth(1).unwrap().trim().to_string())
             .map(Url::from);
 
-        Ok(Self {
-            valid_until: Instant::now() + chrono::Duration::hours(24).to_std()?,
-            matcher,
-            sitemap,
-        })
+        Ok(Self { matcher, sitemap })
     }
 }
 
