@@ -542,7 +542,7 @@ impl CrawlDb {
 
             let mut job = Job {
                 domain: self.domain_ids.value(domain_id.0)?.unwrap(),
-                fetch_sitemap: true, // todo: make this configureable
+                fetch_sitemap: false, // todo: fetch for new sites
                 urls: VecDeque::with_capacity(urls_per_job),
             };
 

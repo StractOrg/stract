@@ -32,7 +32,10 @@ use crate::{
     UserAgent,
 };
 
-use super::{Command, CrawlDatum, Error, Result, Site, UrlResponse, WarcWriter, WorkerJob};
+use super::{
+    robots_txt::RobotsTxtManager, Command, CrawlDatum, Error, Result, Site, UrlResponse,
+    WarcWriter, WorkerJob,
+};
 
 const MIN_CRAWL_DELAY_MS: u64 = 200;
 const MAX_CRAWL_DELAY_MS: u64 = 30_000;
@@ -49,6 +52,7 @@ pub struct Worker {
     politeness_factor: f32,
     coordinator_host: SocketAddr,
     num_jobs_per_fetch: usize,
+    robotstxt: RobotsTxtManager,
 }
 
 impl Worker {
@@ -65,21 +69,26 @@ impl Worker {
             return Err(Error::InvalidPolitenessFactor);
         }
 
+        let client = reqwest::Client::builder()
+            .timeout(timeout)
+            .connect_timeout(timeout)
+            .http2_keep_alive_interval(None)
+            .user_agent(&user_agent.full)
+            .build()?;
+
+        let robotstxt = RobotsTxtManager::new(client.clone());
+
         Ok(Self {
             writer,
+            client,
             current_job: None,
             pending_commands,
-            client: reqwest::Client::builder()
-                .timeout(timeout)
-                .connect_timeout(timeout)
-                .http2_keep_alive_interval(None)
-                .user_agent(&user_agent.full)
-                .build()?,
             user_agent,
             politeness_factor,
             default_politeness_factor: politeness_factor,
             coordinator_host,
             num_jobs_per_fetch,
+            robotstxt,
         })
     }
 
@@ -151,7 +160,7 @@ impl Worker {
     async fn process_job(&mut self) {
         self.politeness_factor = self.default_politeness_factor;
 
-        let mut job = self.current_job.take().unwrap();
+        let job = self.current_job.take().unwrap();
         tracing::info!("Processing job: {:?}", job.job.domain);
 
         let mut url_responses: Vec<UrlResponse> = Vec::new();
@@ -164,7 +173,11 @@ impl Worker {
                 continue;
             }
 
-            if !job.robotstxt.is_allowed(&url, &self.user_agent.token).await {
+            if !self
+                .robotstxt
+                .is_allowed(&url, &self.user_agent.token)
+                .await
+            {
                 continue;
             }
 
@@ -172,7 +185,7 @@ impl Worker {
             if job.job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
                 crawled_sitemaps.insert(site.clone());
 
-                if let Ok(Some(sitemap)) = job.robotstxt.sitemap(&url).await {
+                if let Ok(Some(sitemap)) = self.robotstxt.sitemap(&url).await {
                     let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
                     discovered_urls.extend(sitemap_urls.into_iter());
                 }

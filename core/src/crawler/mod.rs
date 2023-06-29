@@ -25,7 +25,6 @@ use tokio::sync::Mutex;
 use crate::{webpage::Url, CrawlerConfig};
 
 use self::{
-    robots_txt::RobotsTxtManager,
     warc_writer::{WarcWriter, WarcWriterMessage},
     worker::Worker,
 };
@@ -66,8 +65,8 @@ pub enum Error {
     #[error("addr parse error: {0}")]
     AddrParse(#[from] std::net::AddrParseError),
 
-    #[error("async channel: {0}")]
-    SendError(#[from] async_channel::SendError<WarcWriterMessage>),
+    #[error("channel: {0}")]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<WarcWriterMessage>),
 
     #[error("bincode: {0}")]
     Bincode(#[from] bincode::Error),
@@ -123,16 +122,12 @@ pub struct JobResponse {
 }
 
 struct WorkerJob {
-    robotstxt: RobotsTxtManager,
     job: Job,
 }
 
 impl From<Job> for WorkerJob {
     fn from(value: Job) -> Self {
-        Self {
-            robotstxt: RobotsTxtManager::new(),
-            job: value,
-        }
+        Self { job: value }
     }
 }
 

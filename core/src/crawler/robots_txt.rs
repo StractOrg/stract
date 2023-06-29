@@ -26,11 +26,13 @@ use super::{Error, Result, Site};
 
 pub struct RobotsTxtManager {
     cache: HashMap<Site, Option<RobotsTxt>>, // None if robots.txt does not exist
+    client: reqwest::Client,
 }
 
 impl RobotsTxtManager {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest::Client) -> Self {
         Self {
+            client,
             cache: HashMap::new(),
         }
     }
@@ -45,7 +47,11 @@ impl RobotsTxtManager {
     }
 
     async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
-        let res = reqwest::get(&format!("http://{}/robots.txt", site.0)).await?;
+        let res = self
+            .client
+            .get(&format!("http://{}/robots.txt", site.0))
+            .send()
+            .await?;
 
         if res.status() != reqwest::StatusCode::OK {
             return Err(Error::FetchFailed(res.status()));
