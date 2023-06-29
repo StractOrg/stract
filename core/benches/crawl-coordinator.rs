@@ -2,7 +2,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::seq::SliceRandom;
 use stract::{
-    crawler::{CrawlCoordinator, Domain, JobResponse, UrlResponse},
+    crawler::{CrawlCoordinator, JobResponse, UrlResponse},
     webpage::Url,
 };
 
@@ -1743,6 +1743,9 @@ Url::from("https://www.apple.com/apple-music".to_string()),
 Url::from("https://www.apple.com/legal/internet-services/itunes/us/terms.html".to_string()),
     ];
 
+    // pre-initialize domain prefix list
+    letsencrypt_urls[0].domain();
+
     let letsencrypt_url_responses: Vec<UrlResponse> = letsencrypt_urls
         .clone()
         .into_iter()
@@ -1757,23 +1760,29 @@ Url::from("https://www.apple.com/legal/internet-services/itunes/us/terms.html".t
 
     let responses = vec![
         JobResponse {
-            domain: Domain("letsencrypt.org".to_string()),
+            domain: "letsencrypt.org".to_string().into(),
             url_responses: letsencrypt_url_responses,
             discovered_urls: apple_urls,
         },
         JobResponse {
-            domain: Domain("apple.com".to_string()),
+            domain: "apple.com".to_string().into(),
             url_responses: apple_url_responses,
             discovered_urls: letsencrypt_urls,
         },
     ];
     let mut rng = rand::thread_rng();
 
-    for _ in 0..1000 {
+    for _ in 0..10 {
         c.bench_function("Add response to coordinator", |b| {
             b.iter(|| {
                 let response = responses.choose(&mut rng).unwrap();
                 coordinator.add_response(response).unwrap();
+            })
+        });
+
+        c.bench_function("Sample jobs", |b| {
+            b.iter(|| {
+                coordinator.sample_jobs(256).unwrap();
             })
         });
     }

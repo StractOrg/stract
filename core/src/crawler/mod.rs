@@ -68,6 +68,15 @@ pub enum Error {
 
     #[error("async channel: {0}")]
     SendError(#[from] async_channel::SendError<WarcWriterMessage>),
+
+    #[error("bincode: {0}")]
+    Bincode(#[from] bincode::Error),
+
+    #[error("rocksdb: {0}")]
+    Rocksdb(#[from] rocksdb::Error),
+
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -76,7 +85,19 @@ type Result<T> = std::result::Result<T, Error>;
 struct Site(String);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Domain(pub String);
+pub struct Domain(String);
+
+impl From<&Url> for Domain {
+    fn from(url: &Url) -> Self {
+        Self(url.domain().to_string())
+    }
+}
+
+impl From<String> for Domain {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 /// All urls in a job must be from the same domain and only one job per domain.
 /// at a time. This ensures that we stay polite when crawling.

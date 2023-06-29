@@ -18,10 +18,9 @@ use crate::{call_counter::CallCounter, webpage::Url};
 
 use super::{
     crawl_db::{CrawlDb, DomainStatus},
-    Domain, Job, JobResponse, Result,
+    Job, JobResponse, Result,
 };
 use std::{
-    collections::HashSet,
     path::Path,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -33,7 +32,7 @@ use std::{
 const DEFAULT_JOB_URLS: usize = 200;
 
 pub struct CrawlCoordinator {
-    db: CrawlDb,
+    db: Mutex<CrawlDb>,
     num_crawled_urls: AtomicU64,
     num_urls_to_crawl: u64,
     call_counter: Mutex<CallCounter>,
@@ -45,21 +44,14 @@ impl CrawlCoordinator {
         num_urls_to_crawl: u64,
         seed_urls: Vec<String>,
     ) -> Result<Self> {
-        let db = CrawlDb::open(crawldb_folder)?;
+        let mut db = CrawlDb::open(crawldb_folder)?;
 
         let seed_urls = seed_urls.into_iter().map(Url::from).collect::<Vec<_>>();
 
-        let domain_seeds = seed_urls
-            .iter()
-            .map(|url| Domain(url.domain().to_string()))
-            .collect::<HashSet<_>>();
-
-        db.transaction()?.insert_seed_urls(&seed_urls)?;
-        db.transaction()?
-            .update_max_inlinks_domains(domain_seeds.iter())?;
+        db.insert_seed_urls(&seed_urls)?;
 
         Ok(Self {
-            db,
+            db: Mutex::new(db),
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
             call_counter: Mutex::new(CallCounter::new(Duration::from_secs(10))),
@@ -79,29 +71,19 @@ impl CrawlCoordinator {
 
     pub fn add_response(&self, response: &JobResponse) -> Result<()> {
         let start = Instant::now();
+        let mut db = self.db.lock().unwrap();
 
         self.log_crawls_per_second(response.url_responses.len());
 
         self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
 
-        let tx = self.db.transaction().unwrap();
-        let mut domains = HashSet::new();
-        tx.insert_urls(&response.domain, &response.discovered_urls)
+        db.insert_urls(&response.domain, &response.discovered_urls)
             .unwrap();
 
-        tx.update_url_status(&response.url_responses).unwrap();
+        db.update_url_status(&response.url_responses).unwrap();
 
-        tx.set_domain_status(&response.domain, DomainStatus::Pending)
+        db.set_domain_status(&response.domain, DomainStatus::Pending)
             .unwrap();
-        domains.insert(response.domain.clone());
-        domains.extend(
-            response
-                .discovered_urls
-                .iter()
-                .map(|url| Domain(url.domain().to_string())),
-        );
-
-        tx.update_max_inlinks_domains(domains.iter()).unwrap();
 
         tracing::debug!("inserted responses in {:?}", start.elapsed());
 
@@ -114,11 +96,11 @@ impl CrawlCoordinator {
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {
         let start = Instant::now();
-        let tx = self.db.transaction()?;
+        let mut db = self.db.lock().unwrap();
 
-        let domains = tx.sample_domains(num_jobs)?;
+        let domains = db.sample_domains(num_jobs)?;
         tracing::debug!("sampled domains: {:?}", domains);
-        let jobs = tx.prepare_jobs(&domains, DEFAULT_JOB_URLS)?;
+        let jobs = db.prepare_jobs(&domains, DEFAULT_JOB_URLS)?;
         tracing::debug!("sampled jobs: {:?}", jobs);
         tracing::info!("sampled {} jobs in {:?}", jobs.len(), start.elapsed());
 

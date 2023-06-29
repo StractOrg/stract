@@ -14,453 +14,544 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, path::Path, rc::Rc, sync::Arc};
-
-use itertools::Itertools;
-use rusqlite::{
-    types::{FromSql, FromSqlError, FromSqlResult, Value, ValueRef},
-    ToSql,
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, VecDeque},
+    hash::Hash,
+    num::NonZeroUsize,
+    path::Path,
 };
+
+use lru::LruCache;
+use rand::Rng;
 
 use crate::webpage::Url;
 
 use super::{Domain, Job, Result, UrlResponse};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum UrlStatus {
     Pending,
     Crawling,
-    Failed,
+    Failed { status_code: Option<u16> },
     Done,
 }
 
-impl ToSql for UrlStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        match self {
-            UrlStatus::Pending => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(0),
-            )),
-            UrlStatus::Crawling => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(1),
-            )),
-            UrlStatus::Failed => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(2),
-            )),
-            UrlStatus::Done => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(3),
-            )),
-        }
-    }
-}
-
-impl FromSql for UrlStatus {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value {
-            ValueRef::Integer(0) => Ok(UrlStatus::Pending),
-            ValueRef::Integer(1) => Ok(UrlStatus::Crawling),
-            ValueRef::Integer(2) => Ok(UrlStatus::Failed),
-            ValueRef::Integer(3) => Ok(UrlStatus::Done),
-            _ => Err(FromSqlError::InvalidType),
-        }
-    }
-}
-
+#[derive(Clone, PartialEq, Eq)]
 pub enum DomainStatus {
     Pending,
     CrawlInProgress,
 }
 
-impl ToSql for DomainStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        match self {
-            DomainStatus::Pending => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(0),
-            )),
-            DomainStatus::CrawlInProgress => Ok(rusqlite::types::ToSqlOutput::Owned(
-                rusqlite::types::Value::Integer(1),
-            )),
+struct IdTable<T> {
+    t2id: rocksdb::DB,
+    id2t: rocksdb::DB,
+    next_id: u64,
+
+    t2id_cache: LruCache<T, u64>,
+    id2t_cache: LruCache<u64, T>,
+
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> IdTable<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned + Hash + Eq + Clone,
+{
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+        options.increase_parallelism(3);
+
+        // create dir if not exists
+        std::fs::create_dir_all(path.as_ref())?;
+
+        let _ = rocksdb::DB::destroy(&options, path.as_ref().join("t2id"));
+        let _ = rocksdb::DB::destroy(&options, path.as_ref().join("id2t"));
+
+        let t2id = rocksdb::DB::open_default(path.as_ref().join("t2id"))?;
+        let id2t = rocksdb::DB::open_default(path.as_ref().join("id2t"))?;
+
+        Ok(Self {
+            t2id,
+            id2t,
+            next_id: 0,
+
+            t2id_cache: LruCache::new(NonZeroUsize::new(1_000_000).unwrap()),
+            id2t_cache: LruCache::new(NonZeroUsize::new(1_000_000).unwrap()),
+
+            _marker: std::marker::PhantomData,
+        })
+    }
+
+    pub fn bulk_ids(&mut self, items: impl Iterator<Item = T>) -> Result<Vec<u64>> {
+        let mut ids = Vec::new();
+
+        let mut batch_id2t = rocksdb::WriteBatch::default();
+        let mut batch_t2id = rocksdb::WriteBatch::default();
+
+        for item in items {
+            // check cache
+            if let Some(id) = self.t2id_cache.get(&item) {
+                ids.push(*id);
+                continue;
+            }
+
+            // check if item exists
+            let item_bytes = bincode::serialize(&item)?;
+            let id = self.t2id.get(&item_bytes)?;
+            if let Some(id) = id {
+                let id = bincode::deserialize(&id)?;
+
+                // update cache
+                self.t2id_cache.put(item, id);
+
+                ids.push(id);
+                continue;
+            }
+
+            // insert item
+            let id = self.next_id;
+            self.next_id += 1;
+            let id_bytes = bincode::serialize(&id)?;
+            batch_t2id.put(&item_bytes, &id_bytes);
+            batch_id2t.put(&id_bytes, &item_bytes);
+
+            // update cache
+            self.t2id_cache.put(item, id);
+
+            ids.push(id);
         }
+
+        self.id2t.write(batch_id2t)?;
+        self.t2id.write(batch_t2id)?;
+
+        Ok(ids)
+    }
+
+    pub fn id(&mut self, item: T) -> Result<u64> {
+        // check cache
+        if let Some(id) = self.t2id_cache.get(&item) {
+            return Ok(*id);
+        }
+
+        // check if item exists
+        let item_bytes = bincode::serialize(&item)?;
+        let id = self.t2id.get(&item_bytes)?;
+        if let Some(id) = id {
+            let id = bincode::deserialize(&id)?;
+
+            // update cache
+            self.t2id_cache.put(item.clone(), id);
+            self.id2t_cache.put(id, item);
+
+            return Ok(id);
+        }
+
+        // insert item
+        let id = self.next_id;
+        self.next_id += 1;
+        let id_bytes = bincode::serialize(&id)?;
+        self.t2id.put(&item_bytes, &id_bytes)?;
+        self.id2t.put(&id_bytes, &item_bytes)?;
+
+        // update cache
+        self.t2id_cache.put(item.clone(), id);
+        self.id2t_cache.put(id, item);
+
+        Ok(id)
+    }
+
+    pub fn value(&mut self, id: u64) -> Result<Option<T>> {
+        // check cache
+        if let Some(value) = self.id2t_cache.get(&id) {
+            return Ok(Some(value.clone()));
+        }
+
+        let id_bytes = bincode::serialize(&id)?;
+        let value_bytes = self.id2t.get(id_bytes)?;
+        if let Some(value_bytes) = value_bytes {
+            let value: T = bincode::deserialize(&value_bytes)?;
+
+            // update cache
+            self.t2id_cache.put(value.clone(), id);
+            self.id2t_cache.put(id, value.clone());
+
+            return Ok(Some(value));
+        }
+
+        Ok(None)
     }
 }
 
-impl FromSql for DomainStatus {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value {
-            ValueRef::Integer(0) => Ok(DomainStatus::Pending),
-            ValueRef::Integer(1) => Ok(DomainStatus::CrawlInProgress),
-            _ => Err(FromSqlError::InvalidType),
+struct SampledItem<'a, T> {
+    item: &'a T,
+    priority: f64,
+}
+
+impl<'a, T> PartialEq for SampledItem<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority
+    }
+}
+
+impl<'a, T> Eq for SampledItem<'a, T> {}
+
+impl<'a, T> PartialOrd for SampledItem<'a, T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.priority.partial_cmp(&other.priority)
+    }
+}
+
+impl<'a, T> Ord for SampledItem<'a, T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority
+            .partial_cmp(&other.priority)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+fn weighted_sample<'a, T: 'a>(
+    items: impl Iterator<Item = (&'a T, f64)>,
+    num_items: usize,
+) -> Vec<&'a T> {
+    let mut sampled_items: BinaryHeap<Reverse<SampledItem<T>>> =
+        BinaryHeap::with_capacity(num_items);
+
+    let mut rng = rand::thread_rng();
+
+    for (item, weight) in items {
+        // see https://www.kaggle.com/code/kotamori/random-sample-with-weights-on-sql/notebook for details on math
+        // let priority =  -log((abs(random()) % 1000000 + 0.5) / 1000000.0) / (max_incoming_links + 1)
+        let priority = -(rng.gen::<f64>().abs() + 0.5).ln() / (weight + 1.0);
+        if sampled_items.len() < num_items {
+            sampled_items.push(Reverse(SampledItem { item, priority }));
+        } else if let Some(mut min) = sampled_items.peek_mut() {
+            if min.0.priority < priority {
+                min.0.item = item;
+                min.0.priority = priority;
+            }
         }
+    }
+
+    sampled_items.into_iter().map(|s| s.0.item).collect()
+}
+
+struct UrlState {
+    weight: f64,
+    status: UrlStatus,
+}
+struct DomainState {
+    weight: f64,
+    status: DomainStatus,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DomainId(u64);
+
+impl From<u64> for DomainId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct UrlId(u64);
+
+impl From<u64> for UrlId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+struct RedirectDb {
+    inner: rocksdb::DB,
+}
+
+impl RedirectDb {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let inner = rocksdb::DB::open_default(path.as_ref())?;
+
+        Ok(Self { inner })
+    }
+
+    pub fn put(&self, from: &Url, to: &Url) -> Result<()> {
+        let url_bytes = bincode::serialize(from)?;
+        let redirect_bytes = bincode::serialize(to)?;
+        self.inner.put(url_bytes, redirect_bytes)?;
+
+        Ok(())
     }
 }
 
 pub struct CrawlDb {
-    conn: Arc<rusqlite::Connection>,
+    url_ids: IdTable<Url>,
+    domain_ids: IdTable<Domain>,
+
+    redirects: RedirectDb,
+
+    domain_state: HashMap<DomainId, DomainState>,
+
+    urls: HashMap<DomainId, HashMap<UrlId, UrlState>>,
 }
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let conn = Arc::new(rusqlite::Connection::open(path)?);
-        // create tables if not exists
-        // there should be one table that contains all known URLs
-        // when a URL is added to the table, it should be marked as `UrlStatus::Pending`
-        // when a URL is being fetched, it should be marked as `UrlStatus::Crawling`
-        // when a URL has been fetched, it should be marked as `UrlStatus::Done`.
-        // Each URL should have a counter that counts the number of incoming links
-        // from URLs on other domains.
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS url(
-            url TEXT NOT NULL UNIQUE,
-            domain TEXT NOT NULL,
-            status INTEGER NOT NULL,
-            error_code INTEGER,
-            incoming_links INTEGER NOT NULL,
-            PRIMARY KEY (url)
-        );",
-            [],
-        )?;
+        let url_ids = IdTable::open(path.as_ref().join("urls"))?;
+        let domain_ids = IdTable::open(path.as_ref().join("domains"))?;
+        let redirects = RedirectDb::open(path.as_ref().join("redirects"))?;
 
-        // // index by url and status
-        // conn.execute(
-        //     "CREATE INDEX IF NOT EXISTS url_url_status ON url (url, status);",
-        //     [],
-        // )?;
-
-        conn.execute("CREATE INDEX IF NOT EXISTS url_domain ON url (domain);", [])?;
-
-        // conn.execute(
-        //     "CREATE INDEX IF NOT EXISTS url_incoming_links ON url (incoming_links);",
-        //     [],
-        // )?;
-
-        // there should be one table that contains all known domains
-        // and whether a crawl is in progress for that domain.
-        // It should also contain a copy of the maximum count of incoming links
-        // for any URL in that domain.
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS domain (
-            domain TEXT NOT NULL UNIQUE,
-            max_incoming_links INTEGER NOT NULL,
-            status INTEGER NOT NULL,
-            PRIMARY KEY (domain)
-        );",
-            [],
-        )?;
-
-        // index by domain and status
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS domain_domain_status ON domain (domain, status);",
-            [],
-        )?;
-
-        // store redirects
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS redirect (
-            from_url INTEGER NOT NULL,
-            to_url INTEGER NOT NULL,
-            PRIMARY KEY (from_url, to_url)
-        );",
-            [],
-        )?;
-
-        // update performance stuff
-        // WAL mode
-        let _ = conn
-            .prepare("PRAGMA journal_mode = WAL;")?
-            .query([])?
-            .next();
-
-        // sync OFF - if coordinator crashes, we are SOL anyway and will have to restart the crawl.
-        let _ = conn.prepare("PRAGMA synchronous = OFF;")?.query([])?.next();
-
-        // lock held by the SQLite connection is never released in EXCLUSIVE mode
-        let _ = conn
-            .prepare("PRAGMA locking_mode = EXCLUSIVE;")?
-            .query([])?
-            .next();
-
-        // store temp tables in memory
-        let _ = conn.prepare("PRAGMA temp_store = 2;")?.query([])?.next();
-
-        // set cache size to 128 MB
-        conn.pragma_update(None, "cache_size", -128_000)?; // negative value means kilobytes (https://www.sqlite.org/pragma.html#pragma_cache_size)
-
-        conn.pragma_update(None, "page_size", 32_768)?;
-
-        rusqlite::vtab::array::load_module(&conn)?;
-
-        Ok(Self { conn })
-    }
-
-    pub fn transaction(&self) -> Result<Transaction<'_>> {
-        Ok(Transaction {
-            tx: Some(self.conn.unchecked_transaction()?),
+        Ok(Self {
+            url_ids,
+            domain_ids,
+            redirects,
+            domain_state: HashMap::new(),
+            urls: HashMap::new(),
         })
-    }
-}
-
-pub struct Transaction<'a> {
-    tx: Option<rusqlite::Transaction<'a>>,
-}
-
-impl Drop for Transaction<'_> {
-    fn drop(&mut self) {
-        self.tx.take().unwrap().commit().unwrap();
-    }
-}
-
-impl Transaction<'_> {
-    fn tx(&self) -> &rusqlite::Transaction<'_> {
-        self.tx.as_ref().unwrap()
     }
 
     pub fn insert_seed_urls(&mut self, urls: &[Url]) -> Result<()> {
-        let mut prepared_insert_url = self.tx().prepare(
-            "INSERT INTO url (url, domain, status, incoming_links)
-        VALUES (?1, ?2, ?3, ?4)
-        ON CONFLICT (url) DO NOTHING;",
-        )?;
-        let mut prepared_insert_domain = self.tx().prepare(
-            "INSERT INTO domain (domain, max_incoming_links, status)
-        VALUES (?1, 0, ?2)
-        ON CONFLICT (domain) DO NOTHING;",
-        )?;
-
         for url in urls {
-            prepared_insert_url.execute((
-                url.full(),
-                url.domain().to_string(),
-                UrlStatus::Pending,
-                0,
-            ))?;
-            prepared_insert_domain.execute((url.domain().to_string(), DomainStatus::Pending))?;
+            let domain_id = self.domain_ids.id(url.into())?.into();
+            let url_id = self.url_ids.id(url.clone())?.into();
+
+            self.domain_state
+                .entry(domain_id)
+                .or_insert_with(|| DomainState {
+                    weight: 0.0,
+                    status: DomainStatus::Pending,
+                });
+
+            self.urls.entry(domain_id).or_default().insert(
+                url_id,
+                UrlState {
+                    weight: 0.0,
+                    status: UrlStatus::Pending,
+                },
+            );
         }
 
         Ok(())
     }
 
-    pub fn update_max_inlinks_domains<'a, I: Iterator<Item = &'a Domain>>(
-        &self,
-        mut domains: I,
-    ) -> Result<()> {
-        // 32_784 is the maximum number of parameters that SQLite supports.
-        // This is configured in the SQLITE_MAX_VARIABLE_NUMBER environment variable in .cargo/config.toml.
-        for chunk in domains.by_ref().chunks(32_784).into_iter() {
-            self.update_max_inlinks_domains_chunk(chunk)?;
-        }
-
-        Ok(())
-    }
-
-    fn update_max_inlinks_domains_chunk<'a, I: Iterator<Item = &'a Domain>>(
-        &self,
-        domains: I,
-    ) -> Result<()> {
-        // Collect domains into a Vec to use them later in the SQL
-        let domains: Rc<Vec<Value>> =
-            Rc::new(domains.map(|d| d.0.to_string()).map(Value::from).collect());
-
-        // Start transaction
-        let tx = self.tx();
-
-        tx.execute("DROP TABLE IF EXISTS temp_domain;", [])?;
-        // Create a temporary table to hold the max incoming links for each domain
-        tx.execute(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS temp_domain AS
-            SELECT domain, MAX(incoming_links) as max_incoming_links
-            FROM url
-            WHERE domain IN rarray(?1) AND status = ?2
-            GROUP BY domain;",
-            (domains.clone(), UrlStatus::Pending),
-        )?;
-
-        // Update the domain table
-        tx.execute(
-            "UPDATE domain
-            SET max_incoming_links = IFNULL(
-                (SELECT max_incoming_links FROM temp_domain WHERE temp_domain.domain = domain.domain), 0
-            )
-            WHERE domain in rarray(?1);",
-            (domains,),
-        )?;
-
-        // Drop the temporary table
-        tx.execute("DROP TABLE temp_domain;", [])?;
-
-        Ok(())
-    }
-
-    pub fn insert_urls(&self, crawled_domain: &Domain, urls: &[Url]) -> Result<()> {
-        // insert discovered URLs if not already in database
-        // update incoming link counts for discovered URLs
-        // if count is above prev max for domain, update max
-        let domain = Url::from(crawled_domain.0.clone());
-        let mut prepared_diff_domain = self.tx().prepare(
-            "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, 1)
-            ON CONFLICT (url) DO UPDATE SET incoming_links = incoming_links + 1;",
-        )?;
-        let mut prepared_same_domain = self.tx().prepare(
-            "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, 0)
-            ON CONFLICT (url) DO NOTHING;",
-        )?;
-        let mut prepared_insert_domain = self.tx().prepare(
-            "INSERT INTO domain (domain, max_incoming_links, status)
-            VALUES (?1, 0, ?2)
-            ON CONFLICT (domain) DO NOTHING;",
-        )?;
-
-        let mut unique_domains = HashSet::new();
+    pub fn insert_urls(&mut self, crawled_domain: &Domain, urls: &[Url]) -> Result<()> {
+        let mut domains: HashMap<Domain, Vec<Url>> = HashMap::new();
 
         for url in urls {
-            if domain.domain() != url.domain() {
-                prepared_diff_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
-            } else {
-                prepared_same_domain.execute((url.full(), url.domain(), UrlStatus::Pending))?;
+            let domain: Domain = url.domain().to_string().into();
+
+            domains.entry(domain).or_default().push(url.clone());
+        }
+
+        let domain_ids: Vec<DomainId> = self
+            .domain_ids
+            .bulk_ids(domains.keys().cloned())?
+            .into_iter()
+            .map(DomainId::from)
+            .collect();
+
+        self.url_ids.bulk_ids(domains.values().flatten().cloned())?;
+
+        for (domain_id, (domain, urls)) in domain_ids.into_iter().zip(domains.into_iter()) {
+            for url in urls {
+                let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+
+                let domain_state =
+                    self.domain_state
+                        .entry(domain_id)
+                        .or_insert_with(|| DomainState {
+                            weight: 0.0,
+                            status: DomainStatus::Pending,
+                        });
+
+                domain_state.status = DomainStatus::Pending;
+
+                let url_state = self
+                    .urls
+                    .entry(domain_id)
+                    .or_default()
+                    .entry(url_id)
+                    .or_insert_with(|| UrlState {
+                        weight: 0.0,
+                        status: UrlStatus::Pending,
+                    });
+
+                if &domain != crawled_domain {
+                    url_state.weight += 1.0;
+                }
+
+                if url_state.weight > domain_state.weight {
+                    domain_state.weight = url_state.weight;
+                }
             }
-
-            unique_domains.insert(url.domain().to_string());
-        }
-
-        for domain in unique_domains {
-            prepared_insert_domain.execute((domain, DomainStatus::Pending))?;
         }
 
         Ok(())
     }
 
-    pub fn update_url_status(&self, url_responses: &[UrlResponse]) -> Result<()> {
-        let mut prepared_update_status_url = self
-            .tx()
-            .prepare("UPDATE url SET status = ?1, error_code = ?2 WHERE url = ?3;")?;
-
-        let mut prepared_insert_redirect = self.tx().prepare(
-            "INSERT INTO redirect (from_url, to_url)
-            VALUES (?1, ?2)
-            ON CONFLICT (from_url, to_url) DO NOTHING;",
+    pub fn update_url_status(&mut self, url_responses: &[UrlResponse]) -> Result<()> {
+        // bulk register urls
+        self.url_ids.bulk_ids(
+            url_responses
+                .iter()
+                .flat_map(|res| match res {
+                    UrlResponse::Success { url } => vec![url].into_iter(),
+                    UrlResponse::Failed {
+                        url,
+                        status_code: _,
+                    } => vec![url].into_iter(),
+                    UrlResponse::Redirected { url, new_url } => vec![url, new_url].into_iter(),
+                })
+                .cloned(),
         )?;
 
-        let mut prepared_insert_url = self.tx().prepare(
-            "INSERT INTO url (url, domain, status, incoming_links)
-            VALUES (?1, ?2, ?3, 0)
-            ON CONFLICT (url) DO NOTHING;",
-        )?;
-
-        // update status of URLs
-        for url_res in url_responses {
-            match url_res {
+        for response in url_responses {
+            match response {
                 UrlResponse::Success { url } => {
-                    prepared_update_status_url.execute((
-                        UrlStatus::Done,
-                        None::<u16>,
-                        url.full(),
-                    ))?;
+                    let domain: Domain = url.domain().to_string().into();
+                    let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
+                    let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+
+                    let domain_state =
+                        self.domain_state
+                            .entry(domain_id)
+                            .or_insert_with(|| DomainState {
+                                weight: 0.0,
+                                status: DomainStatus::Pending,
+                            });
+                    domain_state.status = DomainStatus::Pending;
+
+                    let url_state = self
+                        .urls
+                        .entry(domain_id)
+                        .or_default()
+                        .entry(url_id)
+                        .or_insert_with(|| UrlState {
+                            weight: 0.0,
+                            status: UrlStatus::Pending,
+                        });
+
+                    url_state.status = UrlStatus::Done;
                 }
                 UrlResponse::Failed { url, status_code } => {
-                    prepared_update_status_url.execute((
-                        UrlStatus::Failed,
-                        status_code,
-                        url.full(),
-                    ))?;
+                    let domain: Domain = url.domain().to_string().into();
+                    let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
+                    let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+
+                    let domain_state =
+                        self.domain_state
+                            .entry(domain_id)
+                            .or_insert_with(|| DomainState {
+                                weight: 0.0,
+                                status: DomainStatus::Pending,
+                            });
+                    domain_state.status = DomainStatus::Pending;
+
+                    let url_state = self
+                        .urls
+                        .entry(domain_id)
+                        .or_default()
+                        .entry(url_id)
+                        .or_insert_with(|| UrlState {
+                            weight: 0.0,
+                            status: UrlStatus::Pending,
+                        });
+
+                    url_state.status = UrlStatus::Failed {
+                        status_code: *status_code,
+                    };
                 }
                 UrlResponse::Redirected { url, new_url } => {
-                    prepared_update_status_url.execute((
-                        UrlStatus::Done,
-                        None::<u16>,
-                        url.full(),
-                    ))?;
-                    prepared_insert_redirect.execute((url.full(), new_url.full()))?;
-                    prepared_insert_url.execute((
-                        new_url.full(),
-                        new_url.domain(),
-                        UrlStatus::Done,
-                    ))?;
+                    self.redirects.put(url, new_url)?;
                 }
             }
         }
+        Ok(())
+    }
+
+    pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
+        let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
+
+        let domain_state = self
+            .domain_state
+            .entry(domain_id)
+            .or_insert_with(|| DomainState {
+                weight: 0.0,
+                status: DomainStatus::Pending,
+            });
+
+        domain_state.status = status;
 
         Ok(())
     }
 
-    pub fn set_domain_status(&self, domain: &Domain, status: DomainStatus) -> Result<()> {
-        self.tx().execute(
-            "UPDATE domain SET status = ?1 WHERE domain = ?2;",
-            (status, &domain.0),
-        )?;
+    pub fn sample_domains(&mut self, num_jobs: usize) -> Result<Vec<DomainId>> {
+        let sampled = weighted_sample(
+            self.domain_state.iter_mut().filter_map(|(id, state)| {
+                if state.status == DomainStatus::Pending {
+                    state.status = DomainStatus::CrawlInProgress;
+                    Some((id, state.weight))
+                } else {
+                    None
+                }
+            }),
+            num_jobs,
+        );
 
-        Ok(())
+        Ok(sampled.into_iter().copied().collect())
     }
 
-    pub fn sample_domains(&self, num_jobs: usize) -> Result<Vec<Domain>> {
-        // weighted sample from domains that are not currently being crawled
-        // see https://www.kaggle.com/code/kotamori/random-sample-with-weights-on-sql/notebook for details on math
-        let mut stmt = self.tx().prepare(
-            "SELECT domain, -log((abs(random()) % 1000000 + 0.5) / 1000000.0) / (max_incoming_links + 1) as priority FROM domain
-            WHERE status = ?1
-            ORDER BY priority DESC
-            LIMIT ?2;",
-        )?;
+    pub fn prepare_jobs(&mut self, domains: &[DomainId], urls_per_job: usize) -> Result<Vec<Job>> {
+        let mut jobs = Vec::with_capacity(domains.len());
+        for domain_id in domains {
+            let urls = self.urls.entry(*domain_id).or_default();
 
-        // dfs sample
-        // let mut stmt = self.tx().prepare(
-        //     "SELECT domain FROM domain
-        //     WHERE status = ?1
-        //     LIMIT ?2;",
-        // )?;
+            let sampled = weighted_sample(
+                urls.iter_mut().filter_map(|(id, state)| {
+                    if state.status == UrlStatus::Pending {
+                        state.status = UrlStatus::Crawling;
+                        Some((id, state.weight))
+                    } else {
+                        None
+                    }
+                }),
+                urls_per_job,
+            );
 
-        let rows = stmt.query_map((DomainStatus::Pending, num_jobs), |row| {
-            row.get::<_, String>(0)
-        })?;
+            let mut job = Job {
+                domain: self.domain_ids.value(domain_id.0)?.unwrap(),
+                fetch_sitemap: true, // todo: make this configureable
+                urls: VecDeque::with_capacity(urls_per_job),
+            };
 
-        let mut domains = Vec::new();
-        for domain in rows {
-            domains.push(Domain(domain?));
-        }
-
-        Ok(domains)
-    }
-
-    pub fn prepare_jobs(&self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
-        let mut jobs = Vec::new();
-        // get URLs from sampled domains
-        let mut stmt = self.tx().prepare(
-            "SELECT url FROM url
-            WHERE domain = ?1 AND status = ?2
-            ORDER BY incoming_links DESC
-            LIMIT ?3;",
-        )?;
-
-        let mut prepared_update_status_url = self
-            .tx()
-            .prepare("UPDATE url SET status = ?1 WHERE url = ?2;")?;
-        let mut prepared_update_status_domain = self
-            .tx()
-            .prepare("UPDATE domain SET status = ?1 WHERE domain = ?2;")?;
-
-        for domain in domains {
-            let mut urls = Vec::new();
-
-            let rows = stmt.query_map((&domain.0, UrlStatus::Pending, urls_per_job), |row| {
-                row.get::<_, String>(0)
-            })?;
-
-            prepared_update_status_domain.execute((DomainStatus::CrawlInProgress, &domain.0))?;
-
-            for url in rows {
-                let url = url?;
-
-                prepared_update_status_url.execute((UrlStatus::Crawling, url.clone()))?;
-
-                urls.push(url.into());
+            for url_id in sampled {
+                let url = self.url_ids.value(url_id.0)?.unwrap();
+                job.urls.push_back(url);
             }
 
-            jobs.push(Job {
-                domain: domain.clone(),
-                fetch_sitemap: true, // TODO: only fetch sitemap if we haven't already
-                urls: urls.into(),
-            });
+            jobs.push(job);
         }
 
         Ok(jobs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sampling() {
+        let items: Vec<(usize, f64)> = vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0)];
+        let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 10);
+        assert_eq!(sampled.len(), items.len());
+
+        let items: Vec<(usize, f64)> = vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0)];
+        let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 1);
+        assert_eq!(sampled.len(), 1);
+
+        let items: Vec<(usize, f64)> = vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0)];
+        let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 0);
+        assert_eq!(sampled.len(), 0);
     }
 }
