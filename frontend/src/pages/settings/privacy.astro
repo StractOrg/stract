@@ -1,4 +1,5 @@
 ---
+import { askama } from "../../askama";
 import SettingsLayout from "../../layouts/Settings.astro";
 ---
 <SettingsLayout>
@@ -24,10 +25,14 @@ import SettingsLayout from "../../layouts/Settings.astro";
       <label for="allowStats">Allow usage statistics</label>
     </div>
 
-    <div class="flex space-x-1 pl-1 text-sm" x-data="{ allowAliceImprovements: $persist(true).as('allowAliceImprovements') }">
-      <input type="checkbox" id="allowAliceImprovements" x-model="allowAliceImprovements">
-      <label for="allowAliceImprovements">Allow Alice conversations to be stored and used for training</label>
-    </div>
+    {
+      askama.if_("with_alice.unwrap_or(true)", () => (
+        <div class="flex space-x-1 pl-1 text-sm" x-data="{ allowAliceImprovements: $persist(true).as('allowAliceImprovements') }">
+          <input type="checkbox" id="allowAliceImprovements" x-model="allowAliceImprovements">
+          <label for="allowAliceImprovements">Allow Alice conversations to be stored and used for training</label>
+        </div>
+      ))
+    }
   </div>
 </SettingsLayout>
 
