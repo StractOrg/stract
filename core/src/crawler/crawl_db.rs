@@ -24,6 +24,7 @@ use std::{
 
 use lru::LruCache;
 use rand::Rng;
+use rocksdb::BlockBasedOptions;
 
 use crate::webpage::Url;
 
@@ -46,6 +47,7 @@ pub enum DomainStatus {
 struct IdTable<T> {
     t2id: rocksdb::DB,
     id2t: rocksdb::DB,
+
     next_id: u64,
 
     t2id_cache: LruCache<T, u64>,
@@ -62,6 +64,12 @@ where
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
         options.increase_parallelism(3);
+
+        let mut block_options = BlockBasedOptions::default();
+
+        block_options.set_bloom_filter(64.0, true);
+
+        options.set_block_based_table_factory(&block_options);
 
         // create dir if not exists
         std::fs::create_dir_all(path.as_ref())?;
