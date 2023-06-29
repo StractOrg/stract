@@ -221,7 +221,6 @@ pub struct UserAgent {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlerConfig {
-    pub num_warc_writers: Option<usize>,
     pub num_workers: usize,
     pub user_agent: UserAgent,
     pub politeness_factor: Option<f32>,

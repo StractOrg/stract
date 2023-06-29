@@ -22,7 +22,6 @@ use super::{CrawlDatum, Result};
 /// as WARC files on S3.
 pub struct WarcWriter {
     tx: async_channel::Sender<WarcWriterMessage>,
-    num_writers: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -130,17 +129,12 @@ async fn writer_task(rx: async_channel::Receiver<WarcWriterMessage>, s3: S3Confi
 }
 
 impl WarcWriter {
-    pub fn new(num_writers: Option<usize>, s3: S3Config) -> Self {
+    pub fn new(s3: S3Config) -> Self {
         let (tx, rx) = async_channel::bounded(1000);
 
-        let num_writers = num_writers.unwrap_or(1);
+        tokio::spawn(writer_task(rx, s3));
 
-        for _ in 0..num_writers {
-            let rx = rx.clone();
-            tokio::spawn(writer_task(rx, s3.clone()));
-        }
-
-        Self { tx, num_writers }
+        Self { tx }
     }
 
     pub async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
@@ -150,9 +144,7 @@ impl WarcWriter {
     }
 
     pub async fn finish(&self) -> Result<()> {
-        for _ in 0..self.num_writers {
-            self.tx.send(WarcWriterMessage::Finish).await?;
-        }
+        self.tx.send(WarcWriterMessage::Finish).await?;
         self.tx.close();
 
         while !self.tx.is_empty() {

@@ -495,18 +495,25 @@ impl CrawlDb {
 
     pub fn sample_domains(&mut self, num_jobs: usize) -> Result<Vec<DomainId>> {
         let sampled = weighted_sample(
-            self.domain_state.iter_mut().filter_map(|(id, state)| {
+            self.domain_state.iter().filter_map(|(id, state)| {
                 if state.status == DomainStatus::Pending {
-                    state.status = DomainStatus::CrawlInProgress;
                     Some((id, state.weight))
                 } else {
                     None
                 }
             }),
             num_jobs,
-        );
+        )
+        .into_iter()
+        .copied()
+        .collect();
 
-        Ok(sampled.into_iter().copied().collect())
+        for id in &sampled {
+            let state = self.domain_state.get_mut(id).unwrap();
+            state.status = DomainStatus::CrawlInProgress;
+        }
+
+        Ok(sampled)
     }
 
     pub fn prepare_jobs(&mut self, domains: &[DomainId], urls_per_job: usize) -> Result<Vec<Job>> {
@@ -514,17 +521,24 @@ impl CrawlDb {
         for domain_id in domains {
             let urls = self.urls.entry(*domain_id).or_default();
 
-            let sampled = weighted_sample(
+            let sampled: Vec<_> = weighted_sample(
                 urls.iter_mut().filter_map(|(id, state)| {
                     if state.status == UrlStatus::Pending {
-                        state.status = UrlStatus::Crawling;
                         Some((id, state.weight))
                     } else {
                         None
                     }
                 }),
                 urls_per_job,
-            );
+            )
+            .into_iter()
+            .copied()
+            .collect();
+
+            for id in &sampled {
+                let state = urls.get_mut(id).unwrap();
+                state.status = UrlStatus::Crawling;
+            }
 
             let mut job = Job {
                 domain: self.domain_ids.value(domain_id.0)?.unwrap(),

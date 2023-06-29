@@ -158,7 +158,7 @@ pub struct Crawler {
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
         let pending_commands = Arc::new(Mutex::new(VecDeque::new()));
-        let writer = Arc::new(WarcWriter::new(config.num_warc_writers, config.s3));
+        let writer = Arc::new(WarcWriter::new(config.s3));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
         let coordinator_host = config.coordinator_host.parse()?;
