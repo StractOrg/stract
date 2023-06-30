@@ -78,7 +78,7 @@ tokio-stream = "0.1.11"
 scylla = "0.7.0"
 chitchat = "0.5.0"
 memmap2 = "0.5.10"
-rkyv = "0.7.41"
+rkyv = { version = "0.7.41", features = ["validation"] }
 dashmap = "5.4.0"
 tch = "0.13.0"
 torch-sys = "0.13.0"

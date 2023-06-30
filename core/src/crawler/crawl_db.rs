@@ -24,13 +24,15 @@ use std::{
 
 use lru::LruCache;
 use rand::Rng;
+use rkyv::Deserialize;
 use rocksdb::BlockBasedOptions;
 
 use crate::webpage::Url;
 
 use super::{Domain, Job, Result, UrlResponse};
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[derive(rkyv::Serialize, rkyv::Deserialize, rkyv::Archive, Clone, PartialEq, Eq)]
+#[archive(check_bytes)]
 pub enum UrlStatus {
     Pending,
     Crawling,
@@ -255,7 +257,8 @@ fn weighted_sample<'a, T: 'a>(
     sampled_items.into_iter().map(|s| s.0.item).collect()
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(rkyv::Serialize, rkyv::Deserialize, rkyv::Archive)]
+#[archive(check_bytes)]
 struct UrlState {
     weight: f64,
     status: UrlStatus,
@@ -265,7 +268,20 @@ struct DomainState {
     status: DomainStatus,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    rkyv::Archive,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+)]
+#[archive(check_bytes)]
 pub struct DomainId(u64);
 
 impl From<u64> for DomainId {
@@ -274,7 +290,11 @@ impl From<u64> for DomainId {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    rkyv::Serialize, rkyv::Deserialize, rkyv::Archive, Clone, Copy, Debug, PartialEq, Eq, Hash,
+)]
+#[archive(check_bytes)]
+#[archive_attr(derive(PartialEq, Eq, Hash))]
 struct UrlId(u64);
 
 impl From<u64> for UrlId {
@@ -335,8 +355,8 @@ impl UrlMap {
     }
 
     pub fn put(&self, domain_id: DomainId, map: HashMap<UrlId, UrlState>) -> Result<()> {
-        let domain_bytes = bincode::serialize(&domain_id)?;
-        let map_bytes = bincode::serialize(&map)?;
+        let domain_bytes = rkyv::to_bytes::<_, 256>(&domain_id).expect("failed to serialize");
+        let map_bytes = rkyv::to_bytes::<_, 256>(&map).expect("failed to serialize");
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.set_sync(false);
@@ -349,13 +369,16 @@ impl UrlMap {
     }
 
     pub fn get(&self, domain_id: DomainId) -> Result<Option<HashMap<UrlId, UrlState>>> {
-        let domain_bytes = bincode::serialize(&domain_id)?;
+        let domain_bytes = rkyv::to_bytes::<_, 256>(&domain_id).expect("failed to serialize");
 
         let map_bytes = self.inner.get(domain_bytes)?;
 
         match map_bytes {
             Some(bytes) => {
-                let map = bincode::deserialize(&bytes)?;
+                let map = rkyv::check_archived_root::<HashMap<UrlId, UrlState>>(&bytes)
+                    .expect("failed to deserialize")
+                    .deserialize(&mut rkyv::Infallible)
+                    .expect("failed to deserialize");
                 Ok(Some(map))
             }
             None => Ok(None),
