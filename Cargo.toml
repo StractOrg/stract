@@ -14,7 +14,7 @@ debug = true
 
 [workspace.dependencies]
 aes-gcm = "0.10.2"
-bincode = "1.3.3"
+bincode = "=1.2.1" # https://github.com/dtolnay/cargo-expand/commit/234519982e1275d8a21c1048962ffe0a32a4b1cd
 clap = { version = "3.1.18", features = ["derive"] }
 encoding_rs = "0.8.31"
 flate2 = "1.0.23"
