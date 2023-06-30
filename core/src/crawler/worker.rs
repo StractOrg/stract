@@ -125,7 +125,7 @@ impl Worker {
                 let res = conn
                     .send_with_timeout::<_, Response>(
                         &Request::NewJobs {
-                            num_jobs: self.num_jobs_per_fetch,
+                            num_jobs: 2 * self.num_jobs_per_fetch,
                         },
                         Duration::from_secs(60 * 60),
                     )
