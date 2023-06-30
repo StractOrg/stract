@@ -78,8 +78,8 @@ where
         let _ = rocksdb::DB::destroy(&options, path.as_ref().join("t2id"));
         let _ = rocksdb::DB::destroy(&options, path.as_ref().join("id2t"));
 
-        let t2id = rocksdb::DB::open_default(path.as_ref().join("t2id"))?;
-        let id2t = rocksdb::DB::open_default(path.as_ref().join("id2t"))?;
+        let t2id = rocksdb::DB::open(&options, path.as_ref().join("t2id"))?;
+        let id2t = rocksdb::DB::open(&options, path.as_ref().join("id2t"))?;
 
         Ok(Self {
             t2id,
