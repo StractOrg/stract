@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::distributed::retry_strategy::ExponentialBackoff;
-use crate::{Error, Result, WarcSource};
+use crate::{Error, Result, S3Config, WarcSource};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
@@ -109,6 +109,7 @@ impl WarcFile {
                 WarcSource::Local(config) => {
                     WarcFile::load_from_folder(warc_path, &config.folder, buf)
                 }
+                WarcSource::S3(config) => WarcFile::download_from_s3(warc_path, &config, buf),
             };
 
             if res.is_ok() {
@@ -162,6 +163,35 @@ impl WarcFile {
 
         buf.rewind()?;
         std::io::copy(&mut &bytes[..], buf)?;
+
+        Ok(())
+    }
+
+    fn download_from_s3<W: Write + Seek>(
+        warc_path: &str,
+        config: &S3Config,
+        buf: &mut W,
+    ) -> Result<()> {
+        let bucket = s3::Bucket::new(
+            &config.bucket,
+            s3::Region::Custom {
+                region: "".to_string(),
+                endpoint: config.endpoint.clone(),
+            },
+            s3::creds::Credentials {
+                access_key: Some(config.access_key.clone()),
+                secret_key: Some(config.secret_key.clone()),
+                security_token: None,
+                session_token: None,
+                expiration: None,
+            },
+        )?
+        .with_path_style();
+
+        let path = Path::new(&config.folder).join(warc_path);
+        let res = bucket.get_object_blocking(path.as_os_str().to_str().unwrap())?;
+
+        buf.write_all(res.bytes())?;
 
         Ok(())
     }

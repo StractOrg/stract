@@ -34,7 +34,7 @@ use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
 use crate::{
     human_website_annotations, HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig,
-    Result, WarcSource,
+    Result, S3Config, WarcSource,
 };
 
 pub struct Indexer {}
@@ -43,6 +43,27 @@ pub struct Indexer {}
 pub enum JobConfig {
     Http(HttpConfig),
     Local(LocalConfig),
+    S3(S3Config),
+}
+
+impl From<WarcSource> for JobConfig {
+    fn from(value: WarcSource) -> Self {
+        match value {
+            WarcSource::HTTP(config) => JobConfig::Http(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
+            WarcSource::S3(config) => JobConfig::S3(config),
+        }
+    }
+}
+
+impl From<JobConfig> for WarcSource {
+    fn from(value: JobConfig) -> Self {
+        match value {
+            JobConfig::Http(config) => WarcSource::HTTP(config),
+            JobConfig::Local(config) => WarcSource::Local(config),
+            JobConfig::S3(config) => WarcSource::S3(config),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -81,10 +102,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
 
-    let source = match job.source_config.clone() {
-        JobConfig::Http(config) => WarcSource::HTTP(config),
-        JobConfig::Local(config) => WarcSource::Local(config),
-    };
+    let source: WarcSource = job.source_config.clone().into();
 
     let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
     pin!(warc_files);
@@ -288,10 +306,7 @@ impl Indexer {
                     .map(|worker| worker.parse().unwrap())
                     .collect();
 
-                let job_config = match config.warc_source.clone() {
-                    WarcSource::HTTP(config) => JobConfig::Http(config),
-                    WarcSource::Local(config) => JobConfig::Local(config),
-                };
+                let job_config: JobConfig = config.warc_source.clone().into();
 
                 let warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
                     warc_paths
@@ -355,10 +370,7 @@ impl Indexer {
     pub fn run_locally(config: &IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
-        let job_config = match config.warc_source.clone() {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-        };
+        let job_config: JobConfig = config.warc_source.clone().into();
 
         let worker = IndexingWorker::new(
             config.centrality_store_path.clone(),

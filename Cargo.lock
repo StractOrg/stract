@@ -550,6 +550,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "block_on_proc"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b872f3528eeeb4370ee73b51194dc1cd93680c2d0eb6c7a223889038d2c1a167"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3687,6 +3697,7 @@ dependencies = [
  "aws-creds",
  "aws-region",
  "base64 0.13.1",
+ "block_on_proc",
  "bytes",
  "cfg-if",
  "futures",

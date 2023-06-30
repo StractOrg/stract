@@ -132,6 +132,7 @@ pub struct WebgraphLocalConfig {
 pub enum WarcSource {
     HTTP(HttpConfig),
     Local(LocalConfig),
+    S3(S3Config),
 }
 
 impl WarcSource {
@@ -146,6 +147,35 @@ impl WarcSource {
             }
             WarcSource::Local(config) => {
                 warc_paths = config.names.clone();
+            }
+            WarcSource::S3(config) => {
+                let bucket = s3::Bucket::new(
+                    &config.bucket,
+                    s3::Region::Custom {
+                        region: "".to_string(),
+                        endpoint: config.endpoint.clone(),
+                    },
+                    s3::creds::Credentials {
+                        access_key: Some(config.access_key.clone()),
+                        secret_key: Some(config.secret_key.clone()),
+                        security_token: None,
+                        session_token: None,
+                        expiration: None,
+                    },
+                )?
+                .with_path_style();
+
+                let objects = bucket.list_blocking(config.folder.clone(), None)?;
+
+                for p in objects.into_iter().filter_map(|o| {
+                    if o.name.ends_with("warc.gz") {
+                        Some(o.name)
+                    } else {
+                        None
+                    }
+                }) {
+                    warc_paths.push(p);
+                }
             }
         }
 
@@ -163,6 +193,15 @@ pub struct LocalConfig {
 pub struct HttpConfig {
     base_url: String,
     warc_paths_file: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct S3Config {
+    pub bucket: String,
+    pub folder: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub endpoint: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -195,15 +234,6 @@ pub struct SearchServerConfig {
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub host: SocketAddr,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct S3Config {
-    pub bucket: String,
-    pub folder: String,
-    pub access_key: String,
-    pub secret_key: String,
-    pub endpoint: String,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlCoordinatorConfig {
@@ -377,6 +407,9 @@ pub enum Error {
 
     #[error("Crawler")]
     Crawler(#[from] crate::crawler::Error),
+
+    #[error("S3")]
+    S3(#[from] s3::error::S3Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

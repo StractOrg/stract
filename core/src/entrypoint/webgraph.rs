@@ -19,7 +19,8 @@ use crate::{
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
-    HttpConfig, LocalConfig, Result, WarcSource, WebgraphLocalConfig, WebgraphMasterConfig,
+    HttpConfig, LocalConfig, Result, S3Config, WarcSource, WebgraphLocalConfig,
+    WebgraphMasterConfig,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -37,6 +38,27 @@ struct GraphPointer {
 pub enum JobConfig {
     Http(HttpConfig),
     Local(LocalConfig),
+    S3(S3Config),
+}
+
+impl From<WarcSource> for JobConfig {
+    fn from(value: WarcSource) -> Self {
+        match value {
+            WarcSource::HTTP(config) => JobConfig::Http(config),
+            WarcSource::Local(config) => JobConfig::Local(config),
+            WarcSource::S3(config) => JobConfig::S3(config),
+        }
+    }
+}
+
+impl From<JobConfig> for WarcSource {
+    fn from(value: JobConfig) -> Self {
+        match value {
+            JobConfig::Http(config) => WarcSource::HTTP(config),
+            JobConfig::Local(config) => WarcSource::Local(config),
+            JobConfig::S3(config) => WarcSource::S3(config),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,10 +79,7 @@ pub fn process_job(job: &Job) -> webgraph::Webgraph {
 
     let mut graph = open_graph(Path::new(&job.graph_base_path).join(name));
 
-    let source = match job.config.clone() {
-        JobConfig::Http(config) => WarcSource::HTTP(config),
-        JobConfig::Local(config) => WarcSource::Local(config),
-    };
+    let source = WarcSource::from(job.config.clone());
 
     let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
     pin!(warc_files);
@@ -175,10 +194,7 @@ impl Webgraph {
                     .map(|worker| worker.parse().unwrap())
                     .collect();
 
-                let job_config = match config.warc_source.clone() {
-                    WarcSource::HTTP(config) => JobConfig::Http(config),
-                    WarcSource::Local(config) => JobConfig::Local(config),
-                };
+                let job_config = JobConfig::from(config.warc_source.clone());
 
                 let mut warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
                     warc_paths
@@ -234,10 +250,7 @@ impl Webgraph {
     pub fn run_locally(config: &WebgraphLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
-        let job_config = match config.warc_source.clone() {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-        };
+        let job_config = JobConfig::from(config.warc_source.clone());
         let worker = StatelessWorker::default();
 
         let graphs: Vec<_> = warc_paths

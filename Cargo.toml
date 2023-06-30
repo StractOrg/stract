@@ -87,7 +87,7 @@ lz-str = "0.2.1"
 safetensors = "0.3.1"
 publicsuffix = "2"
 robotstxt-with-cache = "0.4.0"
-rust-s3 = "0.33.0"
+rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
 rusqlite = { version = "0.29.0", features = ["bundled", "modern-full", "buildtime_bindgen"] }
 async-channel = "1.8.0"
 lru = "0.10.0"
