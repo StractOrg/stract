@@ -92,6 +92,12 @@ impl From<&Url> for Domain {
     }
 }
 
+impl From<Url> for Domain {
+    fn from(url: Url) -> Self {
+        Self::from(&url)
+    }
+}
+
 impl From<String> for Domain {
     fn from(s: String) -> Self {
         Self(s)
