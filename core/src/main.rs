@@ -231,22 +231,25 @@ fn main() -> Result<()> {
             mode,
             webgraph_path,
             output_path,
-        } => match mode {
-            CentralityType::Harmonic => {
-                entrypoint::Centrality::build_harmonic(webgraph_path, output_path)
+        } => {
+            match mode {
+                CentralityType::Harmonic => {
+                    entrypoint::Centrality::build_harmonic(webgraph_path, output_path)
+                }
+                CentralityType::OnlineHarmonic => {
+                    entrypoint::Centrality::build_online(webgraph_path, output_path)
+                }
+                CentralityType::Similarity => {
+                    entrypoint::Centrality::build_similarity(webgraph_path, output_path)
+                }
+                CentralityType::All => {
+                    entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
+                    entrypoint::Centrality::build_online(&webgraph_path, &output_path);
+                    entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
+                }
             }
-            CentralityType::OnlineHarmonic => {
-                entrypoint::Centrality::build_online(webgraph_path, output_path)
-            }
-            CentralityType::Similarity => {
-                entrypoint::Centrality::build_similarity(webgraph_path, output_path)
-            }
-            CentralityType::All => {
-                entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
-                entrypoint::Centrality::build_online(&webgraph_path, &output_path);
-                entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
-            }
-        },
+            tracing::info!("Done");
+        }
         Commands::Webgraph { options } => match options {
             WebgraphOptions::Master { config_path } => {
                 let config = load_toml_config(config_path);
