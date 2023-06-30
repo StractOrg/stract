@@ -294,7 +294,11 @@ impl Worker {
                             self.politeness_factor = MAX_POLITENESS_FACTOR;
                         }
 
-                        tracing::warn!("politeness factor increased to {}", self.politeness_factor);
+                        tracing::warn!(
+                            "politeness factor increased to {} for {}",
+                            self.politeness_factor,
+                            &url
+                        );
                     }
 
                     tracing::debug!("failed to fetch url ({}): {}", &url, datum.status_code);

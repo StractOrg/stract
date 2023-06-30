@@ -86,6 +86,7 @@ impl CrawlCoordinator {
             .unwrap();
 
         tracing::debug!("inserted responses in {:?}", start.elapsed());
+        dbg!(start.elapsed());
 
         Ok(())
     }

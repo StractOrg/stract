@@ -63,10 +63,11 @@ where
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
-        options.increase_parallelism(3);
+        options.increase_parallelism(8);
+        options.set_write_buffer_size(256 * 1024 * 1024); // 256 MB memtable
+        options.set_max_write_buffer_number(8);
 
         let mut block_options = BlockBasedOptions::default();
-
         block_options.set_bloom_filter(64.0, true);
 
         options.set_block_based_table_factory(&block_options);
@@ -131,8 +132,12 @@ where
             ids.push(id);
         }
 
-        self.id2t.write(batch_id2t)?;
-        self.t2id.write(batch_t2id)?;
+        let mut write_options = rocksdb::WriteOptions::default();
+        write_options.set_sync(false);
+        write_options.disable_wal(true);
+
+        self.id2t.write_opt(batch_id2t, &write_options)?;
+        self.t2id.write_opt(batch_t2id, &write_options)?;
 
         Ok(ids)
     }
@@ -160,8 +165,13 @@ where
         let id = self.next_id;
         self.next_id += 1;
         let id_bytes = bincode::serialize(&id)?;
-        self.t2id.put(&item_bytes, &id_bytes)?;
-        self.id2t.put(&id_bytes, &item_bytes)?;
+
+        let mut write_options = rocksdb::WriteOptions::default();
+        write_options.set_sync(false);
+        write_options.disable_wal(true);
+
+        self.t2id.put_opt(&item_bytes, &id_bytes, &write_options)?;
+        self.id2t.put_opt(&id_bytes, &item_bytes, &write_options)?;
 
         // update cache
         self.t2id_cache.put(item.clone(), id);
@@ -286,7 +296,12 @@ impl RedirectDb {
     pub fn put(&self, from: &Url, to: &Url) -> Result<()> {
         let url_bytes = bincode::serialize(from)?;
         let redirect_bytes = bincode::serialize(to)?;
-        self.inner.put(url_bytes, redirect_bytes)?;
+
+        let mut write_options = rocksdb::WriteOptions::default();
+        write_options.set_sync(false);
+        write_options.disable_wal(true);
+        self.inner
+            .put_opt(url_bytes, redirect_bytes, &write_options)?;
 
         Ok(())
     }
