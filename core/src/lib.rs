@@ -165,11 +165,22 @@ impl WarcSource {
                 )?
                 .with_path_style();
 
-                let objects = bucket.list_blocking(config.folder.clone(), None)?;
+                let mut folder = config.folder.clone();
+
+                if !folder.ends_with('/') {
+                    folder.push('/');
+                }
+
+                let pages = bucket.list_blocking(folder, Some("/".to_string()))?;
+
+                let objects = pages
+                    .into_iter()
+                    .flat_map(|p| p.contents.into_iter())
+                    .collect::<Vec<_>>();
 
                 for p in objects.into_iter().filter_map(|o| {
-                    if o.name.ends_with("warc.gz") {
-                        Some(o.name)
+                    if o.key.ends_with("warc.gz") {
+                        Some(o.key)
                     } else {
                         None
                     }

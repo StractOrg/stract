@@ -188,8 +188,7 @@ impl WarcFile {
         )?
         .with_path_style();
 
-        let path = Path::new(&config.folder).join(warc_path);
-        let res = bucket.get_object_blocking(path.as_os_str().to_str().unwrap())?;
+        let res = bucket.get_object_blocking(warc_path)?;
 
         buf.write_all(res.bytes())?;
 
