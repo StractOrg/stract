@@ -26,14 +26,11 @@ use crate::ranking::centrality_store::SearchCentralityStore;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
-use crate::ranking::{
-    online_centrality_scorer, query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS,
-};
+use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Spell;
-use crate::webgraph::centrality::topic::TopicCentrality;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
 use crate::{inverted_index, Error, Result};
@@ -46,7 +43,6 @@ pub struct LocalSearcher {
     spell: Spell,
     entity_index: Option<EntityIndex>,
     centrality_store: Option<SearchCentralityStore>,
-    topic_centrality: Option<TopicCentrality>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
 }
@@ -71,7 +67,6 @@ impl LocalSearcher {
             spell,
             entity_index: None,
             centrality_store: None,
-            topic_centrality: None,
             linear_regression: None,
             lambda_model: None,
         }
@@ -83,10 +78,6 @@ impl LocalSearcher {
 
     pub fn set_centrality_store(&mut self, centrality_store: SearchCentralityStore) {
         self.centrality_store = Some(centrality_store);
-    }
-
-    pub fn set_topic_centrality(&mut self, topic_centrality: TopicCentrality) {
-        self.topic_centrality = Some(topic_centrality);
     }
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
@@ -127,11 +118,6 @@ impl LocalSearcher {
             }
         }
 
-        if let Some(topic_centrality) = self.topic_centrality.as_ref() {
-            let topic_scorer = topic_centrality.scorer(query);
-            ranker.set_topic_scorer(topic_scorer);
-        }
-
         ranker.de_rank_similar(de_rank_similar);
 
         if query_centrality_coeff > 0.0 {
@@ -143,16 +129,13 @@ impl LocalSearcher {
                 let top_host_nodes =
                     self.index
                         .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
-                if !top_host_nodes.is_empty() {
-                    let harmonic = centrality_store
-                        .online_harmonic
-                        .scorer(&top_host_nodes, &[]);
 
+                if !top_host_nodes.is_empty() {
                     let inbound = centrality_store
                         .inbound_similarity
                         .scorer(&top_host_nodes, &[]);
 
-                    let query_centrality = query_centrality::Scorer::new(harmonic, inbound);
+                    let query_centrality = query_centrality::Scorer::new(inbound);
 
                     ranker.set_query_centrality(query_centrality);
                 }
@@ -179,12 +162,6 @@ impl LocalSearcher {
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
 
         if let Some(store) = &self.centrality_store {
-            aggregator.set_personal_harmonic(online_centrality_scorer(
-                parsed_query.site_rankings(),
-                &store.online_harmonic,
-                &store.node2id,
-            ));
-
             let liked_sites: Vec<_> = parsed_query
                 .site_rankings()
                 .liked
@@ -435,7 +412,6 @@ mod tests {
                     page_centrality: 0.0,
                     pre_computed_score: 0.0,
                     node_id: None,
-                    host_topic: None,
                     dmoz_description: None,
                 })
                 .expect("failed to insert webpage");

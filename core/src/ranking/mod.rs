@@ -25,9 +25,6 @@ pub mod pipeline;
 pub mod query_centrality;
 pub mod signal;
 
-use std::collections::BTreeMap;
-
-use ::optics::SiteRankings;
 use initial::InitialScoreTweaker;
 use tantivy::collector::Collector;
 
@@ -37,14 +34,7 @@ use crate::{
     inverted_index,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
-    webgraph::{
-        centrality::{
-            online_harmonic::{OnlineHarmonicCentrality, Scorer},
-            topic,
-        },
-        Node, NodeID,
-    },
-    webpage::{region::Region, Url},
+    webpage::region::Region,
 };
 
 pub use self::signal::*;
@@ -131,37 +121,11 @@ impl Ranker {
         collector.tweak_score(score_tweaker)
     }
 
-    pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
-        self.aggregator.set_topic_scorer(topic_scorer);
-    }
-
     pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
         self.aggregator.set_query_centrality(query_centrality);
     }
 }
 
-pub fn online_centrality_scorer(
-    site_rankings: &SiteRankings,
-    harmonic: &OnlineHarmonicCentrality,
-    node2id: &BTreeMap<Node, NodeID>,
-) -> Scorer {
-    let mut liked = Vec::new();
-    let mut disliked = Vec::new();
-
-    for site in &site_rankings.liked {
-        if let Some(nodeid) = node2id.get(&Node::from_url(&Url::from(site.clone())).into_host()) {
-            liked.push(*nodeid);
-        }
-    }
-
-    for site in &site_rankings.disliked {
-        if let Some(nodeid) = node2id.get(&Node::from_url(&Url::from(site.clone())).into_host()) {
-            disliked.push(*nodeid);
-        }
-    }
-
-    harmonic.scorer(&liked, &disliked)
-}
 
 #[cfg(test)]
 mod tests {
@@ -206,7 +170,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -235,7 +198,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -283,7 +245,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -312,7 +273,6 @@ mod tests {
     //             page_centrality: 5.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -359,7 +319,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -388,7 +347,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -415,7 +373,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -462,7 +419,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -491,7 +447,6 @@ mod tests {
     //             pre_computed_score: 0.0,
     //             page_centrality: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -534,7 +489,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -572,7 +526,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
         })
@@ -620,7 +573,6 @@ mod tests {
     //             page_centrality: 0.0,
     //             pre_computed_score: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -646,7 +598,6 @@ mod tests {
     //             pre_computed_score: 0.0,
     //             page_centrality: 0.0,
     //             
-    //             host_topic: None,
     //             node_id: None,
     //             dmoz_description: None,
     //         })
@@ -690,7 +641,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -717,7 +667,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -745,7 +694,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -819,7 +767,6 @@ mod tests {
             fetch_time_ms: 500,
             page_centrality: 0.0,
             
-            host_topic: None,
             node_id: None,
             dmoz_description: None,
         };
@@ -852,7 +799,6 @@ mod tests {
             pre_computed_score: 0.0,
             page_centrality: 0.0,
             
-            host_topic: None,
             node_id: None,
             dmoz_description: None,
         };
@@ -885,7 +831,6 @@ mod tests {
             pre_computed_score: 0.0,
             page_centrality: 0.0,
             
-            host_topic: None,
             node_id: None,
             dmoz_description: None,
         };
@@ -940,7 +885,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -969,7 +913,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 node_id: None,
                 dmoz_description: None,
             })
@@ -989,188 +932,4 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com");
         assert_eq!(result.webpages[1].url, "https://www.second.com");
     }
-
-    // #[test]
-    // fn topic_score() {
-    //     let mut index = Index::temporary().expect("Unable to open index");
-    //     let topic_a = Topic::from_string("/root/topic_a".to_string());
-    //     let topic_b = Topic::from_string("/root/topic_b".to_string());
-
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                     <html>
-    //                         <head>
-    //                             <title>Test website</title>
-    //                         </head>
-    //                         <body>
-    //                             <div>
-    //                                 {CONTENT} topic_a
-    //                             </div>
-    //                             <div>
-    //                                 {}
-    //                             </div>
-    //                         </body>
-    //                     </html>
-    //                 "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.a.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 1.0,
-    //             fetch_time_ms: 1000,
-    //             pre_computed_score: 0.0,
-    //             page_centrality: 0.0,
-    //             
-    //             host_topic: Some(topic_a.clone()),
-    //             node_id: Some(1.into()),
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                     <html>
-    //                         <head>
-    //                             <title>Test website</title>
-    //                         </head>
-    //                         <body>
-    //                             <div>
-    //                                 {CONTENT} topic_b
-    //                             </div>
-    //                             <div>
-    //                                 {}
-    //                             </div>
-    //                         </body>
-    //                     </html>
-    //                 "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.b.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 1.0,
-    //             fetch_time_ms: 1000,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             host_topic: Some(topic_b.clone()),
-    //             node_id: Some(2.into()),
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                     <html>
-    //                         <head>
-    //                             <title>Test website</title>
-    //                         </head>
-    //                         <body>
-    //                             <div>
-    //                                 {CONTENT_2} topic_a topic_b
-    //                             </div>
-    //                             <div>
-    //                                 {}
-    //                             </div>
-    //                         </body>
-    //                     </html>
-    //                 "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.wrong.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 1.01,
-    //             fetch_time_ms: 0,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             host_topic: None,
-    //             node_id: Some(0.into()),
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index.commit().expect("failed to commit index");
-
-    //     let mut mapper = HashMap::new();
-    //     mapper.insert(
-    //         "www.a.com".to_string(),
-    //         Info {
-    //             description: String::new(),
-    //             topic: topic_a,
-    //         },
-    //     );
-    //     mapper.insert(
-    //         "www.b.com".to_string(),
-    //         Info {
-    //             description: String::new(),
-    //             topic: topic_b,
-    //         },
-    //     );
-    //     let topics = human_website_annotations::Mapper::from(mapper);
-
-    //     let mut webgraph = WebgraphBuilder::new(crate::gen_temp_path()).open();
-
-    //     webgraph.insert(
-    //         Node::from("www.wrong.com"),
-    //         Node::from("www.a.com"),
-    //         String::new(),
-    //     );
-    //     webgraph.insert(
-    //         Node::from("www.wrong.com"),
-    //         Node::from("www.b.com"),
-    //         String::new(),
-    //     );
-
-    //     webgraph.commit();
-
-    //     let harmonic = HarmonicCentrality::calculate(&webgraph);
-
-    //     let harmonic_centrality_store = HarmonicCentralityStore::open(crate::gen_temp_path());
-    //     for (node, centrality) in harmonic.host {
-    //         harmonic_centrality_store
-    //             .host
-    //             .insert(*webgraph.node2id(&node).unwrap(), centrality);
-    //     }
-    //     harmonic_centrality_store.host.flush();
-
-    //     let harmonic = OnlineHarmonicCentrality::new(&webgraph, &harmonic_centrality_store);
-
-    //     let topic_centrality = TopicCentrality::build(&index, topics, webgraph, harmonic);
-
-    //     let mut searcher = LocalSearcher::new(index);
-    //     searcher.set_topic_centrality(topic_centrality);
-
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "topic_a".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
-
-    //     assert_eq!(result.num_hits, 2);
-    //     assert_eq!(result.webpages.len(), 2);
-    //     assert_eq!(result.webpages[0].url, "https://www.a.com");
-    //     assert_eq!(result.webpages[1].url, "https://www.wrong.com");
-
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "topic_b".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
-
-    //     assert_eq!(result.num_hits, 2);
-    //     assert_eq!(result.webpages.len(), 2);
-    //     assert_eq!(result.webpages[0].url, "https://www.b.com");
-    //     assert_eq!(result.webpages[1].url, "https://www.wrong.com");
-    // }
 }

@@ -27,12 +27,6 @@ impl Centrality {
         CentralityStore::build_harmonic(&graph, output_path);
     }
 
-    pub fn build_online<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
-        tracing::info!("Building online harmonic centrality");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
-        CentralityStore::build_online(&graph, output_path);
-    }
-
     pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
         tracing::info!("Building inbound similarity");
         let graph = WebgraphBuilder::new(webgraph_path).open();

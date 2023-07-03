@@ -16,5 +16,3 @@
 
 pub mod betweenness;
 pub mod harmonic;
-pub mod online_harmonic;
-pub mod topic;

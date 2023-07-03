@@ -23,10 +23,7 @@ use tracing::log::trace;
 use crate::Result;
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
-    webgraph::{
-        centrality::{harmonic::HarmonicCentrality, online_harmonic::OnlineHarmonicCentrality},
-        Node, NodeID, Webgraph,
-    },
+    webgraph::{centrality::harmonic::HarmonicCentrality, Node, NodeID, Webgraph},
 };
 
 use super::inbound_similarity::InboundSimilarity;
@@ -74,7 +71,6 @@ impl From<CentralityStore> for IndexerCentralityStore {
 }
 
 pub struct SearchCentralityStore {
-    pub online_harmonic: OnlineHarmonicCentrality,
     pub inbound_similarity: InboundSimilarity,
     pub node2id: BTreeMap<Node, NodeID>,
 }
@@ -82,8 +78,6 @@ pub struct SearchCentralityStore {
 impl SearchCentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            online_harmonic: OnlineHarmonicCentrality::open(path.as_ref().join("online_harmonic"))
-                .unwrap(),
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .unwrap(),
             node2id: open_node2id(path.as_ref().join("node2id")).unwrap(),
@@ -94,7 +88,6 @@ impl SearchCentralityStore {
 impl From<CentralityStore> for SearchCentralityStore {
     fn from(store: CentralityStore) -> Self {
         Self {
-            online_harmonic: store.online_harmonic,
             inbound_similarity: store.inbound_similarity,
             node2id: store.node2id,
         }
@@ -103,7 +96,6 @@ impl From<CentralityStore> for SearchCentralityStore {
 
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
-    pub online_harmonic: OnlineHarmonicCentrality,
     pub inbound_similarity: InboundSimilarity,
     pub node2id: BTreeMap<Node, NodeID>,
     pub base_path: String,
@@ -123,9 +115,6 @@ impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
-            online_harmonic: OnlineHarmonicCentrality::open(path.as_ref().join("online_harmonic"))
-                .ok()
-                .unwrap_or_default(),
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .ok()
                 .unwrap_or_default(),
@@ -163,7 +152,6 @@ impl CentralityStore {
 
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
         Self::build_harmonic(graph, &output_path);
-        Self::build_online(graph, &output_path);
         Self::build_similarity(graph, &output_path)
     }
 
@@ -176,16 +164,6 @@ impl CentralityStore {
             .collect();
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
         Self::store_host(&output_path, &mut store, harmonic_centrality);
-
-        store.flush();
-        store
-    }
-
-    pub fn build_online<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
-        let mut store = CentralityStore::open(output_path.as_ref());
-
-        debug!("Begin online harmonic");
-        store.online_harmonic = OnlineHarmonicCentrality::new(graph, &store.harmonic);
 
         store.flush();
         store
@@ -204,11 +182,6 @@ impl CentralityStore {
     pub fn flush(&self) {
         trace!("flushing");
         self.harmonic.flush();
-
-        trace!("saving online harmonic");
-        self.online_harmonic
-            .save(Path::new(&self.base_path).join("online_harmonic"))
-            .unwrap();
 
         trace!("saving inbound similarity");
         self.inbound_similarity

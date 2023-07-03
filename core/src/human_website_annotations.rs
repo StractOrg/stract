@@ -55,10 +55,6 @@ impl<const N: usize> Topic<N> {
                 .collect::<Vec<_>>(),
         }
     }
-
-    pub(crate) fn as_facet(&self) -> Facet {
-        Facet::from_path(self.detailed_topics.clone().into_iter())
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

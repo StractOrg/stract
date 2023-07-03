@@ -12,7 +12,7 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     cmp::{Ordering, Reverse},
@@ -61,7 +61,7 @@ impl NodeScorer {
 impl Scorer {
     fn calculate_score(&self, node: &NodeID) -> f64 {
         match self.vectors.get(&node.0) {
-            Some(vec) => ((self.disliked.len() as f64
+            Some(vec) => ((self.disliked.len() as f64)
                 + (self
                     .liked
                     .iter()
@@ -71,8 +71,8 @@ impl Scorer {
                         .disliked
                         .iter()
                         .map(|disliked| disliked.sim(node, vec))
-                        .sum::<f64>()))
-                / self.liked.len() as f64)
+                        .sum::<f64>())
+                    / (self.liked.len() + 1) as f64)
                 .max(0.0),
             None => 0.0,
         }
@@ -127,6 +127,7 @@ impl InboundSimilarity {
             DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES,
         )
     }
+
     fn build_with_threshold(
         graph: &Webgraph,
         harmonic: &HarmonicCentralityStore,
@@ -333,7 +334,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("e.com")).unwrap()),
                 dmoz_description: None,
             })
@@ -362,7 +362,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("d.com")).unwrap()),
                 dmoz_description: None,
             })

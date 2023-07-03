@@ -59,6 +59,11 @@ mod tests {
             Node::from("https://www.nan.com").into_host(),
             String::new(),
         );
+        graph.insert(
+            Node::from("https://www.second.com").into_host(),
+            Node::from("https://www.third.com").into_host(),
+            String::new(),
+        );
 
         graph.commit();
 
@@ -87,7 +92,6 @@ mod tests {
                 page_centrality: 0.0,
 
                 dmoz_description: None,
-                host_topic: None,
                 node_id: Some(
                     graph
                         .node2id(&Node::from("https://www.first.com").into_host())
@@ -120,7 +124,6 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                host_topic: None,
                 dmoz_description: None,
                 node_id: Some(
                     graph
@@ -155,7 +158,6 @@ mod tests {
                 pre_computed_score: 0.0,
 
                 dmoz_description: None,
-                host_topic: None,
                 node_id: Some(
                     *graph
                         .node2id(&Node::from("https://www.third.com").into_host())
@@ -212,6 +214,7 @@ mod tests {
                     disliked: vec!["www.second.com".to_string()],
                     blocked: vec!["www.first.com".to_string()],
                 }),
+                return_ranking_signals: true,
                 ..Default::default()
             })
             .expect("Search failed");

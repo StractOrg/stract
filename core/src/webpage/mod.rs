@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    human_website_annotations::Topic,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
     simhash, tokenizer,
@@ -118,7 +117,6 @@ pub struct Webpage {
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
-    pub host_topic: Option<Topic>,
     pub dmoz_description: Option<String>,
 }
 
@@ -135,7 +133,6 @@ impl Webpage {
             fetch_time_ms: 0,
             pre_computed_score: 0.0,
             node_id: None,
-            host_topic: None,
             dmoz_description: None,
         }
     }
@@ -227,22 +224,10 @@ impl Webpage {
             self.node_id.map(|n| n.0).unwrap_or(u64::MAX),
         );
 
-        let facet = self
-            .host_topic
-            .map(|topic| topic.as_facet())
-            .unwrap_or_default();
-
-        doc.add_facet(
-            schema
-                .get_field(Field::Text(TextField::HostTopic).name())
-                .expect("failed to get host_topic field"),
-            facet,
-        );
-
         doc.add_text(
             schema
                 .get_field(Field::Text(TextField::DmozDescription).name())
-                .expect("failed to get host_topic field"),
+                .expect("failed to get dmoz_description field"),
             dmoz_description.unwrap_or_default(),
         );
 
@@ -929,7 +914,6 @@ impl Html {
                     doc.add_u64(tantivy_field, hash);
                 }
                 Field::Text(TextField::BacklinkText)
-                | Field::Text(TextField::HostTopic)
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::PageCentrality)
                 | Field::Fast(FastField::FetchTimeMs)
@@ -1822,7 +1806,6 @@ mod tests {
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
             node_id: None,
-            host_topic: None,
             dmoz_description: Some("dmoz description".to_string()),
         };
 
@@ -1856,7 +1839,6 @@ mod tests {
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
             node_id: None,
-            host_topic: None,
             dmoz_description: Some("dmoz description".to_string()),
         };
 

@@ -192,12 +192,10 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .get(&Node::from_url(html.url()).into_host())
                     .cloned();
 
-                let mut host_topic = None;
                 let mut dmoz_description = None;
 
                 if let Some(mapper) = worker.topics.as_ref() {
                     if let Some(info) = mapper.get(&html.url().site().to_string()) {
-                        host_topic = Some(info.topic.clone());
                         dmoz_description = Some(info.description.clone())
                     }
                 }
@@ -210,7 +208,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     fetch_time_ms,
                     pre_computed_score: 0.0,
                     node_id,
-                    host_topic,
                     dmoz_description,
                 };
 

@@ -89,19 +89,6 @@ enum Commands {
         output_dir: String,
     },
 
-    /// Calculate the topic centrality for websites. We use the DMOZ dataset to
-    /// determine set of representative websites for each topic. Harmonic centrality approximations
-    /// are then calculated for each website in the webgraph.
-    ///
-    /// This is currently not used in the search engine, so everything related to this might be buggy.
-    TopicCentrality {
-        index_path: String,
-        topics_path: String,
-        webgraph_path: String,
-        online_harmonic_path: String,
-        output_path: String,
-    },
-
     /// Deploy the crawl coordinator. The crawl coordinator is responsible for
     /// distributing crawl jobs to the crawles and deciding which urls to crawl next.
     CrawlCoordinator { config_path: String },
@@ -134,7 +121,6 @@ enum AliceOptions {
 enum CentralityType {
     All,
     Harmonic,
-    OnlineHarmonic,
     Similarity,
 }
 
@@ -236,15 +222,11 @@ fn main() -> Result<()> {
                 CentralityType::Harmonic => {
                     entrypoint::Centrality::build_harmonic(webgraph_path, output_path)
                 }
-                CentralityType::OnlineHarmonic => {
-                    entrypoint::Centrality::build_online(webgraph_path, output_path)
-                }
                 CentralityType::Similarity => {
                     entrypoint::Centrality::build_similarity(webgraph_path, output_path)
                 }
                 CentralityType::All => {
                     entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
-                    entrypoint::Centrality::build_online(&webgraph_path, &output_path);
                     entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
                 }
             }
@@ -326,19 +308,6 @@ fn main() -> Result<()> {
             dmoz_file,
             output_path,
         } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
-        Commands::TopicCentrality {
-            index_path,
-            topics_path,
-            webgraph_path,
-            online_harmonic_path,
-            output_path,
-        } => entrypoint::topic_centrality::run(
-            index_path,
-            topics_path,
-            webgraph_path,
-            online_harmonic_path,
-            output_path,
-        ),
         Commands::Alice { options } => match options {
             AliceOptions::Serve { config_path } => {
                 let config: AliceLocalConfig = load_toml_config(config_path);

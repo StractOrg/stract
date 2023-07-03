@@ -267,7 +267,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -296,7 +295,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -395,7 +393,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -423,7 +420,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -500,7 +496,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -530,7 +525,6 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
-                host_topic: None,
             })
             .expect("failed to insert webpage");
         index
@@ -558,7 +552,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -661,7 +654,6 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 
-                host_topic: None,
                 dmoz_description: None,
                 node_id: Some(*graph.node2id(&Node::from("www.a.com").into_host()).unwrap()),
             })
@@ -691,7 +683,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
-                host_topic: None,
                 node_id: Some(*graph.node2id(&Node::from("www.b.com").into_host()).unwrap()),
             })
             .expect("failed to insert webpage");
@@ -719,7 +710,6 @@ mod tests {
                 
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
-                host_topic: None,
                 dmoz_description: None,
                 node_id: Some(*graph.node2id(&Node::from("www.c.com").into_host()).unwrap()),
             })
@@ -796,7 +786,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -841,7 +830,6 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
-                host_topic: None,
             })
             .expect("failed to insert webpage");
 
@@ -975,7 +963,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1050,7 +1037,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1080,7 +1066,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1135,7 +1120,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1194,7 +1178,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1356,7 +1339,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1430,7 +1412,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1491,7 +1472,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1521,7 +1501,6 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -1620,7 +1599,6 @@ mod tests {
             pre_computed_score: 0.0,
             
             node_id: None,
-            host_topic: None,
             dmoz_description: None,
         };
 

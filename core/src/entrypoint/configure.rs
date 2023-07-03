@@ -95,7 +95,6 @@ fn calculate_centrality() {
     let out_path = Path::new(DATA_PATH).join("centrality");
 
     Centrality::build_harmonic(&webgraph_path, &out_path);
-    Centrality::build_online(&webgraph_path, &out_path);
     Centrality::build_similarity(&webgraph_path, &out_path);
 }
 

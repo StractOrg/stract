@@ -36,7 +36,6 @@ use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
 use crate::fastfield_reader::FastFieldReader;
-use crate::human_website_annotations::Topic;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
@@ -489,7 +488,6 @@ pub struct RetrievedWebpage {
     pub description: Option<String>,
     pub dmoz_description: Option<String>,
     pub updated_time: Option<NaiveDateTime>,
-    pub host_topic: Option<Topic>,
     pub schema_org: Vec<schema_org::Item>,
     pub region: Region,
 }
@@ -556,13 +554,6 @@ impl From<Document> for RetrievedWebpage {
                     webpage.region = {
                         let id = value.value.as_u64().unwrap();
                         Region::from_id(id)
-                    }
-                }
-                Field::Text(TextField::HostTopic) => {
-                    let facet = value.value.as_facet().unwrap();
-
-                    if !facet.is_root() {
-                        webpage.host_topic = Some(facet.clone().into());
                     }
                 }
                 Field::Text(TextField::DmozDescription) => {
@@ -862,7 +853,6 @@ mod tests {
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 node_id: None,
-                host_topic: None,
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");

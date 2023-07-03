@@ -22,10 +22,7 @@ use crate::{
     enum_map::EnumMap,
     fastfield_reader,
     schema::{FastField, TextField},
-    webgraph::{
-        centrality::{online_harmonic, topic},
-        NodeID,
-    },
+    webgraph::NodeID,
     webpage::Webpage,
 };
 use optics::ast::RankingTarget;
@@ -124,10 +121,6 @@ pub enum Signal {
     TrackerScore,
     #[serde(rename = "region")]
     Region,
-    #[serde(rename = "personal_centrality")]
-    PersonalCentrality,
-    #[serde(rename = "topic_centrality")]
-    TopicCentrality,
     #[serde(rename = "query_centrality")]
     QueryCentrality,
     #[serde(rename = "inbound_similarity")]
@@ -144,7 +137,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 38] = [
+pub const ALL_SIGNALS: [Signal; 36] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -178,8 +171,6 @@ pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::UpdateTimestamp,
     Signal::TrackerScore,
     Signal::Region,
-    Signal::PersonalCentrality,
-    Signal::TopicCentrality,
     Signal::QueryCentrality,
     Signal::InboundSimilarity,
     Signal::LambdaMART,
@@ -255,14 +246,12 @@ impl Signal {
             Signal::CrossEncoder => 0.16801589371906178,
             Signal::HostCentrality => 15.233546236366237,
             Signal::PageCentrality => 0.0,
-            Signal::TopicCentrality => 0.0,
             Signal::QueryCentrality => 0.0,
             Signal::IsHomepage => 0.0,
             Signal::FetchTimeMs => 0.0,
             Signal::UpdateTimestamp => 0.0,
             Signal::TrackerScore => 0.019542120533715634,
             Signal::Region => 0.06437975586036043,
-            Signal::PersonalCentrality => 10.0,
             Signal::InboundSimilarity => 10.0,
             Signal::LambdaMART => 10.0,
             Signal::LinearRegression => 1.0,
@@ -354,14 +343,6 @@ impl Signal {
                 field_value
                     .map(Region::from_id)
                     .map(|region| score_region(region, signal_aggregator))
-            }
-            Signal::PersonalCentrality => {
-                let host_id = self.host_id(signal_aggregator, doc);
-                host_id.map(|host_id| signal_aggregator.personal_centrality(host_id))
-            }
-            Signal::TopicCentrality => {
-                let host_id = self.host_id(signal_aggregator, doc);
-                host_id.and_then(|host_id| signal_aggregator.topic_centrality(host_id))
             }
             Signal::QueryCentrality => {
                 let host_id = self.host_id(signal_aggregator, doc);
@@ -501,8 +482,6 @@ impl Signal {
             | Signal::ProximitySlop4
             | Signal::ProximitySlop8
             | Signal::CrossEncoder
-            | Signal::PersonalCentrality
-            | Signal::TopicCentrality
             | Signal::InboundSimilarity
             | Signal::LambdaMART
             | Signal::LinearRegression
@@ -679,11 +658,9 @@ pub struct SignalAggregator {
     query: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
-    personal_centrality: Option<Arc<online_harmonic::Scorer>>,
     inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
-    topic_scorer: Option<topic::Scorer>,
     query_centrality: Option<Arc<query_centrality::Scorer>>,
     region_count: Option<Arc<RegionCount>>,
     selected_region: Option<Region>,
@@ -697,11 +674,9 @@ impl Clone for SignalAggregator {
             query: self.query.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
-            personal_centrality: self.personal_centrality.clone(),
             inbound_similariy: self.inbound_similariy.clone(),
             fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
             update_time_cache: self.update_time_cache.clone(),
-            topic_scorer: self.topic_scorer.clone(),
             query_centrality: self.query_centrality.clone(),
             region_count: self.region_count.clone(),
             selected_region: self.selected_region,
@@ -754,12 +729,10 @@ impl SignalAggregator {
 
         Self {
             segment_reader: None,
-            personal_centrality: None,
             inbound_similariy: None,
             query_signal_coefficients,
             fetch_time_ms_cache,
             update_time_cache,
-            topic_scorer: None,
             query_centrality: None,
             region_count: None,
             selected_region: None,
@@ -935,16 +908,8 @@ impl SignalAggregator {
         Ok(())
     }
 
-    pub fn set_topic_scorer(&mut self, topic_scorer: topic::Scorer) {
-        self.topic_scorer = Some(topic_scorer);
-    }
-
     pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
         self.query_centrality = Some(Arc::new(query_centrality));
-    }
-
-    pub fn set_personal_harmonic(&mut self, personal_centrality: online_harmonic::Scorer) {
-        self.personal_centrality = Some(Arc::new(personal_centrality));
     }
 
     pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
@@ -967,23 +932,10 @@ impl SignalAggregator {
         self.linear_regression = Some(linear_model);
     }
 
-    pub fn topic_centrality(&self, host_id: NodeID) -> Option<f64> {
-        self.topic_scorer
-            .as_ref()
-            .map(|scorer| scorer.score(host_id))
-    }
-
     pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.query_centrality
             .as_ref()
             .map(|scorer| scorer.score(host_id))
-    }
-
-    pub fn personal_centrality(&self, host_id: NodeID) -> f64 {
-        self.personal_centrality
-            .as_ref()
-            .map(|scorer| scorer.score(host_id))
-            .unwrap_or_default()
     }
 
     pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {

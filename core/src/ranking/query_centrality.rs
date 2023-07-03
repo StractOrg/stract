@@ -12,29 +12,22 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::{centrality::online_harmonic, NodeID};
+use crate::webgraph::NodeID;
 
 use super::inbound_similarity;
 
 pub struct Scorer {
-    online_harmonic: online_harmonic::Scorer,
     inbound_centrality: inbound_similarity::Scorer,
 }
 
 impl Scorer {
-    pub fn new(
-        online_harmonic: online_harmonic::Scorer,
-        inbound_centrality: inbound_similarity::Scorer,
-    ) -> Self {
-        Self {
-            online_harmonic,
-            inbound_centrality,
-        }
+    pub fn new(inbound_centrality: inbound_similarity::Scorer) -> Self {
+        Self { inbound_centrality }
     }
 
     pub fn score(&self, node: NodeID) -> f64 {
-        self.online_harmonic.score(node) + self.inbound_centrality.score(&node)
+        self.inbound_centrality.score(&node)
     }
 }

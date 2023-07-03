@@ -44,7 +44,6 @@ pub enum TextField {
     TitleIfHomepage,
     BacklinkText,
     Description,
-    HostTopic,
     DmozDescription,
     SchemaOrgJson,
     FlattenedSchemaOrgJson,
@@ -80,7 +79,6 @@ impl TextField {
             TextField::TitleIfHomepage => Tokenizer::default(),
             TextField::BacklinkText => Tokenizer::default(),
             TextField::Description => Tokenizer::default(),
-            TextField::HostTopic => Tokenizer::default(),
             TextField::DmozDescription => Tokenizer::default(),
             TextField::SchemaOrgJson => Tokenizer::Identity(Identity {}),
             TextField::FlattenedSchemaOrgJson => Tokenizer::Json(JsonField),
@@ -118,7 +116,6 @@ impl TextField {
             TextField::TitleIfHomepage => false,
             TextField::BacklinkText => false,
             TextField::Description => true,
-            TextField::HostTopic => false,
             TextField::DmozDescription => true,
             TextField::SchemaOrgJson => false,
             TextField::FlattenedSchemaOrgJson => true,
@@ -148,7 +145,6 @@ impl TextField {
             TextField::Description => "description",
             TextField::TitleIfHomepage => "title_if_homepage",
             TextField::AllBody => "all_body",
-            TextField::HostTopic => "host_topic",
             TextField::DmozDescription => "dmoz_description",
             TextField::SchemaOrgJson => "schema_org_json",
             TextField::FlattenedSchemaOrgJson => "flattened_schema_org_json",
@@ -237,7 +233,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 52] = [
+pub static ALL_FIELDS: [Field; 51] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -255,7 +251,6 @@ pub static ALL_FIELDS: [Field; 52] = [
     Field::Text(TextField::TitleIfHomepage),
     Field::Text(TextField::BacklinkText),
     Field::Text(TextField::Description),
-    Field::Text(TextField::HostTopic),
     Field::Text(TextField::DmozDescription),
     Field::Text(TextField::SchemaOrgJson),
     Field::Text(TextField::FlattenedSchemaOrgJson),
@@ -356,9 +351,6 @@ impl Field {
             }
             Field::Text(TextField::Description) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
-            }
-            Field::Text(TextField::HostTopic) => {
-                IndexingOption::Facet(tantivy::schema::FacetOptions::default())
             }
             Field::Text(TextField::DmozDescription) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
@@ -515,7 +507,6 @@ impl Field {
         !matches!(
             self,
             Field::Text(TextField::BacklinkText)
-                | Field::Text(TextField::HostTopic)
                 | Field::Text(TextField::SchemaOrgJson)
                 | Field::Text(TextField::CleanBodyBigrams)
                 | Field::Text(TextField::TitleBigrams)
@@ -551,7 +542,6 @@ pub fn create_schema() -> tantivy::schema::Schema {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
             IndexingOption::Float(options) => builder.add_f64_field(field.name(), options),
-            IndexingOption::Facet(options) => builder.add_facet_field(field.name(), options),
         };
     }
 
@@ -562,7 +552,6 @@ pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Integer(tantivy::schema::NumericOptions),
     Float(tantivy::schema::NumericOptions),
-    Facet(tantivy::schema::FacetOptions),
 }
 
 pub enum DataType {
