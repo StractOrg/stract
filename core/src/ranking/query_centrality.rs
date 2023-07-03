@@ -24,6 +24,9 @@ pub struct Scorer {
 
 impl Scorer {
     pub fn new(inbound_centrality: inbound_similarity::Scorer) -> Self {
+        let mut inbound_centrality = inbound_centrality;
+        inbound_centrality.set_self_score(0.0);
+
         Self { inbound_centrality }
     }
 

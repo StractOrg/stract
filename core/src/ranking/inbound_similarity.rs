@@ -46,12 +46,25 @@ pub struct Scorer {
 struct NodeScorer {
     node: NodeID,
     inbound: bitvec_similarity::BitVec,
+    self_score: f64,
 }
 
 impl NodeScorer {
+    fn new(node: NodeID, inbound: bitvec_similarity::BitVec) -> Self {
+        Self {
+            node,
+            inbound,
+            self_score: 1.0,
+        }
+    }
+
+    fn set_self_score(&mut self, self_score: f64) {
+        self.self_score = self_score;
+    }
+
     fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
         if self.node == *other {
-            1.0
+            self.self_score
         } else {
             self.inbound.sim(other_inbound)
         }
@@ -85,6 +98,16 @@ impl Scorer {
         let score = self.calculate_score(node);
         self.cache.insert(*node, score);
         score
+    }
+
+    pub fn set_self_score(&mut self, self_score: f64) {
+        for scorer in self.liked.iter_mut() {
+            scorer.set_self_score(self_score);
+        }
+
+        for scorer in self.disliked.iter_mut() {
+            scorer.set_self_score(self_score);
+        }
     }
 }
 
@@ -174,19 +197,13 @@ impl InboundSimilarity {
         let liked: Vec<_> = liked_sites
             .iter()
             .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer {
-                node: *node,
-                inbound,
-            })
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
             .collect();
 
         let disliked: Vec<_> = disliked_sites
             .iter()
             .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer {
-                node: *node,
-                inbound,
-            })
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
             .collect();
 
         Scorer {
