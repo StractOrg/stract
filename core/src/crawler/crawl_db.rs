@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::Reverse,
     collections::{BinaryHeap, HashMap, VecDeque},
     hash::Hash,
     num::NonZeroUsize,
@@ -233,26 +232,25 @@ fn weighted_sample<'a, T: 'a>(
     items: impl Iterator<Item = (&'a T, f64)>,
     num_items: usize,
 ) -> Vec<&'a T> {
-    let mut sampled_items: BinaryHeap<Reverse<SampledItem<T>>> =
-        BinaryHeap::with_capacity(num_items);
+    let mut sampled_items: BinaryHeap<SampledItem<T>> = BinaryHeap::with_capacity(num_items);
 
     let mut rng = rand::thread_rng();
 
     for (item, weight) in items {
         // see https://www.kaggle.com/code/kotamori/random-sample-with-weights-on-sql/notebook for details on math
-        // let priority =  -log((abs(random()) % 1000000 + 0.5) / 1000000.0) / (max_incoming_links + 1)
-        let priority = -(rng.gen::<f64>().abs() + 0.5).ln() / (weight + 1.0);
+        let priority = -(rng.gen::<f64>().abs() + f64::EPSILON).ln() / (weight + 1.0);
+
         if sampled_items.len() < num_items {
-            sampled_items.push(Reverse(SampledItem { item, priority }));
-        } else if let Some(mut min) = sampled_items.peek_mut() {
-            if min.0.priority < priority {
-                min.0.item = item;
-                min.0.priority = priority;
+            sampled_items.push(SampledItem { item, priority });
+        } else if let Some(mut max) = sampled_items.peek_mut() {
+            if priority < max.priority {
+                max.item = item;
+                max.priority = priority;
             }
         }
     }
 
-    sampled_items.into_iter().map(|s| s.0.item).collect()
+    sampled_items.into_iter().map(|s| s.item).collect()
 }
 
 struct UrlState {
@@ -590,5 +588,10 @@ mod tests {
         let items: Vec<(usize, f64)> = vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0)];
         let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 0);
         assert_eq!(sampled.len(), 0);
+
+        let items: Vec<(usize, f64)> = vec![(0, 1000000000.0), (1, 2.0)];
+        let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 1);
+        assert_eq!(sampled.len(), 1);
+        assert_eq!(*sampled[0], 0);
     }
 }
