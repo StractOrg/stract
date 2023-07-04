@@ -21,13 +21,14 @@ use std::{
     path::Path,
 };
 
+use itertools::Itertools;
 use lru::LruCache;
 use rand::Rng;
 use rocksdb::BlockBasedOptions;
 
 use crate::webpage::Url;
 
-use super::{Domain, Job, Result, UrlResponse};
+use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum UrlStatus {
@@ -305,6 +306,11 @@ impl RedirectDb {
     }
 }
 
+struct UrlToInsert {
+    url: Url,
+    different_domain: bool,
+}
+
 pub struct CrawlDb {
     url_ids: IdTable<Url>,
     domain_ids: IdTable<Domain>,
@@ -355,13 +361,19 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn insert_urls(&mut self, crawled_domain: &Domain, urls: &[Url]) -> Result<()> {
-        let mut domains: HashMap<Domain, Vec<Url>> = HashMap::new();
+    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<()> {
+        let mut domains: HashMap<Domain, Vec<UrlToInsert>> = HashMap::new();
 
-        for url in urls {
-            let domain: Domain = url.domain().to_string().into();
+        for res in responses {
+            for url in &res.discovered_urls {
+                let domain: Domain = url.domain().to_string().into();
+                let different_domain = res.domain != domain;
 
-            domains.entry(domain).or_default().push(url.clone());
+                domains.entry(domain).or_default().push(UrlToInsert {
+                    url: url.clone(),
+                    different_domain,
+                });
+            }
         }
 
         let domain_ids: Vec<DomainId> = self
@@ -371,33 +383,31 @@ impl CrawlDb {
             .map(DomainId::from)
             .collect();
 
-        self.url_ids.bulk_ids(domains.values().flatten().cloned())?;
+        self.url_ids
+            .bulk_ids(domains.values().flatten().map(|u| u.url.clone()))?;
 
-        for (domain_id, (domain, urls)) in domain_ids.into_iter().zip(domains.into_iter()) {
+        for (domain_id, urls) in domain_ids.into_iter().zip_eq(domains.values()) {
+            let domain_state = self
+                .domain_state
+                .entry(domain_id)
+                .or_insert_with(|| DomainState {
+                    weight: 0.0,
+                    status: DomainStatus::Pending,
+                });
+
+            let url_states = self.urls.entry(domain_id).or_default();
+
             for url in urls {
-                let url_id: UrlId = self.url_ids.id(url.clone())?.into();
-
-                let domain_state =
-                    self.domain_state
-                        .entry(domain_id)
-                        .or_insert_with(|| DomainState {
-                            weight: 0.0,
-                            status: DomainStatus::Pending,
-                        });
+                let url_id: UrlId = self.url_ids.id(url.url.clone())?.into();
 
                 domain_state.status = DomainStatus::Pending;
 
-                let url_state = self
-                    .urls
-                    .entry(domain_id)
-                    .or_default()
-                    .entry(url_id)
-                    .or_insert_with(|| UrlState {
-                        weight: 0.0,
-                        status: UrlStatus::Pending,
-                    });
+                let url_state = url_states.entry(url_id).or_insert_with(|| UrlState {
+                    weight: 0.0,
+                    status: UrlStatus::Pending,
+                });
 
-                if &domain != crawled_domain {
+                if url.different_domain {
                     url_state.weight += 1.0;
                 }
 
@@ -410,11 +420,45 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn update_url_status(&mut self, url_responses: &[UrlResponse]) -> Result<()> {
+    pub fn update_url_status(&mut self, job_responses: &[JobResponse]) -> Result<()> {
+        let mut url_responses: HashMap<Domain, Vec<UrlResponse>> = HashMap::new();
+
+        for res in job_responses {
+            for url_response in &res.url_responses {
+                match url_response {
+                    UrlResponse::Success { url } => {
+                        let domain: Domain = url.domain().to_string().into();
+                        url_responses
+                            .entry(domain)
+                            .or_default()
+                            .push(url_response.clone());
+                    }
+                    UrlResponse::Failed {
+                        url,
+                        status_code: _,
+                    } => {
+                        let domain: Domain = url.domain().to_string().into();
+                        url_responses
+                            .entry(domain)
+                            .or_default()
+                            .push(url_response.clone());
+                    }
+                    UrlResponse::Redirected { url, new_url: _ } => {
+                        let domain: Domain = url.domain().to_string().into();
+                        url_responses
+                            .entry(domain)
+                            .or_default()
+                            .push(url_response.clone());
+                    }
+                }
+            }
+        }
+
         // bulk register urls
         self.url_ids.bulk_ids(
             url_responses
-                .iter()
+                .values()
+                .flatten()
                 .flat_map(|res| match res {
                     UrlResponse::Success { url } => vec![url].into_iter(),
                     UrlResponse::Failed {
@@ -426,64 +470,47 @@ impl CrawlDb {
                 .cloned(),
         )?;
 
-        for response in url_responses {
-            match response {
-                UrlResponse::Success { url } => {
-                    let domain: Domain = url.domain().to_string().into();
-                    let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
-                    let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+        // bulk register domains
+        self.domain_ids.bulk_ids(url_responses.keys().cloned())?;
 
-                    let domain_state =
-                        self.domain_state
-                            .entry(domain_id)
-                            .or_insert_with(|| DomainState {
-                                weight: 0.0,
-                                status: DomainStatus::Pending,
-                            });
-                    domain_state.status = DomainStatus::Pending;
+        for (domain, responses) in url_responses {
+            let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
+            let domain_state = self
+                .domain_state
+                .entry(domain_id)
+                .or_insert_with(|| DomainState {
+                    weight: 0.0,
+                    status: DomainStatus::Pending,
+                });
+            domain_state.status = DomainStatus::Pending;
 
-                    let url_state = self
-                        .urls
-                        .entry(domain_id)
-                        .or_default()
-                        .entry(url_id)
-                        .or_insert_with(|| UrlState {
+            let url_states = self.urls.entry(domain_id).or_default();
+
+            for response in responses {
+                match response {
+                    UrlResponse::Success { url } => {
+                        let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+
+                        let url_state = url_states.entry(url_id).or_insert_with(|| UrlState {
                             weight: 0.0,
                             status: UrlStatus::Pending,
                         });
 
-                    url_state.status = UrlStatus::Done;
-                }
-                UrlResponse::Failed { url, status_code } => {
-                    let domain: Domain = url.domain().to_string().into();
-                    let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
-                    let url_id: UrlId = self.url_ids.id(url.clone())?.into();
+                        url_state.status = UrlStatus::Done;
+                    }
+                    UrlResponse::Failed { url, status_code } => {
+                        let url_id: UrlId = self.url_ids.id(url.clone())?.into();
 
-                    let domain_state =
-                        self.domain_state
-                            .entry(domain_id)
-                            .or_insert_with(|| DomainState {
-                                weight: 0.0,
-                                status: DomainStatus::Pending,
-                            });
-                    domain_state.status = DomainStatus::Pending;
-
-                    let url_state = self
-                        .urls
-                        .entry(domain_id)
-                        .or_default()
-                        .entry(url_id)
-                        .or_insert_with(|| UrlState {
+                        let url_state = url_states.entry(url_id).or_insert_with(|| UrlState {
                             weight: 0.0,
                             status: UrlStatus::Pending,
                         });
 
-                    url_state.status = UrlStatus::Failed {
-                        status_code: *status_code,
-                    };
-                }
-                UrlResponse::Redirected { url, new_url } => {
-                    self.redirects.put(url, new_url)?;
+                        url_state.status = UrlStatus::Failed { status_code };
+                    }
+                    UrlResponse::Redirected { url, new_url } => {
+                        self.redirects.put(&url, &new_url)?;
+                    }
                 }
             }
         }

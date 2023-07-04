@@ -36,6 +36,7 @@ pub struct CrawlCoordinator {
     num_crawled_urls: AtomicU64,
     num_urls_to_crawl: u64,
     call_counter: Mutex<CallCounter>,
+    response_queue: Mutex<Vec<JobResponse>>,
 }
 
 impl CrawlCoordinator {
@@ -55,6 +56,7 @@ impl CrawlCoordinator {
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
             call_counter: Mutex::new(CallCounter::new(Duration::from_secs(10))),
+            response_queue: Mutex::new(Vec::new()),
         })
     }
 
@@ -70,20 +72,30 @@ impl CrawlCoordinator {
     }
 
     pub fn add_response(&self, response: &JobResponse) -> Result<()> {
+        self.log_crawls_per_second(response.url_responses.len());
+        self.num_crawled_urls
+            .fetch_add(response.url_responses.len() as u64, Ordering::SeqCst);
+
+        self.response_queue.lock().unwrap().push(response.clone());
+
+        Ok(())
+    }
+
+    fn flush_responses(&self) -> Result<()> {
         let start = Instant::now();
+        let mut response_queue = self.response_queue.lock().unwrap();
         let mut db = self.db.lock().unwrap();
 
-        self.log_crawls_per_second(response.url_responses.len());
+        db.insert_urls(&response_queue).unwrap();
 
-        self.num_crawled_urls.fetch_add(1, Ordering::SeqCst);
+        db.update_url_status(&response_queue).unwrap();
 
-        db.insert_urls(&response.domain, &response.discovered_urls)
-            .unwrap();
+        for response in response_queue.iter() {
+            db.set_domain_status(&response.domain, DomainStatus::Pending)
+                .unwrap();
+        }
 
-        db.update_url_status(&response.url_responses).unwrap();
-
-        db.set_domain_status(&response.domain, DomainStatus::Pending)
-            .unwrap();
+        response_queue.clear();
 
         tracing::debug!("inserted responses in {:?}", start.elapsed());
 
@@ -96,6 +108,7 @@ impl CrawlCoordinator {
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {
         let start = Instant::now();
+        self.flush_responses()?;
         let mut db = self.db.lock().unwrap();
 
         let domains = db.sample_domains(num_jobs)?;
