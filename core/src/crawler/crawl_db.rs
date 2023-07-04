@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{BinaryHeap, HashMap, VecDeque},
+    collections::{BTreeMap, BinaryHeap, HashMap, VecDeque},
     hash::Hash,
     num::NonZeroUsize,
     path::Path,
@@ -262,7 +262,7 @@ struct DomainState {
     status: DomainStatus,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DomainId(u64);
 
 impl From<u64> for DomainId {
@@ -271,7 +271,7 @@ impl From<u64> for DomainId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct UrlId(u64);
 
 impl From<u64> for UrlId {
@@ -311,9 +311,9 @@ pub struct CrawlDb {
 
     redirects: RedirectDb,
 
-    domain_state: HashMap<DomainId, DomainState>,
+    domain_state: BTreeMap<DomainId, DomainState>,
 
-    urls: HashMap<DomainId, HashMap<UrlId, UrlState>>,
+    urls: BTreeMap<DomainId, BTreeMap<UrlId, UrlState>>,
 }
 
 impl CrawlDb {
@@ -326,8 +326,8 @@ impl CrawlDb {
             url_ids,
             domain_ids,
             redirects,
-            domain_state: HashMap::new(),
-            urls: HashMap::new(),
+            domain_state: BTreeMap::new(),
+            urls: BTreeMap::new(),
         })
     }
 

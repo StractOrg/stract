@@ -343,7 +343,7 @@ mod tests {
                 "#,
                         rand_words(1000)
                     ),
-                    "e.com",
+                    "https://e.com",
                 ),
                 backlinks: vec![],
                 host_centrality: 0.0,
@@ -371,7 +371,7 @@ mod tests {
                 "#,
                         rand_words(1000)
                     ),
-                    "d.com",
+                    "https://d.com",
                 ),
                 backlinks: vec![],
                 host_centrality: 0.01,

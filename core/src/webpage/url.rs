@@ -195,11 +195,11 @@ impl Url {
 
     pub fn full(&self) -> String {
         if self.0.starts_with("//") {
-            return "https:".to_string() + self.0.as_str();
+            return "http:".to_string() + self.0.as_str();
         }
 
         if self.find_protocol_end() == 0 {
-            "https://".to_string() + self.0.as_str()
+            "http://".to_string() + self.0.as_str()
         } else {
             self.0.clone()
         }
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(url.domain(), "dailymail.co.uk");
         assert_eq!(url.domain_name(), "dailymail");
         assert_eq!(url.site(), "scripts.dailymail.co.uk");
-        assert_eq!(url.full(), "https://scripts.dailymail.co.uk");
+        assert_eq!(url.full(), "http://scripts.dailymail.co.uk");
     }
 
     #[test]
@@ -313,7 +313,7 @@ mod tests {
 
         assert_eq!(url.domain(), "dailymail.co.uk");
         assert_eq!(url.site(), "dailymail.co.uk");
-        assert_eq!(url.full().as_str(), "https://dailymail.co.uk");
+        assert_eq!(url.full().as_str(), "http://dailymail.co.uk");
         assert!(url.matches_url_regex());
     }
 
