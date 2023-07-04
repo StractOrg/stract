@@ -227,45 +227,19 @@ impl<T: AsRankingWebsite> Scorer<T> for Initial {
     }
 }
 
-enum Prev<T: AsRankingWebsite> {
-    Initial,
-    #[allow(dead_code)]
-    Node(Box<RankingStage<T>>),
-}
-
 struct RankingStage<T: AsRankingWebsite> {
     scorer: Box<dyn Scorer<T>>,
-    prev: Prev<T>,
-    top_n: usize,
-    memory: Option<Vec<T>>,
+    stage_top_n: usize,
     derank_similar: bool,
 }
 
 impl<T: AsRankingWebsite> RankingStage<T> {
-    fn initial_top_n(&self) -> usize {
-        match &self.prev {
-            Prev::Initial => self.top_n,
-            Prev::Node(n) => n.initial_top_n(),
-        }
-    }
-
-    pub fn populate(&mut self, websites: Vec<T>) {
-        match &mut self.prev {
-            Prev::Initial => {
-                self.memory = Some(websites);
-            }
-            Prev::Node(n) => n.populate(websites),
-        }
-    }
-
-    fn apply(&self, top_n: usize, page: usize) -> Vec<T> {
-        let next_page = (page * top_n) / self.top_n;
-        let mut websites = match &self.prev {
-            Prev::Initial => self.memory.clone().unwrap(),
-            Prev::Node(n) => n.apply(self.top_n, next_page),
-        };
-
-        let page = page - next_page;
+    fn apply(&self, websites: Vec<T>, top_n: usize, offset: usize) -> Vec<T> {
+        let mut websites = websites
+            .into_iter()
+            .skip(offset)
+            .take(self.stage_top_n.max(top_n))
+            .collect::<Vec<_>>();
 
         self.scorer.score(&mut websites);
         for website in websites.iter_mut() {
@@ -277,31 +251,22 @@ impl<T: AsRankingWebsite> RankingStage<T> {
             }
         }
 
-        let mut collector = BucketCollector::new((page + 1) * top_n);
+        let mut collector = BucketCollector::new(self.stage_top_n.max(top_n) + offset);
 
         for website in websites {
             collector.insert(website);
         }
 
-        collector
-            .into_sorted_vec(self.derank_similar)
-            .into_iter()
-            .skip(page * top_n)
-            .take(top_n)
-            .collect()
+        collector.into_sorted_vec(self.derank_similar)
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.scorer.set_query_info(query);
-        match &mut self.prev {
-            Prev::Initial => {}
-            Prev::Node(prev) => prev.set_query_info(query),
-        }
     }
 }
 
 pub struct RankingPipeline<T: AsRankingWebsite> {
-    last_stage: RankingStage<T>,
+    stage: RankingStage<T>,
     page: usize,
     pub top_n: usize,
 }
@@ -311,16 +276,14 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         crossencoder: Arc<M>,
         lambda: Option<Arc<LambdaMART>>,
     ) -> Result<Self> {
-        let last_stage = RankingStage {
+        let stage = RankingStage {
             scorer: Box::new(ReRanker::new(crossencoder, lambda)),
-            prev: Prev::Initial,
-            memory: None,
-            top_n: 20,
+            stage_top_n: 20,
             derank_similar: false,
         };
 
         Ok(Self {
-            last_stage,
+            stage,
             page: 0,
             top_n: 0,
         })
@@ -343,14 +306,12 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
                 model,
                 signal_coefficients: None,
             }),
-            prev: Prev::Initial,
-            memory: None,
-            top_n: 10_000,
+            stage_top_n: 10_000,
             derank_similar: true,
         };
 
         Self {
-            last_stage,
+            stage: last_stage,
             page: 0,
             top_n: 0,
         }
@@ -364,34 +325,28 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     fn set_query_info(&mut self, query: &mut SearchQuery) {
-        self.last_stage.set_query_info(query);
+        self.stage.set_query_info(query);
         self.page = query.page;
         self.top_n = query.num_results;
 
         query.num_results = self.collector_top_n();
-        query.page = self.collector_page();
+        query.page = 0;
     }
 
-    pub fn apply(mut self, websites: Vec<T>) -> Vec<T> {
-        self.last_stage.populate(websites);
+    pub fn offset(&self) -> usize {
+        self.top_n * self.page
+    }
 
-        self.last_stage.apply(self.top_n, self.pipeline_page())
+    pub fn apply(self, websites: Vec<T>) -> Vec<T> {
+        self.stage.apply(websites, self.top_n, self.offset())
     }
 
     pub fn collector_top_n(&self) -> usize {
-        self.initial_top_n()
+        self.initial_top_n().max(self.top_n) + self.top_n * self.page
     }
 
     pub fn initial_top_n(&self) -> usize {
-        self.last_stage.initial_top_n()
-    }
-
-    fn pipeline_page(&self) -> usize {
-        self.page - (self.collector_page() * self.collector_top_n() / self.top_n)
-    }
-
-    pub fn collector_page(&self) -> usize {
-        (self.page * self.top_n) / self.initial_top_n()
+        self.stage.stage_top_n.max(self.top_n)
     }
 }
 
@@ -465,6 +420,38 @@ mod tests {
     }
 
     #[test]
+    fn top_n() {
+        let num_results = 100;
+        let pipeline = RankingPipeline::reranking_for_query(
+            &mut SearchQuery {
+                num_results,
+                ..Default::default()
+            },
+            Arc::new(DummyCrossEncoder {}),
+            None,
+        )
+        .unwrap();
+
+        let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
+
+        let expected: Vec<_> = sample
+            .clone()
+            .into_iter()
+            .take(num_results)
+            .map(|w| w.pointer.address)
+            .collect();
+
+        let res = pipeline
+            .apply(sample)
+            .into_iter()
+            .map(|w| w.pointer.address)
+            .collect_vec();
+
+        assert_eq!(res.len(), num_results);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
     fn offsets() {
         let num_results = 20;
         let pipeline = RankingPipeline::reranking_for_query(
@@ -478,11 +465,7 @@ mod tests {
         )
         .unwrap();
 
-        let sample: Vec<_> =
-            sample_websites(pipeline.collector_top_n() + pipeline.collector_page() * num_results)
-                .into_iter()
-                .skip(pipeline.collector_page() * num_results)
-                .collect();
+        let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
         let mut prev: Vec<_> = pipeline.apply(sample);
         for p in 1..1_000 {
             let pipeline = RankingPipeline::reranking_for_query(
@@ -495,12 +478,7 @@ mod tests {
             )
             .unwrap();
 
-            let sample: Vec<_> = sample_websites(
-                pipeline.collector_top_n() + pipeline.collector_page() * num_results,
-            )
-            .into_iter()
-            .skip(pipeline.collector_page() * num_results)
-            .collect();
+            let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
             let res: Vec<_> = pipeline.apply(sample).into_iter().collect();
 
             assert_eq!(

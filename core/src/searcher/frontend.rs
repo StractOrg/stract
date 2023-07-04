@@ -80,11 +80,13 @@ impl FrontendSearcher {
         &self,
         initial_results: Vec<InitialSearchResultShard>,
         pipeline: RankingPipeline<ScoredWebsitePointer>,
-    ) -> Vec<ScoredWebsitePointer> {
+    ) -> (Vec<ScoredWebsitePointer>, bool) {
         let mut collector = BucketCollector::new(pipeline.collector_top_n());
 
+        let mut num_sites: usize = 0;
         for result in initial_results {
             for website in result.local_result.websites {
+                num_sites += 1;
                 let pointer = ScoredWebsitePointer {
                     website,
                     shard: result.shard.clone(),
@@ -100,7 +102,12 @@ impl FrontendSearcher {
             .take(pipeline.collector_top_n())
             .collect::<Vec<_>>();
 
-        pipeline.apply(top_websites)
+        let offset = pipeline.offset();
+
+        let res = pipeline.apply(top_websites);
+        let has_more = num_sites.saturating_sub(offset) > res.len();
+
+        (res, has_more)
     }
 
     async fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
@@ -238,7 +245,7 @@ impl FrontendSearcher {
             return Ok(None);
         }
 
-        let top_websites = self.combine_results(initial_results, pipeline);
+        let (top_websites, _) = self.combine_results(initial_results, pipeline);
 
         let scores: Vec<_> = top_websites
             .iter()
@@ -327,8 +334,7 @@ impl FrontendSearcher {
             .map(|result| result.local_result.num_websites)
             .sum();
 
-        let has_more_results = initial_results.iter().any(|res| res.local_result.has_more);
-        let top_websites = self.combine_results(initial_results, pipeline);
+        let (top_websites, has_more_results) = self.combine_results(initial_results, pipeline);
 
         // retrieve webpages
         let mut retrieved_webpages: Vec<_> = self

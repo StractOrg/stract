@@ -119,6 +119,7 @@ impl Spell {
         let searcher = index.inverted_index.tv_searcher();
         let schema = searcher.schema();
         let mut dict = DictionaryBuilder::new(1_000_000);
+
         #[allow(unused_assignments, unused_mut)]
         let mut limit_terms: Option<usize> = None;
         #[cfg(debug_assertions)]
