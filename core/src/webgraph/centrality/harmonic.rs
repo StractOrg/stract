@@ -21,12 +21,13 @@ use tracing::info;
 
 use crate::{
     hyperloglog::HyperLogLog,
-    intmap::IntMap,
+    intmap::{IntMap, IntSet},
     kahan_sum::KahanSum,
     webgraph::{Node, NodeID, Webgraph},
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
+const EXACT_COUNTING_THRESHOLD: u64 = 1_000_000;
 
 #[derive(Clone)]
 struct JankyBloomFilter {
@@ -60,6 +61,22 @@ impl JankyBloomFilter {
         let h = Self::hash(item);
         self.bit_vec[h % self.num_bits as usize]
     }
+
+    pub fn estimate_card(&self) -> u64 {
+        let num_ones = self.bit_vec.count_ones() as u64;
+
+        if num_ones == 0 || self.num_bits == 0 {
+            return 0;
+        }
+
+        if num_ones == self.num_bits {
+            return u64::MAX;
+        }
+
+        (-(self.num_bits as i64) * (1.0 - (num_ones as f64) / (self.num_bits as f64)).ln() as i64)
+            .try_into()
+            .unwrap_or_default()
+    }
 }
 
 pub struct HarmonicCentrality {
@@ -81,45 +98,81 @@ fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
         })
         .collect();
 
-    let mut counter_changes = counters.len() as u64;
+    let mut exact_counting = false;
+    let mut has_changes = true;
     let mut t = 0;
     let mut centralities: IntMap<KahanSum> = nodes
         .iter()
         .map(|node| (node.0, KahanSum::default()))
         .collect();
 
+    let mut exact_changed_nodes = IntSet::default();
     let mut changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
     for node in &nodes {
         changed_nodes.insert(node.0);
     }
 
     loop {
-        if counter_changes == 0 {
+        if !has_changes {
             break;
         }
 
         let mut new_counters: IntMap<_> = counters.clone();
 
-        counter_changes = 0;
+        has_changes = false;
         let mut new_changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
 
-        for edge in graph.edges() {
-            if !changed_nodes.contains(&edge.from.0) {
-                continue;
+        if exact_changed_nodes.len() > 0 {
+            let mut new_exact_changed_nodes = IntSet::default();
+
+            for changed_node in exact_changed_nodes.into_iter() {
+                for edge in graph.raw_outgoing_edges(&NodeID(changed_node)) {
+                    if let (Some(counter_to), Some(counter_from)) =
+                        (new_counters.get_mut(&edge.to.0), counters.get(&edge.from.0))
+                    {
+                        if counter_to
+                            .registers()
+                            .iter()
+                            .zip(counter_from.registers().iter())
+                            .any(|(to, from)| *from > *to)
+                        {
+                            counter_to.merge(counter_from);
+                            new_changed_nodes.insert(edge.to.0);
+
+                            new_exact_changed_nodes.insert(edge.to.0);
+
+                            has_changes = true;
+                        }
+                    }
+                }
             }
 
-            if let (Some(counter_to), Some(counter_from)) =
-                (new_counters.get_mut(&edge.to.0), counters.get(&edge.from.0))
-            {
-                if counter_to
-                    .registers()
-                    .iter()
-                    .zip(counter_from.registers().iter())
-                    .any(|(to, from)| *from > *to)
+            exact_changed_nodes = new_exact_changed_nodes;
+        } else {
+            exact_changed_nodes = IntSet::default();
+            for edge in graph.edges() {
+                if !changed_nodes.contains(&edge.from.0) {
+                    continue;
+                }
+
+                if let (Some(counter_to), Some(counter_from)) =
+                    (new_counters.get_mut(&edge.to.0), counters.get(&edge.from.0))
                 {
-                    counter_to.merge(counter_from);
-                    new_changed_nodes.insert(edge.to.0);
-                    counter_changes += 1;
+                    if counter_to
+                        .registers()
+                        .iter()
+                        .zip(counter_from.registers().iter())
+                        .any(|(to, from)| *from > *to)
+                    {
+                        counter_to.merge(counter_from);
+                        new_changed_nodes.insert(edge.to.0);
+
+                        if exact_counting {
+                            exact_changed_nodes.insert(edge.to.0);
+                        }
+
+                        has_changes = true;
+                    }
                 }
             }
         }
@@ -142,6 +195,10 @@ fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
         counters = new_counters;
         changed_nodes = new_changed_nodes;
         t += 1;
+
+        if changed_nodes.estimate_card() <= EXACT_COUNTING_THRESHOLD {
+            exact_counting = true;
+        }
     }
 
     centralities

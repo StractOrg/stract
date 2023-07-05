@@ -150,6 +150,7 @@ impl<V> Default for IntMap<V> {
     }
 }
 
+#[derive(Default)]
 pub struct IntSet {
     map: IntMap<()>,
 }
@@ -165,6 +166,10 @@ impl IntSet {
 
     pub fn into_iter(self) -> impl Iterator<Item = Key> {
         self.map.into_iter().map(|(key, _)| key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 }
 
