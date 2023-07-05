@@ -79,7 +79,7 @@ pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
-mod warc;
+pub mod warc;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;
@@ -87,7 +87,7 @@ mod widgets;
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingMasterConfig {
     limit_warc_files: Option<usize>,
-    skip_num_warc_files: Option<usize>,
+    skip_warc_files: Option<usize>,
     warc_source: WarcSource,
     workers: Vec<String>,
     batch_size: Option<usize>,
@@ -99,7 +99,7 @@ pub struct IndexingMasterConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
     limit_warc_files: Option<usize>,
-    skip_num_warc_files: Option<usize>,
+    skip_warc_files: Option<usize>,
     warc_source: WarcSource,
     batch_size: Option<usize>,
     webgraph_path: Option<String>,

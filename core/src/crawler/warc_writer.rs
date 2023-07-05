@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use crate::{warc, S3Config};
 
 use super::{CrawlDatum, Result};
@@ -53,7 +55,9 @@ async fn commit(writer: warc::WarcWriter, s3: S3Config) {
         },
     ) {
         Ok(bucket) => {
-            let bucket = bucket.with_path_style();
+            let bucket = bucket
+                .with_path_style()
+                .with_request_timeout(Duration::from_secs(30 * 60));
 
             if let Err(err) = bucket
                 .put_object_with_content_type(

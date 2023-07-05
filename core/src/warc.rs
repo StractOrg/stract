@@ -26,10 +26,9 @@ use std::time::Duration;
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use regex::Regex;
 use tracing::{debug, trace};
 
-pub(crate) struct WarcFile {
+pub struct WarcFile {
     bytes: Vec<u8>,
 }
 
@@ -303,7 +302,6 @@ impl<R: Read> RecordIterator<R> {
 
         loop {
             let mut line_buf = String::new();
-
             if let Err(io) = self.reader.read_line(&mut line_buf) {
                 return Some(Err(Error::IOError(io)));
             }
@@ -473,18 +471,15 @@ impl WarcWriter {
             )?;
         }
 
-        let content_len = record.response.body.len() + 4; // +4 is for the \r\n\r\n between http header and body
+        let body = record.response.body.as_bytes();
+        let content_len = body.len() + 4; // +4 is for the \r\n\r\n between http header and body
         writer.write_all(format!("Content-Length: {content_len}\r\n").as_bytes())?;
 
         writer.write_all("\r\n".as_bytes())?;
         // write the http-header here if we want to in the future
         writer.write_all("\r\n\r\n".as_bytes())?;
 
-        let re = Regex::new(r"(\r\n\r\n)+").unwrap();
-        re.replace_all(&record.response.body, "");
-        let body = re.replace(&record.response.body, "");
-
-        writer.write_all(body.as_bytes())?;
+        writer.write_all(body)?;
         writer.write_all("\r\n\r\n".as_bytes())?;
 
         writer.write_all("WARC/1.0\r\n".as_bytes())?;
@@ -518,6 +513,12 @@ impl WarcWriter {
 
     pub fn num_writes(&self) -> usize {
         self.num_writes
+    }
+}
+
+impl Default for WarcWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -647,6 +648,38 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(&records[0].request.url, "https://a.com");
         assert_eq!(&records[0].response.body, utf8);
+        assert_eq!(records[0].metadata.fetch_time_ms, 0);
+    }
+
+    #[test]
+    fn writer_tabs() {
+        let body = r#"
+               this
+            is
+            a
+            test             "#;
+        let mut writer = WarcWriter::new();
+        let record = WarcRecord {
+            request: Request {
+                url: "https://a.com".to_string(),
+            },
+            response: Response {
+                body: body.to_string(),
+                payload_type: Some("text/html".to_string()),
+            },
+            metadata: Metadata { fetch_time_ms: 0 },
+        };
+        writer.write(&record).unwrap();
+
+        let compressed = writer.finish().unwrap();
+        let records: Vec<WarcRecord> = WarcFile::new(compressed)
+            .records()
+            .map(|res| res.unwrap())
+            .collect();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(&records[0].request.url, "https://a.com");
+        assert_eq!(&records[0].response.body, body);
         assert_eq!(records[0].metadata.fetch_time_ms, 0);
     }
 }

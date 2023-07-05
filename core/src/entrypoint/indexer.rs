@@ -308,7 +308,7 @@ impl Indexer {
                 let warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
                     warc_paths
                         .into_iter()
-                        .skip(config.skip_num_warc_files.unwrap_or(0))
+                        .skip(config.skip_warc_files.unwrap_or(0))
                         .take(config.limit_warc_files.unwrap_or(usize::MAX))
                         .chunks(config.batch_size.unwrap_or(1))
                         .into_iter()
@@ -382,7 +382,7 @@ impl Indexer {
                 |job| -> IndexPointer { job.map(&worker) },
                 warc_paths
                     .into_iter()
-                    .skip(config.skip_num_warc_files.unwrap_or(0))
+                    .skip(config.skip_warc_files.unwrap_or(0))
                     .take(config.limit_warc_files.unwrap_or(usize::MAX))
                     .chunks(config.batch_size.unwrap_or(1))
                     .into_iter()
