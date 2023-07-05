@@ -703,6 +703,10 @@ impl NormalPatternScorer {
     }
 
     fn perform_pattern_match(&mut self) -> usize {
+        if self.intersection_docset.doc() == TERMINATED {
+            return 0;
+        }
+
         {
             self.intersection_docset
                 .docset_mut_specialized(0)
