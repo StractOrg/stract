@@ -26,12 +26,15 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::distributed::sonic;
 
 use super::{InitialWebsiteResult, SearchQuery};
+
+const NUM_REPLICA_RETRIES: usize = 3;
 
 struct RemoteSearcher {
     addr: SocketAddr,
@@ -154,21 +157,21 @@ impl Shard {
         }
     }
 
+    fn replica(&self) -> &RemoteSearcher {
+        self.replicas.choose(&mut rand::thread_rng()).unwrap()
+    }
+
     async fn search(&self, query: &SearchQuery) -> Result<InitialSearchResultShard> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.search(query))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(result) => Ok(InitialSearchResultShard {
-                local_result: result?,
-                shard: self.id.clone(),
-            }),
-            None => Err(Error::SearchFailed.into()),
+        for _ in 0..NUM_REPLICA_RETRIES {
+            if let Ok(result) = self.replica().search(query).await {
+                return Ok(InitialSearchResultShard {
+                    local_result: result,
+                    shard: self.id.clone(),
+                });
+            }
         }
+
+        Err(Error::SearchFailed.into())
     }
 
     async fn retrieve_websites(
@@ -176,45 +179,31 @@ impl Shard {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.retrieve_websites(pointers, original_query))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(Ok(websites)) => Ok(websites),
-            _ => Err(Error::SearchFailed.into()),
+        for _ in 0..NUM_REPLICA_RETRIES {
+            if let Ok(res) = self
+                .replica()
+                .retrieve_websites(pointers, original_query)
+                .await
+            {
+                return Ok(res);
+            }
         }
+
+        Err(Error::SearchFailed.into())
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.get_webpage(url))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(t) => t,
-            _ => Err(Error::WebpageNotFound.into()),
+        for _ in 0..NUM_REPLICA_RETRIES {
+            if let Ok(res) = self.replica().get_webpage(url).await {
+                return Ok(res);
+            }
         }
+
+        Err(Error::SearchFailed.into())
     }
 
     async fn get_homepage_descriptions(&self, urls: &[String]) -> HashMap<Url, String> {
-        match self
-            .replicas
-            .iter()
-            .map(|remote| remote.get_homepage_descriptions(urls))
-            .collect::<FuturesUnordered<_>>()
-            .next()
-            .await
-        {
-            Some(t) => t,
-            _ => HashMap::new(),
-        }
+        self.replica().get_homepage_descriptions(urls).await
     }
 }
 
