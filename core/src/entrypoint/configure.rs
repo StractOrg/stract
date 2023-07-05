@@ -80,6 +80,7 @@ fn create_webgraph() -> Result<()> {
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         graph_base_path: out_path_tmp.to_str().unwrap().to_string(),
+        level: crate::WebgraphLevel::Host,
     };
 
     let graph = webgraph::process_job(&job);

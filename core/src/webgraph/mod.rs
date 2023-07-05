@@ -69,7 +69,7 @@ impl Node {
         Node::from(url.full())
     }
 
-    fn remove_protocol(&mut self) {
+    pub fn remove_protocol(&mut self) {
         let url = Url::from(self.name.clone());
         self.name = url.without_protocol().to_string();
     }
@@ -372,13 +372,8 @@ impl Webgraph {
         }
     }
 
-    pub fn insert(&mut self, mut from: Node, mut to: Node, label: String) {
-        from.remove_protocol();
-        to.remove_protocol();
-
-        let (from, to) = (from.into_host(), to.into_host());
+    pub fn insert(&mut self, from: Node, to: Node, label: String) {
         let (from_id, to_id) = (self.id_or_assign(&from), self.id_or_assign(&to));
-
         self.live_segment.insert(from_id, to_id, label);
     }
 
@@ -792,22 +787,6 @@ mod test {
         n.remove_protocol();
 
         assert_eq!(&n.name, "www.example.com?test");
-
-        let mut graph = WebgraphBuilder::new_memory().open();
-
-        graph.insert(
-            Node::from("http://A"),
-            Node::from("https://B"),
-            String::new(),
-        );
-
-        graph.commit();
-
-        let distances = graph.distances(Node::from("A"));
-        assert_eq!(distances.get(&Node::from("B")), Some(&1));
-
-        let distances = graph.distances(Node::from("http://A"));
-        assert!(distances.is_empty());
     }
 
     #[test]

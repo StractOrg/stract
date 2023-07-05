@@ -1,3 +1,4 @@
+level = "host"
 graph_base_path = "data/webgraph"
 
 [warc_source]

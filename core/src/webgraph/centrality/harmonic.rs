@@ -248,10 +248,26 @@ mod tests {
     fn www_subdomain_ignored() {
         let mut graph = WebgraphBuilder::new_memory().open();
 
-        graph.insert(Node::from("B.com"), Node::from("A.com"), String::new());
-        graph.insert(Node::from("B.com"), Node::from("www.A.com"), String::new());
-        graph.insert(Node::from("C.com"), Node::from("A.com"), String::new());
-        graph.insert(Node::from("C.com"), Node::from("www.A.com"), String::new());
+        graph.insert(
+            Node::from("B.com").into_host(),
+            Node::from("A.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("B.com").into_host(),
+            Node::from("www.A.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("C.com").into_host(),
+            Node::from("A.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("C.com").into_host(),
+            Node::from("www.A.com").into_host(),
+            String::new(),
+        );
 
         graph.commit();
         let centrality = HarmonicCentrality::calculate(&graph);

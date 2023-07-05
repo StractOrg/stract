@@ -19,7 +19,7 @@ use crate::{
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
-    HttpConfig, LocalConfig, Result, S3Config, WarcSource, WebgraphLocalConfig,
+    HttpConfig, LocalConfig, Result, S3Config, WarcSource, WebgraphLevel, WebgraphLocalConfig,
     WebgraphMasterConfig,
 };
 use itertools::Itertools;
@@ -63,6 +63,7 @@ impl From<JobConfig> for WarcSource {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
+    pub level: WebgraphLevel,
     pub config: JobConfig,
     pub warc_paths: Vec<String>,
     pub graph_base_path: String,
@@ -101,11 +102,18 @@ pub fn process_job(job: &Job) -> webgraph::Webgraph {
                     .filter(|link| link.matches_url_regex())
                 {
                     trace!("inserting link {:?}", link);
-                    graph.insert(
-                        Node::from(link.source),
-                        Node::from(link.destination),
-                        link.text,
-                    );
+                    let mut source = Node::from(link.source);
+                    source.remove_protocol();
+
+                    let mut destination = Node::from(link.destination);
+                    destination.remove_protocol();
+
+                    if let WebgraphLevel::Host = job.level {
+                        source = source.into_host();
+                        destination = destination.into_host();
+                    }
+
+                    graph.insert(source, destination, link.text);
                 }
             }
         }
@@ -203,6 +211,7 @@ impl Webgraph {
                         .into_iter()
                         .map(|warc_paths| Job {
                             config: job_config.clone(),
+                            level: config.level.clone(),
                             warc_paths: warc_paths.into_iter().collect(),
                             graph_base_path: config
                                 .graph_base_path
@@ -260,6 +269,7 @@ impl Webgraph {
             .into_iter()
             .map(|warc_paths| Job {
                 config: job_config.clone(),
+                level: config.level.clone(),
                 warc_paths: warc_paths.collect_vec(),
                 graph_base_path: config
                     .graph_base_path

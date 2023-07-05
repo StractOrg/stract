@@ -110,8 +110,15 @@ pub struct IndexingLocalConfig {
     minimum_clean_words: Option<usize>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum WebgraphLevel {
+    Url,
+    Host,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphMasterConfig {
+    level: WebgraphLevel,
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     workers: Vec<String>,
@@ -121,6 +128,7 @@ pub struct WebgraphMasterConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphLocalConfig {
+    level: WebgraphLevel,
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     graph_base_path: Option<String>,
