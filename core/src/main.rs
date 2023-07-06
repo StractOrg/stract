@@ -153,7 +153,8 @@ enum IndexingOptions {
     },
     Worker {
         address: String,
-        centrality_store_path: String,
+        host_centrality_store_path: String,
+        page_centrality_store_path: Option<String>,
         webgraph_path: Option<String>,
         topics_path: Option<String>,
     },
@@ -190,13 +191,15 @@ fn main() -> Result<()> {
             }
             IndexingOptions::Worker {
                 address,
-                centrality_store_path,
+                host_centrality_store_path,
+                page_centrality_store_path,
                 webgraph_path,
                 topics_path,
             } => {
                 entrypoint::Indexer::run_worker(
                     address,
-                    centrality_store_path,
+                    host_centrality_store_path,
+                    page_centrality_store_path,
                     webgraph_path,
                     topics_path,
                 )?;

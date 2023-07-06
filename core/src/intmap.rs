@@ -150,7 +150,7 @@ impl<V> Default for IntMap<V> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct IntSet {
     map: IntMap<()>,
 }
@@ -160,8 +160,8 @@ impl IntSet {
         Self { map: IntMap::new() }
     }
 
-    pub fn insert(&mut self, key: Key) {
-        self.map.insert(key, ());
+    pub fn insert(&mut self, item: Key) {
+        self.map.insert(item, ());
     }
 
     pub fn into_iter(self) -> impl Iterator<Item = Key> {
@@ -170,6 +170,22 @@ impl IntSet {
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    pub fn contains(&self, item: &Key) -> bool {
+        self.map.contains_key(item)
+    }
+}
+
+impl std::iter::FromIterator<u64> for IntSet {
+    fn from_iter<T: IntoIterator<Item = u64>>(iter: T) -> Self {
+        let mut set = Self::new();
+
+        for num in iter {
+            set.insert(num);
+        }
+
+        set
     }
 }
 

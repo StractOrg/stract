@@ -76,19 +76,22 @@ pub struct Job {
 }
 
 pub struct IndexingWorker {
-    centrality_store: IndexerCentralityStore,
+    host_centrality_store: IndexerCentralityStore,
+    page_centrality_store: Option<IndexerCentralityStore>,
     webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
 }
 
 impl IndexingWorker {
     pub fn new(
-        centrality_store_path: String,
+        host_centrality_store_path: String,
+        page_centrality_store_path: Option<String>,
         webgraph_path: Option<String>,
         topics_path: Option<String>,
     ) -> Self {
         Self {
-            centrality_store: IndexerCentralityStore::open(centrality_store_path),
+            host_centrality_store: IndexerCentralityStore::open(host_centrality_store_path),
+            page_centrality_store: page_centrality_store_path.map(IndexerCentralityStore::open),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
@@ -123,7 +126,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
             {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
-                let node_id = worker.centrality_store.node2id.get(
+                let node_id = worker.host_centrality_store.node2id.get(
                     &html
                         .url()
                         .host_without_specific_subdomains_and_query()
@@ -132,7 +135,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 );
 
                 let host_centrality = node_id
-                    .and_then(|node_id| worker.centrality_store.harmonic.host.get(&node_id))
+                    .and_then(|node_id| worker.host_centrality_store.harmonic.get(&node_id))
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
@@ -170,14 +173,17 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
                     .unwrap_or_else(Vec::new);
 
-                let node_id = worker
-                    .centrality_store
-                    .node2id
-                    .get(&html.url().without_protocol().to_lowercase().into());
+                let mut page_centrality = 0.0;
 
-                let page_centrality = node_id
-                    .and_then(|node_id| worker.centrality_store.harmonic.full.get(&node_id))
-                    .unwrap_or_default();
+                if let Some(store) = worker.page_centrality_store.as_ref() {
+                    let node_id = store
+                        .node2id
+                        .get(&html.url().without_protocol().to_lowercase().into());
+
+                    page_centrality = node_id
+                        .and_then(|node_id| store.harmonic.get(&node_id))
+                        .unwrap_or_default();
+                }
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;
 
@@ -187,7 +193,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 trace!("text = {:?}", html.clean_text());
 
                 let node_id = worker
-                    .centrality_store
+                    .host_centrality_store
                     .node2id
                     .get(&Node::from_url(html.url()).into_host());
 
@@ -342,7 +348,8 @@ impl Indexer {
 
     pub fn run_worker(
         worker_addr: String,
-        centrality_store_path: String,
+        host_centrality_store_path: String,
+        page_centrality_store_path: Option<String>,
         webgraph_path: Option<String>,
         topics_path: Option<String>,
     ) -> Result<()> {
@@ -351,14 +358,19 @@ impl Indexer {
             .build()
             .unwrap()
             .block_on(async {
-                IndexingWorker::new(centrality_store_path, webgraph_path, topics_path)
-                    .run::<Job, FrozenIndex>(
-                        worker_addr
-                            .parse::<SocketAddr>()
-                            .expect("Could not parse worker address"),
-                    )
-                    .await
-                    .unwrap();
+                IndexingWorker::new(
+                    host_centrality_store_path,
+                    page_centrality_store_path,
+                    webgraph_path,
+                    topics_path,
+                )
+                .run::<Job, FrozenIndex>(
+                    worker_addr
+                        .parse::<SocketAddr>()
+                        .expect("Could not parse worker address"),
+                )
+                .await
+                .unwrap();
             });
         Ok(())
     }
@@ -369,7 +381,8 @@ impl Indexer {
         let job_config: JobConfig = config.warc_source.clone().into();
 
         let worker = IndexingWorker::new(
-            config.centrality_store_path.clone(),
+            config.host_centrality_store_path.clone(),
+            config.page_centrality_store_path.clone(),
             config.webgraph_path.clone(),
             config.topics_path.clone(),
         );

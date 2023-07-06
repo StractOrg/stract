@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use bitvec::vec::BitVec;
 use tracing::info;
@@ -23,7 +23,7 @@ use crate::{
     hyperloglog::HyperLogLog,
     intmap::{IntMap, IntSet},
     kahan_sum::KahanSum,
-    webgraph::{Node, NodeID, Webgraph},
+    webgraph::{NodeID, Webgraph},
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
@@ -79,11 +79,7 @@ impl JankyBloomFilter {
     }
 }
 
-pub struct HarmonicCentrality {
-    pub host: HashMap<Node, f64>,
-}
-
-fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
+fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let nodes: Vec<_> = graph.nodes().collect();
     info!("Found {} nodes in the graph", nodes.len());
     let norm_factor = (nodes.len() - 1) as f64;
@@ -205,31 +201,30 @@ fn calculate_centrality(graph: &Webgraph) -> HashMap<Node, f64> {
         .into_iter()
         .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
-        .map(|(node_id, centrality)| {
-            (
-                graph.id2node(&NodeID::from(node_id)).unwrap(),
-                centrality / norm_factor,
-            )
-        })
+        .map(|(node_id, centrality)| (NodeID(node_id), centrality / norm_factor))
         .collect()
 }
 
-fn calculate_host(graph: &Webgraph) -> HashMap<Node, f64> {
-    calculate_centrality(graph)
-}
+pub struct HarmonicCentrality(BTreeMap<NodeID, f64>);
 
 impl HarmonicCentrality {
     pub fn calculate(graph: &Webgraph) -> Self {
-        Self {
-            host: calculate_host(graph),
-        }
+        Self(calculate_centrality(graph))
+    }
+
+    pub fn get(&self, node: &NodeID) -> Option<f64> {
+        self.0.get(node).copied()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&NodeID, f64)> {
+        self.0.iter().map(|(node, centrality)| (node, *centrality))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webgraph::WebgraphBuilder;
+    use crate::webgraph::{Node, WebgraphBuilder};
 
     fn test_graph() -> Webgraph {
         //     ┌────┐
@@ -260,28 +255,88 @@ mod tests {
     fn host_harmonic_centrality() {
         let mut graph = WebgraphBuilder::new_memory().open();
 
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("A.com/1"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("A.com/2"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/3"), Node::from("A.com/4"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/1"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/2"), String::new());
-        graph.insert(Node::from("A.com/4"), Node::from("A.com/3"), String::new());
-        graph.insert(Node::from("C.com"), Node::from("B.com"), String::new());
-        graph.insert(Node::from("D.com"), Node::from("B.com"), String::new());
+        graph.insert(
+            Node::from("A.com/1").into_host(),
+            Node::from("A.com/2").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/1").into_host(),
+            Node::from("A.com/3").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/1").into_host(),
+            Node::from("A.com/4").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/2").into_host(),
+            Node::from("A.com/1").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/2").into_host(),
+            Node::from("A.com/3").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/2").into_host(),
+            Node::from("A.com/4").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/3").into_host(),
+            Node::from("A.com/1").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/3").into_host(),
+            Node::from("A.com/2").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/3").into_host(),
+            Node::from("A.com/4").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/4").into_host(),
+            Node::from("A.com/1").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/4").into_host(),
+            Node::from("A.com/2").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("A.com/4").into_host(),
+            Node::from("A.com/3").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("C.com").into_host(),
+            Node::from("B.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("D.com").into_host(),
+            Node::from("B.com").into_host(),
+            String::new(),
+        );
 
         graph.commit();
 
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
-            centrality.host.get(&Node::from("B.com")).unwrap()
-                > centrality.host.get(&Node::from("A.com")).unwrap_or(&0.0)
+            centrality
+                .get(&graph.node2id(&Node::from("B.com")).unwrap())
+                .unwrap()
+                > centrality
+                    .get(&graph.node2id(&Node::from("A.com")).unwrap())
+                    .unwrap_or(0.0)
         );
     }
 
@@ -291,46 +346,25 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
-            centrality.host.get(&Node::from("C")).unwrap()
-                > centrality.host.get(&Node::from("A")).unwrap()
+            centrality
+                .get(&graph.node2id(&Node::from("C")).unwrap())
+                .unwrap()
+                > centrality
+                    .get(&graph.node2id(&Node::from("A")).unwrap())
+                    .unwrap()
         );
         assert!(
-            centrality.host.get(&Node::from("A")).unwrap()
-                > centrality.host.get(&Node::from("B")).unwrap()
+            centrality
+                .get(&graph.node2id(&Node::from("A")).unwrap())
+                .unwrap()
+                > centrality
+                    .get(&graph.node2id(&Node::from("B")).unwrap())
+                    .unwrap()
         );
-        assert_eq!(centrality.host.get(&Node::from("D")), None);
-    }
-
-    #[test]
-    fn www_subdomain_ignored() {
-        let mut graph = WebgraphBuilder::new_memory().open();
-
-        graph.insert(
-            Node::from("B.com").into_host(),
-            Node::from("A.com").into_host(),
-            String::new(),
+        assert_eq!(
+            centrality.get(&graph.node2id(&Node::from("D")).unwrap()),
+            None
         );
-        graph.insert(
-            Node::from("B.com").into_host(),
-            Node::from("www.A.com").into_host(),
-            String::new(),
-        );
-        graph.insert(
-            Node::from("C.com").into_host(),
-            Node::from("A.com").into_host(),
-            String::new(),
-        );
-        graph.insert(
-            Node::from("C.com").into_host(),
-            Node::from("www.A.com").into_host(),
-            String::new(),
-        );
-
-        graph.commit();
-        let centrality = HarmonicCentrality::calculate(&graph);
-
-        assert!(centrality.host.get(&Node::from("A.com")).is_some());
-        assert_eq!(centrality.host.get(&Node::from("www.A.com")), None);
     }
 
     #[test]
@@ -351,7 +385,7 @@ mod tests {
 
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 
-        assert_eq!(centrality.host, centrality_extra.host);
+        assert_eq!(centrality.0, centrality_extra.0);
     }
 
     #[test]
@@ -375,6 +409,6 @@ mod tests {
         let orig_graph = test_graph();
         let orig_centrality = HarmonicCentrality::calculate(&orig_graph);
 
-        assert_eq!(centrality.host, orig_centrality.host);
+        assert_eq!(centrality.0, orig_centrality.0);
     }
 }

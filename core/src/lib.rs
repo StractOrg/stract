@@ -106,7 +106,8 @@ pub struct IndexingLocalConfig {
     output_path: Option<String>,
     host_centrality_threshold: Option<f64>,
     topics_path: Option<String>,
-    centrality_store_path: String,
+    host_centrality_store_path: String,
+    page_centrality_store_path: Option<String>,
     minimum_clean_words: Option<usize>,
 }
 

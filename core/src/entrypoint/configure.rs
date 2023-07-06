@@ -129,6 +129,7 @@ fn create_inverted_index() -> Result<()> {
 
     let worker = indexer::IndexingWorker::new(
         centrality_path.to_str().unwrap().to_string(),
+        None,
         Some(webgraph_path.to_str().unwrap().to_string()),
         Some(
             Path::new(DATA_PATH)

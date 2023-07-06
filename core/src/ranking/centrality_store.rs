@@ -134,24 +134,7 @@ impl Node2Id {
     }
 }
 
-pub struct HarmonicCentralityStore {
-    pub host: Box<dyn Kv<NodeID, f64>>,
-    pub full: Box<dyn Kv<NodeID, f64>>,
-}
-
-impl HarmonicCentralityStore {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        Self {
-            host: RocksDbStore::open(path.as_ref().join("host")),
-            full: RocksDbStore::open(path.as_ref().join("full")),
-        }
-    }
-
-    fn flush(&self) {
-        self.host.flush();
-        self.full.flush();
-    }
-}
+pub type HarmonicCentralityStore = Box<dyn Kv<NodeID, f64> + Send + Sync>;
 
 pub struct IndexerCentralityStore {
     pub harmonic: HarmonicCentralityStore,
@@ -161,7 +144,7 @@ pub struct IndexerCentralityStore {
 impl IndexerCentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
+            harmonic: RocksDbStore::open(path.as_ref().join("harmonic")),
             node2id: Node2Id::open(path.as_ref().join("node2id")),
         }
     }
@@ -210,7 +193,7 @@ pub struct CentralityStore {
 impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
+            harmonic: RocksDbStore::open(path.as_ref().join("harmonic")),
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .ok()
                 .unwrap_or_default(),
@@ -219,10 +202,11 @@ impl CentralityStore {
         }
     }
 
-    fn store_host<P: AsRef<Path>>(
+    fn store_harmonic<P: AsRef<Path>>(
         output_path: P,
         store: &mut CentralityStore,
         harmonic_centrality: HarmonicCentrality,
+        graph: &Webgraph,
     ) {
         let csv_file = File::options()
             .write(true)
@@ -231,17 +215,23 @@ impl CentralityStore {
             .open(output_path.as_ref().join("harmonic.csv"))
             .unwrap();
 
-        let mut host: Vec<_> = harmonic_centrality.host.into_iter().collect();
-        host.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut harmonic: Vec<_> = harmonic_centrality
+            .iter()
+            .map(|(node, centrality)| (*node, centrality))
+            .take(1_000_000)
+            .collect();
+
+        harmonic.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut wtr = csv::Writer::from_writer(csv_file);
-        for (node, centrality) in host {
-            let node_id = store.node2id.get(&node).unwrap();
-            store.harmonic.host.insert(node_id, centrality);
+        for (node_id, centrality) in harmonic {
+            let node = graph.id2node(&node_id).unwrap();
+
+            store.harmonic.insert(node_id, centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
         }
         wtr.flush().unwrap();
-        store.harmonic.host.flush();
+        store.harmonic.flush();
     }
 
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
@@ -254,7 +244,7 @@ impl CentralityStore {
 
         store.node2id.batch_put(graph.node_ids());
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
-        Self::store_host(&output_path, &mut store, harmonic_centrality);
+        Self::store_harmonic(&output_path, &mut store, harmonic_centrality, graph);
 
         store.flush();
         store
