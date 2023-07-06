@@ -126,13 +126,7 @@ enum CentralityType {
 
 #[derive(Subcommand)]
 enum WebgraphOptions {
-    Master {
-        config_path: String,
-    },
-    Worker {
-        address: String,
-    },
-    Local {
+    Create {
         config_path: String,
     },
     Merge {
@@ -148,17 +142,7 @@ enum WebgraphOptions {
 
 #[derive(Subcommand)]
 enum IndexingOptions {
-    Master {
-        config_path: String,
-    },
-    Worker {
-        address: String,
-        host_centrality_store_path: String,
-        page_centrality_store_path: Option<String>,
-        webgraph_path: Option<String>,
-        topics_path: Option<String>,
-    },
-    Local {
+    Search {
         config_path: String,
     },
     Entity {
@@ -185,28 +169,9 @@ fn main() -> Result<()> {
 
     match args.command {
         Commands::Indexer { options } => match options {
-            IndexingOptions::Master { config_path } => {
+            IndexingOptions::Search { config_path } => {
                 let config = load_toml_config(config_path);
-                entrypoint::Indexer::run_master(&config)?;
-            }
-            IndexingOptions::Worker {
-                address,
-                host_centrality_store_path,
-                page_centrality_store_path,
-                webgraph_path,
-                topics_path,
-            } => {
-                entrypoint::Indexer::run_worker(
-                    address,
-                    host_centrality_store_path,
-                    page_centrality_store_path,
-                    webgraph_path,
-                    topics_path,
-                )?;
-            }
-            IndexingOptions::Local { config_path } => {
-                let config = load_toml_config(config_path);
-                entrypoint::Indexer::run_locally(&config)?;
+                entrypoint::Indexer::run(&config)?;
             }
             IndexingOptions::Entity {
                 wikipedia_dump_path,
@@ -236,16 +201,9 @@ fn main() -> Result<()> {
             tracing::info!("Done");
         }
         Commands::Webgraph { options } => match options {
-            WebgraphOptions::Master { config_path } => {
+            WebgraphOptions::Create { config_path } => {
                 let config = load_toml_config(config_path);
-                entrypoint::Webgraph::run_master(&config)?;
-            }
-            WebgraphOptions::Worker { address } => {
-                entrypoint::Webgraph::run_worker(address)?;
-            }
-            WebgraphOptions::Local { config_path } => {
-                let config = load_toml_config(config_path);
-                entrypoint::Webgraph::run_locally(&config)?;
+                entrypoint::Webgraph::run(&config)?;
             }
             WebgraphOptions::Merge {
                 mut paths,

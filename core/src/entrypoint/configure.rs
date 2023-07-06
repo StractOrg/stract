@@ -83,7 +83,8 @@ fn create_webgraph() -> Result<()> {
         level: crate::WebgraphLevel::Host,
     };
 
-    let graph = webgraph::process_job(&job);
+    let worker = webgraph::WebgraphWorker { redirect: None };
+    let graph = worker.process_job(&job);
     std::fs::rename(graph.path, out_path)?;
     std::fs::remove_dir_all(&out_path_tmp)?;
 

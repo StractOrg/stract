@@ -30,7 +30,7 @@ use self::{
 };
 
 pub mod coordinator;
-mod crawl_db;
+pub mod crawl_db;
 mod robots_txt;
 mod warc_writer;
 mod worker;

@@ -282,13 +282,20 @@ impl From<u64> for UrlId {
     }
 }
 
-struct RedirectDb {
+pub struct RedirectDb {
     inner: rocksdb::DB,
 }
 
 impl RedirectDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let inner = rocksdb::DB::open_default(path.as_ref())?;
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_bloom_filter(64.0, true);
+        options.set_block_based_table_factory(&block_options);
+
+        let inner = rocksdb::DB::open(&options, path.as_ref())?;
 
         Ok(Self { inner })
     }
@@ -304,6 +311,18 @@ impl RedirectDb {
             .put_opt(url_bytes, redirect_bytes, &write_options)?;
 
         Ok(())
+    }
+
+    pub fn get(&self, from: &Url) -> Result<Option<Url>> {
+        let url_bytes = bincode::serialize(from)?;
+        let redirect_bytes = self.inner.get(url_bytes)?;
+
+        if let Some(redirect_bytes) = redirect_bytes {
+            let redirect: Url = bincode::deserialize(&redirect_bytes)?;
+            return Ok(Some(redirect));
+        }
+
+        Ok(None)
     }
 }
 

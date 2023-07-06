@@ -85,18 +85,6 @@ pub mod webpage;
 mod widgets;
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct IndexingMasterConfig {
-    limit_warc_files: Option<usize>,
-    skip_warc_files: Option<usize>,
-    warc_source: WarcSource,
-    workers: Vec<String>,
-    batch_size: Option<usize>,
-    host_centrality_threshold: Option<f64>,
-    index_base_path: Option<String>,
-    minimum_clean_words: Option<usize>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
     limit_warc_files: Option<usize>,
     skip_warc_files: Option<usize>,
@@ -119,18 +107,9 @@ pub enum WebgraphLevel {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct WebgraphMasterConfig {
+pub struct WebgraphConstructConfig {
     level: WebgraphLevel,
-    limit_warc_files: Option<usize>,
-    warc_source: WarcSource,
-    workers: Vec<String>,
-    graph_base_path: Option<String>,
-    batch_size: Option<usize>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct WebgraphLocalConfig {
-    level: WebgraphLevel,
+    redirect_db_path: Option<String>,
     limit_warc_files: Option<usize>,
     warc_source: WarcSource,
     graph_base_path: Option<String>,

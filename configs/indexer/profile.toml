@@ -1,7 +1,0 @@
-warc_paths_file = "warc.paths"
-centrality_store_path = "./data/centrality"
-
-[warc_source]
-type = "Local"
-folder = "./data/warc_files"
-names = ["CC-MAIN-20220116093137-20220116123137-00049.warc.gz"]

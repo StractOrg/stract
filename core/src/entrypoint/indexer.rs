@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chrono::Utc;
-use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
 
@@ -26,15 +25,15 @@ use tracing::{debug, info, trace};
 use crate::entrypoint::download_all_warc_files;
 use crate::executor::Executor;
 use crate::index::{FrozenIndex, Index};
-use crate::mapreduce::{Manager, Map, Reduce, Worker};
+use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::centrality_store::IndexerCentralityStore;
 use crate::ranking::SignalAggregator;
 use crate::warc::WarcFile;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
 use crate::{
-    human_website_annotations, HttpConfig, IndexingLocalConfig, IndexingMasterConfig, LocalConfig,
-    Result, S3Config, WarcSource,
+    human_website_annotations, HttpConfig, IndexingLocalConfig, LocalConfig, Result, S3Config,
+    WarcSource,
 };
 
 pub struct Indexer {}
@@ -292,90 +291,7 @@ impl Reduce<Index> for Index {
 }
 
 impl Indexer {
-    pub fn run_master(config: &IndexingMasterConfig) -> Result<()> {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                info!("Running master for index construction");
-
-                let warc_paths = config.warc_source.paths().unwrap();
-
-                let workers: Vec<SocketAddr> = config
-                    .workers
-                    .iter()
-                    .map(|worker| worker.parse().unwrap())
-                    .collect();
-
-                let job_config: JobConfig = config.warc_source.clone().into();
-
-                let warc_paths: Box<dyn Iterator<Item = Job> + Send> = Box::new(
-                    warc_paths
-                        .into_iter()
-                        .skip(config.skip_warc_files.unwrap_or(0))
-                        .take(config.limit_warc_files.unwrap_or(usize::MAX))
-                        .chunks(config.batch_size.unwrap_or(1))
-                        .into_iter()
-                        .map(|warc_paths| Job {
-                            source_config: job_config.clone(),
-                            warc_paths: warc_paths.collect_vec(),
-                            host_centrality_threshold: config.host_centrality_threshold,
-                            base_path: config
-                                .index_base_path
-                                .clone()
-                                .unwrap_or_else(|| "data/index".to_string()),
-                            minimum_clean_words: config.minimum_clean_words,
-                        })
-                        .collect_vec()
-                        .into_iter(),
-                );
-
-                let manager = Manager::new(&workers);
-                let mut index: Index = manager
-                    .run::<IndexingWorker, Job, FrozenIndex, Index>(warc_paths)
-                    .await
-                    .unwrap();
-
-                index
-                    .inverted_index
-                    .merge_into_max_segments(num_cpus::get() as u32)
-                    .unwrap();
-            });
-
-        Ok(())
-    }
-
-    pub fn run_worker(
-        worker_addr: String,
-        host_centrality_store_path: String,
-        page_centrality_store_path: Option<String>,
-        webgraph_path: Option<String>,
-        topics_path: Option<String>,
-    ) -> Result<()> {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                IndexingWorker::new(
-                    host_centrality_store_path,
-                    page_centrality_store_path,
-                    webgraph_path,
-                    topics_path,
-                )
-                .run::<Job, FrozenIndex>(
-                    worker_addr
-                        .parse::<SocketAddr>()
-                        .expect("Could not parse worker address"),
-                )
-                .await
-                .unwrap();
-            });
-        Ok(())
-    }
-
-    pub fn run_locally(config: &IndexingLocalConfig) -> Result<()> {
+    pub fn run(config: &IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
         let job_config: JobConfig = config.warc_source.clone().into();

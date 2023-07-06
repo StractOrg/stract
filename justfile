@@ -1,11 +1,3 @@
-@profile-indexer:
-    sudo rm -rf data/index
-    just cargo flamegraph --root -- indexer local configs/indexer/profile.toml
-
-@webgraph:
-    rm -rf data/webgraph
-    just cargo run --release -- webgraph local configs/webgraph/local.toml
-
 @frontend-rerun *ARGS:
     cd frontend; npm run build
     ./scripts/run_frontend.py {{ARGS}}
@@ -30,13 +22,6 @@
 @configure *ARGS:
     just setup {{ARGS}}
     just cargo run --release --all-features -- configure {{ARGS}}
-
-@centrality webgraph output:
-    ./scripts/build_harmonic {{webgraph}} {{output}}
-
-@entity:
-    rm -rf data/entity
-    just cargo run --release -- indexer entity data/enwiki_subset.xml.bz2 data/entity
 
 @setup_python_env:
     rm -rf .venv

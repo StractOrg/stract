@@ -1,4 +1,0 @@
-#!/bin/bash
-cargo run --release centrality $1 $2 harmonic
-cargo run --release centrality $1 $2 online-harmonic
-cargo run --release centrality $1 $2 similarity
