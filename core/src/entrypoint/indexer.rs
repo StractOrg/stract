@@ -132,7 +132,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 );
 
                 let host_centrality = node_id
-                    .and_then(|node_id| worker.centrality_store.harmonic.host.get(node_id))
+                    .and_then(|node_id| worker.centrality_store.harmonic.host.get(&node_id))
                     .unwrap_or_default();
 
                 if let Some(host_centrality_threshold) = job.host_centrality_threshold {
@@ -176,7 +176,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     .get(&html.url().without_protocol().to_lowercase().into());
 
                 let page_centrality = node_id
-                    .and_then(|node_id| worker.centrality_store.harmonic.full.get(node_id))
+                    .and_then(|node_id| worker.centrality_store.harmonic.full.get(&node_id))
                     .unwrap_or_default();
 
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;
@@ -189,8 +189,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let node_id = worker
                     .centrality_store
                     .node2id
-                    .get(&Node::from_url(html.url()).into_host())
-                    .cloned();
+                    .get(&Node::from_url(html.url()).into_host());
 
                 let mut dmoz_description = None;
 

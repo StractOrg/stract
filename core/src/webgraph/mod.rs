@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
-use rkyv::Archive;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
@@ -32,6 +31,7 @@ use crate::webpage::Url;
 pub mod centrality;
 mod store;
 use self::segment::{LiveSegment, SegmentNodeID, StoredSegment};
+use self::store::Store;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(pub u64);
@@ -42,8 +42,7 @@ impl From<u64> for NodeID {
     }
 }
 
-#[derive(Debug, Clone, Archive, rkyv::Serialize, rkyv::Deserialize, PartialEq, Eq, Hash)]
-#[archive_attr(derive(Eq, Hash, PartialEq, Debug))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct StoredEdge {
     other: SegmentNodeID,
     label: String,
@@ -182,8 +181,8 @@ where
 
     let mut queue = BinaryHeap::new();
 
-    queue.push(cmp::Reverse((0, *source_id)));
-    distances.insert(*source_id, 0);
+    queue.push(cmp::Reverse((0, source_id)));
+    distances.insert(source_id, 0);
 
     while let Some(state) = queue.pop() {
         let (cost, v) = state.0;
@@ -212,7 +211,7 @@ impl ShortestPaths for Webgraph {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node").clone(), dist))
+            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
             .collect()
     }
 
@@ -237,7 +236,7 @@ impl ShortestPaths for Webgraph {
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_reversed_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node").clone(), dist))
+            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
             .collect()
     }
 }
@@ -291,8 +290,8 @@ pub struct Webgraph {
     live_segment: LiveSegment,
     segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
-    node2id: BTreeMap<Node, NodeID>,
-    id2node: BTreeMap<NodeID, Node>,
+    node2id: Store<Node, NodeID>,
+    id2node: Store<NodeID, Node>,
     meta: Meta,
 }
 
@@ -346,8 +345,8 @@ impl Webgraph {
             live_segment: LiveSegment::default(),
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
-            node2id: open_bin(path.as_ref().join("node2id.bin")),
-            id2node: open_bin(path.as_ref().join("id2node.bin")),
+            node2id: Store::open(path.as_ref().join("node2id")),
+            id2node: Store::open(path.as_ref().join("id2node")),
             meta,
         }
     }
@@ -360,12 +359,12 @@ impl Webgraph {
 
     fn id_or_assign(&mut self, node: &Node) -> NodeID {
         match self.node2id(node) {
-            Some(id) => *id,
+            Some(id) => id,
             None => {
                 let id = self.id_and_increment();
 
-                self.node2id.insert(node.clone(), id);
-                self.id2node.insert(id, node.clone());
+                self.node2id.put(node, &id);
+                self.id2node.put(&id, node);
 
                 id
             }
@@ -382,11 +381,11 @@ impl Webgraph {
         let mut mapping = Vec::new();
 
         for (node, other_id) in other.node2id.iter() {
-            match self.node2id(node) {
-                Some(this_id) => mapping.push((*other_id, *this_id)),
+            match self.node2id(&node) {
+                Some(this_id) => mapping.push((other_id, this_id)),
                 None => {
-                    let new_id = self.id_or_assign(node);
-                    mapping.push((*other_id, new_id));
+                    let new_id = self.id_or_assign(&node);
+                    mapping.push((other_id, new_id));
                 }
             }
         }
@@ -421,8 +420,8 @@ impl Webgraph {
         }
 
         self.save_metadata();
-        save_bin(&self.node2id, Path::new(&self.path).join("node2id.bin"));
-        save_bin(&self.id2node, Path::new(&self.path).join("id2node.bin"));
+        self.node2id.flush();
+        self.id2node.flush();
 
         if self.segments.len() > 2 * num_cpus::get() {
             self.merge_segments(num_cpus::get());
@@ -431,11 +430,11 @@ impl Webgraph {
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
         if let Some(node_id) = self.node2id(&node) {
-            self.inner_ingoing_edges(node_id, true)
+            self.inner_ingoing_edges(&node_id, true)
                 .into_iter()
                 .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap().clone(),
-                    to: self.id2node(&edge.to).unwrap().clone(),
+                    from: self.id2node(&edge.from).unwrap(),
+                    to: self.id2node(&edge.to).unwrap(),
                     label: edge.label.loaded().unwrap(),
                 })
                 .collect()
@@ -478,11 +477,11 @@ impl Webgraph {
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
         if let Some(node_id) = self.node2id(&node) {
-            self.inner_outgoing_edges(node_id, true)
+            self.inner_outgoing_edges(&node_id, true)
                 .into_iter()
                 .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap().clone(),
-                    to: self.id2node(&edge.to).unwrap().clone(),
+                    from: self.id2node(&edge.from).unwrap(),
+                    to: self.id2node(&edge.to).unwrap(),
                     label: edge.label.loaded().unwrap(),
                 })
                 .collect()
@@ -491,19 +490,19 @@ impl Webgraph {
         }
     }
 
-    pub fn node2id(&self, node: &Node) -> Option<&NodeID> {
+    pub fn node2id(&self, node: &Node) -> Option<NodeID> {
         self.node2id.get(node)
     }
 
-    pub fn id2node(&self, id: &NodeID) -> Option<&Node> {
+    pub fn id2node(&self, id: &NodeID) -> Option<Node> {
         self.id2node.get(id)
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = &NodeID> + '_ {
+    pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
         self.node2id.values()
     }
 
-    pub fn node_ids(&self) -> impl Iterator<Item = (&Node, &NodeID)> + '_ {
+    pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
         self.node2id.iter()
     }
 

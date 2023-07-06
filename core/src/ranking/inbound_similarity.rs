@@ -285,18 +285,18 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(*graph.node2id(&node).unwrap(), centrality);
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
         let inbound =
             InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
 
-        let scorer = inbound.scorer(&[*graph.node2id(&Node::from("b.com")).unwrap()], &[]);
+        let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
         let e = graph.node2id(&Node::from("e.com")).unwrap();
         let d = graph.node2id(&Node::from("d.com")).unwrap();
 
-        assert!(scorer.score(e) > scorer.score(d));
+        assert!(scorer.score(&e) > scorer.score(&d));
     }
 
     #[test]
@@ -315,7 +315,7 @@ mod tests {
         for (node, centrality) in harmonic.host {
             harmonic_centrality_store
                 .host
-                .insert(*graph.node2id(&node).unwrap(), centrality);
+                .insert(graph.node2id(&node).unwrap(), centrality);
         }
         harmonic_centrality_store.host.flush();
 
@@ -351,7 +351,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                node_id: Some(*graph.node2id(&Node::from("e.com")).unwrap()),
+                node_id: Some(graph.node2id(&Node::from("e.com")).unwrap()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -379,7 +379,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                node_id: Some(*graph.node2id(&Node::from("d.com")).unwrap()),
+                node_id: Some(graph.node2id(&Node::from("d.com")).unwrap()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");

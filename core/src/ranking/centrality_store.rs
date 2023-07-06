@@ -14,19 +14,125 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::{BufReader, BufWriter, Read};
-use std::{collections::BTreeMap, fs::File, path::Path};
+use std::{fs::File, path::Path};
 
+use rocksdb::BlockBasedOptions;
 use tracing::debug;
 use tracing::log::trace;
 
-use crate::Result;
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{centrality::harmonic::HarmonicCentrality, Node, NodeID, Webgraph},
 };
 
 use super::inbound_similarity::InboundSimilarity;
+
+pub struct Node2Id {
+    db: rocksdb::DB,
+}
+
+impl Node2Id {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+        options.increase_parallelism(8);
+        options.set_write_buffer_size(256 * 1024 * 1024); // 256 MB memtable
+        options.set_max_write_buffer_number(8);
+
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_bloom_filter(64.0, true);
+
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
+        block_options.set_block_cache(&cache);
+
+        options.set_block_based_table_factory(&block_options);
+
+        let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
+
+        Self { db }
+    }
+
+    pub fn get(&self, key: &Node) -> Option<NodeID> {
+        let bytes = bincode::serialize(key).unwrap();
+
+        self.db
+            .get(bytes)
+            .unwrap()
+            .map(|bytes| bincode::deserialize(&bytes).unwrap())
+    }
+
+    pub fn put(&self, key: &Node, value: &NodeID) {
+        let key_bytes = bincode::serialize(key).unwrap();
+        let value_bytes = bincode::serialize(value).unwrap();
+
+        self.db.put(key_bytes, value_bytes).unwrap();
+    }
+
+    pub fn batch_put(&self, it: impl Iterator<Item = (Node, NodeID)>) {
+        let mut batch = rocksdb::WriteBatch::default();
+
+        for (key, value) in it {
+            let key_bytes = bincode::serialize(&key).unwrap();
+            let value_bytes = bincode::serialize(&value).unwrap();
+
+            batch.put(key_bytes, value_bytes);
+        }
+
+        self.db.write(batch).unwrap();
+    }
+
+    pub fn contains(&self, key: &Node) -> bool {
+        let bytes = bincode::serialize(key).unwrap();
+
+        self.db.get(bytes).unwrap().is_some()
+    }
+
+    pub fn nodes(&self) -> impl Iterator<Item = Node> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
+
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (key, _) = res.unwrap();
+                bincode::deserialize(&key).unwrap()
+            })
+    }
+
+    pub fn ids(&self) -> impl Iterator<Item = NodeID> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
+
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (_, val) = res.unwrap();
+                bincode::deserialize(&val).unwrap()
+            })
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
+
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (key, val) = res.unwrap();
+                (
+                    bincode::deserialize(&key).unwrap(),
+                    bincode::deserialize(&val).unwrap(),
+                )
+            })
+    }
+
+    pub fn flush(&self) {
+        self.db.flush().unwrap();
+    }
+}
 
 pub struct HarmonicCentralityStore {
     pub host: Box<dyn Kv<NodeID, f64>>,
@@ -49,14 +155,14 @@ impl HarmonicCentralityStore {
 
 pub struct IndexerCentralityStore {
     pub harmonic: HarmonicCentralityStore,
-    pub node2id: BTreeMap<Node, NodeID>,
+    pub node2id: Node2Id,
 }
 
 impl IndexerCentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
             harmonic: HarmonicCentralityStore::open(path.as_ref().join("harmonic")),
-            node2id: open_node2id(path.as_ref().join("node2id")).unwrap(),
+            node2id: Node2Id::open(path.as_ref().join("node2id")),
         }
     }
 }
@@ -72,7 +178,7 @@ impl From<CentralityStore> for IndexerCentralityStore {
 
 pub struct SearchCentralityStore {
     pub inbound_similarity: InboundSimilarity,
-    pub node2id: BTreeMap<Node, NodeID>,
+    pub node2id: Node2Id,
 }
 
 impl SearchCentralityStore {
@@ -80,7 +186,7 @@ impl SearchCentralityStore {
         Self {
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .unwrap(),
-            node2id: open_node2id(path.as_ref().join("node2id")).unwrap(),
+            node2id: Node2Id::open(path.as_ref().join("node2id")),
         }
     }
 }
@@ -97,18 +203,8 @@ impl From<CentralityStore> for SearchCentralityStore {
 pub struct CentralityStore {
     pub harmonic: HarmonicCentralityStore,
     pub inbound_similarity: InboundSimilarity,
-    pub node2id: BTreeMap<Node, NodeID>,
+    pub node2id: Node2Id,
     pub base_path: String,
-}
-
-fn open_node2id<P: AsRef<Path>>(path: P) -> Result<BTreeMap<Node, NodeID>> {
-    let file = File::open(path)?;
-    let mut reader = BufReader::new(file);
-
-    let mut buf = Vec::new();
-    reader.read_to_end(&mut buf)?;
-
-    Ok(bincode::deserialize(&buf)?)
 }
 
 impl CentralityStore {
@@ -118,9 +214,7 @@ impl CentralityStore {
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .ok()
                 .unwrap_or_default(),
-            node2id: open_node2id(path.as_ref().join("node2id"))
-                .ok()
-                .unwrap_or_default(),
+            node2id: Node2Id::open(path.as_ref().join("node2id")),
             base_path: path.as_ref().to_str().unwrap().to_string(),
         }
     }
@@ -134,7 +228,7 @@ impl CentralityStore {
             .write(true)
             .create(true)
             .truncate(true)
-            .open(output_path.as_ref().join("harmonic_host.csv"))
+            .open(output_path.as_ref().join("harmonic.csv"))
             .unwrap();
 
         let mut host: Vec<_> = harmonic_centrality.host.into_iter().collect();
@@ -142,7 +236,7 @@ impl CentralityStore {
         let mut wtr = csv::Writer::from_writer(csv_file);
         for (node, centrality) in host {
             let node_id = store.node2id.get(&node).unwrap();
-            store.harmonic.host.insert(*node_id, centrality);
+            store.harmonic.host.insert(node_id, centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
         }
@@ -158,10 +252,7 @@ impl CentralityStore {
     pub fn build_harmonic<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
         let mut store = CentralityStore::open(output_path.as_ref());
 
-        store.node2id = graph
-            .node_ids()
-            .map(|(node, node_id)| (node.clone(), *node_id))
-            .collect();
+        store.node2id.batch_put(graph.node_ids());
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
         Self::store_host(&output_path, &mut store, harmonic_centrality);
 
@@ -189,14 +280,6 @@ impl CentralityStore {
             .unwrap();
 
         trace!("saving node2id");
-        let mut file = BufWriter::new(
-            File::options()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(Path::new(&self.base_path).join("node2id"))
-                .unwrap(),
-        );
-        bincode::serialize_into(&mut file, &self.node2id).unwrap();
+        self.node2id.flush();
     }
 }

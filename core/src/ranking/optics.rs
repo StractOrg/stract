@@ -95,7 +95,6 @@ mod tests {
                 node_id: Some(
                     graph
                         .node2id(&Node::from("https://www.first.com").into_host())
-                        .copied()
                         .unwrap(),
                 ),
             })
@@ -128,7 +127,6 @@ mod tests {
                 node_id: Some(
                     graph
                         .node2id(&Node::from("https://www.second.com").into_host())
-                        .copied()
                         .unwrap(),
                 ),
             })
@@ -159,7 +157,7 @@ mod tests {
 
                 dmoz_description: None,
                 node_id: Some(
-                    *graph
+                    graph
                         .node2id(&Node::from("https://www.third.com").into_host())
                         .unwrap(),
                 ),

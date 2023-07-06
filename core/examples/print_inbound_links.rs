@@ -28,7 +28,7 @@ pub fn main() {
 
         let node = Node::from(host).into_host();
         let node_id = graph.node2id(&node).unwrap();
-        let inbound_vec = inbound.get(node_id).unwrap();
+        let inbound_vec = inbound.get(&node_id).unwrap();
         println!("{:?}", inbound_vec);
 
         for edge in graph.ingoing_edges(node) {

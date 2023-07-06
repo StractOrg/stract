@@ -14,228 +14,135 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::BTreeMap,
-    fs::OpenOptions,
-    io::BufReader,
-    ops::Range,
-    path::{Path, PathBuf},
-};
+use std::path::Path;
 
-use rkyv::{ser::serializers::AllocSerializer, AlignedVec};
-
-type Result<T> = std::result::Result<T, Error>;
-
-const SCRATCH_SIZE: usize = 4096;
-const LOCATIONS_NAME: &str = "locations.bin";
-const MMAP_NAME: &str = "data.bin";
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("key already exists")]
-    KeyExists,
-
-    #[error("io error: {0}")]
-    Io(std::io::Error),
-
-    #[error("bincode error: {0}")]
-    Bincode(bincode::Error),
-}
+use rocksdb::BlockBasedOptions;
 
 pub struct Store<K, V> {
-    locations: BTreeMap<K, Range<usize>>,
-    folder_path: PathBuf,
-    cur_end_range: usize,
-    map: memmap2::MmapMut,
-    has_new_inserts: bool,
-    segment_name: String,
-    _values: std::marker::PhantomData<V>,
+    db: rocksdb::DB,
+    _phantom: std::marker::PhantomData<(K, V)>,
 }
 
 impl<K, V> Store<K, V>
 where
-    K: serde::de::DeserializeOwned + serde::Serialize + Ord,
-    V: rkyv::Archive + 'static,
-    V::Archived: rkyv::Deserialize<V, rkyv::de::deserializers::SharedDeserializeMap> + 'static,
+    K: serde::de::DeserializeOwned + serde::Serialize,
+    V: serde::de::DeserializeOwned + serde::Serialize,
 {
-    pub fn open<P: AsRef<Path>>(folder_path: P, segment_name: &str) -> Result<Self> {
-        if folder_path.as_ref().is_file() {
-            return Err(Error::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("{} is not a directory", folder_path.as_ref().display()),
-            )));
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+        options.increase_parallelism(8);
+        options.set_write_buffer_size(256 * 1024 * 1024); // 256 MB memtable
+        options.set_max_write_buffer_number(8);
+
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_bloom_filter(64.0, true);
+
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
+        block_options.set_block_cache(&cache);
+
+        options.set_block_based_table_factory(&block_options);
+
+        let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
+
+        Self {
+            db,
+            _phantom: std::marker::PhantomData,
         }
-
-        std::fs::create_dir_all(folder_path.as_ref()).map_err(Error::Io)?;
-
-        let locations_path = folder_path
-            .as_ref()
-            .join(format!("{segment_name}-{LOCATIONS_NAME}"));
-        let f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(locations_path)
-            .map_err(Error::Io)?;
-
-        let mut reader = BufReader::new(f);
-        let locations: BTreeMap<K, Range<usize>> =
-            bincode::deserialize_from(&mut reader).unwrap_or_default();
-
-        let cur_end_range = locations.values().map(|range| range.end).max().unwrap_or(0);
-
-        let mmap_path = folder_path
-            .as_ref()
-            .join(format!("{segment_name}-{MMAP_NAME}"));
-        let map = unsafe {
-            let file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(mmap_path)
-                .map_err(Error::Io)?;
-
-            memmap2::MmapOptions::new()
-                .map_mut(&file)
-                .map_err(Error::Io)?
-        };
-
-        Ok(Self {
-            locations,
-            cur_end_range,
-            map,
-            folder_path: folder_path.as_ref().to_path_buf(),
-            has_new_inserts: false,
-            _values: std::marker::PhantomData,
-            segment_name: segment_name.to_string(),
-        })
     }
 
     pub fn get(&self, key: &K) -> Option<V> {
-        let range = self.locations.get(key)?;
-        let bytes = &self.map[range.clone()];
+        let bytes = bincode::serialize(key).unwrap();
 
-        let mut aligned = AlignedVec::with_capacity(bytes.len());
-        aligned.extend_from_slice(bytes);
-
-        // SAFETY:
-        //      We ensure the target `V` is `'static` and contains only owned data so it's safe to
-        //      temporarily extend the lifetime so we can allocate the type entirely.
-        let v = unsafe { rkyv::util::from_bytes_unchecked::<V>(&aligned).unwrap() };
-
-        Some(v)
+        self.db
+            .get(bytes)
+            .unwrap()
+            .map(|bytes| bincode::deserialize(&bytes).unwrap())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&K, V)> + '_ {
-        self.locations.iter().map(move |(key, range)| {
-            let bytes = &self.map[range.clone()];
+    pub fn put(&self, key: &K, value: &V) {
+        let key_bytes = bincode::serialize(key).unwrap();
+        let value_bytes = bincode::serialize(value).unwrap();
 
-            let mut aligned = AlignedVec::with_capacity(bytes.len());
-            aligned.extend_from_slice(bytes);
-
-            // SAFETY:
-            //      We ensure the target `V` is `'static` and contains only owned data so it's safe to
-            //      temporarily extend the lifetime so we can allocate the type entirely.
-            let v = unsafe { rkyv::util::from_bytes_unchecked::<V>(&aligned).unwrap() };
-
-            (key, v)
-        })
+        self.db.put(key_bytes, value_bytes).unwrap();
     }
 
-    pub fn insert(&mut self, key: K, value: &V) -> Result<()>
-    where
-        V: rkyv::Serialize<AllocSerializer<SCRATCH_SIZE>>,
-    {
-        if self.locations.contains_key(&key) {
-            return Err(Error::KeyExists);
+    pub fn batch_put<'a>(&'a self, it: impl Iterator<Item = (&'a K, &'a V)>) {
+        let mut batch = rocksdb::WriteBatch::default();
+
+        for (key, value) in it {
+            let key_bytes = bincode::serialize(&key).unwrap();
+            let value_bytes = bincode::serialize(&value).unwrap();
+
+            batch.put(key_bytes, value_bytes);
         }
 
-        let bytes = rkyv::to_bytes::<_, SCRATCH_SIZE>(value).unwrap();
-        self.insert_raw(key, &bytes[..])
+        self.db.write(batch).unwrap();
     }
 
-    fn insert_raw(&mut self, key: K, bytes: &[u8]) -> Result<()> {
-        let old_end = self.cur_end_range;
+    pub fn contains_key(&self, key: &K) -> bool {
+        let bytes = bincode::serialize(key).unwrap();
 
-        let new_end = bytes.len() + self.cur_end_range;
-
-        if new_end > self.map.len() {
-            self.resize(new_end)?;
-        }
-
-        self.map[old_end..new_end].copy_from_slice(bytes);
-        self.locations.insert(key, old_end..new_end);
-        self.cur_end_range = new_end;
-        self.has_new_inserts = true;
-
-        Ok(())
+        self.db.get(bytes).unwrap().is_some()
     }
 
-    fn resize(&mut self, size: usize) -> Result<()> {
-        if size > self.map.len() {
-            self.flush_map()?;
+    pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
 
-            let file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(
-                    self.folder_path
-                        .join(format!("{}-{MMAP_NAME}", self.segment_name)),
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (key, _) = res.unwrap();
+                bincode::deserialize(&key).unwrap()
+            })
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = V> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
+
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (_, val) = res.unwrap();
+                bincode::deserialize(&val).unwrap()
+            })
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+        let mut read_opts = rocksdb::ReadOptions::default();
+
+        read_opts.set_readahead_size(4_194_304); // 4 MB
+
+        self.db
+            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
+            .map(|res| {
+                let (key, val) = res.unwrap();
+                (
+                    bincode::deserialize(&key).unwrap(),
+                    bincode::deserialize(&val).unwrap(),
                 )
-                .map_err(Error::Io)?;
-
-            file.set_len(size as u64).map_err(Error::Io)?;
-
-            self.map = unsafe {
-                memmap2::MmapOptions::new()
-                    .map_mut(&file)
-                    .map_err(Error::Io)?
-            };
-        }
-
-        Ok(())
+            })
     }
 
-    fn flush_map(&mut self) -> Result<()> {
-        if self.has_new_inserts {
-            self.map.flush().map_err(Error::Io)?;
-        }
-
-        Ok(())
+    pub fn flush(&self) {
+        self.db.flush().unwrap();
     }
 
-    pub fn flush(&mut self) -> Result<()> {
-        if self.has_new_inserts {
-            self.flush_map()?;
-
-            let f = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(
-                    self.folder_path
-                        .join(format!("{}-{}", self.segment_name, LOCATIONS_NAME)),
-                )
-                .map_err(Error::Io)?;
-
-            bincode::serialize_into(f, &self.locations).map_err(Error::Bincode)?;
-        }
-        self.has_new_inserts = false;
-
-        Ok(())
+    pub fn remove(&self, key: &K) {
+        let bytes = bincode::serialize(key).unwrap();
+        self.db.delete(bytes).unwrap();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use rkyv::Archive;
-
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq, Clone, Archive, rkyv::Serialize, rkyv::Deserialize)]
-    #[archive(compare(PartialEq))]
-    #[archive_attr(derive(Debug))]
+    #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
     struct TestStruct {
         a: String,
         b: i32,
@@ -243,8 +150,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut kv =
-            Store::<String, TestStruct>::open(crate::gen_temp_path(), "test-segment").unwrap();
+        let kv = Store::<String, TestStruct>::open(crate::gen_temp_path().join("test-segment"));
 
         assert!(kv.get(&"test".to_string()).is_none());
 
@@ -253,8 +159,8 @@ mod tests {
             b: 5,
         };
 
-        kv.insert("test".to_string(), &test_struct).unwrap();
-        kv.flush().unwrap();
+        kv.put(&"test".to_string(), &test_struct);
+        kv.flush();
 
         let archived = kv.get(&"test".to_string()).unwrap();
         assert_eq!(test_struct, archived);
@@ -270,43 +176,17 @@ mod tests {
         };
 
         {
-            let mut kv = Store::<String, TestStruct>::open(path.clone(), segment_name).unwrap();
+            let kv = Store::<String, TestStruct>::open(path.join(segment_name));
 
             assert!(kv.get(&"test".to_string()).is_none());
 
-            kv.insert("test".to_string(), &test_struct).unwrap();
-            kv.flush().unwrap();
+            kv.put(&"test".to_string(), &test_struct);
+            kv.flush();
         }
 
-        let kv = Store::<String, TestStruct>::open(path, segment_name).unwrap();
+        let kv = Store::<String, TestStruct>::open(path.join(segment_name));
 
         let archived = kv.get(&"test".to_string()).unwrap();
         assert_eq!(test_struct, archived);
-    }
-
-    #[test]
-    fn test_insert_existing_key() {
-        let mut kv =
-            Store::<String, TestStruct>::open(crate::gen_temp_path(), "test-segment").unwrap();
-
-        assert!(kv.get(&"test".to_string()).is_none());
-
-        let test_struct = TestStruct {
-            a: "test".to_string(),
-            b: 5,
-        };
-
-        kv.insert("test".to_string(), &test_struct).unwrap();
-        kv.flush().unwrap();
-
-        let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(test_struct, archived);
-
-        let test_struct = TestStruct {
-            a: "test".to_string(),
-            b: 6,
-        };
-
-        assert!(kv.insert("test".to_string(), &test_struct).is_err());
     }
 }

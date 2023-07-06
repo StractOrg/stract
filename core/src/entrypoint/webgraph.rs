@@ -101,6 +101,10 @@ pub fn process_job(job: &Job) -> webgraph::Webgraph {
                     .filter(|link| link.source.domain() != link.destination.domain())
                     .filter(|link| link.matches_url_regex())
                 {
+                    if link.source.domain() == link.destination.domain() {
+                        continue;
+                    }
+
                     trace!("inserting link {:?}", link);
                     let mut source = Node::from(link.source);
                     source.remove_protocol();

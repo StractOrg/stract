@@ -167,7 +167,7 @@ impl LocalSearcher {
                 .liked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
-                .filter_map(|node| store.node2id.get(&node).copied())
+                .filter_map(|node| store.node2id.get(&node))
                 .collect();
 
             let disliked_sites: Vec<_> = parsed_query
@@ -175,7 +175,7 @@ impl LocalSearcher {
                 .disliked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
-                .filter_map(|node| store.node2id.get(&node).copied())
+                .filter_map(|node| store.node2id.get(&node))
                 .collect();
 
             aggregator.set_inbound_similarity(

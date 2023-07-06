@@ -74,7 +74,7 @@ impl SimilarSitesFinder {
         let nodes: Vec<_> = nodes
             .iter()
             .map(|url| Node::from(url.to_string()).into_host())
-            .filter_map(|node| self.webgraph.node2id(&node).copied())
+            .filter_map(|node| self.webgraph.node2id(&node))
             .collect();
 
         let scorer = self.inbound_similarity.scorer(&nodes, &[]);
@@ -134,7 +134,7 @@ impl SimilarSitesFinder {
         scored_nodes
             .into_iter()
             .map(|ScoredNodeID { node_id, score }| {
-                let node = self.webgraph.id2node(&node_id).unwrap().clone();
+                let node = self.webgraph.id2node(&node_id).unwrap();
                 ScoredNode { node, score }
             })
             .collect()
@@ -142,7 +142,7 @@ impl SimilarSitesFinder {
 
     pub fn knows_about(&self, node: &Node) -> bool {
         match self.webgraph.node2id(node) {
-            Some(node_id) => self.inbound_similarity.knows_about(*node_id),
+            Some(node_id) => self.inbound_similarity.knows_about(node_id),
             None => false,
         }
     }
