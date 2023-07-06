@@ -67,15 +67,13 @@ impl Node {
     pub fn from_url(url: &Url) -> Self {
         Node::from(url.full())
     }
-
-    pub fn remove_protocol(&mut self) {
-        let url = Url::from(self.name.clone());
-        self.name = url.without_protocol().to_string();
-    }
 }
 
 impl From<String> for Node {
     fn from(name: String) -> Self {
+        let url = Url::from(name);
+        let name = url.without_protocol();
+
         Self {
             name: name.to_lowercase(),
         }
@@ -84,15 +82,13 @@ impl From<String> for Node {
 
 impl From<&Url> for Node {
     fn from(url: &Url) -> Self {
-        Self {
-            name: url.without_protocol().to_lowercase(),
-        }
+        url.full().into()
     }
 }
 
 impl From<&str> for Node {
     fn from(name: &str) -> Self {
-        Self::from(name.to_lowercase())
+        name.to_string().into()
     }
 }
 
@@ -782,8 +778,7 @@ mod test {
 
     #[test]
     fn remove_protocol() {
-        let mut n = Node::from("https://www.example.com?test");
-        n.remove_protocol();
+        let n = Node::from("https://www.example.com?test");
 
         assert_eq!(&n.name, "www.example.com?test");
     }

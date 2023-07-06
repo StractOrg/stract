@@ -123,10 +123,8 @@ impl WebgraphWorker {
 
                         trace!("inserting link {:?}", link);
                         let mut source = Node::from(source);
-                        source.remove_protocol();
 
                         let mut destination = Node::from(destination);
-                        destination.remove_protocol();
 
                         if let WebgraphLevel::Host = job.level {
                             source = source.into_host();

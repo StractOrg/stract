@@ -90,7 +90,7 @@ pub struct IndexingLocalConfig {
     skip_warc_files: Option<usize>,
     warc_source: WarcSource,
     batch_size: Option<usize>,
-    webgraph_path: Option<String>,
+    page_webgraph_path: Option<String>,
     output_path: Option<String>,
     host_centrality_threshold: Option<f64>,
     topics_path: Option<String>,
