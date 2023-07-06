@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, BinaryHeap, HashMap, VecDeque},
     hash::Hash,
     num::NonZeroUsize,
@@ -579,6 +580,20 @@ impl CrawlDb {
                 let state = urls.get_mut(id).unwrap();
                 state.status = UrlStatus::Crawling;
             }
+
+            let domain_state = self.domain_state.get_mut(domain_id).unwrap();
+
+            domain_state.weight = urls
+                .iter()
+                .filter_map(|(_, state)| {
+                    if state.status == UrlStatus::Pending {
+                        Some(state.weight)
+                    } else {
+                        None
+                    }
+                })
+                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                .unwrap_or(0.0);
 
             let mut job = Job {
                 domain: self.domain_ids.value(domain_id.0)?.unwrap(),
