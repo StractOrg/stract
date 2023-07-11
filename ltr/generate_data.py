@@ -24,7 +24,9 @@ if not os.path.exists("data/rwkv_model.pth"):
 
 if not os.path.exists("data/rwkv_tokenizer.json"):
     urllib.request.urlretrieve(
-        "https://raw.githubusercontent.com/BlinkDL/ChatRWKV/main/v2/20B_tokenizer.json", "data/rwkv_tokenizer.json")
+        "https://raw.githubusercontent.com/BlinkDL/ChatRWKV/main/v2/20B_tokenizer.json",
+        "data/rwkv_tokenizer.json",
+    )
 
 torch.set_num_threads(12)
 model = RWKV(
@@ -41,25 +43,40 @@ def search(q: str, top_n, optic=None):
 
     url = f"http://{STRACT_ENDPOINT}/beta/api/search"
     r = requests.post(
-        url, json={"query": q, "page": 0, "num_results": top_n, "return_ranking_signals": True, "optic": optic})
-    search_result = r.json()['webpages']
+        url,
+        json={
+            "query": q,
+            "page": 0,
+            "num_results": top_n,
+            "return_ranking_signals": True,
+            "optic": optic,
+        },
+    )
+    search_result = r.json()["webpages"]
     res = []
 
     for r in search_result:
-        if 'Normal' not in r['snippet']:
+        if "Normal" not in r["snippet"]:
             continue
 
-        snip = r['snippet']['Normal']['text']
+        snip = r["snippet"]["Normal"]["text"]
         snip = snip.replace("<b>", "").replace("</b>", "")
-        res.append({"domain": r['domain'], "title": r['title'], "url": r['url'], "ranking_signals": r['ranking_signals'],
-                    "snippet": snip, "body": r["body"]})
+        res.append(
+            {
+                "domain": r["domain"],
+                "title": r["title"],
+                "url": r["url"],
+                "ranking_signals": r["ranking_signals"],
+                "snippet": snip,
+                "body": r["body"],
+            }
+        )
 
     return res
 
 
 def score_prompt(query: str, res):
-    r = {k: v for (k, v) in res.items()
-         if k in ['domain', 'title', 'snippet']}
+    r = {k: v for (k, v) in res.items() if k in ["domain", "title", "snippet"]}
     # r['domain_score'] = '{:f}'.format(
     #     res['ranking_signals']['host_centrality'])
     encoded = json.dumps(r)
@@ -130,17 +147,19 @@ def run_model(prompt: str) -> str:
         alpha_frequency=0.4,
         alpha_presence=0.4,
         token_ban=[],  # ban the generation of some tokens
-        token_stop=[0])  # stop generation whenever you see any token here
+        token_stop=[0],
+    )  # stop generation whenever you see any token here
 
     for i in range(max_token_count):
-        out, state = model.forward(pipeline.encode(
-            prompt) if i == 0 else [token], state)
+        out, state = model.forward(
+            pipeline.encode(prompt) if i == 0 else [token], state
+        )
         for n in occurrence:
-            out[n] -= (args.alpha_presence + occurrence[n]
-                       * args.alpha_frequency)
+            out[n] -= args.alpha_presence + occurrence[n] * args.alpha_frequency
 
         token = pipeline.sample_logits(
-            out, temperature=args.temperature, top_p=args.top_p)
+            out, temperature=args.temperature, top_p=args.top_p
+        )
         if token in args.token_stop:
             break
         all_tokens += [token]
@@ -149,7 +168,7 @@ def run_model(prompt: str) -> str:
         else:
             occurrence[token] += 1
 
-    output = pipeline.decode(all_tokens).split('\n')[0].strip()
+    output = pipeline.decode(all_tokens).split("\n")[0].strip()
     print("START OF OUTPUT")
     print(output)
     print("END OF OUTPUT")
@@ -166,8 +185,8 @@ def score(query, results):
 
 
 def query_prompt(res):
-    r = {k: v for (k, v) in res.items() if k in ['domain', 'title', 'body']}
-    r['body'] = ' '.join(r['body'].split(' ')[:200])[:1000]
+    r = {k: v for (k, v) in res.items() if k in ["domain", "title", "body"]}
+    r["body"] = " ".join(r["body"].split(" ")[:200])[:1000]
 
     inst = "Generate a keyword based search query such that the following result would be considered a good result. The query should be at most 4 keywords long. You should only output a single query and nothing else"
 
@@ -203,15 +222,16 @@ query:"""
 
 def good_query(res):
     p = query_prompt(res)
-    return run_model(p).replace('"', '').lower().split(",")[0]
+    return run_model(p).replace('"', "").lower().split(",")[0]
 
 
 queries = requests.get(
-    "https://s3.trystract.com/public/queries_us_big.csv").text.splitlines()
+    "http://s3.trystract.com/public/queries_us_big.csv"
+).text.splitlines()
 random.shuffle(queries)
 
 ranking_signals = {}
-scores = {'query': [], 'url': [], 'score': []}
+scores = {"query": [], "url": [], "score": []}
 
 queries_taken = 0
 
@@ -236,30 +256,30 @@ with tqdm(total=NUM_QUERIES) as pbar:
                 if s is None:
                     continue
 
-                url = res[i]['url']
-                signals = res[i]['ranking_signals']
+                url = res[i]["url"]
+                signals = res[i]["ranking_signals"]
 
-                scores['query'].append(query)
-                scores['url'].append(url)
-                scores['score'].append(s)
+                scores["query"].append(query)
+                scores["url"].append(url)
+                scores["score"].append(s)
                 ranking_signals[url] = signals
         except Exception as e:
-            print('Error', e)
+            print("Error", e)
             continue
 
         queries_taken += 1
         pbar.update(1)
 
 df = pd.DataFrame(scores)
-df = df.groupby(['query', 'url'])
-df = df.mean().sort_values(by='score', ascending=False).reset_index()
-df['rank'] = df.groupby('query')['score'].rank(ascending=False)
-df['ranking_signals'] = df['url'].map(ranking_signals)
+df = df.groupby(["query", "url"])
+df = df.mean().sort_values(by="score", ascending=False).reset_index()
+df["rank"] = df.groupby("query")["score"].rank(ascending=False)
+df["ranking_signals"] = df["url"].map(ranking_signals)
 
 # convert to object
-res = json.loads(df.to_json(orient='records'))
+res = json.loads(df.to_json(orient="records"))
 
 
 # save res in ltr_scores.json prettified
-with open('ltr_scores.json', 'w') as f:
+with open("ltr_scores.json", "w") as f:
     json.dump(res, f, indent=2)
