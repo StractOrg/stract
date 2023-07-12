@@ -237,4 +237,86 @@ mod tests {
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.example.com");
     }
+
+    #[test]
+    fn bm25_all_docs() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    {CONTENT} {}
+                </body>
+            </html>
+            "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.first.com",
+            ))
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    {CONTENT} {}
+                </body>
+            </html>
+            "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.second.com",
+            ))
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage::new(
+                &format!(
+                    r#"
+            <html>
+                <head>
+                    <title>Test website</title>
+                </head>
+                <body>
+                    {CONTENT} {}
+                </body>
+            </html>
+            "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.third.com",
+            ))
+            .expect("failed to insert webpage");
+
+        index.commit().unwrap();
+
+        let searcher = LocalSearcher::from(index);
+        let res = searcher
+            .search(&SearchQuery {
+                query: "test".to_string(),
+                return_ranking_signals: true,
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert!(res
+            .webpages
+            .iter()
+            .map(|d| d
+                .ranking_signals
+                .as_ref()
+                .unwrap()
+                .get(&crate::ranking::Signal::Bm25)
+                .unwrap())
+            .all(|&v| v > 0.0));
+    }
 }

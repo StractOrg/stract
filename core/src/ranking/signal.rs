@@ -503,6 +503,26 @@ impl Signal {
                 let region = Region::guess_from(webpage).unwrap_or(Region::All);
                 Some(score_region(region, signal_aggregator))
             }
+            Signal::UrlDigits => {
+                let num_digits = webpage
+                    .html
+                    .url()
+                    .path_and_query()
+                    .chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .count() as f64;
+                Some(score_digits(num_digits))
+            }
+            Signal::UrlSlashes => {
+                let num_slashes = webpage
+                    .html
+                    .url()
+                    .path_and_query()
+                    .chars()
+                    .filter(|c| c == &'/')
+                    .count() as f64;
+                Some(score_slashes(num_slashes))
+            }
             Signal::Bm25
             | Signal::Bm25Title
             | Signal::Bm25TitleBigrams
@@ -528,8 +548,6 @@ impl Signal {
             | Signal::ProximitySlop2
             | Signal::ProximitySlop4
             | Signal::ProximitySlop8
-            | Signal::UrlDigits
-            | Signal::UrlSlashes
             | Signal::CrossEncoder
             | Signal::InboundSimilarity
             | Signal::LambdaMART
