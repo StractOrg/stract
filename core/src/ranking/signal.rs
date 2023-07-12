@@ -129,6 +129,10 @@ pub enum Signal {
     LambdaMART,
     #[serde(rename = "linear_regression")]
     LinearRegression,
+    #[serde(rename = "url_digits")]
+    UrlDigits,
+    #[serde(rename = "url_slashes")]
+    UrlSlashes,
 }
 
 impl From<Signal> for usize {
@@ -137,7 +141,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 36] = [
+pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -174,6 +178,8 @@ pub const ALL_SIGNALS: [Signal; 36] = [
     Signal::QueryCentrality,
     Signal::InboundSimilarity,
     Signal::LambdaMART,
+    Signal::UrlDigits,
+    Signal::UrlSlashes,
 ];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
@@ -193,6 +199,31 @@ fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f6
 
 fn score_trackers(num_trackers: f64) -> f64 {
     1.0 / (num_trackers + 1.0)
+}
+
+fn score_digits(num_digits: f64) -> f64 {
+    1.0 / (num_digits + 1.0)
+}
+
+fn score_slashes(num_slashes: f64) -> f64 {
+    1.0 / (num_slashes + 1.0)
+}
+
+fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
+    match aggregator.region_count.as_ref() {
+        Some(region_count) => {
+            let boost = aggregator.selected_region.map_or(0.0, |region| {
+                if region == webpage_region {
+                    50.0
+                } else {
+                    0.0
+                }
+            });
+
+            boost + region_count.score(&webpage_region)
+        }
+        None => 0.0,
+    }
 }
 
 fn bm25(field: &mut TextFieldData, doc: DocId) -> f64 {
@@ -236,7 +267,7 @@ impl Signal {
             Signal::Bm25DomainIfHomepage => 0.0,
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0,
             Signal::Bm25TitleIfHomepage => 0.0,
-            Signal::Bm25BacklinkText => 0.0,
+            Signal::Bm25BacklinkText => 0.001,
             Signal::Bm25Description => 5.99679347128802e-05,
             Signal::ProximitySlop0 => 0.0,
             Signal::ProximitySlop1 => 0.0,
@@ -244,17 +275,19 @@ impl Signal {
             Signal::ProximitySlop4 => 0.0,
             Signal::ProximitySlop8 => 0.003435930677879231,
             Signal::CrossEncoder => 0.16801589371906178,
-            Signal::HostCentrality => 15.233546236366237,
-            Signal::PageCentrality => 0.0,
+            Signal::HostCentrality => 1.0,
+            Signal::PageCentrality => 2.0,
             Signal::QueryCentrality => 0.0,
             Signal::IsHomepage => 0.0,
-            Signal::FetchTimeMs => 0.0,
-            Signal::UpdateTimestamp => 0.0,
+            Signal::FetchTimeMs => 0.001,
+            Signal::UpdateTimestamp => 0.001,
             Signal::TrackerScore => 0.019542120533715634,
             Signal::Region => 0.06437975586036043,
             Signal::InboundSimilarity => 10.0,
             Signal::LambdaMART => 10.0,
             Signal::LinearRegression => 1.0,
+            Signal::UrlSlashes => 0.01,
+            Signal::UrlDigits => 0.01,
         }
     }
 
@@ -334,6 +367,20 @@ impl Signal {
                     .and_then(|val| val.into());
 
                 field_value.map(|num_trackers| score_trackers(num_trackers as f64))
+            }
+            Signal::UrlDigits => {
+                let field_value: Option<u64> = self
+                    .fastfield_value(signal_aggregator, doc)
+                    .and_then(|val| val.into());
+
+                field_value.map(|num_digits| score_digits(num_digits as f64))
+            }
+            Signal::UrlSlashes => {
+                let field_value: Option<u64> = self
+                    .fastfield_value(signal_aggregator, doc)
+                    .and_then(|val| val.into());
+
+                field_value.map(|num_slashes| score_slashes(num_slashes as f64))
             }
             Signal::Region => {
                 let field_value: Option<u64> = self
@@ -481,6 +528,8 @@ impl Signal {
             | Signal::ProximitySlop2
             | Signal::ProximitySlop4
             | Signal::ProximitySlop8
+            | Signal::UrlDigits
+            | Signal::UrlSlashes
             | Signal::CrossEncoder
             | Signal::InboundSimilarity
             | Signal::LambdaMART
@@ -518,6 +567,8 @@ impl Signal {
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),
             Signal::TrackerScore => Some(FastField::TrackerScore),
             Signal::Region => Some(FastField::Region),
+            Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
+            Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
             _ => None,
         }
     }
@@ -557,23 +608,6 @@ impl FromStr for Signal {
         let s = "\"".to_string() + name + "\"";
         let signal = serde_json::from_str(&s)?;
         Ok(signal)
-    }
-}
-
-fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
-    match aggregator.region_count.as_ref() {
-        Some(region_count) => {
-            let boost = aggregator.selected_region.map_or(0.0, |region| {
-                if region == webpage_region {
-                    50.0
-                } else {
-                    0.0
-                }
-            });
-
-            boost + region_count.score(&webpage_region)
-        }
-        None => 0.0,
     }
 }
 

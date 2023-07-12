@@ -291,6 +291,13 @@ impl Url {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    pub fn path_and_query(&self) -> &str {
+        let without_prot = self.without_protocol();
+        without_prot
+            .find('/')
+            .map_or("", |idx| without_prot.get(idx..).map_or("", |path| path))
+    }
 }
 
 #[cfg(test)]
@@ -463,5 +470,23 @@ mod tests {
 
         let url: Url = "https://test.example.com/test.png".to_string().into();
         assert!(url.path_ends_with(".png"));
+    }
+
+    #[test]
+    fn path_and_query() {
+        let url: Url = "https://example.com".to_string().into();
+        assert!(url.path_and_query().is_empty());
+
+        let url: Url = "https://example.com/".to_string().into();
+        assert!(url.path_and_query().is_empty());
+
+        let url: Url = "https://example.com/test".to_string().into();
+        assert_eq!(url.path_and_query(), "/test");
+
+        let url: Url = "https://example.com/test?a=b".to_string().into();
+        assert_eq!(url.path_and_query(), "/test?a=b");
+
+        let url: Url = "example.com/test?a=b".to_string().into();
+        assert_eq!(url.path_and_query(), "/test?a=b");
     }
 }

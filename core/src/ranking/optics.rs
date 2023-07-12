@@ -64,6 +64,16 @@ mod tests {
             Node::from("https://www.third.com").into_host(),
             String::new(),
         );
+        graph.insert(
+            Node::from("https://www.extra.com").into_host(),
+            Node::from("https://www.first.com").into_host(),
+            String::new(),
+        );
+        graph.insert(
+            Node::from("https://www.second.com").into_host(),
+            Node::from("https://www.extra.com").into_host(),
+            String::new(),
+        );
 
         graph.commit();
 

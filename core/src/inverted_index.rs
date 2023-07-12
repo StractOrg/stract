@@ -235,7 +235,13 @@ impl InvertedIndex {
         let mut top_websites = Vec::new();
 
         let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
-        pointers.sort_by(|a, b| a.1.address.segment.cmp(&b.1.address.segment));
+        pointers.sort_by(|a, b| {
+            a.1.address
+                .segment
+                .cmp(&b.1.address.segment)
+                .then_with(|| a.1.address.doc_id.cmp(&b.1.address.doc_id))
+        });
+
         let mut prev_segment = None;
         for (orig_index, pointer) in pointers {
             let update_segment = match prev_segment {

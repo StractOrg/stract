@@ -135,7 +135,7 @@ mod tests {
     use crate::{
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::{Html, Webpage},
+        webpage::{Html, Webpage, Link},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
@@ -216,253 +216,153 @@ mod tests {
         assert_eq!(result.webpages[1].url, "https://www.a.com");
     }
 
-    // #[test]
-    // fn page_centrality_ranking() {
-    //     let mut index = Index::temporary().expect("Unable to open index");
+    #[test]
+    fn page_centrality_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
 
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Website A</title>
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT} {}
-    //                         example example example
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.a.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.0,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Website B</title>
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT} {}
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.b.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.0,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 5.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website A</title>
+                        </head>
+                        <body>
+                            {CONTENT} {}
+                            example example example
+                        </body>
+                    </html>
+                "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.a.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Website B</title>
+                        </head>
+                        <body>
+                            {CONTENT} {}
+                        </body>
+                    </html>
+                "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.b.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 5.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
 
-    //     index.commit().expect("failed to commit index");
-    //     let searcher = LocalSearcher::from(index);
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "example".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
-    //     assert_eq!(result.webpages.len(), 2);
-    //     assert_eq!(result.webpages[0].url, "https://www.b.com");
-    //     assert_eq!(result.webpages[1].url, "https://www.a.com");
-    // }
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+        let result = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                ..Default::default()
+            })
+            .expect("Search failed");
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.b.com");
+        assert_eq!(result.webpages[1].url, "https://www.a.com");
+    }
 
-    // #[test]
-    // fn navigational_search() {
-    //     let mut index = Index::temporary().expect("Unable to open index");
+    #[test]
+    fn freshness_ranking() {
+        let mut index = Index::temporary().expect("Unable to open index");
 
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>DR Homepage</title>
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT} {}
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.dr.dk",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.0,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Subsite dr</title>
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT} {}
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.dr.dk/whatever",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.0,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Website B</title>
-    //                     </head>
-    //                     dr and some other text {CONTENT} dk {}
-    //                 </html>
-    //             "#,
-    //                     crate::rand_words(100)
-    //                 ),
-    //                 "https://www.b.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.003,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Title</title>
+                            <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.old.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 499,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                    <html>
+                        <head>
+                            <title>Title</title>
+                            <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
+                        </head>
+                        <body>
+                            {CONTENT}
+                        </body>
+                    </html>
+                "#
+                    ),
+                    "https://www.new.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                page_centrality: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
 
-    //     index.commit().expect("failed to commit index");
-    //     let searcher = LocalSearcher::from(index);
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "dr dk".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+        let result = searcher
+            .search(&SearchQuery {
+                query: "title".to_string(),
+                ..Default::default()
+            })
+            .expect("Search failed");
 
-    //     assert_eq!(result.webpages.len(), 3);
-    //     assert_eq!(result.webpages[0].url, "https://www.dr.dk");
-    // }
-
-    // #[test]
-    // fn freshness_ranking() {
-    //     let mut index = Index::temporary().expect("Unable to open index");
-
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Title</title>
-    //                         <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT}
-    //                     </body>
-    //                 </html>
-    //             "#
-    //                 ),
-    //                 "https://www.old.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.0091,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 &format!(
-    //                     r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Title</title>
-    //                         <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
-    //                     </head>
-    //                     <body>
-    //                         {CONTENT}
-    //                     </body>
-    //                 </html>
-    //             "#
-    //                 ),
-    //                 "https://www.new.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.009,
-    //             fetch_time_ms: 500,
-    //             pre_computed_score: 0.0,
-    //             page_centrality: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-
-    //     index.commit().expect("failed to commit index");
-    //     let searcher = LocalSearcher::from(index);
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "title".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
-
-    //     assert_eq!(result.webpages[0].url, "https://www.new.com");
-    // }
+        assert_eq!(result.webpages[0].url, "https://www.new.com");
+    }
 
     #[test]
     fn derank_trackers() {
@@ -544,77 +444,77 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com");
     }
 
-    // #[test]
-    // fn backlink_text() {
-    //     let mut index = Index::temporary().expect("Unable to open index");
+    #[test]
+    fn backlink_text() {
+        let mut index = Index::temporary().expect("Unable to open index");
 
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Test site</title>
-    //                     </head>
-    //                     <body>
-    //                         test
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                 "https://www.first.com",
-    //             ),
-    //             backlinks: vec![Link {
-    //                 source: "https://www.second.com".to_string().into(),
-    //                 destination: "https://www.first.com".to_string().into(),
-    //                 text: "test this is the best test site".to_string(),
-    //             }],
-    //             host_centrality: 0.0,
-    //             fetch_time_ms: 500,
-    //             page_centrality: 0.0,
-    //             pre_computed_score: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
-    //     index
-    //         .insert(Webpage {
-    //             html: Html::parse(
-    //                 r#"
-    //                 <html>
-    //                     <head>
-    //                         <title>Second test site</title>
-    //                     </head>
-    //                     <body>
-    //                         test test test test test test test
-    //                     </body>
-    //                 </html>
-    //             "#,
-    //                 "https://www.second.com",
-    //             ),
-    //             backlinks: vec![],
-    //             host_centrality: 0.00003,
-    //             fetch_time_ms: 500,
-    //             pre_computed_score: 0.0,
-    //             page_centrality: 0.0,
-    //             
-    //             node_id: None,
-    //             dmoz_description: None,
-    //         })
-    //         .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Test site</title>
+                        </head>
+                        <body>
+                            test
+                        </body>
+                    </html>
+                "#,
+                    "https://www.first.com",
+                ),
+                backlinks: vec![Link {
+                    source: "https://www.second.com".to_string().into(),
+                    destination: "https://www.first.com".to_string().into(),
+                    text: "test this is the best test site".to_string(),
+                }],
+                host_centrality: 0.0,
+                fetch_time_ms: 500,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    r#"
+                    <html>
+                        <head>
+                            <title>Second test site</title>
+                        </head>
+                        <body>
+                            test test test test test test test
+                        </body>
+                    </html>
+                "#,
+                    "https://www.second.com",
+                ),
+                backlinks: vec![],
+                host_centrality: 0.00003,
+                fetch_time_ms: 500,
+                pre_computed_score: 0.0,
+                page_centrality: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
 
-    //     index.commit().expect("failed to commit index");
-    //     let searcher = LocalSearcher::from(index);
-    //     let result = searcher
-    //         .search(&SearchQuery {
-    //             query: "test".to_string(),
-    //             ..Default::default()
-    //         })
-    //         .expect("Search failed");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            })
+            .expect("Search failed");
 
-    //     assert_eq!(result.webpages.len(), 2);
-    //     assert_eq!(result.webpages[0].url, "https://www.first.com");
-    // }
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.first.com");
+    }
 
     #[test]
     fn custom_signal_aggregation() {
@@ -931,5 +831,111 @@ mod tests {
         assert_eq!(result.webpages.len(), 2);
         assert_eq!(result.webpages[0].url, "https://www.first.com");
         assert_eq!(result.webpages[1].url, "https://www.second.com");
+    }
+
+    
+    #[test]
+    fn num_slashes_and_digits() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.first.com/one",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 2,
+                pre_computed_score: 0.0,
+                page_centrality: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.second.com/one/two",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 1,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index
+            .insert(Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.third.com/one/two123",
+                ),
+                backlinks: vec![],
+                host_centrality: 1.0,
+                fetch_time_ms: 0,
+                page_centrality: 0.0,
+                pre_computed_score: 0.0,
+                
+                node_id: None,
+                dmoz_description: None,
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::new(index);
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.num_hits, 3);
+        assert_eq!(result.webpages.len(), 3);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/one");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/one/two");
+        assert_eq!(result.webpages[2].url, "https://www.third.com/one/two123");
     }
 }

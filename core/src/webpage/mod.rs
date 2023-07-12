@@ -913,6 +913,24 @@ impl Html {
                     };
                     doc.add_u64(tantivy_field, hash);
                 }
+                Field::Fast(FastField::NumPathAndQuerySlashes) => {
+                    let num_slashes = self
+                        .url()
+                        .path_and_query()
+                        .chars()
+                        .filter(|c| *c == '/')
+                        .count();
+                    doc.add_u64(tantivy_field, num_slashes as u64);
+                }
+                Field::Fast(FastField::NumPathAndQueryDigits) => {
+                    let num_digits = self
+                        .url()
+                        .path_and_query()
+                        .chars()
+                        .filter(|c| c.is_ascii_digit())
+                        .count();
+                    doc.add_u64(tantivy_field, num_digits as u64);
+                }
                 Field::Text(TextField::BacklinkText)
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::PageCentrality)
