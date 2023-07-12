@@ -266,7 +266,7 @@ mod tests {
                     r#"
             <html>
                 <head>
-                    <title>Test website</title>
+                    <title>Test test website</title>
                 </head>
                 <body>
                     {CONTENT} {}
@@ -284,7 +284,7 @@ mod tests {
                     r#"
             <html>
                 <head>
-                    <title>Test website</title>
+                    <title>Test test test website</title>
                 </head>
                 <body>
                     {CONTENT} {}
