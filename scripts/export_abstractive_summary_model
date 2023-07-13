@@ -3,8 +3,13 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import urllib.request
 import torch
 import os
+import sys
 
-os.makedirs("data/summarizer/abstractive", exist_ok=True)
+if os.path.exists("data/summarizer/abstractive"):
+    print("data/summarizer/abstractive already exists. Exiting...")
+    sys.exit()
+
+os.makedirs("data/summarizer/abstractive")
 
 MODEL = "lidiya/bart-large-xsum-samsum"
 

@@ -2,8 +2,13 @@
 import os
 import transformers
 import torch
+import sys
 
 MODEL = "Dzeniks/roberta-fact-check"
+
+if os.path.exists("data/fact_model/"):
+    print("data/fact_model/ already exists. Exiting...")
+    sys.exit()
 
 os.system("mkdir data/fact_model")
 

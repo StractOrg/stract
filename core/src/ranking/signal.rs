@@ -997,6 +997,13 @@ impl SignalAggregator {
             .unwrap_or_default()
     }
 
+    /// Computes the scored signals for a given document.
+    ///
+    /// Important: This function assues that the docs a scored in ascending order of docid
+    /// within their segment. If this invariant is not upheld, the documents will not have
+    /// scores calculated for their text related signals. The wrong ranking will most likely
+    /// be returned.
+    /// This function also assumes that the segment reader has been set.
     pub fn compute_signals(
         &mut self,
         doc: DocId,

@@ -39,7 +39,7 @@ use super::{
 
 const MIN_CRAWL_DELAY_MS: u64 = 200;
 const MAX_CRAWL_DELAY_MS: u64 = 30_000;
-const MAX_POLITENESS_FACTOR: f32 = 128.0;
+const MAX_POLITENESS_FACTOR: f32 = 1024.0;
 const MIN_POLITENESS_FACTOR: f32 = 1.0;
 
 pub struct Worker {

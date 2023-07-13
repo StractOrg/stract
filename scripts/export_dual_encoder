@@ -3,6 +3,7 @@ import os
 import transformers
 import torch
 import torch.nn.functional as F
+import sys
 
 # MODEL = "nreimers/MiniLM-L6-H384-uncased"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -14,6 +15,10 @@ The majority of the forest is contained within Brazil, with 60% of the rainfores
 minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain 
 "Amazonas" in their names. The Amazon represents over half of the planet's remaining rainforests, and comprises the largest and most biodiverse tract 
 of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."""
+
+if os.path.exists("data/summarizer/dual_encoder/"):
+    print("data/summarizer/dual_encoder/ already exists. Exiting...")
+    sys.exit()
 
 os.system("mkdir data/summarizer/dual_encoder")
 

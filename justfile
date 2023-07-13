@@ -24,8 +24,7 @@
     just cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:
-    rm -rf .venv
-    python3 -m venv .venv
+    python3 -m venv .venv || true
     .venv/bin/pip install -r scripts/requirements.txt
 
 @download_libtorch *ARGS:
