@@ -44,13 +44,19 @@ pub const ALL_REGIONS: [Region; 6] = [
 
 impl Region {
     pub fn name(&self) -> String {
+        // TODO: Translate these strings.
+
+        // The names are used in the UI. In the future we should
+        // actually use region, but right now we only detect region
+        // from the language of the page, so it makes more sense to
+        // just use the language name.
         match self {
-            Region::All => "All Regions".to_string(),
-            Region::Denmark => "Denmark".to_string(),
-            Region::France => "France".to_string(),
-            Region::Germany => "Germany".to_string(),
-            Region::Spain => "Spain".to_string(),
-            Region::US => "United States".to_string(),
+            Region::All => "All Languages".to_string(),
+            Region::Denmark => "Danish".to_string(),
+            Region::France => "French".to_string(),
+            Region::Germany => "German".to_string(),
+            Region::Spain => "Spainish".to_string(),
+            Region::US => "English".to_string(),
         }
     }
 
