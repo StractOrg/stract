@@ -168,7 +168,7 @@ impl ScyllaConn {
 
         session
             .query(
-                "CREATE TABLE IF NOT EXISTS ks.chats (id uuid, json_encoded text, date date, primary key (qid))",
+                "CREATE TABLE IF NOT EXISTS ks.chats (id uuid, json_encoded text, date date, primary key (id))",
                 &[],
             )
             .await?;
