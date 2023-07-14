@@ -121,13 +121,30 @@ pub struct JobResponse {
     pub discovered_urls: Vec<Url>,
 }
 
+struct RetrieableUrl {
+    url: Url,
+    retries: u8,
+}
+
+impl From<Url> for RetrieableUrl {
+    fn from(url: Url) -> Self {
+        Self { url, retries: 0 }
+    }
+}
+
 struct WorkerJob {
-    job: Job,
+    pub domain: Domain,
+    pub fetch_sitemap: bool,
+    pub urls: VecDeque<RetrieableUrl>,
 }
 
 impl From<Job> for WorkerJob {
     fn from(value: Job) -> Self {
-        Self { job: value }
+        Self {
+            domain: value.domain,
+            fetch_sitemap: value.fetch_sitemap,
+            urls: value.urls.into_iter().map(RetrieableUrl::from).collect(),
+        }
     }
 }
 

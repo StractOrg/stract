@@ -41,6 +41,7 @@ const MIN_CRAWL_DELAY_MS: u64 = 200;
 const MAX_CRAWL_DELAY_MS: u64 = 30_000;
 const MAX_POLITENESS_FACTOR: f32 = 1024.0;
 const MIN_POLITENESS_FACTOR: f32 = 1.0;
+const MAX_URL_SLOWDOWN_RETRY: u8 = 3;
 
 pub struct Worker {
     current_job: Option<WorkerJob>,
@@ -160,41 +161,42 @@ impl Worker {
     async fn process_job(&mut self) {
         self.politeness_factor = self.default_politeness_factor;
 
-        let job = self.current_job.take().unwrap();
-        tracing::info!("Processing job: {:?}", job.job.domain);
+        let mut job = self.current_job.take().unwrap();
+        tracing::info!("Processing job: {:?}", job.domain);
 
         let mut url_responses: Vec<UrlResponse> = Vec::new();
         let mut discovered_urls: HashSet<Url> = HashSet::new();
 
         let mut crawled_sitemaps: HashSet<Site> = HashSet::new();
 
-        for url in job.job.urls {
-            if url.is_empty() || url.site().is_empty() {
+        while let Some(retryable_url) = job.urls.pop_front() {
+            if retryable_url.retries > MAX_URL_SLOWDOWN_RETRY {
+                continue;
+            }
+
+            if retryable_url.url.is_empty() || retryable_url.url.site().is_empty() {
                 continue;
             }
 
             if !self
                 .robotstxt
-                .is_allowed(&url, &self.user_agent.token)
+                .is_allowed(&retryable_url.url, &self.user_agent.token)
                 .await
             {
                 continue;
             }
 
-            let site = Site(url.site().to_string());
-            if job.job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
+            let site = Site(retryable_url.url.site().to_string());
+            if job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
                 crawled_sitemaps.insert(site.clone());
 
-                if let Ok(Some(sitemap)) = self.robotstxt.sitemap(&url).await {
+                if let Ok(Some(sitemap)) = self.robotstxt.sitemap(&retryable_url.url).await {
                     let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
                     discovered_urls.extend(sitemap_urls.into_iter());
                 }
             }
 
-            let res = self.process_url(url).await;
-
-            discovered_urls.extend(res.new_urls.into_iter());
-            url_responses.push(res.response);
+            let res = self.process_url(retryable_url.url.clone()).await;
 
             let mut delay = res.fetch_time.mul_f32(self.politeness_factor);
 
@@ -207,11 +209,27 @@ impl Worker {
             }
 
             tokio::time::sleep(delay).await;
+
+            if let UrlResponse::Failed {
+                url: _,
+                status_code,
+            } = res.response
+            {
+                if matches!(status_code, Some(429)) {
+                    let mut retryable_url = retryable_url;
+                    retryable_url.retries += 1;
+                    job.urls.push_back(retryable_url);
+                    continue;
+                }
+            }
+
+            discovered_urls.extend(res.new_urls.into_iter());
+            url_responses.push(res.response);
         }
 
         // send response to coordinator
         let job_response = JobResponse {
-            domain: job.job.domain,
+            domain: job.domain,
             url_responses,
             discovered_urls: discovered_urls.into_iter().collect(),
         };
