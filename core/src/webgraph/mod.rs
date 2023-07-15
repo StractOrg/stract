@@ -57,32 +57,27 @@ impl Node {
     pub fn into_host(self) -> Node {
         let url = Url::from(self.name);
 
-        let host = url.host_without_specific_subdomains_and_query();
+        let host = url.host_without_www();
 
         Node {
-            name: host.to_lowercase(),
+            name: host.to_string(),
         }
-    }
-
-    pub fn from_url(url: &Url) -> Self {
-        Node::from(url.full())
     }
 }
 
 impl From<String> for Node {
     fn from(name: String) -> Self {
         let url = Url::from(name);
-        let name = url.without_protocol();
-
-        Self {
-            name: name.to_lowercase(),
-        }
+        url.into()
     }
 }
 
 impl From<&Url> for Node {
     fn from(url: &Url) -> Self {
-        url.full().into()
+        let normalized = url.normalize();
+        Node {
+            name: normalized.into(),
+        }
     }
 }
 
@@ -780,7 +775,7 @@ mod test {
     fn remove_protocol() {
         let n = Node::from("https://www.example.com?test");
 
-        assert_eq!(&n.name, "www.example.com?test");
+        assert_eq!(&n.name, "example.com?test");
     }
 
     #[test]

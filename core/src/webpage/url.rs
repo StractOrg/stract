@@ -55,7 +55,23 @@ impl From<&str> for Url {
     }
 }
 
+impl From<Url> for String {
+    fn from(value: Url) -> Self {
+        value.0
+    }
+}
+
 impl Url {
+    pub fn normalize(&self) -> Self {
+        let res: Url = self.strip_protocol().to_lowercase().into();
+
+        if let Some(stripped) = res.0.strip_prefix("www.") {
+            Url(stripped.to_string())
+        } else {
+            res
+        }
+    }
+
     pub fn strip_protocol(&self) -> &str {
         let mut start_host = 0;
         let url = &self.0;
@@ -87,7 +103,13 @@ impl Url {
             end_site = url.find('/').expect("The url contains atleast 1 '/'");
         }
 
-        &url[..end_site]
+        let res = &url[..end_site];
+
+        if let Some(query_begin) = res.find('?') {
+            &res[..query_begin]
+        } else {
+            res
+        }
     }
 
     pub fn domain(&self) -> &str {
@@ -235,21 +257,15 @@ impl Url {
         self.full().as_str().parse::<http::Uri>().is_ok()
     }
 
-    pub(crate) fn host_without_specific_subdomains_and_query(&self) -> &str {
-        let res = if let Some(subdomain) = self.subdomain() {
+    pub(crate) fn host_without_www(&self) -> &str {
+        if let Some(subdomain) = self.subdomain() {
             if subdomain == "www" {
                 self.domain()
             } else {
                 self.site()
             }
         } else {
-            self.site()
-        };
-
-        if let Some(query_begin) = res.find('?') {
-            &res[..query_begin]
-        } else {
-            res
+            self.domain()
         }
     }
 

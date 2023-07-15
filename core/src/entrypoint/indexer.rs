@@ -125,7 +125,11 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
             {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
-                let node_id = worker.host_centrality_store.node2id.get(&html.url().into());
+                let node = Node::from(html.url());
+                let node_id = worker
+                    .host_centrality_store
+                    .node2id
+                    .get(&node.clone().into_host());
 
                 let host_centrality = node_id
                     .and_then(|node_id| worker.host_centrality_store.harmonic.get(&node_id))
@@ -169,7 +173,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let mut page_centrality = 0.0;
 
                 if let Some(store) = worker.page_centrality_store.as_ref() {
-                    let node_id = store.node2id.get(&html.url().into());
+                    let node_id = store.node2id.get(&node);
 
                     page_centrality = node_id
                         .and_then(|node_id| store.harmonic.get(&node_id))
@@ -186,7 +190,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let node_id = worker
                     .host_centrality_store
                     .node2id
-                    .get(&Node::from_url(html.url()).into_host());
+                    .get(&Node::from(html.url()).into_host());
 
                 let mut dmoz_description = None;
 
