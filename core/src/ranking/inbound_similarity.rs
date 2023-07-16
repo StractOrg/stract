@@ -85,7 +85,7 @@ impl Scorer {
                         .iter()
                         .map(|disliked| disliked.sim(node, vec))
                         .sum::<f64>())
-                    / (self.liked.len() + 1) as f64)
+                    / self.liked.len().max(1) as f64)
                 .max(0.0),
             None => 0.0,
         }

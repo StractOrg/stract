@@ -100,7 +100,7 @@ impl SimilarSitesFinder {
         top_backlink_nodes.reverse();
 
         let mut potential_nodes = IntSet::new();
-        for (backlink_node, _) in top_backlink_nodes.into_iter().take(MAX_SIMILAR_SITES) {
+        for (backlink_node, _) in top_backlink_nodes {
             for edge in self.webgraph.raw_outgoing_edges(&NodeID(backlink_node)) {
                 potential_nodes.insert(edge.to.0);
             }
