@@ -20,7 +20,7 @@ use std::thread;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tokio::pin;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 use crate::entrypoint::download_all_warc_files;
 use crate::executor::Executor;
@@ -99,6 +99,10 @@ impl IndexingWorker {
 
 pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
+
+    let mut has_host_centrality = false;
+    let mut has_page_centrality = false;
+    let mut has_backlinks = false;
 
     info!("processing {}", name);
 
@@ -180,6 +184,18 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                         .unwrap_or_default();
                 }
 
+                if host_centrality > 0.0 {
+                    has_host_centrality = true;
+                }
+
+                if page_centrality > 0.0 {
+                    has_page_centrality = true;
+                }
+
+                if !backlinks.is_empty() {
+                    has_backlinks = true;
+                }
+
                 let fetch_time_ms = record.metadata.fetch_time_ms as u64;
 
                 trace!("inserting webpage: {:?}", html.url());
@@ -225,6 +241,18 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
         index.commit().unwrap();
 
         std::fs::remove_file(path).unwrap();
+    }
+
+    if !has_host_centrality {
+        warn!("no host centrality values found in {}", name);
+    }
+
+    if !has_page_centrality {
+        warn!("no page centrality values found in {}", name);
+    }
+
+    if !has_backlinks {
+        warn!("no backlinks found in {}", name);
     }
 
     index.inverted_index.merge_into_max_segments(1).unwrap();
