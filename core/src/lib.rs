@@ -230,7 +230,7 @@ pub struct SearchServerConfig {
     pub shard_id: ShardId,
     pub index_path: String,
     pub entity_index_path: Option<String>,
-    pub centrality_store_path: Option<String>,
+    pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub host: SocketAddr,

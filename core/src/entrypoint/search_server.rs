@@ -44,7 +44,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
         .entity_index_path
         .map(|path| EntityIndex::open(path).unwrap());
     let centrality_store = config
-        .centrality_store_path
+        .host_centrality_store_path
         .map(SearchCentralityStore::open);
     let search_index = Index::open(config.index_path)?;
 
