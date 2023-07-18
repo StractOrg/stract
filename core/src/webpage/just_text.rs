@@ -489,7 +489,7 @@ impl JustText {
             }
         }
 
-        for (paragraph, classification) in paragraphs.iter_mut().zip(new_classes.into_iter()) {
+        for (paragraph, classification) in paragraphs.iter_mut().zip(new_classes) {
             paragraph.classification = classification;
         }
 

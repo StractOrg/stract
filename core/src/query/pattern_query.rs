@@ -369,8 +369,6 @@ impl PatternWeight {
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
-        if can_optimize_site_domain(&self.patterns, ALL_FIELDS[self.field.field_id() as usize]) {}
-
         let mut term_postings_list = Vec::with_capacity(self.raw_terms.len());
         for term in &self.raw_terms {
             if let Some(postings) = reader

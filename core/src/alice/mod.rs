@@ -27,6 +27,7 @@
 use std::{
     io::{Read, Write},
     path::Path,
+    rc::Rc,
     sync::Arc,
 };
 
@@ -230,7 +231,7 @@ impl Searcher {
 }
 
 pub struct Alice {
-    inner: Arc<RawModel>,
+    inner: Rc<RawModel>,
     tokenizer: Arc<Tokenizer>,
     summarizer: Arc<ExtractiveSummarizer>,
     end_tokens: Vec<i64>,
@@ -305,7 +306,7 @@ impl Alice {
 
         let summarizer = Arc::new(summarizer);
 
-        let inner = Arc::new(model);
+        let inner = Rc::new(model);
         let tokenizer = Arc::new(Tokenizer::open(folder.as_ref().join("tokenizer.json"))?);
 
         let end_tokens = vec![tokenizer.tokenizer.token_to_id("<|endoftext|>").unwrap() as i64];

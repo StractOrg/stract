@@ -122,7 +122,6 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                         if let Some(homepage) = local_searcher.get_homepage(url) {
                             if let Some(desc) = homepage.description() {
                                 result.insert(Url::from(url.clone()), desc.clone());
-                            } else {
                             }
                         }
                     }

@@ -481,22 +481,22 @@ fn flatten(val: serde_json::Value) -> Vec<String> {
 
     while let Some(elem) = stack.pop() {
         match elem.val {
-            serde_json::Value::Null => res.push(
-                itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect(),
-            ),
+            serde_json::Value::Null => {
+                res.push(itertools::intersperse(elem.parent_keys, ".".to_string()).collect())
+            }
             serde_json::Value::Bool(b) => {
                 let key: String =
-                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                    itertools::intersperse(elem.parent_keys, ".".to_string()).collect();
                 res.push(format!("{key}=\"{b}\""))
             }
             serde_json::Value::Number(n) => {
                 let key: String =
-                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                    itertools::intersperse(elem.parent_keys, ".".to_string()).collect();
                 res.push(format!("{key}=\"{n}\""))
             }
             serde_json::Value::String(s) => {
                 let key: String =
-                    itertools::intersperse(elem.parent_keys.into_iter(), ".".to_string()).collect();
+                    itertools::intersperse(elem.parent_keys, ".".to_string()).collect();
                 res.push(format!("{key}=\"{}\"", s.replace('"', "\\\"")))
             }
             serde_json::Value::Array(arr) => {
@@ -531,8 +531,7 @@ impl FlattenedJson {
         let json = serde_json::to_string(value)?;
         let val: serde_json::Value = serde_json::from_str(&json)?;
 
-        let flattened_json =
-            itertools::intersperse(flatten(val).into_iter(), "\n".to_string()).collect();
+        let flattened_json = itertools::intersperse(flatten(val), "\n".to_string()).collect();
 
         Ok(Self { flattened_json })
     }

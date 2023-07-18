@@ -293,7 +293,7 @@ impl DistributedSearcher {
                 .unzip();
 
             if let Ok(websites) = shard.retrieve_websites(&pointers, query).await {
-                for (index, website) in indexes.into_iter().zip(websites.into_iter()) {
+                for (index, website) in indexes.into_iter().zip(websites) {
                     retrieved_webpages[index] = Some(website);
                 }
             }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use aes_gcm::{Aes256Gcm, Key};
 use tch::{IndexOp, Kind, Tensor};
@@ -43,7 +43,7 @@ pub enum TokenGeneratorState {
 }
 
 pub struct AliceTokenGenerator {
-    model: Arc<RawModel>,
+    model: Rc<RawModel>,
     // state needs to be a queue of size 2 to have the ability
     // to generate a new token if the current one is banned
     states: LeakyQueue<ModelState>,
@@ -60,7 +60,7 @@ pub struct AliceTokenGenerator {
 
 impl AliceTokenGenerator {
     pub fn new(
-        model: Arc<RawModel>,
+        model: Rc<RawModel>,
         end_tokens: Vec<i64>,
         state: Tensor,
         tokens: &[i64],

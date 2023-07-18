@@ -137,7 +137,7 @@ impl<M: CrossEncoder> ReRanker<M> {
         let query = &self.query.as_ref().unwrap().query;
         let scores = self.crossencoder.run(query, &bodies);
 
-        for (website, score) in websites.iter_mut().zip(scores.into_iter()) {
+        for (website, score) in websites.iter_mut().zip(scores) {
             let website = website.as_mut_ranking();
             website.signals.insert(Signal::CrossEncoder, score);
         }

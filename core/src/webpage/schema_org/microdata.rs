@@ -606,7 +606,7 @@ mod tests {
     #[test]
     fn schema_image_object_example() {
         let root = kuchiki::parse_html().one(
-            r##"
+            r#"
             <html>
                 <div itemscope itemtype="https://schema.org/ImageObject">
                 <h2 itemprop="name">Beach in Mexico</h2>
@@ -623,7 +623,7 @@ mod tests {
                 <span itemprop="description">I took this picture while on vacation last year.</span>
                 </div>
             </html>
-            "##,
+            "#,
         );
 
         let res = parse_schema(root);
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn schema_person_example() {
         let root = kuchiki::parse_html().one(
-            r##"
+            r#"
             <div itemscope itemtype="https://schema.org/Person">
             <span itemprop="name">Jane Doe</span>
             <img src="janedoe.jpg" itemprop="image" alt="Photo of Jane Doe"/>
@@ -675,7 +675,7 @@ mod tests {
             <a href="http://www.xyz.edu/students/bobsmith.html" itemprop="colleague">
               Bob Smith</a>
           </div>
-            "##,
+            "#,
         );
         let expected_json = r#"
         {

@@ -328,7 +328,7 @@ impl LocalSearcher {
             .map(DisplayedWebpage::from)
             .collect();
 
-        for (webpage, ranking) in webpages.iter_mut().zip(top_websites.into_iter()) {
+        for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {
             let mut ranking_signals = HashMap::new();
 
             for signal in ALL_SIGNALS {

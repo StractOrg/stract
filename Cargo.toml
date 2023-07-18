@@ -4,6 +4,7 @@ members = [
     "optics",
     "kuchiki"
 ]
+resolver = "2"
 
 [profile.release]
 debug = true

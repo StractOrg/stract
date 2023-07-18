@@ -192,7 +192,7 @@ impl Worker {
 
                 if let Ok(Some(sitemap)) = self.robotstxt.sitemap(&retryable_url.url).await {
                     let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
-                    discovered_urls.extend(sitemap_urls.into_iter());
+                    discovered_urls.extend(sitemap_urls);
                 }
             }
 
@@ -223,7 +223,7 @@ impl Worker {
                 }
             }
 
-            discovered_urls.extend(res.new_urls.into_iter());
+            discovered_urls.extend(res.new_urls);
             url_responses.push(res.response);
         }
 
