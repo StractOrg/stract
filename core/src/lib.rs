@@ -410,6 +410,9 @@ pub enum Error {
 
     #[error("S3")]
     S3(#[from] s3::error::S3Error),
+
+    #[error("Unknown webpage robots meta tag")]
+    UnknownRobotsMetaTag,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

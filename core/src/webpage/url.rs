@@ -20,6 +20,8 @@ use publicsuffix::Psl;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+use crate::{ceil_char_boundary, floor_char_boundary};
+
 use super::URL_REGEX;
 
 pub static LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
@@ -82,6 +84,7 @@ impl Url {
             start_host += 2; // skip the two '/'
         }
 
+        let start_host = ceil_char_boundary(url, start_host);
         &url[start_host..]
     }
 
@@ -92,6 +95,7 @@ impl Url {
             start_query = url.find('?').expect("The url contains atleast 1 '?'");
         }
 
+        let start_query = ceil_char_boundary(url, start_query);
         &url[..start_query]
     }
 
@@ -103,9 +107,11 @@ impl Url {
             end_site = url.find('/').expect("The url contains atleast 1 '/'");
         }
 
+        let end_site = ceil_char_boundary(url, end_site);
         let res = &url[..end_site];
 
         if let Some(query_begin) = res.find('?') {
+            let query_begin = ceil_char_boundary(res, query_begin);
             &res[..query_begin]
         } else {
             res
@@ -145,7 +151,9 @@ impl Url {
                 return "";
             }
 
-            &domain[..domain.len() - tld.len() - 1]
+            let idx = domain.len() - tld.len() - 1;
+            let idx = ceil_char_boundary(domain, idx);
+            &domain[..idx]
         }
     }
 
@@ -154,7 +162,8 @@ impl Url {
             if subdomain.is_empty() || subdomain == "." {
                 None
             } else {
-                Some(&subdomain[..subdomain.len() - 1])
+                let idx = floor_char_boundary(subdomain, subdomain.len() - 1);
+                Some(&subdomain[..idx])
             }
         } else {
             None
@@ -271,7 +280,8 @@ impl Url {
 
     pub fn without_query(&self) -> &str {
         if let Some(query_begin) = self.0.find('?') {
-            &self.0[..query_begin]
+            let idx = floor_char_boundary(&self.0, query_begin);
+            &self.0[..idx]
         } else {
             &self.0
         }
@@ -280,7 +290,8 @@ impl Url {
     pub fn full_without_id_tags(&self) -> String {
         let full = self.full();
         if let Some(id_begin) = full.find('#') {
-            full[..id_begin].to_string()
+            let idx = floor_char_boundary(&full, id_begin);
+            full[..idx].to_string()
         } else {
             full
         }

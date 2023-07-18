@@ -129,6 +129,11 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     })
             {
                 let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
+
+                if html.is_no_index() {
+                    continue;
+                }
+
                 let node = Node::from(html.url());
                 let node_id = worker
                     .host_centrality_store

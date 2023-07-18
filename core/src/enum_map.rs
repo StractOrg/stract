@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnumMap<K: Into<usize>, V> {
     inner: Vec<Option<V>>,
+    len: usize,
     _phantom: std::marker::PhantomData<K>,
 }
 
@@ -35,6 +36,7 @@ where
     pub fn new() -> Self {
         Self {
             inner: vec![],
+            len: 0,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -46,7 +48,15 @@ where
             self.inner.resize_with(key + 1, || None);
         }
 
+        if self.inner[key].is_none() {
+            self.len += 1;
+        }
+
         self.inner[key] = Some(value);
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn get(&self, key: K) -> Option<&V> {
@@ -84,6 +94,37 @@ where
         }
 
         map
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EnumSet<K: Into<usize>> {
+    map: EnumMap<K, ()>,
+}
+
+impl<K: Into<usize>> Default for EnumSet<K> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K: Into<usize>> EnumSet<K> {
+    pub fn new() -> Self {
+        Self {
+            map: EnumMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: K) {
+        self.map.insert(key, ());
+    }
+
+    pub fn contains(&self, key: K) -> bool {
+        self.map.get(key).is_some()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.len() == 0
     }
 }
 

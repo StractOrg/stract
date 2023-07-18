@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
+    enum_map::EnumSet,
     prehashed::{hash, split_u128},
     schema::{FastField, TextField},
     simhash, tokenizer,
@@ -24,7 +25,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
-use std::{collections::HashMap, panic};
+use std::{collections::HashMap, panic, str::FromStr};
 use tantivy::tokenizer::{PreTokenizedString, Tokenizer};
 use whatlang::Lang;
 
@@ -241,12 +242,40 @@ struct Script {
 }
 
 #[derive(Debug)]
+enum RobotsMeta {
+    NoIndex,
+    NoFollow,
+}
+
+impl FromStr for RobotsMeta {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "noindex" => Ok(RobotsMeta::NoIndex),
+            "nofollow" => Ok(RobotsMeta::NoFollow),
+            _ => Err(Error::UnknownRobotsMetaTag),
+        }
+    }
+}
+
+impl From<RobotsMeta> for usize {
+    fn from(val: RobotsMeta) -> Self {
+        match val {
+            RobotsMeta::NoIndex => 0,
+            RobotsMeta::NoFollow => 1,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Html {
     url: Url,
     root: NodeRef, // this is reference counted (cheap to clone)
     all_text: Option<String>,
     clean_text: Option<String>,
     lang: Option<Lang>,
+    robots: Option<EnumSet<RobotsMeta>>,
 }
 
 impl Html {
@@ -268,13 +297,84 @@ impl Html {
         let mut url: Url = url.to_string().into();
         url = url.full_without_id_tags().into();
 
-        Self {
+        let mut res = Self {
             root,
             all_text: None,
             clean_text: None,
             lang: None,
             url,
+            robots: None,
+        };
+
+        if let Some(url) = res.canonical_url() {
+            res.url = url;
         }
+
+        res.robots = res.parse_robots_meta();
+
+        res
+    }
+
+    fn canonical_url(&self) -> Option<Url> {
+        let mut canonical_url = None;
+
+        for node in self.root.select("link").unwrap() {
+            if let Some(element) = node.as_node().as_element() {
+                if let Some(rel) = element.attributes.borrow().get("rel") {
+                    if rel == "canonical" {
+                        if let Some(href) = element.attributes.borrow().get("href") {
+                            let url = Url::from(href).into_absolute(self.url());
+                            if url.is_valid_uri() {
+                                canonical_url = Some(url);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        canonical_url
+    }
+
+    fn parse_robots_meta(&self) -> Option<EnumSet<RobotsMeta>> {
+        let mut robots = EnumSet::new();
+
+        for node in self.root.select("meta").unwrap() {
+            if let Some(element) = node.as_node().as_element() {
+                if let Some(name) = element.attributes.borrow().get("name") {
+                    if name == "robots" {
+                        if let Some(content) = element.attributes.borrow().get("content") {
+                            for part in content.split(',') {
+                                let part = part.trim();
+                                if let Ok(meta) = part.parse::<RobotsMeta>() {
+                                    robots.insert(meta);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if robots.is_empty() {
+            None
+        } else {
+            Some(robots)
+        }
+    }
+
+    pub fn is_no_index(&self) -> bool {
+        self.robots
+            .as_ref()
+            .map(|robots| robots.contains(RobotsMeta::NoIndex))
+            .unwrap_or(false)
+    }
+
+    pub fn is_no_follow(&self) -> bool {
+        self.robots
+            .as_ref()
+            .map(|robots| robots.contains(RobotsMeta::NoFollow))
+            .unwrap_or(false)
     }
 
     pub fn parse_text(&mut self) {
@@ -298,6 +398,10 @@ impl Html {
     }
 
     pub fn anchor_links(&self) -> Vec<Link> {
+        if self.is_no_follow() {
+            return Vec::new();
+        }
+
         let mut links = Vec::new();
         let mut open_links = Vec::new();
 
@@ -320,7 +424,7 @@ impl Html {
                                     }
 
                                     links.push(Link {
-                                        source: self.url.clone(),
+                                        source: self.url().clone(),
                                         destination: Url::from(dest.to_string())
                                             .into_absolute(self.url()),
                                         text: text.trim().to_string(),
@@ -354,7 +458,7 @@ impl Html {
 
             if let Some(dest) = attributes.borrow().get("href") {
                 links.push(Link {
-                    source: self.url.clone(),
+                    source: self.url().clone(),
                     destination: Url::from(dest.to_string()).into_absolute(self.url()),
                     text: text.trim().to_string(),
                 });
@@ -371,7 +475,7 @@ impl Html {
             if let Some(element) = node.as_node().as_element() {
                 if let Some(href) = element.attributes.borrow().get("href") {
                     links.push(Link {
-                        source: self.url.clone(),
+                        source: self.url().clone(),
                         destination: Url::from(href).into_absolute(self.url()),
                         text: String::new(),
                     })
@@ -444,7 +548,7 @@ impl Html {
                     let script_url = Url::from(url.as_str()).into_absolute(self.url());
                     if self.url().domain() != script_url.domain() {
                         Some(Link {
-                            source: self.url.clone(),
+                            source: self.url().clone(),
                             destination: script_url,
                             text: String::new(),
                         })
@@ -1099,7 +1203,7 @@ impl Html {
                     })
             })
             .map(|mut image| {
-                image.url = image.url.into_absolute(&self.url);
+                image.url = image.url.into_absolute(self.url());
 
                 image
             })
@@ -1888,23 +1992,11 @@ mod tests {
 
         assert_eq!(
             webpage.anchor_links(),
-            vec![
-                Link {
-                    source: "https://www.example.com/whatever".to_string().into(),
-                    destination: "https://example.com".to_string().into(),
-                    text: "Link to example".to_string()
-                },
-                // Link {
-                //     source: "https://www.example.com/whatever".to_string().into(),
-                //     destination: "test.com".to_string().into(),
-                //     text: String::new()
-                // },
-                // Link {
-                //     source: "https://www.example.com/whatever".to_string().into(),
-                //     destination: "link.com".to_string().into(),
-                //     text: String::new()
-                // },
-            ]
+            vec![Link {
+                source: "https://www.example.com/whatever".to_string().into(),
+                destination: "https://example.com".to_string().into(),
+                text: "Link to example".to_string()
+            },]
         );
     }
 
@@ -1914,5 +2006,131 @@ mod tests {
         let html = Html::parse(stackoverflow, "https://www.example.com");
 
         assert!(html.clean_text().is_some());
+    }
+
+    #[test]
+    fn canonical_url() {
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <link rel="canonical" href="https://example.com/canonical.html" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert_eq!(
+            html.canonical_url(),
+            Some("https://example.com/canonical.html".to_string().into())
+        );
+
+        assert_eq!(
+            html.url(),
+            &"https://example.com/canonical.html".to_string().into()
+        );
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert_eq!(html.canonical_url(), None);
+        assert_eq!(
+            html.url(),
+            &"https://www.example.com/whatever".to_string().into()
+        );
+    }
+
+    #[test]
+    fn robots_meta_tag() {
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <meta name="robots" content="noindex, nofollow" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert!(html.is_no_index());
+        assert!(html.is_no_follow());
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <meta name="robots" content="noindex,nofollow" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert!(html.is_no_index());
+        assert!(html.is_no_follow());
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <meta name="robots" content="noindex" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert!(html.is_no_index());
+        assert!(!html.is_no_follow());
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <meta name="robots" content="nofollow" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert!(!html.is_no_index());
+        assert!(html.is_no_follow());
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        );
+
+        assert!(!html.is_no_index());
+        assert!(!html.is_no_follow());
     }
 }
