@@ -128,3 +128,7 @@ harness = false
 [[bench]]
 name = "crawl-coordinator"
 harness = false
+
+[[bench]]
+name = "similar-sites"
+harness = false

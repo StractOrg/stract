@@ -43,9 +43,14 @@ impl From<u64> for NodeID {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub(crate) struct StoredEdge {
+pub(crate) struct FullStoredEdge {
     other: SegmentNodeID,
     label: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub(crate) struct SmallStoredEdge {
+    other: SegmentNodeID,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

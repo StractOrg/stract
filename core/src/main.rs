@@ -47,7 +47,7 @@ enum Commands {
         options: AliceOptions,
     },
 
-    /// Build the search index.
+    /// Build an index.
     Indexer {
         #[clap(subcommand)]
         options: IndexingOptions,
@@ -119,39 +119,48 @@ enum AliceOptions {
 
 #[derive(Subcommand)]
 enum CentralityType {
+    /// Calculate all the supported centrality metrics.
     All,
+    /// Calculate harmonic centrality. Harmonic centrality is the sum of the inverse distance from all
+    /// other nodes to a given node. It is a measure of how central a node (webpage) is in a graph.
     Harmonic,
+    /// Create an index that can be used to quickly calculate the inbound link similarity between two nodes.
+    /// This is used to calculate the similarity between two webpages.
     Similarity,
 }
 
 #[derive(Subcommand)]
 enum WebgraphOptions {
-    Create {
-        config_path: String,
-    },
+    /// Create a new webgraph.
+    Create { config_path: String },
+
+    /// Merge multiple webgraphs into a single graph with the specified number of segments.
+    /// Can also be used to merge segments of a single webgraph.
     Merge {
         #[clap(required = true)]
         paths: Vec<String>,
         #[clap(long)]
         num_segments: Option<usize>,
     },
-    Server {
-        config_path: String,
-    },
+
+    /// Deploy the webgraph server. The webgraph server is responsible for serving the webgraph to the search servers.
+    /// This is e.g. used to find similar sites etc.
+    Server { config_path: String },
 }
 
 #[derive(Subcommand)]
 enum IndexingOptions {
-    Search {
-        config_path: String,
-    },
+    /// Create the search index.
+    Search { config_path: String },
+
+    /// Create the entity index. Used in the sidebar of the search UI.
     Entity {
         wikipedia_dump_path: String,
         output_path: String,
     },
-    Merge {
-        indexes: Vec<String>,
-    },
+
+    /// Merge multiple search indexes into a single index.
+    Merge { indexes: Vec<String> },
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {

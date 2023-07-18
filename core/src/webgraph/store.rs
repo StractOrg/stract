@@ -36,10 +36,12 @@ where
         options.set_max_write_buffer_number(8);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_bloom_filter(64.0, true);
+        block_options.set_bloom_filter(128.0, true);
 
-        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
+        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024).unwrap(); // 1024 MB cache
         block_options.set_block_cache(&cache);
+
+        block_options.set_block_size(128 * 1024); // 128 KB block size
 
         options.set_block_based_table_factory(&block_options);
 
@@ -54,8 +56,11 @@ where
     pub fn get(&self, key: &K) -> Option<V> {
         let bytes = bincode::serialize(key).unwrap();
 
+        let mut readopts = rocksdb::ReadOptions::default();
+        readopts.set_readahead_size(4_194_304);
+
         self.db
-            .get(bytes)
+            .get_pinned_opt(bytes, &readopts)
             .unwrap()
             .map(|bytes| bincode::deserialize(&bytes).unwrap())
     }
