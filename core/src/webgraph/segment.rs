@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use lru::LruCache;
 use rkyv::Archive;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     path::Path,
+    sync::Mutex,
 };
 
 use super::{
@@ -72,6 +74,7 @@ pub struct StoredSegment {
     small_reversed_adjacency: Store<SegmentNodeID, HashSet<SmallStoredEdge>>,
     id_mapping: Store<NodeID, SegmentNodeID>,
     rev_id_mapping: Store<SegmentNodeID, NodeID>,
+    rev_id_mapping_cache: Mutex<LruCache<SegmentNodeID, NodeID>>,
     meta: Meta,
     id: String,
     folder_path: String,
@@ -98,6 +101,7 @@ impl StoredSegment {
                 .unwrap()
                 .to_string(),
             id,
+            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         }
     }
 
@@ -110,7 +114,19 @@ impl StoredSegment {
     }
 
     fn rev_id_mapping(&self, node: &SegmentNodeID) -> Option<NodeID> {
-        self.rev_id_mapping.get(node)
+        // check cache
+        let mut guard = self.rev_id_mapping_cache.lock().unwrap();
+        if let Some(node_id) = guard.get(node) {
+            return Some(*node_id);
+        }
+
+        let node_id = self.rev_id_mapping.get(node);
+
+        if let Some(node_id) = node_id {
+            guard.put(*node, node_id);
+        }
+
+        node_id
     }
 
     pub fn outgoing_edges(&self, node: &NodeID, load_label: bool) -> Vec<Edge> {
@@ -368,6 +384,7 @@ impl StoredSegment {
             },
             id: new_segment_id,
             folder_path: new_path.to_str().unwrap().to_string(),
+            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         };
 
         res.flush();
@@ -511,6 +528,7 @@ impl LiveSegment {
             },
             folder_path: path.as_os_str().to_str().unwrap().to_string(),
             id: segment_id,
+            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         };
 
         stored_segment.flush();

@@ -29,6 +29,9 @@ use super::inbound_similarity::InboundSimilarity;
 
 pub struct Node2Id {
     db: rocksdb::DB,
+    // from rocksdb docs: `Cache must outlive DB instance which uses it.`
+    #[allow(dead_code)]
+    cache: rocksdb::Cache,
 }
 
 impl Node2Id {
@@ -49,7 +52,7 @@ impl Node2Id {
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 
-        Self { db }
+        Self { db, cache }
     }
 
     pub fn get(&self, key: &Node) -> Option<NodeID> {
