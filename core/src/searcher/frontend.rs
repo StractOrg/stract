@@ -48,8 +48,8 @@ use super::{
     SearchResult, WebsitesResult,
 };
 
-const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 100.0;
-const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 100.0;
+const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 0.1;
+const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 0.1;
 
 pub struct FrontendSearcher {
     distributed_searcher: DistributedSearcher,

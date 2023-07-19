@@ -228,7 +228,7 @@ pub enum Request {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ScoredWebsitePointer {
     pub website: RankingWebsite,
     pub shard: ShardId,
