@@ -237,7 +237,7 @@ import { askama } from "../askama";
           const desc = res.description === null ? "" : res.description;
 
           const siteDiv = document.createElement("div");
-          siteDiv.innerHTML = "<a target=\"_blank\" class=\"underline\" href=\"https://" + res.site + "\">" + res.site + "</a>";
+          siteDiv.innerHTML = "<a target=\"_blank\" class=\"underline\" href=\"http://" + res.site + "\">" + res.site + "</a>";
           siteDiv.innerHTML += "<p class=\"text-sm\">" + desc + "</p>";
           result.appendChild(siteDiv);
         });
