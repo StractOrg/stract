@@ -89,12 +89,6 @@ where
         self.db.write(batch).unwrap();
     }
 
-    pub fn contains_key(&self, key: &K) -> bool {
-        let bytes = bincode::serialize(key).unwrap();
-
-        self.db.get(bytes).unwrap().is_some()
-    }
-
     pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
         let mut read_opts = rocksdb::ReadOptions::default();
 
@@ -105,19 +99,6 @@ where
             .map(|res| {
                 let (key, _) = res.unwrap();
                 bincode::deserialize(&key).unwrap()
-            })
-    }
-
-    pub fn values(&self) -> impl Iterator<Item = V> + '_ {
-        let mut read_opts = rocksdb::ReadOptions::default();
-
-        read_opts.set_readahead_size(4_194_304); // 4 MB
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
-            .map(|res| {
-                let (_, val) = res.unwrap();
-                bincode::deserialize(&val).unwrap()
             })
     }
 
@@ -141,9 +122,11 @@ where
         self.db.flush().unwrap();
     }
 
-    pub fn remove(&self, key: &K) {
-        let bytes = bincode::serialize(key).unwrap();
-        self.db.delete(bytes).unwrap();
+    pub fn estimate_len(&self) -> usize {
+        self.db
+            .property_int_value("rocksdb.estimate-num-keys")
+            .unwrap()
+            .unwrap_or(0) as usize
     }
 }
 

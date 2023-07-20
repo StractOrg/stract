@@ -74,20 +74,20 @@ impl SimilarSitesFinder {
         let nodes: Vec<_> = nodes
             .iter()
             .map(|url| Node::from(url.to_string()).into_host())
-            .filter_map(|node| self.webgraph.node2id(&node))
+            .map(|node| node.id())
             .collect();
 
         let scorer = self.inbound_similarity.scorer(&nodes, &[]);
 
-        let mut backlink_count: IntMap<usize> = IntMap::new();
+        let mut backlink_count: IntMap<NodeID, usize> = IntMap::new();
 
         for node in &nodes {
             for edge in self.webgraph.raw_ingoing_edges(node) {
-                if !backlink_count.contains_key(&edge.from.0) {
-                    backlink_count.insert(edge.from.0, 0);
+                if !backlink_count.contains_key(&edge.from) {
+                    backlink_count.insert(edge.from, 0);
                 }
 
-                *backlink_count.get_mut(&edge.from.0).unwrap() += 1;
+                *backlink_count.get_mut(&edge.from).unwrap() += 1;
             }
         }
 
@@ -101,15 +101,14 @@ impl SimilarSitesFinder {
 
         let mut potential_nodes = IntSet::new();
         for (backlink_node, _) in top_backlink_nodes {
-            for edge in self.webgraph.raw_outgoing_edges(&NodeID(backlink_node)) {
-                potential_nodes.insert(edge.to.0);
+            for edge in self.webgraph.raw_outgoing_edges(&backlink_node) {
+                potential_nodes.insert(edge.to);
             }
         }
 
         let mut scored_nodes = BinaryHeap::with_capacity(limit);
 
         for potential_node in potential_nodes.into_iter() {
-            let potential_node = NodeID(potential_node);
             let score = scorer.score(&potential_node);
             let scored_node_id = ScoredNodeID {
                 node_id: potential_node,
@@ -141,9 +140,6 @@ impl SimilarSitesFinder {
     }
 
     pub fn knows_about(&self, node: &Node) -> bool {
-        match self.webgraph.node2id(node) {
-            Some(node_id) => self.inbound_similarity.knows_about(node_id),
-            None => false,
-        }
+        self.inbound_similarity.knows_about(node.id())
     }
 }

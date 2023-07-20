@@ -42,12 +42,12 @@ use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
-use crate::snippet;
 use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{schema_org, Url, Webpage};
 use crate::Result;
+use crate::{combine_u64s, snippet};
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
 use std::fs;
@@ -271,15 +271,23 @@ impl InvertedIndex {
     pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
         let searcher = self.reader.searcher();
         let doc = searcher.doc(website.address.into())?;
-        let field = self
+
+        let field1 = self
             .schema()
-            .get_field(Field::Fast(FastField::HostNodeID).name())
+            .get_field(Field::Fast(FastField::HostNodeID1).name())
+            .unwrap();
+        let field2 = self
+            .schema()
+            .get_field(Field::Fast(FastField::HostNodeID2).name())
             .unwrap();
 
-        let id = doc.get_first(field).unwrap().as_u64().unwrap();
-        if id == u64::MAX {
+        let id1 = doc.get_first(field1).unwrap().as_u64().unwrap();
+        let id2 = doc.get_first(field2).unwrap().as_u64().unwrap();
+
+        if id1 == u64::MAX && id2 == u64::MAX {
             Ok(None)
         } else {
+            let id = combine_u64s([id1, id2]);
             Ok(Some(id.into()))
         }
     }

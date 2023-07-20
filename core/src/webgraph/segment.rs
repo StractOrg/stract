@@ -14,68 +14,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use lru::LruCache;
-use rkyv::Archive;
 use std::{
     collections::{BTreeMap, HashSet},
-    fmt::Debug,
     path::Path,
-    sync::Mutex,
 };
 
-use super::{
-    open_bin, save_bin, store::Store, Edge, FullStoredEdge, Loaded, NodeID, SmallStoredEdge,
-};
+use super::{store::Store, Edge, FullStoredEdge, Loaded, NodeID, SmallStoredEdge};
 
 const FULL_ADJACENCY_STORE: &str = "full_adjacency";
 const FULL_REVERSED_ADJACENCY_STORE: &str = "full_reversed_adjacency";
 const SMALL_ADJACENCY_STORE: &str = "small_adjacency";
 const SMALL_REVERSED_ADJACENCY_STORE: &str = "small_reversed_adjacency";
-const ID_MAPPING_STORE: &str = "id_mapping";
-const REV_ID_MAPPING_STORE: &str = "rev_id_mapping";
-const META_STORE: &str = "meta.bin";
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    serde::Serialize,
-    serde::Deserialize,
-    Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-)]
-#[archive_attr(derive(Eq, Hash, PartialEq, Debug))]
-pub struct SegmentNodeID(u64);
-
-impl From<u64> for SegmentNodeID {
-    fn from(val: u64) -> Self {
-        Self(val)
-    }
-}
 
 struct MergePacket {
-    next_segment_node_id: SegmentNodeID,
-    new_id_mapping: Store<NodeID, SegmentNodeID>,
-    new_rev_id_mapping: Store<SegmentNodeID, NodeID>,
-    new_full_adjacency: Store<SegmentNodeID, HashSet<FullStoredEdge>>,
-    new_small_adjacency: Store<SegmentNodeID, HashSet<SmallStoredEdge>>,
+    new_full_adjacency: Store<NodeID, HashSet<FullStoredEdge>>,
+    new_small_adjacency: Store<NodeID, HashSet<SmallStoredEdge>>,
 }
 
 pub struct StoredSegment {
-    full_adjacency: Store<SegmentNodeID, HashSet<FullStoredEdge>>,
-    full_reversed_adjacency: Store<SegmentNodeID, HashSet<FullStoredEdge>>,
-    small_adjacency: Store<SegmentNodeID, HashSet<SmallStoredEdge>>,
-    small_reversed_adjacency: Store<SegmentNodeID, HashSet<SmallStoredEdge>>,
-    id_mapping: Store<NodeID, SegmentNodeID>,
-    rev_id_mapping: Store<SegmentNodeID, NodeID>,
-    rev_id_mapping_cache: Mutex<LruCache<SegmentNodeID, NodeID>>,
-    meta: Meta,
+    full_adjacency: Store<NodeID, HashSet<FullStoredEdge>>,
+    full_reversed_adjacency: Store<NodeID, HashSet<FullStoredEdge>>,
+    small_adjacency: Store<NodeID, HashSet<SmallStoredEdge>>,
+    small_reversed_adjacency: Store<NodeID, HashSet<SmallStoredEdge>>,
     id: String,
     folder_path: String,
 }
@@ -91,9 +51,6 @@ impl StoredSegment {
             small_reversed_adjacency: Store::open(
                 folder_path.as_ref().join(SMALL_REVERSED_ADJACENCY_STORE),
             ),
-            id_mapping: Store::open(folder_path.as_ref().join(ID_MAPPING_STORE)),
-            rev_id_mapping: Store::open(folder_path.as_ref().join(REV_ID_MAPPING_STORE)),
-            meta: open_bin(folder_path.as_ref().join(META_STORE)),
             folder_path: folder_path
                 .as_ref()
                 .as_os_str()
@@ -101,101 +58,82 @@ impl StoredSegment {
                 .unwrap()
                 .to_string(),
             id,
-            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         }
     }
 
-    pub fn num_nodes(&self) -> usize {
-        self.meta.num_nodes as usize
-    }
-
-    fn id_mapping(&self, node: &NodeID) -> Option<SegmentNodeID> {
-        self.id_mapping.get(node)
-    }
-
-    fn rev_id_mapping(&self, node: &SegmentNodeID) -> Option<NodeID> {
-        // check cache
-        let mut guard = self.rev_id_mapping_cache.lock().unwrap();
-        if let Some(node_id) = guard.get(node) {
-            return Some(*node_id);
-        }
-
-        let node_id = self.rev_id_mapping.get(node);
-
-        if let Some(node_id) = node_id {
-            guard.put(*node, node_id);
-        }
-
-        node_id
+    pub fn estimate_num_nodes(&self) -> usize {
+        self.small_adjacency.estimate_len()
     }
 
     pub fn outgoing_edges(&self, node: &NodeID, load_label: bool) -> Vec<Edge> {
-        self.id_mapping(node)
-            .and_then(|segment_id| {
-                if load_label {
-                    self.full_adjacency.get(&segment_id).map(|edges| {
-                        edges
-                            .into_iter()
-                            .map(move |edge| Edge {
-                                from: *node,
-                                to: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
-                                label: Loaded::Some(edge.label),
-                            })
-                            .collect()
-                    })
-                } else {
-                    self.small_adjacency.get(&segment_id).map(|edges| {
-                        edges
-                            .into_iter()
-                            .map(move |edge| Edge {
-                                from: *node,
-                                to: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
-                                label: Loaded::NotYet,
-                            })
-                            .collect()
-                    })
-                }
-            })
-            .unwrap_or_default()
+        if load_label {
+            self.full_adjacency
+                .get(node)
+                .map(|edges| {
+                    edges
+                        .into_iter()
+                        .map(move |edge| Edge {
+                            from: *node,
+                            to: edge.other,
+                            label: Loaded::Some(edge.label),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            self.small_adjacency
+                .get(node)
+                .map(|edges| {
+                    edges
+                        .into_iter()
+                        .map(move |edge| Edge {
+                            from: *node,
+                            to: edge.other,
+                            label: Loaded::NotYet,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
     }
 
     pub fn ingoing_edges(&self, node: &NodeID, load_label: bool) -> Vec<Edge> {
-        self.id_mapping(node)
-            .and_then(|segment_id| {
-                if load_label {
-                    self.full_reversed_adjacency.get(&segment_id).map(|edges| {
-                        edges
-                            .into_iter()
-                            .map(move |edge| Edge {
-                                from: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
-                                to: *node,
-                                label: Loaded::Some(edge.label),
-                            })
-                            .collect()
-                    })
-                } else {
-                    self.small_reversed_adjacency.get(&segment_id).map(|edges| {
-                        edges
-                            .into_iter()
-                            .map(move |edge| Edge {
-                                from: self.rev_id_mapping(&SegmentNodeID(edge.other.0)).unwrap(),
-                                to: *node,
-                                label: Loaded::NotYet,
-                            })
-                            .collect()
-                    })
-                }
-            })
-            .unwrap_or_default()
+        if load_label {
+            self.full_reversed_adjacency
+                .get(node)
+                .map(|edges| {
+                    edges
+                        .into_iter()
+                        .map(move |edge| Edge {
+                            from: edge.other,
+                            to: *node,
+                            label: Loaded::Some(edge.label),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            self.small_reversed_adjacency
+                .get(node)
+                .map(|edges| {
+                    edges
+                        .into_iter()
+                        .map(move |edge| Edge {
+                            from: edge.other,
+                            to: *node,
+                            label: Loaded::NotYet,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
     }
 
     fn flush(&mut self) {
         self.full_adjacency.flush();
         self.full_reversed_adjacency.flush();
-        self.id_mapping.flush();
-        self.rev_id_mapping.flush();
-
-        save_bin(&self.meta, self.path().join(META_STORE));
+        self.small_adjacency.flush();
+        self.small_reversed_adjacency.flush();
     }
 
     pub fn id(&self) -> String {
@@ -207,19 +145,13 @@ impl StoredSegment {
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.full_adjacency
-            .iter()
-            .flat_map(move |(node_id, edges)| {
-                let from = self.rev_id_mapping(&node_id).unwrap();
-
-                edges.into_iter().map(move |stored_edge| Edge {
-                    from,
-                    to: self
-                        .rev_id_mapping(&SegmentNodeID(stored_edge.other.0))
-                        .unwrap(),
-                    label: Loaded::NotYet,
-                })
+        self.small_adjacency.iter().flat_map(move |(from, edges)| {
+            edges.into_iter().map(move |stored_edge| Edge {
+                from,
+                to: stored_edge.other,
+                label: Loaded::NotYet,
             })
+        })
     }
 
     fn merge_adjacency<F1>(edges_fn: F1, packet: &mut MergePacket, segments: &[Self])
@@ -230,82 +162,27 @@ impl StoredSegment {
             return;
         }
 
-        let mut i = 0;
+        for segment in segments {
+            for node_id in segment
+                .small_adjacency
+                .keys()
+                .chain(segment.small_reversed_adjacency.keys())
+            {
+                let mut existing = packet.new_full_adjacency.get(&node_id).unwrap_or_default();
 
-        while i < segments.len() {
-            let segment = &segments[i];
-
-            for node_id in segment.id_mapping.keys() {
-                let mut node_seen_before = false;
-                let mut j = 0;
-                while j < i {
-                    if segments[j].id_mapping.contains_key(&node_id) {
-                        node_seen_before = true;
-                        break;
-                    }
-                    j += 1;
+                if let Some(edges) = edges_fn(segment, &node_id) {
+                    existing.extend(edges);
                 }
 
-                if !node_seen_before {
-                    if !packet.new_id_mapping.contains_key(&node_id) {
-                        packet
-                            .new_id_mapping
-                            .put(&node_id, &packet.next_segment_node_id);
-                        packet
-                            .new_rev_id_mapping
-                            .put(&packet.next_segment_node_id, &node_id);
-                        packet.next_segment_node_id.0 += 1;
-                    }
-
-                    let mut edges = HashSet::new();
-
-                    let mut j = i;
-
-                    while j < segments.len() {
-                        let segment = &segments[j];
-                        if let Some(edges_j) = edges_fn(segment, &node_id) {
-                            for edge in edges_j {
-                                let node = segment.rev_id_mapping(&edge.other).unwrap();
-
-                                if !packet.new_id_mapping.contains_key(&node) {
-                                    packet
-                                        .new_id_mapping
-                                        .put(&node, &packet.next_segment_node_id);
-                                    packet
-                                        .new_rev_id_mapping
-                                        .put(&packet.next_segment_node_id, &node);
-                                    packet.next_segment_node_id.0 += 1;
-                                }
-
-                                let new_segment_node_id = packet.new_id_mapping.get(&node).unwrap();
-
-                                let new_edge = FullStoredEdge {
-                                    other: new_segment_node_id,
-                                    label: edge.label,
-                                };
-
-                                edges.insert(new_edge);
-                            }
-                        }
-
-                        j += 1;
-                    }
-
-                    if !edges.is_empty() {
-                        let segment_node_id = packet.new_id_mapping.get(&node_id).unwrap();
-                        let small_edges: HashSet<SmallStoredEdge> = edges
-                            .iter()
-                            .map(|edge| SmallStoredEdge { other: edge.other })
-                            .collect();
-
-                        packet.new_full_adjacency.put(&segment_node_id, &edges);
-                        packet
-                            .new_small_adjacency
-                            .put(&segment_node_id, &small_edges);
-                    }
-                }
+                packet.new_full_adjacency.put(&node_id, &existing);
+                packet.new_small_adjacency.put(
+                    &node_id,
+                    &existing
+                        .into_iter()
+                        .map(|edge| SmallStoredEdge { other: edge.other })
+                        .collect::<HashSet<_>>(),
+                );
             }
-            i += 1;
         }
     }
 
@@ -319,28 +196,13 @@ impl StoredSegment {
         let new_full_adjacency = Store::open(new_path.join(FULL_ADJACENCY_STORE));
         let new_small_adjacency = Store::open(new_path.join(SMALL_ADJACENCY_STORE));
 
-        let next_segment_node_id = SegmentNodeID(0);
-
-        let new_id_mapping = Store::open(new_path.join(ID_MAPPING_STORE));
-        let new_rev_id_mapping = Store::open(new_path.join(REV_ID_MAPPING_STORE));
-
         let mut packet = MergePacket {
-            next_segment_node_id,
-            new_id_mapping,
-            new_rev_id_mapping,
             new_full_adjacency,
             new_small_adjacency,
         };
 
         Self::merge_adjacency(
-            |segment: &StoredSegment, node_id: &NodeID| {
-                segment.id_mapping.get(node_id).map(|segment_node_id| {
-                    segment
-                        .full_adjacency
-                        .get(&segment_node_id)
-                        .unwrap_or_default()
-                })
-            },
+            |segment: &StoredSegment, node_id: &NodeID| segment.full_adjacency.get(node_id),
             &mut packet,
             &segments,
         );
@@ -352,21 +214,13 @@ impl StoredSegment {
             Store::open(new_path.join(SMALL_REVERSED_ADJACENCY_STORE));
 
         let mut packet = MergePacket {
-            next_segment_node_id: packet.next_segment_node_id,
-            new_id_mapping: packet.new_id_mapping,
-            new_rev_id_mapping: packet.new_rev_id_mapping,
             new_full_adjacency: new_full_reversed_adjacency,
             new_small_adjacency: new_small_reversed_adjacency,
         };
 
         Self::merge_adjacency(
             |segment: &StoredSegment, node_id: &NodeID| {
-                segment.id_mapping.get(node_id).map(|segment_node_id| {
-                    segment
-                        .full_reversed_adjacency
-                        .get(&segment_node_id)
-                        .unwrap_or_default()
-                })
+                segment.full_reversed_adjacency.get(node_id)
             },
             &mut packet,
             &segments,
@@ -377,81 +231,24 @@ impl StoredSegment {
             small_adjacency: new_small_adjacency,
             full_reversed_adjacency: packet.new_full_adjacency,
             small_reversed_adjacency: packet.new_small_adjacency,
-            id_mapping: packet.new_id_mapping,
-            rev_id_mapping: packet.new_rev_id_mapping,
-            meta: Meta {
-                num_nodes: packet.next_segment_node_id.0,
-            },
             id: new_segment_id,
             folder_path: new_path.to_str().unwrap().to_string(),
-            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         };
 
         res.flush();
 
         res
     }
-
-    pub fn update_id_mapping(&mut self, mapping: Vec<(NodeID, NodeID)>) {
-        let mut new_mappings = Vec::with_capacity(mapping.len());
-
-        for (old_id, new_id) in mapping {
-            if let Some(segment_id) = self.id_mapping(&old_id) {
-                self.id_mapping.remove(&old_id);
-                self.rev_id_mapping.remove(&segment_id);
-
-                new_mappings.push((segment_id, new_id));
-            }
-        }
-
-        self.id_mapping.batch_put(
-            new_mappings
-                .iter()
-                .map(|(segment_id, new_id)| (new_id, segment_id)),
-        );
-        self.rev_id_mapping.batch_put(
-            new_mappings
-                .iter()
-                .map(|(segment_id, new_id)| (segment_id, new_id)),
-        );
-
-        self.flush();
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-struct Meta {
-    num_nodes: u64,
 }
 
 #[derive(Default)]
 pub struct LiveSegment {
-    adjacency: BTreeMap<SegmentNodeID, HashSet<FullStoredEdge>>,
-    reversed_adjacency: BTreeMap<SegmentNodeID, HashSet<FullStoredEdge>>,
-    id_mapping: BTreeMap<NodeID, SegmentNodeID>,
-    rev_id_mapping: BTreeMap<SegmentNodeID, NodeID>,
-    next_id: u64,
+    adjacency: BTreeMap<NodeID, HashSet<FullStoredEdge>>,
+    reversed_adjacency: BTreeMap<NodeID, HashSet<FullStoredEdge>>,
 }
 
 impl LiveSegment {
-    fn get_or_create_id(&mut self, id: NodeID) -> SegmentNodeID {
-        if let Some(segment_id) = self.id_mapping.get(&id) {
-            *segment_id
-        } else {
-            let segment_id = SegmentNodeID(self.next_id);
-            self.next_id += 1;
-
-            self.id_mapping.insert(id, segment_id);
-            self.rev_id_mapping.insert(segment_id, id);
-
-            segment_id
-        }
-    }
-
     pub fn insert(&mut self, from: NodeID, to: NodeID, label: String) {
-        let from = self.get_or_create_id(from);
-        let to = self.get_or_create_id(to);
-
         self.adjacency
             .entry(from)
             .or_default()
@@ -470,7 +267,7 @@ impl LiveSegment {
         let segment_id = uuid::Uuid::new_v4().to_string();
         let path = folder_path.as_ref().join(&segment_id);
 
-        let small_adjacency: BTreeMap<SegmentNodeID, HashSet<SmallStoredEdge>> = self
+        let small_adjacency: BTreeMap<NodeID, HashSet<SmallStoredEdge>> = self
             .adjacency
             .clone()
             .into_iter()
@@ -484,7 +281,7 @@ impl LiveSegment {
             })
             .collect();
 
-        let small_rev_adjacency: BTreeMap<SegmentNodeID, HashSet<SmallStoredEdge>> = self
+        let small_rev_adjacency: BTreeMap<NodeID, HashSet<SmallStoredEdge>> = self
             .reversed_adjacency
             .clone()
             .into_iter()
@@ -510,25 +307,13 @@ impl LiveSegment {
         let small_rev_adjacency_store = Store::open(path.join(SMALL_REVERSED_ADJACENCY_STORE));
         small_rev_adjacency_store.batch_put(small_rev_adjacency.iter());
 
-        let id_mapping = Store::open(path.join(ID_MAPPING_STORE));
-        id_mapping.batch_put(self.id_mapping.iter());
-
-        let rev_id_mapping = Store::open(path.join(REV_ID_MAPPING_STORE));
-        rev_id_mapping.batch_put(self.rev_id_mapping.iter());
-
         let mut stored_segment = StoredSegment {
             small_adjacency: small_adjacency_store,
             small_reversed_adjacency: small_rev_adjacency_store,
             full_adjacency,
             full_reversed_adjacency,
-            id_mapping,
-            rev_id_mapping,
-            meta: Meta {
-                num_nodes: self.next_id,
-            },
             folder_path: path.as_os_str().to_str().unwrap().to_string(),
             id: segment_id,
-            rev_id_mapping_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
         };
 
         stored_segment.flush();
@@ -537,7 +322,7 @@ impl LiveSegment {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.id_mapping.is_empty()
+        self.adjacency.is_empty()
     }
 }
 

@@ -15,9 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     enum_map::EnumSet,
-    prehashed::{hash, split_u128},
+    prehashed::hash,
     schema::{FastField, TextField},
-    simhash, tokenizer,
+    simhash, split_u128, tokenizer,
     webgraph::NodeID,
     Error, Result,
 };
@@ -218,12 +218,37 @@ impl Webpage {
             self.pre_computed_score,
         );
 
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::HostNodeID).name())
-                .expect("Failed to get node_id field"),
-            self.node_id.map(|n| n.0).unwrap_or(u64::MAX),
-        );
+        match &self.node_id {
+            Some(node_id) => {
+                let [node_id1, node_id2] = split_u128(node_id.bit_128());
+                doc.add_u64(
+                    schema
+                        .get_field(Field::Fast(FastField::HostNodeID1).name())
+                        .expect("Failed to get node_id field 1"),
+                    node_id1,
+                );
+                doc.add_u64(
+                    schema
+                        .get_field(Field::Fast(FastField::HostNodeID2).name())
+                        .expect("Failed to get node_id field 2"),
+                    node_id2,
+                );
+            }
+            None => {
+                doc.add_u64(
+                    schema
+                        .get_field(Field::Fast(FastField::HostNodeID1).name())
+                        .expect("Failed to get node_id field 1"),
+                    u64::MAX,
+                );
+                doc.add_u64(
+                    schema
+                        .get_field(Field::Fast(FastField::HostNodeID2).name())
+                        .expect("Failed to get node_id field 2"),
+                    u64::MAX,
+                );
+            }
+        }
 
         doc.add_text(
             schema
@@ -1041,7 +1066,8 @@ impl Html {
                 | Field::Fast(FastField::FetchTimeMs)
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
-                | Field::Fast(FastField::HostNodeID)
+                | Field::Fast(FastField::HostNodeID1)
+                | Field::Fast(FastField::HostNodeID2)
                 | Field::Text(TextField::DmozDescription) => {}
             }
         }

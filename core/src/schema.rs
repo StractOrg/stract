@@ -182,7 +182,8 @@ pub enum FastField {
     DomainHash1,
     DomainHash2,
     PreComputedScore,
-    HostNodeID,
+    HostNodeID1,
+    HostNodeID2,
     SimHash,
     NumFlattenedSchemaTokens,
     NumPathAndQuerySlashes,
@@ -217,7 +218,8 @@ impl FastField {
             FastField::DomainHash1 => "domain_hash1",
             FastField::DomainHash2 => "domain_hash2",
             FastField::PreComputedScore => "pre_computed_score",
-            FastField::HostNodeID => "host_node_id",
+            FastField::HostNodeID1 => "host_node_id1",
+            FastField::HostNodeID2 => "host_node_id2",
             FastField::SimHash => "sim_hash",
             FastField::NumPathAndQuerySlashes => "num_path_and_query_slashes",
             FastField::NumPathAndQueryDigits => "num_path_and_query_digits",
@@ -237,7 +239,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 53] = [
+pub static ALL_FIELDS: [Field; 54] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -288,7 +290,8 @@ pub static ALL_FIELDS: [Field; 53] = [
     Field::Fast(FastField::DomainHash1),
     Field::Fast(FastField::DomainHash2),
     Field::Fast(FastField::PreComputedScore),
-    Field::Fast(FastField::HostNodeID),
+    Field::Fast(FastField::HostNodeID1),
+    Field::Fast(FastField::HostNodeID2),
     Field::Fast(FastField::SimHash),
     Field::Fast(FastField::NumPathAndQuerySlashes),
     Field::Fast(FastField::NumPathAndQueryDigits),
@@ -487,7 +490,13 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::HostNodeID) => IndexingOption::Integer(
+            Field::Fast(FastField::HostNodeID1) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed()
+                    .set_stored(),
+            ),
+            Field::Fast(FastField::HostNodeID2) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed()
@@ -605,7 +614,8 @@ impl FastField {
             FastField::DomainHash1 => DataType::U64,
             FastField::DomainHash2 => DataType::U64,
             FastField::PreComputedScore => DataType::F64,
-            FastField::HostNodeID => DataType::U64,
+            FastField::HostNodeID1 => DataType::U64,
+            FastField::HostNodeID2 => DataType::U64,
             FastField::SimHash => DataType::U64,
             FastField::NumPathAndQuerySlashes => DataType::U64,
             FastField::NumPathAndQueryDigits => DataType::U64,

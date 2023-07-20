@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
-    data: Vec<u64>,
+    data: Vec<u128>,
 }
 
 impl VeryJankyBloomFilter {
@@ -29,14 +29,15 @@ impl VeryJankyBloomFilter {
         }
     }
 
-    fn hash(&self, item: &usize) -> (usize, usize) {
+    fn hash(&self, item: &u128) -> (usize, u128) {
         (
-            item.wrapping_mul(11400714819323198549) % self.data.len(),
-            item.wrapping_mul(14029467366897019727) % 64,
+            (item.wrapping_mul(180811355057196146399512320062616506473) % self.data.len() as u128)
+                as usize,
+            item.wrapping_mul(258349730118558892798889897730042154643) % 128,
         )
     }
 
-    fn insert(&mut self, item: usize) {
+    fn insert(&mut self, item: u128) {
         let (a, b) = self.hash(&item);
         self.data[a] |= 1 << b;
     }
@@ -52,13 +53,13 @@ impl VeryJankyBloomFilter {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Posting {
-    ranks: Vec<usize>,
-    skip_pointers: Vec<usize>,
+    ranks: Vec<u128>,
+    skip_pointers: Vec<u128>,
     skip_size: usize,
 }
 
 impl Posting {
-    fn new(ranks: Vec<usize>) -> Self {
+    fn new(ranks: Vec<u128>) -> Self {
         let skip_size = (ranks.len() as f64).sqrt() as usize;
 
         let skip_pointers = ranks
@@ -134,7 +135,7 @@ pub struct BitVec {
 }
 
 impl BitVec {
-    pub fn new(mut ranks: Vec<usize>) -> Self {
+    pub fn new(mut ranks: Vec<u128>) -> Self {
         ranks.sort();
         ranks.dedup();
         ranks.shrink_to_fit();
@@ -180,11 +181,11 @@ mod tests {
     use itertools::Itertools;
     use std::iter::repeat;
 
-    fn into_ranks(a: &[bool]) -> Vec<usize> {
+    fn into_ranks(a: &[bool]) -> Vec<u128> {
         a.iter()
             .enumerate()
             .filter(|(_, b)| **b)
-            .map(|(i, _)| i)
+            .map(|(i, _)| i as u128)
             .collect()
     }
 

@@ -24,9 +24,9 @@ use tantivy::{
 };
 
 use crate::{
-    fastfield_reader,
+    combine_u64s, fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
-    prehashed::{combine_u64s, Prehashed},
+    prehashed::Prehashed,
     ranking::initial::Score,
     schema::FastField,
     simhash,

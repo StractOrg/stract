@@ -84,28 +84,28 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     info!("Found {} nodes in the graph", nodes.len());
     let norm_factor = (nodes.len() - 1) as f64;
 
-    let mut counters: IntMap<HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
+    let mut counters: IntMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
         .iter()
         .map(|node| {
             let mut counter = HyperLogLog::default();
-            counter.add(node.0);
+            counter.add(node.bit_64());
 
-            (node.0, counter)
+            (*node, counter)
         })
         .collect();
 
     let mut exact_counting = false;
     let mut has_changes = true;
     let mut t = 0;
-    let mut centralities: IntMap<KahanSum> = nodes
+    let mut centralities: IntMap<NodeID, KahanSum> = nodes
         .iter()
-        .map(|node| (node.0, KahanSum::default()))
+        .map(|node| (*node, KahanSum::default()))
         .collect();
 
-    let mut exact_changed_nodes = IntSet::default();
+    let mut exact_changed_nodes: IntSet<NodeID> = IntSet::default();
     let mut changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
     for node in &nodes {
-        changed_nodes.insert(node.0);
+        changed_nodes.insert(node.bit_64());
     }
 
     loop {
@@ -113,7 +113,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             break;
         }
 
-        let mut new_counters: IntMap<_> = counters.clone();
+        let mut new_counters: IntMap<_, _> = counters.clone();
 
         has_changes = false;
         let mut new_changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
@@ -122,9 +122,9 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             let mut new_exact_changed_nodes = IntSet::default();
 
             for changed_node in exact_changed_nodes.into_iter() {
-                for edge in graph.raw_outgoing_edges(&NodeID(changed_node)) {
+                for edge in graph.raw_outgoing_edges(&changed_node) {
                     if let (Some(counter_to), Some(counter_from)) =
-                        (new_counters.get_mut(&edge.to.0), counters.get(&edge.from.0))
+                        (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {
                         if counter_to
                             .registers()
@@ -133,9 +133,9 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .any(|(to, from)| *from > *to)
                         {
                             counter_to.merge(counter_from);
-                            new_changed_nodes.insert(edge.to.0);
+                            new_changed_nodes.insert(edge.to.bit_64());
 
-                            new_exact_changed_nodes.insert(edge.to.0);
+                            new_exact_changed_nodes.insert(edge.to);
 
                             has_changes = true;
                         }
@@ -147,12 +147,12 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         } else {
             exact_changed_nodes = IntSet::default();
             for edge in graph.edges() {
-                if !changed_nodes.contains(&edge.from.0) {
+                if !changed_nodes.contains(&edge.from.bit_64()) {
                     continue;
                 }
 
                 if let (Some(counter_to), Some(counter_from)) =
-                    (new_counters.get_mut(&edge.to.0), counters.get(&edge.from.0))
+                    (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                 {
                     if counter_to
                         .registers()
@@ -161,10 +161,10 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                         .any(|(to, from)| *from > *to)
                     {
                         counter_to.merge(counter_from);
-                        new_changed_nodes.insert(edge.to.0);
+                        new_changed_nodes.insert(edge.to.bit_64());
 
                         if exact_counting {
-                            exact_changed_nodes.insert(edge.to.0);
+                            exact_changed_nodes.insert(edge.to);
                         }
 
                         has_changes = true;
@@ -201,7 +201,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         .into_iter()
         .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
-        .map(|(node_id, centrality)| (NodeID(node_id), centrality / norm_factor))
+        .map(|(node_id, centrality)| (node_id, centrality / norm_factor))
         .collect()
 }
 
@@ -331,12 +331,8 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
-            centrality
-                .get(&graph.node2id(&Node::from("B.com")).unwrap())
-                .unwrap()
-                > centrality
-                    .get(&graph.node2id(&Node::from("A.com")).unwrap())
-                    .unwrap_or(0.0)
+            centrality.get(&Node::from("B.com").id()).unwrap()
+                > centrality.get(&Node::from("A.com").id()).unwrap_or(0.0)
         );
     }
 
@@ -346,25 +342,14 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         assert!(
-            centrality
-                .get(&graph.node2id(&Node::from("C")).unwrap())
-                .unwrap()
-                > centrality
-                    .get(&graph.node2id(&Node::from("A")).unwrap())
-                    .unwrap()
+            centrality.get(&Node::from("C").id()).unwrap()
+                > centrality.get(&Node::from("A").id()).unwrap()
         );
         assert!(
-            centrality
-                .get(&graph.node2id(&Node::from("A")).unwrap())
-                .unwrap()
-                > centrality
-                    .get(&graph.node2id(&Node::from("B")).unwrap())
-                    .unwrap()
+            centrality.get(&Node::from("A").id()).unwrap()
+                > centrality.get(&Node::from("B").id()).unwrap()
         );
-        assert_eq!(
-            centrality.get(&graph.node2id(&Node::from("D")).unwrap()),
-            None
-        );
+        assert_eq!(centrality.get(&Node::from("D").id()), None);
     }
 
     #[test]

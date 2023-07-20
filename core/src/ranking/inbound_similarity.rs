@@ -38,7 +38,7 @@ const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 1_000_000;
 pub struct Scorer {
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
-    vectors: Arc<IntMap<bitvec_similarity::BitVec>>,
+    vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
     cache: DashMap<NodeID, f64>,
 }
 
@@ -73,7 +73,7 @@ impl NodeScorer {
 
 impl Scorer {
     fn calculate_score(&self, node: &NodeID) -> f64 {
-        match self.vectors.get(&node.0) {
+        match self.vectors.get(node) {
             Some(vec) => ((self.disliked.len() as f64)
                 + (self
                     .liked
@@ -139,7 +139,7 @@ impl Eq for ScoredNode {}
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct InboundSimilarity {
-    vectors: Arc<IntMap<bitvec_similarity::BitVec>>,
+    vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
 }
 
 impl InboundSimilarity {
@@ -177,20 +177,20 @@ impl InboundSimilarity {
             }
         }
 
-        let top_nodes: IntSet = top_nodes.into_iter().map(|n| n.node.0).collect();
+        let top_nodes: IntSet<NodeID> = top_nodes.into_iter().map(|n| n.node).collect();
 
         for node_id in graph.nodes() {
             let mut ranks = Vec::new();
 
             for edge in graph.raw_ingoing_edges(&node_id) {
-                if !top_nodes.contains(&edge.from.0) {
+                if !top_nodes.contains(&edge.from) {
                     continue;
                 }
 
-                ranks.push(edge.from.0 as usize);
+                ranks.push(edge.from.bit_128());
             }
 
-            vectors.insert(node_id.0, bitvec_similarity::BitVec::new(ranks));
+            vectors.insert(node_id, bitvec_similarity::BitVec::new(ranks));
         }
 
         Self {
@@ -201,13 +201,13 @@ impl InboundSimilarity {
     pub fn scorer(&self, liked_sites: &[NodeID], disliked_sites: &[NodeID]) -> Scorer {
         let liked: Vec<_> = liked_sites
             .iter()
-            .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
+            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
             .map(|(node, inbound)| NodeScorer::new(*node, inbound))
             .collect();
 
         let disliked: Vec<_> = disliked_sites
             .iter()
-            .filter_map(|id| self.vectors.get(&id.0).cloned().map(|vec| (id, vec)))
+            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
             .map(|(node, inbound)| NodeScorer::new(*node, inbound))
             .collect();
 
@@ -234,7 +234,7 @@ impl InboundSimilarity {
     }
 
     pub fn get(&self, node: &NodeID) -> Option<&bitvec_similarity::BitVec> {
-        self.vectors.get(&node.0)
+        self.vectors.get(node)
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -248,7 +248,7 @@ impl InboundSimilarity {
     }
 
     pub fn knows_about(&self, node_id: NodeID) -> bool {
-        self.vectors.contains_key(&node_id.0)
+        self.vectors.contains_key(&node_id)
     }
 }
 
@@ -296,9 +296,9 @@ mod tests {
         let inbound =
             InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
 
-        let scorer = inbound.scorer(&[graph.node2id(&Node::from("b.com")).unwrap()], &[]);
-        let e = graph.node2id(&Node::from("e.com")).unwrap();
-        let d = graph.node2id(&Node::from("d.com")).unwrap();
+        let scorer = inbound.scorer(&[Node::from("b.com").id()], &[]);
+        let e = Node::from("e.com").id();
+        let d = Node::from("d.com").id();
 
         assert!(scorer.score(&e) > scorer.score(&d));
     }
@@ -354,7 +354,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                node_id: Some(graph.node2id(&Node::from("e.com")).unwrap()),
+                node_id: Some(Node::from("e.com").id()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");
@@ -382,7 +382,7 @@ mod tests {
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
-                node_id: Some(graph.node2id(&Node::from("d.com")).unwrap()),
+                node_id: Some(Node::from("d.com").id()),
                 dmoz_description: None,
             })
             .expect("failed to insert webpage");

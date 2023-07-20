@@ -16,15 +16,42 @@
 
 use serde::{Deserialize, Serialize};
 
-type Key = u64;
+pub trait Key: PartialEq + Copy + std::fmt::Debug {
+    const BIG_PRIME: Self;
+
+    fn wrapping_mul(self, rhs: Self) -> Self;
+    fn bit_and(self, rhs: Self) -> Self;
+    fn from_usize(val: usize) -> Self;
+    fn as_usize(self) -> usize;
+}
+
+impl Key for u64 {
+    const BIG_PRIME: Self = 11400714819323198549;
+
+    fn wrapping_mul(self, rhs: Self) -> Self {
+        self.wrapping_mul(rhs)
+    }
+
+    fn bit_and(self, rhs: Self) -> Self {
+        self & rhs
+    }
+
+    fn from_usize(val: usize) -> Self {
+        val as Self
+    }
+
+    fn as_usize(self) -> usize {
+        self as usize
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct IntMap<V> {
-    bins: Vec<Vec<(Key, V)>>,
+pub struct IntMap<K: Key, V> {
+    bins: Vec<Vec<(K, V)>>,
     len: usize,
 }
 
-impl<V: Clone> Clone for IntMap<V> {
+impl<K: Key, V: Clone> Clone for IntMap<K, V> {
     fn clone(&self) -> Self {
         Self {
             bins: self.bins.clone(),
@@ -33,7 +60,7 @@ impl<V: Clone> Clone for IntMap<V> {
     }
 }
 
-impl<V> IntMap<V> {
+impl<K: Key, V> IntMap<K, V> {
     pub fn new() -> Self {
         Self::with_capacity(2)
     }
@@ -48,13 +75,14 @@ impl<V> IntMap<V> {
         Self { bins, len: 0 }
     }
 
-    fn bin_idx(&self, key: &Key) -> usize {
-        let mask = (self.bins.len() - 1) as Key;
-        let key = key.wrapping_mul(11400714819323198549 as Key);
-        (key & mask) as usize
+    fn bin_idx(&self, key: &K) -> usize {
+        let mask = K::from_usize(self.bins.len() - 1);
+        let key = key.wrapping_mul(K::BIG_PRIME);
+
+        key.bit_and(mask).as_usize()
     }
 
-    pub fn insert(&mut self, key: Key, value: V) {
+    pub fn insert(&mut self, key: K, value: V) {
         if self.len >= (self.bins.len() as f64 * 1.2) as usize {
             self.grow();
         }
@@ -87,7 +115,7 @@ impl<V> IntMap<V> {
         }
     }
 
-    pub fn get(&self, key: &Key) -> Option<&V> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         let bin = self.bin_idx(key);
         self.bins[bin]
             .iter()
@@ -95,7 +123,7 @@ impl<V> IntMap<V> {
             .map(|(_, val)| val)
     }
 
-    pub fn get_mut(&mut self, key: &Key) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         let bin = self.bin_idx(key);
         self.bins[bin]
             .iter_mut()
@@ -107,25 +135,25 @@ impl<V> IntMap<V> {
         self.len
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = (Key, V)> {
+    pub fn into_iter(self) -> impl Iterator<Item = (K, V)> {
         self.bins.into_iter().flat_map(|bin| bin.into_iter())
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (Key, V)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (K, V)> {
         self.bins.iter_mut().flat_map(|bin| bin.iter_mut())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &(Key, V)> {
+    pub fn iter(&self) -> impl Iterator<Item = &(K, V)> {
         self.bins.iter().flat_map(|bin| bin.iter())
     }
 
-    pub fn contains_key(&self, key: &Key) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         self.get(key).is_some()
     }
 }
 
-impl<V> std::iter::FromIterator<(u64, V)> for IntMap<V> {
-    fn from_iter<T: IntoIterator<Item = (u64, V)>>(iter: T) -> Self {
+impl<K: Key, V> std::iter::FromIterator<(K, V)> for IntMap<K, V> {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let iter = iter.into_iter();
 
         let (_, upper) = iter.size_hint();
@@ -144,27 +172,33 @@ impl<V> std::iter::FromIterator<(u64, V)> for IntMap<V> {
     }
 }
 
-impl<V> Default for IntMap<V> {
+impl<K: Key, V> Default for IntMap<K, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[derive(Default, Debug)]
-pub struct IntSet {
-    map: IntMap<()>,
+#[derive(Debug)]
+pub struct IntSet<K: Key = u64> {
+    map: IntMap<K, ()>,
 }
 
-impl IntSet {
+impl<K: Key> Default for IntSet<K> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K: Key> IntSet<K> {
     pub fn new() -> Self {
         Self { map: IntMap::new() }
     }
 
-    pub fn insert(&mut self, item: Key) {
+    pub fn insert(&mut self, item: K) {
         self.map.insert(item, ());
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = Key> {
+    pub fn into_iter(self) -> impl Iterator<Item = K> {
         self.map.into_iter().map(|(key, _)| key)
     }
 
@@ -172,13 +206,13 @@ impl IntSet {
         self.map.len()
     }
 
-    pub fn contains(&self, item: &Key) -> bool {
+    pub fn contains(&self, item: &K) -> bool {
         self.map.contains_key(item)
     }
 }
 
-impl std::iter::FromIterator<u64> for IntSet {
-    fn from_iter<T: IntoIterator<Item = u64>>(iter: T) -> Self {
+impl<K: Key> std::iter::FromIterator<K> for IntSet<K> {
+    fn from_iter<T: IntoIterator<Item = K>>(iter: T) -> Self {
         let mut set = Self::new();
 
         for num in iter {

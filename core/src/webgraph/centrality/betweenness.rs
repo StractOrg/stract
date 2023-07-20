@@ -56,14 +56,14 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
         centrality.entry(s).or_default();
 
         let mut stack = Vec::new();
-        let mut predecessors: IntMap<Vec<u64>> = IntMap::new();
+        let mut predecessors: IntMap<NodeID, Vec<NodeID>> = IntMap::new();
 
         let mut sigma = IntMap::new();
 
-        sigma.insert(s.0, 1);
+        sigma.insert(s, 1);
 
         let mut distances = IntMap::new();
-        distances.insert(s.0, 0);
+        distances.insert(s, 0);
 
         let mut q = VecDeque::new();
         q.push_back(s);
@@ -73,25 +73,25 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
             for edge in graph.raw_outgoing_edges(&v) {
                 let w = edge.to;
 
-                if !distances.contains_key(&w.0) {
-                    let dist_v = distances.get(&v.0).unwrap();
+                if !distances.contains_key(&w) {
+                    let dist_v = distances.get(&v).unwrap();
                     q.push_back(w);
-                    distances.insert(w.0, dist_v + 1);
+                    distances.insert(w, dist_v + 1);
                 }
 
-                if *distances.get(&w.0).unwrap() == distances.get(&v.0).unwrap() + 1 {
-                    let sigma_v = *sigma.get(&v.0).unwrap_or(&0);
+                if *distances.get(&w).unwrap() == distances.get(&v).unwrap() + 1 {
+                    let sigma_v = *sigma.get(&v).unwrap_or(&0);
 
-                    if !sigma.contains_key(&w.0) {
-                        sigma.insert(w.0, 0);
+                    if !sigma.contains_key(&w) {
+                        sigma.insert(w, 0);
                     }
-                    *sigma.get_mut(&w.0).unwrap() += sigma_v;
+                    *sigma.get_mut(&w).unwrap() += sigma_v;
 
-                    if !predecessors.contains_key(&w.0) {
-                        predecessors.insert(w.0, Vec::new());
+                    if !predecessors.contains_key(&w) {
+                        predecessors.insert(w, Vec::new());
                     }
 
-                    predecessors.get_mut(&w.0).unwrap().push(v.0);
+                    predecessors.get_mut(&w).unwrap().push(v);
                 }
             }
         }
@@ -100,20 +100,20 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
 
         let mut delta = IntMap::new();
         while let Some(w) = stack.pop() {
-            if let Some(pred) = predecessors.get(&w.0) {
+            if let Some(pred) = predecessors.get(&w) {
                 for v in pred {
                     let dv = delta.get(v).copied().unwrap_or(0.0);
 
                     delta.insert(
                         *v,
-                        dv + (*sigma.get(v).unwrap() as f64 / *sigma.get(&w.0).unwrap() as f64)
-                            * (1.0 + delta.get(&w.0).unwrap_or(&0.0)),
+                        dv + (*sigma.get(v).unwrap() as f64 / *sigma.get(&w).unwrap() as f64)
+                            * (1.0 + delta.get(&w).unwrap_or(&0.0)),
                     );
                 }
             }
 
             if w != s {
-                *centrality.entry(w).or_insert(0.0) += *delta.get(&w.0).unwrap_or(&0.0);
+                *centrality.entry(w).or_insert(0.0) += *delta.get(&w).unwrap_or(&0.0);
             }
         }
     }

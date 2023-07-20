@@ -102,11 +102,7 @@ mod tests {
                 page_centrality: 0.0,
 
                 dmoz_description: None,
-                node_id: Some(
-                    graph
-                        .node2id(&Node::from("https://www.first.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(Node::from("https://www.first.com").into_host().id()),
             })
             .expect("failed to insert webpage");
         index
@@ -134,11 +130,7 @@ mod tests {
                 pre_computed_score: 0.0,
 
                 dmoz_description: None,
-                node_id: Some(
-                    graph
-                        .node2id(&Node::from("https://www.second.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(Node::from("https://www.second.com").into_host().id()),
             })
             .expect("failed to insert webpage");
         index
@@ -166,11 +158,7 @@ mod tests {
                 pre_computed_score: 0.0,
 
                 dmoz_description: None,
-                node_id: Some(
-                    graph
-                        .node2id(&Node::from("https://www.third.com").into_host())
-                        .unwrap(),
-                ),
+                node_id: Some(Node::from("https://www.third.com").into_host().id()),
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

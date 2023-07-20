@@ -15,10 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -26,31 +25,62 @@ use std::{cmp, fs};
 
 use crate::directory::{self, DirEntry};
 use crate::executor::Executor;
+use crate::intmap;
 use crate::webpage::Url;
 
 pub mod centrality;
 mod store;
-use self::segment::{LiveSegment, SegmentNodeID, StoredSegment};
+use self::segment::{LiveSegment, StoredSegment};
 use self::store::Store;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NodeID(pub u64);
+pub struct NodeID(u128);
 
-impl From<u64> for NodeID {
-    fn from(val: u64) -> Self {
-        Self(val)
+impl NodeID {
+    pub fn bit_64(self) -> u64 {
+        self.0 as u64
+    }
+
+    pub fn bit_128(self) -> u128 {
+        self.0
+    }
+}
+
+impl From<u128> for NodeID {
+    fn from(val: u128) -> Self {
+        NodeID(val)
+    }
+}
+
+impl intmap::Key for NodeID {
+    const BIG_PRIME: Self = NodeID(11400714819323198549);
+
+    fn wrapping_mul(self, rhs: Self) -> Self {
+        NodeID(self.0.wrapping_mul(rhs.0))
+    }
+
+    fn bit_and(self, rhs: Self) -> Self {
+        NodeID(self.0 & rhs.0)
+    }
+
+    fn from_usize(val: usize) -> Self {
+        NodeID(val as u128)
+    }
+
+    fn as_usize(self) -> usize {
+        self.0 as usize
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct FullStoredEdge {
-    other: SegmentNodeID,
+    other: NodeID,
     label: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct SmallStoredEdge {
-    other: SegmentNodeID,
+    other: NodeID,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -67,6 +97,11 @@ impl Node {
         Node {
             name: host.to_string(),
         }
+    }
+
+    pub fn id(&self) -> NodeID {
+        let digest = md5::compute(self.name.as_bytes());
+        NodeID(u128::from_be_bytes(*digest))
     }
 }
 
@@ -157,22 +192,12 @@ pub trait ShortestPaths {
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
 
-fn dijkstra<F1, F2>(
-    source: Node,
-    node_edges: F1,
-    edge_node: F2,
-    graph: &Webgraph,
-) -> BTreeMap<NodeID, u8>
+fn dijkstra<F1, F2>(source: Node, node_edges: F1, edge_node: F2) -> BTreeMap<NodeID, u8>
 where
     F1: Fn(NodeID) -> Vec<Edge>,
     F2: Fn(&Edge) -> NodeID,
 {
-    let source_id = graph.node2id(&source);
-    if source_id.is_none() {
-        return BTreeMap::new();
-    }
-
-    let source_id = source_id.unwrap();
+    let source_id = source.id();
     let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
 
     let mut queue = BinaryHeap::new();
@@ -207,7 +232,7 @@ impl ShortestPaths for Webgraph {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
+            .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
             .collect()
     }
 
@@ -216,7 +241,6 @@ impl ShortestPaths for Webgraph {
             source,
             |node| self.raw_outgoing_edges(&node),
             |edge| edge.to,
-            self,
         )
     }
 
@@ -225,14 +249,13 @@ impl ShortestPaths for Webgraph {
             source,
             |node| self.raw_ingoing_edges(&node),
             |edge| edge.from,
-            self,
         )
     }
 
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_reversed_distances(source)
             .into_iter()
-            .map(|(id, dist)| (self.id2node(&id).expect("unknown node"), dist))
+            .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
             .collect()
     }
 }
@@ -250,43 +273,11 @@ struct SegmentMergeCandidate {
     merges: Vec<StoredSegment>,
 }
 
-fn open_bin<T, P>(path: P) -> T
-where
-    P: AsRef<Path>,
-    T: DeserializeOwned + Default,
-{
-    let f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(path)
-        .unwrap();
-
-    let reader = BufReader::new(f);
-
-    bincode::deserialize_from(reader).unwrap_or_default()
-}
-
-fn save_bin<T, P>(val: &T, path: P)
-where
-    P: AsRef<Path>,
-    T: Serialize,
-{
-    let f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(path)
-        .unwrap();
-
-    bincode::serialize_into(f, val).unwrap();
-}
 pub struct Webgraph {
     pub path: String,
     live_segment: LiveSegment,
     segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
-    node2id: Store<Node, NodeID>,
     id2node: Store<NodeID, Node>,
     meta: Meta,
 }
@@ -341,30 +332,19 @@ impl Webgraph {
             live_segment: LiveSegment::default(),
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
-            node2id: Store::open(path.as_ref().join("node2id")),
             id2node: Store::open(path.as_ref().join("id2node")),
             meta,
         }
     }
 
-    fn id_and_increment(&mut self) -> NodeID {
-        let id = self.meta.next_node_id.into();
-        self.meta.next_node_id += 1;
-        id
-    }
-
     fn id_or_assign(&mut self, node: &Node) -> NodeID {
-        match self.node2id(node) {
-            Some(id) => id,
-            None => {
-                let id = self.id_and_increment();
+        let id = node.id();
 
-                self.node2id.put(node, &id);
-                self.id2node.put(&id, node);
-
-                id
-            }
+        if self.id2node(&id).is_none() {
+            self.id2node.put(&id, node);
         }
+
+        id
     }
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
@@ -374,24 +354,10 @@ impl Webgraph {
 
     pub fn merge(&mut self, mut other: Webgraph) {
         other.commit();
-        let mut mapping = Vec::new();
 
-        for (node, other_id) in other.node2id.iter() {
-            match self.node2id(&node) {
-                Some(this_id) => mapping.push((other_id, this_id)),
-                None => {
-                    let new_id = self.id_or_assign(&node);
-                    mapping.push((other_id, new_id));
-                }
-            }
+        for (other_id, node) in other.id2node.iter() {
+            self.id2node.put(&other_id, &node);
         }
-
-        self.executor
-            .map(
-                |segment| segment.update_id_mapping(mapping.clone()),
-                other.segments.iter_mut(),
-            )
-            .expect("failed to merge webgraphs");
 
         for segment in other.segments {
             let id = segment.id();
@@ -416,7 +382,6 @@ impl Webgraph {
         }
 
         self.save_metadata();
-        self.node2id.flush();
         self.id2node.flush();
 
         if self.segments.len() > 2 * num_cpus::get() {
@@ -425,18 +390,14 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        if let Some(node_id) = self.node2id(&node) {
-            self.inner_ingoing_edges(&node_id, true)
-                .into_iter()
-                .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap(),
-                    to: self.id2node(&edge.to).unwrap(),
-                    label: edge.label.loaded().unwrap(),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
+        self.inner_ingoing_edges(&node.id(), true)
+            .into_iter()
+            .map(|edge| FullEdge {
+                from: self.id2node(&edge.from).unwrap(),
+                to: self.id2node(&edge.to).unwrap(),
+                label: edge.label.loaded().unwrap(),
+            })
+            .collect()
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge> {
@@ -472,22 +433,14 @@ impl Webgraph {
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        if let Some(node_id) = self.node2id(&node) {
-            self.inner_outgoing_edges(&node_id, true)
-                .into_iter()
-                .map(|edge| FullEdge {
-                    from: self.id2node(&edge.from).unwrap(),
-                    to: self.id2node(&edge.to).unwrap(),
-                    label: edge.label.loaded().unwrap(),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub fn node2id(&self, node: &Node) -> Option<NodeID> {
-        self.node2id.get(node)
+        self.inner_outgoing_edges(&node.id(), true)
+            .into_iter()
+            .map(|edge| FullEdge {
+                from: self.id2node(&edge.from).unwrap(),
+                to: self.id2node(&edge.to).unwrap(),
+                label: edge.label.loaded().unwrap(),
+            })
+            .collect()
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
@@ -495,11 +448,11 @@ impl Webgraph {
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
-        self.node2id.values()
+        self.id2node.keys()
     }
 
     pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
-        self.node2id.iter()
+        self.id2node.iter().map(|(id, node)| (node, id))
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
@@ -512,7 +465,7 @@ impl Webgraph {
         }
 
         self.segments
-            .sort_by_key(|segment| std::cmp::Reverse(segment.num_nodes()));
+            .sort_by_key(|segment| std::cmp::Reverse(segment.estimate_num_nodes()));
 
         let mut candidates = Vec::with_capacity(num_segments);
 
