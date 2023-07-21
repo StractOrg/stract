@@ -15,12 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{cmp, fs};
 
 use crate::directory::{self, DirEntry};
@@ -279,6 +280,7 @@ pub struct Webgraph {
     segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
     id2node: Store<NodeID, Node>,
+    id2node_cache: Mutex<LruCache<NodeID, Node>>,
     meta: Meta,
 }
 
@@ -333,6 +335,7 @@ impl Webgraph {
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
             id2node: Store::open(path.as_ref().join("id2node")),
+            id2node_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
             meta,
         }
     }
@@ -444,7 +447,19 @@ impl Webgraph {
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node.get(id)
+        let mut guard = self.id2node_cache.lock().unwrap();
+
+        if let Some(node) = guard.get(id) {
+            return Some(node.clone());
+        }
+
+        let node = self.id2node.get(id);
+
+        if let Some(node) = &node {
+            guard.put(*id, node.clone());
+        }
+
+        node
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
