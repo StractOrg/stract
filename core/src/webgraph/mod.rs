@@ -54,7 +54,7 @@ impl From<u128> for NodeID {
 }
 
 impl intmap::Key for NodeID {
-    const BIG_PRIME: Self = NodeID(11400714819323198549);
+    const BIG_PRIME: Self = NodeID(335579573203413586826293107669396558523);
 
     fn wrapping_mul(self, rhs: Self) -> Self {
         NodeID(self.0.wrapping_mul(rhs.0))
@@ -335,7 +335,7 @@ impl Webgraph {
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
             id2node: Store::open(path.as_ref().join("id2node")),
-            id2node_cache: Mutex::new(LruCache::new(1_000_000.try_into().unwrap())),
+            id2node_cache: Mutex::new(LruCache::new(500_000.try_into().unwrap())),
             meta,
         }
     }
