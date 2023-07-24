@@ -88,6 +88,19 @@ fn simple_into_tantivy(
 }
 
 impl Term {
+    pub fn as_simple_text(&self) -> &str {
+        match self {
+            Term::Simple(term) => term,
+            Term::Phrase(terms) => terms,
+            Term::Not(term) => term.as_simple_text(),
+            Term::Site(term) => term,
+            Term::Title(term) => term,
+            Term::Body(term) => term,
+            Term::Url(term) => term,
+            Term::PossibleBang(term) => term,
+        }
+    }
+
     pub fn as_tantivy_query(
         &self,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],

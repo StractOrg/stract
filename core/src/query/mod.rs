@@ -77,13 +77,13 @@ impl Query {
             .collect();
 
         let simple_terms_text: Vec<String> = terms
-            .iter()
-            .filter_map(|term| {
-                if let Term::Simple(term) = term.as_ref() {
-                    Some(term.clone())
-                } else {
-                    None
-                }
+            .clone()
+            .into_iter()
+            .flat_map(|term| {
+                term.as_simple_text()
+                    .split_ascii_whitespace()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
             })
             .collect();
 
@@ -307,6 +307,26 @@ mod tests {
             terms,
             vec!["term!".to_string(), "term#".to_string(), "$".to_string()]
         );
+    }
+
+    #[test]
+    fn simple_terms_phrase() {
+        let index = empty_index();
+        let ctx = index.local_search_ctx();
+
+        let terms = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "\"test term\"".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query")
+        .simple_terms()
+        .to_vec();
+
+        assert_eq!(terms, vec!["test".to_string(), "term".to_string()]);
     }
 
     #[test]
