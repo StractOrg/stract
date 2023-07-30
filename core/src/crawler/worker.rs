@@ -26,10 +26,10 @@ use std::{
 use tokio::sync::Mutex;
 
 use crate::{
+    config::CrawlerConfig,
     crawler::{JobResponse, Request, Response},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     webpage::{Html, Url},
-    UserAgent,
 };
 
 use super::{
@@ -37,19 +37,12 @@ use super::{
     WarcWriter, WorkerJob,
 };
 
-const MIN_CRAWL_DELAY_MS: u64 = 200;
-const MAX_CRAWL_DELAY_MS: u64 = 30_000;
-const MAX_POLITENESS_FACTOR: f32 = 1024.0;
-const MIN_POLITENESS_FACTOR: f32 = 1.0;
-const MAX_URL_SLOWDOWN_RETRY: u8 = 3;
-
 pub struct Worker {
     current_job: Option<WorkerJob>,
     pending_commands: Arc<Mutex<VecDeque<Command>>>,
     writer: Arc<WarcWriter>,
     client: reqwest::Client,
-    user_agent: UserAgent,
-    default_politeness_factor: f32,
+    config: CrawlerConfig,
     politeness_factor: f32,
     coordinator_host: SocketAddr,
     num_jobs_per_fetch: usize,
@@ -60,13 +53,11 @@ impl Worker {
     pub fn new(
         pending_commands: Arc<Mutex<VecDeque<Command>>>,
         writer: Arc<WarcWriter>,
-        user_agent: UserAgent,
-        politeness_factor: f32,
+        config: CrawlerConfig,
         timeout: Duration,
         coordinator_host: SocketAddr,
-        num_jobs_per_fetch: usize,
     ) -> Result<Self> {
-        if politeness_factor < MIN_POLITENESS_FACTOR {
+        if config.politeness_factor < config.min_politeness_factor {
             return Err(Error::InvalidPolitenessFactor);
         }
 
@@ -74,7 +65,7 @@ impl Worker {
             .timeout(timeout)
             .connect_timeout(timeout)
             .http2_keep_alive_interval(None)
-            .user_agent(&user_agent.full)
+            .user_agent(&config.user_agent.full)
             .build()?;
 
         let robotstxt = RobotsTxtManager::new(client.clone());
@@ -84,11 +75,10 @@ impl Worker {
             client,
             current_job: None,
             pending_commands,
-            user_agent,
-            politeness_factor,
-            default_politeness_factor: politeness_factor,
+            num_jobs_per_fetch: config.num_workers,
+            politeness_factor: config.politeness_factor,
+            config,
             coordinator_host,
-            num_jobs_per_fetch,
             robotstxt,
         })
     }
@@ -159,7 +149,7 @@ impl Worker {
     }
 
     async fn process_job(&mut self) {
-        self.politeness_factor = self.default_politeness_factor;
+        self.politeness_factor = self.config.politeness_factor;
 
         let mut job = self.current_job.take().unwrap();
         tracing::info!("Processing job: {:?}", job.domain);
@@ -170,7 +160,7 @@ impl Worker {
         let mut crawled_sitemaps: HashSet<Site> = HashSet::new();
 
         while let Some(retryable_url) = job.urls.pop_front() {
-            if retryable_url.retries > MAX_URL_SLOWDOWN_RETRY {
+            if retryable_url.retries > self.config.max_url_slowdown_retry {
                 continue;
             }
 
@@ -180,7 +170,7 @@ impl Worker {
 
             if !self
                 .robotstxt
-                .is_allowed(&retryable_url.url, &self.user_agent.token)
+                .is_allowed(&retryable_url.url, &self.config.user_agent.token)
                 .await
             {
                 continue;
@@ -200,12 +190,12 @@ impl Worker {
 
             let mut delay = res.fetch_time.mul_f32(self.politeness_factor);
 
-            if delay < Duration::from_millis(MIN_CRAWL_DELAY_MS) {
-                delay = Duration::from_millis(MIN_CRAWL_DELAY_MS);
+            if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
+                delay = Duration::from_millis(self.config.min_crawl_delay_ms);
             }
 
-            if delay > Duration::from_millis(MAX_CRAWL_DELAY_MS) {
-                delay = Duration::from_millis(MAX_CRAWL_DELAY_MS);
+            if delay > Duration::from_millis(self.config.max_crawl_delay_ms) {
+                delay = Duration::from_millis(self.config.max_crawl_delay_ms);
             }
 
             tokio::time::sleep(delay).await;
@@ -308,8 +298,8 @@ impl Worker {
                     if datum.status_code == 429 {
                         self.politeness_factor *= 2.0;
 
-                        if self.politeness_factor > MAX_POLITENESS_FACTOR {
-                            self.politeness_factor = MAX_POLITENESS_FACTOR;
+                        if self.politeness_factor > self.config.max_politeness_factor {
+                            self.politeness_factor = self.config.max_politeness_factor;
                         }
 
                         tracing::warn!(
@@ -480,7 +470,10 @@ impl Worker {
                                 .full()
                                 .into();
 
-                            tokio::time::sleep(Duration::from_millis(MIN_CRAWL_DELAY_MS)).await;
+                            tokio::time::sleep(Duration::from_millis(
+                                self.config.min_crawl_delay_ms,
+                            ))
+                            .await;
 
                             urls.append(
                                 &mut self.urls_from_sitemap(url, depth + 1, max_depth).await,

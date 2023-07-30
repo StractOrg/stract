@@ -22,8 +22,6 @@ use crate::{
     webgraph::{Node, NodeID, Webgraph},
 };
 
-const MAX_SIMILAR_SITES: usize = 1_000;
-
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ScoredNode {
     pub node: Node,
@@ -58,18 +56,24 @@ impl Eq for ScoredNodeID {}
 pub struct SimilarSitesFinder {
     webgraph: Arc<Webgraph>,
     inbound_similarity: InboundSimilarity,
+    max_similar_sites: usize,
 }
 
 impl SimilarSitesFinder {
-    pub fn new(webgraph: Arc<Webgraph>, inbound_similarity: InboundSimilarity) -> Self {
+    pub fn new(
+        webgraph: Arc<Webgraph>,
+        inbound_similarity: InboundSimilarity,
+        max_similar_sites: usize,
+    ) -> Self {
         Self {
             webgraph,
             inbound_similarity,
+            max_similar_sites,
         }
     }
 
     pub fn find_similar_sites(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
-        let limit = limit.min(MAX_SIMILAR_SITES);
+        let limit = limit.min(self.max_similar_sites);
 
         let nodes: Vec<_> = nodes
             .iter()

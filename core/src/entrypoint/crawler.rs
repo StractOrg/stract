@@ -17,12 +17,13 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
+    config,
     crawler::{CrawlCoordinator, Crawler},
     distributed::sonic,
-    CrawlCoordinatorConfig, CrawlerConfig, Result,
+    Result,
 };
 
-pub async fn worker(config: CrawlerConfig) -> Result<()> {
+pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
     let crawler = Crawler::new(config).await?;
 
     crawler.wait().await;
@@ -30,7 +31,7 @@ pub async fn worker(config: CrawlerConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn coordinator(config: CrawlCoordinatorConfig) -> Result<()> {
+pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     let coordinator = Arc::new(CrawlCoordinator::new(
         config.crawldb_folder,
         config.num_urls_to_crawl,

@@ -37,11 +37,11 @@ pub use indexer::Indexer;
 use tracing::{debug, log::error};
 pub use webgraph::Webgraph;
 
-use crate::{warc::WarcFile, WarcSource};
+use crate::{config, warc::WarcFile};
 
 fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
-    source: &'a WarcSource,
+    source: &'a config::WarcSource,
     base_path: &'a str,
 ) -> impl Iterator<Item = String> + 'a {
     let download_path = Path::new(base_path).join("warc_files");

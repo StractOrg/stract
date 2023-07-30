@@ -34,7 +34,7 @@ use crate::{
     inverted_index,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
-    webpage::region::Region,
+    webpage::region::Region, config::CollectorConfig,
 };
 
 pub use self::signal::*;
@@ -47,10 +47,11 @@ pub struct Ranker {
     fastfield_reader: FastFieldReader,
     de_rank_similar: bool,
     num_results: Option<usize>,
+    collector_config: CollectorConfig,
 }
 
 impl Ranker {
-    pub fn new(aggregator: SignalAggregator, fastfield_reader: FastFieldReader) -> Self {
+    pub fn new(aggregator: SignalAggregator, fastfield_reader: FastFieldReader, collector_config: CollectorConfig) -> Self {
         Ranker {
             offset: None,
             aggregator,
@@ -58,6 +59,7 @@ impl Ranker {
             de_rank_similar: true,
             fastfield_reader,
             num_results: None,
+            collector_config,
         }
     }
 
@@ -117,6 +119,8 @@ impl Ranker {
         if let Some(max_docs) = &self.max_docs {
             collector = collector.and_max_docs(max_docs.clone());
         }
+
+        collector = collector.and_collector_config(self.collector_config.clone());
 
         collector.tweak_score(score_tweaker)
     }

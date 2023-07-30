@@ -41,12 +41,14 @@ use tch::Tensor;
 
 use crate::{
     api::search::ApiSearchQuery,
+    config::AcceleratorDevice,
+    config::AcceleratorDtype,
+    config::AliceAcceleratorConfig,
     llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
     summarizer::{self, ExtractiveSummarizer},
     webpage::Url,
-    AcceleratorDevice, AcceleratorDtype, AliceAcceleratorConfig,
 };
 
 use self::{

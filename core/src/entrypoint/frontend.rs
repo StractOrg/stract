@@ -18,11 +18,11 @@ use anyhow::Result;
 
 use crate::{
     api::{metrics_router, router, Counters},
+    config,
     metrics::Label,
-    FrontendConfig,
 };
 
-pub async fn run(config: FrontendConfig) -> Result<()> {
+pub async fn run(config: config::FrontendConfig) -> Result<()> {
     let search_counter_success = crate::metrics::Counter::default();
     let search_counter_fail = crate::metrics::Counter::default();
     let explore_counter = crate::metrics::Counter::default();

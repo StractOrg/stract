@@ -14,13 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
+    config::WarcSource,
+    config::WebgraphLevel,
+    config::{self, WebgraphConstructConfig},
     crawler::crawl_db::RedirectDb,
     entrypoint::download_all_warc_files,
     mapreduce::{Map, Reduce, Worker},
     warc::WarcFile,
     webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
     webpage::Html,
-    HttpConfig, LocalConfig, Result, S3Config, WarcSource, WebgraphConstructConfig, WebgraphLevel,
+    Result,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -36,26 +39,26 @@ struct GraphPointer {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobConfig {
-    Http(HttpConfig),
-    Local(LocalConfig),
-    S3(S3Config),
+    Http(config::HttpConfig),
+    Local(config::LocalConfig),
+    S3(config::S3Config),
 }
 
-impl From<WarcSource> for JobConfig {
-    fn from(value: WarcSource) -> Self {
+impl From<config::WarcSource> for JobConfig {
+    fn from(value: config::WarcSource) -> Self {
         match value {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-            WarcSource::S3(config) => JobConfig::S3(config),
+            config::WarcSource::HTTP(config) => JobConfig::Http(config),
+            config::WarcSource::Local(config) => JobConfig::Local(config),
+            config::WarcSource::S3(config) => JobConfig::S3(config),
         }
     }
 }
 
-impl From<JobConfig> for WarcSource {
+impl From<JobConfig> for config::WarcSource {
     fn from(value: JobConfig) -> Self {
         match value {
-            JobConfig::Http(config) => WarcSource::HTTP(config),
-            JobConfig::Local(config) => WarcSource::Local(config),
+            JobConfig::Http(config) => config::WarcSource::HTTP(config),
+            JobConfig::Local(config) => config::WarcSource::Local(config),
             JobConfig::S3(config) => WarcSource::S3(config),
         }
     }

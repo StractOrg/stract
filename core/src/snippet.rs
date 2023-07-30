@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::search_prettifier::html_escape;
 use crate::spell::sentence_ranges;
@@ -33,10 +34,6 @@ use whatlang::Lang;
 /// In the future we want to implement something closer to the method described in <https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf>.
 /// This might require us to store each paragraph of the webpage separately to get adequate performance (maybe we can split passages online with adequate performance
 /// but we need to test this).
-
-const DESIRED_NUM_CHARS: usize = 275;
-const DELTA_NUM_CHARS: usize = 50;
-const MIN_PASSAGE_WIDTH: usize = 20;
 
 const K1: f64 = 1.2;
 const B: f64 = 0.75;
@@ -90,7 +87,12 @@ impl SnippetString {
     }
 }
 
-fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> SnippetString {
+fn snippet_string(
+    text: &str,
+    terms: &[String],
+    lang: whatlang::Lang,
+    config: SnippetConfig,
+) -> SnippetString {
     let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
 
     let terms: HashSet<String> = terms
@@ -109,7 +111,7 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
 
     let mut passages: Vec<_> = sentence_ranges(text)
         .into_iter()
-        .filter(|offset| offset.end - offset.start > MIN_PASSAGE_WIDTH)
+        .filter(|offset| offset.end - offset.start > config.min_passage_width)
         .map(|offset| {
             let sentence = text[offset].to_string();
 
@@ -132,7 +134,7 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
 
     if passages.is_empty() {
         let mut snippet = SnippetString {
-            fragment: text.chars().take(DESIRED_NUM_CHARS).collect(),
+            fragment: text.chars().take(config.desired_num_chars).collect(),
             highlighted: Vec::new(),
         };
 
@@ -191,18 +193,18 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
         highlighted: Vec::new(),
     };
 
-    if snippet.fragment.len() > DESIRED_NUM_CHARS + DELTA_NUM_CHARS {
-        // TODO: find 'DESIRED_NUM_CHARS' sized window that contains most highlights
+    if snippet.fragment.len() > config.desired_num_chars + config.delta_num_chars {
+        // TODO: find 'desired_num_chars' sized window that contains most highlights
         // instead of taking the prefix of the passage as a snippet
         snippet.fragment = snippet
             .fragment
             .chars()
-            .take(DESIRED_NUM_CHARS + DELTA_NUM_CHARS)
+            .take(config.desired_num_chars + config.delta_num_chars)
             .collect();
     } else {
         let mut next_passage_idx = best_idx + 1;
 
-        while snippet.fragment.len() < DESIRED_NUM_CHARS - DELTA_NUM_CHARS
+        while snippet.fragment.len() < config.desired_num_chars - config.delta_num_chars
             && next_passage_idx < passages.len()
         {
             snippet.fragment += " ";
@@ -210,11 +212,11 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
             next_passage_idx += 1;
         }
 
-        if snippet.fragment.len() > DESIRED_NUM_CHARS + DELTA_NUM_CHARS {
+        if snippet.fragment.len() > config.desired_num_chars + config.delta_num_chars {
             snippet.fragment = snippet
                 .fragment
                 .chars()
-                .take(DESIRED_NUM_CHARS + DELTA_NUM_CHARS)
+                .take(config.desired_num_chars + config.delta_num_chars)
                 .collect();
         }
     }
@@ -223,13 +225,13 @@ fn snippet_string(text: &str, terms: &[String], lang: whatlang::Lang) -> Snippet
     snippet
 }
 
-pub fn generate(query: &Query, text: &str, region: &Region) -> String {
+pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> String {
     let lang = match region.lang() {
         Some(lang) => lang,
         None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
     };
 
-    let snippet = snippet_string(text, query.simple_terms(), lang);
+    let snippet = snippet_string(text, query.simple_terms(), lang, config);
 
     snippet.to_html()
 }
@@ -380,9 +382,14 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_query() {
         assert_eq!(
-            snippet_string("this is a test", &[], whatlang::Lang::Eng)
-                .fragment
-                .as_str(),
+            snippet_string(
+                "this is a test",
+                &[],
+                whatlang::Lang::Eng,
+                SnippetConfig::default()
+            )
+            .fragment
+            .as_str(),
             "this is a test"
         );
     }
@@ -390,14 +397,19 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_text() {
         assert_eq!(
-            snippet_string("", &["test".to_string()], whatlang::Lang::Eng)
-                .fragment
-                .as_str(),
+            snippet_string(
+                "",
+                &["test".to_string()],
+                whatlang::Lang::Eng,
+                SnippetConfig::default()
+            )
+            .fragment
+            .as_str(),
             ""
         );
 
         assert_eq!(
-            snippet_string("", &[], whatlang::Lang::Eng)
+            snippet_string("", &[], whatlang::Lang::Eng, SnippetConfig::default())
                 .fragment
                 .as_str(),
             ""

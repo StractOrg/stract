@@ -24,18 +24,15 @@ use tantivy::{
 };
 
 use crate::{
-    combine_u64s, fastfield_reader,
+    combine_u64s,
+    config::CollectorConfig,
+    fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::Prehashed,
     ranking::initial::Score,
     schema::FastField,
     simhash,
 };
-
-// lower scale -> higher penalty
-const SITE_SCALE: f64 = 14.0;
-const TITLE_SCALE: f64 = 6.0;
-const URL_SCALE: f64 = 0.1;
 
 #[derive(Clone)]
 pub struct MaxDocsConsidered {
@@ -52,7 +49,7 @@ pub struct Hashes {
 }
 
 pub trait Doc: Clone {
-    fn score(&self) -> &f64;
+    fn score(&self) -> f64;
     fn id(&self) -> &DocId;
     fn hashes(&self) -> Hashes;
 }
@@ -63,6 +60,7 @@ pub struct TopDocs {
     max_docs: Option<MaxDocsConsidered>,
     fastfield_reader: fastfield_reader::FastFieldReader,
     de_rank_similar: bool,
+    collector_config: CollectorConfig,
 }
 
 impl TopDocs {
@@ -73,6 +71,7 @@ impl TopDocs {
             max_docs: None,
             de_rank_similar: false,
             fastfield_reader,
+            collector_config: CollectorConfig::default(),
         }
     }
 
@@ -83,13 +82,16 @@ impl TopDocs {
 
     pub fn and_max_docs(mut self, max_docs: MaxDocsConsidered) -> Self {
         self.max_docs = Some(max_docs);
-
         self
     }
 
     pub fn and_de_rank_similar(mut self) -> Self {
         self.de_rank_similar = true;
+        self
+    }
 
+    pub fn and_collector_config(mut self, collector_config: CollectorConfig) -> Self {
+        self.collector_config = collector_config;
         self
     }
 
@@ -121,7 +123,10 @@ impl TopDocs {
             max_docs,
             num_docs_taken: 0,
             segment_ord: segment_local_id,
-            bucket_collector: BucketCollector::new(self.top_n + self.offset),
+            bucket_collector: BucketCollector::new(
+                self.top_n + self.offset,
+                self.collector_config.clone(),
+            ),
         })
     }
 }
@@ -185,7 +190,7 @@ impl TopSegmentCollector {
     }
 
     fn harvest(self) -> Vec<SegmentDoc> {
-        self.bucket_collector.into_sorted_vec(false)
+        self.bucket_collector.into_sorted_vec(true)
     }
 }
 
@@ -217,34 +222,39 @@ impl<T: Doc> Eq for ScoredDoc<T> {}
 impl<T: Doc> From<T> for ScoredDoc<T> {
     fn from(doc: T) -> Self {
         Self {
-            adjusted_score: *doc.score(),
+            adjusted_score: doc.score(),
             doc,
         }
     }
 }
 
-#[derive(Default)]
 struct BucketCount {
+    config: CollectorConfig,
     buckets: HashMap<Prehashed, usize>,
 }
 
 impl BucketCount {
+    fn new(config: CollectorConfig) -> Self {
+        Self {
+            config,
+            buckets: HashMap::new(),
+        }
+    }
+
     pub fn adjust_score<T: Doc>(&self, doc: &mut ScoredDoc<T>) {
         let hashes = doc.doc.hashes();
 
-        let mut adjuster = 1.0;
+        let taken_sites = *self.buckets.get(&hashes.site).unwrap_or(&0);
+        let taken_urls = *self.buckets.get(&hashes.url).unwrap_or(&0);
+        let taken_titles = *self.buckets.get(&hashes.title).unwrap_or(&0);
 
-        let taken_sites = self.buckets.get(&hashes.site).unwrap_or(&0);
+        let adjuster = 1.0
+            / (1.0
+                + taken_sites as f64 * self.config.site_penalty
+                + taken_urls as f64 * self.config.url_penalty
+                + taken_titles as f64 * self.config.title_penalty);
 
-        adjuster *= SITE_SCALE / (SITE_SCALE + (*taken_sites as f64));
-
-        let taken_urls = self.buckets.get(&hashes.url).unwrap_or(&0);
-        adjuster *= URL_SCALE / (URL_SCALE + (*taken_urls as f64));
-
-        let taken_titles = self.buckets.get(&hashes.title).unwrap_or(&0);
-        adjuster *= TITLE_SCALE / (TITLE_SCALE + (*taken_titles as f64));
-
-        doc.adjusted_score = *doc.doc.score() * adjuster;
+        doc.adjusted_score = doc.doc.score() * adjuster;
     }
 
     fn update_counts<T: Doc>(&mut self, doc: &ScoredDoc<T>) {
@@ -263,27 +273,28 @@ pub struct BucketCollector<T: Doc> {
 }
 
 impl<T: Doc> BucketCollector<T> {
-    pub fn new(top_n: usize) -> Self {
+    pub fn new(top_n: usize, config: CollectorConfig) -> Self {
         assert!(top_n > 0);
 
         Self {
             top_n,
-            count: BucketCount::default(),
+            count: BucketCount::new(config),
             documents: MinMaxHeap::with_capacity(top_n + 1),
         }
     }
 
     pub fn insert(&mut self, doc: T) {
-        let scored_doc = doc.into();
+        let mut scored_doc: ScoredDoc<T> = doc.into();
+        self.count.adjust_score(&mut scored_doc);
 
-        self.documents.push(scored_doc);
+        if self.documents.len() > self.top_n {
+            let mut min_scored_doc = self.documents.peek_min_mut().unwrap();
 
-        self.prune_buckets()
-    }
-
-    fn prune_buckets(&mut self) {
-        while self.documents.len() > self.top_n + 1 {
-            self.documents.pop_min().unwrap();
+            if scored_doc.adjusted_score > min_scored_doc.adjusted_score {
+                *min_scored_doc = scored_doc;
+            }
+        } else {
+            self.documents.push(scored_doc);
         }
     }
 
@@ -341,8 +352,8 @@ pub struct SegmentDoc {
 }
 
 impl Doc for SegmentDoc {
-    fn score(&self) -> &f64 {
-        &self.score.total
+    fn score(&self) -> f64 {
+        self.score.total
     }
 
     fn id(&self) -> &DocId {
@@ -404,7 +415,10 @@ where
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        let mut collector = BucketCollector::new(self.top_docs.top_n + self.top_docs.offset);
+        let mut collector = BucketCollector::new(
+            self.top_docs.top_n + self.top_docs.offset,
+            self.top_docs.collector_config.clone(),
+        );
 
         for docs in segment_fruits {
             for doc in docs {
@@ -458,7 +472,7 @@ mod tests {
     use super::*;
 
     fn test(top_n: usize, docs: &[(Hashes, DocId, f64)], expected: &[(f64, DocId)]) {
-        let mut collector = BucketCollector::new(top_n);
+        let mut collector = BucketCollector::new(top_n, CollectorConfig::default());
 
         for doc in docs {
             collector.insert(SegmentDoc {

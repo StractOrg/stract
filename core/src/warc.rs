@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::distributed::retry_strategy::ExponentialBackoff;
-use crate::{Error, Result, S3Config, WarcSource};
+use crate::{config::S3Config, config::WarcSource, Error, Result};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};

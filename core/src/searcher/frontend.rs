@@ -24,6 +24,7 @@ use itertools::intersperse;
 use optics::Optic;
 
 use crate::bangs::{Bang, BangHit};
+use crate::config::{CollectorConfig, FrontendThresholds};
 use crate::inverted_index::RetrievedWebpage;
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
@@ -48,15 +49,14 @@ use super::{
     SearchResult, WebsitesResult,
 };
 
-const STACKOVERFLOW_SIDEBAR_THRESHOLD: f64 = 0.1;
-const DISCUSSIONS_WIDGET_THRESHOLD: f64 = 0.1;
-
 pub struct FrontendSearcher {
     distributed_searcher: DistributedSearcher,
     cross_encoder: Arc<CrossEncoderModel>,
     lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
+    collector_config: CollectorConfig,
+    thresholds: FrontendThresholds,
 }
 
 impl FrontendSearcher {
@@ -66,6 +66,8 @@ impl FrontendSearcher {
         lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,
         bangs: Bangs,
+        collector_config: CollectorConfig,
+        thresholds: FrontendThresholds,
     ) -> Self {
         Self {
             distributed_searcher: DistributedSearcher::new(cluster),
@@ -73,6 +75,8 @@ impl FrontendSearcher {
             lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
             bangs,
+            collector_config,
+            thresholds,
         }
     }
 
@@ -81,7 +85,8 @@ impl FrontendSearcher {
         initial_results: Vec<InitialSearchResultShard>,
         pipeline: RankingPipeline<ScoredWebsitePointer>,
     ) -> (Vec<ScoredWebsitePointer>, bool) {
-        let mut collector = BucketCollector::new(pipeline.collector_top_n());
+        let mut collector =
+            BucketCollector::new(pipeline.collector_top_n(), self.collector_config.clone());
 
         let mut num_sites: usize = 0;
         for result in initial_results {
@@ -136,7 +141,7 @@ impl FrontendSearcher {
         results.sort_by(|(_, a), (_, b)| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal));
 
         if let Some((shard, website)) = results.pop() {
-            if website.score > STACKOVERFLOW_SIDEBAR_THRESHOLD {
+            if website.score > self.thresholds.stackoverflow {
                 let scored_websites = vec![ScoredWebsitePointer { website, shard }];
                 let mut retrieved = self
                     .distributed_searcher
@@ -228,6 +233,7 @@ impl FrontendSearcher {
             &mut query,
             self.cross_encoder.clone(),
             self.lambda_model.clone(),
+            self.collector_config.clone(),
         )?;
 
         let initial_results = self.distributed_searcher.search_initial(&query).await;
@@ -258,7 +264,7 @@ impl FrontendSearcher {
             scores[scores.len() / 2]
         };
 
-        if median < DISCUSSIONS_WIDGET_THRESHOLD {
+        if median < self.thresholds.discussions_widget {
             return Ok(None);
         }
 
@@ -308,6 +314,7 @@ impl FrontendSearcher {
             &mut search_query,
             self.cross_encoder.clone(),
             self.lambda_model.clone(),
+            self.collector_config.clone(),
         )?;
 
         let initial_results = self

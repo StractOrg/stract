@@ -35,6 +35,7 @@ use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 
 use crate::collector::Hashes;
+use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
 use crate::query::Query;
 use crate::ranking::initial::Score;
@@ -102,6 +103,7 @@ pub struct InvertedIndex {
     writer: IndexWriter,
     reader: IndexReader,
     schema: Arc<Schema>,
+    snippet_config: SnippetConfig,
 }
 
 impl InvertedIndex {
@@ -165,7 +167,12 @@ impl InvertedIndex {
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
             tantivy_index,
+            snippet_config: SnippetConfig::default(),
         })
+    }
+
+    pub fn set_snippet_config(&mut self, config: SnippetConfig) {
+        self.snippet_config = config;
     }
 
     pub fn fastfield_reader(&self, tv_searcher: &tantivy::Searcher) -> FastFieldReader {
@@ -305,7 +312,8 @@ impl InvertedIndex {
             .collect();
 
         for page in &mut webpages {
-            page.snippet = snippet::generate(query, &page.body, &page.region);
+            page.snippet =
+                snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
         }
 
         Ok(webpages)
@@ -649,6 +657,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
@@ -678,6 +687,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -724,6 +734,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -768,6 +779,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -812,6 +824,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -886,6 +899,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let mut result =
@@ -940,6 +954,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -983,6 +998,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -1051,6 +1067,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -1078,6 +1095,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -1108,6 +1126,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
@@ -1152,6 +1171,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -1216,6 +1236,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =
@@ -1266,6 +1287,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
+            Default::default(),
         );
 
         let result =

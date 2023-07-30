@@ -42,7 +42,11 @@ pub fn main() {
     let graph = WebgraphBuilder::new("data/webgraph").open();
     let store = CentralityStore::open("data/centrality");
 
-    let similarity_finder = SimilarSitesFinder::new(graph.into(), store.inbound_similarity);
+    let similarity_finder = SimilarSitesFinder::new(
+        graph.into(),
+        store.inbound_similarity,
+        stract::config::defaults::WebgraphServer::max_similar_sites(),
+    );
 
     print_top_nodes(
         &[

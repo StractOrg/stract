@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, StoredEntity};
 use crate::image_store::Image;
 use crate::index::Index;
@@ -45,6 +46,7 @@ pub struct LocalSearcher {
     centrality_store: Option<SearchCentralityStore>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
+    collector_config: CollectorConfig,
 }
 
 impl From<Index> for LocalSearcher {
@@ -69,6 +71,7 @@ impl LocalSearcher {
             centrality_store: None,
             linear_regression: None,
             lambda_model: None,
+            collector_config: CollectorConfig::default(),
         }
     }
 
@@ -86,6 +89,14 @@ impl LocalSearcher {
 
     pub fn set_lambda_model(&mut self, model: LambdaMART) {
         self.lambda_model = Some(Arc::new(model));
+    }
+
+    pub fn set_collector_config(&mut self, config: CollectorConfig) {
+        self.collector_config = config;
+    }
+
+    pub fn set_snippet_config(&mut self, config: SnippetConfig) {
+        self.index.inverted_index.set_snippet_config(config);
     }
 
     fn parse_query(&self, ctx: &Ctx, query: &SearchQuery) -> Result<Query> {
@@ -110,6 +121,7 @@ impl LocalSearcher {
         let mut ranker = Ranker::new(
             aggregator,
             self.index.inverted_index.fastfield_reader(&ctx.tv_searcher),
+            self.collector_config.clone(),
         );
 
         if let Some(region) = query.region() {
@@ -155,8 +167,11 @@ impl LocalSearcher {
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RankingWebsite> =
-            RankingPipeline::ltr_for_query(&mut query, self.lambda_model.clone());
+        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::ltr_for_query(
+            &mut query,
+            self.lambda_model.clone(),
+            self.collector_config.clone(),
+        );
         let parsed_query = self.parse_query(ctx, &query)?;
 
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
@@ -298,13 +313,17 @@ impl LocalSearcher {
         let mut search_query = query.clone();
 
         let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
-            Ok(model) => {
-                RankingPipeline::reranking_for_query(&mut search_query, Arc::new(model), None)?
-            }
+            Ok(model) => RankingPipeline::reranking_for_query(
+                &mut search_query,
+                Arc::new(model),
+                None,
+                self.collector_config.clone(),
+            )?,
             Err(_) => RankingPipeline::reranking_for_query(
                 &mut search_query,
                 Arc::new(DummyCrossEncoder {}),
                 None,
+                self.collector_config.clone(),
             )?,
         };
 

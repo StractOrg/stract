@@ -13,7 +13,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let webgraph = Arc::new(WebgraphBuilder::new(WEBGRAPH_PATH).open());
     let inbound = InboundSimilarity::open(INBOUND_SIMILARITY_PATH).unwrap();
 
-    let finder = SimilarSitesFinder::new(webgraph, inbound);
+    let finder = SimilarSitesFinder::new(
+        webgraph,
+        inbound,
+        stract::config::defaults::WebgraphServer::max_similar_sites(),
+    );
 
     for _ in 0..10 {
         c.bench_function("similar_sites", |b| {

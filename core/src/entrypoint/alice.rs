@@ -33,12 +33,12 @@ use tracing::info;
 
 use crate::{
     alice::{Alice, EncodedEncryptedState, EncryptedState},
+    config::AliceLocalConfig,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
     },
     ttl_cache::TTLCache,
-    AliceLocalConfig,
 };
 
 pub struct State {

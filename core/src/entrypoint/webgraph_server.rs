@@ -22,6 +22,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use tracing::info;
 
+use crate::config;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
@@ -33,7 +34,6 @@ use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
 use crate::webpage::Url;
 use crate::Result;
-use crate::WebgraphServerConfig;
 
 #[derive(Serialize, Deserialize)]
 pub enum Request {
@@ -50,7 +50,7 @@ pub struct ScoredSite {
 
 const MAX_SITES: usize = 20;
 
-pub async fn run(config: WebgraphServerConfig) -> Result<()> {
+pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
     // dropping the handle leaves the cluster
@@ -70,7 +70,11 @@ pub async fn run(config: WebgraphServerConfig) -> Result<()> {
     let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
-    let similar_sites_finder = SimilarSitesFinder::new(Arc::clone(&graph), inbound_similarity);
+    let similar_sites_finder = SimilarSitesFinder::new(
+        Arc::clone(&graph),
+        inbound_similarity,
+        config.max_similar_sites,
+    );
 
     let server = sonic::Server::bind(addr).await.unwrap();
 

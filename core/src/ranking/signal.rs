@@ -250,30 +250,30 @@ impl Signal {
     pub fn default_coefficient(&self) -> f64 {
         match self {
             Signal::Bm25 => 0.0005,
-            Signal::Bm25Title => 0.004,
+            Signal::Bm25Title => 0.005,
             Signal::Bm25TitleBigrams => 0.005,
-            Signal::Bm25TitleTrigrams => 0.01,
-            Signal::Bm25CleanBody => 0.004,
+            Signal::Bm25TitleTrigrams => 0.005,
+            Signal::Bm25CleanBody => 0.005,
             Signal::Bm25CleanBodyBigrams => 0.005,
-            Signal::Bm25CleanBodyTrigrams => 0.01,
-            Signal::Bm25StemmedTitle => 0.001,
+            Signal::Bm25CleanBodyTrigrams => 0.005,
+            Signal::Bm25StemmedTitle => 0.0005,
             Signal::Bm25StemmedCleanBody => 0.0005,
             Signal::Bm25AllBody => 0.0,
-            Signal::Bm25Url => 0.0001,
-            Signal::Bm25Site => 0.0001,
-            Signal::Bm25Domain => 0.0001,
-            Signal::Bm25SiteNoTokenizer => 0.0001,
-            Signal::Bm25DomainNoTokenizer => 0.0001,
-            Signal::Bm25DomainIfHomepage => 0.0001,
+            Signal::Bm25Url => 0.00005,
+            Signal::Bm25Site => 0.00005,
+            Signal::Bm25Domain => 0.00005,
+            Signal::Bm25SiteNoTokenizer => 0.00005,
+            Signal::Bm25DomainNoTokenizer => 0.00005,
+            Signal::Bm25DomainIfHomepage => 0.00005,
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0001,
-            Signal::Bm25TitleIfHomepage => 0.0001,
-            Signal::Bm25BacklinkText => 0.01,
+            Signal::Bm25TitleIfHomepage => 0.00001,
+            Signal::Bm25BacklinkText => 0.001,
             Signal::Bm25Description => 5.99679347128802e-05,
-            Signal::ProximitySlop0 => 0.0005,
-            Signal::ProximitySlop1 => 0.0005,
-            Signal::ProximitySlop2 => 0.0005,
-            Signal::ProximitySlop4 => 0.0005,
-            Signal::ProximitySlop8 => 0.0005,
+            Signal::ProximitySlop0 => 0.01,
+            Signal::ProximitySlop1 => 0.01,
+            Signal::ProximitySlop2 => 0.01,
+            Signal::ProximitySlop4 => 0.01,
+            Signal::ProximitySlop8 => 0.01,
             Signal::CrossEncoder => 0.16801589371906178,
             Signal::HostCentrality => 1.0,
             Signal::PageCentrality => 2.0,
@@ -446,21 +446,19 @@ impl Signal {
             | Signal::ProximitySlop2
             | Signal::ProximitySlop4
             | Signal::ProximitySlop8 => {
-                signal_aggregator
+                let reader = signal_aggregator
                     .segment_reader
                     .as_mut()
-                    .and_then(|reader| {
-                        reader.proximity_scorers.get_mut(self).map(|scorer| {
-                            let docset = &mut scorer.docset;
-                            if docset.doc() == doc
-                                || (docset.doc() < doc && docset.seek(doc) == doc)
-                            {
-                                docset.score() as f64
-                            } else {
-                                0.0
-                            }
-                        })
-                    })
+                    .expect("set segment reader before computing signals");
+
+                reader.proximity_scorers.get_mut(self).map(|scorer| {
+                    let docset = &mut scorer.docset;
+                    if docset.doc() == doc || (docset.doc() < doc && docset.seek(doc) == doc) {
+                        docset.score() as f64
+                    } else {
+                        0.0
+                    }
+                })
             }
             Signal::CrossEncoder => None, // this is calculated in a later step
             Signal::LambdaMART => None,

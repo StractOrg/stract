@@ -26,6 +26,7 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
+    config::FrontendConfig,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -37,7 +38,6 @@ use crate::{
     ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
     searcher::frontend::FrontendSearcher,
     summarizer::Summarizer,
-    FrontendConfig,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -150,8 +150,15 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .await?,
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-    let searcher =
-        FrontendSearcher::new(cluster.clone(), crossencoder, lambda_model, qa_model, bangs);
+    let searcher = FrontendSearcher::new(
+        cluster.clone(),
+        crossencoder,
+        lambda_model,
+        qa_model,
+        bangs,
+        config.collector.clone(),
+        config.thresholds.clone(),
+    );
 
     let state = Arc::new(State {
         config: config.clone(),

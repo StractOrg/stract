@@ -18,16 +18,15 @@ use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
+use stract::config;
 use stract::entrypoint::autosuggest_scrape::{self, Gl};
+
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
+
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, frontend, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use stract::{
-    AliceLocalConfig, CrawlCoordinatorConfig, CrawlerConfig, FrontendConfig, SearchServerConfig,
-    WebgraphServerConfig,
-};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -231,7 +230,7 @@ fn main() -> Result<()> {
                 }
             }
             WebgraphOptions::Server { config_path } => {
-                let config: WebgraphServerConfig = load_toml_config(config_path);
+                let config: config::WebgraphServerConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -240,7 +239,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Frontend { config_path } => {
-            let config: FrontendConfig = load_toml_config(config_path);
+            let config: config::FrontendConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -248,7 +247,7 @@ fn main() -> Result<()> {
                 .block_on(frontend::run(config))?
         }
         Commands::SearchServer { config_path } => {
-            let config: SearchServerConfig = load_toml_config(config_path);
+            let config: config::SearchServerConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -280,7 +279,7 @@ fn main() -> Result<()> {
         } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
         Commands::Alice { options } => match options {
             AliceOptions::Serve { config_path } => {
-                let config: AliceLocalConfig = load_toml_config(config_path);
+                let config: config::AliceLocalConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -290,7 +289,7 @@ fn main() -> Result<()> {
             AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
         },
         Commands::CrawlCoordinator { config_path } => {
-            let config: CrawlCoordinatorConfig = load_toml_config(config_path);
+            let config: config::CrawlCoordinatorConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -298,7 +297,7 @@ fn main() -> Result<()> {
                 .block_on(entrypoint::crawler::coordinator(config))?
         }
         Commands::Crawler { config_path } => {
-            let config: CrawlerConfig = load_toml_config(config_path);
+            let config: config::CrawlerConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()

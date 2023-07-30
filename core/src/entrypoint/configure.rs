@@ -74,13 +74,13 @@ fn create_webgraph() -> Result<()> {
     let warc_path = Path::new(DATA_PATH).join("sample.warc.gz");
 
     let job = webgraph::Job {
-        config: webgraph::JobConfig::Local(crate::LocalConfig {
+        config: webgraph::JobConfig::Local(crate::config::LocalConfig {
             folder: ".".to_string(),
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         graph_base_path: out_path_tmp.to_str().unwrap().to_string(),
-        level: crate::WebgraphLevel::Host,
+        level: crate::config::WebgraphLevel::Host,
     };
 
     let worker = webgraph::WebgraphWorker { redirect: None };
@@ -115,7 +115,7 @@ fn create_inverted_index() -> Result<()> {
     let warc_path = Path::new(DATA_PATH).join("sample.warc.gz");
 
     let job = indexer::Job {
-        source_config: indexer::JobConfig::Local(crate::LocalConfig {
+        source_config: indexer::JobConfig::Local(crate::config::LocalConfig {
             folder: ".".to_string(),
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),

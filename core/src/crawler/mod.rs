@@ -22,7 +22,7 @@ use std::{
 
 use tokio::sync::Mutex;
 
-use crate::{webpage::Url, CrawlerConfig};
+use crate::{config::CrawlerConfig, webpage::Url};
 
 use self::{
     warc_writer::{WarcWriter, WarcWriterMessage},
@@ -36,8 +36,6 @@ mod warc_writer;
 mod worker;
 
 pub use coordinator::CrawlCoordinator;
-
-const DEFAULT_POLITENESS_FACTOR: f32 = 1.0;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -58,9 +56,6 @@ pub enum Error {
 
     #[error("invalid politeness factor")]
     InvalidPolitenessFactor,
-
-    #[error("sqlite error")]
-    Sqlite(#[from] rusqlite::Error),
 
     #[error("addr parse error: {0}")]
     AddrParse(#[from] std::net::AddrParseError),
@@ -170,7 +165,7 @@ pub struct Crawler {
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
         let pending_commands = Arc::new(Mutex::new(VecDeque::new()));
-        let writer = Arc::new(WarcWriter::new(config.s3));
+        let writer = Arc::new(WarcWriter::new(config.s3.clone()));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
         let coordinator_host = config.coordinator_host.parse()?;
@@ -179,13 +174,9 @@ impl Crawler {
             let worker = Worker::new(
                 Arc::clone(&pending_commands),
                 Arc::clone(&writer),
-                config.user_agent.clone(),
-                config
-                    .politeness_factor
-                    .unwrap_or(DEFAULT_POLITENESS_FACTOR),
+                config.clone(),
                 timeout,
                 coordinator_host,
-                config.num_workers,
             )?;
 
             handles.push(tokio::spawn(async move {

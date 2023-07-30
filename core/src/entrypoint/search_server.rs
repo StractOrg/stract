@@ -19,6 +19,7 @@ use std::{collections::HashMap, net::SocketAddr};
 use tracing::info;
 
 use crate::{
+    config,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -33,10 +34,10 @@ use crate::{
     },
     searcher::{self, LocalSearcher},
     webpage::Url,
-    Result, SearchServerConfig,
+    Result,
 };
 
-pub async fn run(config: SearchServerConfig) -> Result<()> {
+pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
     let server = sonic::Server::bind(addr).await.unwrap();
 
@@ -65,6 +66,9 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
     if let Some(model_path) = config.lambda_model_path {
         local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
     }
+
+    local_searcher.set_collector_config(config.collector);
+    local_searcher.set_snippet_config(config.snippet);
 
     // dropping the handle leaves the cluster
     let _cluster_handle = Cluster::join(
@@ -100,7 +104,7 @@ pub async fn run(config: SearchServerConfig) -> Result<()> {
                     }
                 }
                 searcher::Request::Search(query) => {
-                    match local_searcher.search_initial(query, false) {
+                    match local_searcher.search_initial(query, true) {
                         Ok(result) => {
                             req.respond(sonic::Response::Content(result)).await.ok();
                         }

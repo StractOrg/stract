@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     collector::{self, BucketCollector},
+    config::CollectorConfig,
     enum_map::EnumMap,
     inverted_index::WebsitePointer,
     searcher::SearchQuery,
@@ -40,8 +41,8 @@ impl<T> collector::Doc for T
 where
     T: AsRankingWebsite,
 {
-    fn score(&self) -> &f64 {
-        &self.as_ranking().score
+    fn score(&self) -> f64 {
+        self.as_ranking().score
     }
 
     fn id(&self) -> &tantivy::DocId {
@@ -234,7 +235,13 @@ struct RankingStage<T: AsRankingWebsite> {
 }
 
 impl<T: AsRankingWebsite> RankingStage<T> {
-    fn apply(&self, websites: Vec<T>, top_n: usize, offset: usize) -> Vec<T> {
+    fn apply(
+        &self,
+        websites: Vec<T>,
+        top_n: usize,
+        offset: usize,
+        collector_config: CollectorConfig,
+    ) -> Vec<T> {
         let mut websites = websites
             .into_iter()
             .skip(offset)
@@ -251,7 +258,8 @@ impl<T: AsRankingWebsite> RankingStage<T> {
             }
         }
 
-        let mut collector = BucketCollector::new(self.stage_top_n.max(top_n) + offset);
+        let mut collector =
+            BucketCollector::new(self.stage_top_n.max(top_n) + offset, collector_config);
 
         for website in websites {
             collector.insert(website);
@@ -269,23 +277,26 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
     stage: RankingStage<T>,
     page: usize,
     pub top_n: usize,
+    collector_config: CollectorConfig,
 }
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
     fn create_reranking<M: CrossEncoder + 'static>(
         crossencoder: Arc<M>,
         lambda: Option<Arc<LambdaMART>>,
+        collector_config: CollectorConfig,
     ) -> Result<Self> {
         let stage = RankingStage {
             scorer: Box::new(ReRanker::new(crossencoder, lambda)),
             stage_top_n: 20,
-            derank_similar: false,
+            derank_similar: true,
         };
 
         Ok(Self {
             stage,
             page: 0,
             top_n: 0,
+            collector_config,
         })
     }
 
@@ -293,14 +304,15 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         query: &mut SearchQuery,
         crossencoder: Arc<M>,
         lambda: Option<Arc<LambdaMART>>,
+        collector_config: CollectorConfig,
     ) -> Result<Self> {
-        let mut pipeline = Self::create_reranking(crossencoder, lambda)?;
+        let mut pipeline = Self::create_reranking(crossencoder, lambda, collector_config)?;
         pipeline.set_query_info(query);
 
         Ok(pipeline)
     }
 
-    fn create_ltr(model: Option<Arc<LambdaMART>>) -> Self {
+    fn create_ltr(model: Option<Arc<LambdaMART>>, collector_config: CollectorConfig) -> Self {
         let last_stage = RankingStage {
             scorer: Box::new(Initial {
                 model,
@@ -314,11 +326,16 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
             stage: last_stage,
             page: 0,
             top_n: 0,
+            collector_config,
         }
     }
 
-    pub fn ltr_for_query(query: &mut SearchQuery, model: Option<Arc<LambdaMART>>) -> Self {
-        let mut pipeline = Self::create_ltr(model);
+    pub fn ltr_for_query(
+        query: &mut SearchQuery,
+        model: Option<Arc<LambdaMART>>,
+        collector_config: CollectorConfig,
+    ) -> Self {
+        let mut pipeline = Self::create_ltr(model, collector_config);
         pipeline.set_query_info(query);
 
         pipeline
@@ -338,7 +355,12 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn apply(self, websites: Vec<T>) -> Vec<T> {
-        self.stage.apply(websites, self.top_n, self.offset())
+        self.stage.apply(
+            websites,
+            self.top_n,
+            self.offset(),
+            self.collector_config.clone(),
+        )
     }
 
     pub fn collector_top_n(&self) -> usize {
@@ -399,6 +421,7 @@ mod tests {
             },
             Arc::new(DummyCrossEncoder {}),
             None,
+            CollectorConfig::default(),
         )
         .unwrap();
         assert_eq!(pipeline.collector_top_n(), 20);
@@ -429,6 +452,7 @@ mod tests {
             },
             Arc::new(DummyCrossEncoder {}),
             None,
+            CollectorConfig::default(),
         )
         .unwrap();
 
@@ -462,6 +486,7 @@ mod tests {
             },
             Arc::new(DummyCrossEncoder {}),
             None,
+            CollectorConfig::default(),
         )
         .unwrap();
 
@@ -475,6 +500,7 @@ mod tests {
                 },
                 Arc::new(DummyCrossEncoder {}),
                 None,
+                CollectorConfig::default(),
             )
             .unwrap();
 

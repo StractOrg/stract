@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use tokio::pin;
 use tracing::{debug, info, trace, warn};
 
+use crate::config;
 use crate::entrypoint::download_all_warc_files;
 use crate::executor::Executor;
 use crate::index::{FrozenIndex, Index};
@@ -31,36 +32,33 @@ use crate::ranking::SignalAggregator;
 use crate::warc::WarcFile;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
 use crate::webpage::{Html, Link, Webpage};
-use crate::{
-    human_website_annotations, HttpConfig, IndexingLocalConfig, LocalConfig, Result, S3Config,
-    WarcSource,
-};
+use crate::{human_website_annotations, Result};
 
 pub struct Indexer {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobConfig {
-    Http(HttpConfig),
-    Local(LocalConfig),
-    S3(S3Config),
+    Http(config::HttpConfig),
+    Local(config::LocalConfig),
+    S3(config::S3Config),
 }
 
-impl From<WarcSource> for JobConfig {
-    fn from(value: WarcSource) -> Self {
+impl From<config::WarcSource> for JobConfig {
+    fn from(value: config::WarcSource) -> Self {
         match value {
-            WarcSource::HTTP(config) => JobConfig::Http(config),
-            WarcSource::Local(config) => JobConfig::Local(config),
-            WarcSource::S3(config) => JobConfig::S3(config),
+            config::WarcSource::HTTP(config) => JobConfig::Http(config),
+            config::WarcSource::Local(config) => JobConfig::Local(config),
+            config::WarcSource::S3(config) => JobConfig::S3(config),
         }
     }
 }
 
-impl From<JobConfig> for WarcSource {
+impl From<JobConfig> for config::WarcSource {
     fn from(value: JobConfig) -> Self {
         match value {
-            JobConfig::Http(config) => WarcSource::HTTP(config),
-            JobConfig::Local(config) => WarcSource::Local(config),
-            JobConfig::S3(config) => WarcSource::S3(config),
+            JobConfig::Http(config) => config::WarcSource::HTTP(config),
+            JobConfig::Local(config) => config::WarcSource::Local(config),
+            JobConfig::S3(config) => config::WarcSource::S3(config),
         }
     }
 }
@@ -108,7 +106,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
 
-    let source: WarcSource = job.source_config.clone().into();
+    let source: config::WarcSource = job.source_config.clone().into();
 
     let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
     pin!(warc_files);
@@ -320,7 +318,7 @@ impl Reduce<Index> for Index {
 }
 
 impl Indexer {
-    pub fn run(config: &IndexingLocalConfig) -> Result<()> {
+    pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
         let job_config: JobConfig = config.warc_source.clone().into();
