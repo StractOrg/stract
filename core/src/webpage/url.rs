@@ -191,7 +191,6 @@ impl Url {
             res
         }
     }
-
     pub fn domain(&self) -> &str {
         let site = self.site().as_bytes();
         match LIST.domain(site) {
@@ -354,7 +353,15 @@ impl Url {
 
     pub fn full_without_id_tags(&self) -> String {
         let full = self.full();
-        if let Some(id_begin) = full.find('#') {
+        if let Some(last_slash) = full.rfind('/') {
+            let last_slash = floor_char_boundary(&full, last_slash);
+            if let Some(id_begin) = full[last_slash..].find('#') {
+                let idx = floor_char_boundary(&full, id_begin + last_slash);
+                full[..idx].to_string()
+            } else {
+                full
+            }
+        } else if let Some(id_begin) = full.find('#') {
             let idx = floor_char_boundary(&full, id_begin);
             full[..idx].to_string()
         } else {
@@ -506,8 +513,13 @@ mod tests {
     #[test]
     fn url_without_id() {
         let url: Url = "https://test.example.com#id".to_string().into();
-
         assert_eq!(&url.full_without_id_tags(), "https://test.example.com");
+
+        let url: Url = "https://test.example.com/#/test".to_string().into();
+        assert_eq!(
+            &url.full_without_id_tags(),
+            "https://test.example.com/#/test"
+        );
     }
 
     #[test]
