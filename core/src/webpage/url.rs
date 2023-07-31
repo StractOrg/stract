@@ -152,7 +152,9 @@ impl Url {
                 let mut end_query = url.len();
 
                 if let Some(hash) = url.find('#') {
-                    end_query = ceil_char_boundary(url, hash);
+                    if hash > start_query {
+                        end_query = ceil_char_boundary(url, hash);
+                    }
                 }
 
                 Some(start_query..end_query)
