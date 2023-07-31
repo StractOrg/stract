@@ -71,9 +71,16 @@ impl Url {
             res = Url(stripped.to_string())
         }
 
-        let mut new_url = res.0.clone();
+        res.remove_utm_queries();
 
-        if let Some(queries) = res.queries() {
+        res
+    }
+
+    pub fn remove_utm_queries(&mut self) {
+        let mut new_url = None;
+
+        if let Some(queries) = self.queries() {
+            let mut tmp_new_url = self.strip_query().to_string();
             let mut new_queries = Vec::new();
             for (key, value) in queries {
                 if !key.starts_with("utm_") {
@@ -81,26 +88,27 @@ impl Url {
                 }
             }
 
-            new_url = res.strip_query().to_string();
             if !new_queries.is_empty() {
-                new_url.push('?');
+                tmp_new_url.push('?');
                 for (key, value) in new_queries {
-                    new_url.push_str(key);
+                    tmp_new_url.push_str(key);
 
                     if let Some(value) = value {
-                        new_url.push('=');
-                        new_url.push_str(value);
+                        tmp_new_url.push('=');
+                        tmp_new_url.push_str(value);
                     }
 
-                    new_url.push('&');
+                    tmp_new_url.push('&');
                 }
-                new_url.pop();
+                tmp_new_url.pop();
             }
+
+            new_url = Some(tmp_new_url);
         }
 
-        res.0 = new_url;
-
-        res
+        if let Some(new_url) = new_url {
+            self.0 = new_url;
+        }
     }
 
     pub fn queries(&self) -> Option<impl Iterator<Item = (&str, Option<&str>)> + '_> {

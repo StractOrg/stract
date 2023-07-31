@@ -335,6 +335,7 @@ impl Html {
             res.url = url;
         }
 
+        res.url.remove_utm_queries();
         res.robots = res.parse_robots_meta();
 
         res
