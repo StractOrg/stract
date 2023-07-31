@@ -41,6 +41,7 @@ pub struct Worker {
     current_job: Option<WorkerJob>,
     pending_commands: Arc<Mutex<VecDeque<Command>>>,
     writer: Arc<WarcWriter>,
+    results: Arc<Mutex<Vec<JobResponse>>>,
     client: reqwest::Client,
     config: CrawlerConfig,
     politeness_factor: f32,
@@ -53,6 +54,7 @@ impl Worker {
     pub fn new(
         pending_commands: Arc<Mutex<VecDeque<Command>>>,
         writer: Arc<WarcWriter>,
+        results: Arc<Mutex<Vec<JobResponse>>>,
         config: CrawlerConfig,
         timeout: Duration,
         coordinator_host: SocketAddr,
@@ -73,6 +75,7 @@ impl Worker {
         Ok(Self {
             writer,
             client,
+            results,
             current_job: None,
             pending_commands,
             num_jobs_per_fetch: config.num_workers,
@@ -113,9 +116,12 @@ impl Worker {
                 }
             } else {
                 let mut conn = self.coordinator_conn();
+                let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
+
                 let res = conn
                     .send_with_timeout::<_, Response>(
                         &Request::NewJobs {
+                            responses: results,
                             num_jobs: 2 * self.num_jobs_per_fetch,
                         },
                         Duration::from_secs(60 * 60),
@@ -217,21 +223,13 @@ impl Worker {
             url_responses.push(res.response);
         }
 
-        // send response to coordinator
         let job_response = JobResponse {
             domain: job.domain,
             url_responses,
             discovered_urls: discovered_urls.into_iter().collect(),
         };
 
-        let mut conn = self.coordinator_conn();
-        let _ = conn
-            .send_with_timeout::<_, Response>(
-                &Request::CrawlResult { job_response },
-                Duration::from_secs(60),
-            )
-            .await
-            .expect("Failed to send crawl result to coordinator");
+        self.results.lock().await.push(job_response);
     }
 
     async fn process_url(&mut self, url: Url) -> ProcessedUrl {

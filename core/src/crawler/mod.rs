@@ -165,6 +165,7 @@ pub struct Crawler {
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
         let pending_commands = Arc::new(Mutex::new(VecDeque::new()));
+        let results = Arc::new(Mutex::new(Vec::new()));
         let writer = Arc::new(WarcWriter::new(config.s3.clone()));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
@@ -174,6 +175,7 @@ impl Crawler {
             let worker = Worker::new(
                 Arc::clone(&pending_commands),
                 Arc::clone(&writer),
+                Arc::clone(&results),
                 config.clone(),
                 timeout,
                 coordinator_host,
@@ -198,13 +200,14 @@ impl Crawler {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Request {
-    NewJobs { num_jobs: usize },
-    CrawlResult { job_response: JobResponse },
+    NewJobs {
+        responses: Vec<JobResponse>,
+        num_jobs: usize,
+    },
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Response {
     NewJobs { jobs: Vec<Job> },
     Done,
-    Ok,
 }

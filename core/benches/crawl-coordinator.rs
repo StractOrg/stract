@@ -1776,7 +1776,7 @@ Url::from("https://www.apple.com/legal/internet-services/itunes/us/terms.html".t
         c.bench_function("Add response to coordinator", |b| {
             b.iter(|| {
                 let response = responses.choose(&mut rng).unwrap();
-                coordinator.add_response(response).unwrap();
+                coordinator.add_responses(&[response.clone()]).unwrap();
             })
         });
 

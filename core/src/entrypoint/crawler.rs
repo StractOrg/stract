@@ -46,7 +46,12 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     loop {
         if let Ok(req) = server.accept::<crate::crawler::Request>().await {
             match &req.body {
-                crate::crawler::Request::NewJobs { num_jobs } => {
+                crate::crawler::Request::NewJobs {
+                    responses,
+                    num_jobs,
+                } => {
+                    coordinator.add_responses(responses)?;
+
                     if coordinator.is_done() {
                         tracing::info!("Crawl is done. Waiting for workers to finish.");
                         req.respond(sonic::Response::Content(crate::crawler::Response::Done))
@@ -61,13 +66,6 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
                         .await
                         .ok();
                     }
-                }
-                crate::crawler::Request::CrawlResult { job_response } => {
-                    coordinator.add_response(job_response)?;
-
-                    req.respond(sonic::Response::Content(crate::crawler::Response::Ok))
-                        .await
-                        .ok();
                 }
             }
         }
