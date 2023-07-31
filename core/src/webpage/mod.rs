@@ -797,7 +797,7 @@ impl Html {
         };
 
         let site_hash = split_u128(hash(self.url().site()).0);
-        let url_without_query_hash = split_u128(hash(self.url().without_query()).0);
+        let url_without_query_hash = split_u128(hash(self.url().strip_query()).0);
         let url_hash = split_u128(hash(self.url().full()).0);
         let domain_hash = split_u128(hash(self.url().domain()).0);
         let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);

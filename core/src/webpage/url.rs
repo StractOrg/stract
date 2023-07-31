@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fmt::Display, time::Duration};
+use std::{fmt::Display, ops::Range, time::Duration};
 
 use publicsuffix::Psl;
 use serde::{Deserialize, Serialize};
@@ -65,12 +65,59 @@ impl From<Url> for String {
 
 impl Url {
     pub fn normalize(&self) -> Self {
-        let res: Url = self.strip_protocol().to_lowercase().into();
+        let mut res: Url = self.strip_protocol().to_lowercase().into();
 
         if let Some(stripped) = res.0.strip_prefix("www.") {
-            Url(stripped.to_string())
-        } else {
-            res
+            res = Url(stripped.to_string())
+        }
+
+        let mut new_url = res.0.clone();
+
+        if let Some(queries) = res.queries() {
+            let mut new_queries = Vec::new();
+            for (key, value) in queries {
+                if !key.starts_with("utm_") {
+                    new_queries.push((key, value));
+                }
+            }
+
+            new_url = res.strip_query().to_string();
+            if !new_queries.is_empty() {
+                new_url.push('?');
+                for (key, value) in new_queries {
+                    new_url.push_str(key);
+
+                    if let Some(value) = value {
+                        new_url.push('=');
+                        new_url.push_str(value);
+                    }
+
+                    new_url.push('&');
+                }
+                new_url.pop();
+            }
+        }
+
+        res.0 = new_url;
+
+        res
+    }
+
+    pub fn queries(&self) -> Option<impl Iterator<Item = (&str, Option<&str>)> + '_> {
+        match self.query_range() {
+            Some(range) => {
+                // remove the '?'
+                let query = &self.0[ceil_char_boundary(&self.0, range.start + 1)
+                    ..ceil_char_boundary(&self.0, range.end)];
+
+                Some(query.split('&').filter_map(|query| {
+                    let mut split = query.split('=');
+                    let key = split.next()?;
+                    let value = split.next();
+                    Some((key, value))
+                }))
+            }
+            None => None,
         }
     }
 
@@ -88,15 +135,32 @@ impl Url {
         &url[start_host..]
     }
 
+    fn query_range(&self) -> Option<Range<usize>> {
+        let url = &self.0;
+
+        match url.find('?') {
+            Some(start_query) => {
+                let start_query = ceil_char_boundary(url, start_query);
+                let mut end_query = url.len();
+
+                if let Some(hash) = url.find('#') {
+                    end_query = ceil_char_boundary(url, hash);
+                }
+
+                Some(start_query..end_query)
+            }
+            None => None,
+        }
+    }
+
     pub fn strip_query(&self) -> &str {
         let url = &self.0;
-        let mut start_query = url.len();
-        if url.contains('?') {
-            start_query = url.find('?').expect("The url contains atleast 1 '?'");
-        }
 
-        let start_query = ceil_char_boundary(url, start_query);
-        &url[..start_query]
+        if let Some(query_range) = self.query_range() {
+            &url[..query_range.start]
+        } else {
+            url
+        }
     }
 
     pub fn site(&self) -> &str {
@@ -278,15 +342,6 @@ impl Url {
         }
     }
 
-    pub fn without_query(&self) -> &str {
-        if let Some(query_begin) = self.0.find('?') {
-            let idx = floor_char_boundary(&self.0, query_begin);
-            &self.0[..idx]
-        } else {
-            &self.0
-        }
-    }
-
     pub fn full_without_id_tags(&self) -> String {
         let full = self.full();
         if let Some(id_begin) = full.find('#') {
@@ -311,7 +366,7 @@ impl Url {
         if self.is_homepage() {
             false
         } else {
-            self.without_query().ends_with(ending)
+            self.strip_query().ends_with(ending)
         }
     }
 
@@ -435,7 +490,7 @@ mod tests {
             .to_string()
             .into();
 
-        assert_eq!(url.without_query(), "https://test.example.com");
+        assert_eq!(url.strip_query(), "https://test.example.com");
     }
 
     #[test]
@@ -514,6 +569,28 @@ mod tests {
         assert_eq!(url.path_and_query(), "/test?a=b");
 
         let url: Url = "example.com/test?a=b".to_string().into();
+        assert_eq!(url.path_and_query(), "/test?a=b");
+    }
+
+    #[test]
+    fn utm_removed_after_normalization() {
+        let url: Url = "https://example.com/test?a=b&utm_source=google"
+            .to_string()
+            .into();
+        let url = url.normalize();
+        assert_eq!(url.path_and_query(), "/test?a=b");
+
+        let url: Url = "https://example.com/test?a=b&utm_source=google&utm_medium=google"
+            .to_string()
+            .into();
+        let url = url.normalize();
+        assert_eq!(url.path_and_query(), "/test?a=b");
+
+        let url: Url =
+            "https://example.com/test?a=b&utm_source=google&utm_medium=google&utm_campaign=google"
+                .to_string()
+                .into();
+        let url = url.normalize();
         assert_eq!(url.path_and_query(), "/test?a=b");
     }
 }
