@@ -3269,6 +3269,7 @@ version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a8c1bda5ae1af7f99a2962e49df150414a43d62404644d98dd5c3a93d07457"
 dependencies = [
+ "hashbrown 0.12.3",
  "idna",
  "psl-types",
 ]

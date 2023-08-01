@@ -86,7 +86,7 @@ torch-sys = "0.13.0"
 libc = "0.2.142"
 lz-str = "0.2.1"
 safetensors = "0.3.1"
-publicsuffix = "2"
+publicsuffix = { version = "2", features = ["hashbrown"] }
 robotstxt-with-cache = "0.4.0"
 rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
 rusqlite = { version = "0.29.0", features = ["bundled", "modern-full", "buildtime_bindgen"] }

@@ -132,14 +132,16 @@ impl Url {
     pub fn strip_protocol(&self) -> &str {
         let mut start_host = 0;
         let url = &self.0;
-        if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("//") {
-            start_host = url
-                .find('/')
-                .expect("It was checked that url starts with protocol");
-            start_host += 2; // skip the two '/'
+
+        if url.starts_with("http://") {
+            start_host = 7;
+        } else if url.starts_with("https://") {
+            start_host = 8;
+        } else if url.starts_with("//") {
+            start_host = 2;
         }
 
-        let start_host = ceil_char_boundary(url, start_host);
+        let start_host = floor_char_boundary(url, std::cmp::min(start_host, url.len()));
         &url[start_host..]
     }
 

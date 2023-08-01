@@ -94,7 +94,7 @@ where
         })
     }
 
-    pub fn bulk_ids(&mut self, items: impl Iterator<Item = T>) -> Result<Vec<u64>> {
+    pub fn bulk_ids<'a>(&'a mut self, items: impl Iterator<Item = &'a T>) -> Result<Vec<u64>> {
         let mut ids = Vec::new();
 
         let mut batch_id2t = rocksdb::WriteBatch::default();
@@ -104,26 +104,26 @@ where
 
         for item in items {
             // check cache
-            if let Some(id) = self.t2id_cache.get(&item) {
+            if let Some(id) = self.t2id_cache.get(item) {
                 ids.push(*id);
                 continue;
             }
 
             // check if item exists
-            let item_bytes = bincode::serialize(&item)?;
+            let item_bytes = bincode::serialize(item)?;
             let id = self.t2id.get(&item_bytes)?;
             if let Some(id) = id {
                 let id = bincode::deserialize(&id)?;
 
                 // update cache
-                self.t2id_cache.put(item, id);
+                self.t2id_cache.put(item.clone(), id);
 
                 ids.push(id);
                 continue;
             }
 
             // insert item
-            let assigned_id = batch_assignments.get(&item).copied();
+            let assigned_id = batch_assignments.get(item).copied();
 
             let id = assigned_id.unwrap_or_else(|| {
                 let id = self.next_id;
@@ -140,7 +140,7 @@ where
             }
 
             // update cache
-            self.t2id_cache.put(item, id);
+            self.t2id_cache.put(item.clone(), id);
 
             ids.push(id);
         }
@@ -410,13 +410,13 @@ impl CrawlDb {
 
         let domain_ids: Vec<DomainId> = self
             .domain_ids
-            .bulk_ids(domains.keys().cloned())?
+            .bulk_ids(domains.keys())?
             .into_iter()
             .map(DomainId::from)
             .collect();
 
         self.url_ids
-            .bulk_ids(domains.values().flatten().map(|u| u.url.clone()))?;
+            .bulk_ids(domains.values().flatten().map(|u| &u.url))?;
 
         for (domain_id, urls) in domain_ids.into_iter().zip_eq(domains.values()) {
             let domain_state = self
@@ -485,23 +485,18 @@ impl CrawlDb {
         }
 
         // bulk register urls
-        self.url_ids.bulk_ids(
-            url_responses
-                .values()
-                .flatten()
-                .flat_map(|res| match res {
-                    UrlResponse::Success { url } => vec![url].into_iter(),
-                    UrlResponse::Failed {
-                        url,
-                        status_code: _,
-                    } => vec![url].into_iter(),
-                    UrlResponse::Redirected { url, new_url } => vec![url, new_url].into_iter(),
-                })
-                .cloned(),
-        )?;
+        self.url_ids
+            .bulk_ids(url_responses.values().flatten().flat_map(|res| match res {
+                UrlResponse::Success { url } => vec![url].into_iter(),
+                UrlResponse::Failed {
+                    url,
+                    status_code: _,
+                } => vec![url].into_iter(),
+                UrlResponse::Redirected { url, new_url } => vec![url, new_url].into_iter(),
+            }))?;
 
         // bulk register domains
-        self.domain_ids.bulk_ids(url_responses.keys().cloned())?;
+        self.domain_ids.bulk_ids(url_responses.keys())?;
 
         for (domain, responses) in url_responses {
             let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();

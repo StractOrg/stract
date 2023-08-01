@@ -1772,7 +1772,7 @@ Url::from("https://www.apple.com/legal/internet-services/itunes/us/terms.html".t
     ];
     let mut rng = rand::thread_rng();
 
-    for _ in 0..10 {
+    for _ in 0..1_000 {
         c.bench_function("Add response to coordinator", |b| {
             b.iter(|| {
                 let response = responses.choose(&mut rng).unwrap();
