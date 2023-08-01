@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::config::{CollectorConfig, SnippetConfig};
-use crate::entity_index::{EntityIndex, StoredEntity};
+use crate::entity_index::{EntityIndex, EntityMatch};
 use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
@@ -254,7 +254,7 @@ impl LocalSearcher {
         })
     }
 
-    fn entity_sidebar(&self, query: &SearchQuery) -> Option<StoredEntity> {
+    fn entity_sidebar(&self, query: &SearchQuery) -> Option<EntityMatch> {
         self.entity_index
             .as_ref()
             .and_then(|index| index.search(&query.query))

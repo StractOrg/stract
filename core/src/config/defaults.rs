@@ -37,6 +37,10 @@ impl Frontend {
         0.5
     }
 
+    pub fn entity_sidebar() -> f64 {
+        10.0
+    }
+
     pub fn discussions_widget() -> f64 {
         0.1
     }

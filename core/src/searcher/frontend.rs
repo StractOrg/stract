@@ -163,8 +163,14 @@ impl FrontendSearcher {
         query: &SearchQuery,
     ) -> Result<Option<Sidebar>> {
         let entity = initial_results
-            .first()
-            .and_then(|result| result.local_result.entity_sidebar.clone());
+            .iter()
+            .filter_map(|res| res.local_result.entity_sidebar.clone())
+            .filter(|entity| entity.match_score as f64 > self.thresholds.entity_sidebar)
+            .max_by(|a, b| {
+                a.match_score
+                    .partial_cmp(&b.match_score)
+                    .unwrap_or(Ordering::Equal)
+            });
 
         match entity {
             Some(entity) => Ok(Some(Sidebar::Entity(entity))),

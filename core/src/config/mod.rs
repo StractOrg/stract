@@ -170,6 +170,9 @@ pub struct FrontendThresholds {
     #[serde(default = "defaults::Frontend::stackoverflow")]
     pub stackoverflow: f64,
 
+    #[serde(default = "defaults::Frontend::entity_sidebar")]
+    pub entity_sidebar: f64,
+
     #[serde(default = "defaults::Frontend::discussions_widget")]
     pub discussions_widget: f64,
 }
@@ -178,6 +181,7 @@ impl Default for FrontendThresholds {
     fn default() -> Self {
         Self {
             stackoverflow: defaults::Frontend::stackoverflow(),
+            entity_sidebar: defaults::Frontend::entity_sidebar(),
             discussions_widget: defaults::Frontend::discussions_widget(),
         }
     }

@@ -145,14 +145,20 @@ fn wikipedify_url(url: &Url) -> Vec<Url> {
     ]
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
     pub image: Option<String>,
-    pub related_entities: Vec<StoredEntity>,
+    pub related_entities: Vec<EntityMatch>,
     pub info: BTreeMap<String, Span>,
     pub links: Vec<Link>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EntityMatch {
+    pub entity: StoredEntity,
+    pub score: f32,
 }
 
 impl EntityIndex {
@@ -230,7 +236,7 @@ impl EntityIndex {
         self.image_downloader.download(&mut self.image_store);
     }
 
-    fn related_entities(&self, doc: DocAddress) -> Vec<StoredEntity> {
+    fn related_entities(&self, doc: DocAddress) -> Vec<EntityMatch> {
         let searcher = self.reader.searcher();
         let more_like_this_query = MoreLikeThisQuery::builder()
             .with_min_doc_frequency(1)
@@ -253,17 +259,20 @@ impl EntityIndex {
             Ok(result) => result
                 .into_iter()
                 .filter(|(_, related_doc)| doc != *related_doc)
-                .map(|(_, doc_address)| {
-                    self.retrieve_stored_entity(&searcher, doc_address, false, false, false)
+                .map(|(score, doc_address)| {
+                    let entity =
+                        self.retrieve_stored_entity(&searcher, doc_address, false, false, false);
+
+                    EntityMatch { entity, score }
                 })
-                .filter(|entity| entity.image.is_some())
+                .filter(|m| m.entity.image.is_some())
                 .take(4)
                 .collect(),
             Err(_) => Vec::new(),
         }
     }
 
-    pub fn search(&self, query: &str) -> Option<StoredEntity> {
+    pub fn search(&self, query: &str) -> Option<EntityMatch> {
         let searcher = self.reader.searcher();
 
         let title = self.schema.get_field("title").unwrap();
@@ -301,8 +310,13 @@ impl EntityIndex {
             .search(&query, &TopDocs::with_limit(1))
             .unwrap()
             .first()
-            .map(|(_score, doc_address)| {
-                self.retrieve_stored_entity(&searcher, *doc_address, true, true, true)
+            .map(|(score, doc_address)| {
+                let entity = self.retrieve_stored_entity(&searcher, *doc_address, true, true, true);
+
+                EntityMatch {
+                    entity,
+                    score: *score,
+                }
             })
     }
 
@@ -439,10 +453,13 @@ mod tests {
 
         index.commit();
 
-        assert_eq!(index.search("the"), None);
-        assert_eq!(index.search("ashes").unwrap().title.as_str(), "the ashes");
+        assert!(index.search("the").is_none());
         assert_eq!(
-            index.search("the ashes").unwrap().title.as_str(),
+            index.search("ashes").unwrap().entity.title.as_str(),
+            "the ashes"
+        );
+        assert_eq!(
+            index.search("the ashes").unwrap().entity.title.as_str(),
             "the ashes"
         );
     }

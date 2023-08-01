@@ -20,7 +20,7 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    entity_index::{entity::Span, StoredEntity},
+    entity_index::{entity::Span, EntityMatch},
     searcher::LocalSearcher,
 };
 
@@ -31,6 +31,7 @@ pub struct DisplayedEntity {
     pub image_base64: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
     pub info: Vec<(String, String)>,
+    pub match_score: f32,
 }
 
 fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(String, String)> {
@@ -77,29 +78,32 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(
 }
 
 impl DisplayedEntity {
-    pub fn from(entity: StoredEntity, searcher: &LocalSearcher) -> Self {
+    pub fn from(m: EntityMatch, searcher: &LocalSearcher) -> Self {
         let entity_abstract = Span {
-            text: entity.entity_abstract,
-            links: entity.links,
+            text: m.entity.entity_abstract,
+            links: m.entity.links,
         };
 
         let small_abstract = entity_link_to_html(entity_abstract, 300);
 
-        let image_base64 = entity
+        let image_base64 = m
+            .entity
             .image
             .and_then(|image| searcher.entity_image(image))
             .map(|image| base64::encode(image.as_raw_bytes()));
 
         Self {
-            title: entity.title,
+            title: m.entity.title,
             small_abstract,
             image_base64,
-            related_entities: entity
+            related_entities: m
+                .entity
                 .related_entities
                 .into_iter()
-                .map(|entity| DisplayedEntity::from(entity, searcher))
+                .map(|m| DisplayedEntity::from(m, searcher))
                 .collect(),
-            info: prepare_info(entity.info, searcher),
+            info: prepare_info(m.entity.info, searcher),
+            match_score: m.score,
         }
     }
 }
