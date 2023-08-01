@@ -167,7 +167,7 @@ fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
             .collect();
 
         res += format!(
-            "<a href=\"https://en.wikipedia.org/wiki/{}\">",
+            "<a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/{}\">",
             link.target.replace(' ', "_")
         )
         .as_str();
@@ -212,7 +212,7 @@ mod tests {
                 },
                 10000
             ),
-            "some <a href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
+            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
                 .to_string()
         );
     }
@@ -231,7 +231,7 @@ mod tests {
                 },
                 7
             ),
-            "some <a href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
+            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
         );
     }
 

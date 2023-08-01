@@ -100,6 +100,8 @@ where
         let mut batch_id2t = rocksdb::WriteBatch::default();
         let mut batch_t2id = rocksdb::WriteBatch::default();
 
+        let mut batch_assignments = HashMap::new();
+
         for item in items {
             // check cache
             if let Some(id) = self.t2id_cache.get(&item) {
@@ -121,11 +123,21 @@ where
             }
 
             // insert item
-            let id = self.next_id;
-            self.next_id += 1;
+            let assigned_id = batch_assignments.get(&item).copied();
+
+            let id = assigned_id.unwrap_or_else(|| {
+                let id = self.next_id;
+                self.next_id += 1;
+                id
+            });
+
             let id_bytes = bincode::serialize(&id)?;
             batch_t2id.put(&item_bytes, &id_bytes);
             batch_id2t.put(&id_bytes, &item_bytes);
+
+            if assigned_id.is_none() {
+                batch_assignments.insert(item.clone(), id);
+            }
 
             // update cache
             self.t2id_cache.put(item, id);
@@ -420,8 +432,6 @@ impl CrawlDb {
             for url in urls {
                 let url_id: UrlId = self.url_ids.id(url.url.clone())?.into();
 
-                domain_state.status = DomainStatus::Pending;
-
                 let url_state = url_states.entry(url_id).or_insert_with(|| UrlState {
                     weight: 0.0,
                     status: UrlStatus::Pending,
@@ -495,14 +505,13 @@ impl CrawlDb {
 
         for (domain, responses) in url_responses {
             let domain_id: DomainId = self.domain_ids.id(domain.clone())?.into();
-            let domain_state = self
-                .domain_state
+
+            self.domain_state
                 .entry(domain_id)
                 .or_insert_with(|| DomainState {
                     weight: 0.0,
                     status: DomainStatus::Pending,
                 });
-            domain_state.status = DomainStatus::Pending;
 
             let url_states = self.urls.entry(domain_id).or_default();
 
@@ -545,7 +554,7 @@ impl CrawlDb {
             .entry(domain_id)
             .or_insert_with(|| DomainState {
                 weight: 0.0,
-                status: DomainStatus::Pending,
+                status: status.clone(),
             });
 
         domain_state.status = status;

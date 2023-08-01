@@ -70,11 +70,11 @@ impl Crawler {
     }
 
     pub fn max_crawl_delay_ms() -> u64 {
-        30_000
+        60_000
     }
 
     pub fn max_politeness_factor() -> f32 {
-        1024.0
+        2048.0
     }
 
     pub fn min_politeness_factor() -> f32 {

@@ -54,7 +54,7 @@ impl CrawlCoordinator {
             db: Mutex::new(db),
             num_urls_to_crawl,
             num_crawled_urls: AtomicU64::new(0),
-            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(10))),
+            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(60))),
         })
     }
 
@@ -74,8 +74,8 @@ impl CrawlCoordinator {
         self.log_crawls_per_second(responses.iter().map(|res| res.url_responses.len()).sum());
         let mut db = self.db.lock().unwrap();
 
-        db.insert_urls(&responses).unwrap();
-        db.update_url_status(&responses).unwrap();
+        db.insert_urls(responses).unwrap();
+        db.update_url_status(responses).unwrap();
 
         for response in responses.iter() {
             db.set_domain_status(&response.domain, DomainStatus::Pending)
