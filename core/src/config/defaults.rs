@@ -65,6 +65,10 @@ impl Snippet {
 pub struct Crawler;
 
 impl Crawler {
+    pub fn robots_txt_cache_sec() -> u64 {
+        60 * 60
+    }
+
     pub fn politeness_factor() -> f32 {
         1.0
     }

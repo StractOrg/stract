@@ -272,6 +272,9 @@ pub struct CrawlerConfig {
     pub num_workers: usize,
     pub user_agent: UserAgent,
 
+    #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
+    pub robots_txt_cache_sec: u64,
+
     #[serde(default = "defaults::Crawler::politeness_factor")]
     pub politeness_factor: f32,
 

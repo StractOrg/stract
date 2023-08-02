@@ -71,7 +71,10 @@ impl Worker {
             .user_agent(&config.user_agent.full)
             .build()?;
 
-        let robotstxt = RobotsTxtManager::new(client.clone());
+        let robotstxt = RobotsTxtManager::new(
+            client.clone(),
+            Duration::from_secs(config.robots_txt_cache_sec),
+        );
 
         Ok(Self {
             writer,
@@ -189,7 +192,7 @@ impl Worker {
             if job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
                 crawled_sitemaps.insert(site.clone());
 
-                if let Ok(Some(sitemap)) = self.robotstxt.sitemap(&retryable_url.url).await {
+                if let Some(sitemap) = self.robotstxt.sitemap(&retryable_url.url).await {
                     let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
                     discovered_urls.extend(sitemap_urls);
                 }

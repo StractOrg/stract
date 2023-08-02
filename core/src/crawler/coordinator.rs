@@ -76,7 +76,12 @@ impl CrawlCoordinator {
 
     pub fn add_responses(&self, responses: &[JobResponse]) -> Result<()> {
         let start = Instant::now();
-        self.log_crawls_per_second(responses.iter().map(|res| res.url_responses.len()).sum());
+        let num_crawled_urls = responses.iter().map(|res| res.url_responses.len()).sum();
+
+        self.log_crawls_per_second(num_crawled_urls);
+        self.num_crawled_urls
+            .fetch_add(num_crawled_urls as u64, Ordering::SeqCst);
+
         let mut db = self.db.lock().unwrap();
 
         db.insert_urls(responses).unwrap();

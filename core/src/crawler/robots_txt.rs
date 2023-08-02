@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, panic};
+use std::{collections::HashMap, panic, time::Duration};
 
 use robotstxt_with_cache::matcher::{
     CachingRobotsMatcher, LongestMatchRobotsMatchStrategy, RobotsMatcher,
@@ -24,22 +24,29 @@ use url::Url;
 
 use super::{Error, Result, Site};
 
+enum Lookup<T> {
+    Found(T),
+    NotFound,
+}
+
 pub struct RobotsTxtManager {
-    cache: HashMap<Site, Option<RobotsTxt>>, // None if robots.txt does not exist
+    cache: HashMap<Site, Lookup<RobotsTxt>>,
     client: reqwest::Client,
+    cache_expiration: Duration,
 }
 
 impl RobotsTxtManager {
-    pub fn new(client: reqwest::Client) -> Self {
+    pub fn new(client: reqwest::Client, cache_expiration: Duration) -> Self {
         Self {
             client,
+            cache_expiration,
             cache: HashMap::new(),
         }
     }
 
     pub async fn is_allowed(&mut self, url: &Url, user_agent: &str) -> bool {
         match self.get_mut(url).await {
-            Ok(Some(robots_txt)) => robots_txt
+            Lookup::Found(robots_txt) => robots_txt
                 .matcher
                 .one_agent_allowed_by_robots(user_agent, url.as_str()),
             _ => true,
@@ -65,61 +72,79 @@ impl RobotsTxtManager {
         }
     }
 
-    async fn get_mut(&mut self, url: &Url) -> Result<Option<&mut RobotsTxt>> {
+    async fn get_mut(&mut self, url: &Url) -> &mut Lookup<RobotsTxt> {
         let site = Site(url.host_str().unwrap_or_default().to_string());
 
-        if self.cache.get(&site).is_none() {
+        let cache_should_update = match self.cache.get_mut(&site) {
+            Some(Lookup::Found(robots_txt)) => robots_txt.is_expired(&self.cache_expiration),
+            Some(Lookup::NotFound) => false,
+            _ => true,
+        };
+
+        if cache_should_update {
             match self.fetch_robots_txt(&site).await {
                 Ok(robots_txt) => {
-                    self.cache.insert(site.clone(), Some(robots_txt));
+                    self.cache.insert(site.clone(), Lookup::Found(robots_txt));
                 }
                 Err(err) => match err.downcast_ref() {
                     Some(Error::FetchFailed(status))
                         if *status == reqwest::StatusCode::IM_A_TEAPOT =>
                     {
-                        self.cache.insert(site.clone(), None);
+                        self.cache.insert(site.clone(), Lookup::NotFound);
                     }
                     _ => {
-                        self.cache.insert(site.clone(), None);
+                        self.cache.insert(site.clone(), Lookup::NotFound);
                         tracing::warn!("failed to fetch robots.txt for {}: {}", site.0, err);
                     }
                 },
             }
         }
 
-        match self.cache.get_mut(&site) {
-            Some(Some(robot)) => Ok(Some(robot)),
-            _ => Ok(None),
-        }
+        self.cache.get_mut(&site).unwrap()
     }
 
-    pub async fn sitemap(&mut self, url: &Url) -> Result<Option<Url>> {
-        Ok(self
-            .get_mut(url)
-            .await?
-            .and_then(|robots_txt| robots_txt.sitemap.clone()))
+    pub async fn sitemap(&mut self, url: &Url) -> Option<Url> {
+        match self.get_mut(url).await {
+            Lookup::Found(robotstxt) => robotstxt.sitemap.clone(),
+            Lookup::NotFound => None,
+        }
     }
 }
 
 struct RobotsTxt {
+    download_time: std::time::Instant,
     matcher: CachingRobotsMatcher<LongestMatchRobotsMatchStrategy>,
     sitemap: Option<Url>,
 }
 
 impl RobotsTxt {
     fn new(body: String) -> Self {
-        let mut matcher = CachingRobotsMatcher::new(RobotsMatcher::default());
+        let mut s = Self {
+            matcher: CachingRobotsMatcher::new(RobotsMatcher::default()),
+            sitemap: None,
+            download_time: std::time::Instant::now(),
+        };
 
-        matcher.parse(&body);
+        s.update(body);
 
-        let sitemap = body
+        s
+    }
+
+    fn is_expired(&self, expiration: &Duration) -> bool {
+        self.download_time.elapsed() > *expiration
+    }
+
+    fn update(&mut self, body: String) {
+        self.matcher.parse(&body);
+
+        self.sitemap = body
             .to_ascii_lowercase()
             .lines()
             .find(|line| line.starts_with("sitemap:"))
             .map(|line| line.split(':').nth(1).unwrap().trim())
             .and_then(|s| Url::parse(s).ok());
 
-        Self { matcher, sitemap }
+        self.download_time = std::time::Instant::now();
     }
 }
 
