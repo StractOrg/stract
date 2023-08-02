@@ -501,7 +501,7 @@ pub struct SearchResult {
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,

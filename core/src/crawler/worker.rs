@@ -28,8 +28,9 @@ use url::Url;
 
 use crate::{
     config::CrawlerConfig,
-    crawler::{JobResponse, Request, Response},
+    crawler::{JobResponse, Response},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
+    entrypoint::crawler::{CoordinatorService, NewJobs},
     webpage::Html,
 };
 
@@ -90,10 +91,12 @@ impl Worker {
         })
     }
 
-    fn coordinator_conn(&self) -> sonic::ResilientConnection<ExponentialBackoff> {
+    fn coordinator_conn(
+        &self,
+    ) -> sonic::service::ResilientConnection<CoordinatorService, ExponentialBackoff> {
         let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
-        sonic::ResilientConnection::create(self.coordinator_host, retry)
+        sonic::service::ResilientConnection::create(self.coordinator_host, retry)
     }
 
     pub async fn run(mut self) {
@@ -119,12 +122,12 @@ impl Worker {
                     }
                 }
             } else {
-                let mut conn = self.coordinator_conn();
+                let conn = self.coordinator_conn();
                 let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
 
                 let res = conn
-                    .send_with_timeout::<_, Response>(
-                        &Request::NewJobs {
+                    .send_with_timeout(
+                        NewJobs {
                             responses: results,
                             num_jobs: 2 * self.num_jobs_per_fetch,
                         },
@@ -133,7 +136,7 @@ impl Worker {
                     .await;
 
                 match res {
-                    Ok(sonic::Response::Content(Response::NewJobs { jobs })) => {
+                    Ok(Response::NewJobs { jobs }) => {
                         if jobs.is_empty() {
                             drop(guard);
                             tokio::time::sleep(Duration::from_secs(30)).await;
@@ -142,7 +145,7 @@ impl Worker {
 
                         guard.extend(jobs.into_iter().map(Command::Job));
                     }
-                    Ok(sonic::Response::Content(Response::Done)) => {
+                    Ok(Response::Done) => {
                         guard.push_back(Command::Shutdown);
 
                         break;

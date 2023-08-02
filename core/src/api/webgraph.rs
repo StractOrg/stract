@@ -19,10 +19,8 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
 
-use crate::{
-    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
-    entrypoint::webgraph_server::ScoredSite,
-    webgraph::Node,
+use crate::distributed::{
+    cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic,
 };
 
 use super::State;
@@ -67,11 +65,11 @@ pub async fn similar_sites(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let mut conn = sonic::ResilientConnection::create(host, retry);
+    let conn = sonic::service::ResilientConnection::create(host, retry);
 
     match conn
-        .send_with_timeout::<_, Vec<ScoredSite>>(
-            &crate::entrypoint::webgraph_server::Request::SimilarSites {
+        .send_with_timeout(
+            crate::entrypoint::webgraph_server::SimilarSites {
                 sites: params.sites,
                 top_n: params.top_n,
             },
@@ -79,12 +77,11 @@ pub async fn similar_sites(
         )
         .await
     {
-        Ok(sonic::Response::Content(nodes)) => Ok(Json(nodes)),
+        Ok(nodes) => Ok(Json(nodes)),
         Err(err) => {
             tracing::error!("Failed to send request to webgraph: {}", err);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
-        _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -111,16 +108,16 @@ pub async fn knows_site(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let mut conn = sonic::ResilientConnection::create(host, retry);
+    let conn = sonic::service::ResilientConnection::create(host, retry);
 
     match conn
-        .send_with_timeout::<_, Option<Node>>(
-            &crate::entrypoint::webgraph_server::Request::Knows { site: params.site },
+        .send_with_timeout(
+            crate::entrypoint::webgraph_server::Knows { site: params.site },
             Duration::from_secs(2),
         )
         .await
     {
-        Ok(sonic::Response::Content(Some(node))) => Ok(Json(KnowsSite::Known { site: node.name })),
+        Ok(Some(node)) => Ok(Json(KnowsSite::Known { site: node.name })),
         Err(err) => {
             tracing::error!("Failed to send request to webgraph: {}", err);
             Ok(Json(KnowsSite::Unknown))

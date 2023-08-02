@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, time::Duration};
+pub mod service;
 
-use bytemuck::{Pod, Zeroable};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use thiserror::Error;
+use std::{marker::PhantomData, time::Duration};
+
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
-type Result<T, E = Error> = std::result::Result<T, E>;
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Got an IO error")]
     IO(#[from] std::io::Error),
@@ -36,56 +36,43 @@ pub enum Error {
 
     #[error("Failed to connect to peer: connection timeout")]
     ConnectionTimeout,
+
+    #[error("Other")]
+    Other(#[from] anyhow::Error),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub enum Response<T: Serialize> {
-    Empty,
-    Content(T),
+pub struct Server<Req, Res> {
+    pub(super) listener: TcpListener,
+    marker: PhantomData<(Req, Res)>,
+}
+pub struct Connection<Req, Res> {
+    stream: TcpStream,
+    marker: PhantomData<(Req, Res)>,
+}
+pub struct Request<Req, Res> {
+    stream: TcpStream,
+    body: Option<Req>,
+    marker: PhantomData<(Req, Res)>,
 }
 
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 struct Header {
     body_size: usize,
 }
 
-pub struct Request<T> {
-    stream: TcpStream,
-    pub body: T,
-}
-
-impl<T> Request<T> {
-    pub async fn respond<R: Serialize>(mut self, response: Response<R>) -> Result<()> {
-        let bytes = bincode::serialize(&response).unwrap();
-        let header = Header {
-            body_size: bytes.len(),
-        };
-
-        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
-        self.stream.write_all(&bytes).await?;
-        self.stream.flush().await?;
-
-        self.stream.shutdown().await?;
-
-        Ok(())
-    }
-}
-
-pub struct Server {
-    listener: TcpListener,
-}
-
-impl Server {
+impl<Req, Res> Server<Req, Res>
+where
+    Req: Serialize + DeserializeOwned,
+{
     pub async fn bind(addr: impl ToSocketAddrs) -> Result<Self> {
         let listener = TcpListener::bind(addr).await?;
-        Ok(Self { listener })
+        Ok(Server {
+            listener,
+            marker: PhantomData,
+        })
     }
-
-    pub async fn accept<T>(&self) -> Result<Request<T>>
-    where
-        T: Serialize + DeserializeOwned,
-    {
+    pub async fn accept(&self) -> Result<Request<Req, Res>> {
         let (mut stream, client) = self.listener.accept().await?;
         tracing::debug!("accepted connection from: {}", &client);
 
@@ -98,17 +85,21 @@ impl Server {
         stream.read_exact(&mut buf).await?;
         tracing::debug!("received bytes: {:?}", &buf);
 
-        let body = bincode::deserialize(&buf).unwrap();
+        let body = Some(bincode::deserialize(&buf).unwrap());
 
-        Ok(Request { stream, body })
+        Ok(Request {
+            stream,
+            body,
+            marker: PhantomData,
+        })
     }
 }
 
-pub struct Connection {
-    stream: TcpStream,
-}
-
-impl Connection {
+impl<Req, Res> Connection<Req, Res>
+where
+    Req: Serialize + DeserializeOwned,
+    Res: Serialize + DeserializeOwned,
+{
     pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
         Self::create_with_timeout(server, Duration::from_secs(30)).await
     }
@@ -120,16 +111,16 @@ impl Connection {
         match tokio::time::timeout(timeout, TcpStream::connect(server)).await {
             Ok(stream) => {
                 let stream = stream?;
-                Ok(Connection { stream })
+                Ok(Connection {
+                    stream,
+                    marker: PhantomData,
+                })
             }
             Err(_) => Err(Error::ConnectionTimeout),
         }
     }
 
-    pub async fn send_without_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
-        mut self,
-        request: &T,
-    ) -> Result<Response<R>> {
+    pub async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::serialize(&request).unwrap();
 
         let header = Header {
@@ -152,19 +143,12 @@ impl Connection {
         Ok(bincode::deserialize(&buf).unwrap())
     }
 
-    pub async fn send<T: Serialize, R: DeserializeOwned + Serialize>(
-        self,
-        request: &T,
-    ) -> Result<Response<R>> {
+    pub async fn send(self, request: &Req) -> Result<Res> {
         self.send_with_timeout(request, Duration::from_secs(30))
             .await
     }
 
-    pub async fn send_with_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
-        self,
-        request: &T,
-        timeout: Duration,
-    ) -> Result<Response<R>> {
+    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::ConnectionTimeout),
@@ -172,41 +156,30 @@ impl Connection {
     }
 }
 
-pub struct ResilientConnection<Rt: Iterator<Item = Duration>> {
-    addr: SocketAddr,
-    retry: Rt,
-}
+impl<Req, Res> Request<Req, Res>
+where
+    Req: Serialize + DeserializeOwned,
+    Res: Serialize + DeserializeOwned,
+{
+    pub async fn respond(mut self, response: Res) -> Result<()> {
+        let bytes = bincode::serialize(&response).unwrap();
+        let header = Header {
+            body_size: bytes.len(),
+        };
 
-impl<Rt: Iterator<Item = Duration>> ResilientConnection<Rt> {
-    pub fn create(addr: SocketAddr, retry: Rt) -> Self {
-        Self { addr, retry }
+        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
+        self.stream.write_all(&bytes).await?;
+        self.stream.flush().await?;
+
+        self.stream.shutdown().await?;
+
+        Ok(())
     }
-
-    pub async fn send_with_timeout<T: Serialize, R: DeserializeOwned + Serialize>(
-        &mut self,
-        request: &T,
-        timeout: Duration,
-    ) -> Result<Response<R>> {
-        loop {
-            match Connection::create_with_timeout(&self.addr, timeout).await {
-                Ok(conn) => {
-                    let response = conn.send_with_timeout(request, timeout).await;
-                    if let Err(Error::ConnectionTimeout) = response {
-                        continue;
-                    }
-                    return response;
-                }
-                Err(Error::ConnectionTimeout) => {
-                    if let Some(timeout) = self.retry.next() {
-                        tokio::time::sleep(timeout).await;
-                        continue;
-                    } else {
-                        return Err(Error::ConnectionTimeout);
-                    }
-                }
-                Err(e) => return Err(e),
-            }
-        }
+    pub fn body(&self) -> &Req {
+        self.body.as_ref().unwrap()
+    }
+    fn take_body(&mut self) -> Req {
+        self.body.take().expect("body was taken twice")
     }
 }
 
@@ -216,17 +189,20 @@ mod tests {
 
     use proptest::prelude::*;
     use proptest_derive::Arbitrary;
+    use serde::Deserialize;
 
     use super::*;
 
     fn fixture<
-        A: Send + Sync + 'static,
-        B: Send + Sync + 'static,
+        Req: Serialize + DeserializeOwned + Send + 'static,
+        Res: Serialize + DeserializeOwned + Send + 'static,
+        A: Send + 'static,
+        B: Send + 'static,
         X: Future<Output = Result<A, TestCaseError>> + Send,
         Y: Future<Output = Result<B, TestCaseError>> + Send,
     >(
-        svr_fn: impl FnOnce(Server) -> X + Send + 'static,
-        con_fn: impl FnOnce(Connection) -> Y + Send + 'static,
+        svr_fn: impl FnOnce(Server<Req, Res>) -> X + Send + 'static,
+        con_fn: impl FnOnce(Connection<Req, Res>) -> Y + Send + 'static,
     ) -> (Result<A, TestCaseError>, Result<B, TestCaseError>) {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -256,31 +232,21 @@ mod tests {
 
     proptest! {
         #[test]
-        fn basic_arb(msg_1: Message, msg_2: Message) {
+        fn basic_arb(a1: Message, b1: Message) {
+            let (a2, b2) = (a1.clone(), b1.clone());
             let (svr_res, con_res) = fixture(
-                {
-                    let msg_1 = msg_1.clone();
-                    let msg_2 = msg_2.clone();
-                    |svr| async move {
-                        let req = svr.accept::<Message>().await?;
-
-                        prop_assert_eq!(&req.body, &msg_1);
-
-                        let res = Response::Content(msg_2);
-                        req.respond(res).await?;
-
-                        Ok(())
-                    }
+                |svr| async move {
+                    let req = svr.accept().await?;
+                    prop_assert_eq!(req.body(), &a1);
+                    req.respond(b1).await?;
+                    Ok(())
                 },
                 |con| async move {
-                    let res: Response<Message> = con.send(&msg_1).await?;
-
-                    prop_assert_eq!(res, Response::Content(msg_2));
-
+                    let res = con.send(&a2).await?;
+                    prop_assert_eq!(res, b2);
                     Ok(())
                 },
             );
-
             svr_res?;
             con_res?;
         }

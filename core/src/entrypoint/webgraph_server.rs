@@ -28,18 +28,14 @@ use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
 use crate::distributed::sonic;
+use crate::distributed::sonic::service::Message;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
+use crate::sonic_service;
 use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
-
-#[derive(Serialize, Deserialize)]
-pub enum Request {
-    SimilarSites { sites: Vec<String>, top_n: usize },
-    Knows { site: String },
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ScoredSite {
@@ -49,6 +45,74 @@ pub struct ScoredSite {
 }
 
 const MAX_SITES: usize = 20;
+
+pub struct WebGraphService {
+    searcher: DistributedSearcher,
+    similar_sites_finder: SimilarSitesFinder,
+}
+
+sonic_service!(WebGraphService, [SimilarSites, Knows]);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimilarSites {
+    pub sites: Vec<String>,
+    pub top_n: usize,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Knows {
+    pub site: String,
+}
+
+#[async_trait::async_trait]
+impl Message<WebGraphService> for SimilarSites {
+    type Response = Vec<ScoredSite>;
+
+    async fn handle(self, server: &mut WebGraphService) -> sonic::Result<Self::Response> {
+        let sites = &self.sites[..std::cmp::min(self.sites.len(), MAX_SITES)];
+        let similar_sites = server
+            .similar_sites_finder
+            .find_similar_sites(sites, self.top_n);
+
+        let urls = similar_sites
+            .iter()
+            .map(|s| Url::parse(&("http://".to_string() + s.node.name.as_str())).unwrap())
+            .collect_vec();
+
+        let descriptions = server.searcher.get_homepage_descriptions(&urls).await;
+
+        let similar_sites = similar_sites
+            .into_iter()
+            .map(|site| {
+                let description = descriptions
+                    .get(&Url::parse(&("http://".to_string() + site.node.name.as_str())).unwrap())
+                    .cloned();
+
+                ScoredSite {
+                    site: site.node.name,
+                    score: site.score,
+                    description,
+                }
+            })
+            .collect_vec();
+
+        Ok(similar_sites)
+    }
+}
+
+#[async_trait::async_trait]
+impl Message<WebGraphService> for Knows {
+    type Response = Option<Node>;
+
+    async fn handle(self, server: &mut WebGraphService) -> sonic::Result<Self::Response> {
+        let node = Node::from(self.site.to_string()).into_host();
+
+        if server.similar_sites_finder.knows_about(&node) {
+            Ok(Some(node))
+        } else {
+            Ok(None)
+        }
+    }
+}
 
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
@@ -76,60 +140,17 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         config.max_similar_sites,
     );
 
-    let server = sonic::Server::bind(addr).await.unwrap();
+    let mut server = WebGraphService {
+        searcher,
+        similar_sites_finder,
+    }
+    .bind(addr)
+    .await
+    .unwrap();
 
     info!("webgraph server is ready to accept requests on {}", addr);
 
     loop {
-        if let Ok(req) = server.accept::<Request>().await {
-            match &req.body {
-                Request::SimilarSites { sites, top_n } => {
-                    let sites = &sites[..std::cmp::min(sites.len(), MAX_SITES)];
-                    let similar_sites = similar_sites_finder.find_similar_sites(sites, *top_n);
-
-                    let urls = similar_sites
-                        .iter()
-                        .map(|s| {
-                            Url::parse(&("http://".to_string() + s.node.name.as_str())).unwrap()
-                        })
-                        .collect_vec();
-
-                    let descriptions = searcher.get_homepage_descriptions(&urls).await;
-
-                    let similar_sites = similar_sites
-                        .into_iter()
-                        .map(|site| {
-                            let description = descriptions
-                                .get(
-                                    &Url::parse(&("http://".to_string() + site.node.name.as_str()))
-                                        .unwrap(),
-                                )
-                                .cloned();
-
-                            ScoredSite {
-                                site: site.node.name,
-                                score: site.score,
-                                description,
-                            }
-                        })
-                        .collect_vec();
-
-                    req.respond(sonic::Response::Content(similar_sites))
-                        .await
-                        .ok();
-                }
-                Request::Knows { site } => {
-                    let node = Node::from(site.to_string()).into_host();
-
-                    if similar_sites_finder.knows_about(&node) {
-                        req.respond(sonic::Response::Content(Some(node))).await.ok();
-                    } else {
-                        req.respond::<Option<Node>>(sonic::Response::Content(None))
-                            .await
-                            .ok();
-                    }
-                }
-            }
-        }
+        let _ = server.accept().await;
     }
 }

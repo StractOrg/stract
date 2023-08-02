@@ -5,7 +5,7 @@ use stract::mapreduce::{Manager, Map, Reduce, StatelessWorker};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct Job {
     id: usize,
 }

@@ -16,7 +16,7 @@
 
 use std::net::SocketAddr;
 
-use crate::distributed::sonic;
+use crate::mapreduce::MapReduceServer;
 
 use super::{Map, Result, Task};
 use async_trait::async_trait;
@@ -32,22 +32,22 @@ pub trait Worker {
     where
         Self: Sized,
         I: Map<Self, O> + Send + Sync,
-        O: Serialize + DeserializeOwned + Send,
+        O: Serialize + DeserializeOwned + Send + Sync,
     {
-        let server = sonic::Server::bind(addr).await?;
+        let server = MapReduceServer::<I, O>::bind(addr).await?;
         info!("worker listening on: {:}", addr);
 
         loop {
-            let req: sonic::Request<Task<I>> = server.accept().await?;
+            let req = server.accept().await?;
             debug!("received request");
-            match &req.body {
+            match req.body() {
                 Task::Job(job) => {
                     debug!("request is a job");
                     let res = job.map(self);
-                    req.respond(sonic::Response::Content(res)).await?;
+                    req.respond(Some(res)).await?;
                 }
                 Task::AllFinished => {
-                    req.respond::<Task<I>>(sonic::Response::Empty).await?;
+                    req.respond(None).await?;
                     break;
                 }
             }

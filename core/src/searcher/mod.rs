@@ -66,7 +66,7 @@ pub struct SearchQuery {
     pub return_ranking_signals: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
     pub num_websites: usize,

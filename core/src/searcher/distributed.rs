@@ -16,6 +16,7 @@
 
 use crate::{
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
+    entrypoint::search_server::{self, SearchService},
     inverted_index::{self, RetrievedWebpage},
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
     Result,
@@ -54,10 +55,15 @@ pub enum Error {
 
 impl RemoteSearcher {
     async fn search(&self, query: &SearchQuery) -> Result<InitialWebsiteResult> {
-        let mut conn = self.conn();
+        let conn = self.conn();
 
-        if let Ok(sonic::Response::Content(body)) = conn
-            .send_with_timeout(&Request::Search(query.clone()), Duration::from_secs(1))
+        if let Ok(Some(body)) = conn
+            .send_with_timeout(
+                search_server::Search {
+                    query: query.clone(),
+                },
+                Duration::from_secs(1),
+            )
             .await
         {
             return Ok(body);
@@ -71,11 +77,11 @@ impl RemoteSearcher {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
-        let mut conn = self.conn();
+        let conn = self.conn();
 
-        if let Ok(sonic::Response::Content(body)) = conn
+        if let Ok(Some(body)) = conn
             .send_with_timeout(
-                &Request::RetrieveWebsites {
+                search_server::RetrieveWebsites {
                     websites: pointers.to_vec(),
                     query: original_query.to_string(),
                 },
@@ -89,11 +95,11 @@ impl RemoteSearcher {
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let mut conn = self.conn();
+        let conn = self.conn();
 
-        if let Ok(sonic::Response::Content(body)) = conn
+        if let Ok(body) = conn
             .send_with_timeout(
-                &Request::GetWebpage {
+                search_server::GetWebpage {
                     url: url.to_string(),
                 },
                 Duration::from_secs(1),
@@ -107,11 +113,11 @@ impl RemoteSearcher {
     }
 
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let mut conn = self.conn();
+        let conn = self.conn();
 
-        if let Ok(sonic::Response::Content(body)) = conn
+        if let Ok(body) = conn
             .send_with_timeout(
-                &Request::GetHomepageDescriptions {
+                search_server::GetHomepageDescriptions {
                     urls: urls.to_vec(),
                 },
                 Duration::from_secs(1),
@@ -124,12 +130,14 @@ impl RemoteSearcher {
         HashMap::new()
     }
 
-    fn conn(&self) -> sonic::ResilientConnection<impl Iterator<Item = Duration>> {
+    fn conn(
+        &self,
+    ) -> sonic::service::ResilientConnection<SearchService, impl Iterator<Item = Duration>> {
         let retry = ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5);
 
-        sonic::ResilientConnection::create(self.addr, retry)
+        sonic::service::ResilientConnection::create(self.addr, retry)
     }
 }
 
@@ -211,21 +219,6 @@ impl Shard {
 pub struct InitialSearchResultShard {
     pub local_result: InitialWebsiteResult,
     pub shard: ShardId,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum Request {
-    Search(SearchQuery),
-    RetrieveWebsites {
-        websites: Vec<inverted_index::WebsitePointer>,
-        query: String,
-    },
-    GetWebpage {
-        url: String,
-    },
-    GetHomepageDescriptions {
-        urls: Vec<Url>,
-    },
 }
 
 #[derive(Clone, Debug)]
