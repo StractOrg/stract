@@ -16,6 +16,7 @@
 
 use std::{net::SocketAddr, time::Duration};
 
+use bytemuck::{Pod, Zeroable};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -23,7 +24,7 @@ use tokio::{
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -37,12 +38,13 @@ pub enum Error {
     ConnectionTimeout,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response<T: Serialize> {
     Empty,
     Content(T),
 }
 
+#[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 struct Header {
     body_size: usize,
@@ -53,10 +55,6 @@ pub struct Request<T> {
     pub body: T,
 }
 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    std::slice::from_raw_parts((p as *const T) as *const u8, std::mem::size_of::<T>())
-}
-
 impl<T> Request<T> {
     pub async fn respond<R: Serialize>(mut self, response: Response<R>) -> Result<()> {
         let bytes = bincode::serialize(&response).unwrap();
@@ -64,9 +62,7 @@ impl<T> Request<T> {
             body_size: bytes.len(),
         };
 
-        self.stream
-            .write_all(unsafe { any_as_u8_slice(&header) })
-            .await?;
+        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
         self.stream.write_all(&bytes).await?;
         self.stream.flush().await?;
 
@@ -95,7 +91,7 @@ impl Server {
 
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
         stream.read_exact(&mut header_buf).await?;
-        let header: Header = unsafe { std::ptr::read(header_buf.as_ptr() as *const _) };
+        let header: Header = *bytemuck::from_bytes(&header_buf);
 
         let mut buf = vec![0; header.body_size];
 
@@ -140,15 +136,13 @@ impl Connection {
             body_size: bytes.len(),
         };
 
-        self.stream
-            .write_all(unsafe { any_as_u8_slice(&header) })
-            .await?;
+        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
         self.stream.write_all(&bytes).await?;
         self.stream.flush().await?;
 
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
         self.stream.read_exact(&mut header_buf).await?;
-        let header: Header = unsafe { std::ptr::read(header_buf.as_ptr() as *const _) };
+        let header: Header = *bytemuck::from_bytes(&header_buf);
 
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
@@ -212,6 +206,83 @@ impl<Rt: Iterator<Item = Duration>> ResilientConnection<Rt> {
                 }
                 Err(e) => return Err(e),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, future::Future};
+
+    use proptest::prelude::*;
+    use proptest_derive::Arbitrary;
+
+    use super::*;
+
+    fn fixture<
+        A: Send + Sync + 'static,
+        B: Send + Sync + 'static,
+        X: Future<Output = Result<A, TestCaseError>> + Send,
+        Y: Future<Output = Result<B, TestCaseError>> + Send,
+    >(
+        svr_fn: impl FnOnce(Server) -> X + Send + 'static,
+        con_fn: impl FnOnce(Connection) -> Y + Send + 'static,
+    ) -> (Result<A, TestCaseError>, Result<B, TestCaseError>) {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                let server = Server::bind(("127.0.0.1", 0)).await.unwrap();
+                let addr = server.listener.local_addr().unwrap();
+                let connection = Connection::create(addr).await.unwrap();
+
+                let svr_task = tokio::spawn(async move { svr_fn(server).await });
+                let con_task = tokio::spawn(async move { con_fn(connection).await });
+
+                let (svr_res, con_res) = tokio::join!(svr_task, con_task);
+                (
+                    svr_res.unwrap_or_else(|err| panic!("server failed: {err}")),
+                    con_res.unwrap_or_else(|err| panic!("connection failed: {err}")),
+                )
+            })
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Arbitrary)]
+    struct Message {
+        text: String,
+        other: HashMap<String, f32>,
+    }
+
+    proptest! {
+        #[test]
+        fn basic_arb(msg_1: Message, msg_2: Message) {
+            let (svr_res, con_res) = fixture(
+                {
+                    let msg_1 = msg_1.clone();
+                    let msg_2 = msg_2.clone();
+                    |svr| async move {
+                        let req = svr.accept::<Message>().await?;
+
+                        prop_assert_eq!(&req.body, &msg_1);
+
+                        let res = Response::Content(msg_2);
+                        req.respond(res).await?;
+
+                        Ok(())
+                    }
+                },
+                |con| async move {
+                    let res: Response<Message> = con.send(&msg_1).await?;
+
+                    prop_assert_eq!(res, Response::Content(msg_2));
+
+                    Ok(())
+                },
+            );
+
+            svr_res?;
+            con_res?;
         }
     }
 }
