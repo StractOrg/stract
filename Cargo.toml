@@ -39,7 +39,6 @@ askama = "0.11.1"
 axum = "0.6.9"
 axum-extra = { version = "0.6.0", features = ["spa"] }
 axum-macros = "0.3.4"
-anyhow = "1.0.58"
 html-escape = "0.2.11"
 logos = "0.12.1"
 csv = "1.1.6"
@@ -86,9 +85,11 @@ torch-sys = "0.13.0"
 libc = "0.2.142"
 lz-str = "0.2.1"
 safetensors = "0.3.1"
-publicsuffix = { version = "2", features = ["hashbrown"] }
 robotstxt-with-cache = "0.4.0"
 rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
 rusqlite = { version = "0.29.0", features = ["bundled", "modern-full", "buildtime_bindgen"] }
 async-channel = "1.8.0"
 lru = "0.10.0"
+url = { version = "2.4.0", features = ["serde"] }
+anyhow = { version = "1.0.72", features = ["backtrace"] }
+

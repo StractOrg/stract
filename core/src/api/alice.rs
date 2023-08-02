@@ -101,7 +101,7 @@ impl EncodedSavedState {
         Self(saved_state)
     }
 
-    fn decode(self) -> Result<SavedState, crate::alice::Error> {
+    fn decode(self) -> Result<SavedState, anyhow::Error> {
         let saved_state = base64::decode(self.0)?;
         let saved_state = bincode::deserialize(&saved_state)?;
         Ok(saved_state)

@@ -323,7 +323,7 @@ impl EntityBuilder {
         }
 
         let mut info = self.extract_info();
-        let image = info.remove("image").map(|span| span.text.into());
+        let image = info.remove("image").map(|span| span.text);
 
         let (page_abstract, paragraphs) = self.extract_text();
 
@@ -387,7 +387,7 @@ mod tests {
 
         assert_eq!(
             entity.image,
-            Some("Aristotle Altemps Inv8575.jpg".to_string().into())
+            Some("Aristotle Altemps Inv8575.jpg".to_string())
         );
 
         assert!(
@@ -461,10 +461,7 @@ mod tests {
         );
         assert_eq!(entity.info.get("death_date"), None);
 
-        assert_eq!(
-            entity.image,
-            Some("President Barack Obama.jpg".to_string().into())
-        );
+        assert_eq!(entity.image, Some("President Barack Obama.jpg".to_string()));
 
         assert!(
             entity.page_abstract.text.trim().starts_with("Barack Hussein Obama II (   ; born August 4, 1961) is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, he was the first African-American  president of the United States."));

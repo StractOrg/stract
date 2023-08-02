@@ -31,7 +31,7 @@ pub enum TextField {
     AllBody,
     Url,
     UrlNoTokenizer,
-    Site,
+    SiteWithout,
     Domain,
     SiteNoTokenizer,
     SiteIfHomepageNoTokenizer,
@@ -69,7 +69,7 @@ impl TextField {
             TextField::AllBody => Tokenizer::default(),
             TextField::Url => Tokenizer::default(),
             TextField::UrlNoTokenizer => Tokenizer::Identity(Identity {}),
-            TextField::Site => Tokenizer::default(),
+            TextField::SiteWithout => Tokenizer::default(),
             TextField::Domain => Tokenizer::default(),
             TextField::SiteNoTokenizer => Tokenizer::Identity(Identity {}),
             TextField::SiteIfHomepageNoTokenizer => Tokenizer::Identity(Identity {}),
@@ -106,7 +106,7 @@ impl TextField {
             TextField::AllBody => false,
             TextField::Url => true,
             TextField::UrlNoTokenizer => false,
-            TextField::Site => true,
+            TextField::SiteWithout => true,
             TextField::Domain => true,
             TextField::SiteNoTokenizer => false,
             TextField::SiteIfHomepageNoTokenizer => false,
@@ -132,7 +132,7 @@ impl TextField {
             TextField::CleanBody => "body",
             TextField::Url => "url",
             TextField::UrlNoTokenizer => "url_no_tokenizer",
-            TextField::Site => "site",
+            TextField::SiteWithout => "site",
             TextField::Domain => "domain",
             TextField::SiteNoTokenizer => "site_no_tokenizer",
             TextField::SiteIfHomepageNoTokenizer => "site_if_homepage_no_tokenizer",
@@ -247,7 +247,7 @@ pub static ALL_FIELDS: [Field; 54] = [
     Field::Text(TextField::AllBody),
     Field::Text(TextField::Url),
     Field::Text(TextField::UrlNoTokenizer),
-    Field::Text(TextField::Site),
+    Field::Text(TextField::SiteWithout),
     Field::Text(TextField::Domain),
     Field::Text(TextField::SiteNoTokenizer),
     Field::Text(TextField::SiteIfHomepageNoTokenizer),
@@ -328,7 +328,9 @@ impl Field {
             Field::Text(TextField::UrlNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::Site) => IndexingOption::Text(self.default_text_options()),
+            Field::Text(TextField::SiteWithout) => {
+                IndexingOption::Text(self.default_text_options())
+            }
             Field::Text(TextField::SiteIfHomepageNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options())
             }

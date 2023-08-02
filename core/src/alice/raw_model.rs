@@ -15,7 +15,7 @@ use std::{fs::OpenOptions, path::Path};
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::alice::{Error, Result};
+use crate::alice::Result;
 use safetensors::SafeTensors;
 use tch::{
     nn::{embedding, layer_norm, Embedding, LayerNorm, LayerNormConfig, ModuleT, VarStore},
@@ -529,12 +529,9 @@ impl RawModel {
                 .read(true)
                 .write(true)
                 .create(true)
-                .open(path)
-                .map_err(Error::Io)?;
+                .open(path)?;
 
-            memmap2::MmapOptions::new()
-                .map_mut(&file)
-                .map_err(Error::Io)?
+            memmap2::MmapOptions::new().map_mut(&file)?
         };
 
         let weights = SafeTensors::deserialize(&mmap)?;

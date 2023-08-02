@@ -21,13 +21,11 @@ use std::{
 };
 
 use tokio::sync::Mutex;
+use url::Url;
 
-use crate::{config::CrawlerConfig, webpage::Url};
+use crate::config::CrawlerConfig;
 
-use self::{
-    warc_writer::{WarcWriter, WarcWriterMessage},
-    worker::Worker,
-};
+use self::{warc_writer::WarcWriter, worker::Worker};
 
 pub mod coordinator;
 pub mod crawl_db;
@@ -39,12 +37,6 @@ pub use coordinator::CrawlCoordinator;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("chrono out-of-range error: {0}")]
-    Chrono(#[from] chrono::OutOfRangeError),
-
     #[error("invalid content type: {0}")]
     InvalidContentType(String),
 
@@ -56,24 +48,9 @@ pub enum Error {
 
     #[error("invalid politeness factor")]
     InvalidPolitenessFactor,
-
-    #[error("addr parse error: {0}")]
-    AddrParse(#[from] std::net::AddrParseError),
-
-    #[error("channel: {0}")]
-    SendError(#[from] tokio::sync::mpsc::error::SendError<WarcWriterMessage>),
-
-    #[error("bincode: {0}")]
-    Bincode(#[from] bincode::Error),
-
-    #[error("rocksdb: {0}")]
-    Rocksdb(#[from] rocksdb::Error),
-
-    #[error("io: {0}")]
-    Io(#[from] std::io::Error),
 }
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Site(String);
@@ -83,7 +60,7 @@ pub struct Domain(String);
 
 impl From<&Url> for Domain {
     fn from(url: &Url) -> Self {
-        Self(url.domain().to_string())
+        Self(url.domain().unwrap_or_default().to_string())
     }
 }
 

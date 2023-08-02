@@ -167,7 +167,7 @@ pub async fn route(
     )
 }
 
-pub async fn run(config: AliceLocalConfig) -> Result<(), crate::alice::Error> {
+pub async fn run(config: AliceLocalConfig) -> Result<(), anyhow::Error> {
     let addr: SocketAddr = config.host;
     let key = base64::decode(config.encryption_key)?;
 

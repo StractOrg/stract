@@ -28,16 +28,7 @@ const CLUSTER_ID: &str = "stract-cluster";
 const GOSSIP_INTERVAL: Duration = Duration::from_secs(1);
 const SERVICE_KEY: &str = "service";
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Anyhow")]
-    Anyhow(#[from] anyhow::Error),
-
-    #[error("serde json")]
-    SerdeJson(#[from] serde_json::Error),
-}
-
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 pub struct Cluster {
     alive_nodes: Arc<RwLock<HashSet<Member>>>,

@@ -22,6 +22,7 @@ use std::time::Instant;
 
 use itertools::intersperse;
 use optics::Optic;
+use url::Url;
 
 use crate::bangs::{Bang, BangHit};
 use crate::config::{CollectorConfig, FrontendThresholds};
@@ -149,7 +150,10 @@ impl FrontendSearcher {
                     .await;
 
                 if let Some(res) = retrieved.pop() {
-                    return Ok(Some(create_stackoverflow_sidebar(res.schema_org, res.url)?));
+                    return Ok(Some(create_stackoverflow_sidebar(
+                        res.schema_org,
+                        Url::parse(&res.url).unwrap(),
+                    )?));
                 }
             }
         }
@@ -209,7 +213,7 @@ impl FrontendSearcher {
                     tag: String::new(),
                     url: webpage.url.clone(),
                 },
-                redirect_to: webpage.url.clone().into(),
+                redirect_to: Url::parse(&webpage.url).unwrap(),
             }));
         }
 
@@ -385,7 +389,7 @@ impl FrontendSearcher {
 
     pub async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         if let Some(bang) = self.check_bangs(query).await? {
-            return Ok(SearchResult::Bang(bang));
+            return Ok(SearchResult::Bang(Box::new(bang)));
         }
 
         Ok(SearchResult::Websites(self.search_websites(query).await?))

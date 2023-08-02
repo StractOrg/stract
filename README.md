@@ -38,4 +38,4 @@ You can contact us at [hello@trystract.com](mailto:hello@trystract.com) or in ou
 # 🏆 Thank you!
 We truly stand on the shoulders of giants and this project would not have been even remotely feasible without them. An especially huge thank you to
 * The authors and contributors of Tantivy for providing the inverted index library on which Stract is built.
-* The commoncrawl organization for crawling the web and making the dataset readily available.
+* The commoncrawl organization for crawling the web and making the dataset readily available. Even though we have our own crawler now, commoncrawl has been a huge help in the early stages of development.

@@ -24,12 +24,13 @@ use std::{
 };
 
 use tokio::sync::Mutex;
+use url::Url;
 
 use crate::{
     config::CrawlerConfig,
     crawler::{JobResponse, Request, Response},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
-    webpage::{Html, Url},
+    webpage::Html,
 };
 
 use super::{
@@ -60,7 +61,7 @@ impl Worker {
         coordinator_host: SocketAddr,
     ) -> Result<Self> {
         if config.politeness_factor < config.min_politeness_factor {
-            return Err(Error::InvalidPolitenessFactor);
+            return Err(Error::InvalidPolitenessFactor.into());
         }
 
         let client = reqwest::Client::builder()
@@ -170,7 +171,9 @@ impl Worker {
                 continue;
             }
 
-            if retryable_url.url.is_empty() || retryable_url.url.site().is_empty() {
+            if retryable_url.url.host_str().is_none()
+                || !matches!(retryable_url.url.scheme(), "http" | "https")
+            {
                 continue;
             }
 
@@ -182,7 +185,7 @@ impl Worker {
                 continue;
             }
 
-            let site = Site(retryable_url.url.site().to_string());
+            let site = Site(retryable_url.url.host_str().unwrap_or_default().to_string());
             if job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
                 crawled_sitemaps.insert(site.clone());
 
@@ -240,57 +243,69 @@ impl Worker {
                 if matches!(datum.status_code, 200 | 301 | 302) {
                     self.save_datum(datum.clone()).await;
 
-                    let html = Html::parse(&datum.body, &datum.url.full());
-                    let new_urls = html
-                        .all_links()
-                        .into_iter()
-                        .map(|link| Url::from(link.destination.full()).into_absolute(&datum.url))
-                        .filter(|url| {
-                            !url.path_ends_with(".pdf")
-                                && !url.path_ends_with(".jpg")
-                                && !url.path_ends_with(".zip")
-                                && !url.path_ends_with(".png")
-                                && !url.path_ends_with(".css")
-                                && !url.path_ends_with(".js")
-                                && !url.path_ends_with(".json")
-                                && !url.path_ends_with(".jsonp")
-                                && !url.path_ends_with(".woff2")
-                                && !url.path_ends_with(".woff")
-                                && !url.path_ends_with(".ttf")
-                                && !url.path_ends_with(".svg")
-                                && !url.path_ends_with(".gif")
-                                && !url.path_ends_with(".jpeg")
-                                && !url.path_ends_with(".ico")
-                                && !url.path_ends_with(".mp4")
-                                && !url.path_ends_with(".mp3")
-                                && !url.path_ends_with(".avi")
-                                && !url.path_ends_with(".mov")
-                                && !url.path_ends_with(".mpeg")
-                                && !url.path_ends_with(".webm")
-                                && !url.path_ends_with(".wav")
-                                && !url.path_ends_with(".flac")
-                                && !url.path_ends_with(".aac")
-                                && !url.path_ends_with(".ogg")
-                                && !url.path_ends_with(".m4a")
-                                && !url.path_ends_with(".m4v")
-                        })
-                        .collect();
+                    match Html::parse(&datum.body, datum.url.as_str()) {
+                        Ok(html) => {
+                            let new_urls = html
+                                .all_links()
+                                .into_iter()
+                                .map(|link| link.destination)
+                                .filter(|url| {
+                                    !url.path().ends_with(".pdf")
+                                        && !url.path().ends_with(".jpg")
+                                        && !url.path().ends_with(".zip")
+                                        && !url.path().ends_with(".png")
+                                        && !url.path().ends_with(".css")
+                                        && !url.path().ends_with(".js")
+                                        && !url.path().ends_with(".json")
+                                        && !url.path().ends_with(".jsonp")
+                                        && !url.path().ends_with(".woff2")
+                                        && !url.path().ends_with(".woff")
+                                        && !url.path().ends_with(".ttf")
+                                        && !url.path().ends_with(".svg")
+                                        && !url.path().ends_with(".gif")
+                                        && !url.path().ends_with(".jpeg")
+                                        && !url.path().ends_with(".ico")
+                                        && !url.path().ends_with(".mp4")
+                                        && !url.path().ends_with(".mp3")
+                                        && !url.path().ends_with(".avi")
+                                        && !url.path().ends_with(".mov")
+                                        && !url.path().ends_with(".mpeg")
+                                        && !url.path().ends_with(".webm")
+                                        && !url.path().ends_with(".wav")
+                                        && !url.path().ends_with(".flac")
+                                        && !url.path().ends_with(".aac")
+                                        && !url.path().ends_with(".ogg")
+                                        && !url.path().ends_with(".m4a")
+                                        && !url.path().ends_with(".m4v")
+                                })
+                                .collect();
 
-                    let url_res =
-                        if datum.status_code == 301 || datum.status_code == 302 || url != datum.url
-                        {
-                            UrlResponse::Redirected {
-                                url,
-                                new_url: datum.url,
+                            let url_res = if datum.status_code == 301
+                                || datum.status_code == 302
+                                || url != datum.url
+                            {
+                                UrlResponse::Redirected {
+                                    url,
+                                    new_url: datum.url,
+                                }
+                            } else {
+                                UrlResponse::Success { url: datum.url }
+                            };
+
+                            ProcessedUrl {
+                                new_urls,
+                                response: url_res,
+                                fetch_time: Duration::from_millis(datum.fetch_time_ms),
                             }
-                        } else {
-                            UrlResponse::Success { url: datum.url }
-                        };
-
-                    ProcessedUrl {
-                        new_urls,
-                        response: url_res,
-                        fetch_time: Duration::from_millis(datum.fetch_time_ms),
+                        }
+                        Err(_) => ProcessedUrl {
+                            new_urls: Vec::new(),
+                            response: UrlResponse::Failed {
+                                url,
+                                status_code: None,
+                            },
+                            fetch_time: Duration::from_millis(datum.fetch_time_ms),
+                        },
                     }
                 } else {
                     if datum.status_code == 429 {
@@ -342,9 +357,9 @@ impl Worker {
             .with_limit(Duration::from_secs(20))
             .take(3);
 
-        let mut res = Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT));
+        let mut res = Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
         for time in backoff {
-            if let Ok(cur_res) = self.client.get(url.full()).send().await {
+            if let Ok(cur_res) = self.client.get(url.to_string()).send().await {
                 res = Ok(cur_res);
                 break;
             } else {
@@ -376,24 +391,24 @@ impl Worker {
         // check if content length is too large
         if let Some(content_length) = headers.get("content-length") {
             if content_length.parse::<usize>().unwrap_or(0) > 10_000_000 {
-                return Err(Error::ContentTooLarge);
+                return Err(Error::ContentTooLarge.into());
             }
         }
 
         // check if content type is html
         if let Some(content_type) = headers.get("content-type") {
             if !content_type.contains("text/html") {
-                return Err(Error::InvalidContentType(content_type.to_string()));
+                return Err(Error::InvalidContentType(content_type.to_string()).into());
             }
         }
 
         let status_code = res.status().as_u16();
 
-        let res_url = res.url().as_str().to_string();
+        let res_url = res.url().clone();
         let body = res.text().await?;
 
         Ok(CrawlDatum {
-            url: Url::from(res_url).full().into(),
+            url: res_url,
             status_code,
             headers,
             body,
@@ -464,23 +479,19 @@ impl Worker {
                     }
                     Ok(Event::Text(e)) => {
                         if in_sitemap && in_loc {
-                            let url = Url::from(e.unescape_and_decode(&reader).unwrap())
-                                .full()
-                                .into();
-
-                            tokio::time::sleep(Duration::from_millis(
-                                self.config.min_crawl_delay_ms,
-                            ))
-                            .await;
-
-                            urls.append(
-                                &mut self.urls_from_sitemap(url, depth + 1, max_depth).await,
-                            );
+                            if let Ok(url) = Url::parse(&e.unescape_and_decode(&reader).unwrap()) {
+                                urls.append(
+                                    &mut self.urls_from_sitemap(url, depth + 1, max_depth).await,
+                                );
+                                tokio::time::sleep(Duration::from_millis(
+                                    self.config.min_crawl_delay_ms,
+                                ))
+                                .await;
+                            }
                         } else if in_url && in_loc {
-                            let url = Url::from(e.unescape_and_decode(&reader).unwrap())
-                                .full()
-                                .into();
-                            urls.push(url);
+                            if let Ok(url) = Url::parse(&e.unescape_and_decode(&reader).unwrap()) {
+                                urls.push(url);
+                            }
                         }
                     }
                     Ok(Event::Eof) => break,

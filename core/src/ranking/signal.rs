@@ -484,7 +484,7 @@ impl Signal {
         let value = match self {
             Signal::HostCentrality => Some(webpage.host_centrality),
             Signal::PageCentrality => Some(webpage.page_centrality),
-            Signal::IsHomepage => Some(webpage.html.url().is_homepage().into()),
+            Signal::IsHomepage => Some(webpage.html.is_homepage().into()),
             Signal::FetchTimeMs => {
                 let fetch_time_ms = webpage.fetch_time_ms as usize;
                 if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
@@ -511,20 +511,28 @@ impl Signal {
                 Some(score_region(region, signal_aggregator))
             }
             Signal::UrlDigits => {
-                let num_digits = webpage
+                let num_digits = (webpage
                     .html
                     .url()
-                    .path_and_query()
+                    .path()
                     .chars()
                     .filter(|c| c.is_ascii_digit())
-                    .count() as f64;
+                    .count()
+                    + webpage
+                        .html
+                        .url()
+                        .query()
+                        .unwrap_or_default()
+                        .chars()
+                        .filter(|c| c.is_ascii_digit())
+                        .count()) as f64;
                 Some(score_digits(num_digits))
             }
             Signal::UrlSlashes => {
                 let num_slashes = webpage
                     .html
                     .url()
-                    .path_and_query()
+                    .path()
                     .chars()
                     .filter(|c| c == &'/')
                     .count() as f64;
@@ -610,7 +618,7 @@ impl Signal {
             Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
             Signal::Bm25AllBody => Some(TextField::AllBody),
             Signal::Bm25Url => Some(TextField::Url),
-            Signal::Bm25Site => Some(TextField::Site),
+            Signal::Bm25Site => Some(TextField::SiteWithout),
             Signal::Bm25Domain => Some(TextField::Domain),
             Signal::Bm25SiteNoTokenizer => Some(TextField::SiteNoTokenizer),
             Signal::Bm25DomainNoTokenizer => Some(TextField::DomainNoTokenizer),
@@ -1116,7 +1124,8 @@ mod tests {
                 crate::rand_words(1_000)
             ),
             "https://www.example.com",
-        );
+        )
+        .unwrap();
 
         webpage
             .html

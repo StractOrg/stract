@@ -31,13 +31,13 @@ use tantivy::{
     DocAddress, IndexReader, IndexWriter, Searcher, Term,
 };
 use tracing::info;
+use url::Url;
 
 use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
     kv::{rocksdb_store::RocksDbStore, Kv},
     tokenizer::Normal,
-    webpage::Url,
     Result,
 };
 
@@ -119,8 +119,8 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantiv
     doc
 }
 
-fn wikipedify_url(url: &Url) -> Vec<Url> {
-    let mut name = url.raw().replace(' ', "_");
+fn wikipedify_url(url: &str) -> Vec<Url> {
+    let mut name = url.replace(' ', "_");
 
     if name.starts_with("File:") {
         if let Some(index) = name.find("File:") {
@@ -130,18 +130,18 @@ fn wikipedify_url(url: &Url) -> Vec<Url> {
 
     let hex = format!("{:?}", md5::compute(&name));
     vec![
-        format!(
+        Url::parse(&format!(
             "https://upload.wikimedia.org/wikipedia/commons/{:}/{:}",
             hex[0..1].to_string() + "/" + &hex[0..2],
             name
-        )
-        .into(),
-        format!(
+        ))
+        .unwrap(),
+        Url::parse(&format!(
             "https://upload.wikimedia.org/wikipedia/en/{:}/{:}",
             hex[0..1].to_string() + "/" + &hex[0..2],
             name
-        )
-        .into(),
+        ))
+        .unwrap(),
     ]
 }
 
@@ -213,10 +213,7 @@ impl EntityIndex {
         }
 
         if let Some(image) = entity.image.clone() {
-            let image = wikipedify_url(&image)
-                .into_iter()
-                .filter(Url::is_valid_uri)
-                .collect();
+            let image = wikipedify_url(&image).into_iter().collect();
 
             self.image_downloader.schedule(ImageDownloadJob {
                 key: entity.title.clone(),
@@ -414,24 +411,22 @@ mod tests {
     #[test]
     fn wikipedia_image_url_aristotle() {
         assert_eq!(
-            wikipedify_url(&"Aristotle Altemps Inv8575.jpg".to_string().into())
+            wikipedify_url("Aristotle Altemps Inv8575.jpg")
                 .first()
                 .unwrap()
-                .full(),
+                .as_str(),
             "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
-                .to_string()
         );
     }
 
     #[test]
     fn wikipedia_image_url_with_file() {
         assert_eq!(
-            wikipedify_url(&"File:Aristotle Altemps Inv8575.jpg".to_string().into())
+            wikipedify_url("File:Aristotle Altemps Inv8575.jpg")
                 .first()
                 .unwrap()
-                .full(),
+                .as_str(),
             "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
-                .to_string()
         );
     }
 

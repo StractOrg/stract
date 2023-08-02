@@ -35,9 +35,11 @@ use aes_gcm::{
     aead::{Aead, OsRng},
     AeadCore, Aes256Gcm, Key, KeyInit, Nonce,
 };
+use anyhow::anyhow;
 use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
 use tch::Tensor;
+use url::Url;
 
 use crate::{
     api::search::ApiSearchQuery,
@@ -47,8 +49,7 @@ use crate::{
     llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
-    summarizer::{self, ExtractiveSummarizer},
-    webpage::Url,
+    summarizer::ExtractiveSummarizer,
 };
 
 use self::{
@@ -69,57 +70,21 @@ Alice: <answer><|endoftext|>"#;
 pub mod generate;
 mod raw_model;
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Torch error: {0}")]
-    Torch(#[from] tch::TchError),
-
-    #[error("SafeTensors error: {0}")]
-    SafeTensors(#[from] safetensors::SafeTensorError),
-
-    #[error("Tokenizers error: {0}")]
-    Tokenizers(#[from] tokenizers::Error),
-
     #[error("Empty input")]
     EmptyInput,
-
-    #[error("Reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
 
     #[error("Unexpected search result")]
     UnexpectedSearchResult,
 
-    #[error("Summarizer: {0}")]
-    Summarizer(#[from] summarizer::Error),
-
-    #[error("Bincode: {0}")]
-    Bincode(#[from] bincode::Error),
-
-    #[error("Base64: {0}")]
-    Base64(#[from] base64::DecodeError),
-
     #[error("Failed to decrypt")]
     DecryptionFailed,
 
-    #[error("Cluster")]
-    Cluster(#[from] crate::distributed::cluster::Error),
-
     #[error("Unexpected completion")]
     UnexpectedCompletion,
-
-    #[error("Event source cannot clone")]
-    EventSourceCannotClone(#[from] reqwest_eventsource::CannotCloneRequestError),
-
-    #[error("Event source error")]
-    EventSource(#[from] reqwest_eventsource::Error),
-
-    #[error("Serde JSON error")]
-    SerdeJson(#[from] serde_json::Error),
 
     #[error("Last message should be from user")]
     LastMessageNotUser,
@@ -136,13 +101,13 @@ pub struct SimplifiedWebsite {
 impl SimplifiedWebsite {
     fn new(webpage: DisplayedWebpage, query: &str, summarizer: &ExtractiveSummarizer) -> Self {
         let text = summarizer.summarize(query, &webpage.body);
-        let url = Url::from(webpage.url.to_string());
+        let url = Url::parse(&webpage.url).unwrap();
 
         Self {
             title: webpage.title,
             text,
-            site: url.site().to_string(),
-            url: url.full(),
+            site: url.host_str().unwrap_or_default().to_string(),
+            url: url.to_string(),
         }
     }
 }
@@ -213,7 +178,7 @@ impl Searcher {
 
         match res {
             SearchResult::Websites(res) => Ok(res),
-            SearchResult::Bang(_) => Err(Error::UnexpectedSearchResult),
+            SearchResult::Bang(_) => Err(Error::UnexpectedSearchResult.into()),
         }
     }
 
@@ -404,13 +369,16 @@ pub struct Tokenizer {
 
 impl Tokenizer {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Tokenizer> {
-        let tokenizer = tokenizers::Tokenizer::from_file(path)?;
+        let tokenizer = tokenizers::Tokenizer::from_file(path).map_err(|e| anyhow!(e))?;
 
         Ok(Self { tokenizer })
     }
 
     pub fn encode(&self, input: String) -> Result<Vec<i64>> {
-        let encoding = self.tokenizer.encode(input, false)?;
+        let encoding = self
+            .tokenizer
+            .encode(input, false)
+            .map_err(|e| anyhow!(e))?;
 
         let ids = encoding
             .get_ids()
@@ -424,7 +392,10 @@ impl Tokenizer {
     pub fn decode(&self, tokens: &[i64]) -> Result<String> {
         let tokens = tokens.iter().map(|&id| id as u32).collect::<Vec<_>>();
 
-        let output = self.tokenizer.decode(tokens, true)?;
+        let output = self
+            .tokenizer
+            .decode(tokens, true)
+            .map_err(|e| anyhow!(e))?;
 
         Ok(output)
     }

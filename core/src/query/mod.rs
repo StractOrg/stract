@@ -338,8 +338,9 @@ mod tests {
         };
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -349,12 +350,15 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.first.com",
-            ))
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -364,8 +368,10 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.second.com",
-            ))
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -373,7 +379,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.second.com");
+        assert_eq!(result.webpages[0].url, "https://www.second.com/");
     }
 
     #[test]
@@ -381,8 +387,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -392,12 +399,15 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.first.com",
-            ))
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -407,8 +417,10 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.second.com",
-            ))
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -420,7 +432,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
             query: "test site:www.first.com".to_string(),
@@ -429,7 +441,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
             query: "test -site:first.com".to_string(),
@@ -438,7 +450,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.second.com");
+        assert_eq!(result.webpages[0].url, "https://www.second.com/");
     }
 
     #[test]
@@ -446,8 +458,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -457,12 +470,15 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.first.com",
-            ))
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -472,8 +488,10 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.second.com",
-            ))
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -485,7 +503,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
 
     #[test]
@@ -493,8 +511,9 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -504,12 +523,15 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.first.com/forum",
-            ))
+                    "https://www.first.com/forum",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                r#"
+            .insert(
+                Webpage::new(
+                    r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -519,8 +541,10 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://www.second.com",
-            ))
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -576,9 +600,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -588,15 +613,18 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                    rand_words(1000)
-                ),
-                "https://www.the-first.com",
-            ))
+                        rand_words(1000)
+                    ),
+                    "https://www.the-first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -606,10 +634,12 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                    rand_words(1000)
-                ),
-                "https://www.second.com",
-            ))
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -629,7 +659,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.the-first.com");
+        assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
 
         let query = SearchQuery {
             query: "test site:www.the-first.com".to_string(),
@@ -638,7 +668,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.the-first.com");
+        assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
     }
 
     #[test]
@@ -646,9 +676,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -658,15 +689,18 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                    rand_words(1000)
-                ),
-                "https://www.first.com",
-            ))
+                        rand_words(1000)
+                    ),
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test test</title>
@@ -676,10 +710,12 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                    rand_words(1000)
-                ),
-                "https://www.second.com",
-            ))
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
@@ -691,7 +727,7 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
             query: "\"Test website\" site:www.second.com".to_string(),

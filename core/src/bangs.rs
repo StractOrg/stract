@@ -18,8 +18,9 @@ use std::{collections::HashMap, fs, path::Path};
 
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
-use crate::{query::parser::Term, webpage::Url};
+use crate::query::parser::Term;
 
 pub const BANG_PREFIX: char = '!';
 
@@ -84,29 +85,32 @@ impl Bangs {
             }
         }) {
             if let Some(bang) = self.bangs.get(possible_bang) {
+                let mut url = bang.url.replace(
+                    "{{{s}}}",
+                    intersperse(
+                        terms
+                            .iter()
+                            .filter(|term| {
+                                if let Term::PossibleBang(bang) = term.as_ref() {
+                                    bang != possible_bang
+                                } else {
+                                    true
+                                }
+                            })
+                            .map(|term| term.as_ref().to_string()),
+                        " ".to_string(),
+                    )
+                    .collect::<String>()
+                    .as_str(),
+                );
+
+                if !url.contains("://") {
+                    url = "http://".to_string() + url.as_str();
+                }
+
                 return Some(BangHit {
                     bang: bang.clone(),
-                    redirect_to: bang
-                        .url
-                        .replace(
-                            "{{{s}}}",
-                            intersperse(
-                                terms
-                                    .iter()
-                                    .filter(|term| {
-                                        if let Term::PossibleBang(bang) = term.as_ref() {
-                                            bang != possible_bang
-                                        } else {
-                                            true
-                                        }
-                                    })
-                                    .map(|term| term.as_ref().to_string()),
-                                " ".to_string(),
-                            )
-                            .collect::<String>()
-                            .as_str(),
-                        )
-                        .into(),
+                    redirect_to: Url::parse(url.as_str()).unwrap(),
                 });
             }
         }
@@ -151,9 +155,8 @@ mod tests {
                     tag: "ty".to_string(),
                     url: "https://www.youtube.com/results?search_query={{{s}}}".to_string()
                 },
-                redirect_to: "https://www.youtube.com/results?search_query=bangs"
-                    .to_string()
-                    .into()
+                redirect_to: Url::parse("https://www.youtube.com/results?search_query=bangs")
+                    .unwrap()
             })
         );
     }

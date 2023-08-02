@@ -17,11 +17,11 @@ use futures::StreamExt;
 use std::{collections::HashSet, hash::Hash, time::Duration};
 
 use serde::Serialize;
+use url::Url;
 
 use crate::{
     distributed::retry_strategy::ExponentialBackoff,
     image_store::{Image, ImageStore},
-    webpage::Url,
 };
 
 #[derive(Clone, Debug)]
@@ -40,19 +40,15 @@ where
 {
     async fn download(self) -> Option<DownloadedImage<K>> {
         for url in &self.urls {
-            if !url.is_valid_uri() {
-                continue;
-            }
-
             for duration in ExponentialBackoff::from_millis(10).take(4) {
-                if let Some(image) = url
-                    .download_bytes(self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
-                    .await
-                    .and_then(|bytes| Image::from_bytes(bytes).ok())
-                    .map(|image| DownloadedImage {
-                        image,
-                        key: self.key.clone(),
-                    })
+                if let Some(image) =
+                    download_bytes(url, self.timeout.unwrap_or_else(|| Duration::from_secs(20)))
+                        .await
+                        .and_then(|bytes| Image::from_bytes(bytes).ok())
+                        .map(|image| DownloadedImage {
+                            image,
+                            key: self.key.clone(),
+                        })
                 {
                     return Some(image);
                 }
@@ -62,6 +58,20 @@ where
         }
 
         None
+    }
+}
+
+async fn download_bytes(url: &Url, timeout: Duration) -> Option<Vec<u8>> {
+    let client = reqwest::Client::builder().timeout(timeout).build().unwrap();
+
+    tracing::debug!("downloading {}", url);
+
+    match client.get(url.as_str()).send().await {
+        Ok(res) => {
+            let bytes = res.bytes().await.ok()?.to_vec();
+            Some(bytes)
+        }
+        Err(_) => None,
     }
 }
 

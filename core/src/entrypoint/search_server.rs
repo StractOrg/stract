@@ -33,7 +33,6 @@ use crate::{
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{self, LocalSearcher},
-    webpage::Url,
     Result,
 };
 
@@ -125,7 +124,7 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
                     for url in urls {
                         if let Some(homepage) = local_searcher.get_homepage(url) {
                             if let Some(desc) = homepage.description() {
-                                result.insert(Url::from(url.clone()), desc.clone());
+                                result.insert(url.clone(), desc.clone());
                             }
                         }
                     }

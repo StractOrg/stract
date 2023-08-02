@@ -135,6 +135,7 @@ impl Ranker {
 mod tests {
 
     use optics::Optic;
+    use url::Url;
 
     use crate::{
         index::Index,
@@ -167,7 +168,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
@@ -195,7 +196,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 5.0,
                 fetch_time_ms: 500,
@@ -216,8 +217,8 @@ mod tests {
             })
             .expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.b.com");
-        assert_eq!(result.webpages[1].url, "https://www.a.com");
+        assert_eq!(result.webpages[0].url, "https://www.b.com/");
+        assert_eq!(result.webpages[1].url, "https://www.a.com/");
     }
 
     #[test]
@@ -242,7 +243,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
@@ -270,7 +271,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
@@ -291,8 +292,8 @@ mod tests {
             })
             .expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.b.com");
-        assert_eq!(result.webpages[1].url, "https://www.a.com");
+        assert_eq!(result.webpages[0].url, "https://www.b.com/");
+        assert_eq!(result.webpages[1].url, "https://www.a.com/");
     }
 
     #[test]
@@ -316,7 +317,7 @@ mod tests {
                 "#
                     ),
                     "https://www.old.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 499,
@@ -344,7 +345,7 @@ mod tests {
                 "#
                     ),
                     "https://www.new.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
@@ -365,7 +366,7 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.webpages[0].url, "https://www.new.com");
+        assert_eq!(result.webpages[0].url, "https://www.new.com/");
     }
 
     #[test]
@@ -386,7 +387,7 @@ mod tests {
                     </html>
                 "#,
                     "https://www.first.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
@@ -423,7 +424,7 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                "https://www.second.com"),
+                "https://www.second.com").unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.00003,
                 fetch_time_ms: 500,
@@ -445,7 +446,7 @@ mod tests {
             .expect("Search failed");
 
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
 
     #[test]
@@ -466,10 +467,10 @@ mod tests {
                     </html>
                 "#,
                     "https://www.first.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![Link {
-                    source: "https://www.second.com".to_string().into(),
-                    destination: "https://www.first.com".to_string().into(),
+                    source: Url::parse("https://www.second.com").unwrap(),
+                    destination: Url::parse("https://www.first.com").unwrap(),
                     text: "test this is the best test site".to_string(),
                 }],
                 host_centrality: 0.0,
@@ -495,7 +496,7 @@ mod tests {
                     </html>
                 "#,
                     "https://www.second.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.00003,
                 fetch_time_ms: 500,
@@ -517,7 +518,7 @@ mod tests {
             .expect("Search failed");
 
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
 
     #[test]
@@ -538,7 +539,7 @@ mod tests {
             </html>
             "#,
                     "https://www.body.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
@@ -564,7 +565,7 @@ mod tests {
             </html>
             "#,
                     "https://www.title.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
@@ -591,7 +592,7 @@ mod tests {
             </html>
             "#,
                     "https://www.centrality.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.02,
                 fetch_time_ms: 500,
@@ -624,7 +625,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.num_hits, 3);
-        assert_eq!(&res.webpages[0].url, "https://www.title.com");
+        assert_eq!(&res.webpages[0].url, "https://www.title.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -642,7 +643,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.num_hits, 3);
-        assert_eq!(&res.webpages[0].url, "https://www.centrality.com");
+        assert_eq!(&res.webpages[0].url, "https://www.centrality.com/");
     }
 
     #[test]
@@ -664,7 +665,7 @@ mod tests {
                     crate::rand_words(100)
                 ),
                 "https://www.first.com",
-            ),
+            ).unwrap(),
             backlinks: vec![],
             host_centrality: 1.0,
             pre_computed_score: 0.0,
@@ -696,7 +697,7 @@ mod tests {
                     crate::rand_words(100)
                 ),
                 "https://www.third.com",
-            ),
+            ).unwrap(),
             backlinks: vec![],
             host_centrality: 1.0,
             fetch_time_ms: 500,
@@ -728,7 +729,7 @@ mod tests {
                     crate::rand_words(100)
                 ),
                 "https://www.second.com",
-            ),
+            ).unwrap(),
             backlinks: vec![],
             host_centrality: 1.0,
             fetch_time_ms: 500,
@@ -756,9 +757,9 @@ mod tests {
 
         assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
-        assert_eq!(result.webpages[1].url, "https://www.second.com");
-        assert_eq!(result.webpages[2].url, "https://www.third.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/");
+        assert_eq!(result.webpages[2].url, "https://www.third.com/");
     }
 
     #[test]
@@ -782,7 +783,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.first.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 0,
@@ -810,7 +811,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.second.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 5000,
@@ -833,8 +834,8 @@ mod tests {
 
         assert_eq!(result.num_hits, 2);
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
-        assert_eq!(result.webpages[1].url, "https://www.second.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/");
     }
 
     
@@ -859,7 +860,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.first.com/one",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 2,
@@ -887,7 +888,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.second.com/one/two",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 1,
@@ -915,7 +916,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.third.com/one/two123",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 0,

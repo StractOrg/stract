@@ -20,7 +20,7 @@ use robotstxt_with_cache::matcher::{
     CachingRobotsMatcher, LongestMatchRobotsMatchStrategy, RobotsMatcher,
 };
 
-use crate::webpage::Url;
+use url::Url;
 
 use super::{Error, Result, Site};
 
@@ -41,7 +41,7 @@ impl RobotsTxtManager {
         match self.get_mut(url).await {
             Ok(Some(robots_txt)) => robots_txt
                 .matcher
-                .one_agent_allowed_by_robots(user_agent, &url.full()),
+                .one_agent_allowed_by_robots(user_agent, url.as_str()),
             _ => true,
         }
     }
@@ -54,32 +54,36 @@ impl RobotsTxtManager {
             .await?;
 
         if res.status() != reqwest::StatusCode::OK {
-            return Err(Error::FetchFailed(res.status()));
+            return Err(Error::FetchFailed(res.status()).into());
         }
 
         let body = res.text().await?;
 
         match panic::catch_unwind(|| RobotsTxt::new(body)) {
-            Ok(r) => r,
-            Err(_) => Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT)),
+            Ok(r) => Ok(r),
+            Err(_) => Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into()),
         }
     }
 
     async fn get_mut(&mut self, url: &Url) -> Result<Option<&mut RobotsTxt>> {
-        let site = Site(url.site().to_string());
+        let site = Site(url.host_str().unwrap_or_default().to_string());
 
         if self.cache.get(&site).is_none() {
             match self.fetch_robots_txt(&site).await {
                 Ok(robots_txt) => {
                     self.cache.insert(site.clone(), Some(robots_txt));
                 }
-                Err(Error::FetchFailed(status)) if status == reqwest::StatusCode::NOT_FOUND => {
-                    self.cache.insert(site.clone(), None);
-                }
-                Err(err) => {
-                    self.cache.insert(site.clone(), None);
-                    tracing::warn!("failed to fetch robots.txt for {}: {}", site.0, err);
-                }
+                Err(err) => match err.downcast_ref() {
+                    Some(Error::FetchFailed(status))
+                        if *status == reqwest::StatusCode::IM_A_TEAPOT =>
+                    {
+                        self.cache.insert(site.clone(), None);
+                    }
+                    _ => {
+                        self.cache.insert(site.clone(), None);
+                        tracing::warn!("failed to fetch robots.txt for {}: {}", site.0, err);
+                    }
+                },
             }
         }
 
@@ -103,7 +107,7 @@ struct RobotsTxt {
 }
 
 impl RobotsTxt {
-    fn new(body: String) -> Result<Self> {
+    fn new(body: String) -> Self {
         let mut matcher = CachingRobotsMatcher::new(RobotsMatcher::default());
 
         matcher.parse(&body);
@@ -112,10 +116,10 @@ impl RobotsTxt {
             .to_ascii_lowercase()
             .lines()
             .find(|line| line.starts_with("sitemap:"))
-            .map(|line| line.split(':').nth(1).unwrap().trim().to_string())
-            .map(Url::from);
+            .map(|line| line.split(':').nth(1).unwrap().trim())
+            .and_then(|s| Url::parse(s).ok());
 
-        Ok(Self { matcher, sitemap })
+        Self { matcher, sitemap }
     }
 }
 
@@ -130,8 +134,7 @@ mod tests {
             r#"User-agent: StractSearch
             Disallow: /test"#
                 .to_string(),
-        )
-        .unwrap();
+        );
 
         assert!(!robots_txt
             .matcher

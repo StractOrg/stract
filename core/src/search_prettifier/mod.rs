@@ -22,12 +22,12 @@ use std::collections::HashMap;
 use chrono::{NaiveDateTime, Utc};
 use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::{
     inverted_index::RetrievedWebpage,
     ranking::Signal,
     spell::{self, CorrectionTerm},
-    webpage::Url,
 };
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
@@ -90,17 +90,23 @@ pub fn html_escape(s: &str) -> String {
 }
 
 fn prettify_url(url: &Url) -> String {
-    let mut pretty_url = url.strip_query().to_string();
+    let mut pretty_url = url.clone();
+    pretty_url.set_query(None);
+
+    let scheme = pretty_url.scheme().to_string();
+
+    let mut pretty_url = pretty_url.to_string();
+
+    if let Some(stripped) = pretty_url.strip_prefix((scheme.clone() + "://").as_str()) {
+        pretty_url = stripped.to_string();
+    }
 
     if pretty_url.ends_with('/') {
         pretty_url = pretty_url.chars().take(pretty_url.len() - 1).collect();
     }
 
-    let protocol = Url::from(pretty_url.clone()).protocol().to_string() + "://";
-    pretty_url = Url::from(pretty_url.clone())
-        .strip_protocol()
-        .replace('/', " › ");
-    pretty_url = protocol + pretty_url.as_str();
+    pretty_url = pretty_url.replace('/', " › ");
+    pretty_url = scheme + "://" + pretty_url.as_str();
 
     pretty_url
 }
@@ -133,9 +139,9 @@ fn prettify_date(date: NaiveDateTime) -> String {
 fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
     let last_updated = webpage.updated_time.map(prettify_date);
 
-    let url = Url::from(webpage.url.clone());
+    let url = Url::parse(&webpage.url).unwrap();
 
-    if url.domain() == "stackoverflow.com"
+    if url.domain().unwrap_or_default() == "stackoverflow.com"
         && webpage
             .schema_org
             .iter()
@@ -178,15 +184,15 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
         let snippet = generate_snippet(&webpage);
 
-        let url: Url = webpage.url.clone().into();
-        let domain = url.domain().to_string();
+        let url = Url::parse(&webpage.url).unwrap();
+        let domain = url.domain().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
 
         let title = html_escape(&webpage.title);
 
         Self {
             title,
-            site: url.site().to_string(),
+            site: url.host_str().unwrap_or_default().to_string(),
             url: webpage.url,
             pretty_url,
             domain,

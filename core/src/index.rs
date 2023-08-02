@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use tantivy::collector::Collector;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
+use url::Url;
 
 use crate::directory::{self, DirEntry};
 use crate::inverted_index::{self, InvertedIndex};
@@ -142,7 +143,7 @@ impl Index {
         self.inverted_index.get_webpage(url)
     }
 
-    pub fn get_homepage(&self, url: &str) -> Option<inverted_index::RetrievedWebpage> {
+    pub fn get_homepage(&self, url: &Url) -> Option<inverted_index::RetrievedWebpage> {
         self.inverted_index.get_homepage(url)
     }
 }
@@ -197,9 +198,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test website</title>
@@ -209,9 +211,11 @@ mod tests {
                 </body>
             </html>
             "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         index.commit().unwrap();
@@ -235,7 +239,7 @@ mod tests {
 
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.example.com");
+        assert_eq!(result.webpages[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -243,9 +247,10 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test website</title>
@@ -255,15 +260,18 @@ mod tests {
                 </body>
             </html>
             "#,
-                    crate::rand_words(100)
-                ),
-                "https://www.first.com",
-            ))
+                        crate::rand_words(100)
+                    ),
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test test website</title>
@@ -273,15 +281,18 @@ mod tests {
                 </body>
             </html>
             "#,
-                    crate::rand_words(100)
-                ),
-                "https://www.second.com",
-            ))
+                        crate::rand_words(100)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test test test website</title>
@@ -291,10 +302,12 @@ mod tests {
                 </body>
             </html>
             "#,
-                    crate::rand_words(100)
-                ),
-                "https://www.third.com",
-            ))
+                        crate::rand_words(100)
+                    ),
+                    "https://www.third.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         index.commit().unwrap();

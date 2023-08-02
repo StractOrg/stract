@@ -15,8 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -24,10 +22,13 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::{cmp, fs};
 
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
+use url::Url;
+
 use crate::directory::{self, DirEntry};
 use crate::executor::Executor;
 use crate::intmap;
-use crate::webpage::Url;
 
 pub mod centrality;
 mod store;
@@ -91,12 +92,20 @@ pub struct Node {
 
 impl Node {
     pub fn into_host(self) -> Node {
-        let url = Url::from(self.name);
+        let url = if self.name.contains("://") {
+            Url::parse(&self.name)
+        } else {
+            Url::parse(&("http://".to_string() + self.name.as_str()))
+        };
 
-        let host = url.host_without_www();
-
-        Node {
-            name: host.to_string(),
+        match url {
+            Ok(url) => {
+                let host = url.host_str().unwrap_or_default().to_string();
+                Node { name: host }
+            }
+            Err(_) => Node {
+                name: String::new(),
+            },
         }
     }
 
@@ -108,17 +117,20 @@ impl Node {
 
 impl From<String> for Node {
     fn from(name: String) -> Self {
-        let url = Url::from(name);
-        url.into()
+        let url = if name.contains("://") {
+            Url::parse(&name).unwrap()
+        } else {
+            Url::parse(&("http://".to_string() + name.as_str())).unwrap()
+        };
+
+        Node::from(&url)
     }
 }
 
 impl From<&Url> for Node {
     fn from(url: &Url) -> Self {
-        let normalized = url.normalize();
-        Node {
-            name: normalized.into(),
-        }
+        let normalized = normalize_url(url);
+        Node { name: normalized }
     }
 }
 
@@ -132,6 +144,52 @@ impl From<Url> for Node {
     fn from(url: Url) -> Self {
         Self::from(&url)
     }
+}
+
+pub fn normalize_url(url: &Url) -> String {
+    let mut url = url.clone();
+    let allowed_queries: Vec<_> = url
+        .query_pairs()
+        .filter(|(key, _)| {
+            !key.starts_with("utm_")
+                && !key.starts_with("fbclid")
+                && !key.starts_with("gclid")
+                && !key.starts_with("msclkid")
+        })
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect();
+
+    {
+        let mut queries = url.query_pairs_mut();
+        queries.clear();
+
+        if !allowed_queries.is_empty() {
+            queries.extend_pairs(allowed_queries);
+        }
+    }
+
+    if url.query().unwrap_or_default().is_empty() {
+        url.set_query(None);
+    }
+
+    let scheme = url.scheme();
+    let mut normalized = url
+        .as_str()
+        .strip_prefix(scheme)
+        .unwrap_or_default()
+        .strip_prefix("://")
+        .unwrap_or_default()
+        .to_string();
+
+    if let Some(stripped) = normalized.strip_prefix("www.") {
+        normalized = stripped.to_string();
+    }
+
+    if let Some(prefix) = normalized.strip_suffix('/') {
+        normalized = prefix.to_string();
+    }
+
+    normalized
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -746,9 +804,9 @@ mod test {
 
     #[test]
     fn remove_protocol() {
-        let n = Node::from("https://www.example.com?test");
+        let n = Node::from("https://www.example.com/?test");
 
-        assert_eq!(&n.name, "example.com?test");
+        assert_eq!(&n.name, "example.com/?test=");
     }
 
     #[test]

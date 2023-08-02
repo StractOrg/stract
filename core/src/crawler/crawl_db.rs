@@ -26,8 +26,7 @@ use itertools::Itertools;
 use lru::LruCache;
 use rand::Rng;
 use rocksdb::BlockBasedOptions;
-
-use crate::webpage::Url;
+use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
@@ -398,7 +397,7 @@ impl CrawlDb {
 
         for res in responses {
             for url in &res.discovered_urls {
-                let domain: Domain = url.domain().to_string().into();
+                let domain = Domain::from(url);
                 let different_domain = res.domain != domain;
 
                 domains.entry(domain).or_default().push(UrlToInsert {
@@ -457,7 +456,7 @@ impl CrawlDb {
             for url_response in &res.url_responses {
                 match url_response {
                     UrlResponse::Success { url } => {
-                        let domain: Domain = url.domain().to_string().into();
+                        let domain = Domain::from(url);
                         url_responses
                             .entry(domain)
                             .or_default()
@@ -467,14 +466,14 @@ impl CrawlDb {
                         url,
                         status_code: _,
                     } => {
-                        let domain: Domain = url.domain().to_string().into();
+                        let domain = Domain::from(url);
                         url_responses
                             .entry(domain)
                             .or_default()
                             .push(url_response.clone());
                     }
                     UrlResponse::Redirected { url, new_url: _ } => {
-                        let domain: Domain = url.domain().to_string().into();
+                        let domain = Domain::from(url);
                         url_responses
                             .entry(domain)
                             .or_default()

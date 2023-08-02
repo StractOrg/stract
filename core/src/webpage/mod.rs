@@ -27,16 +27,15 @@ use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use std::{collections::HashMap, panic, str::FromStr};
 use tantivy::tokenizer::{PreTokenizedString, Tokenizer};
+use url::Url;
 use whatlang::Lang;
 
 mod just_text;
 pub mod region;
 pub mod schema_org;
-mod url;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
 
-pub use self::url::Url;
 use self::{
     just_text::{JustText, Paragraph},
     region::Region,
@@ -123,10 +122,10 @@ pub struct Webpage {
 
 impl Webpage {
     #[cfg(test)]
-    pub fn new(html: &str, url: &str) -> Self {
-        let html = Html::parse(html, url);
+    pub fn new(html: &str, url: &str) -> Result<Self> {
+        let html = Html::parse(html, url)?;
 
-        Self {
+        Ok(Self {
             html,
             backlinks: Vec::new(),
             host_centrality: 0.0,
@@ -135,7 +134,7 @@ impl Webpage {
             pre_computed_score: 0.0,
             node_id: None,
             dmoz_description: None,
-        }
+        })
     }
 
     fn dmoz_description(&self) -> Option<String> {
@@ -273,13 +272,13 @@ enum RobotsMeta {
 }
 
 impl FromStr for RobotsMeta {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "noindex" => Ok(RobotsMeta::NoIndex),
             "nofollow" => Ok(RobotsMeta::NoFollow),
-            _ => Err(Error::UnknownRobotsMetaTag),
+            _ => Err(Error::UnknownRobotsMetaTag.into()),
         }
     }
 }
@@ -304,12 +303,12 @@ pub struct Html {
 }
 
 impl Html {
-    pub fn parse(html: &str, url: &str) -> Self {
-        let mut html = Self::parse_without_text(html, url);
+    pub fn parse(html: &str, url: &str) -> Result<Self> {
+        let mut html = Self::parse_without_text(html, url)?;
 
         html.parse_text();
 
-        html
+        Ok(html)
     }
 
     #[cfg(test)]
@@ -317,10 +316,11 @@ impl Html {
         self.clean_text = Some(text);
     }
 
-    pub fn parse_without_text(html: &str, url: &str) -> Self {
+    pub fn parse_without_text(html: &str, url: &str) -> Result<Self> {
         let root = kuchiki::parse_html().one(html);
-        let mut url: Url = url.to_string().into();
-        url = url.full_without_id_tags().into();
+
+        let mut url = Url::parse(url)?;
+        url.set_fragment(None); // remove fragment (e.g. #comments
 
         let mut res = Self {
             root,
@@ -335,10 +335,28 @@ impl Html {
             res.url = url;
         }
 
-        res.url.remove_utm_queries();
+        let queries: Vec<_> = res
+            .url
+            .query_pairs()
+            .filter(|(key, _)| !key.starts_with("utm_"))
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect();
+
+        {
+            let mut query_mut = res.url.query_pairs_mut();
+            query_mut.clear();
+            if !queries.is_empty() {
+                query_mut.extend_pairs(queries);
+            }
+        }
+
+        if res.url.query().unwrap_or_default().is_empty() {
+            res.url.set_query(None);
+        }
+
         res.robots = res.parse_robots_meta();
 
-        res
+        Ok(res)
     }
 
     fn canonical_url(&self) -> Option<Url> {
@@ -349,10 +367,14 @@ impl Html {
                 if let Some(rel) = element.attributes.borrow().get("rel") {
                     if rel == "canonical" {
                         if let Some(href) = element.attributes.borrow().get("href") {
-                            let url = Url::from(href).into_absolute(self.url());
-                            if url.is_valid_uri() {
-                                canonical_url = Some(url);
-                            }
+                            match Url::parse(href) {
+                                Ok(url) => canonical_url = Some(url),
+                                Err(_) => {
+                                    if let Ok(url) = self.url().join(href) {
+                                        canonical_url = Some(url);
+                                    }
+                                }
+                            };
                         }
                     }
                 }
@@ -449,12 +471,15 @@ impl Html {
                                         continue;
                                     }
 
-                                    links.push(Link {
-                                        source: self.url().clone(),
-                                        destination: Url::from(dest.to_string())
-                                            .into_absolute(self.url()),
-                                        text: text.trim().to_string(),
-                                    });
+                                    if let Ok(dest) =
+                                        Url::parse(dest).or_else(|_| self.url().join(dest))
+                                    {
+                                        links.push(Link {
+                                            source: self.url().clone(),
+                                            destination: dest,
+                                            text: text.trim().to_string(),
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -483,11 +508,17 @@ impl Html {
             }
 
             if let Some(dest) = attributes.borrow().get("href") {
-                links.push(Link {
-                    source: self.url().clone(),
-                    destination: Url::from(dest.to_string()).into_absolute(self.url()),
-                    text: text.trim().to_string(),
-                });
+                if dest.starts_with("mailto:") || dest.starts_with("tel:") {
+                    continue;
+                }
+
+                if let Ok(dest) = Url::parse(dest).or_else(|_| self.url().join(dest)) {
+                    links.push(Link {
+                        source: self.url().clone(),
+                        destination: dest,
+                        text: text.trim().to_string(),
+                    });
+                }
             }
         }
 
@@ -500,11 +531,13 @@ impl Html {
         for node in self.root.select("link").unwrap() {
             if let Some(element) = node.as_node().as_element() {
                 if let Some(href) = element.attributes.borrow().get("href") {
-                    links.push(Link {
-                        source: self.url().clone(),
-                        destination: Url::from(href).into_absolute(self.url()),
-                        text: String::new(),
-                    })
+                    if let Ok(href) = Url::parse(href).or_else(|_| self.url().join(href)) {
+                        links.push(Link {
+                            source: self.url().clone(),
+                            destination: href,
+                            text: String::new(),
+                        });
+                    }
                 }
             }
         }
@@ -531,11 +564,15 @@ impl Html {
                             | "twitter:image:src"
                     ) {
                         if let Some(content) = metadata.get("content") {
-                            return Some(Link {
-                                source: self.url().clone(),
-                                destination: Url::from(content.as_str()).into_absolute(self.url()),
-                                text: String::new(),
-                            });
+                            if let Ok(destination) = Url::parse(content.as_str())
+                                .or_else(|_| self.url().join(content.as_str()))
+                            {
+                                return Some(Link {
+                                    source: self.url().clone(),
+                                    destination,
+                                    text: String::new(),
+                                });
+                            }
                         }
                     }
                 }
@@ -551,11 +588,15 @@ impl Html {
                             | "vb_meta_bburl"
                     ) {
                         if let Some(content) = metadata.get("content") {
-                            return Some(Link {
-                                source: self.url().clone(),
-                                destination: Url::from(content.as_str()).into_absolute(self.url()),
-                                text: String::new(),
-                            });
+                            if let Ok(destination) = Url::parse(content.as_str())
+                                .or_else(|_| self.url().join(content.as_str()))
+                            {
+                                return Some(Link {
+                                    source: self.url().clone(),
+                                    destination,
+                                    text: String::new(),
+                                });
+                            }
                         }
                     }
                 }
@@ -571,8 +612,11 @@ impl Html {
         links.extend(self.scripts().into_iter().filter_map(|script| {
             match script.attributes.get("src") {
                 Some(url) => {
-                    let script_url = Url::from(url.as_str()).into_absolute(self.url());
-                    if self.url().domain() != script_url.domain() {
+                    let script_url = Url::parse(url.as_str())
+                        .or_else(|_| self.url().join(url.as_str()))
+                        .ok()?;
+
+                    if script_url.domain() != self.url().domain() {
                         Some(Link {
                             source: self.url().clone(),
                             destination: script_url,
@@ -611,7 +655,7 @@ impl Html {
                 };
 
                 let image_type = node.attributes.borrow().get("type").map(|t| t.to_string());
-                let link = Url::from(link.to_string()).into_absolute(self.url());
+                let link = Url::parse(link).or_else(|_| self.url().join(link)).ok()?;
 
                 let favicon = FaviconLink {
                     link,
@@ -704,7 +748,7 @@ impl Html {
         let title = self.title();
 
         if title.is_none() {
-            return Err(Error::EmptyField("title"));
+            return Err(Error::EmptyField("title").into());
         }
         let title = title.unwrap();
 
@@ -715,7 +759,7 @@ impl Html {
         let all_text = self.all_text();
 
         if all_text.is_none() {
-            return Err(Error::EmptyField("all body"));
+            return Err(Error::EmptyField("all body").into());
         }
         let all_text = all_text.unwrap();
 
@@ -728,17 +772,23 @@ impl Html {
     }
 
     fn pretokenize_url(&self) -> PreTokenizedString {
-        let url = self.url().full();
+        let url = self.url().to_string();
         self.pretokenize_string(url)
     }
 
     fn pretokenize_domain(&self) -> PreTokenizedString {
-        let domain = self.url().domain().to_string();
+        let mut domain = self.url().domain().unwrap_or_default().to_string();
+
+        if let Some(stripped) = domain.strip_prefix("www.") {
+            domain = stripped.to_string();
+        }
+
         self.pretokenize_string(domain)
     }
 
     fn pretokenize_site(&self) -> PreTokenizedString {
-        let site = self.url().site().to_string();
+        let site = self.url().host_str().unwrap_or_default().to_string();
+
         self.pretokenize_string(site)
     }
 
@@ -797,10 +847,15 @@ impl Html {
             },
         };
 
-        let site_hash = split_u128(hash(self.url().site()).0);
-        let url_without_query_hash = split_u128(hash(self.url().strip_query()).0);
-        let url_hash = split_u128(hash(self.url().full()).0);
-        let domain_hash = split_u128(hash(self.url().domain()).0);
+        let site_hash = split_u128(hash(self.url().host_str().unwrap_or_default()).0);
+
+        let mut url_without_query = self.url().clone();
+        url_without_query.set_query(None);
+
+        let url_without_query_hash = split_u128(hash(url_without_query.as_str()).0);
+        let url_hash = split_u128(hash(self.url().as_str()).0);
+
+        let domain_hash = split_u128(hash(self.url().domain().unwrap_or_default()).0);
         let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
 
         for field in &ALL_FIELDS {
@@ -864,7 +919,7 @@ impl Html {
                     doc.add_pre_tokenized_text(tantivy_field, url.clone())
                 }
                 Field::Text(TextField::UrlNoTokenizer) => {
-                    let url = self.url().full();
+                    let url = self.url().to_string();
 
                     doc.add_pre_tokenized_text(
                         tantivy_field,
@@ -880,7 +935,7 @@ impl Html {
                         },
                     );
                 }
-                Field::Text(TextField::Site) => {
+                Field::Text(TextField::SiteWithout) => {
                     doc.add_pre_tokenized_text(tantivy_field, site.clone())
                 }
                 Field::Text(TextField::Domain) => {
@@ -889,27 +944,27 @@ impl Html {
                 Field::Text(TextField::SiteNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
-                        text: self.url().site().to_string(),
+                        text: site.text.clone(),
                         tokens: vec![tantivy::tokenizer::Token {
                             offset_from: 0,
-                            offset_to: self.url().site().len(),
+                            offset_to: site.text.len(),
                             position: 0,
-                            text: self.url().site().to_string(),
+                            text: site.text.clone(),
                             position_length: 1,
                         }],
                     },
                 ),
                 Field::Text(TextField::SiteIfHomepageNoTokenizer) => {
-                    if self.url().is_homepage() {
+                    if self.is_homepage() {
                         doc.add_pre_tokenized_text(
                             tantivy_field,
                             PreTokenizedString {
-                                text: self.url().site().to_string(),
+                                text: site.text.clone(),
                                 tokens: vec![tantivy::tokenizer::Token {
                                     offset_from: 0,
-                                    offset_to: self.url().site().len(),
+                                    offset_to: site.text.len(),
                                     position: 0,
-                                    text: self.url().site().to_string(),
+                                    text: site.text.clone(),
                                     position_length: 1,
                                 }],
                             },
@@ -921,41 +976,49 @@ impl Html {
                 Field::Text(TextField::DomainNoTokenizer) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     PreTokenizedString {
-                        text: self.url().domain().to_string(),
+                        text: domain.text.clone(),
                         tokens: vec![tantivy::tokenizer::Token {
                             offset_from: 0,
-                            offset_to: self.url().domain().len(),
+                            offset_to: domain.text.len(),
                             position: 0,
-                            text: self.url().domain().to_string(),
+                            text: domain.text.clone(),
                             position_length: 1,
                         }],
                     },
                 ),
                 Field::Text(TextField::TitleIfHomepage) => {
-                    if self.url().is_homepage() {
+                    if self.is_homepage() {
                         doc.add_pre_tokenized_text(tantivy_field, title.clone());
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
                 }
                 Field::Text(TextField::DomainIfHomepage) => {
-                    if self.url().is_homepage() {
-                        doc.add_text(tantivy_field, self.url().domain());
+                    if self.is_homepage() {
+                        doc.add_text(tantivy_field, domain.text.clone());
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
                 }
                 Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
-                    if self.url().is_homepage() {
+                    if self.is_homepage() {
+                        let domain_name = self
+                            .url()
+                            .domain()
+                            .unwrap_or_default()
+                            .find('.')
+                            .map(|index| &domain.text[..index])
+                            .unwrap_or_default();
+
                         doc.add_pre_tokenized_text(
                             tantivy_field,
                             PreTokenizedString {
-                                text: self.url().domain_name().to_string(),
+                                text: domain_name.to_string(),
                                 tokens: vec![tantivy::tokenizer::Token {
                                     offset_from: 0,
-                                    offset_to: self.url().domain_name().len(),
+                                    offset_to: domain_name.len(),
                                     position: 0,
-                                    text: self.url().domain_name().to_string(),
+                                    text: domain_name.to_string(),
                                     position_length: 1,
                                 }],
                             },
@@ -974,7 +1037,7 @@ impl Html {
                     doc.add_pre_tokenized_text(tantivy_field, pretokenized_schema_json.clone());
                 }
                 Field::Fast(FastField::IsHomepage) => {
-                    doc.add_u64(tantivy_field, self.url().is_homepage().into());
+                    doc.add_u64(tantivy_field, (self.is_homepage()).into());
                 }
                 Field::Fast(FastField::LastUpdated) => doc.add_u64(
                     tantivy_field,
@@ -1046,19 +1109,27 @@ impl Html {
                 Field::Fast(FastField::NumPathAndQuerySlashes) => {
                     let num_slashes = self
                         .url()
-                        .path_and_query()
-                        .chars()
-                        .filter(|c| *c == '/')
-                        .count();
+                        .path_segments()
+                        .map(|segments| segments.count())
+                        .unwrap_or(0);
+
                     doc.add_u64(tantivy_field, num_slashes as u64);
                 }
                 Field::Fast(FastField::NumPathAndQueryDigits) => {
                     let num_digits = self
                         .url()
-                        .path_and_query()
+                        .path()
                         .chars()
                         .filter(|c| c.is_ascii_digit())
-                        .count();
+                        .count()
+                        + self
+                            .url()
+                            .query()
+                            .unwrap_or_default()
+                            .chars()
+                            .filter(|c| c.is_ascii_digit())
+                            .count();
+
                     doc.add_u64(tantivy_field, num_digits as u64);
                 }
                 Field::Text(TextField::BacklinkText)
@@ -1106,26 +1177,39 @@ impl Html {
         let mut links: Vec<Url> = Vec::new();
 
         for script in self.scripts() {
-            if let Some(link) = script.attributes.get("src") {
-                links.push(Url::from(link.to_string()).into_absolute(self.url()));
+            if let Some(link) = script
+                .attributes
+                .get("src")
+                .and_then(|link| Url::parse(link).or_else(|_| self.url().join(link)).ok())
+            {
+                links.push(link);
             }
 
             for res in URL_REGEX.find_iter(&script.content) {
-                links.push(Url::from(res.as_str().to_string()).into_absolute(self.url()));
+                if let Ok(link) =
+                    Url::parse(res.as_str()).or_else(|_| self.url().join(res.as_str()))
+                {
+                    links.push(link);
+                }
             }
         }
 
         for node in self.root.select("link").unwrap() {
-            if let Some(link) = node.attributes.borrow().get("href") {
-                links.push(Url::from(link.to_string()).into_absolute(self.url()));
+            if let Some(link) = node
+                .attributes
+                .borrow()
+                .get("href")
+                .and_then(|link| Url::parse(link).or_else(|_| self.url().join(link)).ok())
+            {
+                links.push(link);
             }
         }
 
         links
             .into_iter()
-            .filter(|link| !link.site().is_empty())
-            .filter(|link| link.site() != self.url().site())
-            .unique_by(|link| link.site().to_string())
+            .filter(|link| link.host_str().is_some())
+            .filter(|link| link.host_str() != self.url().host_str())
+            .unique_by(|link| link.host_str().unwrap().to_string())
             .collect()
     }
 
@@ -1173,7 +1257,11 @@ impl Html {
                     false
                 }
             })
-            .and_then(|metadata| metadata.get("content").map(|link| link.clone().into()))
+            .and_then(|metadata| {
+                metadata
+                    .get("content")
+                    .and_then(|link| Url::parse(link).or_else(|_| self.url().join(link)).ok())
+            })
             .map(|url| ImageLink {
                 url,
                 title: self.og_title(),
@@ -1193,7 +1281,7 @@ impl Html {
                         .many()
                         .into_iter()
                         .filter_map(|url| url.try_into_string())
-                        .map(|url| url.into())
+                        .filter_map(|url| Url::parse(&url).or_else(|_| self.url().join(&url)).ok())
                 })
             })
             .flatten()
@@ -1218,22 +1306,16 @@ impl Html {
     }
 
     pub fn primary_image(&self) -> Option<ImageLink> {
-        self.og_image()
-            .or_else(|| {
-                self.schema_org_images()
-                    .first()
-                    .cloned()
-                    .map(|url| ImageLink {
-                        url,
-                        title: self.og_title(),
-                        description: self.description(),
-                    })
-            })
-            .map(|mut image| {
-                image.url = image.url.into_absolute(self.url());
-
-                image
-            })
+        self.og_image().or_else(|| {
+            self.schema_org_images()
+                .first()
+                .cloned()
+                .map(|url| ImageLink {
+                    url,
+                    title: self.og_title(),
+                    description: self.description(),
+                })
+        })
     }
 
     pub fn og_description(&self) -> Option<String> {
@@ -1279,6 +1361,10 @@ impl Html {
             })
             .and_then(|metadata| metadata.get("content").cloned())
     }
+
+    pub fn is_homepage(&self) -> bool {
+        self.url().path() == "/"
+    }
 }
 
 fn stemmer_from_lang(lang: &Lang) -> rust_stemmers::Stemmer {
@@ -1321,12 +1407,6 @@ pub struct Link {
     pub text: String,
 }
 
-impl Link {
-    pub fn matches_url_regex(&self) -> bool {
-        self.destination.matches_url_regex() && self.source.matches_url_regex()
-    }
-}
-
 pub type Meta = HashMap<String, String>;
 
 #[cfg(test)]
@@ -1357,15 +1437,15 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
 
         assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         assert_eq!(
             webpage.anchor_links(),
             vec![Link {
-                source: "https://www.example.com/whatever".to_string().into(),
-                destination: "https://example.com".to_string().into(),
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com").unwrap(),
                 text: "Link to example".to_string()
             }]
         );
@@ -1380,8 +1460,8 @@ mod tests {
             webpage.url().to_string().as_str(),
             "https://www.example.com/whatever"
         );
-        assert_eq!(webpage.url().site(), "www.example.com");
-        assert_eq!(webpage.url().domain(), "example.com");
+        assert_eq!(webpage.url().host_str().unwrap(), "www.example.com");
+        assert_eq!(webpage.url().domain().unwrap(), "www.example.com");
     }
 
     #[test]
@@ -1399,7 +1479,7 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
 
         assert_eq!(webpage.title(), None);
     }
@@ -1416,7 +1496,7 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
 
         assert_eq!(webpage.clean_text(), Some(&CONTENT.to_string()));
     }
@@ -1444,7 +1524,7 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com");
+        let webpage = Html::parse(&raw, "https://www.example.com").unwrap();
 
         assert!(!webpage.clean_text().unwrap().contains("not"));
     }
@@ -1472,7 +1552,7 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com");
+        let webpage = Html::parse(&raw, "https://www.example.com").unwrap();
 
         assert!(!webpage.clean_text().unwrap().contains("not"));
     }
@@ -1481,37 +1561,44 @@ mod tests {
     fn co_uk_domain() {
         let raw = "";
 
-        let webpage = Html::parse(raw, "https://www.domain.co.uk");
-        assert_eq!(webpage.url().domain(), "domain.co.uk");
+        let webpage = Html::parse(raw, "https://www.domain.co.uk").unwrap();
+        assert_eq!(
+            webpage.url().domain().unwrap_or_default(),
+            "www.domain.co.uk"
+        );
     }
 
     #[test]
     fn is_homepage() {
-        let webpage = Html::parse("", "https://www.example.com");
-        assert!(webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://www.example.com").unwrap();
+        assert!(webpage.is_homepage());
 
-        let webpage = Html::parse("", "https://www.example.com/");
-        assert!(webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://www.example.com/").unwrap();
+        assert!(webpage.is_homepage());
 
-        let webpage = Html::parse("", "https://www.example.com/test");
-        assert!(!webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://www.example.com/test").unwrap();
+        assert!(!webpage.is_homepage());
 
-        let webpage = Html::parse("", "https://example.com/test");
-        assert!(!webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://example.com/test").unwrap();
+        assert!(!webpage.is_homepage());
 
-        let webpage = Html::parse("", "https://example.com/");
-        assert!(webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://example.com/").unwrap();
+        assert!(webpage.is_homepage());
 
-        let webpage = Html::parse("", "https://example.com");
-        assert!(webpage.url().is_homepage());
+        let webpage = Html::parse("", "https://example.com").unwrap();
+        assert!(webpage.is_homepage());
 
-        let webpage = Html::parse("", "http://example.com");
-        assert!(webpage.url().is_homepage());
+        let webpage = Html::parse("", "http://example.com").unwrap();
+        assert!(webpage.is_homepage());
     }
 
     #[test]
     fn hard_parsing() {
-        let webpage = Html::parse(include_str!("../../testcases/parsing/yasudaya.html"), "");
+        let webpage = Html::parse(
+            include_str!("../../testcases/parsing/yasudaya.html"),
+            "https://example.com",
+        )
+        .unwrap();
         assert_eq!(
             webpage.title(),
             Some("パチンコ大当たり情報 - Ｐジューシーハニー３ 大当たり詳細ページ - やすだひばりヶ丘店".to_string())
@@ -1519,7 +1606,11 @@ mod tests {
         assert!(webpage.all_text().is_some());
         assert!(!webpage.all_text().unwrap().is_empty());
 
-        let webpage = Html::parse(include_str!("../../testcases/parsing/5390001.html"), "");
+        let webpage = Html::parse(
+            include_str!("../../testcases/parsing/5390001.html"),
+            "https://example.com",
+        )
+        .unwrap();
         assert_eq!(
             webpage.title(),
             Some("特效烟机系列_山东壹线文化传播有限公司".to_string())
@@ -1529,8 +1620,9 @@ mod tests {
 
         let webpage = Html::parse(
             include_str!("../../testcases/parsing/77p2p-7.live-105.html"),
-            "",
-        );
+            "https://example.com",
+        )
+        .unwrap();
         assert_eq!(
             webpage.title(),
             Some("77p2pЅu¤WЖ[¬Э - ҐDјЅ :: іnєс".to_string())
@@ -1541,7 +1633,11 @@ mod tests {
 
     #[test]
     fn reddit_comments() {
-        let webpage = Html::parse(include_str!("../../testcases/parsing/reddit.html"), "");
+        let webpage = Html::parse(
+            include_str!("../../testcases/parsing/reddit.html"),
+            "https://reddit.com/",
+        )
+        .unwrap();
 
         assert!(webpage.clean_text().is_some());
         assert!(webpage.clean_text().unwrap().len() > 1000);
@@ -1555,26 +1651,15 @@ mod tests {
     fn out_of_bounds_str() {
         let webpage = Html::parse(
             include_str!("../../testcases/parsing/byte_index_out_of_bounds.html"),
-            "",
-        );
+            "https://example.com",
+        )
+        .unwrap();
         assert_eq!(webpage.title(), Some("Test".to_string()));
         assert!(webpage.all_text().is_some());
         assert!(!webpage.all_text().unwrap().is_empty());
 
         let schema = create_schema();
         webpage.into_tantivy(&schema).unwrap();
-    }
-
-    #[test]
-    fn test_find_protocol() {
-        assert_eq!(
-            Url::from("https://example.com".to_string()).protocol(),
-            "https"
-        );
-        assert_eq!(
-            Url::from("http://example.com".to_string()).protocol(),
-            "http"
-        );
     }
 
     #[test]
@@ -1588,11 +1673,11 @@ mod tests {
         "#
         .to_string();
 
-        let webpage = Html::parse(&raw, "https://www.example.com");
+        let webpage = Html::parse(&raw, "https://www.example.com").unwrap();
         assert_eq!(
             webpage.favicon(),
             Some(FaviconLink {
-                link: "https://example.com/favicon.png".to_string().into(),
+                link: Url::parse("https://example.com/favicon.png").unwrap(),
                 width: Some(192),
                 height: Some(192),
                 image_type: None
@@ -1611,11 +1696,11 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, site_url);
+        let webpage = Html::parse(&raw, site_url).unwrap();
         assert_eq!(
             webpage.favicon(),
             Some(FaviconLink {
-                link: expected.to_string().into(),
+                link: Url::parse(expected).unwrap(),
                 width: Some(192),
                 height: Some(192),
                 image_type: None
@@ -1647,7 +1732,7 @@ mod tests {
         );
         full_link_favicon(
             "favicon.png",
-            "https://www.example.com/test",
+            "https://www.example.com/test/",
             "https://www.example.com/test/favicon.png",
         );
         full_link_favicon(
@@ -1659,8 +1744,8 @@ mod tests {
 
     #[test]
     fn domain_from_domain_url() {
-        let url: Url = "example.com".to_string().into();
-        assert_eq!(url.domain(), "example.com");
+        let url: Url = Url::parse("http://example.com").unwrap();
+        assert_eq!(url.domain().unwrap(), "example.com");
     }
 
     #[test]
@@ -1674,7 +1759,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(
             html.updated_time(),
@@ -1689,7 +1774,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(html.updated_time(), None);
 
@@ -1702,7 +1787,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(html.updated_time(), None);
 
@@ -1715,7 +1800,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(html.updated_time(), None);
     }
@@ -1733,12 +1818,12 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(
             html.primary_image(),
             Some(ImageLink {
-                url: "https://example.com/link_to_image.html".to_string().into(),
+                url: Url::parse("https://example.com/link_to_image.html").unwrap(),
                 title: Some("title".to_string()),
                 description: Some("desc".to_string())
             })
@@ -1752,7 +1837,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(html.primary_image(), None);
 
@@ -1776,12 +1861,12 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "https://example.com");
+        let html = Html::parse(html, "https://example.com").unwrap();
 
         assert_eq!(
             html.primary_image(),
             Some(ImageLink {
-                url: "https://example.com/mexico-beach.jpg".to_string().into(),
+                url: Url::parse("https://example.com/mexico-beach.jpg").unwrap(),
                 title: None,
                 description: None
             })
@@ -1799,7 +1884,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "http://example.com").unwrap();
 
         assert_eq!(html.updated_time(), None);
     }
@@ -1815,7 +1900,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "http://example.com").unwrap();
 
         assert_eq!(
             html.description(),
@@ -1830,7 +1915,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "http://example.com").unwrap();
 
         assert_eq!(html.description(), None);
     }
@@ -1846,7 +1931,7 @@ mod tests {
         </body>
     </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "http://example.com").unwrap();
 
         assert_eq!(
             html.updated_time(),
@@ -1881,12 +1966,12 @@ mod tests {
                 </body>
             </html>
         "#;
-        let html = Html::parse(html, "example.com");
+        let html = Html::parse(html, "http://example.com").unwrap();
 
         assert_eq!(
             html.trackers()
                 .into_iter()
-                .map(|url| url.site().to_string())
+                .map(|url| url.host_str().unwrap().to_string())
                 .collect::<Vec<_>>(),
             vec![
                 "cdn.segment.com".to_string(),
@@ -1924,8 +2009,8 @@ mod tests {
                         </body>
                     </html>
                 "#,
-            "example.com",
-        );
+            "https://example.com",
+        ).unwrap();
 
         assert_eq!(html.title(), Some("Test site".to_string()));
         assert_eq!(html.all_text(), Some("test".to_string()));
@@ -1944,8 +2029,9 @@ mod tests {
                         </body>
                     </html>
                 "#,
-            "example.com",
-        );
+            "https://example.com",
+        )
+        .unwrap();
 
         let webpage = Webpage {
             html,
@@ -1978,8 +2064,9 @@ mod tests {
                         </body>
                     </html>
                 "#,
-            "example.com",
-        );
+            "http://example.com",
+        )
+        .unwrap();
         let webpage = Webpage {
             html,
             backlinks: Vec::new(),
@@ -2013,15 +2100,15 @@ mod tests {
         "#
         );
 
-        let webpage = Html::parse(&raw, "https://www.example.com/whatever");
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
 
         assert_eq!(webpage.title(), Some("Best website".to_string()));
 
         assert_eq!(
             webpage.anchor_links(),
             vec![Link {
-                source: "https://www.example.com/whatever".to_string().into(),
-                destination: "https://example.com".to_string().into(),
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com").unwrap(),
                 text: "Link to example".to_string()
             },]
         );
@@ -2030,7 +2117,7 @@ mod tests {
     #[test]
     fn stackoverflow_question_has_clean_text() {
         let stackoverflow = include_str!("../../testcases/schema_org/stackoverflow_with_code.html");
-        let html = Html::parse(stackoverflow, "https://www.example.com");
+        let html = Html::parse(stackoverflow, "https://www.example.com").unwrap();
 
         assert!(html.clean_text().is_some());
     }
@@ -2048,16 +2135,17 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             html.canonical_url(),
-            Some("https://example.com/canonical.html".to_string().into())
+            Some(Url::parse("https://example.com/canonical.html").unwrap())
         );
 
         assert_eq!(
             html.url(),
-            &"https://example.com/canonical.html".to_string().into()
+            &Url::parse("https://example.com/canonical.html").unwrap()
         );
 
         let html = Html::parse(
@@ -2070,12 +2158,13 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert_eq!(html.canonical_url(), None);
         assert_eq!(
             html.url(),
-            &"https://www.example.com/whatever".to_string().into()
+            &Url::parse("https://www.example.com/whatever").unwrap()
         );
     }
 
@@ -2092,7 +2181,8 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert!(html.is_no_index());
         assert!(html.is_no_follow());
@@ -2108,7 +2198,8 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert!(html.is_no_index());
         assert!(html.is_no_follow());
@@ -2124,7 +2215,8 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert!(html.is_no_index());
         assert!(!html.is_no_follow());
@@ -2140,7 +2232,8 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert!(!html.is_no_index());
         assert!(html.is_no_follow());
@@ -2155,7 +2248,8 @@ mod tests {
             </html>
         "#,
             "https://www.example.com/whatever",
-        );
+        )
+        .unwrap();
 
         assert!(!html.is_no_index());
         assert!(!html.is_no_follow());

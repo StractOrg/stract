@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{call_counter::CallCounter, webpage::Url};
+use url::Url;
+
+use crate::call_counter::CallCounter;
 
 use super::{
     crawl_db::{CrawlDb, DomainStatus},
@@ -45,10 +47,13 @@ impl CrawlCoordinator {
         seed_urls: Vec<String>,
     ) -> Result<Self> {
         let mut db = CrawlDb::open(crawldb_folder)?;
+        let mut parsed_seed_urls = Vec::new();
 
-        let seed_urls = seed_urls.into_iter().map(Url::from).collect::<Vec<_>>();
+        for url in seed_urls {
+            parsed_seed_urls.push(Url::parse(&url)?);
+        }
 
-        db.insert_seed_urls(&seed_urls)?;
+        db.insert_seed_urls(&parsed_seed_urls)?;
 
         Ok(Self {
             db: Mutex::new(db),

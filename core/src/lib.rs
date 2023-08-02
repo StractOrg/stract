@@ -21,10 +21,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
-use std::io;
-use std::num::ParseIntError;
 use std::path::PathBuf;
-use tantivy::TantivyError;
 use thiserror::Error;
 
 pub mod entrypoint;
@@ -83,23 +80,8 @@ mod widgets;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Failed to download object from HTTP")]
-    HTTPDownloadError(#[from] reqwest::Error),
-
-    #[error("Got an IO error")]
-    IOError(#[from] io::Error),
-
-    #[error("Not valid UTF8")]
-    FromUTF8(#[from] std::string::FromUtf8Error),
-
     #[error("Failed to parse WARC file")]
     WarcParse(&'static str),
-
-    #[error("Could not parse string to int")]
-    IntParse(#[from] ParseIntError),
-
-    #[error("Encountered a tantivy error")]
-    Tantivy(#[from] TantivyError),
 
     #[error("Encountered an empty required field when converting to tantivy")]
     EmptyField(&'static str),
@@ -107,32 +89,8 @@ pub enum Error {
     #[error("Parsing error")]
     ParsingError(String),
 
-    #[error("Error while serializing/deserializing to/from bytes")]
-    Serialization(#[from] bincode::Error),
-
-    #[error("Error executing distributed jobs")]
-    MapReduce(#[from] mapreduce::Error),
-
     #[error("Failed to download warc files after all retries")]
     DownloadFailed,
-
-    #[error("Encountered an error when reading CSV file")]
-    Csv(#[from] csv::Error),
-
-    #[error("Encountered an error in the FST crate")]
-    Fst(#[from] fst::Error),
-
-    #[error("Image error")]
-    Image(#[from] image::ImageError),
-
-    #[error("XML parser error")]
-    XML(#[from] quick_xml::Error),
-
-    #[error("Spell dictionary error")]
-    Spell(#[from] crate::spell::dictionary::DictionaryError),
-
-    #[error("Optic")]
-    Optics(#[from] optics::Error),
 
     #[error("Query cannot be completely empty")]
     EmptyQuery,
@@ -140,56 +98,20 @@ pub enum Error {
     #[error("Unknown region")]
     UnknownRegion,
 
-    #[error("String is not float")]
-    ParseFloat(#[from] std::num::ParseFloatError),
-
-    #[error("Could not open inverted-index directory")]
-    Directory(#[from] tantivy::directory::error::OpenDirectoryError),
-
-    #[error("Could not convert to/from JSON")]
-    Json(#[from] serde_json::Error),
-
     #[error("Unknown CLI option")]
     UnknownCLIOption,
 
     #[error("The stackoverflow schema was not structured as expected")]
     InvalidStackoverflowSchema,
 
-    #[error("Rayong thread pool builder")]
-    RayonThreadPool(#[from] rayon::ThreadPoolBuildError),
-
     #[error("Internal error")]
     InternalError(String),
-
-    #[error("Distributed searcher")]
-    DistributedSearcher(#[from] searcher::distributed::Error),
-
-    #[error("Cluster")]
-    Cluster(#[from] crate::distributed::cluster::Error),
-
-    #[error("Lambdamart")]
-    LambdaMART(#[from] ranking::models::lambdamart::Error),
-
-    #[error("Summarizer")]
-    Summarizer(#[from] crate::summarizer::Error),
-
-    #[error("Alice")]
-    Alice(#[from] crate::alice::Error),
-
-    #[error("Fact check model")]
-    FactCheckModel(#[from] crate::fact_check_model::Error),
-
-    #[error("Crawler")]
-    Crawler(#[from] crate::crawler::Error),
-
-    #[error("S3")]
-    S3(#[from] s3::error::S3Error),
 
     #[error("Unknown webpage robots meta tag")]
     UnknownRobotsMetaTag,
 }
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, anyhow::Error>;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
 pub fn gen_temp_path() -> PathBuf {

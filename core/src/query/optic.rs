@@ -144,7 +144,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Site => ConstQuery::new(
                 PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::Site,
+                    TextField::SiteWithout,
                     schema,
                     fastfield_reader.clone(),
                 )
@@ -259,7 +259,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -287,7 +287,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.01,
                 page_centrality: 0.0,
@@ -311,8 +311,8 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 2);
-        assert_eq!(res[0].url, "https://www.b.com");
-        assert_eq!(res[1].url, "https://www.a.com");
+        assert_eq!(res[0].url, "https://www.b.com/");
+        assert_eq!(res[1].url, "https://www.a.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -336,7 +336,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.a.com");
+        assert_eq!(res[0].url, "https://www.a.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -360,8 +360,8 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 2);
-        assert_eq!(res[0].url, "https://www.a.com");
-        assert_eq!(res[1].url, "https://www.b.com");
+        assert_eq!(res[0].url, "https://www.a.com/");
+        assert_eq!(res[1].url, "https://www.b.com/");
     }
 
     #[test]
@@ -385,7 +385,7 @@ mod tests {
                 "#
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -412,7 +412,7 @@ mod tests {
                 "#
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
@@ -488,7 +488,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -516,7 +516,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
@@ -544,7 +544,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
@@ -647,7 +647,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -675,7 +675,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
@@ -703,7 +703,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0002,
                 page_centrality: 0.0,
@@ -778,7 +778,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -821,7 +821,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com/",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
@@ -858,7 +858,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com");
+        assert_eq!(res[0].url, "https://www.b.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -882,7 +882,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com");
+        assert_eq!(res[0].url, "https://www.b.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -906,7 +906,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.a.com");
+        assert_eq!(res[0].url, "https://www.a.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -930,7 +930,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://www.b.com");
+        assert_eq!(res[0].url, "https://www.b.com/");
     }
 
     #[test]
@@ -955,7 +955,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://chat.stackoverflow.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1029,7 +1029,7 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://a.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1057,8 +1057,8 @@ mod tests {
                 "#,
                         crate::rand_words(100)
                     ),
-                    "https://b.com",
-                ),
+                    "https://b.com/",
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1100,7 +1100,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://b.com");
+        assert_eq!(res[0].url, "https://b.com/");
     }
 
     #[test]
@@ -1112,7 +1112,7 @@ mod tests {
                 html: Html::parse(
                     include_str!("../../testcases/schema_org/infinity_war.html"),
                     "https://a.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1135,7 +1135,7 @@ mod tests {
             .webpages;
 
         assert!(!res.is_empty());
-        assert_eq!(&res[0].url, "https://a.com");
+        assert_eq!(&res[0].url, "https://a.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -1170,7 +1170,7 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1192,7 +1192,7 @@ mod tests {
             .unwrap()
             .webpages;
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].url, "https://example.com");
+        assert_eq!(res[0].url, "https://example.com/");
 
         let res = searcher
             .search(&SearchQuery {
@@ -1331,7 +1331,7 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1404,7 +1404,7 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1464,7 +1464,7 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1493,7 +1493,7 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ),
+                ).unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
@@ -1590,8 +1590,8 @@ mod tests {
                             </body>
                         </html>
                     "#,
-                "https://example.com",
-            ),
+                "https://example.com/",
+            ).unwrap(),
             backlinks: vec![],
             host_centrality: 0.0,
             page_centrality: 0.0,

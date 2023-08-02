@@ -30,7 +30,6 @@ use crate::{
     searcher::{self, SearchQuery, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
     webpage::region::{Region, ALL_REGIONS},
     widgets::Widget,
-    Error,
 };
 
 use super::{
@@ -199,16 +198,16 @@ pub async fn route(
                 Ok(HtmlTemplate(template).into_response())
             }
             SearchResult::Bang(result) => {
-                Ok(Redirect::to(&result.redirect_to.full()).into_response())
+                Ok(Redirect::to(result.redirect_to.as_str()).into_response())
             }
         },
-        Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
-            Ok(Redirect::to("/").into_response())
-        }
-        Err(err) => {
-            tracing::error!("{:?}", err);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(err) => match err.downcast_ref() {
+            Some(searcher::distributed::Error::EmptyQuery) => Ok(Redirect::to("/").into_response()),
+            _ => {
+                tracing::error!("{:?}", err);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
     }
 }
 
@@ -281,7 +280,7 @@ pub struct ApiSearchQuery {
 }
 
 impl TryFrom<ApiSearchQuery> for SearchQuery {
-    type Error = crate::Error;
+    type Error = anyhow::Error;
 
     fn try_from(api: ApiSearchQuery) -> Result<Self, Self::Error> {
         let optic = if let Some(optic) = &api.optic {
@@ -310,7 +309,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
 #[serde(tag = "@type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
-    Bang(BangHit),
+    Bang(Box<BangHit>),
 }
 
 impl From<SearchResult> for ApiSearchResult {
@@ -348,14 +347,17 @@ pub async fn api(
                 Ok(Json(result).into_response())
             }
         }
-        Err(Error::DistributedSearcher(searcher::distributed::Error::EmptyQuery)) => {
-            Ok(searcher::distributed::Error::EmptyQuery
-                .to_string()
-                .into_response())
-        }
-        Err(err) => {
-            tracing::error!("{:?}", err);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+
+        Err(err) => match err.downcast_ref() {
+            Some(searcher::distributed::Error::EmptyQuery) => {
+                Ok(searcher::distributed::Error::EmptyQuery
+                    .to_string()
+                    .into_response())
+            }
+            _ => {
+                tracing::error!("{:?}", err);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
     }
 }

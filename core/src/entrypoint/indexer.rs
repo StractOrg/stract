@@ -16,6 +16,7 @@
 use chrono::Utc;
 use std::path::Path;
 use std::thread;
+use url::Url;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -126,7 +127,14 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                         None => true,
                     })
             {
-                let mut html = Html::parse_without_text(&record.response.body, &record.request.url);
+                let mut html =
+                    match Html::parse_without_text(&record.response.body, &record.request.url) {
+                        Ok(html) => html,
+                        Err(err) => {
+                            debug!("error parsing html: {:?}", err);
+                            continue;
+                        }
+                    };
 
                 if html.is_no_index() {
                     continue;
@@ -169,8 +177,14 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                             .ingoing_edges(Node::from(html.url()))
                             .into_iter()
                             .map(|edge| Link {
-                                source: edge.from.name.into(),
-                                destination: edge.to.name.into(),
+                                source: Url::parse(
+                                    &("http://".to_string() + edge.from.name.as_str()),
+                                )
+                                .unwrap(),
+                                destination: Url::parse(
+                                    &("http://".to_string() + edge.to.name.as_str()),
+                                )
+                                .unwrap(),
                                 text: edge.label,
                             })
                             .collect()
@@ -214,7 +228,9 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 let mut dmoz_description = None;
 
                 if let Some(mapper) = worker.topics.as_ref() {
-                    if let Some(info) = mapper.get(&html.url().site().to_string()) {
+                    if let Some(info) =
+                        mapper.get(&html.url().host_str().unwrap_or_default().to_string())
+                    {
                         dmoz_description = Some(info.description.clone())
                     }
                 }

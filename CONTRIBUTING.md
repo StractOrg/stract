@@ -5,9 +5,11 @@ bug reports, feature request, and evangelizing are as valuable.
 
 # Submitting a PR
 Check if your issue is already listed [github](https://github.com/StractOrg/stract/issues).
-If it is not, create your own issue.
+If it is not, create your own issue. Please make sure that an issue exists before
+submitting a PR. This will allow us to discuss the issue and make sure that the
+PR is not a waste of your time.
 
-Please add the following phrase at the end of your commit.  `Closes #<Issue Number>`.
+Please add the following phrase at the end of your commit `Closes #<Issue Number>`.
 It will automatically link your PR in the issue page. Also, once your PR is merged, it will
 closes the issue. If your PR only partially addresses the issue and you would like to
 keep it open, just write `See #<Issue Number>`.

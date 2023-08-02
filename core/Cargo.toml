@@ -35,7 +35,6 @@ whatlang = { workspace = true }
 tokio = { workspace = true }
 askama = { workspace = true }
 axum = { workspace = true }
-anyhow = { workspace = true }
 axum-extra = { workspace = true }
 html-escape = { workspace = true }
 logos = { workspace = true }
@@ -87,11 +86,12 @@ rand = { workspace = true }
 half = { workspace = true }
 aes-gcm = { workspace = true }
 reqwest-eventsource = { workspace = true }
-publicsuffix = { workspace = true }
 robotstxt-with-cache = { workspace = true }
 rust-s3 = { workspace = true }
 async-channel = { workspace = true }
 lru = { workspace = true }
+url = { workspace = true }
+anyhow = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

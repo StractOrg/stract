@@ -19,6 +19,7 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{extract, response::IntoResponse};
 use serde::Deserialize;
+use url::Url;
 use uuid::Uuid;
 
 use crate::improvement::{AliceMessage, ImprovementEvent, StoredQuery};
@@ -50,12 +51,15 @@ pub async fn click(
     }
 }
 
-impl From<StoreParams> for StoredQuery {
-    fn from(params: StoreParams) -> Self {
-        StoredQuery::new(
-            params.query,
-            params.urls.into_iter().map(|s| s.into()).collect(),
-        )
+impl TryFrom<StoreParams> for StoredQuery {
+    type Error = anyhow::Error;
+    fn try_from(params: StoreParams) -> Result<Self, Self::Error> {
+        let mut urls = Vec::new();
+        for url in params.urls {
+            urls.push(Url::parse(&url)?);
+        }
+
+        Ok(StoredQuery::new(params.query, urls))
     }
 }
 
@@ -65,13 +69,15 @@ pub async fn store(
     extract::Json(params): extract::Json<StoreParams>,
 ) -> impl IntoResponse {
     match state.improvement_queue.as_ref() {
-        Some(q) => {
-            let query: StoredQuery = params.into();
-            let qid = *query.qid();
-            q.lock().await.push(ImprovementEvent::StoreQuery(query));
+        Some(q) => match StoredQuery::try_from(params) {
+            Ok(query) => {
+                let qid = *query.qid();
+                q.lock().await.push(ImprovementEvent::StoreQuery(query));
 
-            qid.to_string()
-        }
+                qid.to_string()
+            }
+            Err(_) => String::new(),
+        },
         None => String::new(),
     }
 }

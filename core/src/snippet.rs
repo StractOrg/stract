@@ -270,9 +270,10 @@ Survey in 2016, 2017, and 2018."#;
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Website for runners</title>
@@ -282,9 +283,11 @@ Survey in 2016, 2017, and 2018."#;
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -307,9 +310,10 @@ Survey in 2016, 2017, and 2018."#;
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Website for runners</title>
@@ -319,9 +323,11 @@ Survey in 2016, 2017, and 2018."#;
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -344,9 +350,10 @@ Survey in 2016, 2017, and 2018."#;
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Website for runners</title>
@@ -356,9 +363,11 @@ Survey in 2016, 2017, and 2018."#;
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 

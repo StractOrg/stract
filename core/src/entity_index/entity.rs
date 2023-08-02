@@ -19,8 +19,6 @@ use std::collections::{BTreeMap, HashSet};
 use parse_wiki_text::Node;
 use serde::{Deserialize, Serialize};
 
-use crate::webpage::Url;
-
 #[derive(Debug)]
 pub struct Paragraph {
     pub title: Option<String>,
@@ -32,7 +30,7 @@ pub struct Entity {
     pub title: String,
     pub page_abstract: Span,
     pub info: BTreeMap<String, Span>,
-    pub image: Option<Url>,
+    pub image: Option<String>,
     pub paragraphs: Vec<Paragraph>,
     pub categories: HashSet<String>,
 }

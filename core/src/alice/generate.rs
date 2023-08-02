@@ -67,7 +67,7 @@ impl AliceTokenGenerator {
         max_new_tokens: Option<usize>,
     ) -> Result<Self> {
         if tokens.is_empty() {
-            return Err(Error::EmptyInput);
+            return Err(Error::EmptyInput.into());
         }
 
         // this must be 2, otherwise `.front()` and `.back()` calls are wrong throughout the generation code

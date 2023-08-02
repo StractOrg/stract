@@ -17,6 +17,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use url::Url;
+
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, EntityMatch};
 use crate::image_store::Image;
@@ -103,7 +105,7 @@ impl LocalSearcher {
         let parsed_query = Query::parse(ctx, query, &self.index.inverted_index)?;
 
         if parsed_query.is_empty() {
-            Err(Error::EmptyQuery)
+            Err(Error::EmptyQuery.into())
         } else {
             Ok(parsed_query)
         }
@@ -294,7 +296,7 @@ impl LocalSearcher {
         let query = Query::parse(&ctx, &query, &self.index.inverted_index)?;
 
         if query.is_empty() {
-            return Err(Error::EmptyQuery);
+            return Err(Error::EmptyQuery.into());
         }
 
         self.index.retrieve_websites(websites, &query)
@@ -388,7 +390,7 @@ impl LocalSearcher {
         self.index.get_webpage(url)
     }
 
-    pub fn get_homepage(&self, url: &str) -> Option<RetrievedWebpage> {
+    pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         self.index.get_homepage(url)
     }
 }
@@ -424,7 +426,8 @@ mod tests {
             </html>
             "#,
                         &format!("https://www.{i}.com"),
-                    ),
+                    )
+                    .unwrap(),
                     backlinks: vec![],
                     host_centrality: (NUM_WEBSITES - i) as f64,
                     fetch_time_ms: 500,
@@ -458,7 +461,7 @@ mod tests {
             for (i, url) in urls.into_iter().enumerate() {
                 assert_eq!(
                     url,
-                    format!("https://www.{}.com", i + (p * NUM_RESULTS_PER_PAGE))
+                    format!("https://www.{}.com/", i + (p * NUM_RESULTS_PER_PAGE))
                 )
             }
         }
@@ -482,7 +485,7 @@ mod tests {
             "#
                 ,
                 "https://www.example.com",
-            ))
+            ).unwrap())
             .expect("failed to insert webpage");
 
         index.commit().unwrap();

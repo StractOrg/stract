@@ -15,13 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::{
     inverted_index::RetrievedWebpage,
-    webpage::{
-        schema_org::{self, Item, OneOrMany, Property},
-        Url,
-    },
+    webpage::schema_org::{self, Item, OneOrMany, Property},
     Error,
 };
 
@@ -90,17 +88,13 @@ fn parse_so_answer(
     let url = url
         .one()
         .and_then(|prop| prop.try_into_string())
-        .map(Url::from)
-        .map(|mut url| {
-            url = url.into_absolute(&Url::from(webpage_url.site()));
-            url
-        })?;
+        .and_then(|s| Url::parse(&s).or_else(|_| webpage_url.join(&s)).ok())?;
 
     Some(StackOverflowAnswer {
         body: text,
         date: format!("{}", date.date().format("%b %d, %Y")),
         upvotes,
-        url: url.full(),
+        url: url.to_string(),
         accepted,
     })
 }
@@ -165,7 +159,11 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 .and_then(|ans| ans.one())
                 .and_then(|prop| prop.try_into_item())
                 .and_then(|item| {
-                    schema_item_to_stackoverflow_answer(item, Url::from(webpage.url.clone()), true)
+                    schema_item_to_stackoverflow_answer(
+                        item,
+                        Url::parse(&webpage.url).unwrap(),
+                        true,
+                    )
                 })
             {
                 answers.push(ans);
@@ -180,7 +178,11 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 .into_iter()
                 .filter_map(|prop| prop.try_into_item())
                 .filter_map(|item| {
-                    schema_item_to_stackoverflow_answer(item, Url::from(webpage.url.clone()), false)
+                    schema_item_to_stackoverflow_answer(
+                        item,
+                        Url::parse(&webpage.url).unwrap(),
+                        false,
+                    )
                 })
             {
                 answers.push(answer);
@@ -191,11 +193,11 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 answers: answers.into_iter().take(3).collect(),
             })
         }
-        None => Err(Error::InvalidStackoverflowSchema),
+        None => Err(Error::InvalidStackoverflowSchema.into()),
     }
 }
 
-pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: String) -> Result<Sidebar> {
+pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: Url) -> Result<Sidebar> {
     if let Some(item) = schema_org
         .into_iter()
         .find(|item| item.types_contains("QAPage"))
@@ -216,12 +218,10 @@ pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: String) -> Resul
             .cloned()
             .and_then(|ans| ans.one())
             .and_then(|prop| prop.try_into_item())
-            .and_then(|item| {
-                schema_item_to_stackoverflow_answer(item, Url::from(url.clone()), true)
-            })
+            .and_then(|item| schema_item_to_stackoverflow_answer(item, url, true))
             .map(|answer| Sidebar::StackOverflow { title, answer })
-            .ok_or(Error::InvalidStackoverflowSchema)
+            .ok_or(Error::InvalidStackoverflowSchema.into())
     } else {
-        Err(Error::InvalidStackoverflowSchema)
+        Err(Error::InvalidStackoverflowSchema.into())
     }
 }

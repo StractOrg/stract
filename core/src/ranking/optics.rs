@@ -94,7 +94,8 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.first.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 50,
@@ -122,7 +123,8 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.second.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 49,
@@ -150,7 +152,8 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.third.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 0,
@@ -180,9 +183,9 @@ mod tests {
 
         assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
-        assert_eq!(result.webpages[1].url, "https://www.second.com");
-        assert_eq!(result.webpages[2].url, "https://www.third.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/");
+        assert_eq!(result.webpages[2].url, "https://www.third.com/");
 
         let result = searcher
             .search(&SearchQuery {
@@ -198,9 +201,9 @@ mod tests {
 
         assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
-        assert_eq!(result.webpages[0].url, "https://www.first.com");
-        assert_eq!(result.webpages[1].url, "https://www.second.com");
-        assert_eq!(result.webpages[2].url, "https://www.third.com");
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/");
+        assert_eq!(result.webpages[2].url, "https://www.third.com/");
 
         let result = searcher
             .search(&SearchQuery {
@@ -217,7 +220,7 @@ mod tests {
 
         assert_eq!(result.num_hits, 2);
         assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.third.com");
-        assert_eq!(result.webpages[1].url, "https://www.second.com");
+        assert_eq!(result.webpages[0].url, "https://www.third.com/");
+        assert_eq!(result.webpages[1].url, "https://www.second.com/");
     }
 }

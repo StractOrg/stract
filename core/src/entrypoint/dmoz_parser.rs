@@ -16,10 +16,10 @@
 
 use flate2::read::MultiGzDecoder;
 use quick_xml::events::Event;
+use url::Url;
 
 use crate::{
     human_website_annotations::{Info, Topic},
-    webpage::Url,
     Result,
 };
 use std::{
@@ -127,9 +127,12 @@ pub fn parse<P: AsRef<Path>>(dmoz_file: P) -> Result<human_website_annotations::
     let mut map = HashMap::new();
 
     for page in PageIterator::from(reader) {
-        let url = Url::from(page.url.clone());
+        let url = match Url::parse(&page.url) {
+            Ok(url) => url,
+            Err(_) => continue,
+        };
 
-        if !url.is_homepage() {
+        if url.path() != "/" {
             continue;
         }
 
@@ -144,7 +147,7 @@ pub fn parse<P: AsRef<Path>>(dmoz_file: P) -> Result<human_website_annotations::
             topic,
         };
 
-        map.insert(url.site().to_string(), info);
+        map.insert(url.host_str().unwrap().to_string(), info);
     }
 
     Ok(map.into())

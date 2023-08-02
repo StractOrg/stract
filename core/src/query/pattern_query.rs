@@ -182,7 +182,7 @@ fn can_optimize_site_domain(patterns: &[PatternPart], field: Field) -> bool {
         && patterns[1..patterns.len() - 1]
             .iter()
             .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
-        && (matches!(field, Field::Text(TextField::Site))
+        && (matches!(field, Field::Text(TextField::SiteWithout))
             || matches!(field, Field::Text(TextField::Domain)))
 }
 
@@ -215,7 +215,7 @@ impl FastSiteDomainPatternWeight {
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
         let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::Site) => Field::Text(TextField::SiteNoTokenizer),
+            Field::Text(TextField::SiteWithout) => Field::Text(TextField::SiteNoTokenizer),
             Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
             _ => unreachable!(),
         };
@@ -320,7 +320,7 @@ impl PatternWeight {
             Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
             Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
             Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
-            Field::Text(TextField::Site) => Ok(FastField::NumSiteTokens),
+            Field::Text(TextField::SiteWithout) => Ok(FastField::NumSiteTokens),
             Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
             Field::Text(TextField::FlattenedSchemaOrgJson) => {
                 Ok(FastField::NumFlattenedSchemaTokens)

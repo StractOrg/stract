@@ -18,7 +18,6 @@ use crate::{
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
     inverted_index::{self, RetrievedWebpage},
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
-    webpage::Url,
     Result,
 };
 
@@ -29,6 +28,7 @@ use futures::StreamExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use url::Url;
 
 use crate::distributed::sonic;
 
@@ -106,7 +106,7 @@ impl RemoteSearcher {
         Err(Error::WebpageNotFound.into())
     }
 
-    async fn get_homepage_descriptions(&self, urls: &[String]) -> HashMap<Url, String> {
+    async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         let mut conn = self.conn();
 
         if let Ok(sonic::Response::Content(body)) = conn
@@ -202,7 +202,7 @@ impl Shard {
         Err(Error::SearchFailed.into())
     }
 
-    async fn get_homepage_descriptions(&self, urls: &[String]) -> HashMap<Url, String> {
+    async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         self.replica().get_homepage_descriptions(urls).await
     }
 }
@@ -224,7 +224,7 @@ pub enum Request {
         url: String,
     },
     GetHomepageDescriptions {
-        urls: Vec<String>,
+        urls: Vec<Url>,
     },
 }
 
@@ -335,7 +335,7 @@ impl DistributedSearcher {
             .ok_or(Error::WebpageNotFound.into())
     }
 
-    pub async fn get_homepage_descriptions(&self, urls: &[String]) -> HashMap<Url, String> {
+    pub async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         self.shards()
             .await
             .iter()

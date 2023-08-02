@@ -347,7 +347,8 @@ mod tests {
                         rand_words(1000)
                     ),
                     "https://e.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
@@ -375,7 +376,8 @@ mod tests {
                         rand_words(1000)
                     ),
                     "https://d.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![],
                 host_centrality: 0.01,
                 fetch_time_ms: 500,
@@ -406,7 +408,7 @@ mod tests {
             .webpages;
 
         assert_eq!(res.len(), 2);
-        assert_eq!(&res[0].url, "https://e.com");
-        assert_eq!(&res[1].url, "https://d.com");
+        assert_eq!(&res[0].url, "https://e.com/");
+        assert_eq!(&res[1].url, "https://d.com/");
     }
 }

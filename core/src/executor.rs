@@ -90,7 +90,8 @@ impl Executor {
                 if results.len() != num_jobs {
                     return Err(Error::InternalError(
                         "At least one of the scheduled jobs failed.".to_string(),
-                    ));
+                    )
+                    .into());
                 }
 
                 Ok(results)

@@ -20,9 +20,10 @@ use chrono::{DateTime, NaiveDate, Timelike, Utc};
 use scylla::{prepared_statement::PreparedStatement, SessionBuilder};
 use thiserror::Error;
 use tokio::{sync::Mutex, time};
+use url::Url;
 use uuid::Uuid;
 
-use crate::{api::improvement::AliceConversation, leaky_queue::LeakyQueue, webpage::Url};
+use crate::{api::improvement::AliceConversation, leaky_queue::LeakyQueue};
 
 #[derive(Debug, Error)]
 enum Error {

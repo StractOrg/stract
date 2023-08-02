@@ -39,7 +39,7 @@ pub const NUM_RESULTS_PER_PAGE: usize = 20;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SearchResult {
     Websites(WebsitesResult),
-    Bang(BangHit),
+    Bang(Box<BangHit>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

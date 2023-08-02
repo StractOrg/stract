@@ -101,14 +101,25 @@ impl WebgraphWorker {
 
             if let Ok(file) = WarcFile::open(&path) {
                 for record in file.records().flatten() {
-                    let webpage =
-                        Html::parse_without_text(&record.response.body, &record.request.url);
+                    let webpage = match Html::parse_without_text(
+                        &record.response.body,
+                        &record.request.url,
+                    ) {
+                        Ok(webpage) => webpage,
+                        Err(err) => {
+                            tracing::error!("error parsing webpage: {}", err);
+                            continue;
+                        }
+                    };
+
                     for link in webpage
                         .anchor_links()
                         .into_iter()
-                        .filter(|link| matches!(link.destination.protocol(), "http" | "https"))
+                        .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
                         .filter(|link| link.source.domain() != link.destination.domain())
-                        .filter(|link| link.matches_url_regex())
+                        .filter(|link| {
+                            link.source.domain().is_some() && link.destination.domain().is_some()
+                        })
                     {
                         let source = link.source.clone();
                         let mut destination = link.destination.clone();

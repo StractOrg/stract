@@ -123,7 +123,7 @@ impl WarcFile {
             sleep(dur);
         }
 
-        Err(Error::DownloadFailed)
+        Err(Error::DownloadFailed.into())
     }
 
     fn load_from_folder<W: Write + Seek>(name: &str, folder: &str, buf: &mut W) -> Result<()> {
@@ -155,7 +155,7 @@ impl WarcFile {
         let res = client.get(url).send()?;
 
         if res.status().as_u16() != 200 {
-            return Err(Error::DownloadFailed);
+            return Err(Error::DownloadFailed.into());
         }
 
         let bytes = res.bytes()?;
@@ -271,7 +271,7 @@ impl Metadata {
             }
         }
 
-        Err(Error::WarcParse("Failed to parse metadata"))
+        Err(Error::WarcParse("Failed to parse metadata").into())
     }
 }
 
@@ -295,7 +295,7 @@ impl<R: Read> RecordIterator<R> {
         rtrim(&mut version);
 
         if !version.to_uppercase().starts_with("WARC/1.") {
-            return Some(Err(Error::WarcParse("Unknown WARC version")));
+            return Some(Err(Error::WarcParse("Unknown WARC version").into()));
         }
 
         let mut header = BTreeMap::<String, String>::new();
@@ -303,7 +303,7 @@ impl<R: Read> RecordIterator<R> {
         loop {
             let mut line_buf = String::new();
             if let Err(io) = self.reader.read_line(&mut line_buf) {
-                return Some(Err(Error::IOError(io)));
+                return Some(Err(io.into()));
             }
 
             rtrim(&mut line_buf);
@@ -321,33 +321,36 @@ impl<R: Read> RecordIterator<R> {
             } else {
                 return Some(Err(Error::WarcParse(
                     "All header lines must contain a colon",
-                )));
+                )
+                .into()));
             }
         }
 
         let content_len = header.get("CONTENT-LENGTH");
         if content_len.is_none() {
-            return Some(Err(Error::WarcParse("Record has no content-length")));
+            return Some(Err(Error::WarcParse("Record has no content-length").into()));
         }
 
         let content_len = content_len.unwrap().parse::<usize>();
         if content_len.is_err() {
-            return Some(Err(Error::WarcParse("Could not parse content length")));
+            return Some(Err(
+                Error::WarcParse("Could not parse content length").into()
+            ));
         }
 
         let content_len = content_len.unwrap();
         let mut content = vec![0; content_len];
         if let Err(io) = self.reader.read_exact(&mut content) {
-            return Some(Err(Error::IOError(io)));
+            return Some(Err(io.into()));
         }
 
         let mut linefeed = [0u8; 4];
         if let Err(io) = self.reader.read_exact(&mut linefeed) {
-            return Some(Err(Error::IOError(io)));
+            return Some(Err(io.into()));
         }
 
         if linefeed != [13, 10, 13, 10] {
-            return Some(Err(Error::WarcParse("Invalid record ending")));
+            return Some(Err(Error::WarcParse("Invalid record ending").into()));
         }
 
         let record = RawWarcRecord { header, content };
@@ -386,7 +389,7 @@ impl<R: Read> Iterator for RecordIterator<R> {
                     "response" => response = Some(Response::from_raw(item)),
                     "metadata" => metadata = Some(Metadata::from_raw(item)),
                     _ => {
-                        return Some(Err(Error::WarcParse("Unsupported WARC type")));
+                        return Some(Err(Error::WarcParse("Unsupported WARC type").into()));
                     }
                 }
             }
@@ -395,7 +398,8 @@ impl<R: Read> Iterator for RecordIterator<R> {
         if request.is_none() || response.is_none() || metadata.is_none() {
             return Some(Err(Error::WarcParse(
                 "Request, response or metadata not found",
-            )));
+            )
+            .into()));
         }
 
         let request = request.unwrap();
@@ -405,7 +409,8 @@ impl<R: Read> Iterator for RecordIterator<R> {
         if request.is_err() || response.is_err() || metadata.is_err() {
             return Some(Err(Error::WarcParse(
                 "Request, response or metadata is error",
-            )));
+            )
+            .into()));
         }
 
         let request = request.unwrap();
@@ -494,7 +499,7 @@ impl WarcWriter {
         writer.write_all("\r\n\r\n".as_bytes())?;
 
         writer.flush().unwrap();
-        let bytes = writer.finish().map_err(Error::IOError)?;
+        let bytes = writer.finish()?;
 
         self.buf.extend_from_slice(&bytes);
 

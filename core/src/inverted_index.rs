@@ -33,6 +33,7 @@ use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
+use url::Url;
 
 use crate::collector::Hashes;
 use crate::config::SnippetConfig;
@@ -46,7 +47,7 @@ use crate::search_ctx::Ctx;
 use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
-use crate::webpage::{schema_org, Url, Webpage};
+use crate::webpage::{schema_org, Webpage};
 use crate::Result;
 use crate::{combine_u64s, snippet};
 use crate::{schema::create_schema, tokenizer::Tokenizer};
@@ -455,13 +456,14 @@ impl InvertedIndex {
     }
 
     pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
+        let url = Url::parse(url).ok()?;
         let tv_searcher = self.reader.searcher();
         let field = tv_searcher
             .schema()
             .get_field(Field::Text(TextField::UrlNoTokenizer).name())
             .unwrap();
 
-        let term = tantivy::Term::from_field_text(field, url);
+        let term = tantivy::Term::from_field_text(field, url.as_str());
 
         let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
 
@@ -473,15 +475,14 @@ impl InvertedIndex {
             .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
     }
 
-    pub(crate) fn get_homepage(&self, url: &str) -> Option<RetrievedWebpage> {
-        let url = Url::from(url.to_string());
+    pub(crate) fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         let tv_searcher = self.reader.searcher();
         let field = tv_searcher
             .schema()
             .get_field(Field::Text(TextField::SiteIfHomepageNoTokenizer).name())
             .unwrap();
 
-        let term = tantivy::Term::from_field_text(field, url.site());
+        let term = tantivy::Term::from_field_text(field, url.host_str().unwrap_or_default());
 
         let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
 
@@ -665,9 +666,10 @@ mod tests {
         assert_eq!(result.num_docs, 0);
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -677,9 +679,11 @@ mod tests {
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let ctx = index.local_search_ctx();
@@ -694,7 +698,7 @@ mod tests {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -702,9 +706,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -714,9 +719,11 @@ mod tests {
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -748,9 +755,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Website for runners</title>
@@ -760,9 +768,11 @@ mod tests {
                 </body>
             </html>
             "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -785,7 +795,7 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -793,9 +803,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Fast runner</title>
@@ -805,9 +816,11 @@ mod tests {
                 </body>
             </html>
             "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -830,7 +843,7 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -838,9 +851,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Website A</title>
@@ -849,9 +863,11 @@ mod tests {
                 {CONTENT}
             </html>
             "#
-                ),
-                "https://www.a.com",
-            ))
+                    ),
+                    "https://www.a.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index
             .insert(Webpage {
@@ -869,10 +885,11 @@ mod tests {
             "#
                     ),
                     "https://www.b.com",
-                ),
+                )
+                .unwrap(),
                 backlinks: vec![Link {
-                    source: "https://www.a.com".to_string().into(),
-                    destination: "https://www.b.com".to_string().into(),
+                    source: Url::parse("https://www.a.com/").unwrap(),
+                    destination: Url::parse("https://www.b.com/").unwrap(),
                     text: "B site is great".to_string(),
                 }],
                 host_centrality: 1.0,
@@ -910,7 +927,7 @@ mod tests {
             .sort_by(|a, b| a.url.partial_cmp(&b.url).unwrap());
 
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.a.com");
+        assert_eq!(result.documents[0].url, "https://www.a.com/");
     }
 
     #[test]
@@ -921,9 +938,10 @@ mod tests {
             let dedup_s = crate::rand_words(100);
 
             index
-                .insert(Webpage::new(
-                    &format!(
-                        r#"
+                .insert(
+                    Webpage::new(
+                        &format!(
+                            r#"
                     <html>
                         <head>
                             <title>Website for runners</title>
@@ -933,9 +951,11 @@ mod tests {
                         </body>
                     </html>
                     "#
-                    ),
-                    "https://www.example.com",
-                ))
+                        ),
+                        "https://www.example.com",
+                    )
+                    .unwrap(),
+                )
                 .expect("failed to insert webpage");
         }
 
@@ -967,9 +987,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>News website</title>
@@ -979,9 +1000,11 @@ mod tests {
                         </body>
                     </html>
                 "#
-                ),
-                "https://www.dr.dk",
-            ))
+                    ),
+                    "https://www.dr.dk",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -1004,7 +1027,7 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.dr.dk");
+        assert_eq!(result.documents[0].url, "https://www.dr.dk/");
     }
 
     #[test]
@@ -1012,9 +1035,10 @@ mod tests {
         let mut index1 = InvertedIndex::temporary().expect("Unable to open index");
 
         index1
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test website</title>
@@ -1024,18 +1048,21 @@ mod tests {
                 </body>
             </html>
             "#,
-                    crate::rand_words(100)
-                ),
-                "https://www.example.com",
-            ))
+                        crate::rand_words(100)
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         let mut index2 = InvertedIndex::temporary().expect("Unable to open index");
 
         index2
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
             <html>
                 <head>
                     <title>Test website</title>
@@ -1045,10 +1072,12 @@ mod tests {
                 </body>
             </html>
             "#,
-                    crate::rand_words(100)
-                ),
-                "https://www.example.com",
-            ))
+                        crate::rand_words(100)
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         let mut index = index1.merge(index2);
@@ -1074,8 +1103,8 @@ mod tests {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 2);
         assert_eq!(result.documents.len(), 2);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
-        assert_eq!(result.documents[1].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
+        assert_eq!(result.documents[1].url, "https://www.example.com/");
     }
 
     #[test]
@@ -1104,9 +1133,10 @@ mod tests {
         assert_eq!(result.num_docs, 0);
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -1116,9 +1146,11 @@ mod tests {
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com",
-            ))
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -1132,7 +1164,7 @@ mod tests {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -1140,9 +1172,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                         <html>
                             <head>
                                 <title>Test website</title>
@@ -1152,9 +1185,11 @@ mod tests {
                             </body>
                         </html>
                     "#
-                ),
-                "https://www.example.com#tag",
-            ))
+                    ),
+                    "https://www.example.com#tag",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
@@ -1178,7 +1213,7 @@ mod tests {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.example.com");
+        assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
 
     #[test]
@@ -1186,9 +1221,10 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>News website</title>
@@ -1198,15 +1234,18 @@ mod tests {
                         </body>
                     </html>
                 "#
-                ),
-                "https://www.dr.xyz",
-            ))
+                    ),
+                    "https://www.dr.xyz",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         index
-            .insert(Webpage::new(
-                &format!(
-                    r#"
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
                     <html>
                         <head>
                             <title>News website</title>
@@ -1216,9 +1255,11 @@ mod tests {
                         </body>
                     </html>
                 "#
-                ),
-                "https://www.dr.dk",
-            ))
+                    ),
+                    "https://www.dr.dk",
+                )
+                .unwrap(),
+            )
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
@@ -1242,7 +1283,7 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 1);
-        assert_eq!(result.documents[0].url, "https://www.dr.dk");
+        assert_eq!(result.documents[0].url, "https://www.dr.dk/");
     }
 
     #[test]
@@ -1269,7 +1310,7 @@ mod tests {
                 "#
                 ),
                 "https://www.example.com",
-            ))
+            ).unwrap())
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
@@ -1348,14 +1389,14 @@ mod tests {
                 "#
                 ),
                 "https://www.example.com",
-            ))
+            ).unwrap())
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 
         let webpage = index.get_webpage("https://www.example.com").unwrap();
         assert_eq!(webpage.title, "News website".to_string());
-        assert_eq!(webpage.url, "https://www.example.com".to_string());
+        assert_eq!(webpage.url, "https://www.example.com/".to_string());
     }
 
     #[test]
@@ -1383,13 +1424,15 @@ mod tests {
                 "#
                 ),
                 "https://www.example.com",
-            ))
+            ).unwrap())
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 
-        let webpage = index.get_homepage("https://www.example.com").unwrap();
+        let webpage = index
+            .get_homepage(&Url::parse("https://www.example.com").unwrap())
+            .unwrap();
         assert_eq!(webpage.title, "News website".to_string());
-        assert_eq!(webpage.url, "https://www.example.com".to_string());
+        assert_eq!(webpage.url, "https://www.example.com/".to_string());
     }
 }

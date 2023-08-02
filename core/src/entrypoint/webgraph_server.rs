@@ -21,6 +21,7 @@ use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::info;
+use url::Url;
 
 use crate::config;
 use crate::distributed::cluster::Cluster;
@@ -32,7 +33,6 @@ use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
 use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
-use crate::webpage::Url;
 use crate::Result;
 
 #[derive(Serialize, Deserialize)]
@@ -89,7 +89,9 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
 
                     let urls = similar_sites
                         .iter()
-                        .map(|s| s.node.name.clone())
+                        .map(|s| {
+                            Url::parse(&("http://".to_string() + s.node.name.as_str())).unwrap()
+                        })
                         .collect_vec();
 
                     let descriptions = searcher.get_homepage_descriptions(&urls).await;
@@ -98,7 +100,10 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
                         .into_iter()
                         .map(|site| {
                             let description = descriptions
-                                .get(&Url::from(site.node.name.clone()))
+                                .get(
+                                    &Url::parse(&("http://".to_string() + site.node.name.as_str()))
+                                        .unwrap(),
+                                )
                                 .cloned();
 
                             ScoredSite {
