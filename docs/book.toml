@@ -1,0 +1,10 @@
+[book]
+authors = ["Mikkel Denker"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Stract overview"
+
+[output.html]
+git-repository-url = "https://github.com/StractOrg/stract/"
+edit-url-template = "https://github.com/StractOrg/stract/edit/main/docs/{path}"
