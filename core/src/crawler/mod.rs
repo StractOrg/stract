@@ -25,7 +25,7 @@ use url::Url;
 
 use crate::config::CrawlerConfig;
 
-use self::{warc_writer::WarcWriter, worker::Worker};
+use self::{warc_writer::WarcWriter, worker::WorkerThread};
 
 pub mod coordinator;
 pub mod crawl_db;
@@ -148,8 +148,8 @@ impl Crawler {
         let mut handles = Vec::new();
         let coordinator_host = config.coordinator_host.parse()?;
 
-        for _ in 0..config.num_workers {
-            let worker = Worker::new(
+        for _ in 0..config.num_worker_threads {
+            let worker = WorkerThread::new(
                 Arc::clone(&pending_commands),
                 Arc::clone(&writer),
                 Arc::clone(&results),

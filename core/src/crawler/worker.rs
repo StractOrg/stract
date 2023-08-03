@@ -38,7 +38,7 @@ use super::{
     WarcWriter, WorkerJob,
 };
 
-pub struct Worker {
+pub struct WorkerThread {
     current_job: Option<WorkerJob>,
     pending_commands: Arc<Mutex<VecDeque<Command>>>,
     writer: Arc<WarcWriter>,
@@ -51,7 +51,7 @@ pub struct Worker {
     robotstxt: RobotsTxtManager,
 }
 
-impl Worker {
+impl WorkerThread {
     pub fn new(
         pending_commands: Arc<Mutex<VecDeque<Command>>>,
         writer: Arc<WarcWriter>,
@@ -82,7 +82,7 @@ impl Worker {
             results,
             current_job: None,
             pending_commands,
-            num_jobs_per_fetch: config.num_workers,
+            num_jobs_per_fetch: config.num_worker_threads,
             politeness_factor: config.politeness_factor,
             config,
             coordinator_host,

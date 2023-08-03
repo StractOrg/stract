@@ -39,9 +39,9 @@ where
         options.set_max_write_buffer_number(8);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_bloom_filter(128.0, true);
+        block_options.set_ribbon_filter(5.0);
 
-        let cache = rocksdb::Cache::new_lru_cache(512 * 1024 * 1024).unwrap(); // 512 MB cache
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
         block_options.set_block_cache(&cache);
 
         block_options.set_block_size(128 * 1024); // 128 KB block size

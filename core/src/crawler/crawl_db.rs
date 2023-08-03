@@ -68,7 +68,7 @@ where
         options.set_max_write_buffer_number(8);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_bloom_filter(64.0, true);
+        block_options.set_ribbon_filter(10.0);
 
         options.set_block_based_table_factory(&block_options);
 
@@ -86,8 +86,8 @@ where
             id2t,
             next_id: 0,
 
-            t2id_cache: LruCache::new(NonZeroUsize::new(1_000_000).unwrap()),
-            id2t_cache: LruCache::new(NonZeroUsize::new(1_000_000).unwrap()),
+            t2id_cache: LruCache::new(NonZeroUsize::new(500_000).unwrap()),
+            id2t_cache: LruCache::new(NonZeroUsize::new(500_000).unwrap()),
 
             _marker: std::marker::PhantomData,
         })
@@ -303,7 +303,7 @@ impl RedirectDb {
         options.create_if_missing(true);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_bloom_filter(64.0, true);
+        block_options.set_ribbon_filter(10.0);
         options.set_block_based_table_factory(&block_options);
 
         let inner = rocksdb::DB::open(&options, path.as_ref())?;
