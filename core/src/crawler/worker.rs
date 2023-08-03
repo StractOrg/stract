@@ -127,7 +127,7 @@ impl Worker {
 
                 let res = conn
                     .send_with_timeout(
-                        NewJobs {
+                        &NewJobs {
                             responses: results,
                             num_jobs: 2 * self.num_jobs_per_fetch,
                         },

@@ -63,7 +63,7 @@ struct Header {
 
 impl<Req, Res> Server<Req, Res>
 where
-    Req: Serialize + DeserializeOwned,
+    Req: DeserializeOwned,
 {
     pub async fn bind(addr: impl ToSocketAddrs) -> Result<Self> {
         let listener = TcpListener::bind(addr).await?;
@@ -97,8 +97,8 @@ where
 
 impl<Req, Res> Connection<Req, Res>
 where
-    Req: Serialize + DeserializeOwned,
-    Res: Serialize + DeserializeOwned,
+    Req: Serialize,
+    Res: DeserializeOwned,
 {
     pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
         Self::create_with_timeout(server, Duration::from_secs(30)).await
@@ -158,8 +158,7 @@ where
 
 impl<Req, Res> Request<Req, Res>
 where
-    Req: Serialize + DeserializeOwned,
-    Res: Serialize + DeserializeOwned,
+    Res: Serialize,
 {
     pub async fn respond(mut self, response: Res) -> Result<()> {
         let bytes = bincode::serialize(&response).unwrap();

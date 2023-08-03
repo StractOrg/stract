@@ -6,10 +6,15 @@ use super::{Error, Result};
 
 #[async_trait::async_trait]
 pub trait Service: Sized {
-    type Request: serde::Serialize + serde::de::DeserializeOwned;
+    type Request: serde::de::DeserializeOwned;
+    type RequestRef<'a>: serde::Serialize;
     type Response: serde::Serialize + serde::de::DeserializeOwned;
 
     async fn handle(req: Self::Request, server: &mut Self) -> Result<Self::Response>;
+}
+
+pub struct Connection<'a, S: Service> {
+    inner: super::Connection<S::RequestRef<'a>, S::Response>,
 }
 
 #[async_trait::async_trait]
@@ -18,18 +23,13 @@ pub trait Message<S: Service> {
     async fn handle(self, server: &mut S) -> Result<Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
-    fn wrap_request(req: Self) -> S::Request;
+    fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;
     fn unwrap_response(res: S::Response) -> Option<Self::Response>;
 }
 
 pub struct Server<S: Service> {
     inner: super::Server<S::Request, S::Response>,
     service: S,
-}
-
-pub struct Connection<S: Service> {
-    inner: super::Connection<S::Request, S::Response>,
-    marker: PhantomData<S>,
 }
 
 pub struct ResilientConnection<S: Service, Rt: Iterator<Item = Duration>> {
@@ -52,50 +52,47 @@ impl<S: Service> Server<S> {
     }
 }
 
-impl<S: Service> Connection<S> {
+impl<'a, S: Service> Connection<'a, S> {
     #[allow(dead_code)]
-    pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
+    pub async fn create(server: impl ToSocketAddrs) -> Result<Connection<'a, S>> {
         Ok(Connection {
             inner: super::Connection::create(server).await?,
-            marker: PhantomData,
         })
     }
-
+    #[allow(dead_code)]
     pub async fn create_with_timeout(
         server: impl ToSocketAddrs,
         timeout: Duration,
-    ) -> Result<Self> {
+    ) -> Result<Connection<'a, S>> {
         Ok(Connection {
             inner: super::Connection::create_with_timeout(server, timeout).await?,
-            marker: PhantomData,
         })
     }
-
     #[allow(dead_code)]
-    pub async fn send_without_timeout<R: Wrapper<S>>(self, request: R) -> Result<R::Response> {
-        let res = self
-            .inner
-            .send_without_timeout(&R::wrap_request(request))
-            .await?;
-        Ok(R::unwrap_response(res).unwrap())
+    pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+        Ok(R::unwrap_response(
+            self.inner
+                .send_without_timeout(&R::wrap_request_ref(request))
+                .await?,
+        )
+        .unwrap())
     }
-
     #[allow(dead_code)]
-    pub async fn send<R: Wrapper<S>>(self, request: R) -> Result<R::Response> {
-        let res = self.inner.send(&R::wrap_request(request)).await?;
-        Ok(R::unwrap_response(res).unwrap())
+    pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+        Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
     }
-
+    #[allow(dead_code)]
     pub async fn send_with_timeout<R: Wrapper<S>>(
         self,
-        request: R,
+        request: &'a R,
         timeout: Duration,
     ) -> Result<R::Response> {
-        let res = self
-            .inner
-            .send_with_timeout(&R::wrap_request(request), timeout)
-            .await?;
-        Ok(R::unwrap_response(res).unwrap())
+        Ok(R::unwrap_response(
+            self.inner
+                .send_with_timeout(&R::wrap_request_ref(request), timeout)
+                .await?,
+        )
+        .unwrap())
     }
 }
 
@@ -110,16 +107,13 @@ impl<S: Service, Rt: Iterator<Item = Duration>> ResilientConnection<S, Rt> {
 
     pub async fn send_with_timeout<R: Wrapper<S>>(
         mut self,
-        request: R,
+        request: &R,
         timeout: Duration,
-    ) -> Result<R::Response>
-    where
-        R: Clone,
-    {
+    ) -> Result<R::Response> {
         loop {
             match Connection::create_with_timeout(&self.addr, timeout).await {
                 Ok(conn) => {
-                    let response = conn.send_with_timeout(request.clone(), timeout).await;
+                    let response = conn.send_with_timeout(request, timeout).await;
                     if let Err(Error::ConnectionTimeout) = response {
                         continue;
                     }
@@ -149,9 +143,13 @@ macro_rules! sonic_service {
 
             use $crate::distributed::sonic;
 
-            #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
+            #[derive(Debug, Clone, ::serde::Deserialize)]
             pub enum Request {
                 $($req($req),)*
+            }
+            #[derive(Debug, Clone, ::serde::Serialize)]
+            pub enum RequestRef<'a> {
+                $($req(&'a $req),)*
             }
             #[derive(::serde::Serialize, ::serde::Deserialize)]
             pub enum Response {
@@ -159,8 +157,8 @@ macro_rules! sonic_service {
             }
             $(
                 impl sonic::service::Wrapper<$service> for $req {
-                    fn wrap_request(req: Self) -> Request{
-                        Request::$req(req)
+                    fn wrap_request_ref(req: &Self) -> RequestRef {
+                        RequestRef::$req(req)
                     }
                     fn unwrap_response(res: <$service as sonic::service::Service>::Response) -> Option<Self::Response> {
                         #[allow(irrefutable_let_patterns)]
@@ -175,6 +173,7 @@ macro_rules! sonic_service {
             #[async_trait::async_trait]
             impl sonic::service::Service for $service {
                 type Request = Request;
+                type RequestRef<'a> = RequestRef<'a>;
                 type Response = Response;
 
                 async fn handle(req: Request, server: &mut Self) -> sonic::Result<Response> {
@@ -198,7 +197,7 @@ macro_rules! sonic_service {
 mod tests {
     use std::{marker::PhantomData, net::SocketAddr};
 
-    use super::{Connection, Server, Service, Wrapper};
+    use super::{Server, Service, Wrapper};
     use futures::Future;
 
     struct ConnectionBuilder<S> {
@@ -207,11 +206,11 @@ mod tests {
     }
 
     impl<S: Service> ConnectionBuilder<S> {
-        async fn conn(&self) -> Result<Connection<S>, anyhow::Error> {
-            Ok(Connection::create(self.addr).await?)
-        }
-        async fn send<R: Wrapper<S>>(&self, req: R) -> Result<R::Response, anyhow::Error> {
-            Ok(self.conn().await?.send(req).await?)
+        async fn send<R: Wrapper<S>>(&self, req: &R) -> Result<R::Response, anyhow::Error> {
+            Ok(super::Connection::create(self.addr)
+                .await?
+                .send(req)
+                .await?)
         }
     }
 
@@ -224,7 +223,7 @@ mod tests {
         con_fn: impl FnOnce(ConnectionBuilder<S>) -> Y + Send + 'static,
     ) -> Result<B, anyhow::Error>
     where
-        S::Request: Send + Sync + 'static + Clone,
+        S::Request: Send + Sync + 'static,
         S::Response: Send + Sync + 'static,
     {
         tokio::runtime::Builder::new_multi_thread()
@@ -301,12 +300,12 @@ mod tests {
         use counter_service::*;
 
         fixture(CounterService { counter: 0 }, |b| async move {
-            let val = b.send(Change { amount: 15 }).await?;
+            let val = b.send(&Change { amount: 15 }).await?;
             assert_eq!(val, 15);
-            let val = b.send(Change { amount: 15 }).await?;
+            let val = b.send(&Change { amount: 15 }).await?;
             assert_eq!(val, 30);
-            b.send(Reset).await?;
-            let val = b.send(Change { amount: 15 }).await?;
+            b.send(&Reset).await?;
+            let val = b.send(&Change { amount: 15 }).await?;
             assert_eq!(val, 15);
             Ok(())
         })?;

@@ -69,7 +69,7 @@ pub async fn similar_sites(
 
     match conn
         .send_with_timeout(
-            crate::entrypoint::webgraph_server::SimilarSites {
+            &crate::entrypoint::webgraph_server::SimilarSites {
                 sites: params.sites,
                 top_n: params.top_n,
             },
@@ -112,7 +112,7 @@ pub async fn knows_site(
 
     match conn
         .send_with_timeout(
-            crate::entrypoint::webgraph_server::Knows { site: params.site },
+            &crate::entrypoint::webgraph_server::Knows { site: params.site },
             Duration::from_secs(2),
         )
         .await

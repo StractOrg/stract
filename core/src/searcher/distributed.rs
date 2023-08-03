@@ -59,7 +59,7 @@ impl RemoteSearcher {
 
         if let Ok(Some(body)) = conn
             .send_with_timeout(
-                search_server::Search {
+                &search_server::Search {
                     query: query.clone(),
                 },
                 Duration::from_secs(1),
@@ -81,7 +81,7 @@ impl RemoteSearcher {
 
         if let Ok(Some(body)) = conn
             .send_with_timeout(
-                search_server::RetrieveWebsites {
+                &search_server::RetrieveWebsites {
                     websites: pointers.to_vec(),
                     query: original_query.to_string(),
                 },
@@ -99,7 +99,7 @@ impl RemoteSearcher {
 
         if let Ok(body) = conn
             .send_with_timeout(
-                search_server::GetWebpage {
+                &search_server::GetWebpage {
                     url: url.to_string(),
                 },
                 Duration::from_secs(1),
@@ -117,7 +117,7 @@ impl RemoteSearcher {
 
         if let Ok(body) = conn
             .send_with_timeout(
-                search_server::GetHomepageDescriptions {
+                &search_server::GetHomepageDescriptions {
                     urls: urls.to_vec(),
                 },
                 Duration::from_secs(1),
