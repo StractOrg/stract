@@ -195,6 +195,8 @@ macro_rules! sonic_service {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use std::{marker::PhantomData, net::SocketAddr};
 
     use super::{Server, Service, Wrapper};
@@ -217,11 +219,11 @@ mod tests {
     fn fixture<
         S: Service + Send + Sync + 'static,
         B: Send + Sync + 'static,
-        Y: Future<Output = Result<B, anyhow::Error>> + Send,
+        Y: Future<Output = Result<B, TestCaseError>> + Send,
     >(
         service: S,
         con_fn: impl FnOnce(ConnectionBuilder<S>) -> Y + Send + 'static,
-    ) -> Result<B, anyhow::Error>
+    ) -> Result<B, TestCaseError>
     where
         S::Request: Send + Sync + 'static,
         S::Response: Send + Sync + 'static,
@@ -255,6 +257,7 @@ mod tests {
     }
 
     mod counter_service {
+        use proptest_derive::Arbitrary;
         use serde::{Deserialize, Serialize};
 
         use crate::distributed::sonic;
@@ -267,7 +270,7 @@ mod tests {
 
         sonic_service!(CounterService, [Change, Reset]);
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Arbitrary)]
         pub struct Change {
             pub amount: i32,
         }
@@ -295,21 +298,44 @@ mod tests {
         }
     }
 
-    #[test]
-    fn simple_service() -> Result<(), anyhow::Error> {
-        use counter_service::*;
+    use counter_service::*;
 
+    #[test]
+    fn simple_service() -> Result<(), TestCaseError> {
         fixture(CounterService { counter: 0 }, |b| async move {
-            let val = b.send(&Change { amount: 15 }).await?;
+            let val = b
+                .send(&Change { amount: 15 })
+                .await
+                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
             assert_eq!(val, 15);
-            let val = b.send(&Change { amount: 15 }).await?;
+            let val = b
+                .send(&Change { amount: 15 })
+                .await
+                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
             assert_eq!(val, 30);
-            b.send(&Reset).await?;
-            let val = b.send(&Change { amount: 15 }).await?;
+            b.send(&Reset)
+                .await
+                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+            let val = b
+                .send(&Change { amount: 15 })
+                .await
+                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
             assert_eq!(val, 15);
             Ok(())
         })?;
 
         Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn ref_serialization(a: Change) {
+            fixture(CounterService { counter: 0 }, |conn| async move {
+                conn.send(&Reset).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                let val = conn.send(&a).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                prop_assert_eq!(val, a.amount);
+                Ok(())
+            })?;
+        }
     }
 }
