@@ -20,9 +20,6 @@ use rocksdb::BlockBasedOptions;
 
 pub struct Store<K, V> {
     db: rocksdb::DB,
-    // from rocksdb docs: `Cache must outlive DB instance which uses it.`
-    #[allow(dead_code)]
-    cache: rocksdb::Cache,
     _phantom: std::marker::PhantomData<(K, V)>,
 }
 
@@ -33,6 +30,8 @@ where
 {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let mut options = rocksdb::Options::default();
+        options.set_max_open_files(8);
+
         options.create_if_missing(true);
         options.increase_parallelism(8);
         options.set_write_buffer_size(256 * 1024 * 1024); // 256 MB memtable
@@ -41,18 +40,18 @@ where
         let mut block_options = BlockBasedOptions::default();
         block_options.set_ribbon_filter(5.0);
 
-        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
-        block_options.set_block_cache(&cache);
+        block_options.disable_cache();
 
         block_options.set_block_size(128 * 1024); // 128 KB block size
+        block_options.set_cache_index_and_filter_blocks(true);
 
         options.set_block_based_table_factory(&block_options);
+        options.set_optimize_filters_for_hits(true);
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 
         Self {
             db,
-            cache,
             _phantom: std::marker::PhantomData,
         }
     }
