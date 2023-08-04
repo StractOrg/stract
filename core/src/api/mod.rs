@@ -57,6 +57,7 @@ mod alice;
 mod autosuggest;
 mod chat;
 mod crawler;
+mod docs;
 mod explore;
 mod fact_check;
 pub mod improvement;
@@ -206,17 +207,16 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         )
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
-        .merge(
+        .merge(docs::router())
+        .nest(
+            "/beta",
             Router::new()
-                .route("/beta/api/summarize", get(summarize::route))
-                .route(
-                    "/beta/api/webgraph/similar_sites",
-                    post(webgraph::similar_sites),
-                )
-                .route("/beta/api/webgraph/knows_site", get(webgraph::knows_site))
-                .route("/beta/api/alice", get(alice::route))
-                .route("/beta/api/alice/save_state", post(alice::save_state))
-                .route("/beta/api/fact_check", post(fact_check::route)),
+                .route("/api/summarize", get(summarize::route))
+                .route("/api/webgraph/similar_sites", post(webgraph::similar_sites))
+                .route("/api/webgraph/knows_site", get(webgraph::knows_site))
+                .route("/api/alice", get(alice::route))
+                .route("/api/alice/save_state", post(alice::save_state))
+                .route("/api/fact_check", post(fact_check::route)),
         )
         .with_state(state))
 }

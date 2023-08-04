@@ -1,0 +1,26 @@
+site_name: Overview Docs
+docs_dir: src
+
+nav:
+  - Introduction: index.md
+  - Overview: overview.md
+  - Crawler: crawler.md
+  - Webgraph: webgraph.md
+
+theme:
+  name: material
+  logo: assets/images/biglogo.svg
+  favicon: assets/images/favicon.ico
+  features:
+    - navigation.expand
+  palette:
+    primary: white
+    accent: light blue
+extra_css:
+  - assets/styles/main.css
+extra:
+  expand: true
+  generator: false
+  homepage: https://trystract.com
+plugins:
+  - search

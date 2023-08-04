@@ -93,6 +93,8 @@ lru = { workspace = true }
 url = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

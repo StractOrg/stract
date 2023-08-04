@@ -30,9 +30,5 @@
 @download_libtorch *ARGS:
     .venv/bin/python3 scripts/download_libtorch.py {{ARGS}}
 
-@docs:
-    .venv/bin/python3 scripts/generate_docs.py
-    .venv/bin/python3 -m http.server --directory docs/dist
-
 @cargo *ARGS:
     LIBTORCH="{{justfile_directory()}}/libtorch" LD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" DYLD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" cargo {{ARGS}}
