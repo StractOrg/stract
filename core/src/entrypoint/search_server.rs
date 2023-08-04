@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use tracing::info;
+use url::Url;
 
 use crate::{
     config,
@@ -27,111 +29,158 @@ use crate::{
     },
     entity_index::EntityIndex,
     index::Index,
-    inverted_index,
+    inverted_index::{self, RetrievedWebpage},
     ranking::{
         centrality_store::SearchCentralityStore,
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
-    searcher::{self, LocalSearcher},
-    Result,
+    searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
+    sonic_service, Result,
 };
 
-pub async fn run(config: config::SearchServerConfig) -> Result<()> {
-    let addr: SocketAddr = config.host;
-    let server = sonic::Server::bind(addr).await.unwrap();
+sonic_service!(
+    SearchService,
+    [
+        RetrieveWebsites,
+        Search,
+        GetWebpage,
+        GetHomepageDescriptions,
+    ]
+);
 
-    let entity_index = config
-        .entity_index_path
-        .map(|path| EntityIndex::open(path).unwrap());
-    let centrality_store = config
-        .host_centrality_store_path
-        .map(SearchCentralityStore::open);
-    let search_index = Index::open(config.index_path)?;
-
-    let mut local_searcher = LocalSearcher::new(search_index);
-
-    if let Some(entity_index) = entity_index {
-        local_searcher.set_entity_index(entity_index);
-    }
-
-    if let Some(centrality_store) = centrality_store {
-        local_searcher.set_centrality_store(centrality_store);
-    }
-
-    if let Some(model_path) = config.linear_model_path {
-        local_searcher.set_linear_model(LinearRegression::open(model_path)?);
-    }
-
-    if let Some(model_path) = config.lambda_model_path {
-        local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
-    }
-
-    local_searcher.set_collector_config(config.collector);
-    local_searcher.set_snippet_config(config.snippet);
-
+pub struct SearchService {
+    local_searcher: LocalSearcher,
     // dropping the handle leaves the cluster
-    let _cluster_handle = Cluster::join(
-        Member {
-            id: config.cluster_id,
-            service: Service::Searcher {
-                host: config.host,
-                shard: config.shard_id,
+    #[allow(unused)]
+    cluster_handle: Cluster,
+}
+
+impl SearchService {
+    async fn new(config: config::SearchServerConfig) -> Result<Self> {
+        let entity_index = config
+            .entity_index_path
+            .map(|path| EntityIndex::open(path).unwrap());
+        let centrality_store = config
+            .host_centrality_store_path
+            .map(SearchCentralityStore::open);
+        let search_index = Index::open(config.index_path)?;
+
+        let mut local_searcher = LocalSearcher::new(search_index);
+
+        if let Some(entity_index) = entity_index {
+            local_searcher.set_entity_index(entity_index);
+        }
+
+        if let Some(centrality_store) = centrality_store {
+            local_searcher.set_centrality_store(centrality_store);
+        }
+
+        if let Some(model_path) = config.linear_model_path {
+            local_searcher.set_linear_model(LinearRegression::open(model_path)?);
+        }
+
+        if let Some(model_path) = config.lambda_model_path {
+            local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
+        }
+
+        local_searcher.set_collector_config(config.collector);
+        local_searcher.set_snippet_config(config.snippet);
+
+        let cluster_handle = Cluster::join(
+            Member {
+                id: config.cluster_id,
+                service: Service::Searcher {
+                    host: config.host,
+                    shard: config.shard_id,
+                },
             },
-        },
-        config.gossip_addr,
-        config.gossip_seed_nodes.unwrap_or_default(),
-    )
-    .await?;
+            config.gossip_addr,
+            config.gossip_seed_nodes.unwrap_or_default(),
+        )
+        .await?;
+
+        Ok(SearchService {
+            local_searcher,
+            cluster_handle,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrieveWebsites {
+    pub websites: Vec<inverted_index::WebsitePointer>,
+    pub query: String,
+}
+#[async_trait::async_trait]
+impl sonic::service::Message<SearchService> for RetrieveWebsites {
+    type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
+    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+        match server
+            .local_searcher
+            .retrieve_websites(&self.websites, &self.query)
+        {
+            Ok(response) => Ok(Some(response)),
+            Err(_) => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Search {
+    pub query: SearchQuery,
+}
+#[async_trait::async_trait]
+impl sonic::service::Message<SearchService> for Search {
+    type Response = Option<InitialWebsiteResult>;
+    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+        match server.local_searcher.search_initial(&self.query, true) {
+            Ok(result) => Ok(Some(result)),
+            Err(_) => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetWebpage {
+    pub url: String,
+}
+#[async_trait::async_trait]
+impl sonic::service::Message<SearchService> for GetWebpage {
+    type Response = Option<RetrievedWebpage>;
+    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+        Ok(server.local_searcher.get_webpage(&self.url))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetHomepageDescriptions {
+    pub urls: Vec<Url>,
+}
+#[async_trait::async_trait]
+impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
+    type Response = HashMap<Url, String>;
+    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+        let mut result = HashMap::with_capacity(self.urls.len());
+
+        for url in &self.urls {
+            if let Some(homepage) = server.local_searcher.get_homepage(url) {
+                if let Some(desc) = homepage.description() {
+                    result.insert(url.clone(), desc.clone());
+                }
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+pub async fn run(config: config::SearchServerConfig) -> Result<()> {
+    let addr = config.host;
+    let mut server = SearchService::new(config).await?.bind(addr).await.unwrap();
 
     info!("search server is ready to accept requests on {}", addr);
 
     loop {
-        if let Ok(req) = server.accept::<searcher::distributed::Request>().await {
-            match &req.body {
-                searcher::Request::RetrieveWebsites { websites, query } => {
-                    match local_searcher.retrieve_websites(websites, query) {
-                        Ok(response) => {
-                            req.respond(sonic::Response::Content(response)).await.ok();
-                        }
-                        Err(_) => {
-                            req.respond::<Vec<inverted_index::RetrievedWebpage>>(
-                                sonic::Response::Empty,
-                            )
-                            .await
-                            .ok();
-                        }
-                    }
-                }
-                searcher::Request::Search(query) => {
-                    match local_searcher.search_initial(query, true) {
-                        Ok(result) => {
-                            req.respond(sonic::Response::Content(result)).await.ok();
-                        }
-                        Err(_) => {
-                            req.respond::<inverted_index::SearchResult>(sonic::Response::Empty)
-                                .await
-                                .ok();
-                        }
-                    }
-                }
-                searcher::Request::GetWebpage { url } => {
-                    let result = local_searcher.get_webpage(url);
-                    req.respond(sonic::Response::Content(result)).await.ok();
-                }
-                searcher::Request::GetHomepageDescriptions { urls } => {
-                    let mut result = HashMap::with_capacity(urls.len());
-
-                    for url in urls {
-                        if let Some(homepage) = local_searcher.get_homepage(url) {
-                            if let Some(desc) = homepage.description() {
-                                result.insert(url.clone(), desc.clone());
-                            }
-                        }
-                    }
-
-                    req.respond(sonic::Response::Content(result)).await.ok();
-                }
-            }
-        }
+        server.accept().await?;
     }
 }

@@ -175,15 +175,7 @@ impl Crawler {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum Request {
-    NewJobs {
-        responses: Vec<JobResponse>,
-        num_jobs: usize,
-    },
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Response {
     NewJobs { jobs: Vec<Job> },
     Done,

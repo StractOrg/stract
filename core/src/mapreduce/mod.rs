@@ -62,3 +62,6 @@ enum Task<T> {
     Job(T),
     AllFinished,
 }
+
+type MapReduceServer<I, O> = sonic::Server<Task<I>, Option<O>>;
+type MapReduceConnection<I, O> = sonic::Connection<Task<I>, Option<O>>;

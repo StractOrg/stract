@@ -1,7 +1,6 @@
-use super::{Error, Result, Worker};
+use super::{Error, MapReduceConnection, Result, Worker};
 use super::{Map, Reduce};
 use crate::distributed::retry_strategy::ExponentialBackoff;
-use crate::distributed::sonic;
 use crate::mapreduce::Task;
 use futures::StreamExt;
 use itertools::Itertools;
@@ -28,9 +27,14 @@ impl RemoteWorker {
             .take(15)
     }
 
-    async fn connect(&self) -> Result<sonic::Connection> {
+    async fn connect<W, I, O>(&self) -> Result<MapReduceConnection<I, O>>
+    where
+        W: Worker,
+        I: Map<W, O> + Send,
+        O: Serialize + DeserializeOwned + Send,
+    {
         for dur in RemoteWorker::retry_strategy() {
-            if let Ok(conn) = sonic::Connection::create(self.addr).await {
+            if let Ok(conn) = MapReduceConnection::create(self.addr).await {
                 debug!("connected");
                 return Ok(conn);
             }
@@ -41,15 +45,15 @@ impl RemoteWorker {
         Err(Error::NoResponse)
     }
 
-    async fn perform<W, I, O>(&self, job: &I) -> Result<O>
+    async fn perform<W, I, O>(&self, job: I) -> Result<O>
     where
         W: Worker,
         I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
-        let conn = self.connect().await?;
+        let conn = self.connect::<W, I, O>().await?;
         match conn.send(&Task::Job(job)).await {
-            Ok(sonic::Response::Content(res)) => Ok(res),
+            Ok(Some(res)) => Ok(res),
             _ => Err(Error::NoResponse),
         }
     }
@@ -62,9 +66,9 @@ impl RemoteWorker {
     {
         debug!("closing worker {:}", self.addr);
         let conn = self.connect().await?;
-        let res: sonic::Response<O> = conn.send(&Task::<I>::AllFinished).await?;
+        let res = conn.send(&Task::<I>::AllFinished).await?;
 
-        debug_assert!(matches!(res, sonic::Response::Empty));
+        debug_assert!(res.is_none());
 
         Ok(())
     }
@@ -195,13 +199,13 @@ impl Manager {
     async fn try_map<W, I, O>(&self, job: &I) -> Result<O>
     where
         W: Worker,
-        I: Map<W, O> + Send,
+        I: Map<W, O> + Send + Clone,
         O: Serialize + DeserializeOwned + Send,
     {
         loop {
             match self.pool.get_worker().await? {
                 Some(worker) => {
-                    let res = worker.perform(job).await?;
+                    let res = worker.perform(job.clone()).await?;
                     worker.success().await;
 
                     return Ok(res);
@@ -216,7 +220,7 @@ impl Manager {
     pub async fn map<W, I, O>(&self, job: I) -> O
     where
         W: Worker,
-        I: Map<W, O> + Send,
+        I: Map<W, O> + Send + Clone,
         O: Serialize + DeserializeOwned + Send,
     {
         loop {
@@ -246,7 +250,7 @@ impl Manager {
     async fn get_results<W, I, O1, O2>(&self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
         W: Worker,
-        I: Map<W, O1> + Send,
+        I: Map<W, O1> + Send + Clone,
         O1: Serialize + DeserializeOwned + Send,
         O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
@@ -270,7 +274,7 @@ impl Manager {
     pub async fn run<W, I, O1, O2>(self, jobs: impl Iterator<Item = I> + Send) -> Option<O2>
     where
         W: Worker,
-        I: Map<W, O1> + Send,
+        I: Map<W, O1> + Send + Clone,
         O1: Serialize + DeserializeOwned + Send,
         O2: From<O1> + Reduce<O1> + Send + Reduce<O2>,
     {
