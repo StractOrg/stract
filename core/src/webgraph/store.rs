@@ -43,7 +43,6 @@ where
         block_options.disable_cache();
 
         block_options.set_block_size(128 * 1024); // 128 KB block size
-        block_options.set_cache_index_and_filter_blocks(true);
 
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
