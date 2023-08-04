@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Main library for Stract.
+
+#![doc(html_logo_url = "https://trystract.com/images/biglogo.svg")]
 // #![warn(clippy::pedantic)]
 // #![warn(missing_docs)]
 // #![warn(clippy::missing_docs_in_private_items)]
