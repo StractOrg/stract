@@ -43,7 +43,7 @@ impl Node2Id {
         options.set_max_write_buffer_number(8);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_bloom_filter(64.0, true);
+        block_options.set_ribbon_filter(10.0);
 
         let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024).unwrap(); // 256 MB cache
         block_options.set_block_cache(&cache);

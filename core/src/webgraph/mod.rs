@@ -393,7 +393,7 @@ impl Webgraph {
             segments,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
             id2node: Store::open(path.as_ref().join("id2node")),
-            id2node_cache: Mutex::new(LruCache::new(500_000.try_into().unwrap())),
+            id2node_cache: Mutex::new(LruCache::new(10_000.try_into().unwrap())),
             meta,
         }
     }

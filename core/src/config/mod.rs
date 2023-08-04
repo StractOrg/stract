@@ -269,7 +269,7 @@ pub struct UserAgent {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlerConfig {
-    pub num_workers: usize,
+    pub num_worker_threads: usize,
     pub user_agent: UserAgent,
 
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
