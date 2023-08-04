@@ -16,11 +16,13 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config,
-    crawler::{CrawlCoordinator, Crawler},
-    distributed::sonic,
-    Result,
+    crawler::{CrawlCoordinator, Crawler, JobResponse},
+    distributed::sonic::{self, service::Message},
+    sonic_service, Result,
 };
 
 pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
@@ -31,6 +33,35 @@ pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
     Ok(())
 }
 
+pub struct CoordinatorService {
+    coordinator: Arc<CrawlCoordinator>,
+}
+
+sonic_service!(CoordinatorService, [NewJobs]);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewJobs {
+    pub responses: Vec<JobResponse>,
+    pub num_jobs: usize,
+}
+#[async_trait::async_trait]
+impl Message<CoordinatorService> for NewJobs {
+    type Response = crate::crawler::Response;
+
+    async fn handle(self, server: &mut CoordinatorService) -> sonic::Result<Self::Response> {
+        server.coordinator.add_responses(&self.responses)?;
+
+        if server.coordinator.is_done() {
+            tracing::info!("Crawl is done. Waiting for workers to finish.");
+            Ok(crate::crawler::Response::Done)
+        } else {
+            let jobs = server.coordinator.sample_jobs(self.num_jobs)?;
+
+            Ok(crate::crawler::Response::NewJobs { jobs })
+        }
+    }
+}
+
 pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     let coordinator = Arc::new(CrawlCoordinator::new(
         config.crawldb_folder,
@@ -39,35 +70,11 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     )?);
 
     let addr: SocketAddr = config.host;
-    let server = sonic::Server::bind(addr).await.unwrap();
+    let mut server = CoordinatorService { coordinator }.bind(addr).await.unwrap();
 
     tracing::info!("Crawl coordinator listening on {}", addr);
 
     loop {
-        if let Ok(req) = server.accept::<crate::crawler::Request>().await {
-            match &req.body {
-                crate::crawler::Request::NewJobs {
-                    responses,
-                    num_jobs,
-                } => {
-                    coordinator.add_responses(responses)?;
-
-                    if coordinator.is_done() {
-                        tracing::info!("Crawl is done. Waiting for workers to finish.");
-                        req.respond(sonic::Response::Content(crate::crawler::Response::Done))
-                            .await
-                            .ok();
-                    } else {
-                        let jobs = coordinator.sample_jobs(*num_jobs)?;
-
-                        req.respond(sonic::Response::Content(
-                            crate::crawler::Response::NewJobs { jobs },
-                        ))
-                        .await
-                        .ok();
-                    }
-                }
-            }
-        }
+        let _ = server.accept().await;
     }
 }

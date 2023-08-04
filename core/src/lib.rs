@@ -111,7 +111,7 @@ pub enum Error {
     UnknownRobotsMetaTag,
 }
 
-pub(crate) type Result<T> = std::result::Result<T, anyhow::Error>;
+pub(crate) type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
 pub fn gen_temp_path() -> PathBuf {

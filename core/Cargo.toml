@@ -92,6 +92,7 @@ async-channel = { workspace = true }
 lru = { workspace = true }
 url = { workspace = true }
 anyhow = { workspace = true }
+bytemuck = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }
@@ -99,6 +100,8 @@ lalrpop = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 maplit = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
 
 [[bench]]
 name = "search-preindexed"

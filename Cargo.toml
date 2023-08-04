@@ -92,4 +92,7 @@ async-channel = "1.8.0"
 lru = "0.10.0"
 url = { version = "2.4.0", features = ["serde"] }
 anyhow = { version = "1.0.72", features = ["backtrace"] }
+bytemuck = { version = "1.13.1", features = ["derive"] }
+proptest = "1.2.0"
+proptest-derive = "0.3.0"
 
