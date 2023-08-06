@@ -202,10 +202,6 @@ impl<K: Key> IntSet<K> {
         self.map.into_iter().map(|(key, _)| key)
     }
 
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
     pub fn contains(&self, item: &K) -> bool {
         self.map.contains_key(item)
     }

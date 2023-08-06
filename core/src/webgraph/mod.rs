@@ -526,6 +526,10 @@ impl Webgraph {
             .collect()
     }
 
+    pub fn segments(&self) -> &[StoredSegment] {
+        &self.segments
+    }
+
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
         let mut guard = self.id2node_cache.lock().unwrap();
 
