@@ -218,6 +218,11 @@ impl CentralityStore {
             .open(output_path.as_ref().join("harmonic.csv"))
             .unwrap();
 
+        for (node_id, centrality) in harmonic_centrality.iter() {
+            store.harmonic.insert(*node_id, centrality);
+        }
+        store.harmonic.flush();
+
         let mut harmonic: Vec<_> = harmonic_centrality
             .iter()
             .map(|(node, centrality)| (*node, centrality))
@@ -229,12 +234,10 @@ impl CentralityStore {
         for (node_id, centrality) in harmonic {
             let node = graph.id2node(&node_id).unwrap();
 
-            store.harmonic.insert(node_id, centrality);
             wtr.write_record(&[node.name, centrality.to_string()])
                 .unwrap();
         }
         wtr.flush().unwrap();
-        store.harmonic.flush();
     }
 
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {

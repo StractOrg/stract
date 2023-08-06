@@ -23,6 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::{cmp, fs};
 
 use lru::LruCache;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -526,10 +527,6 @@ impl Webgraph {
             .collect()
     }
 
-    pub fn segments(&self) -> &[StoredSegment] {
-        &self.segments
-    }
-
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
         let mut guard = self.id2node_cache.lock().unwrap();
 
@@ -560,6 +557,12 @@ impl Webgraph {
 
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
         self.segments.iter().flat_map(|segment| segment.edges())
+    }
+
+    pub fn par_edges(&self) -> impl ParallelIterator<Item = Edge> + '_ {
+        self.segments
+            .par_iter()
+            .flat_map(|segment| segment.edges().par_bridge())
     }
 
     pub fn merge_segments(&mut self, num_segments: usize) {

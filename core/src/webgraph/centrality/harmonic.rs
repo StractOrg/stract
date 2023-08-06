@@ -33,7 +33,7 @@ use crate::{
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
-const EXACT_COUNTING_THRESHOLD: u64 = 1_000_000;
+const EXACT_COUNTING_THRESHOLD: u64 = 500_000;
 
 #[derive(Clone)]
 struct JankyBloomFilter {
@@ -109,6 +109,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         .collect();
 
     let mut exact_changed_nodes: DashSet<NodeID> = DashSet::default();
+
     let mut changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
     for node in &nodes {
         changed_nodes.insert(node.bit_64());
@@ -152,12 +153,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             exact_changed_nodes = new_exact_changed_nodes;
         } else {
             exact_changed_nodes = DashSet::default();
-            graph.segments().par_iter().for_each(|segment| {
-                for edge in segment.edges() {
-                    if !changed_nodes.contains(&edge.from.bit_64()) {
-                        continue;
-                    }
-
+            graph.par_edges().for_each(|edge| {
+                if changed_nodes.contains(&edge.from.bit_64()) {
                     if let (Some(mut counter_to), Some(counter_from)) =
                         (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {

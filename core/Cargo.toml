@@ -136,3 +136,7 @@ harness = false
 [[bench]]
 name = "similar-sites"
 harness = false
+
+[[bench]]
+name = "hyperloglog"
+harness = false

@@ -47,7 +47,7 @@ mod executor;
 mod fact_check_model;
 mod fastfield_reader;
 mod human_website_annotations;
-mod hyperloglog;
+pub mod hyperloglog;
 mod image_downloader;
 mod image_store;
 mod improvement;
