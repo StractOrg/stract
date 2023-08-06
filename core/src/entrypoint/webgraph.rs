@@ -19,16 +19,15 @@ use crate::{
     config::{self, WebgraphConstructConfig},
     crawler::crawl_db::RedirectDb,
     entrypoint::download_all_warc_files,
-    mapreduce::{Map, Reduce, Worker},
+    mapreduce::Worker,
     warc::WarcFile,
-    webgraph::{self, FrozenWebgraph, Node, WebgraphBuilder},
+    webgraph::{self, Node, WebgraphBuilder},
     webpage::Html,
     Result,
 };
 use itertools::Itertools;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{path::Path, thread};
+use std::{path::Path, sync::Arc};
 use tokio::pin;
 use tracing::{info, trace};
 
@@ -64,7 +63,7 @@ impl From<JobConfig> for config::WarcSource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Job {
     pub level: WebgraphLevel,
     pub config: JobConfig,
@@ -72,21 +71,22 @@ pub struct Job {
     pub graph_base_path: String,
 }
 
-fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
-    WebgraphBuilder::new(path).open()
+pub fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
+    WebgraphBuilder::new(path)
+        .commit_mode(webgraph::CommitMode::SingleSegment)
+        .open()
 }
 
 pub struct WebgraphWorker {
-    pub redirect: Option<RedirectDb>,
+    pub graph: webgraph::Webgraph,
+    pub redirect: Option<Arc<RedirectDb>>,
 }
 
 impl WebgraphWorker {
-    pub fn process_job(&self, job: &Job) -> webgraph::Webgraph {
+    pub fn process_job(&mut self, job: &Job) {
         let name = job.warc_paths.first().unwrap().split('/').last().unwrap();
 
         info!("processing {}", name);
-
-        let mut graph = open_graph(Path::new(&job.graph_base_path).join(name));
 
         let source = WarcSource::from(job.config.clone());
 
@@ -145,78 +145,22 @@ impl WebgraphWorker {
                             destination = destination.into_host();
                         }
 
-                        graph.insert(source, destination, link.text);
+                        self.graph.insert(source, destination, link.text);
                     }
                 }
             }
 
-            graph.commit();
+            self.graph.commit();
 
             std::fs::remove_file(path).unwrap();
         }
-        graph.merge_segments(1);
+        self.graph.merge_segments(1);
 
         info!("{} done", name);
-
-        graph
     }
 }
 
 impl Worker for WebgraphWorker {}
-
-impl Map<WebgraphWorker, FrozenWebgraph> for Job {
-    fn map(&self, worker: &WebgraphWorker) -> FrozenWebgraph {
-        let graph = worker.process_job(self);
-        graph.into()
-    }
-}
-
-impl Map<WebgraphWorker, GraphPointer> for Job {
-    fn map(&self, worker: &WebgraphWorker) -> GraphPointer {
-        let graph = worker.process_job(self);
-        GraphPointer { path: graph.path }
-    }
-}
-
-impl Reduce<FrozenWebgraph> for webgraph::Webgraph {
-    fn reduce(self, other: FrozenWebgraph) -> webgraph::Webgraph {
-        let other: webgraph::Webgraph = other.into();
-        self.reduce(other)
-    }
-}
-
-impl Reduce<webgraph::Webgraph> for webgraph::Webgraph {
-    fn reduce(mut self, element: webgraph::Webgraph) -> Self {
-        let other_path = element.path.clone();
-
-        self.merge(element);
-
-        std::fs::remove_dir_all(other_path).unwrap();
-        self
-    }
-}
-
-impl Reduce<GraphPointer> for GraphPointer {
-    fn reduce(self, other: GraphPointer) -> Self {
-        let self_clone = self.clone();
-
-        {
-            let graph = open_graph(self.path);
-            let other_graph = open_graph(other.path);
-
-            let _ = graph.reduce(other_graph);
-        }
-
-        self_clone
-    }
-}
-
-impl Reduce<GraphPointer> for webgraph::Webgraph {
-    fn reduce(self, other: GraphPointer) -> Self {
-        let other = open_graph(other.path);
-        self.reduce(other)
-    }
-}
 
 pub struct Webgraph {}
 
@@ -227,13 +171,11 @@ impl Webgraph {
         let job_config = JobConfig::from(config.warc_source.clone());
 
         let redirect = match &config.redirect_db_path {
-            Some(path) => Some(RedirectDb::open(path)?),
+            Some(path) => Some(Arc::new(RedirectDb::open(path)?)),
             None => None,
         };
 
-        let worker = WebgraphWorker { redirect };
-
-        let graphs: Vec<_> = warc_paths
+        let jobs: Vec<_> = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
@@ -247,57 +189,48 @@ impl Webgraph {
                     .clone()
                     .unwrap_or_else(|| "data/webgraph".to_string()),
             })
-            .collect_vec()
-            .into_par_iter()
-            .map(|job| -> GraphPointer { job.map(&worker) })
-            .collect();
+            .collect_vec();
 
-        if graphs.len() > 1 {
-            Self::merge(graphs);
-        }
+        let num_workers = num_cpus::get();
 
-        Ok(())
-    }
+        let mut handlers = Vec::new();
+        let parent_path = config
+            .graph_base_path
+            .clone()
+            .unwrap_or_else(|| "data/webgraph".to_string());
 
-    fn merge(graphs: Vec<GraphPointer>) {
-        let num_graphs = graphs.len();
-        let mut it = graphs.into_iter();
-        let num_cores = num_cpus::get();
+        for i in 0..num_workers {
+            let path = parent_path.clone();
+            let path = Path::new(&path);
+            let path = path.join(format!("worker_{i}"));
 
-        let mut threads = Vec::new();
+            let mut worker = WebgraphWorker {
+                redirect: redirect.clone(),
+                graph: open_graph(path),
+            };
 
-        for _ in 0..(num_cores + 1) {
-            let graphs = it
-                .by_ref()
-                .take(((num_graphs as f64) / (num_cores as f64)).ceil() as usize)
-                .collect_vec();
-
-            if graphs.is_empty() {
-                break;
-            }
-
-            threads.push(thread::spawn(move || {
-                let mut it = graphs.into_iter();
-                let mut graph = open_graph(it.next().unwrap().path);
-
-                for other in it {
-                    graph = graph.reduce(other);
+            let jobs = jobs.clone();
+            handlers.push(std::thread::spawn(move || {
+                for job in jobs.iter().skip(i).step_by(num_workers) {
+                    worker.process_job(job);
                 }
-                graph.merge_segments(1);
 
-                graph
+                worker.graph
             }));
         }
 
         let mut graphs = Vec::new();
-        for thread in threads {
-            graphs.push(thread.join().unwrap());
+        for handler in handlers {
+            graphs.push(handler.join().unwrap());
         }
 
         let mut graph = graphs.pop().unwrap();
-
-        for other in graphs {
-            graph = graph.reduce(other);
+        for other_graph in graphs {
+            graph.merge(other_graph);
         }
+
+        graph.move_to(&parent_path);
+
+        Ok(())
     }
 }

@@ -61,12 +61,8 @@ fn download_files() {
 
 fn create_webgraph() -> Result<()> {
     debug!("Creating webgraph");
-    let out_path_tmp = Path::new(DATA_PATH).join("webgraph_tmp");
     let out_path = Path::new(DATA_PATH).join("webgraph");
 
-    if out_path_tmp.exists() {
-        std::fs::remove_dir_all(&out_path_tmp)?;
-    }
     if out_path.exists() {
         std::fs::remove_dir_all(&out_path)?;
     }
@@ -79,14 +75,18 @@ fn create_webgraph() -> Result<()> {
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
-        graph_base_path: out_path_tmp.to_str().unwrap().to_string(),
+        graph_base_path: out_path.to_str().unwrap().to_string(),
         level: crate::config::WebgraphLevel::Host,
     };
 
-    let worker = webgraph::WebgraphWorker { redirect: None };
-    let graph = worker.process_job(&job);
+    let mut worker = webgraph::WebgraphWorker {
+        redirect: None,
+        graph: webgraph::open_graph(&job.graph_base_path),
+    };
+
+    worker.process_job(&job);
+    let graph = worker.graph;
     std::fs::rename(graph.path, out_path)?;
-    std::fs::remove_dir_all(&out_path_tmp)?;
 
     Ok(())
 }

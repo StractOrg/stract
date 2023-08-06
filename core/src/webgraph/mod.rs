@@ -220,7 +220,15 @@ pub struct FullEdge {
     pub label: String,
 }
 
+#[derive(Default, Clone, Copy)]
+pub enum CommitMode {
+    #[default]
+    NewSegment,
+    SingleSegment,
+}
+
 pub struct WebgraphBuilder {
+    commit_mode: CommitMode,
     path: Box<Path>,
 }
 
@@ -235,12 +243,18 @@ impl WebgraphBuilder {
 
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self {
+            commit_mode: CommitMode::default(),
             path: path.as_ref().into(),
         }
     }
 
+    pub fn commit_mode(mut self, mode: CommitMode) -> Self {
+        self.commit_mode = mode;
+        self
+    }
+
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path)
+        Webgraph::open(self.path, self.commit_mode)
     }
 }
 
@@ -339,6 +353,7 @@ pub struct Webgraph {
     executor: Arc<Executor>,
     id2node: Store<NodeID, Node>,
     id2node_cache: Mutex<LruCache<NodeID, Node>>,
+    commit_mode: CommitMode,
     meta: Meta,
 }
 
@@ -374,7 +389,7 @@ impl Webgraph {
         writer.write_all(json.as_bytes()).unwrap();
     }
 
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    fn open<P: AsRef<Path>>(path: P, commit_mode: CommitMode) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
@@ -391,6 +406,7 @@ impl Webgraph {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
             live_segment: LiveSegment::default(),
             segments,
+            commit_mode,
             executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
             id2node: Store::open(path.as_ref().join("id2node")),
             id2node_cache: Mutex::new(LruCache::new(10_000.try_into().unwrap())),
@@ -416,9 +432,7 @@ impl Webgraph {
     pub fn merge(&mut self, mut other: Webgraph) {
         other.commit();
 
-        for (other_id, node) in other.id2node.iter() {
-            self.id2node.put(&other_id, &node);
-        }
+        self.id2node.batch_put_owned(other.id2node.iter());
 
         for segment in other.segments {
             let id = segment.id();
@@ -436,10 +450,18 @@ impl Webgraph {
     pub fn commit(&mut self) {
         if !self.live_segment.is_empty() {
             let live_segment = std::mem::take(&mut self.live_segment);
-            let segment = live_segment.commit(Path::new(&self.path).join("segments"));
 
-            self.meta.comitted_segments.push(segment.id());
-            self.segments.push(segment);
+            match (self.commit_mode, self.segments.first_mut()) {
+                (CommitMode::SingleSegment, Some(segment)) => {
+                    segment.add(live_segment);
+                }
+                _ => {
+                    let segment = live_segment.commit(Path::new(&self.path).join("segments"));
+
+                    self.meta.comitted_segments.push(segment.id());
+                    self.segments.push(segment);
+                }
+            }
         }
 
         self.save_metadata();
@@ -590,6 +612,24 @@ impl Webgraph {
             }
         }
     }
+
+    pub fn move_to<P: AsRef<Path>>(&mut self, new_path: P) {
+        let path = Path::new(&self.path);
+        let new_path = new_path.as_ref();
+
+        if path == new_path {
+            return;
+        }
+
+        fs::rename(path, new_path).unwrap();
+
+        let path = Path::new(&self.path);
+        if path.exists() {
+            fs::remove_dir_all(path).unwrap();
+        }
+
+        self.path = new_path.as_os_str().to_str().unwrap().to_string();
+    }
 }
 
 impl From<FrozenWebgraph> for Webgraph {
@@ -665,6 +705,68 @@ mod test {
         graph.commit();
 
         graph
+    }
+
+    fn verify_graph(graph: &Webgraph) {
+        let mut res = graph.outgoing_edges(Node::from("A"));
+        res.sort_by(|a, b| a.to.name.cmp(&b.to.name));
+
+        assert_eq!(
+            res,
+            vec![
+                FullEdge {
+                    from: Node::from("A"),
+                    to: Node::from("B"),
+                    label: String::new()
+                },
+                FullEdge {
+                    from: Node::from("A"),
+                    to: Node::from("C"),
+                    label: String::new()
+                }
+            ]
+        );
+
+        let mut res = graph.ingoing_edges(Node::from("C"));
+        res.sort_by(|a, b| a.from.name.cmp(&b.from.name));
+
+        assert_eq!(
+            res,
+            vec![
+                FullEdge {
+                    from: Node::from("A"),
+                    to: Node::from("C"),
+                    label: String::new()
+                },
+                FullEdge {
+                    from: Node::from("B"),
+                    to: Node::from("C"),
+                    label: String::new()
+                },
+                FullEdge {
+                    from: Node::from("D"),
+                    to: Node::from("C"),
+                    label: String::new()
+                },
+            ]
+        );
+
+        let res = graph.outgoing_edges(Node::from("D"));
+
+        assert_eq!(
+            res,
+            vec![FullEdge {
+                from: Node::from("D"),
+                to: Node::from("C"),
+                label: String::new()
+            },]
+        );
+
+        let distances = graph.distances(Node::from("D"));
+
+        assert_eq!(distances.get(&Node::from("C")), Some(&1));
+        assert_eq!(distances.get(&Node::from("A")), Some(&2));
+        assert_eq!(distances.get(&Node::from("B")), Some(&3));
     }
 
     #[test]
@@ -824,117 +926,28 @@ mod test {
         graph.commit();
 
         assert_eq!(num_edges, graph.segments.len());
-
-        let distances = graph.distances(Node::from("D"));
-
-        assert_eq!(distances.get(&Node::from("C")), Some(&1));
-        assert_eq!(distances.get(&Node::from("A")), Some(&2));
-        assert_eq!(distances.get(&Node::from("B")), Some(&3));
-
-        let mut res = graph.outgoing_edges(Node::from("A"));
-        res.sort_by(|a, b| a.to.name.cmp(&b.to.name));
-
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("B"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                }
-            ]
-        );
-
-        let mut res = graph.ingoing_edges(Node::from("C"));
-        res.sort_by(|a, b| a.from.name.cmp(&b.from.name));
-
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("B"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("D"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-            ]
-        );
+        verify_graph(&graph);
 
         graph.merge_segments(2);
         assert_eq!(graph.segments.len(), 2);
 
-        let mut res = graph.outgoing_edges(Node::from("A"));
-        res.sort_by(|a, b| a.to.name.cmp(&b.to.name));
+        verify_graph(&graph);
+    }
 
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("B"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                }
-            ]
-        );
+    #[test]
+    fn single_segment_commit_mode() {
+        let mut graph = WebgraphBuilder::new_memory()
+            .commit_mode(CommitMode::SingleSegment)
+            .open();
 
-        let mut res = graph.ingoing_edges(Node::from("C"));
-        res.sort_by(|a, b| a.from.name.cmp(&b.from.name));
+        for (from, to, label) in test_edges() {
+            graph.insert(from, to, label);
+            graph.commit();
+        }
 
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("B"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("D"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-            ]
-        );
+        graph.commit();
 
-        let res = graph.outgoing_edges(Node::from("D"));
-
-        assert_eq!(
-            res,
-            vec![FullEdge {
-                from: Node::from("D"),
-                to: Node::from("C"),
-                label: String::new()
-            },]
-        );
-
-        let distances = graph.distances(Node::from("D"));
-
-        assert_eq!(distances.get(&Node::from("C")), Some(&1));
-        assert_eq!(distances.get(&Node::from("A")), Some(&2));
-        assert_eq!(distances.get(&Node::from("B")), Some(&3));
+        assert_eq!(graph.segments.len(), 1);
+        verify_graph(&graph);
     }
 }

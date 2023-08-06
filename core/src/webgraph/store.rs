@@ -78,6 +78,19 @@ where
         let mut batch = rocksdb::WriteBatch::default();
 
         for (key, value) in it {
+            let key_bytes = bincode::serialize(key).unwrap();
+            let value_bytes = bincode::serialize(value).unwrap();
+
+            batch.put(key_bytes, value_bytes);
+        }
+
+        self.db.write(batch).unwrap();
+    }
+
+    pub fn batch_put_owned(&self, it: impl Iterator<Item = (K, V)>) {
+        let mut batch = rocksdb::WriteBatch::default();
+
+        for (key, value) in it {
             let key_bytes = bincode::serialize(&key).unwrap();
             let value_bytes = bincode::serialize(&value).unwrap();
 

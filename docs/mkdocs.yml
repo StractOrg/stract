@@ -6,6 +6,8 @@ nav:
   - Overview: overview.md
   - Crawler: crawler.md
   - Webgraph: webgraph.md
+  - Search Index: ()
+  - Optics: ()
 
 theme:
   name: material
