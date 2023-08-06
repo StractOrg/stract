@@ -28,7 +28,6 @@ use tracing::info;
 
 use crate::{
     hyperloglog::HyperLogLog,
-    intmap::IntMap,
     kahan_sum::KahanSum,
     webgraph::{NodeID, Webgraph},
 };
@@ -87,12 +86,12 @@ impl JankyBloomFilter {
 }
 
 fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
-    let nodes: Vec<_> = graph.nodes().collect();
+    let nodes = graph.nodes_vec();
     info!("Found {} nodes in the graph", nodes.len());
     let norm_factor = (nodes.len() - 1) as f64;
 
     let mut counters: DashMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
-        .iter()
+        .par_iter()
         .map(|node| {
             let mut counter = HyperLogLog::default();
             counter.add(node.bit_64());
@@ -104,8 +103,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let mut exact_counting = false;
     let has_changes = AtomicBool::new(true);
     let mut t = 0;
-    let mut centralities: IntMap<NodeID, KahanSum> = nodes
-        .iter()
+    let centralities: DashMap<NodeID, KahanSum> = nodes
+        .par_iter()
         .map(|node| (*node, KahanSum::default()))
         .collect();
 
@@ -182,7 +181,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             })
         }
 
-        for (node, score) in centralities.iter_mut() {
+        centralities.par_iter_mut().for_each(|mut r| {
+            let (node, score) = r.pair_mut();
             *score += new_counters
                 .get(node)
                 .map(|counter| counter.size())
@@ -195,7 +195,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                 )
                 .unwrap_or_default() as f64
                 / (t + 1) as f64;
-        }
+        });
 
         counters = new_counters;
         changed_nodes = new_changed_nodes.into_inner().unwrap();

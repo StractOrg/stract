@@ -131,16 +131,8 @@ impl<K: Key, V> IntMap<K, V> {
             .map(|(_, val)| val)
     }
 
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
     pub fn into_iter(self) -> impl Iterator<Item = (K, V)> {
         self.bins.into_iter().flat_map(|bin| bin.into_iter())
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (K, V)> {
-        self.bins.iter_mut().flat_map(|bin| bin.iter_mut())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &(K, V)> {
