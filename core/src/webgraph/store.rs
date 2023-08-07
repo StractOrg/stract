@@ -16,7 +16,6 @@
 
 use std::path::Path;
 
-use rayon::prelude::*;
 use rocksdb::BlockBasedOptions;
 
 pub struct Store<K, V> {
@@ -113,22 +112,6 @@ where
                 let (key, _) = res.unwrap();
                 bincode::deserialize(&key).unwrap()
             })
-    }
-
-    pub fn keys_vec(&self) -> Vec<K> {
-        let mut read_opts = rocksdb::ReadOptions::default();
-
-        read_opts.set_readahead_size(4_194_304); // 4 MB
-        read_opts.set_pin_data(true);
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
-            .par_bridge()
-            .map(|res| {
-                let (key, _) = res.unwrap();
-                bincode::deserialize(&key).unwrap()
-            })
-            .collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {

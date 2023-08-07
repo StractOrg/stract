@@ -547,10 +547,6 @@ impl Webgraph {
         self.id2node.keys()
     }
 
-    pub fn nodes_vec(&self) -> Vec<NodeID> {
-        self.id2node.keys_vec()
-    }
-
     pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
         self.id2node.iter().map(|(id, node)| (node, id))
     }

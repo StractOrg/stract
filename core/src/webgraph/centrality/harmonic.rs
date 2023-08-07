@@ -85,35 +85,36 @@ impl JankyBloomFilter {
 }
 
 fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
-    let nodes = graph.nodes_vec();
-    info!("Found {} nodes in the graph", nodes.len());
-    let exact_counting_threshold = (nodes.len() as f64).sqrt().max(0.0).round() as u64;
-    let norm_factor = (nodes.len() - 1) as f64;
+    let mut num_nodes = 0;
 
-    let mut counters: DashMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
-        .par_iter()
-        .map(|node| {
-            let mut counter = HyperLogLog::default();
-            counter.add(node.bit_64());
+    let mut counters: DashMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = DashMap::new();
+    let centralities: DashMap<NodeID, KahanSum> = DashMap::new();
 
-            (*node, counter)
-        })
-        .collect();
+    for node in graph.nodes() {
+        let mut counter = HyperLogLog::default();
+        counter.add(node.bit_64());
+
+        counters.insert(node, counter);
+        centralities.insert(node, KahanSum::default());
+
+        num_nodes += 1;
+    }
+
+    let mut changed_nodes = JankyBloomFilter::new(num_nodes as u64, 0.05);
+
+    for node in graph.nodes() {
+        changed_nodes.insert(node.bit_64());
+    }
+
+    info!("Found {} nodes in the graph", num_nodes);
+    let exact_counting_threshold = (num_nodes as f64).sqrt().max(0.0).round() as u64;
+    let norm_factor = (num_nodes - 1) as f64;
 
     let mut exact_counting = false;
     let has_changes = AtomicBool::new(true);
     let mut t = 0;
-    let centralities: DashMap<NodeID, KahanSum> = nodes
-        .par_iter()
-        .map(|node| (*node, KahanSum::default()))
-        .collect();
 
     let mut exact_changed_nodes: DashSet<NodeID> = DashSet::default();
-
-    let mut changed_nodes = JankyBloomFilter::new(nodes.len() as u64, 0.05);
-    for node in &nodes {
-        changed_nodes.insert(node.bit_64());
-    }
 
     loop {
         if !has_changes.load(Ordering::Relaxed) {
@@ -123,7 +124,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         let new_counters: DashMap<_, _> = counters.clone();
 
         has_changes.store(false, Ordering::Relaxed);
-        let new_changed_nodes = Mutex::new(JankyBloomFilter::new(nodes.len() as u64, 0.05));
+        let new_changed_nodes = Mutex::new(JankyBloomFilter::new(num_nodes as u64, 0.05));
 
         if !exact_changed_nodes.is_empty()
             && exact_changed_nodes.len() as u64 <= exact_counting_threshold
