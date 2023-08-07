@@ -231,6 +231,7 @@ pub enum CommitMode {
 pub struct WebgraphBuilder {
     commit_mode: CommitMode,
     path: Box<Path>,
+    executor: Executor,
 }
 
 impl WebgraphBuilder {
@@ -246,6 +247,7 @@ impl WebgraphBuilder {
         Self {
             commit_mode: CommitMode::default(),
             path: path.as_ref().into(),
+            executor: Executor::multi_thread("webgraph").unwrap(),
         }
     }
 
@@ -254,8 +256,13 @@ impl WebgraphBuilder {
         self
     }
 
+    pub fn single_threaded(mut self) -> Self {
+        self.executor = Executor::single_thread();
+        self
+    }
+
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.commit_mode)
+        Webgraph::open(self.path, self.commit_mode, self.executor)
     }
 }
 
@@ -390,7 +397,7 @@ impl Webgraph {
         writer.write_all(json.as_bytes()).unwrap();
     }
 
-    fn open<P: AsRef<Path>>(path: P, commit_mode: CommitMode) -> Self {
+    fn open<P: AsRef<Path>>(path: P, commit_mode: CommitMode, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
@@ -408,7 +415,7 @@ impl Webgraph {
             live_segment: LiveSegment::default(),
             segments,
             commit_mode,
-            executor: Arc::new(Executor::multi_thread("webgraph").unwrap()),
+            executor: Arc::new(executor),
             id2node: Store::open(path.as_ref().join("id2node")),
             id2node_cache: Mutex::new(LruCache::new(10_000.try_into().unwrap())),
             meta,

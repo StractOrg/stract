@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chrono::Utc;
+use rayon::prelude::*;
 use std::path::Path;
 use std::thread;
 use url::Url;
@@ -25,7 +26,6 @@ use tracing::{debug, info, trace, warn};
 
 use crate::config;
 use crate::entrypoint::download_all_warc_files;
-use crate::executor::Executor;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::centrality_store::IndexerCentralityStore;
@@ -137,6 +137,11 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     };
 
                 if html.is_no_index() {
+                    continue;
+                }
+
+                let title = html.title().unwrap_or_default();
+                if title.is_empty() || title.chars().all(|c| c.is_whitespace()) {
                     continue;
                 }
 
@@ -252,7 +257,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 webpage.pre_computed_score = signal_aggregator.precompute_score(&webpage);
 
                 if let Err(err) = index.insert(webpage) {
-                    debug!("{:?}", err);
+                    warn!("{:?}", err);
                 }
             }
         }
@@ -346,29 +351,27 @@ impl Indexer {
             config.topics_path.clone(),
         );
 
-        let executor = Executor::multi_thread("indexer").unwrap();
-
-        let indexes = executor
-            .map(
-                |job| -> IndexPointer { job.map(&worker) },
-                warc_paths
-                    .into_iter()
-                    .skip(config.skip_warc_files.unwrap_or(0))
-                    .take(config.limit_warc_files.unwrap_or(usize::MAX))
-                    .chunks(config.batch_size.unwrap_or(1))
-                    .into_iter()
-                    .map(|warc_paths| Job {
-                        source_config: job_config.clone(),
-                        warc_paths: warc_paths.collect_vec(),
-                        host_centrality_threshold: config.host_centrality_threshold,
-                        base_path: config
-                            .output_path
-                            .clone()
-                            .unwrap_or_else(|| "data/index".to_string()),
-                        minimum_clean_words: config.minimum_clean_words,
-                    }),
-            )
-            .unwrap_or_default();
+        let indexes = warc_paths
+            .into_par_iter()
+            .skip(config.skip_warc_files.unwrap_or(0))
+            .take(config.limit_warc_files.unwrap_or(usize::MAX))
+            .chunks(config.batch_size.unwrap_or(1))
+            .into_par_iter()
+            .map(|warc_paths| Job {
+                source_config: job_config.clone(),
+                warc_paths,
+                host_centrality_threshold: config.host_centrality_threshold,
+                base_path: config
+                    .output_path
+                    .clone()
+                    .unwrap_or_else(|| "data/index".to_string()),
+                minimum_clean_words: config.minimum_clean_words,
+            })
+            .map(|job| {
+                let pointer: IndexPointer = job.map(&worker);
+                pointer
+            })
+            .collect();
 
         Self::merge(indexes)?;
         Ok(())

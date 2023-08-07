@@ -85,7 +85,7 @@ pub enum Error {
     #[error("Failed to parse WARC file")]
     WarcParse(&'static str),
 
-    #[error("Encountered an empty required field when converting to tantivy")]
+    #[error("Encountered an empty required field ({0}) when converting to tantivy")]
     EmptyField(&'static str),
 
     #[error("Parsing error")]
