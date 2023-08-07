@@ -33,7 +33,6 @@ use crate::{
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
-const EXACT_COUNTING_THRESHOLD: u64 = 500_000;
 
 #[derive(Clone)]
 struct JankyBloomFilter {
@@ -88,6 +87,7 @@ impl JankyBloomFilter {
 fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let nodes = graph.nodes_vec();
     info!("Found {} nodes in the graph", nodes.len());
+    let exact_counting_threshold = (nodes.len() as f64).sqrt().max(0.0).round() as u64;
     let norm_factor = (nodes.len() - 1) as f64;
 
     let mut counters: DashMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = nodes
@@ -125,7 +125,9 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         has_changes.store(false, Ordering::Relaxed);
         let new_changed_nodes = Mutex::new(JankyBloomFilter::new(nodes.len() as u64, 0.05));
 
-        if !exact_changed_nodes.is_empty() {
+        if !exact_changed_nodes.is_empty()
+            && exact_changed_nodes.len() as u64 <= exact_counting_threshold
+        {
             let new_exact_changed_nodes = DashSet::default();
 
             exact_changed_nodes.par_iter().for_each(|changed_node| {
@@ -198,7 +200,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         changed_nodes = new_changed_nodes.into_inner().unwrap();
         t += 1;
 
-        if changed_nodes.estimate_card() <= EXACT_COUNTING_THRESHOLD {
+        if changed_nodes.estimate_card() <= exact_counting_threshold {
             exact_counting = true;
         }
     }
