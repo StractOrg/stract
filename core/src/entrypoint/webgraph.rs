@@ -20,7 +20,6 @@ use crate::{
     crawler::crawl_db::RedirectDb,
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
-    warc::WarcFile,
     webgraph::{self, Node, WebgraphBuilder},
     webpage::Html,
     Result,
@@ -93,18 +92,10 @@ impl WebgraphWorker {
         let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
         pin!(warc_files);
 
-        for warc_path in warc_files.by_ref() {
-            let name = warc_path.split('/').last().unwrap();
-            let path = Path::new(&job.graph_base_path)
-                .join("warc_files")
-                .join(name);
-
-            if let Ok(file) = WarcFile::open(&path) {
-                for record in file.records().flatten() {
-                    let webpage = match Html::parse_without_text(
-                        &record.response.body,
-                        &record.request.url,
-                    ) {
+        for file in warc_files.by_ref() {
+            for record in file.records().flatten() {
+                let webpage =
+                    match Html::parse_without_text(&record.response.body, &record.request.url) {
                         Ok(webpage) => webpage,
                         Err(err) => {
                             tracing::error!("error parsing webpage: {}", err);
@@ -112,47 +103,44 @@ impl WebgraphWorker {
                         }
                     };
 
-                    for link in webpage
-                        .anchor_links()
-                        .into_iter()
-                        .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
-                        .filter(|link| link.source.domain() != link.destination.domain())
-                        .filter(|link| {
-                            link.source.domain().is_some() && link.destination.domain().is_some()
-                        })
-                    {
-                        let source = link.source.clone();
-                        let mut destination = link.destination.clone();
+                for link in webpage
+                    .anchor_links()
+                    .into_iter()
+                    .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
+                    .filter(|link| link.source.domain() != link.destination.domain())
+                    .filter(|link| {
+                        link.source.domain().is_some() && link.destination.domain().is_some()
+                    })
+                {
+                    let source = link.source.clone();
+                    let mut destination = link.destination.clone();
 
-                        if let Some(redirect) = &self.redirect {
-                            if let Some(new_destination) = redirect.get(&destination).unwrap() {
-                                trace!("redirecting {:?} to {:?}", destination, new_destination);
-                                destination = new_destination;
-                            }
+                    if let Some(redirect) = &self.redirect {
+                        if let Some(new_destination) = redirect.get(&destination).unwrap() {
+                            trace!("redirecting {:?} to {:?}", destination, new_destination);
+                            destination = new_destination;
                         }
-
-                        if source.domain() == destination.domain() {
-                            continue;
-                        }
-
-                        trace!("inserting link {:?}", link);
-                        let mut source = Node::from(source);
-
-                        let mut destination = Node::from(destination);
-
-                        if let WebgraphLevel::Host = job.level {
-                            source = source.into_host();
-                            destination = destination.into_host();
-                        }
-
-                        self.graph.insert(source, destination, link.text);
                     }
+
+                    if source.domain() == destination.domain() {
+                        continue;
+                    }
+
+                    trace!("inserting link {:?}", link);
+                    let mut source = Node::from(source);
+
+                    let mut destination = Node::from(destination);
+
+                    if let WebgraphLevel::Host = job.level {
+                        source = source.into_host();
+                        destination = destination.into_host();
+                    }
+
+                    self.graph.insert(source, destination, link.text);
                 }
             }
 
             self.graph.commit();
-
-            std::fs::remove_file(path).unwrap();
         }
         self.graph.merge_segments(1);
 

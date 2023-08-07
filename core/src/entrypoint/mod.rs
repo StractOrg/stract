@@ -29,7 +29,7 @@ pub mod search_server;
 mod webgraph;
 pub mod webgraph_server;
 
-use std::{fs::File, path::Path};
+use std::path::Path;
 
 pub use centrality::Centrality;
 pub use entity::EntityIndexer;
@@ -43,7 +43,7 @@ fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
     source: &'a config::WarcSource,
     base_path: &'a str,
-) -> impl Iterator<Item = String> + 'a {
+) -> impl Iterator<Item = WarcFile> + 'a {
     let download_path = Path::new(base_path).join("warc_files");
 
     if !download_path.exists() {
@@ -55,24 +55,17 @@ fn download_all_warc_files<'a>(
         .map(|warc_path| warc_path.to_string())
         .collect();
 
-    warc_paths.into_iter().map(|warc_path| {
-        let download_path = Path::new(base_path).join("warc_files");
-        let name = warc_path.split('/').last().unwrap();
-        let mut file = File::options()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(download_path.join(name))
-            .unwrap();
+    warc_paths.into_iter().filter_map(|warc_path| {
         debug!("downloading warc file {}", &warc_path);
-        let res = WarcFile::download_into_buf(source, &warc_path, &mut file);
+        let res = WarcFile::download(source, &warc_path);
 
         if let Err(err) = res {
             error!("error while downloading: {:?}", err);
+            return None;
         }
 
         debug!("finished downloading");
 
-        warc_path
+        Some(res.unwrap())
     })
 }

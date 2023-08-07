@@ -81,10 +81,10 @@ impl WarcFile {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn download(source: &WarcSource, warc_path: &str) -> Result<Self> {
         let mut cursor = Cursor::new(Vec::new());
         Self::download_into_buf(source, warc_path, &mut cursor)?;
+        cursor.rewind()?;
 
         let mut buf = Vec::new();
         cursor.read_to_end(&mut buf)?;
@@ -131,7 +131,9 @@ impl WarcFile {
         let mut reader = BufReader::new(f);
 
         buf.rewind()?;
+
         std::io::copy(&mut reader, buf)?;
+
         Ok(())
     }
 
