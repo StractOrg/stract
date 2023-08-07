@@ -66,6 +66,10 @@ struct InvertedIndexResult {
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         let spell = Spell::for_index(&index);
+
+        let mut index = index;
+        index.optimize_for_search().unwrap();
+
         LocalSearcher {
             index,
             spell,

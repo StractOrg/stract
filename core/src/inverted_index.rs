@@ -111,7 +111,7 @@ impl InvertedIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let schema = create_schema();
 
-        let mut tantivy_index = if path.as_ref().exists() {
+        let tantivy_index = if path.as_ref().exists() {
             let mmap_directory = MmapDirectory::open(&path)?;
             tantivy::Index::open(mmap_directory)?
         } else {
@@ -127,8 +127,6 @@ impl InvertedIndex {
             let mmap_directory = MmapDirectory::open(&path)?;
             tantivy::Index::create(mmap_directory, schema.clone(), index_settings)?
         };
-
-        tantivy_index.set_default_multithread_executor()?;
 
         let tokenizer = Tokenizer::default();
         tantivy_index
@@ -492,6 +490,12 @@ impl InvertedIndex {
 
         res.pop()
             .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
+    }
+
+    pub fn optimize_for_search(&mut self) -> Result<()> {
+        self.tantivy_index.set_default_multithread_executor()?;
+
+        Ok(())
     }
 }
 

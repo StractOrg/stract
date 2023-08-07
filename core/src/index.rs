@@ -67,6 +67,12 @@ impl Index {
         })
     }
 
+    pub fn optimize_for_search(&mut self) -> Result<()> {
+        self.inverted_index.optimize_for_search()?;
+
+        Ok(())
+    }
+
     pub fn tokenizers(&self) -> &TokenizerManager {
         self.inverted_index.tokenizers()
     }

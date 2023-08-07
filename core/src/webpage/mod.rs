@@ -1008,7 +1008,10 @@ impl Html {
                             .domain()
                             .unwrap_or_default()
                             .find('.')
-                            .map(|index| &domain.text[..ceil_char_boundary(&domain.text, index)])
+                            .map(|index| {
+                                &domain.text[..ceil_char_boundary(&domain.text, index)
+                                    .min(domain.text.len())]
+                            })
                             .unwrap_or_default();
 
                         doc.add_pre_tokenized_text(
