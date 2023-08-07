@@ -90,7 +90,7 @@ impl IndexingWorker {
         Self {
             host_centrality_store: IndexerCentralityStore::open(host_centrality_store_path),
             page_centrality_store: page_centrality_store_path.map(IndexerCentralityStore::open),
-            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).open()),
+            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
         }
     }
@@ -352,10 +352,13 @@ impl Indexer {
         );
 
         let indexes = warc_paths
-            .into_par_iter()
+            .into_iter()
             .skip(config.skip_warc_files.unwrap_or(0))
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
+            .into_iter()
+            .map(|paths| paths.collect_vec())
+            .collect_vec()
             .into_par_iter()
             .map(|warc_paths| Job {
                 source_config: job_config.clone(),
