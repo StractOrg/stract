@@ -205,12 +205,16 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         }
     }
 
-    centralities
+    let res = centralities
         .into_iter()
         .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
         .map(|(node_id, centrality)| (node_id, centrality / norm_factor))
-        .collect()
+        .collect();
+
+    info!("Harmonic centrality calculated");
+
+    res
 }
 
 pub struct HarmonicCentrality(BTreeMap<NodeID, f64>);

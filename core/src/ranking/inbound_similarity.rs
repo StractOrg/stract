@@ -24,6 +24,7 @@ use std::{
 };
 
 use dashmap::DashMap;
+use rayon::prelude::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -33,7 +34,7 @@ use crate::{
 };
 
 use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
-const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES: usize = 1_000_000;
+const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_NODES: usize = 1_000_000;
 
 pub struct Scorer {
     liked: Vec<NodeScorer>,
@@ -144,11 +145,7 @@ pub struct InboundSimilarity {
 
 impl InboundSimilarity {
     pub fn build(graph: &Webgraph, harmonic: &HarmonicCentralityStore) -> Self {
-        Self::build_with_threshold(
-            graph,
-            harmonic,
-            DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_FOR_NODES,
-        )
+        Self::build_with_threshold(graph, harmonic, DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_NODES)
     }
 
     fn build_with_threshold(
@@ -179,18 +176,22 @@ impl InboundSimilarity {
 
         let top_nodes: IntSet<NodeID> = top_nodes.into_iter().map(|n| n.node).collect();
 
-        for node_id in graph.nodes() {
-            let mut ranks = Vec::new();
+        let adjacency: DashMap<NodeID, Vec<NodeID>> = DashMap::new();
 
-            for edge in graph.raw_ingoing_edges(&node_id) {
-                if !top_nodes.contains(&edge.from) {
-                    continue;
-                }
-
-                ranks.push(edge.from.bit_128());
+        graph.par_edges().for_each(|edge| {
+            if top_nodes.contains(&edge.from) {
+                adjacency
+                    .entry(edge.to)
+                    .or_insert_with(Vec::new)
+                    .push(edge.from);
             }
+        });
 
-            vectors.insert(node_id, bitvec_similarity::BitVec::new(ranks));
+        for (node_id, inbound) in adjacency {
+            vectors.insert(
+                node_id,
+                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.bit_128()).collect()),
+            );
         }
 
         Self {

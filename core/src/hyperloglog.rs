@@ -4348,9 +4348,11 @@ impl<const N: usize> HyperLogLog<N> {
     pub fn estimate_bias(&self, e: f64, b: usize) -> f64 {
         // binary search first nearest neighbor
         let lookup_array = RAW_ESTIMATE_DATA_VEC[b - 1 - RAW_ESTIMATE_DATA_OFFSET];
+
         let mut idx_left = match lookup_array.binary_search_by(|v| v.partial_cmp(&e).unwrap()) {
-            Ok(i) => Some(i),  // exact match
-            Err(i) => Some(i), // no match, i points to left neighbor
+            Ok(i) => Some(i),                                 // exact match
+            Err(i) if i == lookup_array.len() => Some(i - 1), // no match, i points to end of array
+            Err(i) => Some(i),                                // no match, i points to left neighbor
         };
 
         let mut idx_right = match idx_left {
@@ -4403,7 +4405,8 @@ impl<const N: usize> HyperLogLog<N> {
         }
 
         // calculate mean of neighbors
-        let bias_data = BIAS_DATA_VEC[b - BIAS_DATA_OFFSET];
+        let bias_data = BIAS_DATA_VEC[b - 1 - BIAS_DATA_OFFSET];
+
         neighbors.iter().map(|&i| bias_data[i]).sum::<f64>() / (K as f64)
     }
 
@@ -4428,16 +4431,14 @@ impl<const N: usize> HyperLogLog<N> {
             .sum();
 
         let z = 1f64 / sum;
-        // let z = 1.0;
 
         let e = self.am() * m.powi(2) * z;
 
-        let e_star = e;
-        // let e_star = if e <= (5. * m) {
-        //     e - self.estimate_bias(e, b)
-        // } else {
-        //     e
-        // };
+        let e_star = if e <= (5. * m) {
+            e - self.estimate_bias(e, b)
+        } else {
+            e
+        };
 
         let v = self.registers.iter().filter(|r| **r == 0).count();
         let h = if v != 0 {
@@ -4479,6 +4480,21 @@ mod tests {
 
         for item in 0..10_000_000 {
             set.add(item);
+        }
+
+        let delta = (set.relative_error() * (set.size() as f64)) as usize;
+        let lower_bound = set.size() - delta;
+        let upper_bound = set.size() + delta;
+
+        assert!(set.size() > lower_bound && set.size() < upper_bound);
+    }
+    #[test]
+    fn many_different_sizes() {
+        let mut set: HyperLogLog<128> = HyperLogLog::default();
+
+        for item in 0..10_000 {
+            set.add(item);
+            set.size();
         }
 
         let delta = (set.relative_error() * (set.size() as f64)) as usize;
