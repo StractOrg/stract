@@ -153,7 +153,7 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
-        let writer = tantivy_index.writer_with_num_threads(1, 1_000_000_000)?;
+        let writer = tantivy_index.writer_with_num_threads(1, 10_000_000)?;
 
         let merge_policy = NoMergePolicy;
         writer.set_merge_policy(Box::new(merge_policy));
