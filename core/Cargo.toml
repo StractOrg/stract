@@ -96,6 +96,9 @@ bytemuck = { workspace = true }
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { workspace = true }
+
 [build-dependencies]
 lalrpop = { workspace = true }
 
