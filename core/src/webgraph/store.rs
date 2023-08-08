@@ -25,7 +25,7 @@ pub struct Store<K, V> {
 
 impl<K, V> Store<K, V>
 where
-    K: serde::de::DeserializeOwned + serde::Serialize,
+    K: serde::de::DeserializeOwned + serde::Serialize + Send,
     V: serde::de::DeserializeOwned + serde::Serialize,
 {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
@@ -78,6 +78,19 @@ where
         let mut batch = rocksdb::WriteBatch::default();
 
         for (key, value) in it {
+            let key_bytes = bincode::serialize(key).unwrap();
+            let value_bytes = bincode::serialize(value).unwrap();
+
+            batch.put(key_bytes, value_bytes);
+        }
+
+        self.db.write(batch).unwrap();
+    }
+
+    pub fn batch_put_owned(&self, it: impl Iterator<Item = (K, V)>) {
+        let mut batch = rocksdb::WriteBatch::default();
+
+        for (key, value) in it {
             let key_bytes = bincode::serialize(&key).unwrap();
             let value_bytes = bincode::serialize(&value).unwrap();
 
@@ -91,6 +104,7 @@ where
         let mut read_opts = rocksdb::ReadOptions::default();
 
         read_opts.set_readahead_size(4_194_304); // 4 MB
+        read_opts.set_pin_data(true);
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)

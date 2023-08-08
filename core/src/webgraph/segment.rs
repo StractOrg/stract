@@ -187,7 +187,12 @@ impl StoredSegment {
     }
 
     pub fn merge(segments: Vec<StoredSegment>) -> Self {
-        debug_assert!(segments.len() > 1);
+        debug_assert!(!segments.is_empty());
+
+        if segments.len() == 1 {
+            let mut segments = segments;
+            return segments.pop().unwrap();
+        }
 
         let new_segment_id = uuid::Uuid::new_v4().to_string();
 
@@ -238,6 +243,37 @@ impl StoredSegment {
         res.flush();
 
         res
+    }
+
+    pub fn add(&mut self, live_segment: LiveSegment) {
+        for (node_id, adjacency) in live_segment.adjacency {
+            let mut existing = self.full_adjacency.get(&node_id).unwrap_or_default();
+            existing.extend(adjacency);
+            self.full_adjacency.put(&node_id, &existing);
+            self.small_adjacency.put(
+                &node_id,
+                &existing
+                    .into_iter()
+                    .map(|edge| SmallStoredEdge { other: edge.other })
+                    .collect::<HashSet<_>>(),
+            );
+        }
+
+        for (node_id, adjacency) in live_segment.reversed_adjacency {
+            let mut existing = self
+                .full_reversed_adjacency
+                .get(&node_id)
+                .unwrap_or_default();
+            existing.extend(adjacency);
+            self.full_reversed_adjacency.put(&node_id, &existing);
+            self.small_reversed_adjacency.put(
+                &node_id,
+                &existing
+                    .into_iter()
+                    .map(|edge| SmallStoredEdge { other: edge.other })
+                    .collect::<HashSet<_>>(),
+            );
+        }
     }
 }
 

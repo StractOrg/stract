@@ -16,7 +16,7 @@
 
 use std::ops::{Add, AddAssign};
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct KahanSum {
     sum: f64,
     err: f64,
@@ -59,6 +59,8 @@ mod tests {
     #[test]
     fn it_works() {
         let mut sum = KahanSum::default();
+        assert_eq!(0.0, f64::from(sum));
+
         for elem in [
             10000.0f64,
             std::f64::consts::PI,

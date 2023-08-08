@@ -66,6 +66,10 @@ struct InvertedIndexResult {
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         let spell = Spell::for_index(&index);
+
+        let mut index = index;
+        index.optimize_for_search().unwrap();
+
         LocalSearcher {
             index,
             spell,
@@ -184,7 +188,7 @@ impl LocalSearcher {
                 .liked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
-                .filter_map(|node| store.node2id.get(&node))
+                .map(|node| node.id())
                 .collect();
 
             let disliked_sites: Vec<_> = parsed_query
@@ -192,7 +196,7 @@ impl LocalSearcher {
                 .disliked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
-                .filter_map(|node| store.node2id.get(&node))
+                .map(|node| node.id())
                 .collect();
 
             aggregator.set_inbound_similarity(

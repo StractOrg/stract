@@ -41,6 +41,7 @@ impl RocksDbStore {
         options.create_if_missing(true);
         options.set_max_open_files(1);
         options.set_max_file_opening_threads(1);
+        options.optimize_for_point_lookup(512 * 1024 * 1024); // 512 MB
 
         Box::new(DB::open(&options, path).expect("unable to open rocks db"))
     }

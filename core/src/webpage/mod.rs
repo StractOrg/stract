@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
+    ceil_char_boundary,
     enum_map::EnumSet,
     prehashed::hash,
     schema::{FastField, TextField},
@@ -1007,7 +1008,10 @@ impl Html {
                             .domain()
                             .unwrap_or_default()
                             .find('.')
-                            .map(|index| &domain.text[..index])
+                            .map(|index| {
+                                &domain.text[..ceil_char_boundary(&domain.text, index)
+                                    .min(domain.text.len())]
+                            })
                             .unwrap_or_default();
 
                         doc.add_pre_tokenized_text(

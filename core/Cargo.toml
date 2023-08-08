@@ -93,6 +93,11 @@ lru = { workspace = true }
 url = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }
@@ -133,4 +138,8 @@ harness = false
 
 [[bench]]
 name = "similar-sites"
+harness = false
+
+[[bench]]
+name = "hyperloglog"
 harness = false

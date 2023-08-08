@@ -1,0 +1,36 @@
+site_name: Overview Docs
+docs_dir: src
+
+nav:
+  - Introduction: index.md
+  - Overview: overview.md
+  - Crawler: crawler.md
+  - Webgraph: webgraph.md
+  - Search Index: search_index.md
+  - Optics: ()
+
+theme:
+  name: material
+  logo: assets/images/biglogo.svg
+  favicon: assets/images/favicon.ico
+  features:
+    - navigation.expand
+  palette:
+    primary: white
+    accent: light blue
+
+extra_javascript:
+  - assets/js/katex.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
+
+extra_css:
+  - assets/styles/main.css
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
+
+extra:
+  expand: true
+  generator: false
+  homepage: https://trystract.com
+plugins:
+  - search

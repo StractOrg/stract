@@ -1,0 +1,18 @@
+.md-header__title {
+    font-size: 0.8rem;
+}
+
+.md-logo>img {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.md-logo {
+    width: 5rem;
+    height: auto;
+}
+
+.md-footer,
+.md-footer-meta {
+    background-color: white !important;
+}

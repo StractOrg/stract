@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Main library for Stract.
+
+#![doc(html_logo_url = "https://trystract.com/images/biglogo.svg")]
 // #![warn(clippy::pedantic)]
 // #![warn(missing_docs)]
 // #![warn(clippy::missing_docs_in_private_items)]
@@ -45,7 +47,7 @@ mod executor;
 mod fact_check_model;
 mod fastfield_reader;
 mod human_website_annotations;
-mod hyperloglog;
+pub mod hyperloglog;
 mod image_downloader;
 mod image_store;
 mod improvement;
@@ -83,7 +85,7 @@ pub enum Error {
     #[error("Failed to parse WARC file")]
     WarcParse(&'static str),
 
-    #[error("Encountered an empty required field when converting to tantivy")]
+    #[error("Encountered an empty required field ({0}) when converting to tantivy")]
     EmptyField(&'static str),
 
     #[error("Parsing error")]
