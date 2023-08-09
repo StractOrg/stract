@@ -23,9 +23,9 @@ use std::{
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::config::CrawlerConfig;
+use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
 
-use self::{warc_writer::WarcWriter, worker::WorkerThread};
+use self::{crawl_db::DomainId, warc_writer::WarcWriter, worker::WorkerThread};
 
 pub mod coordinator;
 pub mod crawl_db;
@@ -60,13 +60,20 @@ pub struct Domain(String);
 
 impl From<&Url> for Domain {
     fn from(url: &Url) -> Self {
-        Self(url.domain().unwrap_or_default().to_string())
+        Self(url.root_domain().unwrap_or_default().to_string())
     }
 }
 
 impl From<String> for Domain {
     fn from(s: String) -> Self {
         Self(s)
+    }
+}
+
+impl Domain {
+    pub fn id(&self) -> DomainId {
+        let digest = md5::compute(self.0.as_bytes());
+        u128::from_be_bytes(digest.0).into()
     }
 }
 

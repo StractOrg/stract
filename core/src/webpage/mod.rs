@@ -34,12 +34,14 @@ use whatlang::Lang;
 mod just_text;
 pub mod region;
 pub mod schema_org;
+pub mod url_ext;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
 
 use self::{
     just_text::{JustText, Paragraph},
     region::Region,
+    url_ext::UrlExt,
 };
 
 pub static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
@@ -617,7 +619,7 @@ impl Html {
                         .or_else(|_| self.url().join(url.as_str()))
                         .ok()?;
 
-                    if script_url.domain() != self.url().domain() {
+                    if script_url.root_domain() != self.url().root_domain() {
                         Some(Link {
                             source: self.url().clone(),
                             destination: script_url,
@@ -778,7 +780,7 @@ impl Html {
     }
 
     fn pretokenize_domain(&self) -> PreTokenizedString {
-        let mut domain = self.url().domain().unwrap_or_default().to_string();
+        let mut domain = self.url().root_domain().unwrap_or_default().to_string();
 
         if let Some(stripped) = domain.strip_prefix("www.") {
             domain = stripped.to_string();
@@ -856,7 +858,7 @@ impl Html {
         let url_without_query_hash = split_u128(hash(url_without_query.as_str()).0);
         let url_hash = split_u128(hash(self.url().as_str()).0);
 
-        let domain_hash = split_u128(hash(self.url().domain().unwrap_or_default()).0);
+        let domain_hash = split_u128(hash(self.url().root_domain().unwrap_or_default()).0);
         let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
 
         for field in &ALL_FIELDS {
@@ -1005,7 +1007,7 @@ impl Html {
                     if self.is_homepage() {
                         let domain_name = self
                             .url()
-                            .domain()
+                            .root_domain()
                             .unwrap_or_default()
                             .find('.')
                             .map(|index| {
@@ -1417,7 +1419,7 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::schema::create_schema;
+    use crate::{schema::create_schema, webpage::url_ext::UrlExt};
 
     use super::*;
 
@@ -1465,7 +1467,6 @@ mod tests {
             "https://www.example.com/whatever"
         );
         assert_eq!(webpage.url().host_str().unwrap(), "www.example.com");
-        assert_eq!(webpage.url().domain().unwrap(), "www.example.com");
     }
 
     #[test]
@@ -1567,8 +1568,8 @@ mod tests {
 
         let webpage = Html::parse(raw, "https://www.domain.co.uk").unwrap();
         assert_eq!(
-            webpage.url().domain().unwrap_or_default(),
-            "www.domain.co.uk"
+            webpage.url().root_domain().unwrap_or_default(),
+            "domain.co.uk"
         );
     }
 
@@ -1749,7 +1750,10 @@ mod tests {
     #[test]
     fn domain_from_domain_url() {
         let url: Url = Url::parse("http://example.com").unwrap();
-        assert_eq!(url.domain().unwrap(), "example.com");
+        assert_eq!(url.root_domain().unwrap(), "example.com");
+
+        let url: Url = Url::parse("http://test.example.com").unwrap();
+        assert_eq!(url.root_domain().unwrap(), "example.com");
     }
 
     #[test]

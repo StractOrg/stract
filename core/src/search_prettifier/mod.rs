@@ -28,6 +28,7 @@ use crate::{
     inverted_index::RetrievedWebpage,
     ranking::Signal,
     spell::{self, CorrectionTerm},
+    webpage::url_ext::UrlExt,
 };
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
@@ -141,7 +142,7 @@ fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
 
     let url = Url::parse(&webpage.url).unwrap();
 
-    if url.domain().unwrap_or_default() == "stackoverflow.com"
+    if url.root_domain().unwrap_or_default() == "stackoverflow.com"
         && webpage
             .schema_org
             .iter()
@@ -185,7 +186,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
         let snippet = generate_snippet(&webpage);
 
         let url = Url::parse(&webpage.url).unwrap();
-        let domain = url.domain().unwrap_or_default().to_string();
+        let domain = url.root_domain().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
 
         let title = html_escape(&webpage.title);

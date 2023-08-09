@@ -54,11 +54,21 @@ impl RobotsTxtManager {
     }
 
     async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
-        let res = self
+        let mut res = self
             .client
             .get(&format!("http://{}/robots.txt", site.0))
             .send()
-            .await?;
+            .await;
+
+        if res.is_err() {
+            res = self
+                .client
+                .get(&format!("https://{}/robots.txt", site.0))
+                .send()
+                .await;
+        }
+
+        let res = res?;
 
         if res.status() != reqwest::StatusCode::OK {
             return Err(Error::FetchFailed(res.status()).into());

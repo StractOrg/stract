@@ -15,9 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    ceil_char_boundary,
     kv::{rocksdb_store::RocksDbStore, Kv},
     prehashed::{hash, Prehashed},
+    webpage::url_ext::UrlExt,
 };
 use std::{collections::HashSet, path::Path};
 use url::Url;
@@ -34,16 +34,9 @@ impl SubdomainCounter {
     }
 
     pub fn increment(&mut self, url: Url) {
-        let scheme = url.scheme();
-        let domain = url.domain().unwrap_or_default();
+        let domain = url.root_domain().unwrap_or_default();
 
-        let mut url = url.as_str().strip_prefix(scheme).unwrap_or_default();
-
-        if let Some(slash) = url.find('/') {
-            url = &url[..ceil_char_boundary(url, slash)];
-        }
-
-        if let Some(subdomain) = url.strip_suffix(domain) {
+        if let Some(subdomain) = url.subdomain() {
             let domain = hash(domain);
             let subdomain = subdomain.to_string();
 
