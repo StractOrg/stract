@@ -318,7 +318,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
                 model,
                 signal_coefficients: None,
             }),
-            stage_top_n: 10_000,
+            stage_top_n: 100,
             derank_similar: true,
         };
 

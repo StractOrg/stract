@@ -161,7 +161,7 @@ impl LocalSearcher {
         }
 
         Ok(ranker
-            .with_max_docs(10_000_000, self.index.num_segments())
+            .with_max_docs(250_000, self.index.num_segments())
             .with_num_results(query.num_results())
             .with_offset(query.offset()))
     }

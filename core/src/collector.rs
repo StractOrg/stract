@@ -161,14 +161,19 @@ impl TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn collect(&mut self, doc: DocId, score: Score) {
+    fn is_done(&self) -> bool {
         if let Some(max_docs) = &self.max_docs {
-            if self.num_docs_taken >= *max_docs {
-                return;
-            }
-
-            self.num_docs_taken += 1;
+            self.num_docs_taken >= *max_docs
+        } else {
+            false
         }
+    }
+    fn collect(&mut self, doc: DocId, score: Score) {
+        if self.is_done() {
+            return;
+        }
+
+        self.num_docs_taken += 1;
 
         let simhash: Option<u64> = self
             .fastfield_segment_reader
@@ -458,6 +463,10 @@ where
     type Fruit = Vec<SegmentDoc>;
 
     fn collect(&mut self, doc: DocId, score: tantivy::Score) {
+        if self.segment_collector.is_done() {
+            return;
+        }
+
         let score = self.segment_scorer.score(doc, score);
         self.segment_collector.collect(doc, score);
     }

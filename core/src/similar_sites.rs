@@ -83,55 +83,61 @@ impl SimilarSitesFinder {
 
         let scorer = self.inbound_similarity.scorer(&nodes, &[]);
 
-        let mut backlink_count: IntMap<NodeID, usize> = IntMap::new();
+        let mut backlinks: IntMap<NodeID, f64> = IntMap::new();
 
         for node in &nodes {
             for edge in self.webgraph.raw_ingoing_edges(node) {
-                if !backlink_count.contains_key(&edge.from) {
-                    backlink_count.insert(edge.from, 0);
+                if !backlinks.contains_key(&edge.from) {
+                    backlinks.insert(edge.from, scorer.score(&edge.from));
                 }
-
-                *backlink_count.get_mut(&edge.from).unwrap() += 1;
             }
         }
 
-        let mut top_backlink_nodes: Vec<_> = backlink_count
+        let mut top_backlink_nodes: Vec<_> = backlinks
             .into_iter()
-            .map(|(node, count)| (node, count))
+            .map(|(node, score)| (node, score))
             .collect();
 
-        top_backlink_nodes.sort_unstable_by_key(|(_, count)| *count);
+        top_backlink_nodes.sort_unstable_by(|(_, score_a), (_, score_b)| {
+            score_a
+                .partial_cmp(score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         top_backlink_nodes.reverse();
 
-        let mut potential_nodes = IntSet::new();
-        for (backlink_node, _) in top_backlink_nodes {
-            for edge in self.webgraph.raw_outgoing_edges(&backlink_node) {
-                potential_nodes.insert(edge.to);
-            }
-        }
-
         let mut scored_nodes = BinaryHeap::with_capacity(limit);
+        let mut checked_nodes = IntSet::new();
 
-        for potential_node in potential_nodes.into_iter() {
-            let score = scorer.score(&potential_node);
-            let scored_node_id = ScoredNodeID {
-                node_id: potential_node,
-                score,
-            };
+        for (backlink_node, _) in top_backlink_nodes.into_iter().take(limit) {
+            for edge in self.webgraph.raw_outgoing_edges(&backlink_node) {
+                let potential_node = edge.to;
 
-            if scored_nodes.len() < limit {
-                scored_nodes.push(Reverse(scored_node_id));
-            } else {
-                let mut min_scored_node = scored_nodes.peek_mut().unwrap();
+                if checked_nodes.contains(&potential_node) {
+                    continue;
+                }
 
-                if scored_node_id > min_scored_node.0 {
-                    *min_scored_node = Reverse(scored_node_id);
+                checked_nodes.insert(potential_node);
+
+                let score = scorer.score(&potential_node);
+                let scored_node_id = ScoredNodeID {
+                    node_id: potential_node,
+                    score,
+                };
+
+                if scored_nodes.len() < limit {
+                    scored_nodes.push(Reverse(scored_node_id));
+                } else {
+                    let mut min_scored_node = scored_nodes.peek_mut().unwrap();
+
+                    if scored_node_id > min_scored_node.0 {
+                        *min_scored_node = Reverse(scored_node_id);
+                    }
                 }
             }
         }
 
         let mut scored_nodes: Vec<_> = scored_nodes.into_iter().take(limit).map(|n| n.0).collect();
-        scored_nodes.sort();
+        scored_nodes.sort_unstable();
         scored_nodes.reverse();
 
         scored_nodes
