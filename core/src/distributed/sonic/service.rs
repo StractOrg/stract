@@ -105,19 +105,21 @@ impl<S: Service, Rt: Iterator<Item = Duration>> ResilientConnection<S, Rt> {
         }
     }
 
-    pub async fn send_with_timeout<R: Wrapper<S>>(
+    /// If `req_timeout` is None, send with default timeout of 90 seconds.
+    pub async fn send<R: Wrapper<S>>(
         mut self,
         request: &R,
-        timeout: Duration,
+        conn_timeout: Duration,
+        req_timeout: Option<Duration>,
     ) -> Result<R::Response> {
         loop {
-            match Connection::create_with_timeout(&self.addr, timeout).await {
+            match Connection::create_with_timeout(&self.addr, conn_timeout).await {
                 Ok(conn) => {
-                    let response = conn.send_with_timeout(request, timeout).await;
-                    if let Err(Error::ConnectionTimeout) = response {
-                        continue;
+                    if let Some(req_timeout) = req_timeout {
+                        return conn.send_with_timeout(request, req_timeout).await;
+                    } else {
+                        return conn.send(request).await;
                     }
-                    return response;
                 }
                 Err(Error::ConnectionTimeout) => {
                     if let Some(timeout) = self.retry.next() {

@@ -181,6 +181,8 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     info!("search server is ready to accept requests on {}", addr);
 
     loop {
-        server.accept().await?;
+        if let Err(e) = server.accept().await {
+            tracing::error!("{}", e);
+        }
     }
 }

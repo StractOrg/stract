@@ -37,6 +37,9 @@ pub enum Error {
     #[error("Failed to connect to peer: connection timeout")]
     ConnectionTimeout,
 
+    #[error("Failed to get response for request: connection timeout")]
+    RequestTimeout,
+
     #[error("Other")]
     Other(#[from] anyhow::Error),
 }
@@ -144,14 +147,14 @@ where
     }
 
     pub async fn send(self, request: &Req) -> Result<Res> {
-        self.send_with_timeout(request, Duration::from_secs(30))
+        self.send_with_timeout(request, Duration::from_secs(90))
             .await
     }
 
     pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
-            Err(_) => Err(Error::ConnectionTimeout),
+            Err(_) => Err(Error::RequestTimeout),
         }
     }
 }

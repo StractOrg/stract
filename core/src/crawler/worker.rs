@@ -126,12 +126,13 @@ impl WorkerThread {
                 let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
 
                 let res = conn
-                    .send_with_timeout(
+                    .send(
                         &NewJobs {
                             responses: results,
                             num_jobs: 2 * self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(60 * 60),
+                        Duration::from_secs(60),
+                        Some(Duration::from_secs(60 * 60)),
                     )
                     .await;
 

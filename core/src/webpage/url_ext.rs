@@ -36,10 +36,33 @@ impl UrlExt for url::Url {
     }
 
     fn subdomain(&self) -> Option<&str> {
-        let host = self.host_str()?;
-        let suffix = std::str::from_utf8(LIST.domain(host.as_bytes())?.as_bytes()).ok()?;
-        let suffix = suffix.strip_prefix(".")?;
-        let subdomain = host.strip_suffix(suffix)?;
+        let domain = dbg!(self.root_domain()?);
+        let host = dbg!(self.host_str()?);
+
+        let mut subdomain = host.strip_suffix(domain)?;
+
+        if let Some(s) = subdomain.strip_suffix('.') {
+            subdomain = s;
+        }
+
         Some(subdomain)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use url::Url;
+
+    use super::*;
+
+    #[test]
+    fn domain_from_domain_url() {
+        let url: Url = Url::parse("http://example.com").unwrap();
+        assert_eq!(url.root_domain().unwrap(), "example.com");
+
+        let url: Url = Url::parse("http://test.example.com").unwrap();
+        assert_eq!(url.root_domain().unwrap(), "example.com");
+
+        assert_eq!(url.subdomain().unwrap(), "test");
     }
 }

@@ -1748,15 +1748,6 @@ mod tests {
     }
 
     #[test]
-    fn domain_from_domain_url() {
-        let url: Url = Url::parse("http://example.com").unwrap();
-        assert_eq!(url.root_domain().unwrap(), "example.com");
-
-        let url: Url = Url::parse("http://test.example.com").unwrap();
-        assert_eq!(url.root_domain().unwrap(), "example.com");
-    }
-
-    #[test]
     fn metadata_updated_time() {
         let html = r#"
     <html>

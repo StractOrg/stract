@@ -75,7 +75,7 @@ impl Message<WebGraphService> for SimilarSites {
 
         let urls = similar_sites
             .iter()
-            .map(|s| Url::parse(&("http://".to_string() + s.node.name.as_str())).unwrap())
+            .filter_map(|s| Url::parse(&("http://".to_string() + s.node.name.as_str())).ok())
             .collect_vec();
 
         let descriptions = server.searcher.get_homepage_descriptions(&urls).await;
@@ -83,9 +83,9 @@ impl Message<WebGraphService> for SimilarSites {
         let similar_sites = similar_sites
             .into_iter()
             .map(|site| {
-                let description = descriptions
-                    .get(&Url::parse(&("http://".to_string() + site.node.name.as_str())).unwrap())
-                    .cloned();
+                let description = Url::parse(&("http://".to_string() + site.node.name.as_str()))
+                    .ok()
+                    .and_then(|url| descriptions.get(&url).cloned());
 
                 ScoredSite {
                     site: site.node.name,
@@ -151,6 +151,8 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     info!("webgraph server is ready to accept requests on {}", addr);
 
     loop {
-        let _ = server.accept().await;
+        if let Err(e) = server.accept().await {
+            tracing::error!("{}", e);
+        }
     }
 }
