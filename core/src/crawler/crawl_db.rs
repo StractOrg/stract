@@ -22,20 +22,21 @@ use std::{
     num::NonZeroUsize,
     ops::Range,
     path::Path,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
-use dashmap::DashMap;
 use itertools::Itertools;
 use lru::LruCache;
 use rand::Rng;
+use rayon::prelude::IntoParallelRefIterator;
 use rayon::prelude::*;
 use rocksdb::BlockBasedOptions;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UrlStatus {
     Pending,
     Crawling,
@@ -171,7 +172,8 @@ impl AsId for Url {
 
 struct IdTable<T> {
     db: Mutex<MemmapDb<Id, T>>,
-    cache: Mutex<LruCache<Id, T>>,
+    value_cache: Mutex<LruCache<Id, T>>,
+    id_cache: Mutex<LruCache<T, Id>>,
 }
 
 impl<T> IdTable<T>
@@ -186,30 +188,34 @@ where
 
         Ok(Self {
             db,
-            cache: Mutex::new(LruCache::new(NonZeroUsize::new(500_000).unwrap())),
+            value_cache: Mutex::new(LruCache::new(NonZeroUsize::new(500_000).unwrap())),
+            id_cache: Mutex::new(LruCache::new(NonZeroUsize::new(500_000).unwrap())),
         })
     }
 
-    pub fn bulk_ids<'a>(&'a self, items: impl Iterator<Item = &'a T>) -> Result<Vec<Id>> {
-        let mut ids = Vec::new();
-
+    pub fn bulk_insert_ids(&self, items: &[(T, Id)]) -> Result<()> {
         let mut db = self.db.lock().unwrap();
-        for item in items {
-            let id = item.as_id();
 
-            if !db.contains(&id) {
-                db.put(&id, item)?;
+        let mut id_cache = self.id_cache.lock().unwrap();
+
+        for (item, id) in items {
+            if !db.contains(id) {
+                db.put(id, item)?;
             }
 
-            ids.push(id);
+            id_cache.put(item.clone(), *id);
         }
 
         db.commit()?;
 
-        Ok(ids)
+        Ok(())
     }
 
     pub fn id(&self, item: &T) -> Result<Id> {
+        if let Some(id) = self.id_cache.lock().unwrap().get(item) {
+            return Ok(*id);
+        }
+
         let id = item.as_id();
 
         let mut db = self.db.lock().unwrap();
@@ -223,7 +229,7 @@ where
     }
 
     pub fn value(&mut self, id: Id) -> Result<Option<T>> {
-        let mut cache = self.cache.lock().unwrap();
+        let mut cache = self.value_cache.lock().unwrap();
 
         // check cache
         if let Some(value) = cache.get(&id) {
@@ -293,6 +299,7 @@ fn weighted_sample<'a, T: 'a>(
     sampled_items.into_iter().map(|s| s.item).collect()
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct UrlState {
     weight: f64,
     status: UrlStatus,
@@ -302,7 +309,7 @@ struct DomainState {
     status: DomainStatus,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DomainId(u128);
 
 impl From<u128> for DomainId {
@@ -311,7 +318,7 @@ impl From<u128> for DomainId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 struct UrlId(u128);
 
 impl From<u128> for UrlId {
@@ -369,15 +376,101 @@ struct UrlToInsert {
     different_domain: bool,
 }
 
+struct UrlStateDb {
+    cache: LruCache<DomainId, Arc<Mutex<BTreeMap<UrlId, UrlState>>>>,
+    cache_size: usize,
+    db: rocksdb::DB,
+}
+
+impl UrlStateDb {
+    pub fn open<P: AsRef<Path>>(path: P, cache_size: usize) -> Result<Self> {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_ribbon_filter(10.0);
+        options.set_block_based_table_factory(&block_options);
+        options.set_optimize_filters_for_hits(true);
+        options.optimize_for_point_lookup(512 * 1024 * 1024); // 512 MB
+
+        let db = rocksdb::DB::open(&options, path.as_ref())?;
+
+        Ok(Self {
+            cache: LruCache::new(NonZeroUsize::new(cache_size + 1).unwrap()),
+            cache_size,
+            db,
+        })
+    }
+
+    pub fn get(&mut self, domain_id: DomainId) -> Result<Arc<Mutex<BTreeMap<UrlId, UrlState>>>> {
+        // check cache
+        if let Some(value) = self.cache.get(&domain_id) {
+            return Ok(value.clone());
+        }
+
+        // check db
+        let domain_id_bytes = bincode::serialize(&domain_id)?;
+        let value_bytes = self.db.get(domain_id_bytes)?;
+
+        if let Some(value_bytes) = &value_bytes {
+            let value: Arc<Mutex<BTreeMap<UrlId, UrlState>>> = bincode::deserialize(value_bytes)?;
+            self.cache.put(domain_id, value.clone());
+
+            self.maybe_prune_cache()?;
+
+            return Ok(value);
+        }
+
+        Ok(Arc::new(Mutex::new(BTreeMap::new())))
+    }
+
+    fn maybe_prune_cache(&mut self) -> Result<()> {
+        // if cache is full, write half of it to disk
+        if self.cache.len() >= self.cache_size {
+            let mut batch = rocksdb::WriteBatch::default();
+
+            for _ in 0..self.cache_size / 2 {
+                if let Some((key, value)) = self.cache.pop_lru() {
+                    let domain_id_bytes = bincode::serialize(&key)?;
+                    let value_bytes = bincode::serialize(&value)?;
+
+                    batch.put(domain_id_bytes, value_bytes);
+                } else {
+                    break;
+                }
+            }
+
+            let mut write_options = rocksdb::WriteOptions::default();
+            write_options.set_sync(false);
+            write_options.disable_wal(true);
+
+            self.db.write_opt(batch, &write_options)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn put(
+        &mut self,
+        domain_id: DomainId,
+        url_states: Arc<Mutex<BTreeMap<UrlId, UrlState>>>,
+    ) -> Result<()> {
+        self.cache.put(domain_id, url_states.clone());
+        self.maybe_prune_cache()?;
+
+        Ok(())
+    }
+}
+
 pub struct CrawlDb {
     url_ids: IdTable<Url>,
     domain_ids: IdTable<Domain>,
 
     redirects: RedirectDb,
 
-    domain_state: DashMap<DomainId, DomainState>,
+    domain_state: BTreeMap<DomainId, DomainState>,
 
-    urls: DashMap<DomainId, BTreeMap<UrlId, UrlState>>,
+    urls: UrlStateDb,
 }
 
 impl CrawlDb {
@@ -390,8 +483,8 @@ impl CrawlDb {
             url_ids,
             domain_ids,
             redirects,
-            domain_state: DashMap::new(),
-            urls: DashMap::new(),
+            domain_state: BTreeMap::new(),
+            urls: UrlStateDb::open(path.as_ref().join("urls").join("states"), 100_000)?,
         })
     }
 
@@ -407,13 +500,17 @@ impl CrawlDb {
                     status: DomainStatus::Pending,
                 });
 
-            self.urls.entry(domain_id).or_default().insert(
+            let urls = self.urls.get(domain_id)?;
+
+            urls.lock().unwrap().insert(
                 url_id,
                 UrlState {
                     weight: 0.0,
                     status: UrlStatus::Pending,
                 },
             );
+
+            self.urls.put(domain_id, urls)?;
         }
 
         Ok(())
@@ -434,31 +531,41 @@ impl CrawlDb {
             }
         });
 
-        let domain_ids: Vec<DomainId> = self
-            .domain_ids
-            .bulk_ids(domains.keys())?
-            .into_iter()
-            .map(DomainId::from)
+        let domain_ids: Vec<_> = domains
+            .par_iter()
+            .map(|(domain, _)| (domain.clone(), domain.as_id()))
             .collect();
+        self.domain_ids.bulk_insert_ids(&domain_ids)?;
 
-        self.url_ids
-            .bulk_ids(domains.values().flatten().map(|u| &u.url))?;
+        let url_ids: Vec<_> = domains
+            .par_iter()
+            .flat_map(|(_, urls)| {
+                urls.iter()
+                    .map(|url| (url.url.clone(), url.url.as_id()))
+                    .collect_vec()
+            })
+            .collect();
+        self.url_ids.bulk_insert_ids(&url_ids)?;
 
-        domain_ids
+        for (domain_id, urls) in domain_ids
             .into_iter()
+            .map(|(_, id)| id)
             .zip_eq(domains.values())
-            .par_bridge()
-            .for_each(|(domain_id, urls)| {
-                let mut domain_state =
-                    self.domain_state
-                        .entry(domain_id)
-                        .or_insert_with(|| DomainState {
-                            weight: 0.0,
-                            status: DomainStatus::Pending,
-                        });
+        {
+            let domain_id = domain_id.into();
 
-                let mut url_states = self.urls.entry(domain_id).or_default();
+            let domain_state = self
+                .domain_state
+                .entry(domain_id)
+                .or_insert_with(|| DomainState {
+                    weight: 0.0,
+                    status: DomainStatus::Pending,
+                });
 
+            let url_states = self.urls.get(domain_id)?;
+
+            {
+                let mut url_states = url_states.lock().unwrap();
                 for url in urls {
                     let id = self.url_ids.id(&url.url);
 
@@ -483,7 +590,10 @@ impl CrawlDb {
                         domain_state.weight = url_state.weight;
                     }
                 }
-            });
+            }
+
+            self.urls.put(domain_id, url_states)?;
+        }
 
         Ok(())
     }
@@ -523,35 +633,47 @@ impl CrawlDb {
         }
 
         // bulk register urls
-        self.url_ids
-            .bulk_ids(url_responses.values().flatten().flat_map(|res| match res {
-                UrlResponse::Success { url } => vec![url].into_iter(),
-                UrlResponse::Failed {
-                    url,
-                    status_code: _,
-                } => vec![url].into_iter(),
-                UrlResponse::Redirected { url, new_url } => vec![url, new_url].into_iter(),
-            }))?;
+        let url_ids: Vec<_> = url_responses
+            .par_iter()
+            .flat_map(|(_, responses)| {
+                responses
+                    .iter()
+                    .flat_map(|res| match res {
+                        UrlResponse::Success { url } => vec![url],
+                        UrlResponse::Failed {
+                            url,
+                            status_code: _,
+                        } => vec![url],
+                        UrlResponse::Redirected { url, new_url } => vec![url, new_url],
+                    })
+                    .map(|url| (url.clone(), url.as_id()))
+                    .collect_vec()
+            })
+            .collect();
+
+        self.url_ids.bulk_insert_ids(&url_ids)?;
 
         // bulk register domains
-        self.domain_ids.bulk_ids(url_responses.keys())?;
+        let domain_ids: Vec<_> = url_responses
+            .par_iter()
+            .map(|(domain, _)| (domain.clone(), domain.as_id()))
+            .collect();
+        self.domain_ids.bulk_insert_ids(&domain_ids)?;
 
-        url_responses
-            .into_par_iter()
-            .filter_map(|(domain, responses)| {
-                let domain_id: DomainId = self.domain_ids.id(&domain).ok()?.into();
-                Some((domain_id, responses))
-            })
-            .for_each(|(domain_id, responses)| {
-                self.domain_state
-                    .entry(domain_id)
-                    .or_insert_with(|| DomainState {
-                        weight: 0.0,
-                        status: DomainStatus::Pending,
-                    });
+        for (domain_id, responses) in url_responses.into_iter().filter_map(|(domain, responses)| {
+            let domain_id: DomainId = self.domain_ids.id(&domain).ok()?.into();
+            Some((domain_id, responses))
+        }) {
+            self.domain_state
+                .entry(domain_id)
+                .or_insert_with(|| DomainState {
+                    weight: 0.0,
+                    status: DomainStatus::Pending,
+                });
 
-                let mut url_states = self.urls.entry(domain_id).or_default();
-
+            let url_states = self.urls.get(domain_id)?;
+            {
+                let mut url_states = url_states.lock().unwrap();
                 for response in responses {
                     match response {
                         UrlResponse::Success { url } => {
@@ -591,7 +713,10 @@ impl CrawlDb {
                         }
                     }
                 }
-            });
+            }
+
+            self.urls.put(domain_id, url_states)?;
+        }
 
         Ok(())
     }
@@ -599,7 +724,7 @@ impl CrawlDb {
     pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
         let domain_id: DomainId = self.domain_ids.id(domain)?.into();
 
-        let mut domain_state = self
+        let domain_state = self
             .domain_state
             .entry(domain_id)
             .or_insert_with(|| DomainState {
@@ -616,8 +741,7 @@ impl CrawlDb {
         let available_domains: Vec<_> = self
             .domain_state
             .iter()
-            .filter_map(|r| {
-                let (id, state) = r.pair();
+            .filter_map(|(id, state)| {
                 if state.status == DomainStatus::Pending {
                     Some((*id, state.weight))
                 } else {
@@ -635,7 +759,7 @@ impl CrawlDb {
         .collect();
 
         for id in &sampled {
-            let mut state = self.domain_state.get_mut(id).unwrap();
+            let state = self.domain_state.get_mut(id).unwrap();
             state.status = DomainStatus::CrawlInProgress;
         }
 
@@ -645,53 +769,59 @@ impl CrawlDb {
     pub fn prepare_jobs(&mut self, domains: &[DomainId], urls_per_job: usize) -> Result<Vec<Job>> {
         let mut jobs = Vec::with_capacity(domains.len());
         for domain_id in domains {
-            let mut urls = self.urls.entry(*domain_id).or_default();
+            let urls = self.urls.get(*domain_id)?;
 
-            let sampled: Vec<_> = weighted_sample(
-                urls.iter_mut().filter_map(|(id, state)| {
-                    if state.status == UrlStatus::Pending {
-                        Some((id, state.weight))
-                    } else {
-                        None
-                    }
-                }),
-                urls_per_job,
-            )
-            .into_iter()
-            .copied()
-            .collect();
+            {
+                let mut urls = urls.lock().unwrap();
 
-            for id in &sampled {
-                let state = urls.get_mut(id).unwrap();
-                state.status = UrlStatus::Crawling;
+                let sampled: Vec<_> = weighted_sample(
+                    urls.iter().filter_map(|(id, state)| {
+                        if state.status == UrlStatus::Pending {
+                            Some((id, state.weight))
+                        } else {
+                            None
+                        }
+                    }),
+                    urls_per_job,
+                )
+                .into_iter()
+                .copied()
+                .collect();
+
+                for id in &sampled {
+                    let state = urls.get_mut(id).unwrap();
+                    state.status = UrlStatus::Crawling;
+                }
+
+                let domain_state = self.domain_state.get_mut(domain_id).unwrap();
+
+                domain_state.weight = urls
+                    .iter()
+                    .filter_map(|(_, state)| {
+                        if state.status == UrlStatus::Pending {
+                            Some(state.weight)
+                        } else {
+                            None
+                        }
+                    })
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                    .unwrap_or(0.0);
+
+                let mut job = Job {
+                    domain: self.domain_ids.value(domain_id.0)?.unwrap(),
+                    fetch_sitemap: false, // todo: fetch for new sites
+                    urls: VecDeque::with_capacity(urls_per_job),
+                };
+
+                for url_id in sampled {
+                    let url = self.url_ids.value(url_id.0)?.unwrap();
+                    job.urls.push_back(url);
+                }
+
+                jobs.push(job);
             }
 
-            let mut domain_state = self.domain_state.get_mut(domain_id).unwrap();
-
-            domain_state.weight = urls
-                .iter()
-                .filter_map(|(_, state)| {
-                    if state.status == UrlStatus::Pending {
-                        Some(state.weight)
-                    } else {
-                        None
-                    }
-                })
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap_or(0.0);
-
-            let mut job = Job {
-                domain: self.domain_ids.value(domain_id.0)?.unwrap(),
-                fetch_sitemap: false, // todo: fetch for new sites
-                urls: VecDeque::with_capacity(urls_per_job),
-            };
-
-            for url_id in sampled {
-                let url = self.url_ids.value(url_id.0)?.unwrap();
-                job.urls.push_back(url);
-            }
-
-            jobs.push(job);
+            self.urls.put(*domain_id, urls)?;
         }
 
         Ok(jobs)

@@ -190,10 +190,6 @@ impl<K: Key> IntSet<K> {
         self.map.insert(item, ());
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = K> {
-        self.map.into_iter().map(|(key, _)| key)
-    }
-
     pub fn contains(&self, item: &K) -> bool {
         self.map.contains_key(item)
     }
