@@ -255,6 +255,9 @@ pub struct SearchServerConfig {
 
     #[serde(default)]
     pub snippet: SnippetConfig,
+
+    #[serde(default = "defaults::SearchServer::build_spell_dictionary")]
+    pub build_spell_dictionary: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

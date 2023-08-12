@@ -43,7 +43,7 @@ use super::{InitialWebsiteResult, SearchQuery};
 
 pub struct LocalSearcher {
     index: Index,
-    spell: Spell,
+    spell: Option<Spell>,
     entity_index: Option<EntityIndex>,
     centrality_store: Option<SearchCentralityStore>,
     linear_regression: Option<Arc<LinearRegression>>,
@@ -65,20 +65,22 @@ struct InvertedIndexResult {
 
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
-        let spell = Spell::for_index(&index);
-
         let mut index = index;
         index.optimize_for_search().unwrap();
 
         LocalSearcher {
             index,
-            spell,
+            spell: None,
             entity_index: None,
             centrality_store: None,
             linear_regression: None,
             lambda_model: None,
             collector_config: CollectorConfig::default(),
         }
+    }
+
+    pub fn build_spell_dict(&mut self) {
+        self.spell = Some(Spell::for_index(&self.index));
     }
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
@@ -281,7 +283,7 @@ impl LocalSearcher {
     ) -> Result<InitialWebsiteResult> {
         let ctx = self.index.inverted_index.local_search_ctx();
         let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
-        let correction = self.spell.correction(query);
+        let correction = self.spell.as_ref().and_then(|s| s.correction(query));
         let sidebar = self
             .entity_sidebar(query)
             .map(|entity| DisplayedEntity::from(entity, self));
@@ -504,12 +506,15 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::new(index);
+        let mut searcher = LocalSearcher::new(index);
+        searcher.build_spell_dict();
 
         assert_eq!(
             String::from(
                 searcher
                     .spell
+                    .as_ref()
+                    .unwrap()
                     .correction(&SearchQuery {
                         query: "th best".to_string(),
                         ..Default::default()
@@ -519,7 +524,7 @@ mod tests {
             "the best".to_string()
         );
         assert_eq!(
-            searcher.spell.correction(&SearchQuery {
+            searcher.spell.as_ref().unwrap().correction(&SearchQuery {
                 query: "the best".to_string(),
                 ..Default::default()
             }),

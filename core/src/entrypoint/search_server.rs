@@ -83,6 +83,10 @@ impl SearchService {
             local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
         }
 
+        if config.build_spell_dictionary {
+            local_searcher.build_spell_dict();
+        }
+
         local_searcher.set_collector_config(config.collector);
         local_searcher.set_snippet_config(config.snippet);
 

@@ -105,3 +105,11 @@ impl WebgraphServer {
         1_000
     }
 }
+
+pub struct SearchServer;
+
+impl SearchServer {
+    pub fn build_spell_dictionary() -> bool {
+        false
+    }
+}
