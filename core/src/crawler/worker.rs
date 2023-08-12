@@ -65,10 +65,21 @@ impl WorkerThread {
             return Err(Error::InvalidPolitenessFactor.into());
         }
 
+        let mut headers = reqwest::header::HeaderMap::default();
+        headers.insert(
+            reqwest::header::ACCEPT,
+            reqwest::header::HeaderValue::from_static("text/html"),
+        );
+        headers.insert(
+            reqwest::header::ACCEPT_LANGUAGE,
+            reqwest::header::HeaderValue::from_static("en-US,en;q=0.9,*;q=0.8"),
+        );
+
         let client = reqwest::Client::builder()
             .timeout(timeout)
             .connect_timeout(timeout)
             .http2_keep_alive_interval(None)
+            .default_headers(headers)
             .user_agent(&config.user_agent.full)
             .build()?;
 
@@ -248,71 +259,74 @@ impl WorkerThread {
         match fetch {
             Ok(datum) => {
                 if matches!(datum.status_code, 200 | 301 | 302) {
-                    self.save_datum(datum.clone()).await;
+                    if datum.status_code == 200 {
+                        self.save_datum(datum.clone()).await;
 
-                    match Html::parse(&datum.body, datum.url.as_str()) {
-                        Ok(html) => {
-                            let new_urls = html
-                                .all_links()
-                                .into_iter()
-                                .map(|link| link.destination)
-                                .filter(|url| {
-                                    !url.path().ends_with(".pdf")
-                                        && !url.path().ends_with(".jpg")
-                                        && !url.path().ends_with(".zip")
-                                        && !url.path().ends_with(".png")
-                                        && !url.path().ends_with(".css")
-                                        && !url.path().ends_with(".js")
-                                        && !url.path().ends_with(".json")
-                                        && !url.path().ends_with(".jsonp")
-                                        && !url.path().ends_with(".woff2")
-                                        && !url.path().ends_with(".woff")
-                                        && !url.path().ends_with(".ttf")
-                                        && !url.path().ends_with(".svg")
-                                        && !url.path().ends_with(".gif")
-                                        && !url.path().ends_with(".jpeg")
-                                        && !url.path().ends_with(".ico")
-                                        && !url.path().ends_with(".mp4")
-                                        && !url.path().ends_with(".mp3")
-                                        && !url.path().ends_with(".avi")
-                                        && !url.path().ends_with(".mov")
-                                        && !url.path().ends_with(".mpeg")
-                                        && !url.path().ends_with(".webm")
-                                        && !url.path().ends_with(".wav")
-                                        && !url.path().ends_with(".flac")
-                                        && !url.path().ends_with(".aac")
-                                        && !url.path().ends_with(".ogg")
-                                        && !url.path().ends_with(".m4a")
-                                        && !url.path().ends_with(".m4v")
-                                })
-                                .collect();
+                        match Html::parse(&datum.body, datum.url.as_str()) {
+                            Ok(html) => {
+                                let new_urls = html
+                                    .all_links()
+                                    .into_iter()
+                                    .map(|link| link.destination)
+                                    .filter(|url| {
+                                        !url.path().ends_with(".pdf")
+                                            && !url.path().ends_with(".jpg")
+                                            && !url.path().ends_with(".zip")
+                                            && !url.path().ends_with(".png")
+                                            && !url.path().ends_with(".css")
+                                            && !url.path().ends_with(".js")
+                                            && !url.path().ends_with(".json")
+                                            && !url.path().ends_with(".jsonp")
+                                            && !url.path().ends_with(".woff2")
+                                            && !url.path().ends_with(".woff")
+                                            && !url.path().ends_with(".ttf")
+                                            && !url.path().ends_with(".svg")
+                                            && !url.path().ends_with(".gif")
+                                            && !url.path().ends_with(".jpeg")
+                                            && !url.path().ends_with(".ico")
+                                            && !url.path().ends_with(".mp4")
+                                            && !url.path().ends_with(".mp3")
+                                            && !url.path().ends_with(".avi")
+                                            && !url.path().ends_with(".mov")
+                                            && !url.path().ends_with(".mpeg")
+                                            && !url.path().ends_with(".webm")
+                                            && !url.path().ends_with(".wav")
+                                            && !url.path().ends_with(".flac")
+                                            && !url.path().ends_with(".aac")
+                                            && !url.path().ends_with(".ogg")
+                                            && !url.path().ends_with(".m4a")
+                                            && !url.path().ends_with(".m4v")
+                                    })
+                                    .collect();
 
-                            let url_res = if datum.status_code == 301
-                                || datum.status_code == 302
-                                || url != datum.url
-                            {
-                                UrlResponse::Redirected {
-                                    url,
-                                    new_url: datum.url,
+                                let url_res = UrlResponse::Success { url: datum.url };
+
+                                ProcessedUrl {
+                                    new_urls,
+                                    response: url_res,
+                                    fetch_time: Duration::from_millis(datum.fetch_time_ms),
                                 }
-                            } else {
-                                UrlResponse::Success { url: datum.url }
-                            };
-
-                            ProcessedUrl {
-                                new_urls,
-                                response: url_res,
-                                fetch_time: Duration::from_millis(datum.fetch_time_ms),
                             }
-                        }
-                        Err(_) => ProcessedUrl {
-                            new_urls: Vec::new(),
-                            response: UrlResponse::Failed {
-                                url,
-                                status_code: None,
+                            Err(_) => ProcessedUrl {
+                                new_urls: Vec::new(),
+                                response: UrlResponse::Failed {
+                                    url,
+                                    status_code: None,
+                                },
+                                fetch_time: Duration::from_millis(datum.fetch_time_ms),
                             },
+                        }
+                    } else {
+                        let url_res = UrlResponse::Redirected {
+                            url,
+                            new_url: datum.url,
+                        };
+
+                        ProcessedUrl {
+                            new_urls: Vec::new(),
+                            response: url_res,
                             fetch_time: Duration::from_millis(datum.fetch_time_ms),
-                        },
+                        }
                     }
                 } else {
                     if datum.status_code == 429 {
@@ -356,6 +370,10 @@ impl WorkerThread {
     }
 
     async fn save_datum(&self, datum: CrawlDatum) {
+        if datum.status_code != 200 {
+            return;
+        }
+
         self.writer.write(datum).await.ok();
     }
 
@@ -410,6 +428,27 @@ impl WorkerThread {
         }
 
         let status_code = res.status().as_u16();
+
+        if status_code == 301 || status_code == 302 {
+            let location = res
+                .headers()
+                .get("location")
+                .ok_or(Error::InvalidRedirect)?;
+
+            let location = location.to_str().map_err(|_| Error::InvalidRedirect)?;
+
+            let url = Url::parse(location)
+                .or_else(|_| url.join(location))
+                .map_err(|_| Error::InvalidRedirect)?;
+
+            return Ok(CrawlDatum {
+                url,
+                status_code,
+                headers,
+                body: String::new(),
+                fetch_time_ms: fetch_time.as_millis() as u64,
+            });
+        }
 
         let res_url = res.url().clone();
         let body = res.text().await?;

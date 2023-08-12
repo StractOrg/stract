@@ -80,7 +80,7 @@ impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
             .aggregator
             .compute_signals(doc)
             .flatten()
-            .map(|computed| computed.coefficient * computed.value)
+            .map(|computed| computed.score.coefficient * computed.score.value)
             .sum();
 
         if let Some(boost) = self.aggregator.boosts(doc) {

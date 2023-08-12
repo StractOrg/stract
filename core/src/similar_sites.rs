@@ -81,7 +81,7 @@ impl SimilarSitesFinder {
             .map(|node| node.id())
             .collect();
 
-        let scorer = self.inbound_similarity.scorer(&nodes, &[]);
+        let scorer = self.inbound_similarity.scorer(&nodes, &[], true);
 
         let mut backlinks: IntMap<NodeID, f64> = IntMap::new();
 

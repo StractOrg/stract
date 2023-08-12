@@ -49,6 +49,16 @@ enum NodeOrLeaf {
     Leaf(usize),
 }
 
+pub trait AsValue {
+    fn as_value(&self) -> f64;
+}
+
+impl AsValue for f64 {
+    fn as_value(&self) -> f64 {
+        *self
+    }
+}
+
 #[derive(Debug)]
 struct Node {
     threshold: f64,
@@ -59,9 +69,9 @@ struct Node {
 }
 
 impl Node {
-    fn next(&self, features: &EnumMap<Signal, f64>) -> Option<&NodeOrLeaf> {
+    fn next<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> Option<&NodeOrLeaf> {
         self.feature.and_then(|feature| {
-            let value = features.get(feature).copied().unwrap_or(0.0);
+            let value = features.get(feature).map(|v| v.as_value()).unwrap_or(0.0);
             if value <= self.threshold {
                 self.left.as_ref()
             } else {
@@ -205,7 +215,7 @@ impl Tree {
         Ok(Self { nodes })
     }
 
-    fn predict(&self, features: &EnumMap<Signal, f64>) -> Result<f64> {
+    fn predict<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> Result<f64> {
         let mut node = &self.nodes[0];
         while let Some(next) = node.next(features) {
             node = match next {
@@ -255,7 +265,7 @@ impl LambdaMART {
         Ok(Self { tree })
     }
 
-    pub fn predict(&self, features: &EnumMap<Signal, f64>) -> f64 {
+    pub fn predict<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> f64 {
         self.tree.predict(features).unwrap()
     }
 }

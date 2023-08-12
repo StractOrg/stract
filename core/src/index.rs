@@ -336,6 +336,6 @@ mod tests {
                 .unwrap()
                 .get(&crate::ranking::Signal::Bm25)
                 .unwrap())
-            .all(|&v| v > 0.0));
+            .all(|&v| v.value > 0.0));
     }
 }

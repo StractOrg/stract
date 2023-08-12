@@ -26,6 +26,9 @@ use std::time::Duration;
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+#[cfg(test)]
+use proptest_derive::Arbitrary;
+
 use tracing::{debug, trace};
 
 pub struct WarcFile {
@@ -205,6 +208,7 @@ struct RawWarcRecord {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct WarcRecord {
     pub request: Request,
     pub response: Response,
@@ -212,6 +216,7 @@ pub struct WarcRecord {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct Request {
     // WARC-Target-URI
     pub url: String,
@@ -230,6 +235,7 @@ impl Request {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct Response {
     pub body: String,
     pub payload_type: Option<String>,
@@ -251,6 +257,7 @@ impl Response {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct Metadata {
     // fetchTimeMs
     pub fetch_time_ms: usize,
@@ -308,14 +315,23 @@ impl<R: Read> RecordIterator<R> {
                 return Some(Err(io.into()));
             }
 
-            rtrim(&mut line_buf);
-
             if &line_buf == "\r\n" || line_buf.is_empty() {
                 // end of header
                 break;
             }
             if let Some(semi) = line_buf.find(':') {
-                let value = line_buf.split_off(semi + 1).trim().to_string();
+                let mut value = line_buf.split_off(semi + 1).to_string();
+
+                if let Some(stripped) = value.strip_suffix("\r\n") {
+                    value = stripped.to_string();
+                } else if let Some(stripped) = value.strip_suffix('\n') {
+                    value = stripped.to_string();
+                }
+
+                if let Some(stripped) = value.strip_prefix(' ') {
+                    value = stripped.to_string();
+                }
+
                 line_buf.pop(); // remove colon
                 let key = line_buf;
 
@@ -370,15 +386,9 @@ impl<R: Read> Iterator for RecordIterator<R> {
         }
         self.num_reads += 1;
 
-        let items = [self.next_raw(), self.next_raw(), self.next_raw()];
-
-        let mut response = None;
         let mut request = None;
-        let mut metadata = None;
 
-        for item in items {
-            let item = item?;
-
+        while let Some(item) = self.next_raw() {
             if item.is_err() {
                 return Some(Err(item.err().unwrap()));
             }
@@ -386,27 +396,69 @@ impl<R: Read> Iterator for RecordIterator<R> {
             let item = item.unwrap();
 
             if let Some(warc_type) = item.header.get("WARC-TYPE") {
-                match warc_type.as_str() {
-                    "request" => request = Some(Request::from_raw(item)),
-                    "response" => response = Some(Response::from_raw(item)),
-                    "metadata" => metadata = Some(Metadata::from_raw(item)),
-                    _ => {
-                        return Some(Err(Error::WarcParse("Unsupported WARC type").into()));
-                    }
+                if warc_type.as_str() == "request" {
+                    request = Some(Request::from_raw(item));
+                    break;
                 }
             }
         }
 
-        if request.is_none() || response.is_none() || metadata.is_none() {
-            return Some(Err(Error::WarcParse(
-                "Request, response or metadata not found",
-            )
-            .into()));
+        let request = request?;
+
+        // next 2 should be response and metadata
+        let response = self.next_raw()?;
+
+        if response.is_err() {
+            return Some(Err(response.err().unwrap()));
         }
 
-        let request = request.unwrap();
         let response = response.unwrap();
+
+        match response.header.get("WARC-TYPE") {
+            Some(warc_type) => {
+                if warc_type.as_str() != "response" {
+                    return Some(Err(Error::WarcParse(
+                        "Expected response, got something else",
+                    )
+                    .into()));
+                }
+            }
+            None => {
+                return Some(Err(Error::WarcParse(
+                    "Expected response, got something else",
+                )
+                .into()));
+            }
+        }
+
+        let response = Response::from_raw(response);
+
+        let metadata = self.next_raw()?;
+
+        if metadata.is_err() {
+            return Some(Err(metadata.err().unwrap()));
+        }
+
         let metadata = metadata.unwrap();
+
+        match metadata.header.get("WARC-TYPE") {
+            Some(warc_type) => {
+                if warc_type.as_str() != "metadata" {
+                    return Some(Err(Error::WarcParse(
+                        "Expected metadata, got something else",
+                    )
+                    .into()));
+                }
+            }
+            None => {
+                return Some(Err(Error::WarcParse(
+                    "Expected metadata, got something else",
+                )
+                .into()));
+            }
+        }
+
+        let metadata = Metadata::from_raw(metadata);
 
         if request.is_err() || response.is_err() || metadata.is_err() {
             return Some(Err(Error::WarcParse(
@@ -534,6 +586,7 @@ mod tests {
     use super::*;
     use flate2::write::GzEncoder;
     use flate2::Compression;
+    use proptest::prelude::*;
     use std::io::Write;
 
     #[test]
@@ -688,5 +741,23 @@ mod tests {
         assert_eq!(&records[0].request.url, "https://a.com");
         assert_eq!(&records[0].response.body, body);
         assert_eq!(records[0].metadata.fetch_time_ms, 0);
+    }
+
+    proptest! {
+        #[test]
+        fn write_read_invariant_prop(records: Vec<WarcRecord>) {
+            let mut writer = WarcWriter::new();
+            for record in records.iter() {
+                writer.write(record).unwrap();
+            }
+            let compressed = writer.finish().unwrap();
+
+            let read_records: Vec<WarcRecord> = WarcFile::new(compressed)
+                .records()
+                .map(|res| res.unwrap())
+                .collect();
+
+            prop_assert_eq!(records, read_records);
+        }
     }
 }

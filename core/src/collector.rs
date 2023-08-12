@@ -283,24 +283,15 @@ impl<T: Doc> BucketCollector<T> {
 
         Self {
             top_n,
+            documents: MinMaxHeap::with_capacity(config.max_docs_considered + 1),
             count: BucketCount::new(config),
-            documents: MinMaxHeap::with_capacity(top_n + 1),
         }
     }
 
     pub fn insert(&mut self, doc: T) {
         let mut scored_doc: ScoredDoc<T> = doc.into();
         self.count.adjust_score(&mut scored_doc);
-
-        if self.documents.len() > self.top_n {
-            let mut min_scored_doc = self.documents.peek_min_mut().unwrap();
-
-            if scored_doc.adjusted_score > min_scored_doc.adjusted_score {
-                *min_scored_doc = scored_doc;
-            }
-        } else {
-            self.documents.push(scored_doc);
-        }
+        self.documents.push(scored_doc);
     }
 
     fn update_best_doc(&mut self) {

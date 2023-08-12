@@ -72,6 +72,10 @@ where
         self.inner.iter_mut().filter_map(|value| value.as_mut())
     }
 
+    pub fn values(&self) -> impl Iterator<Item = &V> {
+        self.inner.iter().filter_map(|value| value.as_ref())
+    }
+
     pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
         let key = key.into();
         if key >= self.inner.len() {

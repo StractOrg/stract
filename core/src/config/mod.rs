@@ -153,6 +153,9 @@ pub struct CollectorConfig {
 
     #[serde(default = "defaults::Collector::url_penalty")]
     pub url_penalty: f64,
+
+    #[serde(default = "defaults::Collector::max_docs_considered")]
+    pub max_docs_considered: usize,
 }
 
 impl Default for CollectorConfig {
@@ -161,6 +164,7 @@ impl Default for CollectorConfig {
             site_penalty: defaults::Collector::site_penalty(),
             title_penalty: defaults::Collector::title_penalty(),
             url_penalty: defaults::Collector::url_penalty(),
+            max_docs_considered: defaults::Collector::max_docs_considered(),
         }
     }
 }

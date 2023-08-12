@@ -152,7 +152,7 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
 
     loop {
         if let Err(e) = server.accept().await {
-            tracing::error!("{}", e);
+            tracing::error!("{:?}", e);
         }
     }
 }

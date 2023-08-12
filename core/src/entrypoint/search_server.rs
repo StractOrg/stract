@@ -182,7 +182,7 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
 
     loop {
         if let Err(e) = server.accept().await {
-            tracing::error!("{}", e);
+            tracing::error!("{:?}", e);
         }
     }
 }

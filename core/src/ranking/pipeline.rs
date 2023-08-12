@@ -28,8 +28,11 @@ use crate::{
 };
 
 use super::{
-    models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
-    Signal, SignalAggregator, SignalCoefficient,
+    models::{
+        cross_encoder::CrossEncoder,
+        lambdamart::{self, LambdaMART},
+    },
+    Signal, SignalAggregator, SignalCoefficient, SignalScore,
 };
 
 pub trait AsRankingWebsite: Clone {
@@ -64,10 +67,16 @@ impl AsRankingWebsite for RankingWebsite {
     }
 }
 
+impl lambdamart::AsValue for SignalScore {
+    fn as_value(&self) -> f64 {
+        self.value
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RankingWebsite {
     pub pointer: WebsitePointer,
-    pub signals: EnumMap<Signal, f64>,
+    pub signals: EnumMap<Signal, SignalScore>,
     pub title: Option<String>,
     pub clean_body: Option<String>,
     pub optic_boost: Option<f64>,
@@ -85,14 +94,10 @@ impl RankingWebsite {
             pointer: pointer.clone(),
         };
 
-        let mut total = 0.0;
         for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
             res.signals
-                .insert(computed_signal.signal, computed_signal.value);
-            total += computed_signal.value * computed_signal.coefficient;
+                .insert(computed_signal.signal, computed_signal.score);
         }
-
-        res.signals.insert(Signal::LinearRegression, total);
 
         if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
             res.optic_boost = Some(boost);
@@ -140,8 +145,21 @@ impl<M: CrossEncoder> ReRanker<M> {
 
         for (website, score) in websites.iter_mut().zip(scores) {
             let website = website.as_mut_ranking();
-            website.signals.insert(Signal::CrossEncoder, score);
+            website.signals.insert(
+                Signal::CrossEncoder,
+                SignalScore {
+                    coefficient: self.crossencoder_coeff(),
+                    value: score,
+                },
+            );
         }
+    }
+
+    fn crossencoder_coeff(&self) -> f64 {
+        self.signal_coefficients
+            .as_ref()
+            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoder))
+            .unwrap_or(Signal::CrossEncoder.default_coefficient())
     }
 }
 
@@ -151,22 +169,11 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
 
         for website in websites.iter_mut() {
             let website = website.as_mut_ranking();
-            let score = calculate_score(
+            website.score = calculate_score(
                 &self.lambda_mart,
                 &self.signal_coefficients,
                 &website.signals,
             );
-
-            if let Some(coeffs) = &self.signal_coefficients {
-                if let Some(coeff) = coeffs.get(&Signal::CrossEncoder) {
-                    website.score =
-                        score + coeff * website.signals.get(Signal::CrossEncoder).unwrap();
-                } else {
-                    website.score = score;
-                }
-            } else {
-                website.score = score;
-            }
         }
     }
 
@@ -180,7 +187,7 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
 fn calculate_score(
     model: &Option<Arc<LambdaMART>>,
     signal_coefficients: &Option<SignalCoefficient>,
-    signals: &EnumMap<Signal, f64>,
+    signals: &EnumMap<Signal, SignalScore>,
 ) -> f64 {
     let lambda_score = match model {
         Some(model) => match signal_coefficients {
@@ -188,9 +195,9 @@ fn calculate_score(
                 Some(coeff) => {
                     if coeff == 0.0 {
                         signals
-                            .get(Signal::LinearRegression)
-                            .copied()
-                            .unwrap_or(0.0)
+                            .values()
+                            .map(|score| score.coefficient * score.value)
+                            .sum()
                     } else {
                         coeff * model.predict(signals)
                     }
@@ -200,9 +207,9 @@ fn calculate_score(
             None => Signal::LambdaMART.default_coefficient() * model.predict(signals),
         },
         None => signals
-            .get(Signal::LinearRegression)
-            .copied()
-            .unwrap_or(0.0),
+            .values()
+            .map(|score| score.coefficient * score.value)
+            .sum(),
     };
 
     lambda_score
@@ -388,7 +395,13 @@ mod tests {
         (0..n)
             .map(|i| -> RankingWebsite {
                 let mut signals = EnumMap::new();
-                signals.insert(Signal::LinearRegression, 1.0 / i as f64);
+                signals.insert(
+                    Signal::Bm25,
+                    SignalScore {
+                        coefficient: 1.0,
+                        value: 1.0 / i as f64,
+                    },
+                );
                 RankingWebsite {
                     pointer: WebsitePointer {
                         score: Score { total: 0.0 },

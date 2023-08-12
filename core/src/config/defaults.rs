@@ -18,15 +18,19 @@ pub struct Collector;
 
 impl Collector {
     pub fn site_penalty() -> f64 {
-        0.3
+        0.1
     }
 
     pub fn title_penalty() -> f64 {
-        2.0
+        1.0
     }
 
     pub fn url_penalty() -> f64 {
         20.0
+    }
+
+    pub fn max_docs_considered() -> usize {
+        250_000
     }
 }
 

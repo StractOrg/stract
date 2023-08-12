@@ -302,10 +302,9 @@ impl FrontendSearcher {
             let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
 
             for signal in ALL_SIGNALS {
-                signals.insert(
-                    signal,
-                    pointer.website.signals.get(signal).copied().unwrap_or(0.0),
-                );
+                if let Some(signal_value) = pointer.website.signals.get(signal) {
+                    signals.insert(signal, *signal_value);
+                }
             }
 
             website.ranking_signals = Some(signals);

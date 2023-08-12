@@ -647,6 +647,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "proximity signals are currently disabled"]
     fn term_proximity_ranking() {
         let mut index = Index::temporary().expect("Unable to open index");
         let mut w = Webpage {

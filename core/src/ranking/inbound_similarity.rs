@@ -41,6 +41,7 @@ pub struct Scorer {
     disliked: Vec<NodeScorer>,
     vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
     cache: DashMap<NodeID, f64>,
+    normalized: bool,
 }
 
 #[derive(Debug)]
@@ -74,22 +75,29 @@ impl NodeScorer {
 
 impl Scorer {
     fn calculate_score(&self, node: &NodeID) -> f64 {
-        match self.vectors.get(node) {
-            Some(vec) => ((self.disliked.len() as f64)
-                + (self
-                    .liked
-                    .iter()
-                    .map(|liked| liked.sim(node, vec))
-                    .sum::<f64>()
-                    - self
-                        .disliked
+        let s = match self.vectors.get(node) {
+            Some(vec) => {
+                (self.disliked.len() as f64)
+                    + (self
+                        .liked
                         .iter()
-                        .map(|disliked| disliked.sim(node, vec))
-                        .sum::<f64>())
-                    / self.liked.len().max(1) as f64)
-                .max(0.0),
+                        .map(|liked| liked.sim(node, vec))
+                        .sum::<f64>()
+                        - self
+                            .disliked
+                            .iter()
+                            .map(|disliked| disliked.sim(node, vec))
+                            .sum::<f64>())
+            }
             None => 0.0,
+        };
+
+        if self.normalized {
+            s / self.liked.len().max(1) as f64
+        } else {
+            s
         }
+        .max(0.0)
     }
     pub fn score(&self, node: &NodeID) -> f64 {
         if let Some(cached) = self.cache.get(node) {
@@ -199,7 +207,12 @@ impl InboundSimilarity {
         }
     }
 
-    pub fn scorer(&self, liked_sites: &[NodeID], disliked_sites: &[NodeID]) -> Scorer {
+    pub fn scorer(
+        &self,
+        liked_sites: &[NodeID],
+        disliked_sites: &[NodeID],
+        normalized: bool,
+    ) -> Scorer {
         let liked: Vec<_> = liked_sites
             .iter()
             .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
@@ -217,6 +230,7 @@ impl InboundSimilarity {
             disliked,
             vectors: self.vectors.clone(),
             cache: DashMap::new(),
+            normalized,
         }
     }
 
@@ -297,7 +311,7 @@ mod tests {
         let inbound =
             InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
 
-        let scorer = inbound.scorer(&[Node::from("b.com").id()], &[]);
+        let scorer = inbound.scorer(&[Node::from("b.com").id()], &[], false);
         let e = Node::from("e.com").id();
         let d = Node::from("d.com").id();
 

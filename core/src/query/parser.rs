@@ -339,6 +339,8 @@ fn parse_term(term: &str) -> Box<Term> {
 
 #[allow(clippy::vec_box)]
 pub fn parse(query: &str) -> Vec<Box<Term>> {
+    let query = query.to_lowercase();
+
     let mut res = Vec::new();
 
     let mut cur_term_begin = 0;

@@ -98,7 +98,7 @@ mod tests {
                 .unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 50,
+                fetch_time_ms: 500,
                 pre_computed_score: 0.0,
                 page_centrality: 0.0,
 
@@ -127,7 +127,7 @@ mod tests {
                 .unwrap(),
                 backlinks: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 49,
+                fetch_time_ms: 499,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
 
@@ -174,7 +174,7 @@ mod tests {
                 query: "test".to_string(),
                 site_rankings: Some(SiteRankings {
                     liked: vec!["www.first.com".to_string()],
-                    disliked: vec!["www.third.com".to_string()],
+                    disliked: vec![],
                     blocked: vec![],
                 }),
                 ..Default::default()

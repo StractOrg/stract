@@ -141,7 +141,7 @@ impl LocalSearcher {
         if query_centrality_coeff > 0.0 {
             if let Some(centrality_store) = self.centrality_store.as_ref() {
                 ranker = ranker
-                    .with_max_docs(10_000, self.index.num_segments())
+                    .with_max_docs(1_000, self.index.num_segments())
                     .with_num_results(100);
 
                 let top_host_nodes =
@@ -149,9 +149,10 @@ impl LocalSearcher {
                         .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
 
                 if !top_host_nodes.is_empty() {
-                    let inbound = centrality_store
-                        .inbound_similarity
-                        .scorer(&top_host_nodes, &[]);
+                    let inbound =
+                        centrality_store
+                            .inbound_similarity
+                            .scorer(&top_host_nodes, &[], false);
 
                     let query_centrality = query_centrality::Scorer::new(inbound);
 
@@ -161,7 +162,10 @@ impl LocalSearcher {
         }
 
         Ok(ranker
-            .with_max_docs(250_000, self.index.num_segments())
+            .with_max_docs(
+                self.collector_config.max_docs_considered,
+                self.index.num_segments(),
+            )
             .with_num_results(query.num_results())
             .with_offset(query.offset()))
     }
@@ -199,11 +203,15 @@ impl LocalSearcher {
                 .map(|node| node.id())
                 .collect();
 
-            aggregator.set_inbound_similarity(
-                store
-                    .inbound_similarity
-                    .scorer(&liked_sites, &disliked_sites),
-            )
+            let mut scorer = store
+                .inbound_similarity
+                .scorer(&liked_sites, &disliked_sites, false);
+
+            if liked_sites.len() + disliked_sites.len() > 1 {
+                scorer.set_self_score(0.0);
+            }
+
+            aggregator.set_inbound_similarity(scorer);
         }
 
         aggregator.set_region_count(self.index.region_count.clone());
@@ -357,7 +365,9 @@ impl LocalSearcher {
             let mut ranking_signals = HashMap::new();
 
             for signal in ALL_SIGNALS {
-                ranking_signals.insert(signal, *ranking.signals.get(signal).unwrap_or(&0.0));
+                if let Some(score) = ranking.signals.get(signal) {
+                    ranking_signals.insert(signal, *score);
+                }
             }
 
             webpage.ranking_signals = Some(ranking_signals);

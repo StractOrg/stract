@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{array, ops::Range, str::CharIndices};
+use std::{array, str::CharIndices};
 
 use logos::{Lexer, Logos};
 use tantivy::tokenizer::{
@@ -170,9 +170,7 @@ impl tantivy::tokenizer::Tokenizer for Normal {
 
 impl tantivy::tokenizer::Tokenizer for Stemmed {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let analyzer = TextAnalyzer::from(Simple)
-            .filter(LowerCaser)
-            .filter(StopWordFilter::remove(vec![]));
+        let analyzer = TextAnalyzer::from(Simple).filter(LowerCaser);
 
         let lang = match self.force_language {
             Some(lang) => Some(lang),
@@ -195,7 +193,7 @@ impl tantivy::tokenizer::Tokenizer for Identity {
 impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         let inner = Normal::default().token_stream(text);
-        let stream: NGramTokenStream<2> = NGramTokenStream::new(text, inner);
+        let stream: NGramTokenStream<2> = NGramTokenStream::new(inner);
         BoxTokenStream::from(stream)
     }
 }
@@ -203,7 +201,7 @@ impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
 impl tantivy::tokenizer::Tokenizer for TrigramTokenizer {
     fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
         let inner = Normal::default().token_stream(text);
-        let stream: NGramTokenStream<3> = NGramTokenStream::new(text, inner);
+        let stream: NGramTokenStream<3> = NGramTokenStream::new(inner);
         BoxTokenStream::from(stream)
     }
 }
@@ -306,41 +304,33 @@ impl<'a> tantivy::tokenizer::TokenStream for SimpleTokenStream<'a> {
     }
 }
 
-#[derive(Default)]
-struct TokenRef {
-    range: Range<usize>,
-    position: usize,
-}
-
-impl From<&tantivy::tokenizer::Token> for TokenRef {
-    fn from(token: &tantivy::tokenizer::Token) -> Self {
-        Self {
-            range: token.offset_from..token.offset_to,
-            position: token.position,
-        }
-    }
-}
-
 struct NGramTokenStream<'a, const N: usize> {
     inner: BoxTokenStream<'a>,
-    text: &'a str,
     token: tantivy::tokenizer::Token,
-    token_refs: [TokenRef; N],
+    token_window: [tantivy::tokenizer::Token; N],
     is_first: bool,
     next_pos: usize,
 }
 
 impl<'a, const N: usize> NGramTokenStream<'a, N> {
-    fn new(text: &'a str, inner: BoxTokenStream<'a>) -> Self {
+    fn new(inner: BoxTokenStream<'a>) -> Self {
         Self {
             inner,
-            text,
             token: tantivy::tokenizer::Token::default(),
-            token_refs: array::from_fn(|_| TokenRef::default()),
+            token_window: array::from_fn(|_| tantivy::tokenizer::Token::default()),
             is_first: true,
             next_pos: 0,
         }
     }
+}
+
+fn reuse_token_alloc(token: &mut tantivy::tokenizer::Token, new_token: &tantivy::tokenizer::Token) {
+    token.text.clear();
+    token.text += new_token.text.as_str();
+    token.offset_from = new_token.offset_from;
+    token.offset_to = new_token.offset_to;
+    token.position = new_token.position;
+    token.position_length = new_token.position_length;
 }
 
 impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 1> {
@@ -348,19 +338,15 @@ impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 1> {
         self.is_first = false;
         let res = self.inner.advance();
 
+        self.token_window[0].text.clear();
+
         if res {
-            self.token_refs[0].range = self.inner.token().offset_from..self.inner.token().offset_to;
-            self.token_refs[0].position = self.next_pos;
+            self.token_window[0].text += self.inner.token().text.as_str();
             self.next_pos += 1;
         }
 
-        self.token = tantivy::tokenizer::Token {
-            offset_from: self.token_refs[0].range.start,
-            offset_to: self.token_refs[0].range.end,
-            position: self.token_refs[0].position,
-            text: self.text[self.token_refs[0].range.clone()].to_string(),
-            position_length: 1,
-        };
+        reuse_token_alloc(&mut self.token, &self.token_window[0]);
+        self.token.position_length = 1;
 
         res
     }
@@ -380,29 +366,36 @@ impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 2> {
             if !self.inner.advance() {
                 return false;
             }
-
-            self.token_refs[0] = self.inner.token().into();
+            reuse_token_alloc(&mut self.token_window[0], self.inner.token());
 
             if !self.inner.advance() {
                 return false;
             }
-            self.token_refs[1] = self.inner.token().into();
+            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
         } else {
             if !self.inner.advance() {
                 return false;
             }
 
-            self.token_refs.rotate_left(1);
-            self.token_refs[1] = self.inner.token().into();
+            self.token_window.rotate_left(1);
+            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
         }
-        self.is_first = false;
 
+        self.is_first = false;
         self.next_pos += 1;
 
         self.token.position = self.next_pos;
-        self.token.text =
-            self.text[self.token_refs[0].range.start..self.token_refs[1].range.end].to_string();
+        self.token.offset_from = self.token_window[0].offset_from;
+        self.token.offset_to = self.token_window[1].offset_to;
         self.token.position_length = 2;
+
+        self.token.text.clear();
+        for token in &self.token_window {
+            self.token.text += token.text.as_str();
+            self.token.text += " ";
+        }
+        self.token.text.pop();
+
         true
     }
 
@@ -422,33 +415,41 @@ impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 3> {
                 return false;
             }
 
-            self.token_refs[0] = self.inner.token().into();
+            reuse_token_alloc(&mut self.token_window[0], self.inner.token());
 
             if !self.inner.advance() {
                 return false;
             }
-            self.token_refs[1] = self.inner.token().into();
+            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
 
             if !self.inner.advance() {
                 return false;
             }
-            self.token_refs[2] = self.inner.token().into();
+            reuse_token_alloc(&mut self.token_window[2], self.inner.token());
         } else {
             if !self.inner.advance() {
                 return false;
             }
 
-            self.token_refs.rotate_left(1);
-            self.token_refs[2] = self.inner.token().into();
+            self.token_window.rotate_left(1);
+            reuse_token_alloc(&mut self.token_window[2], self.inner.token());
         }
-        self.is_first = false;
 
+        self.is_first = false;
         self.next_pos += 1;
 
         self.token.position = self.next_pos;
-        self.token.text =
-            self.text[self.token_refs[0].range.start..self.token_refs[2].range.end].to_string();
+        self.token.offset_from = self.token_window[0].offset_from;
+        self.token.offset_to = self.token_window[2].offset_to;
         self.token.position_length = 3;
+
+        self.token.text.clear();
+        for token in &self.token_window {
+            self.token.text += token.text.as_str();
+            self.token.text += " ";
+        }
+        self.token.text.pop();
+
         true
     }
 
@@ -905,6 +906,11 @@ key1.key2="this\" is @ a # test""#;
                 "is a".to_string(),
                 "a test".to_string()
             ]
+        );
+
+        assert_eq!(
+            tokenize_bigram("this.is"),
+            vec!["this .".to_string(), ". is".to_string()]
         );
     }
 

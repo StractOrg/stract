@@ -36,8 +36,8 @@ impl UrlExt for url::Url {
     }
 
     fn subdomain(&self) -> Option<&str> {
-        let domain = dbg!(self.root_domain()?);
-        let host = dbg!(self.host_str()?);
+        let domain = self.root_domain()?;
+        let host = self.host_str()?;
 
         let mut subdomain = host.strip_suffix(domain)?;
 

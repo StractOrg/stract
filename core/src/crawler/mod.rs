@@ -48,6 +48,9 @@ pub enum Error {
 
     #[error("invalid politeness factor")]
     InvalidPolitenessFactor,
+
+    #[error("invalid redirect")]
+    InvalidRedirect,
 }
 
 type Result<T> = std::result::Result<T, anyhow::Error>;

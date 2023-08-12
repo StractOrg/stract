@@ -26,7 +26,7 @@ use url::Url;
 
 use crate::{
     inverted_index::RetrievedWebpage,
-    ranking::Signal,
+    ranking::{Signal, SignalScore},
     spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
 };
@@ -168,7 +168,7 @@ pub struct DisplayedWebpage {
     pub pretty_url: String,
     pub snippet: Snippet,
     pub body: String,
-    pub ranking_signals: Option<HashMap<Signal, f64>>,
+    pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
