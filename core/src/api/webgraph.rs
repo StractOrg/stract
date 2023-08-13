@@ -65,7 +65,7 @@ pub async fn similar_sites(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let mut conn = sonic::service::ResilientConnection::create_with_timeout(
+    let conn = sonic::service::ResilientConnection::create_with_timeout(
         host,
         Duration::from_secs(30),
         retry,
@@ -114,7 +114,7 @@ pub async fn knows_site(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let mut conn = sonic::service::ResilientConnection::create_with_timeout(
+    let conn = sonic::service::ResilientConnection::create_with_timeout(
         host,
         Duration::from_secs(30),
         retry,

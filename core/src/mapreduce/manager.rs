@@ -51,7 +51,7 @@ impl RemoteWorker {
         I: Map<W, O> + Send,
         O: Serialize + DeserializeOwned + Send,
     {
-        let mut conn = self.connect::<W, I, O>().await?;
+        let conn = self.connect::<W, I, O>().await?;
         match conn.send(&Task::Job(job)).await {
             Ok(Some(res)) => Ok(res),
             _ => Err(Error::NoResponse),
@@ -65,7 +65,7 @@ impl RemoteWorker {
         O: Serialize + DeserializeOwned + Send,
     {
         debug!("closing worker {:}", self.addr);
-        let mut conn = self.connect().await?;
+        let conn = self.connect().await?;
         let res = conn.send(&Task::<I>::AllFinished).await?;
 
         debug_assert!(res.is_none());

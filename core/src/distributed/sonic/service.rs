@@ -5,10 +5,10 @@ use tokio::net::ToSocketAddrs;
 use super::Result;
 
 #[async_trait::async_trait]
-pub trait Service: Sized {
-    type Request: serde::de::DeserializeOwned;
-    type RequestRef<'a>: serde::Serialize;
-    type Response: serde::Serialize + serde::de::DeserializeOwned;
+pub trait Service: Sized + Send + Sync {
+    type Request: serde::de::DeserializeOwned + Send + Sync;
+    type RequestRef<'a>: serde::Serialize + Send + Sync;
+    type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
 
     async fn handle(req: Self::Request, server: &mut Self) -> Result<Self::Response>;
 }
@@ -63,10 +63,7 @@ impl<'a, S: Service> Connection<'a, S> {
         })
     }
     #[allow(dead_code)]
-    pub async fn send_without_timeout<R: Wrapper<S>>(
-        &mut self,
-        request: &'a R,
-    ) -> Result<R::Response> {
+    pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
                 .send_without_timeout(&R::wrap_request_ref(request))
@@ -75,12 +72,12 @@ impl<'a, S: Service> Connection<'a, S> {
         .unwrap())
     }
     #[allow(dead_code)]
-    pub async fn send<R: Wrapper<S>>(&mut self, request: &'a R) -> Result<R::Response> {
+    pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
     }
     #[allow(dead_code)]
     pub async fn send_with_timeout<R: Wrapper<S>>(
-        &mut self,
+        self,
         request: &'a R,
         timeout: Duration,
     ) -> Result<R::Response> {
@@ -108,9 +105,8 @@ impl<'a, S: Service> ResilientConnection<'a, S> {
         })
     }
 
-    /// If `req_timeout` is None, send with default timeout of 90 seconds.
     pub async fn send_with_timeout<R: Wrapper<S>>(
-        &mut self,
+        self,
         request: &'a R,
         timeout: Duration,
     ) -> Result<R::Response> {

@@ -40,62 +40,16 @@ pub enum Error {
     #[error("Failed to get response for request: connection timeout")]
     RequestTimeout,
 
+    #[error("Could not build connection pool")]
+    PoolCreation,
+
     #[error("Other")]
     Other(#[from] anyhow::Error),
 }
 
-pub struct Server<Req, Res> {
-    pub(super) listener: TcpListener,
-    marker: PhantomData<(Req, Res)>,
-}
 pub struct Connection<Req, Res> {
     stream: TcpStream,
     marker: PhantomData<(Req, Res)>,
-}
-pub struct Request<Req, Res> {
-    stream: TcpStream,
-    body: Option<Req>,
-    marker: PhantomData<(Req, Res)>,
-}
-
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-struct Header {
-    body_size: usize,
-}
-
-impl<Req, Res> Server<Req, Res>
-where
-    Req: DeserializeOwned,
-{
-    pub async fn bind(addr: impl ToSocketAddrs) -> Result<Self> {
-        let listener = TcpListener::bind(addr).await?;
-        Ok(Server {
-            listener,
-            marker: PhantomData,
-        })
-    }
-    pub async fn accept(&self) -> Result<Request<Req, Res>> {
-        let (mut stream, client) = self.listener.accept().await?;
-        tracing::debug!("accepted connection from: {}", &client);
-
-        let mut header_buf = vec![0; std::mem::size_of::<Header>()];
-        stream.read_exact(&mut header_buf).await?;
-        let header: Header = *bytemuck::from_bytes(&header_buf);
-
-        let mut buf = vec![0; header.body_size];
-
-        stream.read_exact(&mut buf).await?;
-        tracing::debug!("received bytes: {:?}", &buf);
-
-        let body = Some(bincode::deserialize(&buf).unwrap());
-
-        Ok(Request {
-            stream,
-            body,
-            marker: PhantomData,
-        })
-    }
 }
 
 impl<Req, Res> Connection<Req, Res>
@@ -123,8 +77,13 @@ where
         }
     }
 
-    pub async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
+    pub async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::serialize(&request).unwrap();
+
+        // disable linger to avoid TIME_WAIT.
+        // should be safe since the connection is closed from the client side.
+        // No stray packets should therefore find its way to the socket.
+        self.stream.set_linger(Some(Duration::from_secs(0)))?;
 
         let header = Header {
             body_size: bytes.len(),
@@ -140,23 +99,75 @@ where
 
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
-
         self.stream.flush().await?;
+        self.stream.shutdown().await?;
 
         Ok(bincode::deserialize(&buf).unwrap())
     }
 
-    pub async fn send(&mut self, request: &Req) -> Result<Res> {
+    pub async fn send(self, request: &Req) -> Result<Res> {
         self.send_with_timeout(request, Duration::from_secs(90))
             .await
     }
 
-    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
+    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::RequestTimeout),
         }
     }
+}
+
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+struct Header {
+    body_size: usize,
+}
+
+pub struct Server<Req, Res> {
+    pub(super) listener: TcpListener,
+    marker: PhantomData<(Req, Res)>,
+}
+
+impl<Req, Res> Server<Req, Res>
+where
+    Req: DeserializeOwned,
+{
+    pub async fn bind(addr: impl ToSocketAddrs) -> Result<Self> {
+        let listener = TcpListener::bind(addr).await?;
+        Ok(Server {
+            listener,
+            marker: PhantomData,
+        })
+    }
+
+    pub async fn accept(&self) -> Result<Request<Req, Res>> {
+        let (mut stream, client) = self.listener.accept().await?;
+        tracing::debug!("accepted connection from: {}", &client);
+
+        let mut header_buf = vec![0; std::mem::size_of::<Header>()];
+        stream.read_exact(&mut header_buf).await?;
+        let header: Header = *bytemuck::from_bytes(&header_buf);
+
+        let mut buf = vec![0; header.body_size];
+
+        stream.read_exact(&mut buf).await?;
+        tracing::debug!("received bytes: {:?}", &buf);
+
+        let body = Some(bincode::deserialize(&buf).unwrap());
+
+        Ok(Request {
+            stream,
+            body,
+            marker: PhantomData,
+        })
+    }
+}
+
+pub struct Request<Req, Res> {
+    stream: TcpStream,
+    body: Option<Req>,
+    marker: PhantomData<(Req, Res)>,
 }
 
 impl<Req, Res> Request<Req, Res>
@@ -173,13 +184,19 @@ where
         self.stream.write_all(&bytes).await?;
         self.stream.flush().await?;
 
-        self.stream.shutdown().await?;
+        // wait for client to close connection
+        let mut buf: [u8; 1] = [0];
+        tokio::time::timeout(Duration::from_secs(5), self.stream.read_exact(&mut buf))
+            .await
+            .ok();
 
         Ok(())
     }
+
     pub fn body(&self) -> &Req {
         self.body.as_ref().unwrap()
     }
+
     fn take_body(&mut self) -> Req {
         self.body.take().expect("body was taken twice")
     }
@@ -217,7 +234,7 @@ where
         }
     }
 
-    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
+    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
         self.conn.send_with_timeout(request, timeout).await
     }
 }
@@ -280,7 +297,7 @@ mod tests {
                     req.respond(b1).await?;
                     Ok(())
                 },
-                |mut con| async move {
+                |con| async move {
                     let res = con.send(&a2).await?;
                     prop_assert_eq!(res, b2);
                     Ok(())

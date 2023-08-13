@@ -55,7 +55,7 @@ pub enum Error {
 
 impl RemoteSearcher {
     async fn search(&self, query: &SearchQuery) -> Result<InitialWebsiteResult> {
-        let mut conn = self.conn().await;
+        let conn = self.conn().await;
 
         if let Ok(Some(body)) = conn
             .send_with_timeout(
@@ -77,7 +77,7 @@ impl RemoteSearcher {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
-        let mut conn = self.conn().await;
+        let conn = self.conn().await;
 
         if let Ok(Some(body)) = conn
             .send_with_timeout(
@@ -95,7 +95,7 @@ impl RemoteSearcher {
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let mut conn = self.conn().await;
+        let conn = self.conn().await;
 
         if let Ok(body) = conn
             .send_with_timeout(
@@ -113,7 +113,7 @@ impl RemoteSearcher {
     }
 
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let mut conn = self.conn().await;
+        let conn = self.conn().await;
 
         if let Ok(body) = conn
             .send_with_timeout(

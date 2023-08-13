@@ -138,7 +138,7 @@ impl WorkerThread {
                     }
                 }
             } else {
-                let mut conn = self.coordinator_conn().await.unwrap();
+                let conn = self.coordinator_conn().await.unwrap();
                 let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
 
                 let res = conn
