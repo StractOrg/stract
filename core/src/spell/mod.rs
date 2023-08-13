@@ -107,7 +107,7 @@ pub struct Spell {
 impl Spell {
     pub fn for_index(index: &Index) -> Self {
         let dict = Self::build_dict(index);
-        let spell_checker = SpellChecker::new(dict.clone(), LogarithmicEdit::new(4));
+        let spell_checker = SpellChecker::new(dict.clone(), LogarithmicEdit::new(3));
 
         Self {
             dict,
@@ -118,7 +118,7 @@ impl Spell {
         info!("Building spell correction dictionary");
         let searcher = index.inverted_index.tv_searcher();
         let schema = searcher.schema();
-        let mut dict = DictionaryBuilder::new(10_000);
+        let mut dict = DictionaryBuilder::new(20_000);
 
         #[allow(unused_assignments, unused_mut)]
         let mut limit_terms: Option<usize> = None;
