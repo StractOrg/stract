@@ -1,22 +1,22 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use tokio::net::ToSocketAddrs;
 
 use super::Result;
 
 #[async_trait::async_trait]
-pub trait Service: Sized + Send + Sync {
+pub trait Service: Sized + Send + Sync + 'static {
     type Request: serde::de::DeserializeOwned + Send + Sync;
     type RequestRef<'a>: serde::Serialize + Send + Sync;
     type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
 
-    async fn handle(req: Self::Request, server: &mut Self) -> Result<Self::Response>;
+    async fn handle(req: Self::Request, server: &Self) -> Result<Self::Response>;
 }
 
 #[async_trait::async_trait]
 pub trait Message<S: Service> {
     type Response;
-    async fn handle(self, server: &mut S) -> Result<Self::Response>;
+    async fn handle(self, server: &S) -> Result<Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
     fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;
@@ -25,20 +25,34 @@ pub trait Wrapper<S: Service>: Message<S> {
 
 pub struct Server<S: Service> {
     inner: super::Server<S::Request, S::Response>,
-    service: S,
+    service: Arc<S>,
 }
 
 impl<S: Service> Server<S> {
     pub async fn bind(service: S, addr: impl ToSocketAddrs) -> Result<Self> {
         Ok(Server {
             inner: super::Server::bind(addr).await?,
-            service,
+            service: Arc::new(service),
         })
     }
-    pub async fn accept(&mut self) -> Result<()> {
+    pub async fn accept(&self) -> Result<()> {
         let mut req = self.inner.accept().await?;
-        let res = S::handle(req.take_body(), &mut self.service).await?;
-        req.respond(res).await
+
+        let service = Arc::clone(&self.service);
+        tokio::spawn(async move {
+            match S::handle(req.take_body(), &service).await {
+                Ok(res) => {
+                    if let Err(e) = req.respond(res).await {
+                        tracing::error!("failed to respond to request: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("failed to handle request: {}", e);
+                }
+            }
+        });
+
+        Ok(())
     }
 }
 
@@ -158,7 +172,7 @@ macro_rules! sonic_service {
                 type RequestRef<'a> = RequestRef<'a>;
                 type Response = Response;
 
-                async fn handle(req: Request, server: &mut Self) -> sonic::Result<Response> {
+                async fn handle(req: Request, server: &Self) -> sonic::Result<Response> {
                     match req {
                         $(
                             Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
@@ -179,7 +193,7 @@ macro_rules! sonic_service {
 mod tests {
     use proptest::prelude::*;
 
-    use std::{marker::PhantomData, net::SocketAddr};
+    use std::{marker::PhantomData, net::SocketAddr, sync::atomic::AtomicI32};
 
     use super::{Server, Service, Wrapper};
     use futures::Future;
@@ -215,7 +229,7 @@ mod tests {
             .build()
             .unwrap()
             .block_on(async move {
-                let mut server = Server::bind(service, ("127.0.0.1", 0)).await.unwrap();
+                let server = Server::bind(service, ("127.0.0.1", 0)).await.unwrap();
                 let addr = server.inner.listener.local_addr().unwrap();
 
                 let svr_task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
@@ -239,6 +253,8 @@ mod tests {
     }
 
     mod counter_service {
+        use std::sync::atomic::AtomicI32;
+
         use proptest_derive::Arbitrary;
         use serde::{Deserialize, Serialize};
 
@@ -247,7 +263,7 @@ mod tests {
         use super::super::Message;
 
         pub struct CounterService {
-            pub counter: i32,
+            pub counter: AtomicI32,
         }
 
         sonic_service!(CounterService, [Change, Reset]);
@@ -263,9 +279,11 @@ mod tests {
         impl Message<CounterService> for Change {
             type Response = i32;
 
-            async fn handle(self, server: &mut CounterService) -> sonic::Result<Self::Response> {
-                server.counter += self.amount;
-                Ok(server.counter)
+            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+                let prev = server
+                    .counter
+                    .fetch_add(self.amount, std::sync::atomic::Ordering::SeqCst);
+                Ok(prev + self.amount)
             }
         }
 
@@ -273,8 +291,8 @@ mod tests {
         impl Message<CounterService> for Reset {
             type Response = ();
 
-            async fn handle(self, server: &mut CounterService) -> sonic::Result<Self::Response> {
-                server.counter = 0;
+            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+                server.counter.store(0, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
         }
@@ -284,27 +302,32 @@ mod tests {
 
     #[test]
     fn simple_service() -> Result<(), TestCaseError> {
-        fixture(CounterService { counter: 0 }, |b| async move {
-            let val = b
-                .send(&Change { amount: 15 })
-                .await
-                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
-            assert_eq!(val, 15);
-            let val = b
-                .send(&Change { amount: 15 })
-                .await
-                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
-            assert_eq!(val, 30);
-            b.send(&Reset)
-                .await
-                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
-            let val = b
-                .send(&Change { amount: 15 })
-                .await
-                .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
-            assert_eq!(val, 15);
-            Ok(())
-        })?;
+        fixture(
+            CounterService {
+                counter: AtomicI32::new(0),
+            },
+            |b| async move {
+                let val = b
+                    .send(&Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 15);
+                let val = b
+                    .send(&Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 30);
+                b.send(&Reset)
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                let val = b
+                    .send(&Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 15);
+                Ok(())
+            },
+        )?;
 
         Ok(())
     }
@@ -312,7 +335,7 @@ mod tests {
     proptest! {
         #[test]
         fn ref_serialization(a: Change) {
-            fixture(CounterService { counter: 0 }, |conn| async move {
+            fixture(CounterService { counter: AtomicI32::new(0) }, |conn| async move {
                 conn.send(&Reset).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 let val = conn.send(&a).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 prop_assert_eq!(val, a.amount);

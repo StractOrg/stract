@@ -48,7 +48,7 @@ pub struct NewJobs {
 impl Message<CoordinatorService> for NewJobs {
     type Response = crate::crawler::Response;
 
-    async fn handle(self, server: &mut CoordinatorService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
         server.coordinator.add_responses(&self.responses)?;
 
         if server.coordinator.is_done() {
@@ -70,7 +70,7 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     )?);
 
     let addr: SocketAddr = config.host;
-    let mut server = CoordinatorService { coordinator }.bind(addr).await.unwrap();
+    let server = CoordinatorService { coordinator }.bind(addr).await.unwrap();
 
     tracing::info!("Crawl coordinator listening on {}", addr);
 

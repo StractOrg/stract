@@ -67,7 +67,7 @@ pub struct Knows {
 impl Message<WebGraphService> for SimilarSites {
     type Response = Vec<ScoredSite>;
 
-    async fn handle(self, server: &mut WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
         let sites = &self.sites[..std::cmp::min(self.sites.len(), MAX_SITES)];
         let similar_sites = server
             .similar_sites_finder
@@ -103,7 +103,7 @@ impl Message<WebGraphService> for SimilarSites {
 impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
-    async fn handle(self, server: &mut WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
         let node = Node::from(self.site.to_string()).into_host();
 
         if server.similar_sites_finder.knows_about(&node) {
@@ -140,7 +140,7 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         config.max_similar_sites,
     );
 
-    let mut server = WebGraphService {
+    let server = WebGraphService {
         searcher,
         similar_sites_finder,
     }

@@ -118,7 +118,7 @@ pub struct RetrieveWebsites {
 #[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for RetrieveWebsites {
     type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
-    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
         match server
             .local_searcher
             .retrieve_websites(&self.websites, &self.query)
@@ -136,7 +136,7 @@ pub struct Search {
 #[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for Search {
     type Response = Option<InitialWebsiteResult>;
-    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
         match server.local_searcher.search_initial(&self.query, true) {
             Ok(result) => Ok(Some(result)),
             Err(_) => Ok(None),
@@ -151,7 +151,7 @@ pub struct GetWebpage {
 #[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for GetWebpage {
     type Response = Option<RetrievedWebpage>;
-    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
         Ok(server.local_searcher.get_webpage(&self.url))
     }
 }
@@ -163,7 +163,7 @@ pub struct GetHomepageDescriptions {
 #[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
     type Response = HashMap<Url, String>;
-    async fn handle(self, server: &mut SearchService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
         let mut result = HashMap::with_capacity(self.urls.len());
 
         for url in &self.urls {
@@ -180,7 +180,7 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
 
 pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     let addr = config.host;
-    let mut server = SearchService::new(config).await?.bind(addr).await.unwrap();
+    let server = SearchService::new(config).await?.bind(addr).await.unwrap();
 
     info!("search server is ready to accept requests on {}", addr);
 
