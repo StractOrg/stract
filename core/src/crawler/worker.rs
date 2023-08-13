@@ -102,12 +102,17 @@ impl WorkerThread {
         })
     }
 
-    fn coordinator_conn(
+    async fn coordinator_conn(
         &self,
-    ) -> sonic::service::ResilientConnection<CoordinatorService, ExponentialBackoff> {
+    ) -> Result<sonic::service::ResilientConnection<CoordinatorService>> {
         let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
-        sonic::service::ResilientConnection::create(self.coordinator_host, retry)
+        Ok(sonic::service::ResilientConnection::create_with_timeout(
+            self.coordinator_host,
+            Duration::from_secs(30),
+            retry,
+        )
+        .await?)
     }
 
     pub async fn run(mut self) {
@@ -133,17 +138,16 @@ impl WorkerThread {
                     }
                 }
             } else {
-                let conn = self.coordinator_conn();
+                let mut conn = self.coordinator_conn().await.unwrap();
                 let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
 
                 let res = conn
-                    .send(
+                    .send_with_timeout(
                         &NewJobs {
                             responses: results,
                             num_jobs: 2 * self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(60),
-                        Some(Duration::from_secs(60 * 60)),
+                        Duration::from_secs(60 * 60),
                     )
                     .await;
 

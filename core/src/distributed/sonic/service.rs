@@ -1,8 +1,8 @@
-use std::{marker::PhantomData, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use tokio::net::ToSocketAddrs;
 
-use super::{Error, Result};
+use super::Result;
 
 #[async_trait::async_trait]
 pub trait Service: Sized {
@@ -11,10 +11,6 @@ pub trait Service: Sized {
     type Response: serde::Serialize + serde::de::DeserializeOwned;
 
     async fn handle(req: Self::Request, server: &mut Self) -> Result<Self::Response>;
-}
-
-pub struct Connection<'a, S: Service> {
-    inner: super::Connection<S::RequestRef<'a>, S::Response>,
 }
 
 #[async_trait::async_trait]
@@ -32,12 +28,6 @@ pub struct Server<S: Service> {
     service: S,
 }
 
-pub struct ResilientConnection<S: Service, Rt: Iterator<Item = Duration>> {
-    addr: SocketAddr,
-    retry: Rt,
-    marker: PhantomData<S>,
-}
-
 impl<S: Service> Server<S> {
     pub async fn bind(service: S, addr: impl ToSocketAddrs) -> Result<Self> {
         Ok(Server {
@@ -50,6 +40,10 @@ impl<S: Service> Server<S> {
         let res = S::handle(req.take_body(), &mut self.service).await?;
         req.respond(res).await
     }
+}
+
+pub struct Connection<'a, S: Service> {
+    inner: super::Connection<S::RequestRef<'a>, S::Response>,
 }
 
 impl<'a, S: Service> Connection<'a, S> {
@@ -69,7 +63,10 @@ impl<'a, S: Service> Connection<'a, S> {
         })
     }
     #[allow(dead_code)]
-    pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+    pub async fn send_without_timeout<R: Wrapper<S>>(
+        &mut self,
+        request: &'a R,
+    ) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
                 .send_without_timeout(&R::wrap_request_ref(request))
@@ -78,12 +75,12 @@ impl<'a, S: Service> Connection<'a, S> {
         .unwrap())
     }
     #[allow(dead_code)]
-    pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+    pub async fn send<R: Wrapper<S>>(&mut self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
     }
     #[allow(dead_code)]
     pub async fn send_with_timeout<R: Wrapper<S>>(
-        self,
+        &mut self,
         request: &'a R,
         timeout: Duration,
     ) -> Result<R::Response> {
@@ -96,42 +93,29 @@ impl<'a, S: Service> Connection<'a, S> {
     }
 }
 
-impl<S: Service, Rt: Iterator<Item = Duration>> ResilientConnection<S, Rt> {
-    pub fn create(addr: SocketAddr, retry: Rt) -> Self {
-        Self {
-            addr,
-            retry,
-            marker: PhantomData,
-        }
+pub struct ResilientConnection<'a, S: Service> {
+    inner: super::ResilientConnection<S::RequestRef<'a>, S::Response>,
+}
+
+impl<'a, S: Service> ResilientConnection<'a, S> {
+    pub async fn create_with_timeout<Rt: Iterator<Item = Duration>>(
+        addr: SocketAddr,
+        timeout: Duration,
+        retry: Rt,
+    ) -> Result<ResilientConnection<'a, S>> {
+        Ok(Self {
+            inner: super::ResilientConnection::create_with_timeout(addr, timeout, retry).await?,
+        })
     }
 
     /// If `req_timeout` is None, send with default timeout of 90 seconds.
-    pub async fn send<R: Wrapper<S>>(
-        mut self,
-        request: &R,
-        conn_timeout: Duration,
-        req_timeout: Option<Duration>,
+    pub async fn send_with_timeout<R: Wrapper<S>>(
+        &mut self,
+        request: &'a R,
+        timeout: Duration,
     ) -> Result<R::Response> {
-        loop {
-            match Connection::create_with_timeout(&self.addr, conn_timeout).await {
-                Ok(conn) => {
-                    if let Some(req_timeout) = req_timeout {
-                        return conn.send_with_timeout(request, req_timeout).await;
-                    } else {
-                        return conn.send(request).await;
-                    }
-                }
-                Err(Error::ConnectionTimeout) => {
-                    if let Some(timeout) = self.retry.next() {
-                        tokio::time::sleep(timeout).await;
-                        continue;
-                    } else {
-                        return Err(Error::ConnectionTimeout);
-                    }
-                }
-                Err(e) => return Err(e),
-            }
-        }
+        let req_ref = R::wrap_request_ref(request);
+        Ok(R::unwrap_response(self.inner.send_with_timeout(&req_ref, timeout).await?).unwrap())
     }
 }
 

@@ -55,15 +55,14 @@ pub enum Error {
 
 impl RemoteSearcher {
     async fn search(&self, query: &SearchQuery) -> Result<InitialWebsiteResult> {
-        let conn = self.conn();
+        let mut conn = self.conn().await;
 
         if let Ok(Some(body)) = conn
-            .send(
+            .send_with_timeout(
                 &search_server::Search {
                     query: query.clone(),
                 },
-                Duration::from_secs(5),
-                Some(Duration::from_secs(60)),
+                Duration::from_secs(60),
             )
             .await
         {
@@ -78,16 +77,15 @@ impl RemoteSearcher {
         pointers: &[inverted_index::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
-        let conn = self.conn();
+        let mut conn = self.conn().await;
 
         if let Ok(Some(body)) = conn
-            .send(
+            .send_with_timeout(
                 &search_server::RetrieveWebsites {
                     websites: pointers.to_vec(),
                     query: original_query.to_string(),
                 },
-                Duration::from_secs(5),
-                Some(Duration::from_secs(60)),
+                Duration::from_secs(60),
             )
             .await
         {
@@ -97,15 +95,14 @@ impl RemoteSearcher {
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let conn = self.conn();
+        let mut conn = self.conn().await;
 
         if let Ok(body) = conn
-            .send(
+            .send_with_timeout(
                 &search_server::GetWebpage {
                     url: url.to_string(),
                 },
-                Duration::from_secs(5),
-                Some(Duration::from_secs(60)),
+                Duration::from_secs(60),
             )
             .await
         {
@@ -116,15 +113,14 @@ impl RemoteSearcher {
     }
 
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let conn = self.conn();
+        let mut conn = self.conn().await;
 
         if let Ok(body) = conn
-            .send(
+            .send_with_timeout(
                 &search_server::GetHomepageDescriptions {
                     urls: urls.to_vec(),
                 },
-                Duration::from_secs(5),
-                Some(Duration::from_secs(60)),
+                Duration::from_secs(60),
             )
             .await
         {
@@ -134,14 +130,18 @@ impl RemoteSearcher {
         HashMap::new()
     }
 
-    fn conn(
-        &self,
-    ) -> sonic::service::ResilientConnection<SearchService, impl Iterator<Item = Duration>> {
+    async fn conn(&self) -> sonic::service::ResilientConnection<SearchService> {
         let retry = ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5);
 
-        sonic::service::ResilientConnection::create(self.addr, retry)
+        sonic::service::ResilientConnection::create_with_timeout(
+            self.addr,
+            Duration::from_secs(30),
+            retry,
+        )
+        .await
+        .unwrap()
     }
 }
 

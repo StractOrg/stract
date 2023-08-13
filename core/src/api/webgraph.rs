@@ -65,16 +65,21 @@ pub async fn similar_sites(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let conn = sonic::service::ResilientConnection::create(host, retry);
+    let mut conn = sonic::service::ResilientConnection::create_with_timeout(
+        host,
+        Duration::from_secs(30),
+        retry,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match conn
-        .send(
+        .send_with_timeout(
             &crate::entrypoint::webgraph_server::SimilarSites {
                 sites: params.sites,
                 top_n: params.top_n,
             },
-            Duration::from_secs(5),
-            Some(Duration::from_secs(60)),
+            Duration::from_secs(60),
         )
         .await
     {
@@ -109,13 +114,18 @@ pub async fn knows_site(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let conn = sonic::service::ResilientConnection::create(host, retry);
+    let mut conn = sonic::service::ResilientConnection::create_with_timeout(
+        host,
+        Duration::from_secs(30),
+        retry,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match conn
-        .send(
+        .send_with_timeout(
             &crate::entrypoint::webgraph_server::Knows { site: params.site },
-            Duration::from_secs(5),
-            Some(Duration::from_secs(60)),
+            Duration::from_secs(60),
         )
         .await
     {

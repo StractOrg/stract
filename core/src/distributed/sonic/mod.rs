@@ -123,7 +123,7 @@ where
         }
     }
 
-    pub async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
+    pub async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::serialize(&request).unwrap();
 
         let header = Header {
@@ -141,17 +141,17 @@ where
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
 
-        self.stream.shutdown().await?;
+        self.stream.flush().await?;
 
         Ok(bincode::deserialize(&buf).unwrap())
     }
 
-    pub async fn send(self, request: &Req) -> Result<Res> {
+    pub async fn send(&mut self, request: &Req) -> Result<Res> {
         self.send_with_timeout(request, Duration::from_secs(90))
             .await
     }
 
-    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
+    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::RequestTimeout),
@@ -182,6 +182,43 @@ where
     }
     fn take_body(&mut self) -> Req {
         self.body.take().expect("body was taken twice")
+    }
+}
+
+pub struct ResilientConnection<Req, Res> {
+    conn: Connection<Req, Res>,
+}
+
+impl<Req, Res> ResilientConnection<Req, Res>
+where
+    Req: Serialize,
+    Res: DeserializeOwned,
+{
+    pub async fn create_with_timeout(
+        server: impl ToSocketAddrs + Clone,
+        timeout: Duration,
+        retry: impl Iterator<Item = Duration>,
+    ) -> Result<Self> {
+        let mut conn = Connection::create_with_timeout(server.clone(), timeout).await;
+        let mut retry = retry;
+
+        loop {
+            match conn {
+                Ok(conn) => return Ok(ResilientConnection { conn }),
+                Err(_) => {
+                    if let Some(timeout) = retry.next() {
+                        tokio::time::sleep(timeout).await;
+                        conn = Connection::create_with_timeout(server.clone(), timeout).await;
+                    } else {
+                        return Err(Error::ConnectionTimeout);
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
+        self.conn.send_with_timeout(request, timeout).await
     }
 }
 
@@ -243,7 +280,7 @@ mod tests {
                     req.respond(b1).await?;
                     Ok(())
                 },
-                |con| async move {
+                |mut con| async move {
                     let res = con.send(&a2).await?;
                     prop_assert_eq!(res, b2);
                     Ok(())

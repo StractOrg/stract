@@ -53,7 +53,7 @@ pub enum Error {
     InvalidRedirect,
 }
 
-type Result<T> = std::result::Result<T, anyhow::Error>;
+type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Site(String);
