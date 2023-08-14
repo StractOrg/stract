@@ -81,12 +81,17 @@ where
 
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
-        options.set_max_open_files(8);
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.disable_cache();
+        block_options.set_ribbon_filter(5.0);
 
         options.set_block_based_table_factory(&block_options);
+        options.set_optimize_filters_for_hits(true);
+        options.set_max_background_jobs(8);
+        options.set_write_buffer_size(512 * 1024 * 1024);
+        options.set_allow_mmap_reads(true);
+        options.set_allow_mmap_writes(true);
+        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
         let cache_size = 100_000;
@@ -262,10 +267,8 @@ impl RedirectDb {
         let mut options = rocksdb::Options::default();
 
         options.create_if_missing(true);
-        options.set_max_open_files(8);
 
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.disable_cache();
+        let block_options = rocksdb::BlockBasedOptions::default();
 
         options.set_block_based_table_factory(&block_options);
 
@@ -320,12 +323,17 @@ where
         let mut options = rocksdb::Options::default();
 
         options.create_if_missing(true);
-        options.set_max_open_files(8);
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.disable_cache();
+        block_options.set_ribbon_filter(5.0);
 
         options.set_block_based_table_factory(&block_options);
+        options.set_optimize_filters_for_hits(true);
+        options.set_max_background_jobs(8);
+        options.set_write_buffer_size(512 * 1024 * 1024);
+        options.set_allow_mmap_reads(true);
+        options.set_allow_mmap_writes(true);
+        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
@@ -405,7 +413,7 @@ pub struct CrawlDb {
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let url_ids = IdTable::open(path.as_ref().join("urls"))?;
+        let url_ids = IdTable::open(path.as_ref().join("urls").join("ids"))?;
         let domain_ids = IdTable::open(path.as_ref().join("domains"))?;
         let redirects = RedirectDb::open(path.as_ref().join("redirects"))?;
 
