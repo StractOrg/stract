@@ -61,7 +61,7 @@ pub enum DomainStatus {
 struct MemmapDb<K, V> {
     inner: Option<memmap::MmapMut>,
     file: std::fs::File,
-    ranges: HashMap<K, Range<usize>>,
+    ranges: BTreeMap<K, Range<usize>>,
     len: usize,
 
     write_batch: Vec<u8>,
@@ -71,7 +71,7 @@ struct MemmapDb<K, V> {
 
 impl<K, V> MemmapDb<K, V>
 where
-    K: serde::Serialize + serde::de::DeserializeOwned + Hash + Eq + Clone,
+    K: serde::Serialize + serde::de::DeserializeOwned + Hash + Ord + Eq + Clone,
     V: serde::Serialize + serde::de::DeserializeOwned + Clone,
 {
     fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -90,7 +90,7 @@ where
             None
         };
 
-        let ranges = HashMap::new();
+        let ranges = BTreeMap::new();
 
         Ok(Self {
             inner,
@@ -188,8 +188,8 @@ where
 
         Ok(Self {
             db,
-            value_cache: Mutex::new(LruCache::new(NonZeroUsize::new(500_000).unwrap())),
-            id_cache: Mutex::new(LruCache::new(NonZeroUsize::new(500_000).unwrap())),
+            value_cache: Mutex::new(LruCache::new(NonZeroUsize::new(50_000).unwrap())),
+            id_cache: Mutex::new(LruCache::new(NonZeroUsize::new(50_000).unwrap())),
         })
     }
 
@@ -390,8 +390,8 @@ impl UrlStateDb {
         let mut block_options = BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
         options.set_block_based_table_factory(&block_options);
+        options.optimize_for_point_lookup(512); // 512 MB
         options.set_optimize_filters_for_hits(true);
-        options.optimize_for_point_lookup(512 * 1024 * 1024); // 512 MB
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
@@ -484,7 +484,7 @@ impl CrawlDb {
             domain_ids,
             redirects,
             domain_state: BTreeMap::new(),
-            urls: UrlStateDb::open(path.as_ref().join("urls").join("states"), 100_000)?,
+            urls: UrlStateDb::open(path.as_ref().join("urls").join("states"), 10_000)?,
         })
     }
 
