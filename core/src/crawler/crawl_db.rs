@@ -123,7 +123,6 @@ where
             }
 
             let mut write_options = rocksdb::WriteOptions::default();
-            write_options.set_sync(false);
             write_options.disable_wal(true);
 
             self.db.write_opt(batch, &write_options)?;
@@ -280,7 +279,6 @@ impl RedirectDb {
         let redirect_bytes = bincode::serialize(to)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
-        write_options.set_sync(false);
         write_options.disable_wal(true);
         self.inner
             .put_opt(url_bytes, redirect_bytes, &write_options)?;
@@ -378,7 +376,6 @@ where
             }
 
             let mut write_options = rocksdb::WriteOptions::default();
-            write_options.set_sync(false);
             write_options.disable_wal(true);
 
             self.db.write_opt(batch, &write_options)?;
