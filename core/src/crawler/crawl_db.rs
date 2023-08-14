@@ -44,7 +44,7 @@ pub enum UrlStatus {
     Done,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainStatus {
     Pending,
     CrawlInProgress,
@@ -876,5 +876,27 @@ mod tests {
 
         assert!(db.contains(&321));
         assert_eq!(db.get(&321).unwrap(), "world");
+    }
+
+    #[test]
+    fn simple_politeness() {
+        let mut db = CrawlDb::open(gen_temp_path()).unwrap();
+
+        db.insert_seed_urls(&[Url::parse("https://example.com").unwrap()])
+            .unwrap();
+
+        let domain = Domain::from(&Url::parse("https://example.com").unwrap());
+        let domain_id = db.domain_ids.id(&domain).unwrap().into();
+        let sample = db.sample_domains(128).unwrap();
+
+        assert_eq!(sample.len(), 1);
+        assert_eq!(&sample[0], &domain_id);
+        assert_eq!(
+            db.domain_state.get(&domain_id).unwrap().status,
+            DomainStatus::CrawlInProgress
+        );
+
+        let new_sample = db.sample_domains(128).unwrap();
+        assert_eq!(new_sample.len(), 0);
     }
 }
