@@ -78,6 +78,10 @@ impl Domain {
         let digest = md5::compute(self.0.as_bytes());
         u128::from_be_bytes(digest.0).into()
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// All urls in a job must be from the same domain and only one job per domain.

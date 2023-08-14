@@ -18,11 +18,9 @@ use std::{
     cmp::Ordering,
     collections::{BTreeMap, BinaryHeap, HashMap, VecDeque},
     hash::Hash,
-    io::Write,
     num::NonZeroUsize,
-    ops::Range,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use itertools::Itertools;
@@ -30,7 +28,6 @@ use lru::LruCache;
 use rand::Rng;
 use rayon::prelude::IntoParallelRefIterator;
 use rayon::prelude::*;
-use rocksdb::BlockBasedOptions;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -48,108 +45,6 @@ pub enum UrlStatus {
 pub enum DomainStatus {
     Pending,
     CrawlInProgress,
-}
-
-/// This is a simple key-value store that uses memory mapping to store the data on disk.
-/// It is not thread safe, so it should be wrapped in a mutex.
-///
-/// The keys are stored in memory in a map from `K` to `Range<usize>`, where the range is the
-/// position of the value in the file.
-///
-/// This DB should only be used for data that is acceptable to lose in case of a crash.
-/// Currently the database doesn't even save the key -> range map to disk, so it will be lost.
-struct MemmapDb<K, V> {
-    inner: Option<memmap::MmapMut>,
-    file: std::fs::File,
-    ranges: BTreeMap<K, Range<usize>>,
-    len: usize,
-
-    write_batch: Vec<u8>,
-
-    _phantom: std::marker::PhantomData<V>,
-}
-
-impl<K, V> MemmapDb<K, V>
-where
-    K: serde::Serialize + serde::de::DeserializeOwned + Hash + Ord + Eq + Clone,
-    V: serde::Serialize + serde::de::DeserializeOwned + Clone,
-{
-    fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        std::fs::create_dir_all(path.as_ref())?;
-
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(path.as_ref().join("db"))?;
-
-        let inner = if file.metadata()?.len() > 0 {
-            Some(unsafe { memmap::MmapOptions::new().map_mut(&file)? })
-        } else {
-            None
-        };
-
-        let ranges = BTreeMap::new();
-
-        Ok(Self {
-            inner,
-            ranges,
-            file,
-            len: 0,
-            write_batch: Vec::new(),
-            _phantom: std::marker::PhantomData,
-        })
-    }
-
-    fn get(&self, key: &K) -> Option<V> {
-        let range = self.ranges.get(key)?;
-
-        if range.start >= self.inner.as_ref()?.len() || range.end > self.inner.as_ref()?.len() {
-            return None;
-        }
-
-        let value_bytes = &self.inner.as_ref()?[range.clone()];
-        let value: V = bincode::deserialize(value_bytes).ok()?;
-
-        Some(value)
-    }
-
-    fn put(&mut self, key: &K, value: &V) -> Result<()> {
-        let value_bytes = bincode::serialize(value)?;
-
-        let range = self.len..self.len + value_bytes.len();
-
-        self.write_batch.write_all(&value_bytes)?;
-        self.len += value_bytes.len();
-
-        self.ranges.insert(key.clone(), range);
-
-        Ok(())
-    }
-
-    fn commit(&mut self) -> Result<()> {
-        self.file.write_all(&self.write_batch)?;
-        self.write_batch.clear();
-
-        if let Some(inner) = &self.inner {
-            inner.flush()?;
-        }
-
-        self.file.flush()?;
-
-        self.inner = if self.file.metadata()?.len() > 0 {
-            Some(unsafe { memmap::MmapOptions::new().map_mut(&self.file)? })
-        } else {
-            None
-        };
-
-        Ok(())
-    }
-
-    fn contains(&self, key: &K) -> bool {
-        self.ranges.contains_key(key)
-    }
 }
 
 type Id = u128;
@@ -171,9 +66,9 @@ impl AsId for Url {
 }
 
 struct IdTable<T> {
-    db: Mutex<MemmapDb<Id, T>>,
-    value_cache: Mutex<LruCache<Id, T>>,
-    id_cache: Mutex<LruCache<T, Id>>,
+    db: rocksdb::DB,
+    cache: Mutex<LruCache<Id, T>>,
+    cache_size: usize,
 }
 
 impl<T> IdTable<T>
@@ -184,63 +79,95 @@ where
         // create dir if not exists
         std::fs::create_dir_all(path.as_ref())?;
 
-        let db = Mutex::new(MemmapDb::open(path.as_ref().join("db"))?);
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+        options.set_max_open_files(8);
+
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.disable_cache();
+
+        options.set_block_based_table_factory(&block_options);
+
+        let db = rocksdb::DB::open(&options, path.as_ref())?;
+        let cache_size = 100_000;
 
         Ok(Self {
             db,
-            value_cache: Mutex::new(LruCache::new(NonZeroUsize::new(50_000).unwrap())),
-            id_cache: Mutex::new(LruCache::new(NonZeroUsize::new(50_000).unwrap())),
+            cache: Mutex::new(LruCache::new(NonZeroUsize::new(cache_size + 1).unwrap())),
+            cache_size,
         })
     }
 
     pub fn bulk_insert_ids(&self, items: &[(T, Id)]) -> Result<()> {
-        let mut db = self.db.lock().unwrap();
-
-        let mut id_cache = self.id_cache.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
 
         for (item, id) in items {
-            if !db.contains(id) {
-                db.put(id, item)?;
-            }
-
-            id_cache.put(item.clone(), *id);
+            cache.put(*id, item.clone());
+            self.maybe_prune_cache(&mut cache)?;
         }
 
-        db.commit()?;
+        Ok(())
+    }
+
+    fn maybe_prune_cache(&self, guard: &mut MutexGuard<LruCache<Id, T>>) -> Result<()> {
+        // if cache is full, write half of it to disk
+        if guard.len() >= self.cache_size {
+            let mut batch = rocksdb::WriteBatch::default();
+
+            for _ in 0..self.cache_size / 2 {
+                if let Some((id, value)) = guard.pop_lru() {
+                    batch.put(bincode::serialize(&id)?, bincode::serialize(&value)?);
+                } else {
+                    break;
+                }
+            }
+
+            let mut write_options = rocksdb::WriteOptions::default();
+            write_options.set_sync(false);
+            write_options.disable_wal(true);
+
+            self.db.write_opt(batch, &write_options)?;
+        }
 
         Ok(())
     }
 
     pub fn id(&self, item: &T) -> Result<Id> {
-        if let Some(id) = self.id_cache.lock().unwrap().get(item) {
-            return Ok(*id);
-        }
-
+        let mut cache = self.cache.lock().unwrap();
         let id = item.as_id();
 
-        let mut db = self.db.lock().unwrap();
-
-        // check if item exists
-        if !db.contains(&id) {
-            db.put(&id, item)?;
+        // check cache
+        if cache.get(&id).is_some() {
+            Ok(id)
+        } else {
+            cache.put(id, item.clone());
+            self.maybe_prune_cache(&mut cache)?;
+            Ok(id)
         }
-
-        Ok(id)
     }
 
-    pub fn value(&mut self, id: Id) -> Result<Option<T>> {
-        let mut cache = self.value_cache.lock().unwrap();
+    pub fn value(&self, id: Id) -> Result<Option<T>> {
+        let mut cache = self.cache.lock().unwrap();
 
         // check cache
         if let Some(value) = cache.get(&id) {
             return Ok(Some(value.clone()));
         }
 
+        let id_bytes = bincode::serialize(&id)?;
+
         // check db
-        let value = self.db.lock().unwrap().get(&id);
+        let value = self.db.get(id_bytes)?;
+
+        let value: Option<T> = if let Some(value) = &value {
+            Some(bincode::deserialize(value)?)
+        } else {
+            None
+        };
 
         if let Some(value) = &value {
             cache.put(id, value.clone());
+            self.maybe_prune_cache(&mut cache)?;
         }
 
         Ok(value)
@@ -334,10 +261,13 @@ pub struct RedirectDb {
 impl RedirectDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut options = rocksdb::Options::default();
-        options.create_if_missing(true);
 
-        let mut block_options = BlockBasedOptions::default();
-        block_options.set_ribbon_filter(10.0);
+        options.create_if_missing(true);
+        options.set_max_open_files(8);
+
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.disable_cache();
+
         options.set_block_based_table_factory(&block_options);
 
         let inner = rocksdb::DB::open(&options, path.as_ref())?;
@@ -376,22 +306,28 @@ struct UrlToInsert {
     different_domain: bool,
 }
 
-struct UrlStateDb {
-    cache: LruCache<DomainId, Arc<Mutex<BTreeMap<UrlId, UrlState>>>>,
+struct PointDb<K, V> {
+    cache: LruCache<K, Arc<Mutex<V>>>,
     cache_size: usize,
     db: rocksdb::DB,
+    _marker: std::marker::PhantomData<K>,
 }
 
-impl UrlStateDb {
+impl<K, V> PointDb<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned + Hash + Eq + Clone,
+    V: serde::Serialize + serde::de::DeserializeOwned + Clone + Default + Send + Sync,
+{
     pub fn open<P: AsRef<Path>>(path: P, cache_size: usize) -> Result<Self> {
         let mut options = rocksdb::Options::default();
-        options.create_if_missing(true);
 
-        let mut block_options = BlockBasedOptions::default();
-        block_options.set_ribbon_filter(10.0);
+        options.create_if_missing(true);
+        options.set_max_open_files(8);
+
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.disable_cache();
+
         options.set_block_based_table_factory(&block_options);
-        options.optimize_for_point_lookup(512); // 512 MB
-        options.set_optimize_filters_for_hits(true);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
@@ -399,29 +335,30 @@ impl UrlStateDb {
             cache: LruCache::new(NonZeroUsize::new(cache_size + 1).unwrap()),
             cache_size,
             db,
+            _marker: std::marker::PhantomData,
         })
     }
 
-    pub fn get(&mut self, domain_id: DomainId) -> Result<Arc<Mutex<BTreeMap<UrlId, UrlState>>>> {
+    pub fn get(&mut self, key: K) -> Result<Arc<Mutex<V>>> {
         // check cache
-        if let Some(value) = self.cache.get(&domain_id) {
+        if let Some(value) = self.cache.get(&key) {
             return Ok(value.clone());
         }
 
         // check db
-        let domain_id_bytes = bincode::serialize(&domain_id)?;
+        let domain_id_bytes = bincode::serialize(&key)?;
         let value_bytes = self.db.get(domain_id_bytes)?;
 
         if let Some(value_bytes) = &value_bytes {
-            let value: Arc<Mutex<BTreeMap<UrlId, UrlState>>> = bincode::deserialize(value_bytes)?;
-            self.cache.put(domain_id, value.clone());
+            let value: Arc<Mutex<V>> = bincode::deserialize(value_bytes)?;
+            self.cache.put(key, value.clone());
 
             self.maybe_prune_cache()?;
 
             return Ok(value);
         }
 
-        Ok(Arc::new(Mutex::new(BTreeMap::new())))
+        Ok(Arc::new(Mutex::new(V::default())))
     }
 
     fn maybe_prune_cache(&mut self) -> Result<()> {
@@ -450,12 +387,8 @@ impl UrlStateDb {
         Ok(())
     }
 
-    pub fn put(
-        &mut self,
-        domain_id: DomainId,
-        url_states: Arc<Mutex<BTreeMap<UrlId, UrlState>>>,
-    ) -> Result<()> {
-        self.cache.put(domain_id, url_states.clone());
+    pub fn put(&mut self, key: K, value: Arc<Mutex<V>>) -> Result<()> {
+        self.cache.put(key, value);
         self.maybe_prune_cache()?;
 
         Ok(())
@@ -470,7 +403,7 @@ pub struct CrawlDb {
 
     domain_state: BTreeMap<DomainId, DomainState>,
 
-    urls: UrlStateDb,
+    urls: PointDb<DomainId, BTreeMap<UrlId, UrlState>>,
 }
 
 impl CrawlDb {
@@ -484,7 +417,7 @@ impl CrawlDb {
             domain_ids,
             redirects,
             domain_state: BTreeMap::new(),
-            urls: UrlStateDb::open(path.as_ref().join("urls").join("states"), 10_000)?,
+            urls: PointDb::open(path.as_ref().join("urls").join("states"), 10_000)?,
         })
     }
 
@@ -852,30 +785,6 @@ mod tests {
         let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 1);
         assert_eq!(sampled.len(), 1);
         assert_eq!(*sampled[0], 0);
-    }
-
-    #[test]
-    fn memmap_db() {
-        let mut db: MemmapDb<u128, String> = MemmapDb::open(gen_temp_path()).unwrap();
-
-        assert!(!db.contains(&123));
-        assert!(db.get(&123).is_none());
-
-        db.put(&123, &"hello".to_string()).unwrap();
-        db.commit().unwrap();
-
-        assert!(db.contains(&123));
-        assert_eq!(db.get(&123).unwrap(), "hello");
-
-        db.put(&321, &"world".to_string()).unwrap();
-
-        assert!(db.contains(&321));
-        assert!(db.get(&321).is_none());
-
-        db.commit().unwrap();
-
-        assert!(db.contains(&321));
-        assert_eq!(db.get(&321).unwrap(), "world");
     }
 
     #[test]
