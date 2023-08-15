@@ -145,7 +145,7 @@ impl RobotsTxt {
     }
 
     fn update(&mut self, body: String) {
-        self.matcher.parse(&body);
+        self.matcher.parse(&body.to_lowercase());
 
         self.sitemap = body
             .to_ascii_lowercase()
@@ -164,9 +164,26 @@ mod tests {
 
     #[test]
     fn simple() {
-        let ua_token = "StractSearch";
+        let ua_token = "StractBot";
         let mut robots_txt = RobotsTxt::new(
-            r#"User-agent: StractSearch
+            r#"User-agent: StractBot
+            Disallow: /test"#
+                .to_string(),
+        );
+
+        assert!(!robots_txt
+            .matcher
+            .one_agent_allowed_by_robots(ua_token, "http://example.com/test"));
+        assert!(robots_txt
+            .matcher
+            .one_agent_allowed_by_robots(ua_token, "http://example.com/example"));
+    }
+
+    #[test]
+    fn lowercase() {
+        let ua_token = "StractBot";
+        let mut robots_txt = RobotsTxt::new(
+            r#"User-agent: stractbot
             Disallow: /test"#
                 .to_string(),
         );

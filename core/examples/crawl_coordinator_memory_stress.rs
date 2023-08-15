@@ -1,5 +1,5 @@
 use anyhow::Result;
-use indicatif::ProgressIterator;
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::Rng;
 use stract::crawler::{CrawlCoordinator, Domain, JobResponse, UrlResponse};
 use url::Url;
@@ -34,6 +34,37 @@ fn rand_url(domain: &Domain) -> Url {
     Url::parse(&format!("https://{}/{}", domain.as_str(), path)).unwrap()
 }
 
+fn random_responses(num: usize) -> Vec<JobResponse> {
+    let mut responses = Vec::with_capacity(num);
+    for _ in 0..num {
+        let domain = rand_domain();
+
+        let url_responses = vec![
+            UrlResponse::Success {
+                url: rand_url(&domain)
+            };
+            100
+        ];
+
+        let mut discovered_urls = Vec::new();
+        for _ in 0..3 {
+            let domain = rand_domain();
+
+            for _ in 0..10 {
+                discovered_urls.push(rand_url(&domain));
+            }
+        }
+
+        responses.push(JobResponse {
+            domain: domain.clone(),
+            url_responses,
+            discovered_urls,
+        });
+    }
+
+    responses
+}
+
 fn main() -> Result<()> {
     let test_size = 1_000_000_000;
     if std::path::Path::new("data/crawldb").exists() {
@@ -42,34 +73,18 @@ fn main() -> Result<()> {
 
     let coordinator = CrawlCoordinator::new("data/crawldb", test_size, vec![])?;
 
-    for _ in (0..test_size as usize).progress() {
-        let mut responses = Vec::new();
-        for _ in 0..100 {
-            let domain = rand_domain();
+    let pb = ProgressBar::new(test_size);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({per_sec})",
+            )
+            .progress_chars("#>-"),
+    );
 
-            let url_responses = vec![
-                UrlResponse::Success {
-                    url: rand_url(&domain)
-                };
-                100
-            ];
-
-            let mut discovered_urls = Vec::new();
-            for _ in 0..3 {
-                let domain = rand_domain();
-
-                for _ in 0..10 {
-                    discovered_urls.push(rand_url(&domain));
-                }
-            }
-
-            responses.push(JobResponse {
-                domain: domain.clone(),
-                url_responses,
-                discovered_urls,
-            });
-        }
-
+    for _ in 0..test_size {
+        pb.inc(1);
+        let responses = random_responses(1024);
         coordinator.add_responses(&responses)?;
     }
 
