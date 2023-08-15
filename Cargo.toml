@@ -78,7 +78,6 @@ tokio-stream = "0.1.11"
 scylla = "0.7.0"
 chitchat = "0.5.0"
 memmap2 = "0.5.10"
-rkyv =  "0.7.41"
 dashmap = { version = "5.4.0", features = ["rayon"] }
 tch = "0.13.0"
 torch-sys = "0.13.0"
@@ -99,4 +98,5 @@ utoipa = "3.4.4"
 utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
 tikv-jemallocator = "0.5"
 publicsuffix = "2.2.3"
+hashbrown = { version = "0.14.0", features = ["serde"] }
 

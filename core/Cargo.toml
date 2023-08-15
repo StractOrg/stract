@@ -74,7 +74,6 @@ tokio-stream = { workspace = true }
 scylla = { workspace = true }
 chitchat = { workspace = true }
 memmap2 = { workspace = true }
-rkyv = { workspace = true }
 dashmap = { workspace = true }
 tch = { workspace = true }
 torch-sys = { workspace = true }
@@ -96,6 +95,7 @@ bytemuck = { workspace = true }
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 publicsuffix = { workspace = true }
+hashbrown = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { workspace = true }

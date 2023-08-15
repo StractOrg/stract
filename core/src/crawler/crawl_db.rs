@@ -14,21 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use hashbrown::HashMap;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet, VecDeque},
-    hash::Hash,
+    collections::{BinaryHeap, VecDeque},
     path::Path,
 };
-
-use itertools::Itertools;
-use rand::Rng;
-use rayon::prelude::IntoParallelRefIterator;
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use url::Url;
-
-use crate::intmap::{self, IntMap};
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
@@ -44,88 +38,6 @@ pub enum UrlStatus {
 pub enum DomainStatus {
     Pending,
     CrawlInProgress,
-}
-
-type Id = u128;
-trait AsId {
-    fn as_id(&self) -> Id;
-}
-
-impl AsId for Domain {
-    fn as_id(&self) -> Id {
-        self.id().0
-    }
-}
-
-impl AsId for Url {
-    fn as_id(&self) -> Id {
-        let digest = md5::compute(self.as_str());
-        u128::from_be_bytes(digest.0)
-    }
-}
-
-struct IdTable<T> {
-    db: rocksdb::DB,
-    _marker: std::marker::PhantomData<T>,
-}
-
-impl<T> IdTable<T>
-where
-    T: serde::Serialize + serde::de::DeserializeOwned + Hash + Eq + Clone + AsId,
-{
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // create dir if not exists
-        std::fs::create_dir_all(path.as_ref())?;
-
-        let mut options = rocksdb::Options::default();
-        options.create_if_missing(true);
-
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_ribbon_filter(5.0);
-
-        options.set_block_based_table_factory(&block_options);
-        options.set_optimize_filters_for_hits(true);
-        options.set_max_background_jobs(8);
-        options.set_write_buffer_size(512 * 1024 * 1024);
-        options.set_allow_mmap_reads(true);
-        options.set_allow_mmap_writes(true);
-        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
-        options.optimize_for_point_lookup(512);
-
-        let db = rocksdb::DB::open(&options, path.as_ref())?;
-
-        Ok(Self {
-            db,
-            _marker: std::marker::PhantomData,
-        })
-    }
-
-    pub fn bulk_insert_ids(&self, items: &[(T, Id)]) -> Result<()> {
-        let mut batch = rocksdb::WriteBatch::default();
-
-        for (item, id) in items {
-            batch.put(bincode::serialize(id)?, bincode::serialize(item)?);
-        }
-
-        let mut write_options = rocksdb::WriteOptions::default();
-        write_options.disable_wal(true);
-
-        self.db.write_opt(batch, &write_options)?;
-
-        Ok(())
-    }
-
-    pub fn value(&self, id: Id) -> Result<Option<T>> {
-        let id_bytes = bincode::serialize(&id)?;
-
-        // check db
-        let value = self.db.get(id_bytes)?;
-
-        match value {
-            Some(value) => Ok(Some(bincode::deserialize(&value)?)),
-            None => Ok(None),
-        }
-    }
 }
 
 struct SampledItem<T> {
@@ -186,24 +98,6 @@ struct UrlState {
 struct DomainState {
     weight: f64,
     status: DomainStatus,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct DomainId(u128);
-
-impl From<u128> for DomainId {
-    fn from(id: u128) -> Self {
-        Self(id)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-struct UrlId(u128);
-
-impl From<u128> for UrlId {
-    fn from(id: u128) -> Self {
-        Self(id)
-    }
 }
 
 pub struct RedirectDb {
@@ -271,7 +165,7 @@ where
         options.create_if_missing(true);
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_ribbon_filter(5.0);
+        block_options.set_ribbon_filter(10.0);
 
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
@@ -290,8 +184,8 @@ where
         })
     }
 
-    pub fn get(&mut self, key: K) -> Result<Option<V>> {
-        let key_bytes = bincode::serialize(&key)?;
+    pub fn get(&mut self, key: &K) -> Result<Option<V>> {
+        let key_bytes = bincode::serialize(key)?;
         let value_bytes = self.db.get(key_bytes)?;
 
         match value_bytes {
@@ -300,9 +194,9 @@ where
         }
     }
 
-    pub fn put(&mut self, key: K, value: V) -> Result<()> {
-        let key_bytes = bincode::serialize(&key)?;
-        let value_bytes = bincode::serialize(&value)?;
+    pub fn put(&mut self, key: &K, value: &V) -> Result<()> {
+        let key_bytes = bincode::serialize(key)?;
+        let value_bytes = bincode::serialize(value)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -338,9 +232,9 @@ impl DomainStateDb {
         Ok(Self { db })
     }
 
-    fn get(&self, domain_id: DomainId) -> Result<Option<DomainState>> {
-        let domain_id_bytes = bincode::serialize(&domain_id)?;
-        let value_bytes = self.db.get(domain_id_bytes)?;
+    fn get(&self, domain: &Domain) -> Result<Option<DomainState>> {
+        let domain_bytes = bincode::serialize(domain)?;
+        let value_bytes = self.db.get(domain_bytes)?;
 
         if let Some(value_bytes) = &value_bytes {
             let value: DomainState = bincode::deserialize(value_bytes)?;
@@ -350,60 +244,57 @@ impl DomainStateDb {
         Ok(None)
     }
 
-    fn put(&self, domain_id: DomainId, state: DomainState) -> Result<()> {
-        let domain_id_bytes = bincode::serialize(&domain_id)?;
-        let state_bytes = bincode::serialize(&state)?;
+    fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
+        let domain_bytes = bincode::serialize(domain)?;
+        let state_bytes = bincode::serialize(state)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
-        self.db
-            .put_opt(domain_id_bytes, state_bytes, &write_options)?;
+        self.db.put_opt(domain_bytes, state_bytes, &write_options)?;
 
         Ok(())
     }
 
-    fn iter(&self) -> impl Iterator<Item = (DomainId, DomainState)> + '_ {
+    fn iter(&self) -> impl Iterator<Item = (Domain, DomainState)> + '_ {
         let iter = self.db.iterator(rocksdb::IteratorMode::Start);
 
         iter.filter_map(|r| {
             let (key, value) = r.ok()?;
-            let domain_id: DomainId = bincode::deserialize(&key).unwrap();
+            let domain: Domain = bincode::deserialize(&key).unwrap();
             let state: DomainState = bincode::deserialize(&value).unwrap();
 
-            Some((domain_id, state))
+            Some((domain, state))
         })
     }
 }
 
-impl intmap::Key for UrlId {
-    const BIG_PRIME: Self = Self(335579573203413586826293107669396558523);
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+struct UrlString(String);
 
-    fn wrapping_mul(self, rhs: Self) -> Self {
-        Self(self.0.wrapping_mul(rhs.0))
+impl From<&Url> for UrlString {
+    fn from(url: &Url) -> Self {
+        Self(url.as_str().to_string())
     }
+}
 
-    fn bit_and(self, rhs: Self) -> Self {
-        Self(self.0 & rhs.0)
+impl From<Url> for UrlString {
+    fn from(url: Url) -> Self {
+        Self(url.as_str().to_string())
     }
+}
 
-    fn from_usize(val: usize) -> Self {
-        Self(val as u128)
-    }
-
-    fn as_usize(self) -> usize {
-        self.0 as usize
+impl From<&UrlString> for Url {
+    fn from(url: &UrlString) -> Self {
+        Url::parse(&url.0).unwrap()
     }
 }
 
 pub struct CrawlDb {
-    url_ids: IdTable<Url>,
-    domain_ids: IdTable<Domain>,
-
     redirects: RedirectDb,
 
     domain_state: DomainStateDb,
 
-    urls: PointDb<DomainId, IntMap<UrlId, UrlState>>,
+    urls: PointDb<Domain, HashMap<UrlString, UrlState>>,
 }
 
 impl CrawlDb {
@@ -414,63 +305,38 @@ impl CrawlDb {
             ));
         }
 
-        let url_ids = IdTable::open(path.as_ref().join("urls").join("ids"))?;
-        let domain_ids = IdTable::open(path.as_ref().join("domains").join("ids"))?;
         let redirects = RedirectDb::open(path.as_ref().join("redirects"))?;
 
         Ok(Self {
-            url_ids,
-            domain_ids,
             redirects,
-            domain_state: DomainStateDb::open(path.as_ref().join("domains").join("states"))?,
-            urls: PointDb::open(path.as_ref().join("urls").join("states"))?,
+            domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
+            urls: PointDb::open(path.as_ref().join("urls"))?,
         })
     }
 
     pub fn insert_seed_urls(&mut self, urls: &[Url]) -> Result<()> {
-        let domain_ids: HashSet<_> = urls
-            .par_iter()
-            .map(Domain::from)
-            .map(|domain| {
-                let id = domain.as_id();
-                (domain, id)
-            })
-            .collect();
-
-        let domain_ids: Vec<_> = domain_ids.into_iter().collect();
-        self.domain_ids.bulk_insert_ids(&domain_ids)?;
-
-        let url_ids: HashSet<_> = urls
-            .par_iter()
-            .map(|url| (url.clone(), url.as_id()))
-            .collect();
-
-        let url_ids: Vec<_> = url_ids.into_iter().collect();
-        self.url_ids.bulk_insert_ids(&url_ids)?;
-
         for url in urls {
-            let domain_id = Domain::from(url).as_id().into();
-            let url_id = url.as_id().into();
+            let domain = Domain::from(url);
 
             self.domain_state.put(
-                domain_id,
-                DomainState {
+                &domain,
+                &DomainState {
                     weight: 0.0,
                     status: DomainStatus::Pending,
                 },
             )?;
 
-            let mut urls = self.urls.get(domain_id)?.unwrap_or_default();
+            let mut urls = self.urls.get(&domain)?.unwrap_or_default();
 
             urls.insert(
-                url_id,
+                url.into(),
                 UrlState {
                     weight: 0.0,
                     status: UrlStatus::Pending,
                 },
             );
 
-            self.urls.put(domain_id, urls)?;
+            self.urls.put(&domain, &urls)?;
         }
 
         Ok(())
@@ -491,51 +357,30 @@ impl CrawlDb {
             }
         });
 
-        let domain_ids: Vec<_> = domains
-            .par_iter()
-            .map(|(domain, _)| (domain.clone(), domain.as_id()))
-            .collect();
-        self.domain_ids.bulk_insert_ids(&domain_ids)?;
-
-        let url_ids: Vec<_> = domains
-            .par_iter()
-            .flat_map(|(_, urls)| {
-                urls.iter()
-                    .map(|url| (url.url.clone(), url.url.as_id()))
-                    .collect_vec()
-            })
-            .collect();
-        self.url_ids.bulk_insert_ids(&url_ids)?;
-
-        for (domain_id, urls) in domain_ids
-            .into_iter()
-            .map(|(_, id)| id)
-            .zip_eq(domains.values())
-        {
-            let domain_id = domain_id.into();
-
-            let mut domain_state = match self.domain_state.get(domain_id)? {
+        for (domain, urls) in domains.into_iter() {
+            let mut domain_state = match self.domain_state.get(&domain)? {
                 Some(state) => state,
                 None => {
                     let state = DomainState {
                         weight: 0.0,
                         status: DomainStatus::Pending,
                     };
-                    self.domain_state.put(domain_id, state.clone())?;
+                    self.domain_state.put(&domain, &state)?;
 
                     state
                 }
             };
 
-            let mut url_states = self.urls.get(domain_id)?.unwrap_or_default();
+            let mut url_states = self.urls.get(&domain)?.unwrap_or_default();
 
             for url in urls {
-                let url_id: UrlId = url.url.as_id().into();
-
-                let mut url_state = url_states.get(&url_id).cloned().unwrap_or(UrlState {
-                    weight: 0.0,
-                    status: UrlStatus::Pending,
-                });
+                let mut url_state = url_states
+                    .get(&UrlString::from(&url.url))
+                    .cloned()
+                    .unwrap_or(UrlState {
+                        weight: 0.0,
+                        status: UrlStatus::Pending,
+                    });
 
                 if url.different_domain {
                     url_state.weight += 1.0;
@@ -545,12 +390,12 @@ impl CrawlDb {
                     domain_state.weight = url_state.weight;
                 }
 
-                url_states.insert(url_id, url_state);
+                url_states.insert(url.url.into(), url_state);
             }
 
-            self.domain_state.put(domain_id, domain_state)?;
+            self.domain_state.put(&domain, &domain_state)?;
 
-            self.urls.put(domain_id, url_states)?;
+            self.urls.put(&domain, &url_states)?;
         }
 
         Ok(())
@@ -590,73 +435,44 @@ impl CrawlDb {
             }
         }
 
-        // bulk register urls
-        let url_ids: Vec<_> = url_responses
-            .par_iter()
-            .flat_map(|(_, responses)| {
-                responses
-                    .iter()
-                    .flat_map(|res| match res {
-                        UrlResponse::Success { url } => vec![url],
-                        UrlResponse::Failed {
-                            url,
-                            status_code: _,
-                        } => vec![url],
-                        UrlResponse::Redirected { url, new_url } => vec![url, new_url],
-                    })
-                    .map(|url| (url.clone(), url.as_id()))
-                    .collect_vec()
-            })
-            .collect();
-
-        self.url_ids.bulk_insert_ids(&url_ids)?;
-
-        // bulk register domains
-        let domain_ids: Vec<_> = url_responses
-            .par_iter()
-            .map(|(domain, _)| (domain.clone(), domain.as_id()))
-            .collect();
-        self.domain_ids.bulk_insert_ids(&domain_ids)?;
-
-        for (domain_id, responses) in url_responses.into_iter().map(|(domain, responses)| {
-            let domain_id = domain.as_id().into();
-            (domain_id, responses)
-        }) {
-            if self.domain_state.get(domain_id)?.is_none() {
+        for (domain, responses) in url_responses {
+            if self.domain_state.get(&domain)?.is_none() {
                 self.domain_state.put(
-                    domain_id,
-                    DomainState {
+                    &domain,
+                    &DomainState {
                         weight: 0.0,
                         status: DomainStatus::Pending,
                     },
                 )?;
             }
 
-            let mut url_states = self.urls.get(domain_id)?.unwrap_or_default();
+            let mut url_states = self.urls.get(&domain)?.unwrap_or_default();
             for response in responses {
                 match response {
                     UrlResponse::Success { url } => {
-                        let url_id: UrlId = url.as_id().into();
-
-                        let mut url_state = url_states.get(&url_id).cloned().unwrap_or(UrlState {
-                            weight: 0.0,
-                            status: UrlStatus::Pending,
-                        });
+                        let mut url_state = url_states
+                            .get(&UrlString::from(&url))
+                            .cloned()
+                            .unwrap_or(UrlState {
+                                weight: 0.0,
+                                status: UrlStatus::Pending,
+                            });
 
                         url_state.status = UrlStatus::Done;
 
-                        url_states.insert(url_id, url_state);
+                        url_states.insert(UrlString::from(&url), url_state);
                     }
                     UrlResponse::Failed { url, status_code } => {
-                        let url_id: UrlId = url.as_id().into();
-
-                        let mut url_state = url_states.get(&url_id).cloned().unwrap_or(UrlState {
-                            weight: 0.0,
-                            status: UrlStatus::Pending,
-                        });
+                        let mut url_state = url_states
+                            .get(&UrlString::from(&url))
+                            .cloned()
+                            .unwrap_or(UrlState {
+                                weight: 0.0,
+                                status: UrlStatus::Pending,
+                            });
 
                         url_state.status = UrlStatus::Failed { status_code };
-                        url_states.insert(url_id, url_state);
+                        url_states.insert(url.into(), url_state);
                     }
                     UrlResponse::Redirected { url, new_url } => {
                         self.redirects.put(&url, &new_url).ok();
@@ -664,34 +480,30 @@ impl CrawlDb {
                 }
             }
 
-            self.urls.put(domain_id, url_states)?;
+            self.urls.put(&domain, &url_states)?;
         }
 
         Ok(())
     }
 
     pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
-        self.domain_ids
-            .bulk_insert_ids(&[(domain.clone(), domain.as_id())])?;
-        let domain_id = domain.id();
-
-        let mut domain_state = self.domain_state.get(domain_id)?.unwrap_or(DomainState {
+        let mut domain_state = self.domain_state.get(domain)?.unwrap_or(DomainState {
             weight: 0.0,
             status,
         });
 
         domain_state.status = status;
 
-        self.domain_state.put(domain_id, domain_state)?;
+        self.domain_state.put(domain, &domain_state)?;
 
         Ok(())
     }
 
-    pub fn sample_domains(&mut self, num_jobs: usize) -> Result<Vec<DomainId>> {
+    pub fn sample_domains(&mut self, num_jobs: usize) -> Result<Vec<Domain>> {
         let sampled = weighted_sample(
-            self.domain_state.iter().filter_map(|(id, state)| {
+            self.domain_state.iter().filter_map(|(domain, state)| {
                 if state.status == DomainStatus::Pending {
-                    Some((id, state.weight))
+                    Some((domain, state.weight))
                 } else {
                     None
                 }
@@ -699,40 +511,41 @@ impl CrawlDb {
             num_jobs,
         );
 
-        for id in sampled.iter() {
-            let mut state = self.domain_state.get(*id)?.unwrap();
+        for domain in sampled.iter() {
+            let mut state = self.domain_state.get(domain)?.unwrap();
             state.status = DomainStatus::CrawlInProgress;
-            self.domain_state.put(*id, state)?;
+            self.domain_state.put(domain, &state)?;
         }
 
         Ok(sampled)
     }
 
-    pub fn prepare_jobs(&mut self, domains: &[DomainId], urls_per_job: usize) -> Result<Vec<Job>> {
+    pub fn prepare_jobs(&mut self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
         let mut jobs = Vec::with_capacity(domains.len());
-        for domain_id in domains {
-            let mut urls = self.urls.get(*domain_id)?.unwrap_or_default();
-
-            let sampled: Vec<_> = weighted_sample(
-                urls.iter().filter_map(|(id, state)| {
+        for domain in domains {
+            let mut urls = self.urls.get(domain)?.unwrap_or_default();
+            let available_urls: Vec<_> = urls
+                .iter()
+                .filter_map(|(url, state)| {
                     if state.status == UrlStatus::Pending {
-                        Some((id, state.weight))
+                        Some((url.clone(), state.weight))
                     } else {
                         None
                     }
-                }),
-                urls_per_job,
-            )
-            .into_iter()
-            .copied()
-            .collect();
+                })
+                .collect();
 
-            for id in &sampled {
-                let state = urls.get_mut(id).unwrap();
+            let sampled: Vec<_> = weighted_sample(
+                available_urls.iter().map(|(url, weight)| (url, *weight)),
+                urls_per_job,
+            );
+
+            for url in &sampled {
+                let state = urls.get_mut(*url).unwrap();
                 state.status = UrlStatus::Crawling;
             }
 
-            let mut domain_state = self.domain_state.get(*domain_id)?.unwrap();
+            let mut domain_state = self.domain_state.get(domain)?.unwrap();
 
             domain_state.weight = urls
                 .iter()
@@ -746,22 +559,21 @@ impl CrawlDb {
                 .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
                 .unwrap_or(0.0);
 
-            self.domain_state.put(*domain_id, domain_state.clone())?;
+            self.domain_state.put(domain, &domain_state)?;
 
             let mut job = Job {
-                domain: self.domain_ids.value(domain_id.0)?.unwrap(),
+                domain: domain.clone(),
                 fetch_sitemap: false, // todo: fetch for new sites
                 urls: VecDeque::with_capacity(urls_per_job),
             };
 
-            for url_id in sampled {
-                let url = self.url_ids.value(url_id.0)?.unwrap();
-                job.urls.push_back(url);
+            for url in sampled {
+                job.urls.push_back(url.into());
             }
 
             jobs.push(job);
 
-            self.urls.put(*domain_id, urls)?;
+            self.urls.put(domain, &urls)?;
         }
 
         Ok(jobs)
@@ -802,14 +614,13 @@ mod tests {
             .unwrap();
 
         let domain = Domain::from(&Url::parse("https://example.com").unwrap());
-        let domain_id = domain.id();
 
         let sample = db.sample_domains(128).unwrap();
 
         assert_eq!(sample.len(), 1);
-        assert_eq!(&sample[0], &domain_id);
+        assert_eq!(&sample[0], &domain);
         assert_eq!(
-            db.domain_state.get(domain_id).unwrap().unwrap().status,
+            db.domain_state.get(&domain).unwrap().unwrap().status,
             DomainStatus::CrawlInProgress
         );
 

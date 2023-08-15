@@ -25,7 +25,7 @@ use url::Url;
 
 use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
 
-use self::{crawl_db::DomainId, warc_writer::WarcWriter, worker::WorkerThread};
+use self::{warc_writer::WarcWriter, worker::WorkerThread};
 
 pub mod coordinator;
 pub mod crawl_db;
@@ -74,11 +74,6 @@ impl From<String> for Domain {
 }
 
 impl Domain {
-    pub fn id(&self) -> DomainId {
-        let digest = md5::compute(self.0.as_bytes());
-        u128::from_be_bytes(digest.0).into()
-    }
-
     pub fn as_str(&self) -> &str {
         &self.0
     }
