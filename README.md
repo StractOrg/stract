@@ -5,6 +5,9 @@
   <a target="_blank" href="https://docs.trystract.com">
     <img src="https://img.shields.io/badge/overview-docs-0b7bff?labelColor=white" style="max-width: 100%;">
   </a>
+  <a target="_blank" href="https://trystract.com/beta/api/docs">
+    <img src="https://img.shields.io/badge/api-docs-0b7bff?labelColor=white" style="max-width: 100%;">
+  </a>
 </p>
 <br />
 
