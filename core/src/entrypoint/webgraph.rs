@@ -26,7 +26,7 @@ use crate::{
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 use tokio::pin;
 use tracing::{info, trace};
 
@@ -215,10 +215,10 @@ impl Webgraph {
 
         let mut graph = graphs.pop().unwrap();
         for other_graph in graphs {
+            let other_path = other_graph.path.clone();
             graph.merge(other_graph);
+            fs::remove_dir_all(other_path)?;
         }
-
-        graph.move_to(&parent_path);
 
         Ok(())
     }

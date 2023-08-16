@@ -626,24 +626,6 @@ impl Webgraph {
             }
         }
     }
-
-    pub fn move_to<P: AsRef<Path>>(&mut self, new_path: P) {
-        let path = Path::new(&self.path);
-        let new_path = new_path.as_ref();
-
-        if path == new_path {
-            return;
-        }
-
-        fs::rename(path, new_path).unwrap();
-
-        let path = Path::new(&self.path);
-        if path.exists() {
-            fs::remove_dir_all(path).unwrap();
-        }
-
-        self.path = new_path.as_os_str().to_str().unwrap().to_string();
-    }
 }
 
 impl From<FrozenWebgraph> for Webgraph {
