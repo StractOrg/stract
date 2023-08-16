@@ -133,8 +133,6 @@ import OpticSelector from "../components/OpticSelector.astro";
     const statusTemplate: HTMLDivElement = document.querySelector(".status-template")!;
     const opticSelector: HTMLSelectElement = document.querySelector("#optics-selector")!;
 
-    const allowStats = window.localStorage.getItem("allowAliceImprovements") === "true";
-
     let prevState: any | null = null;
     let chatId: string | null = null;
 
@@ -369,8 +367,6 @@ import OpticSelector from "../components/OpticSelector.astro";
         messageInput.disabled = false;
         sendButton.style.color = originalSendButtonColor;
         messageInput.focus();
-
-        improvements();
     }
 
     async function sendMessageToAlice(message: string) {
@@ -651,48 +647,6 @@ import OpticSelector from "../components/OpticSelector.astro";
         const codeBlocks = document.querySelectorAll("code");
         for (const codeBlock of codeBlocks) {
             codeBlock.style.background = "none";
-        }
-    }
-
-    // improvements
-    async function newChatId(): Promise<string> {
-        let url = "/improvement/alice/new_chat_id";
-
-        // post request using fetch api
-        let response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        return await response.text();
-    }
-
-    async function storeChat() {
-        if (chatId == null) {
-            chatId = await newChatId();
-        }
-
-        let chat = {
-            messages: messages,
-            id: chatId
-        };
-
-        let url = "/improvement/alice/store_chat";
-
-        await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify(chat),
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-    }
-
-    function improvements() {
-        if (allowStats) {
-            storeChat();
         }
     }
 </script>

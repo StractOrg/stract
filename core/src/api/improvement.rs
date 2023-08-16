@@ -22,7 +22,7 @@ use serde::Deserialize;
 use url::Url;
 use uuid::Uuid;
 
-use crate::improvement::{AliceMessage, ImprovementEvent, StoredQuery};
+use crate::improvement::{ImprovementEvent, StoredQuery};
 
 use super::{HtmlTemplate, State};
 
@@ -79,29 +79,6 @@ pub async fn store(
             Err(_) => String::new(),
         },
         None => String::new(),
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AliceConversation {
-    pub id: Uuid,
-    pub messages: Vec<AliceMessage>,
-}
-
-#[allow(clippy::unused_async)]
-pub async fn new_chat_id() -> impl IntoResponse {
-    Uuid::new_v4().to_string()
-}
-
-#[allow(clippy::unused_async)]
-pub async fn store_chat(
-    extract::State(state): extract::State<Arc<State>>,
-    extract::Json(params): extract::Json<AliceConversation>,
-) {
-    if let Some(q) = state.improvement_queue.as_ref() {
-        q.lock().await.push(ImprovementEvent::Chat {
-            chat: params.into(),
-        })
     }
 }
 

@@ -197,14 +197,6 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .route("/opensearch.xml", get(opensearch::route))
         .route("/improvement/click", post(improvement::click))
         .route("/improvement/store", post(improvement::store))
-        .route(
-            "/improvement/alice/new_chat_id",
-            post(improvement::new_chat_id),
-        )
-        .route(
-            "/improvement/alice/store_chat",
-            post(improvement::store_chat),
-        )
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
         .merge(docs::router())

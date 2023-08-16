@@ -12,7 +12,7 @@ import SettingsLayout from "../../layouts/Settings.astro";
 
     <div class="text-sm">
       It is important to note, that <b class="font-extrabold">no</b> personal information is stored about your search. We don't store your IP, browser fingerprint or even a precise timestamp.
-      In fact, you can see exactly what gets stored <a href="https://github.com/StractOrg/Stract/blob/main/core/src/improvement.rs#L36-#L64">here</a>.
+      In fact, you can see exactly what gets stored <a href="https://github.com/StractOrg/Stract/blob/main/core/src/improvement.rs#L37-#L51">here</a>.
     </div>
 
     <div class="text-sm">
@@ -24,15 +24,6 @@ import SettingsLayout from "../../layouts/Settings.astro";
       <input type="checkbox" id="allowStats" x-model="allowStats">
       <label for="allowStats">Allow usage statistics</label>
     </div>
-
-    {
-      askama.if_("with_alice.unwrap_or(true)", () => (
-        <div class="flex space-x-1 pl-1 text-sm" x-data="{ allowAliceImprovements: $persist(true).as('allowAliceImprovements') }">
-          <input type="checkbox" id="allowAliceImprovements" x-model="allowAliceImprovements">
-          <label for="allowAliceImprovements">Allow Alice conversations to be stored and used for training</label>
-        </div>
-      ))
-    }
   </div>
 </SettingsLayout>
 

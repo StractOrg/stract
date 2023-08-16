@@ -8,7 +8,6 @@
 </p>
 <br />
 
-
 Stract is an open source web search engine hosted at [trystract.com](https://trystract.com/) targeted towards tinkerers and developers.
 
 <br />
