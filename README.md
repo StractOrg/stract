@@ -1,11 +1,12 @@
+<a target="_blank" href="https://docs.trystract.com">
+  <img src="https://img.shields.io/badge/overview-docs-0b7bff?labelColor=white" style="max-width: 100%;">
+</a>
+
 <p align="center">
   <img src="git-assets/big-logo.svg" height="120" />
 </p>
 <br />
 
-<a target="_blank" href="https://docs.trystract.com">
-<img src="https://img.shields.io/badge/overview-docs-0b7bff?labelColor=white" style="max-width: 100%;">
-</a>
 
 Stract is an open source web search engine hosted at [trystract.com](https://trystract.com/) targeted towards tinkerers and developers.
 
