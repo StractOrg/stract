@@ -58,7 +58,19 @@ type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Site(String);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    rkyv::Archive,
+)]
+#[archive(check_bytes)]
 pub struct Domain(String);
 
 impl From<&Url> for Domain {

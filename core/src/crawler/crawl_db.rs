@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use hashbrown::HashMap;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use rkyv::{Archive, Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, VecDeque},
@@ -26,7 +26,8 @@ use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
 pub enum UrlStatus {
     Pending,
     Crawling,
@@ -34,7 +35,8 @@ pub enum UrlStatus {
     Done,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
 pub enum DomainStatus {
     Pending,
     CrawlInProgress,
@@ -89,12 +91,15 @@ fn weighted_sample<T>(items: impl Iterator<Item = (T, f64)>, num_items: usize) -
     sampled_items.into_iter().map(|s| s.item).collect()
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
 struct UrlState {
     weight: f64,
     status: UrlStatus,
 }
-#[derive(Clone, Serialize, Deserialize)]
+
+#[derive(Clone, Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
 struct DomainState {
     weight: f64,
     status: DomainStatus,
@@ -149,16 +154,11 @@ struct UrlToInsert {
     different_domain: bool,
 }
 
-struct PointDb<K, V> {
+struct UrlStateDb {
     db: rocksdb::DB,
-    _marker: std::marker::PhantomData<(K, V)>,
 }
 
-impl<K, V> PointDb<K, V>
-where
-    K: serde::Serialize + serde::de::DeserializeOwned,
-    V: serde::Serialize + serde::de::DeserializeOwned,
-{
+impl UrlStateDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut options = rocksdb::Options::default();
 
@@ -173,30 +173,35 @@ where
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
-        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
         options.optimize_for_point_lookup(512);
+        options.set_max_subcompactions(8);
+        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
+        options.set_compression_type(rocksdb::DBCompressionType::None);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
-        Ok(Self {
-            db,
-            _marker: std::marker::PhantomData,
-        })
+        Ok(Self { db })
     }
 
-    pub fn get(&mut self, key: &K) -> Result<Option<V>> {
-        let key_bytes = bincode::serialize(key)?;
+    pub fn get(&mut self, key: &Domain) -> Result<Option<BTreeMap<UrlString, UrlState>>> {
+        let key_bytes = rkyv::to_bytes::<_, 1024>(key)?;
         let value_bytes = self.db.get(key_bytes)?;
 
         match value_bytes {
-            Some(value_bytes) => Ok(Some(bincode::deserialize(&value_bytes)?)),
+            Some(value_bytes) => {
+                let archived =
+                    rkyv::check_archived_root::<BTreeMap<UrlString, UrlState>>(&value_bytes[..])
+                        .unwrap();
+                let value = archived.deserialize(&mut rkyv::Infallible).unwrap();
+                Ok(Some(value))
+            }
             None => Ok(None),
         }
     }
 
-    pub fn put(&mut self, key: &K, value: &V) -> Result<()> {
-        let key_bytes = bincode::serialize(key)?;
-        let value_bytes = bincode::serialize(value)?;
+    pub fn put(&mut self, key: &Domain, value: &BTreeMap<UrlString, UrlState>) -> Result<()> {
+        let key_bytes = rkyv::to_bytes::<_, 1024>(key)?;
+        let value_bytes = rkyv::to_bytes::<_, 1024>(value)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -225,7 +230,7 @@ impl DomainStateDb {
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
-        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
+        options.set_max_subcompactions(8);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
@@ -233,11 +238,12 @@ impl DomainStateDb {
     }
 
     fn get(&self, domain: &Domain) -> Result<Option<DomainState>> {
-        let domain_bytes = bincode::serialize(domain)?;
+        let domain_bytes = rkyv::to_bytes::<_, 1024>(domain)?;
         let value_bytes = self.db.get(domain_bytes)?;
 
         if let Some(value_bytes) = &value_bytes {
-            let value: DomainState = bincode::deserialize(value_bytes)?;
+            let archived = rkyv::check_archived_root::<DomainState>(&value_bytes[..]).unwrap();
+            let value = archived.deserialize(&mut rkyv::Infallible).unwrap();
             return Ok(Some(value));
         }
 
@@ -245,8 +251,8 @@ impl DomainStateDb {
     }
 
     fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
-        let domain_bytes = bincode::serialize(domain)?;
-        let state_bytes = bincode::serialize(state)?;
+        let domain_bytes = rkyv::to_bytes::<_, 1024>(domain)?;
+        let state_bytes = rkyv::to_bytes::<_, 1024>(state)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -260,15 +266,20 @@ impl DomainStateDb {
 
         iter.filter_map(|r| {
             let (key, value) = r.ok()?;
-            let domain: Domain = bincode::deserialize(&key).unwrap();
-            let state: DomainState = bincode::deserialize(&value).unwrap();
+            let domain_archive = rkyv::check_archived_root::<Domain>(&key[..]).ok()?;
+            let state_archive = rkyv::check_archived_root::<DomainState>(&value[..]).ok()?;
+
+            let domain: Domain = domain_archive.deserialize(&mut rkyv::Infallible).ok()?;
+            let state: DomainState = state_archive.deserialize(&mut rkyv::Infallible).ok()?;
 
             Some((domain, state))
         })
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Archive, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[archive(check_bytes)]
+#[archive_attr(derive(Hash, PartialEq, Eq, PartialOrd, Ord))]
 struct UrlString(String);
 
 impl From<&Url> for UrlString {
@@ -294,23 +305,23 @@ pub struct CrawlDb {
 
     domain_state: DomainStateDb,
 
-    urls: PointDb<Domain, HashMap<UrlString, UrlState>>,
+    urls: UrlStateDb,
 }
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if Path::new(path.as_ref()).exists() {
-            return Err(anyhow::anyhow!(
-                "crawl db already exists and might be in incorrect state"
-            ));
-        }
+        // if Path::new(path.as_ref()).exists() {
+        //     return Err(anyhow::anyhow!(
+        //         "crawl db already exists and might be in incorrect state"
+        //     ));
+        // }
 
         let redirects = RedirectDb::open(path.as_ref().join("redirects"))?;
 
         Ok(Self {
             redirects,
             domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
-            urls: PointDb::open(path.as_ref().join("urls"))?,
+            urls: UrlStateDb::open(path.as_ref().join("urls"))?,
         })
     }
 
@@ -541,8 +552,10 @@ impl CrawlDb {
             );
 
             for url in &sampled {
-                let state = urls.get_mut(*url).unwrap();
+                let mut state = urls.get(url).unwrap().clone();
                 state.status = UrlStatus::Crawling;
+
+                urls.insert((*url).clone(), state);
             }
 
             let mut domain_state = self.domain_state.get(domain)?.unwrap();

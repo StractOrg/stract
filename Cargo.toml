@@ -98,5 +98,5 @@ utoipa = "3.4.4"
 utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
 tikv-jemallocator = "0.5"
 publicsuffix = "2.2.3"
-hashbrown = { version = "0.14.0", features = ["serde"] }
+rkyv = { version = "0.7.42", features = ["validation"] }
 

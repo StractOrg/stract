@@ -1,5 +1,5 @@
 # Optics
 Optics is a domain specific language that is intended to give the user full control over which search results gets returned.
+The syntax for optics is described in the [quickstart guide](https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic), but the overall idea is that the user specifies a set of rules where each rule contains a set of matches that must all match the search result and an action that is then applied to the search result. The result can either be boosted, downranked or discarded.
 
-- If the user has specified an optic url, we grab the file from the url and parses it.
-- Compiles down to tantivy queries that are matched against the inverted index.
+When an optic is applied to a search query, the optic is fetched at the provided url after which it is parsed and compiled into an additional set of tantivy queries. These queries are then combined with the actual search query that can be evaluated against the inverted index.
