@@ -22,9 +22,11 @@ pub use distributed::*;
 pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     bangs::BangHit,
+    config::defaults,
     ranking::pipeline::RankingWebsite,
     search_prettifier::{
         DisplayedAnswer, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
@@ -42,7 +44,7 @@ pub enum SearchResult {
     Bang(Box<BangHit>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
@@ -87,7 +89,7 @@ impl Default for SearchQuery {
             selected_region: Default::default(),
             optic: Default::default(),
             site_rankings: Default::default(),
-            return_ranking_signals: false,
+            return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
         }
     }
 }

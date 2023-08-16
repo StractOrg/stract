@@ -23,6 +23,7 @@ use chrono::{NaiveDateTime, Utc};
 use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::{
     inverted_index::RetrievedWebpage,
@@ -34,9 +35,9 @@ use crate::{
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
 pub use entity::DisplayedEntity;
 
-use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
+pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub enum Snippet {
     Normal {
         date: Option<String>,
@@ -48,7 +49,7 @@ pub enum Snippet {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct HighlightedSpellCorrection {
     pub raw: String,
     pub highlighted: String,
@@ -159,7 +160,7 @@ fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
@@ -171,7 +172,7 @@ pub struct DisplayedWebpage {
     pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DisplayedAnswer {
     pub title: String,
     pub url: String,
@@ -204,7 +205,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub enum Sidebar {
     Entity(DisplayedEntity),
     StackOverflow {

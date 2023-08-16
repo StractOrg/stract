@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::config::defaults;
 use http::{StatusCode, Uri};
 use optics::{Optic, SiteRankings};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use axum::Json;
 use axum_macros::debug_handler;
@@ -267,7 +269,9 @@ fn next_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> String {
     next_page_url
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(title = "SearchQuery", example = json!({"query": "hello world"}))]
 pub struct ApiSearchQuery {
     pub query: String,
     pub page: Option<usize>,
@@ -275,8 +279,12 @@ pub struct ApiSearchQuery {
     pub selected_region: Option<Region>,
     pub optic: Option<String>,
     pub site_rankings: Option<SiteRankings>,
-    pub return_ranking_signals: Option<bool>,
-    pub flatten_response: Option<bool>,
+
+    #[serde(default = "defaults::SearchQuery::return_ranking_signals")]
+    pub return_ranking_signals: bool,
+
+    #[serde(default = "defaults::SearchQuery::flatten_response")]
+    pub flatten_response: bool,
 }
 
 impl TryFrom<ApiSearchQuery> for SearchQuery {
@@ -298,14 +306,12 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             selected_region: api.selected_region,
             optic,
             site_rankings: api.site_rankings,
-            return_ranking_signals: api
-                .return_ranking_signals
-                .unwrap_or(default.return_ranking_signals),
+            return_ranking_signals: api.return_ranking_signals,
         })
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(tag = "@type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
@@ -324,11 +330,19 @@ impl From<SearchResult> for ApiSearchResult {
 #[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
+#[utoipa::path(
+    post,
+    path = "/beta/api/search",
+    request_body(content = ApiSearchQuery),
+    responses(
+        (status = 200, description = "Search results", body = ApiSearchResult),
+    )
+)]
 pub async fn api(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(query): extract::Json<ApiSearchQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let flatten_result = query.flatten_response.unwrap_or(true);
+    let flatten_result = query.flatten_response;
     let query = SearchQuery::try_from(query);
 
     if let Err(err) = query {

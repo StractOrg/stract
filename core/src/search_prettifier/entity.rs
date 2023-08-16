@@ -18,13 +18,14 @@ use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     entity_index::{entity::Span, EntityMatch},
     searcher::LocalSearcher,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,

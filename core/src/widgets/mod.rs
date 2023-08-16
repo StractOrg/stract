@@ -16,10 +16,11 @@
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use self::calculator::{try_calculate, Calculation};
 
-mod calculator;
+pub mod calculator;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -29,7 +30,7 @@ pub enum Error {
     CalculatorParse,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub enum Widget {
     Calculator(Calculation),
 }

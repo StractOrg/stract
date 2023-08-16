@@ -17,12 +17,13 @@
 use std::{collections::HashMap, fs::File, io::Write, path::Path};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{Error, Result};
 
 use super::Webpage;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Default, ToSchema)]
 pub enum Region {
     #[default]
     All,

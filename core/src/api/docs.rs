@@ -14,13 +14,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use super::search;
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(OpenApi)]
 #[openapi(
-        paths(),
+        paths(
+            search::api,
+        ),
+        components(
+            schemas(
+                crate::webpage::region::Region,
+                optics::SiteRankings,
+                search::ApiSearchQuery,
+                search::ApiSearchResult,
+                crate::searcher::WebsitesResult,
+                crate::search_prettifier::HighlightedSpellCorrection,
+                crate::search_prettifier::DisplayedWebpage,
+                crate::search_prettifier::DisplayedEntity,
+                crate::search_prettifier::DisplayedAnswer,
+                crate::search_prettifier::Sidebar,
+                crate::search_prettifier::Snippet,
+                crate::search_prettifier::StackOverflowAnswer,
+                crate::search_prettifier::StackOverflowQuestion,
+                crate::search_prettifier::CodeOrText,
+
+                crate::bangs::UrlWrapper,
+
+                crate::widgets::Widget,
+                crate::widgets::calculator::Calculation,
+                crate::widgets::calculator::Expr,
+                crate::ranking::signal::SignalScore,
+                crate::bangs::BangHit,
+                crate::bangs::Bang,
+            ),
+        ),
         modifiers(&ApiModifier),
         tags(
             (name = "stract"),
@@ -43,5 +73,9 @@ pub fn router<S: Clone + Send + Sync + 'static, B: axum::body::HttpBody + Send +
 ) -> impl Into<Router<S, B>> {
     SwaggerUi::new("/beta/api/docs")
         .url("/beta/api/docs/openapi.json", ApiDoc::openapi())
-        .config(utoipa_swagger_ui::Config::default().use_base_layout())
+        .config(
+            utoipa_swagger_ui::Config::default()
+                .use_base_layout()
+                .default_models_expand_depth(0),
+        )
 }

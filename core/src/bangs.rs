@@ -14,17 +14,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::query::parser::Term;
 
 pub const BANG_PREFIX: char = '!';
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Bang {
     #[serde(rename = "c")]
     pub(crate) category: Option<String>,
@@ -48,10 +54,35 @@ pub struct Bang {
     pub(crate) url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+/// Wrapper around `Url` that implements `ToSchema` for `Url`.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, ToSchema)]
+#[schema(value_type = String, title = "Url")]
+pub struct UrlWrapper(Url);
+
+impl DerefMut for UrlWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for UrlWrapper {
+    type Target = Url;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Url> for UrlWrapper {
+    fn from(url: Url) -> Self {
+        Self(url)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, ToSchema)]
 pub struct BangHit {
     pub bang: Bang,
-    pub redirect_to: Url,
+    pub redirect_to: UrlWrapper,
 }
 
 pub struct Bangs {
@@ -110,7 +141,7 @@ impl Bangs {
 
                 return Some(BangHit {
                     bang: bang.clone(),
-                    redirect_to: Url::parse(url.as_str()).unwrap(),
+                    redirect_to: Url::parse(url.as_str()).unwrap().into(),
                 });
             }
         }
@@ -157,6 +188,7 @@ mod tests {
                 },
                 redirect_to: Url::parse("https://www.youtube.com/results?search_query=bangs")
                     .unwrap()
+                    .into()
             })
         );
     }

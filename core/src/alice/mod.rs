@@ -169,8 +169,8 @@ impl Searcher {
             page: None,
             selected_region: None,
             site_rankings: None,
-            return_ranking_signals: None,
-            flatten_response: Some(false),
+            return_ranking_signals: false,
+            flatten_response: false,
         };
         tracing::debug!("searching at {:?}: {:#?}", self.url, query);
 

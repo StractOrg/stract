@@ -32,3 +32,4 @@ Inbound similarity plays a crucial role in enhancing personalized search results
 Let's denote the set of inbound links for site $u$ as $I_{u}$ and $v$ for $I_{v}$. The similarity between two sites is calculated as the cosine similarity between their inbound link vectors:
 $$S(u, v) = \frac{I_{u} \cdot I_{v}}{\|\|I_{u}\|\|\|\|I_{v}\|\|}$$
 
+It's also this inbound similarity metric that is used to find similar sites in the *explore* feature.

@@ -18,12 +18,13 @@ use crate::widgets::{Error, Result};
 use lalrpop_util::lalrpop_mod;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+use utoipa::ToSchema;
 
 lalrpop_mod!(pub parser, "/widgets/calculator.rs");
 pub static PARSER: once_cell::sync::Lazy<parser::ExprParser> =
     once_cell::sync::Lazy::new(parser::ExprParser::new);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub enum Expr {
     Number(f64),
     Op(Box<Expr>, Opcode, Box<Expr>),
@@ -106,7 +107,7 @@ fn parse(expr: &str) -> Result<Box<Expr>> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct Calculation {
     pub input: String,
     pub expr: Box<Expr>,

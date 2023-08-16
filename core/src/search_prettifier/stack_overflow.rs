@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::{
     inverted_index::RetrievedWebpage,
@@ -26,7 +27,7 @@ use crate::{
 use super::{Sidebar, Snippet};
 use crate::Result;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct StackOverflowAnswer {
     pub body: Vec<CodeOrText>,
     pub date: String,
@@ -35,12 +36,12 @@ pub struct StackOverflowAnswer {
     pub accepted: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct StackOverflowQuestion {
     pub body: Vec<CodeOrText>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub enum CodeOrText {
     Code(String),
     Text(String),

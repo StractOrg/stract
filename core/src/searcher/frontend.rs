@@ -213,7 +213,7 @@ impl FrontendSearcher {
                     tag: String::new(),
                     url: webpage.url.clone(),
                 },
-                redirect_to: Url::parse(&webpage.url).unwrap(),
+                redirect_to: Url::parse(&webpage.url).unwrap().into(),
             }));
         }
 

@@ -35,6 +35,7 @@ use tantivy::postings::SegmentPostings;
 use tantivy::query::{PhraseQuery, Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};
@@ -1106,7 +1107,7 @@ pub struct ComputedSignal {
     pub score: SignalScore,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 pub struct SignalScore {
     pub coefficient: f64,
     pub value: f64,

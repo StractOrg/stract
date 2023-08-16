@@ -113,3 +113,15 @@ impl SearchServer {
         true
     }
 }
+
+pub struct SearchQuery;
+
+impl SearchQuery {
+    pub fn flatten_response() -> bool {
+        true
+    }
+
+    pub fn return_ranking_signals() -> bool {
+        false
+    }
+}

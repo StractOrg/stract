@@ -22,6 +22,7 @@ use std::convert::TryFrom;
 use ast::RankingCoeff;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use self::ast::{RawAction, RawMatchPart, RawOptic, RawRule};
 pub use lexer::lex;
@@ -370,7 +371,7 @@ impl ToString for Rule {
     }
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone, ToSchema)]
 pub struct SiteRankings {
     pub liked: Vec<String>,
     pub disliked: Vec<String>,

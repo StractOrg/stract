@@ -5,7 +5,7 @@ coordinator_host = "0.0.0.0:8080"
 
 [user_agent]
 token = "StractBot"
-full = "Mozilla/5.0 (compatible; StractBot/0.1; +https://trystract.com/webmasters)"
+full = "Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://trystract.com/webmasters)"
 
 [s3]
 bucket = "crawl"

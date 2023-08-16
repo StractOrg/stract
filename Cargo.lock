@@ -2973,6 +2973,7 @@ dependencies = [
  "once_cell",
  "serde",
  "thiserror",
+ "utoipa",
 ]
 
 [[package]]
@@ -5254,6 +5255,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.56",
  "quote 1.0.26",
+ "regex",
  "syn 2.0.15",
 ]
 
