@@ -22,6 +22,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use tracing::info;
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::config;
 use crate::distributed::cluster::Cluster;
@@ -37,7 +38,7 @@ use crate::webgraph::Node;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct ScoredSite {
     pub site: String,
     pub score: f64,

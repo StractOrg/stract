@@ -18,6 +18,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::distributed::{
     cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic,
@@ -47,13 +48,20 @@ impl RemoteWebgraph {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct SimilarSitesParams {
     pub sites: Vec<String>,
     pub top_n: usize,
 }
 
 #[allow(clippy::unused_async)]
+#[utoipa::path(post,
+    path = "/beta/api/webgraph/similar_sites",
+    request_body(content = SimilarSitesParams),
+    responses(
+        (status = 200, description = "List of similar sites", body = Vec<ScoredSite>),
+    )
+)]
 pub async fn similar_sites(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(params): extract::Json<SimilarSitesParams>,
@@ -91,12 +99,12 @@ pub async fn similar_sites(
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, IntoParams)]
 pub struct KnowsSiteParams {
     pub site: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(tag = "@type", rename_all = "camelCase")]
 pub enum KnowsSite {
     Known { site: String },
@@ -104,6 +112,13 @@ pub enum KnowsSite {
 }
 
 #[allow(clippy::unused_async)]
+#[utoipa::path(post,
+    path = "/beta/api/webgraph/knows_site",
+    params(KnowsSiteParams),
+    responses(
+        (status = 200, description = "Whether the site is known", body = KnowsSite),
+    )
+)]
 pub async fn knows_site(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<KnowsSiteParams>,
