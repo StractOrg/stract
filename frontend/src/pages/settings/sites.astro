@@ -2,55 +2,67 @@
 import SettingsLayout from "../../layouts/Settings.astro";
 ---
 <SettingsLayout>
-  <div>
-    <h1 class="mb-2 text-2xl font-medium">Liked Sites</h1>
-    <div class="text-sm">
-      Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.
-    </div>
-    <div>
-      <div
-        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
-        id="liked-list"
-      >
-        <div class="w-10"></div>
-        <div class="font-medium">Site Name</div>
-      </div>
-    </div>
-  </div>
+  <div class="flex flex-col w-full h-full space-y-10">
 
-  <div>
-    <h1 class="mb-2 text-2xl font-medium">Disliked Sites</h1>
-    <div class="text-sm">
-      Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.
-    </div>
     <div>
-      <div
-        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
-        id="disliked-list"
-      >
-        <div class="w-10"></div>
-        <div class="font-medium">Site Name</div>
+      <h1 class="mb-2 text-2xl font-medium">Liked Sites</h1>
+      <div class="text-sm">
+        Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.
+      </div>
+      <div>
+        <div
+          class="grid w-full grid-cols-[auto_1fr] space-y-5"
+          id="liked-list"
+        >
+          <div class="w-10"></div>
+          <div class="font-medium">Site Name</div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div>
-    <h1 class="mb-2 text-2xl font-medium">Blocked Sites</h1>
-    <div class="text-sm">
-      These are the sites you have blocked. They won't appear in any of
-      your searches.
-    </div>
     <div>
-      <div
-        class="grid mb-10 w-full grid-cols-[auto_1fr] space-y-5"
-        id="blocked-list"
-      >
-        <div class="w-10"></div>
-        <div class="font-medium">Site Name</div>
+      <h1 class="mb-2 text-2xl font-medium">Disliked Sites</h1>
+      <div class="text-sm">
+        Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.
       </div>
+      <div>
+        <div
+          class="grid w-full grid-cols-[auto_1fr] space-y-5"
+          id="disliked-list"
+        >
+          <div class="w-10"></div>
+          <div class="font-medium">Site Name</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h1 class="mb-2 text-2xl font-medium">Blocked Sites</h1>
+      <div class="text-sm">
+        These are the sites you have blocked. They won't appear in any of
+        your searches.
+      </div>
+      <div>
+        <div
+          class="grid w-full grid-cols-[auto_1fr] space-y-5"
+          id="blocked-list"
+        >
+          <div class="w-10"></div>
+          <div class="font-medium">Site Name</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-center">
+      <a id="export-optic" href="#" download="exported.optic" class="w-fit bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5">
+        Clear all and export as optic
+      </a>
     </div>
   </div>
 </SettingsLayout>
+
+
+<script is:inline src="/js/lz-string.min.js"></script>
 
 <script is:inline>
   let sites = JSON.parse(
@@ -60,6 +72,7 @@ import SettingsLayout from "../../layouts/Settings.astro";
   const likedList = document.getElementById("liked-list");
   const dislikedList = document.getElementById("disliked-list");
   const blockedList = document.getElementById("blocked-list");
+  const exportButton = document.getElementById("export-optic");
 
   const BLOCKED = 0;
   const LESS = 1;
@@ -134,5 +147,46 @@ import SettingsLayout from "../../layouts/Settings.astro";
     updateList();
   }
 
+  exportButton.addEventListener("click", () => {
+    sites = {}
+    
+    window.localStorage.setItem(
+      "sites-ranking-adjustment",
+      JSON.stringify(sites)
+    );
+    
+    updateList();
+  });
+
+  function updateExportLink() {
+    console.log(sites);
+    if (sites.length == 0) {
+      exportButton.href = "#";
+      return;
+    }
+
+    let data = {
+      liked: [],
+      disliked: [],
+      blocked: [],
+    };
+
+    for (const site in sites) {
+      if (sites[site] == MORE) {
+        data.liked.push(site);
+      } else if (sites[site] == LESS) {
+        data.disliked.push(site);
+      } else if (sites[site] == BLOCKED) {
+        data.blocked.push(site);
+      }
+    }
+
+    // @ts-ignore
+    const compressed = LZString.compressToBase64(JSON.stringify(data));
+    const url = window.location + "/export?data=" + compressed;
+    exportButton.href = url;
+  }
+
   updateList();
+  updateExportLink();
 </script>

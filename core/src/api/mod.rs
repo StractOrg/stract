@@ -191,6 +191,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .route("/settings", get(optics::route))
         .route("/settings/optics", get(optics::route))
         .route("/settings/sites", get(sites::route))
+        .route("/settings/sites/export", get(sites::export))
         .route("/settings/privacy", get(improvement::settings))
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/webmasters", get(crawler::info_route))

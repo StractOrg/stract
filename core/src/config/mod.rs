@@ -25,17 +25,17 @@ use std::net::SocketAddr;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
-    pub(crate) limit_warc_files: Option<usize>,
-    pub(crate) skip_warc_files: Option<usize>,
-    pub(crate) warc_source: WarcSource,
-    pub(crate) batch_size: Option<usize>,
-    pub(crate) page_webgraph_path: Option<String>,
-    pub(crate) output_path: Option<String>,
-    pub(crate) host_centrality_threshold: Option<f64>,
-    pub(crate) topics_path: Option<String>,
-    pub(crate) host_centrality_store_path: String,
-    pub(crate) page_centrality_store_path: Option<String>,
-    pub(crate) minimum_clean_words: Option<usize>,
+    pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
+    pub warc_source: WarcSource,
+    pub batch_size: Option<usize>,
+    pub page_webgraph_path: Option<String>,
+    pub output_path: Option<String>,
+    pub host_centrality_threshold: Option<f64>,
+    pub topics_path: Option<String>,
+    pub host_centrality_store_path: String,
+    pub page_centrality_store_path: Option<String>,
+    pub minimum_clean_words: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -47,12 +47,12 @@ pub enum WebgraphLevel {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
-    pub(crate) level: WebgraphLevel,
-    pub(crate) redirect_db_path: Option<String>,
-    pub(crate) limit_warc_files: Option<usize>,
-    pub(crate) warc_source: WarcSource,
-    pub(crate) graph_base_path: Option<String>,
-    pub(crate) batch_size: Option<usize>,
+    pub level: WebgraphLevel,
+    pub redirect_db_path: Option<String>,
+    pub limit_warc_files: Option<usize>,
+    pub warc_source: WarcSource,
+    pub graph_base_path: Option<String>,
+    pub batch_size: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -130,8 +130,8 @@ pub struct LocalConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HttpConfig {
-    pub(crate) base_url: String,
-    pub(crate) warc_paths_file: String,
+    pub base_url: String,
+    pub warc_paths_file: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

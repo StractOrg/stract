@@ -19,6 +19,8 @@ use std::sync::Arc;
 use super::{HtmlTemplate, State};
 use askama::Template;
 use axum::{extract, response::IntoResponse};
+use http::StatusCode;
+use optics::{Optic, SiteRankings};
 
 #[allow(clippy::unused_async)]
 pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
@@ -33,4 +35,43 @@ pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl In
 #[template(path = "settings/sites/index.html")]
 struct SitesTemplate {
     with_alice: Option<bool>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ExportParams {
+    pub data: String,
+}
+
+#[allow(clippy::unused_async)]
+pub async fn export(
+    extract::Query(ExportParams { data }): extract::Query<ExportParams>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let data = data.replace(' ', "+");
+    match lz_str::decompress_from_base64(&data) {
+        Some(bytes) => match String::from_utf16(&bytes) {
+            Ok(s) => match serde_json::from_str::<SiteRankings>(&s) {
+                Ok(site_rankings) => {
+                    let optic = Optic {
+                        site_rankings,
+                        rules: vec![],
+                        ..Default::default()
+                    };
+
+                    Ok(optic.to_string())
+                }
+                Err(err) => {
+                    tracing::error!("Failed to parse data: {}", err);
+                    Err(StatusCode::BAD_REQUEST)
+                }
+            },
+            Err(err) => {
+                tracing::error!("Failed to parse data: {}", err);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        },
+        None => {
+            tracing::error!("Failed to de-compress data");
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
 }

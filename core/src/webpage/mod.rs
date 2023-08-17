@@ -179,11 +179,8 @@ impl Webpage {
             );
         }
 
-        let backlink_text: String = itertools::intersperse(
-            self.backlink_labels.into_iter().map(|label| label),
-            "\n".to_string(),
-        )
-        .collect();
+        let backlink_text: String =
+            itertools::intersperse(self.backlink_labels, "\n".to_string()).collect();
 
         doc.add_text(
             schema
