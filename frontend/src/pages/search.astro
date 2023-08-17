@@ -101,18 +101,18 @@ import Searchbar from "../components/Searchbar.astro";
                     <div class="flex min-w-0 grow flex-col space-y-1">
                       <div class="flex items-center text-sm">
                         <a
-                          class="url truncate text-gray-800 hover:no-underline"
+                          class="url truncate text-gray-800 hover:no-underline improvement-on-click"
                           href="{{ item.url }}"
-                          onclick="improvement({{ loop.index0 }})"
+                          data-idx="{{ loop.index0 }}"
                         >
                           {askama`item.pretty_url $ {{internet.url}}`}
                         </a>
                       </div>
                       <a
-                        class="title-link sr-title-link truncate text-xl font-medium"
+                        class="title-link sr-title-link truncate text-xl font-medium improvement-on-click"
                         title="{{ item.title }}"
                         href="{{ item.url }}"
-                        onclick="improvement({{ loop.index0 }})"
+                        data-idx="{{ loop.index0 }}"
                       >
                         {askama`item.title $ {{lorem.sentence}}`}
                       </a>
@@ -180,7 +180,7 @@ import Searchbar from "../components/Searchbar.astro";
       {
         askama.for_("alert in alerts", () => (
           <div class="bg-red-700 text-white py-2 pl-2 pr-4 mr-2 mb-2 rounded-xl">
-            <span class="cursor-pointer mr-2" onclick="this.parentElement.style.display='none';">&times;</span>
+            <span class="cursor-pointer mr-2 alert-cross">&times;</span>
             {askama`alert $ {{lorem.sentence}}`}
           </div>
         ))
@@ -245,92 +245,9 @@ import Searchbar from "../components/Searchbar.astro";
     <>
       <link rel="stylesheet" href="/css/highlightjs-default.min.css" />
       <script is:inline src="/js/highlight.min.js"></script>
-      <script is:inline>
-        hljs.highlightAll();
-      </script>
+      <script is:inline src="/js/activate_hljs.js"></script>
     </>
   ))
 }
 
-<script is:inline>
-  var rankingAdjustButtons = document.querySelectorAll(".adjust-btn");
-  var titleLinks = document.querySelectorAll(".sr-title-link");
-  var modal = document.getElementById("modal");
-
-  var searchParams = new URLSearchParams(window.location.search);
-  var query = searchParams.get("q");
-
-  const allowStats = window.localStorage.getItem("allowStats") === "true";
-
-  var qid = null;
-
-  var improvementSent = new Set();
-
-  var urls = [];
-
-  for (const elem of titleLinks) {
-    urls.push(elem.href);
-  }
-
-  if (allowStats) {
-    fetch("/improvement/store", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        "query": query,
-        "urls": urls
-      })
-    }).then((response) => response.text()).then((data) => {
-      qid = data;
-    });
-  }
-
-  document.addEventListener("click", (elem) => {
-    modal.classList.remove("modal-open");
-    modal.classList.add("modal-closed");
-  });
-
-  var rankingModalHeight = modal.clientHeight;
-
-  var prevButtonClickIdx = -1;
-
-  rankingAdjustButtons.forEach((btn) => {
-    btn.addEventListener("click", (event) => {
-      event.stopPropagation();
-
-      const elem = event.target;
-      const hasCleanBody = (elem.dataset.hasCleanBody === "true");
-
-      updateModal(elem.dataset.idx, elem.dataset.site, elem.dataset.url, hasCleanBody);
-
-      const rect = elem.getBoundingClientRect();
-      modal.style.left = rect.left + rect.width + 5 + "px";
-      modal.style.top =
-        rect.top +
-        document.documentElement.scrollTop -
-        rankingModalHeight / 2 +
-        "px";
-
-      setTimeout(() => {
-        if (prevButtonClickIdx == elem.dataset.idx && modal.classList.contains("modal-open")) {
-          modal.classList.add("modal-closed");
-          modal.classList.remove("modal-open");
-        } else {
-          modal.classList.remove("modal-closed");
-          modal.classList.add("modal-open");
-        }
-
-        prevButtonClickIdx = elem.dataset.idx;
-      }, 0);
-    });
-  });
-
-  function improvement(idx) {
-    if (allowStats && qid && !improvementSent.has(idx)) {
-      window.navigator.sendBeacon("/improvement/click?qid=" + qid + "&click=" + idx);
-      improvementSent.add(idx);
-    }
-  }
-</script>
+<script is:inline src="/js/search.js"></script>
