@@ -72,27 +72,26 @@ import { askama } from "../askama";
   }
 </style>
 
-<script is:inline src="/js/lz-string.min.js"></script>
-<script>
-  const siteInput: HTMLInputElement = document.querySelector("#site-input")!;
-  const siteInputContainer: HTMLDivElement = document.querySelector("#site-input-container")!;
-  const siteInputError: HTMLLabelElement = document.querySelector("#site-input-error")!;
+<script is:inline>
+  const siteInput = document.querySelector("#site-input");
+  const siteInputContainer = document.querySelector("#site-input-container");
+  const siteInputError = document.querySelector("#site-input-error");
   const origSiteInputBorderColor = siteInputContainer.style.borderColor;
-  const sitesList: HTMLDivElement = document.querySelector("#sites-list")!;
-  const result: HTMLDivElement = document.querySelector("#result")!;
-  const limit: HTMLSelectElement = document.querySelector("#limit")!;
-  const submitButton: HTMLButtonElement = document.querySelector("#add-site-btn")!;
-  const resultContainer: HTMLHeadingElement = document.querySelector("#result-container")!;
-  const moreButton: HTMLDivElement = document.querySelector("#more-btn")!;
-  const exportButton: HTMLAnchorElement = document.querySelector("#export-optic")!;
+  const sitesList = document.querySelector("#sites-list");
+  const result = document.querySelector("#result");
+  const limit = document.querySelector("#limit");
+  const submitButton = document.querySelector("#add-site-btn");
+  const resultContainer = document.querySelector("#result-container");
+  const moreButton = document.querySelector("#more-btn");
+  const exportButton = document.querySelector("#export-optic");
 
   const origMoreButtonColor = moreButton.style.color;
 
   const API = "/beta/api/webgraph/similar_sites";
   const KNOWS_SITE_API = "/beta/api/webgraph/knows_site";
 
-  let sites: string[] = [];
-  let similarSites: string[] = [];
+  let sites = [];
+  let similarSites = [];
 
   siteInput.addEventListener("keyup", function(event) {
     if (event.key === "Enter") {
@@ -156,13 +155,13 @@ import { askama } from "../askama";
       });
   }
 
-  function addSite(site: string) {
+  function addSite(site) {
     sites.push(site);
     displayChosenSites();
     updateSimilarSites();
   }
   
-  function removeSite(index: number) {
+  function removeSite(index) {
     sites.splice(index, 1);
     displayChosenSites();
     updateSimilarSites();
@@ -210,10 +209,10 @@ import { askama } from "../askama";
         result.innerHTML = "";
 
 
-        similarSites = data.map((res: {site: string, score: number}) => res.site);
+        similarSites = data.map((res) => res.site);
 
 
-        data.forEach((res: {site: string, score: number, description: string | null}) => {
+        data.forEach((res) => {
           const addSiteDiv = document.createElement("div");
           addSiteDiv.style.width = "1rem";
 
@@ -258,3 +257,4 @@ import { askama } from "../askama";
     exportButton.href = url;
   }
 </script>
+<script is:inline src="/js/lz-string.min.js"></script>

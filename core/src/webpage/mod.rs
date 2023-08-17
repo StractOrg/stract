@@ -292,6 +292,51 @@ impl From<RobotsMeta> for usize {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
+enum MicroFormat {
+    HCard,
+    HEvent,
+    HEntry,
+    HRecipe,
+    HReview,
+    HProduct,
+}
+
+impl MicroFormat {
+    fn as_str(&self) -> &str {
+        match self {
+            MicroFormat::HCard => "h-card",
+            MicroFormat::HEvent => "h-event",
+            MicroFormat::HEntry => "h-entry",
+            MicroFormat::HRecipe => "h-recipe",
+            MicroFormat::HReview => "h-review",
+            MicroFormat::HProduct => "h-product",
+        }
+    }
+}
+
+impl From<MicroFormat> for usize {
+    fn from(value: MicroFormat) -> Self {
+        match value {
+            MicroFormat::HCard => 0,
+            MicroFormat::HEvent => 1,
+            MicroFormat::HEntry => 2,
+            MicroFormat::HRecipe => 3,
+            MicroFormat::HReview => 4,
+            MicroFormat::HProduct => 5,
+        }
+    }
+}
+
+const ALL_MICROFORMATS: [MicroFormat; 6] = [
+    MicroFormat::HCard,
+    MicroFormat::HEvent,
+    MicroFormat::HEntry,
+    MicroFormat::HRecipe,
+    MicroFormat::HReview,
+    MicroFormat::HProduct,
+];
+
 #[derive(Debug)]
 pub struct Html {
     url: Url,
@@ -718,6 +763,24 @@ impl Html {
         } else {
             None
         }
+    }
+
+    fn microformats(&self) -> EnumSet<MicroFormat> {
+        let mut microformats = EnumSet::new();
+
+        for node in self.root.inclusive_descendants() {
+            if let Some(element) = node.as_element() {
+                if let Some(class) = element.attributes.borrow().get("class") {
+                    for microformat in ALL_MICROFORMATS {
+                        if class.to_lowercase().contains(microformat.as_str()) {
+                            microformats.insert(microformat);
+                        }
+                    }
+                }
+            }
+        }
+
+        microformats
     }
 
     pub fn url(&self) -> &Url {
@@ -2249,5 +2312,37 @@ mod tests {
 
         assert!(!html.is_no_index());
         assert!(!html.is_no_follow());
+    }
+
+    #[test]
+    fn microformats() {
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                </head>
+                <body>
+                    <article class="h-entry">
+                        <h1 class="p-name">Microformats are amazing</h1>
+                        <p class="e-content">This is the content of the article</p>
+                        <a class="u-url" href="https://example.com/microformats">Permalink</a>
+                        <a class="u-author" href="https://example.com">Author</a>
+                        <time class="dt-published" datetime="2021-01-01T00:00:00+00:00">2021-01-01</time>
+                    </article>
+
+                    <div class="h-RECIPE>
+                        For some reason this site also has a recipe
+                    </div>
+                </body>
+            </html>
+            "#,
+            "https://www.example.com/",
+        ).unwrap();
+
+        let microformats = html.microformats();
+
+        assert!(microformats.contains(MicroFormat::HEntry));
+        assert!(microformats.contains(MicroFormat::HRecipe));
+        assert!(!microformats.contains(MicroFormat::HCard));
     }
 }

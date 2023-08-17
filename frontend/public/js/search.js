@@ -4,6 +4,10 @@ var modal = document.getElementById("modal");
 var alertCrosses = document.querySelectorAll(".alert-cross");
 var improvementButtons = document.querySelectorAll(".improvement-on-click");
 
+document.querySelector("#region-selector").addEventListener("change", (_) => {
+    document.getElementById('searchbar-form').submit();
+});
+
 improvementButtons.forEach((btn) => {
     btn.addEventListener("click", (event) => {
         improvement(btn.dataset.idx);

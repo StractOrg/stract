@@ -6,8 +6,6 @@ export interface Props {
 
 const { search_on_change } = Astro.props;
 
-const onChange = search_on_change ? "document.getElementById('searchbar-form').submit()" : "";
-
 import { askama } from "$/askama";
 ---
 
@@ -16,7 +14,6 @@ import { askama } from "$/askama";
     form="searchbar-form"
     id="optics-selector"
     name="optic"
-    onchange={onChange}
     class="styled-selector m-0"
   >
     <option value="">No Optic</option>
@@ -28,6 +25,8 @@ import { askama } from "$/askama";
     }
   </select>
 </div>
+
+{search_on_change && <script is:inline src="/js/search_on_optics_change.js"></script>}
 
 <script>
   const optics: {url: string, name: string, description: string}[] = JSON.parse(window.localStorage.getItem("optics") || "[]");
