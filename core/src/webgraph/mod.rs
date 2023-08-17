@@ -19,10 +19,9 @@ use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{cmp, fs};
 
-use lru::LruCache;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -206,10 +205,24 @@ pub enum Loaded<T> {
     NotYet,
 }
 impl<T> Loaded<T> {
-    fn loaded(self) -> Option<T> {
+    pub fn loaded(self) -> Option<T> {
         match self {
             Loaded::Some(t) => Some(t),
             Loaded::NotYet => None,
+        }
+    }
+}
+
+impl<T> std::fmt::Display for Loaded<T>
+where
+    T: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Loaded::Some(val) => {
+                write!(f, "{}", val)
+            }
+            Loaded::NotYet => Ok(()),
         }
     }
 }
@@ -346,7 +359,6 @@ type SegmentID = String;
 #[derive(Serialize, Deserialize, Default)]
 struct Meta {
     comitted_segments: Vec<SegmentID>,
-    next_node_id: u64,
 }
 
 struct SegmentMergeCandidate {
@@ -360,7 +372,6 @@ pub struct Webgraph {
     segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
     id2node: Store<NodeID, Node>,
-    id2node_cache: Mutex<LruCache<NodeID, Node>>,
     commit_mode: CommitMode,
     meta: Meta,
 }
@@ -417,7 +428,6 @@ impl Webgraph {
             commit_mode,
             executor: Arc::new(executor),
             id2node: Store::open(path.as_ref().join("id2node")),
-            id2node_cache: Mutex::new(LruCache::new(10_000.try_into().unwrap())),
             meta,
         }
     }
@@ -495,6 +505,10 @@ impl Webgraph {
         self.inner_ingoing_edges(node, false)
     }
 
+    pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge> {
+        self.inner_ingoing_edges(node, true)
+    }
+
     fn inner_ingoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
         self.executor
             .map(
@@ -535,19 +549,7 @@ impl Webgraph {
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        let mut guard = self.id2node_cache.lock().unwrap();
-
-        if let Some(node) = guard.get(id) {
-            return Some(node.clone());
-        }
-
-        let node = self.id2node.get(id);
-
-        if let Some(node) = &node {
-            guard.put(*id, node.clone());
-        }
-
-        node
+        self.id2node.get(id)
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {

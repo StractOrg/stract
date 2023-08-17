@@ -88,7 +88,6 @@ reqwest-eventsource = { workspace = true }
 robotstxt-with-cache = { workspace = true }
 rust-s3 = { workspace = true }
 async-channel = { workspace = true }
-lru = { workspace = true }
 url = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }

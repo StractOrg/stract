@@ -114,7 +114,7 @@ impl<const N: usize> Preprocessor<N> {
 
 pub struct Webpage {
     pub html: Html,
-    pub backlinks: Vec<Link>,
+    pub backlink_labels: Vec<String>,
     pub host_centrality: f64,
     pub page_centrality: f64,
     pub fetch_time_ms: u64,
@@ -130,7 +130,7 @@ impl Webpage {
 
         Ok(Self {
             html,
-            backlinks: Vec::new(),
+            backlink_labels: Vec::new(),
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 0,
@@ -180,7 +180,7 @@ impl Webpage {
         }
 
         let backlink_text: String = itertools::intersperse(
-            self.backlinks.into_iter().map(|link| link.text),
+            self.backlink_labels.into_iter().map(|label| label),
             "\n".to_string(),
         )
         .collect();
@@ -2034,7 +2034,7 @@ mod tests {
 
         let webpage = Webpage {
             html,
-            backlinks: Vec::new(),
+            backlink_labels: Vec::new(),
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 500,
@@ -2068,7 +2068,7 @@ mod tests {
         .unwrap();
         let webpage = Webpage {
             html,
-            backlinks: Vec::new(),
+            backlink_labels: Vec::new(),
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 500,

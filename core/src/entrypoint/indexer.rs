@@ -17,7 +17,6 @@ use chrono::Utc;
 use rayon::prelude::*;
 use std::path::Path;
 use std::thread;
-use url::Url;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -31,7 +30,7 @@ use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::centrality_store::IndexerCentralityStore;
 use crate::ranking::SignalAggregator;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
-use crate::webpage::{Html, Link, Webpage};
+use crate::webpage::{Html, Webpage};
 use crate::{human_website_annotations, Result};
 
 pub struct Indexer {}
@@ -168,22 +167,14 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 }
             }
 
-            let backlinks: Vec<Link> = worker
+            let backlink_labels: Vec<String> = worker
                 .webgraph
                 .as_ref()
                 .map(|webgraph| {
                     webgraph
-                        .ingoing_edges(Node::from(html.url()))
+                        .raw_ingoing_edges_with_labels(&Node::from(html.url()).id())
                         .into_iter()
-                        .map(|edge| Link {
-                            source: Url::parse(&("http://".to_string() + edge.from.name.as_str()))
-                                .unwrap(),
-                            destination: Url::parse(
-                                &("http://".to_string() + edge.to.name.as_str()),
-                            )
-                            .unwrap(),
-                            text: edge.label,
-                        })
+                        .map(|edge| edge.label.loaded().unwrap())
                         .collect()
                 })
                 .unwrap_or_else(Vec::new);
@@ -204,7 +195,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 has_page_centrality = true;
             }
 
-            if !backlinks.is_empty() {
+            if !backlink_labels.is_empty() {
                 has_backlinks = true;
             }
 
@@ -227,7 +218,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
             let mut webpage = Webpage {
                 html,
-                backlinks,
+                backlink_labels,
                 page_centrality,
                 host_centrality,
                 fetch_time_ms,

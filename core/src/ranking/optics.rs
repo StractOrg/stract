@@ -96,7 +96,7 @@ mod tests {
                     "https://www.first.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
+                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
@@ -125,7 +125,7 @@ mod tests {
                     "https://www.second.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
+                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 499,
                 page_centrality: 0.0,
@@ -154,7 +154,7 @@ mod tests {
                     "https://www.third.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
+                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 0,
                 page_centrality: 0.0,

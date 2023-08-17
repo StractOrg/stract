@@ -364,7 +364,7 @@ mod tests {
                     "https://e.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
+                backlink_labels: vec![],
                 host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
@@ -393,7 +393,7 @@ mod tests {
                     "https://d.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
+                backlink_labels: vec![],
                 host_centrality: 0.01,
                 fetch_time_ms: 500,
                 page_centrality: 0.0,

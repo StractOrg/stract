@@ -616,7 +616,7 @@ mod tests {
     use crate::{
         ranking::{Ranker, SignalAggregator},
         searcher::SearchQuery,
-        webpage::{Html, Link},
+        webpage::Html,
     };
 
     use super::*;
@@ -891,11 +891,7 @@ mod tests {
                     "https://www.b.com",
                 )
                 .unwrap(),
-                backlinks: vec![Link {
-                    source: Url::parse("https://www.a.com/").unwrap(),
-                    destination: Url::parse("https://www.b.com/").unwrap(),
-                    text: "B site is great".to_string(),
-                }],
+                backlink_labels: vec!["B site is great".to_string()],
                 host_centrality: 1.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,

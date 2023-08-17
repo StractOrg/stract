@@ -444,7 +444,7 @@ mod tests {
                         &format!("https://www.{i}.com"),
                     )
                     .unwrap(),
-                    backlinks: vec![],
+                    backlink_labels: vec![],
                     host_centrality: (NUM_WEBSITES - i) as f64,
                     fetch_time_ms: 500,
                     page_centrality: 0.0,
