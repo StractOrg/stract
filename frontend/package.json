@@ -11,9 +11,6 @@
     "prettier": "prettier -w . --cache"
   },
   "dependencies": {
-    "@alpinejs/persist": "^3.11.1",
-    "@types/alpinejs": "^3.7.1",
-    "alpinejs": "^3.11.1",
     "astro": "^2.0.2",
     "astro-icon": "^0.8.0"
   },

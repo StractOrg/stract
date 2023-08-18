@@ -23,7 +23,12 @@ alertCrosses.forEach((cross) => {
 var searchParams = new URLSearchParams(window.location.search);
 var query = searchParams.get("q");
 
-const allowStats = window.localStorage.getItem("allowStats") === "true";
+let allowStats = window.localStorage.getItem("allowStats") === "true";
+
+if (allowStats === null) {
+    allowStats = "true";
+}
+
 
 var qid = null;
 

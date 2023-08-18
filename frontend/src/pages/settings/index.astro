@@ -27,19 +27,18 @@ import { askama } from "../../askama";
     </div>
     <div
       class="mt-16"
-      x-data="{ items: $persist([]).as('optics'), name: '', description: '', url: '' }"
     >
       <div class="flex w-full justify-between px-5 h-10">
-        <input id="name" type="text" placeholder="Name" x-model="name" />
-        <input id="url" type="text" placeholder="Url" x-model="url" />
+        <input id="name" type="text" placeholder="Name" />
+        <input id="url" type="text" placeholder="Url" />
         <button
-          x-on:click="if (name != '' && url != '') {items.push({ name, description, url }); name = url = description = ''}"
           class="w-20 rounded-full border-0 bg-brand text-sm text-white"
+          id="add-btn"
           >Add</button
         >
       </div>
       <div class="flex w-full px-5 h-10 mt-2">
-        <input id="description" type="text" placeholder="Description" x-model="description" />
+        <input id="description" type="text" placeholder="Description" />
       </div>
       <div class="mt-5">
         <div class="grid w-full space-y-5" id="optics-list">
@@ -54,30 +53,12 @@ import { askama } from "../../askama";
                 <div class="mr-5 w-5">
                   <img src="/images/disabled-delete.svg" class="h-5 w-5" />
                 </div>
-                <div class="flex-1 text-sm mr-5">{askama`optic.name $ {{random.words}}`}</div>
-                <div class="flex-1 text-sm mr-5">{askama`optic.description $ {{random.words}}`}</div>
-                <div class="flex-1 text-sm"><a href={askama`optic.url $ {{internet.url}}`}>Source</a></div>
+                <div class="col-data mr-5">{askama`optic.name $ {{random.words}}`}</div>
+                <div class="col-data mr-5">{askama`optic.description $ {{random.words}}`}</div>
+                <div class="col-data"><a href={askama`optic.url $ {{internet.url}}`}>Source</a></div>
               </div>
             ))
           }
-          <template x-for="(item, index) in items">
-            <div class="flex">
-              <div class="w-10">
-                <img
-                  src="/images/delete.svg"
-                  class="h-5 w-5 hover:cursor-pointer"
-                  x-on:click="items.splice(index, 1)"
-                />
-              </div>
-              <div class="user-optic flex-1 text-sm mr-5" x-text="item.name">
-              </div>
-              <div class="user-optic flex-1 text-sm mr-5" x-text="item.description">
-              </div>
-              <div class="user-optic flex-1 text-sm">
-                <a x-bind:href="item.url">Source</a>
-              </div>
-            </div>
-          </template>
         </div>
       </div>
     </div>
@@ -86,10 +67,26 @@ import { askama } from "../../askama";
 
 <style>
   a {
-    @apply underline font-medium;
+    text-decoration: underline;
+    font-weight: 500;
   }
 </style>
 
-<script>
-  import "$/alpine";
-</script>
+<style is:inline>
+  .delete-btn {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .delete-btn:hover {
+    cursor: pointer;
+  }
+
+  .col-data {
+    flex: 1 1 0%;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+</style>
+
+<script is:inline src="/js/optics_settings.js"></script>

@@ -108,8 +108,7 @@ exportButton.addEventListener("click", () => {
 });
 
 function updateExportLink() {
-    console.log(sites);
-    if (sites.length == 0) {
+    if (Object.keys(sites) == 0) {
         exportButton.href = "#";
         return;
     }
