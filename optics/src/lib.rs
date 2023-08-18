@@ -147,6 +147,7 @@ impl ToString for Matching {
             MatchLocation::Title => s.push_str("Title"),
             MatchLocation::Description => s.push_str("Description"),
             MatchLocation::Content => s.push_str("Content"),
+            MatchLocation::MicroformatTag => s.push_str("MicroformatTag"),
             MatchLocation::Schema => s.push_str("Schema"),
         }
         s.push('(');
@@ -174,6 +175,7 @@ impl TryFrom<RawMatchPart> for Matching {
             RawMatchPart::Title(s) => (s, MatchLocation::Title),
             RawMatchPart::Description(s) => (s, MatchLocation::Description),
             RawMatchPart::Content(s) => (s, MatchLocation::Content),
+            RawMatchPart::MicroformatTag(s) => (s, MatchLocation::MicroformatTag),
             RawMatchPart::Schema(s) => (s, MatchLocation::Schema),
         };
 
@@ -282,6 +284,7 @@ pub enum MatchLocation {
     Title,
     Description,
     Content,
+    MicroformatTag,
     Schema,
 }
 

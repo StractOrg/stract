@@ -322,6 +322,7 @@ impl PatternWeight {
             Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
             Field::Text(TextField::SiteWithout) => Ok(FastField::NumSiteTokens),
             Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
+            Field::Text(TextField::MicroformatTags) => Ok(FastField::NumMicroformatTagsTokens),
             Field::Text(TextField::FlattenedSchemaOrgJson) => {
                 Ok(FastField::NumFlattenedSchemaTokens)
             }

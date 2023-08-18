@@ -51,6 +51,7 @@ pub enum TextField {
     TitleBigrams,
     CleanBodyTrigrams,
     TitleTrigrams,
+    MicroformatTags,
 }
 
 impl From<TextField> for usize {
@@ -86,6 +87,7 @@ impl TextField {
             TextField::TitleBigrams => Tokenizer::Bigram(BigramTokenizer::default()),
             TextField::CleanBodyTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::TitleTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
+            TextField::MicroformatTags => Tokenizer::default(),
         }
     }
 
@@ -123,6 +125,7 @@ impl TextField {
             TextField::TitleBigrams => false,
             TextField::CleanBodyTrigrams => false,
             TextField::TitleTrigrams => false,
+            TextField::MicroformatTags => true,
         }
     }
 
@@ -152,6 +155,7 @@ impl TextField {
             TextField::TitleBigrams => "title_bigrams",
             TextField::CleanBodyTrigrams => "clean_body_trigrams",
             TextField::TitleTrigrams => "title_trigrams",
+            TextField::MicroformatTags => "microformat_tags",
         }
     }
 }
@@ -171,6 +175,7 @@ pub enum FastField {
     NumDescriptionTokens,
     NumSiteTokens,
     NumDomainTokens,
+    NumMicroformatTagsTokens,
     SiteHash1,
     SiteHash2,
     UrlWithoutQueryHash1,
@@ -207,6 +212,7 @@ impl FastField {
             FastField::NumDomainTokens => "num_domain_tokens",
             FastField::NumSiteTokens => "num_site_tokens",
             FastField::NumFlattenedSchemaTokens => "num_flattened_schema_tokens",
+            FastField::NumMicroformatTagsTokens => "num_microformat_tags_tokens",
             FastField::SiteHash1 => "site_hash1",
             FastField::SiteHash2 => "site_hash2",
             FastField::UrlWithoutQueryHash1 => "url_without_query_hash1",
@@ -239,7 +245,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 54] = [
+pub static ALL_FIELDS: [Field; 56] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -264,6 +270,7 @@ pub static ALL_FIELDS: [Field; 54] = [
     Field::Text(TextField::TitleBigrams),
     Field::Text(TextField::CleanBodyTrigrams),
     Field::Text(TextField::TitleTrigrams),
+    Field::Text(TextField::MicroformatTags),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -279,6 +286,7 @@ pub static ALL_FIELDS: [Field; 54] = [
     Field::Fast(FastField::NumDomainTokens),
     Field::Fast(FastField::NumSiteTokens),
     Field::Fast(FastField::NumFlattenedSchemaTokens),
+    Field::Fast(FastField::NumMicroformatTagsTokens),
     Field::Fast(FastField::SiteHash1),
     Field::Fast(FastField::SiteHash2),
     Field::Fast(FastField::UrlWithoutQueryHash1),
@@ -384,6 +392,9 @@ impl Field {
             Field::Text(TextField::TitleTrigrams) => {
                 IndexingOption::Text(self.default_text_options())
             }
+            Field::Text(TextField::MicroformatTags) => {
+                IndexingOption::Text(self.default_text_options())
+            }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
@@ -432,6 +443,11 @@ impl Field {
                     .set_indexed(),
             ),
             Field::Fast(FastField::NumTitleTokens) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast(Cardinality::SingleValue)
+                    .set_indexed(),
+            ),
+            Field::Fast(FastField::NumMicroformatTagsTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -532,6 +548,11 @@ impl Field {
         }
     }
 
+    /// Whether or not the field should be included
+    /// in the fields that the `Query` searches.
+    ///
+    /// The fields can still be searched by manually
+    /// constructing a tantivy query.
     pub fn is_searchable(&self) -> bool {
         !matches!(
             self,
@@ -541,6 +562,7 @@ impl Field {
                 | Field::Text(TextField::TitleBigrams)
                 | Field::Text(TextField::CleanBodyTrigrams)
                 | Field::Text(TextField::TitleTrigrams)
+                | Field::Text(TextField::MicroformatTags)
         ) && !self.is_fast()
     }
 
@@ -600,6 +622,7 @@ impl FastField {
             FastField::Region => DataType::U64,
             FastField::NumUrlTokens => DataType::U64,
             FastField::NumTitleTokens => DataType::U64,
+            FastField::NumMicroformatTagsTokens => DataType::U64,
             FastField::NumCleanBodyTokens => DataType::U64,
             FastField::NumDescriptionTokens => DataType::U64,
             FastField::NumDomainTokens => DataType::U64,

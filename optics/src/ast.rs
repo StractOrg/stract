@@ -122,6 +122,7 @@ pub enum RawMatchPart {
     Title(String),
     Description(String),
     Content(String),
+    MicroformatTag(String),
     Schema(String),
 }
 

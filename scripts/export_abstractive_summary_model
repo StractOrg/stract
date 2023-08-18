@@ -8,7 +8,6 @@ import sys
 if os.path.exists("data/summarizer/abstractive"):
     print("data/summarizer/abstractive already exists. Exiting...")
     sys.exit()
-
 os.makedirs("data/summarizer/abstractive")
 
 MODEL = "lidiya/bart-large-xsum-samsum"

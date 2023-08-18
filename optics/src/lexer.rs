@@ -41,6 +41,7 @@ pub enum Token<'a> {
     Title,
     Description,
     Content,
+    MicroformatTag,
     Schema,
     Action,
     Boost,
@@ -76,6 +77,7 @@ impl<'a> ToString for Token<'a> {
             Token::Title => "Title".to_string(),
             Token::Description => "Description".to_string(),
             Token::Content => "Content".to_string(),
+            Token::MicroformatTag => "MicroformatTag".to_string(),
             Token::Schema => "Schema".to_string(),
             Token::Action => "Action".to_string(),
             Token::Boost => "Boost".to_string(),
@@ -143,6 +145,8 @@ enum Outer<'a> {
     Description,
     #[token("Content")]
     Content,
+    #[token("MicroformatTag")]
+    MicroformatTag,
     #[token("Schema")]
     Schema,
     #[token("Action")]
@@ -314,6 +318,7 @@ impl<'source> Iterator for LexerBridge<'source> {
                 Outer::Title => Some(Ok((s.start, Token::Title, s.end))),
                 Outer::Description => Some(Ok((s.start, Token::Description, s.end))),
                 Outer::Content => Some(Ok((s.start, Token::Content, s.end))),
+                Outer::MicroformatTag => Some(Ok((s.start, Token::MicroformatTag, s.end))),
                 Outer::Schema => Some(Ok((s.start, Token::Schema, s.end))),
                 Outer::Action => Some(Ok((s.start, Token::Action, s.end))),
                 Outer::Boost => Some(Ok((s.start, Token::Boost, s.end))),

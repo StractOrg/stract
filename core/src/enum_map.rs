@@ -86,6 +86,18 @@ where
     }
 }
 
+impl<K, V> EnumMap<K, V>
+where
+    K: TryFrom<usize> + Into<usize>,
+{
+    pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
+        self.inner
+            .iter()
+            .enumerate()
+            .filter_map(|(key, value)| value.as_ref().and_then(|_| K::try_from(key).ok()))
+    }
+}
+
 impl<K, V> FromIterator<(K, V)> for EnumMap<K, V>
 where
     K: Into<usize>,
@@ -129,6 +141,15 @@ impl<K: Into<usize>> EnumSet<K> {
 
     pub fn is_empty(&self) -> bool {
         self.map.len() == 0
+    }
+}
+
+impl<K> EnumSet<K>
+where
+    K: TryFrom<usize> + Into<usize>,
+{
+    pub fn iter(&self) -> impl Iterator<Item = K> + '_ {
+        self.map.keys()
     }
 }
 

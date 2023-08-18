@@ -209,6 +209,15 @@ impl AsTantivyQuery for Matching {
                 )),
                 1.0,
             )),
+            MatchLocation::MicroformatTag => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    TextField::MicroformatTags,
+                    schema,
+                    fastfield_reader.clone(),
+                )),
+                1.0,
+            )),
             MatchLocation::Schema => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
@@ -1645,5 +1654,98 @@ mod tests {
             .unwrap()
             .webpages;
         assert_eq!(res.len(), 1);
+    }
+
+    #[test]
+    fn indieweb_search() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>This is an example indie website</title>
+                            </head>
+                            <body>
+                                <article class="h-entry">
+                                    <h1 class="p-name">Microformats are amazing</h1>
+                                    <p class="e-content">This is the content of the article</p>
+                                    <a class="u-url" href="https://example.com/microformats">Permalink</a>
+                                    <a class="u-author" href="https://example.com">Author</a>
+                                    <time class="dt-published" datetime="2021-01-01T00:00:00+00:00">2021-01-01</time>
+                                </article>
+                            </body>
+                        </html>
+                    "#,
+                "https://example.com/",
+            ).unwrap(),
+            backlink_labels: vec![],
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            
+            node_id: None,
+            dmoz_description: None,
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+        
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>This is an example non-indie website</title>
+                            </head>
+                            <body>
+                                example example example
+                            </body>
+                        </html>
+                    "#,
+                "https://non-indie-example.com/",
+            ).unwrap(),
+            backlink_labels: vec![],
+            host_centrality: 0.0,
+            page_centrality: 0.0,
+            fetch_time_ms: 500,
+            pre_computed_score: 0.0,
+            
+            node_id: None,
+            dmoz_description: None,
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 2);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("DiscardNonMatching; Rule { Matches { MicroformatTag(\"|h-*\") } }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].domain, "example.com");
     }
 }

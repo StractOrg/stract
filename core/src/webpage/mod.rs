@@ -293,7 +293,7 @@ impl From<RobotsMeta> for usize {
 }
 
 #[allow(clippy::enum_variant_names)]
-enum MicroFormat {
+enum Microformat {
     HCard,
     HEvent,
     HEntry,
@@ -302,39 +302,55 @@ enum MicroFormat {
     HProduct,
 }
 
-impl MicroFormat {
+impl Microformat {
     fn as_str(&self) -> &str {
         match self {
-            MicroFormat::HCard => "h-card",
-            MicroFormat::HEvent => "h-event",
-            MicroFormat::HEntry => "h-entry",
-            MicroFormat::HRecipe => "h-recipe",
-            MicroFormat::HReview => "h-review",
-            MicroFormat::HProduct => "h-product",
+            Microformat::HCard => "h-card",
+            Microformat::HEvent => "h-event",
+            Microformat::HEntry => "h-entry",
+            Microformat::HRecipe => "h-recipe",
+            Microformat::HReview => "h-review",
+            Microformat::HProduct => "h-product",
         }
     }
 }
 
-impl From<MicroFormat> for usize {
-    fn from(value: MicroFormat) -> Self {
+impl From<Microformat> for usize {
+    fn from(value: Microformat) -> Self {
         match value {
-            MicroFormat::HCard => 0,
-            MicroFormat::HEvent => 1,
-            MicroFormat::HEntry => 2,
-            MicroFormat::HRecipe => 3,
-            MicroFormat::HReview => 4,
-            MicroFormat::HProduct => 5,
+            Microformat::HCard => 0,
+            Microformat::HEvent => 1,
+            Microformat::HEntry => 2,
+            Microformat::HRecipe => 3,
+            Microformat::HReview => 4,
+            Microformat::HProduct => 5,
         }
     }
 }
 
-const ALL_MICROFORMATS: [MicroFormat; 6] = [
-    MicroFormat::HCard,
-    MicroFormat::HEvent,
-    MicroFormat::HEntry,
-    MicroFormat::HRecipe,
-    MicroFormat::HReview,
-    MicroFormat::HProduct,
+impl TryFrom<usize> for Microformat {
+    type Error = anyhow::Error;
+
+    fn try_from(value: usize) -> Result<Self> {
+        match value {
+            0 => Ok(Microformat::HCard),
+            1 => Ok(Microformat::HEvent),
+            2 => Ok(Microformat::HEntry),
+            3 => Ok(Microformat::HRecipe),
+            4 => Ok(Microformat::HReview),
+            5 => Ok(Microformat::HProduct),
+            _ => Err(anyhow::anyhow!("Unknown microformat")),
+        }
+    }
+}
+
+const ALL_MICROFORMATS: [Microformat; 6] = [
+    Microformat::HCard,
+    Microformat::HEvent,
+    Microformat::HEntry,
+    Microformat::HRecipe,
+    Microformat::HReview,
+    Microformat::HProduct,
 ];
 
 #[derive(Debug)]
@@ -765,7 +781,7 @@ impl Html {
         }
     }
 
-    fn microformats(&self) -> EnumSet<MicroFormat> {
+    fn microformats(&self) -> EnumSet<Microformat> {
         let mut microformats = EnumSet::new();
 
         for node in self.root.inclusive_descendants() {
@@ -861,6 +877,17 @@ impl Html {
         self.pretokenize_string(text)
     }
 
+    fn pretokenize_microformats(&self) -> PreTokenizedString {
+        let mut text = String::new();
+
+        for microformat in self.microformats().iter() {
+            text.push_str(microformat.as_str());
+            text.push(' ');
+        }
+
+        self.pretokenize_string(text)
+    }
+
     fn pretokenize_string(&self, text: String) -> PreTokenizedString {
         let mut tokens = Vec::new();
 
@@ -884,6 +911,7 @@ impl Html {
         let domain = self.pretokenize_domain();
         let site = self.pretokenize_site();
         let description = self.pretokenize_description();
+        let microformats = self.pretokenize_microformats();
 
         let schemas: Vec<_> = self.schema_org();
 
@@ -1102,6 +1130,9 @@ impl Html {
                 Field::Text(TextField::FlattenedSchemaOrgJson) => {
                     doc.add_pre_tokenized_text(tantivy_field, pretokenized_schema_json.clone());
                 }
+                Field::Text(TextField::MicroformatTags) => {
+                    doc.add_pre_tokenized_text(tantivy_field, microformats.clone());
+                }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, (self.is_homepage()).into());
                 }
@@ -1115,6 +1146,9 @@ impl Html {
                 }
                 Field::Fast(FastField::NumUrlTokens) => {
                     doc.add_u64(tantivy_field, url.tokens.len() as u64)
+                }
+                Field::Fast(FastField::NumMicroformatTagsTokens) => {
+                    doc.add_u64(tantivy_field, microformats.tokens.len() as u64)
                 }
                 Field::Fast(FastField::NumTitleTokens) => {
                     doc.add_u64(tantivy_field, title.tokens.len() as u64)
@@ -2330,7 +2364,7 @@ mod tests {
                         <time class="dt-published" datetime="2021-01-01T00:00:00+00:00">2021-01-01</time>
                     </article>
 
-                    <div class="h-RECIPE>
+                    <div class="h-RECIPE">
                         For some reason this site also has a recipe
                     </div>
                 </body>
@@ -2341,8 +2375,8 @@ mod tests {
 
         let microformats = html.microformats();
 
-        assert!(microformats.contains(MicroFormat::HEntry));
-        assert!(microformats.contains(MicroFormat::HRecipe));
-        assert!(!microformats.contains(MicroFormat::HCard));
+        assert!(microformats.contains(Microformat::HEntry));
+        assert!(microformats.contains(Microformat::HRecipe));
+        assert!(!microformats.contains(Microformat::HCard));
     }
 }
