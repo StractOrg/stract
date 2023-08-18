@@ -4,7 +4,7 @@ import { askama } from "../../askama";
 ---
 
 <SettingsLayout>
-  <div>
+  <div class="content">
     <div class="space-y-3">
       <h1 class="text-2xl font-medium">Manage Optics</h1>
       <div class="text-sm">
@@ -65,14 +65,12 @@ import { askama } from "../../askama";
   </div>
 </SettingsLayout>
 
-<style>
-  a {
+<style is:inline>
+  .content a {
     text-decoration: underline;
     font-weight: 500;
   }
-</style>
 
-<style is:inline>
   .delete-btn {
     width: 1.25rem;
     height: 1.25rem;

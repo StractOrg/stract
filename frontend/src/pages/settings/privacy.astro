@@ -3,7 +3,7 @@ import { askama } from "../../askama";
 import SettingsLayout from "../../layouts/Settings.astro";
 ---
 <SettingsLayout>
-  <div class="flex flex-col space-y-3">
+  <div class="flex flex-col space-y-3 content">
     <h1 class="text-2xl font-medium">Privacy</h1>
     <div class="text-sm">
       By default, some data about your searches are stored on our servers. We primarily store the text you used for the search, and which results (if any) you clicked on.
@@ -28,8 +28,9 @@ import SettingsLayout from "../../layouts/Settings.astro";
 </SettingsLayout>
 
 <style>
-  a {
-    @apply underline font-medium;
+  .content a {
+    text-decoration: underline;
+    font-weight: 500;
   }
 </style>
 
