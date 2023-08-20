@@ -16,10 +16,39 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use parse_wiki_text::Node;
+use itertools::Itertools;
+use parse_wiki_text::{Node, Parameter};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+pub trait WikiNodeExt<'a> {
+    fn as_text(&self) -> Option<&'a str>;
+    fn as_category_target(&self) -> Option<&'a str>;
+    fn as_template(&self) -> Option<(&Vec<Node<'a>>, &Vec<Parameter<'a>>)>;
+}
+impl<'a> WikiNodeExt<'a> for Node<'a> {
+    fn as_text(&self) -> Option<&'a str> {
+        match self {
+            Node::Text { value, .. } => Some(value),
+            _ => None,
+        }
+    }
+    fn as_category_target(&self) -> Option<&'a str> {
+        match self {
+            Node::Category { target, .. } => Some(target),
+            _ => None,
+        }
+    }
+    fn as_template(&self) -> Option<(&Vec<Node<'a>>, &Vec<Parameter<'a>>)> {
+        match self {
+            Node::Template {
+                name, parameters, ..
+            } => Some((name, parameters)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Paragraph {
     pub title: Option<String>,
     pub content: Span,
@@ -35,7 +64,7 @@ pub struct Entity {
     pub categories: HashSet<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Span {
     pub text: String,
     pub links: Vec<Link>,
@@ -55,11 +84,44 @@ impl Span {
         }
     }
 
-    pub fn add_link(&mut self, text: &str, link: Link) {
-        debug_assert_eq!(self.text.chars().count() + text.chars().count(), link.end);
-        debug_assert_eq!(self.text.chars().count(), link.start);
+    pub fn add_link(&mut self, text: &str, target: String) {
+        let link = Link {
+            target,
+            start: self.text.len(),
+            end: self.text.len() + text.len(),
+        };
         self.links.push(link);
         self.text.push_str(text);
+    }
+
+    pub fn add_node(&mut self, node: &Node) {
+        match node {
+            Node::Link { target, text, .. } => {
+                let text = text.iter().filter_map(|node| node.as_text()).join("");
+                self.add_link(&text, target.to_string());
+            }
+            Node::Text { value, .. } => {
+                if *value == "\n" {
+                    if !self.text.is_empty() {
+                        self.text.push_str(". ");
+                    }
+                } else {
+                    self.text.push_str(value);
+                }
+            }
+            Node::Template { parameters, .. } if self.text.is_empty() => {
+                for other_span in parameters
+                    .iter()
+                    .filter(|parameter| parameter.name.is_none())
+                    .map(|parameter| Span::from(&parameter.value[..]))
+                {
+                    self.merge(other_span);
+                    self.text.push(' ');
+                }
+                self.text = self.text.trim_end().to_string();
+            }
+            _ => {}
+        }
     }
 }
 
@@ -70,75 +132,12 @@ pub struct Link {
     pub target: String,
 }
 
-impl<'a> From<Vec<Node<'a>>> for Span {
-    fn from(nodes: Vec<Node<'a>>) -> Self {
-        let mut span = Span {
-            text: String::new(),
-            links: Vec::new(),
-        };
-
+impl<'a> From<&[Node<'a>]> for Span {
+    fn from(nodes: &[Node<'a>]) -> Self {
+        let mut span = Span::default();
         for node in nodes {
-            match node {
-                Node::Link {
-                    end: _,
-                    start: _,
-                    target,
-                    text,
-                } => {
-                    let text: String = itertools::intersperse(
-                        text.into_iter().filter_map(|node| match node {
-                            Node::Text {
-                                end: _,
-                                start: _,
-                                value,
-                            } => Some(value),
-                            _ => None,
-                        }),
-                        "",
-                    )
-                    .collect();
-
-                    let link = Link {
-                        target: target.to_string(),
-                        start: span.text.chars().count(),
-                        end: span.text.chars().count() + text.chars().count(),
-                    };
-                    span.add_link(&text, link);
-                }
-                Node::Text {
-                    end: _,
-                    start: _,
-                    value,
-                } => {
-                    if value == "\n" {
-                        if !span.text.is_empty() {
-                            span.text.push_str(". ");
-                        }
-                        continue;
-                    }
-
-                    span.text.push_str(value);
-                }
-                Node::Template {
-                    end: _,
-                    name: _,
-                    parameters,
-                    start: _,
-                } if span.text.is_empty() => {
-                    for other_span in parameters
-                        .into_iter()
-                        .filter(|parameter| parameter.name.is_none())
-                        .map(|parameter| Span::from(parameter.value))
-                    {
-                        span.merge(other_span);
-                        span.text.push(' ');
-                    }
-                    span.text = span.text.trim_end().to_string();
-                }
-                _ => {}
-            }
+            span.add_node(node);
         }
-
         span
     }
 }

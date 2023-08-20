@@ -91,6 +91,7 @@ anyhow = { version = "1.0.72", features = ["backtrace"] }
 bytemuck = { version = "1.13.1", features = ["derive"] }
 proptest = "1.2.0"
 proptest-derive = "0.3.0"
+insta = "1.31"
 utoipa = { version = "3.4.4", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
 tikv-jemallocator = "0.5"

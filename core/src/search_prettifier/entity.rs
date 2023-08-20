@@ -17,6 +17,7 @@
 use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -109,29 +110,23 @@ impl DisplayedEntity {
 }
 
 fn maybe_prettify_entity_date(value: String) -> String {
-    if let Ok(date) = NaiveDate::parse_from_str(value.trim(), "%Y %-m %-d") {
-        return format!("{}", date.format("%d/%m/%Y"));
+    let parse_ymd = |date| NaiveDate::parse_from_str(date, "%Y %-m %-d");
+
+    if let Ok(date) = parse_ymd(value.trim()) {
+        return date.format("%d/%m/%Y").to_string();
     }
 
-    if value.split_whitespace().count() == 6 {
-        let first_date = NaiveDate::parse_from_str(
-            itertools::intersperse(value.split_whitespace().take(3), " ")
-                .collect::<String>()
-                .as_str(),
-            "%Y %-m %-d",
-        );
-        let second_date = NaiveDate::parse_from_str(
-            itertools::intersperse(value.split_whitespace().skip(3), " ")
-                .collect::<String>()
-                .as_str(),
-            "%Y %-m %-d",
-        );
-
-        if let (Ok(first_date), Ok(second_date)) = (first_date, second_date) {
-            // the dates are reversed from the parser, so we need to return second_date before first_date
-            return format!("{}", second_date.format("%d/%m/%Y"))
-                + " - "
-                + format!("{}", first_date.format("%d/%m/%Y")).as_str();
+    // the dates are reversed from the parser, so we parse the second date first
+    if let Some((y2, m2, d2, y1, m1, d1)) = value.split_whitespace().collect_tuple() {
+        if let (Ok(fst_date), Ok(snd_date)) = (
+            parse_ymd(&[y1, m1, d1].join(" ")),
+            parse_ymd(&[y2, m2, d2].join(" ")),
+        ) {
+            return format!(
+                "{} - {}",
+                fst_date.format("%d/%m/%Y"),
+                snd_date.format("%d/%m/%Y"),
+            );
         }
     }
 
@@ -139,61 +134,27 @@ fn maybe_prettify_entity_date(value: String) -> String {
 }
 
 fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
-    let mut s = span.text;
+    let (s, maybe_ellipsis) = if span.text.len() > trunace_to {
+        (&span.text[0..trunace_to], "...")
+    } else {
+        (&*span.text, "")
+    };
 
-    let truncated = s.len() > trunace_to;
-    if truncated {
-        s = s.chars().take(trunace_to).collect();
-    }
-
-    let chars = s.chars();
-    let num_chars = chars.clone().count();
-
-    let mut res = String::new();
-
-    let mut last_link_end = 0;
-    for link in span.links {
-        if link.start > num_chars {
-            break;
+    span.links.iter().rfold(s.to_string(), |mut acc, link| {
+        let (start, end) = (link.start, link.end.min(acc.len()));
+        if start > acc.len() {
+            return acc;
         }
 
-        res += chars
-            .clone()
-            .skip(last_link_end)
-            .take(link.start - last_link_end)
-            .collect::<String>()
-            .as_str();
+        let anchor_start = format!(
+            r#"<a class="hover:underline" href="https://en.wikipedia.org/wiki/{}">"#,
+            link.target.replace(' ', "_"),
+        );
+        acc.insert_str(start, &anchor_start);
+        acc.insert_str(end + anchor_start.len(), "</a>");
 
-        let link_text: String = chars
-            .clone()
-            .skip(link.start)
-            .take(link.end - link.start)
-            .collect();
-
-        res += format!(
-            "<a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/{}\">",
-            link.target.replace(' ', "_")
-        )
-        .as_str();
-
-        res += link_text.as_str();
-
-        res += "</a>";
-
-        last_link_end = link.end;
-    }
-
-    res += chars
-        .clone()
-        .skip(last_link_end)
-        .collect::<String>()
-        .as_str();
-
-    if truncated {
-        res += "...";
-    }
-
-    res
+        acc
+    }) + maybe_ellipsis
 }
 
 #[cfg(test)]
