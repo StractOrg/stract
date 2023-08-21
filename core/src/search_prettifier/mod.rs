@@ -38,6 +38,7 @@ pub use entity::DisplayedEntity;
 pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type")]
 pub enum Snippet {
     Normal {
         date: Option<String>,
@@ -206,6 +207,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", content = "value")]
 pub enum Sidebar {
     Entity(DisplayedEntity),
     StackOverflow {

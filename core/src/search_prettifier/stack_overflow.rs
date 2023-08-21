@@ -42,6 +42,7 @@ pub struct StackOverflowQuestion {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", content = "value")]
 pub enum CodeOrText {
     Code(String),
     Text(String),
