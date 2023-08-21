@@ -788,7 +788,7 @@ impl Html {
             if let Some(element) = node.as_element() {
                 if let Some(class) = element.attributes.borrow().get("class") {
                     for microformat in ALL_MICROFORMATS {
-                        if class.to_lowercase().contains(microformat.as_str()) {
+                        if class.to_lowercase().as_str() == microformat.as_str() {
                             microformats.insert(microformat);
                         }
                     }
@@ -2361,6 +2361,7 @@ mod tests {
                         <p class="e-content">This is the content of the article</p>
                         <a class="u-url" href="https://example.com/microformats">Permalink</a>
                         <a class="u-author" href="https://example.com">Author</a>
+                        <p class="search-product">substrings should not match</p>
                         <time class="dt-published" datetime="2021-01-01T00:00:00+00:00">2021-01-01</time>
                     </article>
 
@@ -2378,5 +2379,6 @@ mod tests {
         assert!(microformats.contains(Microformat::HEntry));
         assert!(microformats.contains(Microformat::HRecipe));
         assert!(!microformats.contains(Microformat::HCard));
+        assert!(!microformats.contains(Microformat::HProduct));
     }
 }
