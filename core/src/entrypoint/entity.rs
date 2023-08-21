@@ -146,40 +146,47 @@ fn extract_info(nodes: &[Node]) -> Option<BTreeMap<String, Span>> {
     Some(info)
 }
 
+/// Renders a subset of [Wikipedia
+/// Templates](https://en.wikipedia.org/wiki/Wikipedia:TemplateData/Used_templates).
+///
+/// There are multiple thousands of these templates, each with their own
+/// potentially complex implementation. This function is a _best-effort_
+/// implementation of a few the most common templates.
+fn render_template(name: &str, parameters: &[Parameter]) -> Option<String> {
+    Some(match name {
+        // https://en.wikipedia.org/wiki/Template:IPAc-en
+        // https://en.wiktionary.org/wiki/Template:grc-IPA
+        "IPAc-en" | "IPA-grc" => {
+            parameters
+                .iter()
+                .filter(|p| p.name.is_none())
+                .flat_map(|p| &p.value)
+                .filter_map(|v| v.as_text())
+                .filter(|v| !["pron"].contains(v))
+                .join("")
+                .replace('_', " ")
+
+            // NOTE: For debugging
+            // format!("@@IPA({parameters:?})@@")
+        }
+        // https://en.wikipedia.org/wiki/Template:Respell
+        "respell" => {
+            parameters
+                .iter()
+                .filter(|p| p.name.is_none())
+                .flat_map(|p| &p.value)
+                .filter_map(|v| v.as_text())
+                .join("-")
+                .replace('_', " ")
+
+            // NOTE: For debugging
+            // format!("@@respell({parameters:?})@@")
+        }
+        _ => return None,
+    })
+}
+
 fn extract_text(nodes: &[Node]) -> (Option<Span>, Vec<Paragraph>) {
-    fn render_template(name: &str, parameters: &[Parameter]) -> Option<String> {
-        Some(match name {
-            // https://en.wikipedia.org/wiki/Template:IPAc-en
-            // https://en.wiktionary.org/wiki/Template:grc-IPA
-            "IPAc-en" | "IPA-grc" => {
-                parameters
-                    .iter()
-                    .filter(|p| p.name.is_none())
-                    .flat_map(|p| &p.value)
-                    .filter_map(|v| v.as_text())
-                    .filter(|v| !["pron"].contains(v))
-                    .join("")
-                    .replace('_', " ")
-
-                // NOTE: For debugging
-                // format!("@@IPA({parameters:?})@@")
-            }
-            // https://en.wikipedia.org/wiki/Template:Respell
-            "respell" => {
-                parameters
-                    .iter()
-                    .filter(|p| p.name.is_none())
-                    .flat_map(|p| &p.value)
-                    .filter_map(|v| v.as_text())
-                    .join("-")
-                    .replace('_', " ")
-
-                // format!("@@respell({parameters:?})@@")
-            }
-            _ => return None,
-        })
-    }
-
     let mut paragraphs = Vec::new();
 
     for node in nodes
