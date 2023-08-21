@@ -49,10 +49,8 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(
         .map(|(key, value)| {
             let mut value = entity_link_to_html(value, 150).replace('*', "•");
 
-            if value.starts_with('•') || value.starts_with("\n•") {
-                if let Some(first_bullet) = value.find('•') {
-                    value = value.chars().skip(first_bullet + 1).collect();
-                }
+            if let Some((_, rest)) = value.split_once('•') {
+                value = rest.to_string();
             }
 
             let value = maybe_prettify_entity_date(value);
