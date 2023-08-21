@@ -329,10 +329,12 @@ mod tests {
         }
     }
 
-    fn check_abstract(title: &str, src: &str, f: impl FnOnce(String)) {
+    /// `expect` assert properties of the rendered version of the provided wiki
+    /// data.
+    fn check_abstract(title: &str, text: &str, expect: impl FnOnce(String)) {
         let entity = EntityBuilder {
             title: title.to_string(),
-            text: src.to_string(),
+            text: text.to_string(),
         }
         .build()
         .unwrap();
@@ -366,12 +368,14 @@ mod tests {
             "\n---\n".to_string(),
             fmt_span(&entity.page_abstract).trim().to_string(),
         ];
-        f(sections
-            .into_iter()
-            .join("\n")
-            .lines()
-            .map(|l| l.trim_end())
-            .join("\n"))
+        expect(
+            sections
+                .into_iter()
+                .join("\n")
+                .lines()
+                .map(|l| l.trim_end())
+                .join("\n"),
+        )
     }
 
     #[test]
