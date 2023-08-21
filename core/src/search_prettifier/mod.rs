@@ -38,6 +38,7 @@ pub use entity::DisplayedEntity;
 pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Snippet {
     Normal {
         date: Option<String>,
@@ -50,6 +51,7 @@ pub enum Snippet {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct HighlightedSpellCorrection {
     pub raw: String,
     pub highlighted: String,
@@ -159,6 +161,7 @@ fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DisplayedWebpage {
     pub title: String,
     pub url: String,
@@ -171,6 +174,7 @@ pub struct DisplayedWebpage {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DisplayedAnswer {
     pub title: String,
     pub url: String,
@@ -204,6 +208,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum Sidebar {
     Entity(DisplayedEntity),
     StackOverflow {

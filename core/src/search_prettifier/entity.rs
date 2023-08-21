@@ -26,6 +26,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,

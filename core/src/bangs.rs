@@ -31,6 +31,7 @@ use crate::query::parser::Term;
 pub const BANG_PREFIX: char = '!';
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Bang {
     #[serde(rename = "c")]
     pub(crate) category: Option<String>,
@@ -80,6 +81,7 @@ impl From<Url> for UrlWrapper {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct BangHit {
     pub bang: Bang,
     pub redirect_to: UrlWrapper,

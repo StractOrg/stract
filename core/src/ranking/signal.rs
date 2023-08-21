@@ -1108,6 +1108,7 @@ pub struct ComputedSignal {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SignalScore {
     pub coefficient: f64,
     pub value: f64,

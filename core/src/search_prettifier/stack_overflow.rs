@@ -28,6 +28,7 @@ use super::{Sidebar, Snippet};
 use crate::Result;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StackOverflowAnswer {
     pub body: Vec<CodeOrText>,
     pub date: String,
@@ -37,11 +38,13 @@ pub struct StackOverflowAnswer {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StackOverflowQuestion {
     pub body: Vec<CodeOrText>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum CodeOrText {
     Code(String),
     Text(String),
