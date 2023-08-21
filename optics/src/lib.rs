@@ -375,6 +375,7 @@ impl ToString for Rule {
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SiteRankings {
     pub liked: Vec<String>,
     pub disliked: Vec<String>,

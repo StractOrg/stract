@@ -49,6 +49,7 @@ impl RemoteWebgraph {
 }
 
 #[derive(serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SimilarSitesParams {
     pub sites: Vec<String>,
     pub top_n: usize,

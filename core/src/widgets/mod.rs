@@ -31,7 +31,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type", content = "value")]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum Widget {
     Calculator(Calculation),
 }
