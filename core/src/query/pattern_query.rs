@@ -647,6 +647,7 @@ impl DocSet for FastSiteDomainPatternScorer {
 }
 
 struct NormalPatternScorer {
+    pattern_all_simple: bool,
     similarity_weight: Option<Bm25Weight>,
     fieldnorm_reader: FieldNormReader,
     intersection_docset: Intersection<SegmentPostings>,
@@ -673,6 +674,7 @@ impl NormalPatternScorer {
         let segment_reader = fastfield_reader.get_segment(&segment);
 
         let mut s = Self {
+            pattern_all_simple: pattern.iter().all(|p| matches!(p, SmallPatternPart::Term)),
             intersection_docset: Intersection::new(term_postings_list),
             num_query_terms,
             similarity_weight,
@@ -696,6 +698,15 @@ impl NormalPatternScorer {
     }
 
     fn pattern_match(&mut self) -> bool {
+        if self.num_query_terms == 1 && self.pattern_all_simple {
+            // speedup for single term patterns
+            self.phrase_count = self
+                .intersection_docset
+                .docset_mut_specialized(0)
+                .term_freq();
+            return self.phrase_count > 0;
+        }
+
         self.phrase_count = self.perform_pattern_match() as u32;
 
         self.phrase_count > 0
