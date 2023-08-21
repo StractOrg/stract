@@ -26,7 +26,7 @@
       ]
     },
     "keywords": {
-      "match": "\\b(Matches|Signal|Field|Site|Url|Domain|Title|Description|Content|Schema|Action|Boost|Downrank|Discard|Ranking|Stage)\\b",
+      "match": "\\b(Matches|Signal|Field|Site|Url|Domain|Title|Description|Content|MicroformatTag|Schema|Action|Boost|Downrank|Discard|Ranking|Stage)\\b",
       "name": "entity.name.function"
     },
     "control": {

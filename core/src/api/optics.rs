@@ -43,9 +43,9 @@ pub const DEFAULT_OPTICS: [OpticLink; 7] = [
         description: "Remove the top 10,000 most popular websites from search results.",
     },
     OpticLink {
-        name: "Blogroll",
-        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/blogroll.optic",
-        description: "Search only in a list of blogs from blogroll.org and some hand-picked blogs from hackernews.",
+        name: "Indieweb & blogroll",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/indiweb_blogroll.optic",
+        description: "Search only in the indieweb + a list of blogs from blogroll.org and some hand-picked blogs from hackernews.",
     },
     OpticLink {
         name: "Devdocs",

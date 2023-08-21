@@ -27,6 +27,7 @@ Stract is an open source web search engine hosted at [trystract.com](https://try
 * Wikipedia and stackoverflow sidebar
 * De-rank websites with third-party trackers
 * Use [optics](https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic) to almost endlessly customize your search results.
+  * Limit your searches to blogs, indieweb, educational content etc.
   * Customize how signals are combined during search for the final search result
 * Prioritize links (centrality) from the sites you trust.
 * Explore the web and find sites similar to the ones you like.

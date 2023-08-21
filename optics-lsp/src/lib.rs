@@ -205,6 +205,9 @@ impl OpticsBackend {
                                 Consider the pattern `\"Best * ever\"`. This will match any result where the description starts with `Best` followed by any term(s) and then followed by the term `ever`. \
                                 Note that the pattern will only match full terms (no substring matching) and the modifier `|` can only be used at the end or beggining of the pattern.".to_string()),
 
+                                optics::Token::MicroformatTag => Some("`MicroformatTag(\"...\")` matches any search result that contains the microformat tag defined in `\"...\"`. \
+                                This is useful when looking for indieweb pages.".to_string()),
+
                                 optics::Token::Schema => Some("`Schema(\"...\")` matches any search result that contains the https://schema.org entity defined in `\"...\"`. \
                                 As an example, `Schema(\"BlogPosting\")` matches all pages that contains the https://schema.org/BlogPosting entity. Note that `Schema` \
                                 does not support the pattern syntax, but only simple strings.".to_string()),
@@ -235,6 +238,7 @@ impl OpticsBackend {
                                 optics::Token::Dislike => Some("`Dislike(Site(...))` lets you dislike specifc sites. During ranking, we will calculate a centrality meassure from all you dislike sites \
                                 so results that are heavily linked to from your disliked sites will be downranked. Note therefore, that `Dislike` not only alters the ranking of the specifc site, \
                                 but also sites that are heavily linked to from the disliked site.".to_string()),
+
 
                                 _ => None,
                             };

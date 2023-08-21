@@ -47,7 +47,7 @@ where
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
 
-        options.set_compression_type(rocksdb::DBCompressionType::None);
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 

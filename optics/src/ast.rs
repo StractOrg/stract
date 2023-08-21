@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn blogroll_parse() {
-        assert!(parse(include_str!("../testcases/blogroll.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/indieweb_blogroll.optic")).is_ok());
     }
 
     #[test]
