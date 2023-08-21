@@ -29,7 +29,7 @@ fn highlight(query: &str, suggestion: &str) -> String {
         .chars()
         .zip(query.chars())
         .position(|(suggestion_char, query_char)| suggestion_char != query_char)
-        .unwrap_or(query.len());
+        .unwrap_or(query.chars().count());
 
     let mut new_suggestion: String = suggestion.chars().take(idx).collect();
     new_suggestion += HIGHLIGHTED_PREFIX;

@@ -103,8 +103,8 @@ fn prettify_url(url: &Url) -> String {
         pretty_url = stripped.to_string();
     }
 
-    if pretty_url.ends_with('/') {
-        pretty_url = pretty_url.chars().take(pretty_url.len() - 1).collect();
+    while pretty_url.ends_with('/') {
+        pretty_url = pretty_url[..pretty_url.len() - 1].to_string();
     }
 
     pretty_url = pretty_url.replace('/', " › ");

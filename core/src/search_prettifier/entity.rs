@@ -51,7 +51,7 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(
 
             if value.starts_with('•') || value.starts_with("\n•") {
                 if let Some(first_bullet) = value.find('•') {
-                    value = value.chars().skip(first_bullet + 1).collect();
+                    value = value[first_bullet + '•'.len_utf8()..].to_string();
                 }
             }
 
