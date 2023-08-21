@@ -61,7 +61,12 @@ impl<R: BufRead> Iterator for EntityIterator<R> {
 
         loop {
             let event = self.reader.read_event(&mut self.buf).ok()?;
-            match (&event, &*event) {
+            let name = match &event {
+                Start(b) | Empty(b) => b.name(),
+                End(b) => b.name(),
+                _ => &[],
+            };
+            match (&event, name) {
                 (Start(_), b"page") => self.current_entity = Some(EntityBuilder::new()),
                 (End(_), b"page") => {
                     if let Some(entity) = self.current_entity.take().and_then(|e| e.build()) {
