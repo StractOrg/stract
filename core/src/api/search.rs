@@ -122,12 +122,20 @@ pub async fn route(
     if let Some(url) = &params.optic {
         if !url.is_empty() {
             if let Ok(res) = reqwest::get(url).await {
+                let status = res.status();
                 if let Ok(text) = res.text().await {
-                    match Optic::parse(&text) {
-                        Ok(parsed_optic) => optic = Some(parsed_optic),
-                        Err(err) => {
-                            alerts.push(format!("Could not parse optic: {}", err));
+                    if status.is_success() {
+                        match Optic::parse(&text) {
+                            Ok(parsed_optic) => optic = Some(parsed_optic),
+                            Err(err) => {
+                                alerts.push(format!("Could not parse optic: {}", err));
+                            }
                         }
+                    } else {
+                        alerts.push(format!(
+                            "HTTP error when retrieving optic: {}",
+                            status.as_u16()
+                        ));
                     }
                 } else {
                     alerts.push("Could not retrieve optic as text".to_string());

@@ -52,7 +52,7 @@ use super::{
 
 pub struct FrontendSearcher {
     distributed_searcher: DistributedSearcher,
-    cross_encoder: Arc<CrossEncoderModel>,
+    cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
@@ -63,7 +63,7 @@ pub struct FrontendSearcher {
 impl FrontendSearcher {
     pub fn new(
         cluster: Arc<Cluster>,
-        cross_encoder: CrossEncoderModel,
+        cross_encoder: Option<CrossEncoderModel>,
         lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,
         bangs: Bangs,
@@ -72,7 +72,7 @@ impl FrontendSearcher {
     ) -> Self {
         Self {
             distributed_searcher: DistributedSearcher::new(cluster),
-            cross_encoder: Arc::new(cross_encoder),
+            cross_encoder: cross_encoder.map(Arc::new),
             lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
             bangs,
@@ -241,7 +241,7 @@ impl FrontendSearcher {
 
         let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
             &mut query,
-            self.cross_encoder.clone(),
+            self.cross_encoder.as_ref().map(Arc::clone),
             self.lambda_model.clone(),
             self.collector_config.clone(),
         )?;
@@ -321,7 +321,7 @@ impl FrontendSearcher {
         let mut search_query = query.clone();
         let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
             &mut search_query,
-            self.cross_encoder.clone(),
+            self.cross_encoder.as_ref().map(Arc::clone),
             self.lambda_model.clone(),
             self.collector_config.clone(),
         )?;

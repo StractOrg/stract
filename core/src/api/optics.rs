@@ -44,7 +44,7 @@ pub const DEFAULT_OPTICS: [OpticLink; 7] = [
     },
     OpticLink {
         name: "Indieweb & blogroll",
-        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/indiweb_blogroll.optic",
+        url: "https://raw.githubusercontent.com/StractOrg/sample-optics/main/indieweb_blogroll.optic",
         description: "Search only in the indieweb + a list of blogs from blogroll.org and some hand-picked blogs from hackernews.",
     },
     OpticLink {

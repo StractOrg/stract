@@ -196,7 +196,7 @@ pub struct FrontendConfig {
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
-    pub crossencoder_model_path: String,
+    pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub qa_model_path: Option<String>,
     pub with_alice: Option<bool>,

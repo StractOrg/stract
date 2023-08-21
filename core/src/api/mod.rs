@@ -119,7 +119,11 @@ pub async fn favicon() -> impl IntoResponse {
 
 pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Router> {
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
-    let crossencoder = CrossEncoderModel::open(&config.crossencoder_model_path)?;
+    let mut cross_encoder = None;
+
+    if let Some(path) = config.crossencoder_model_path.as_ref() {
+        cross_encoder = Some(CrossEncoderModel::open(path)?);
+    }
 
     let lambda_model = match &config.lambda_model_path {
         Some(path) => Some(LambdaMART::open(path)?),
@@ -153,7 +157,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
     let searcher = FrontendSearcher::new(
         cluster.clone(),
-        crossencoder,
+        cross_encoder,
         lambda_model,
         qa_model,
         bangs,

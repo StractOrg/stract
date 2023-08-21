@@ -40,6 +40,13 @@ fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
 
 impl<TDocSet: DocSet> Intersection<TDocSet> {
     pub(crate) fn new(mut docsets: Vec<TDocSet>) -> Intersection<TDocSet> {
+        if docsets.len() == 1 {
+            return Intersection {
+                docsets,
+                old_idx: vec![0],
+            };
+        }
+
         let mut docsets: Vec<(usize, TDocSet)> = docsets.drain(..).enumerate().collect();
         docsets.sort_by_key(|(_, docset)| docset.size_hint());
         let (tmp, mut docsets): (Vec<usize>, Vec<TDocSet>) = docsets.into_iter().unzip();
@@ -63,6 +70,11 @@ impl<TDocSet: DocSet> DocSet for Intersection<TDocSet> {
 
         let (first, rest) = self.docsets.split_at_mut(1);
         let rarest_docset = &mut first[0];
+
+        if rest.is_empty() {
+            return rarest_docset.advance();
+        }
+
         let mut candidate = rarest_docset.advance();
         'outer: loop {
             for docset in rest.iter_mut() {
@@ -78,9 +90,15 @@ impl<TDocSet: DocSet> DocSet for Intersection<TDocSet> {
     }
 
     fn seek(&mut self, target: DocId) -> DocId {
+        let num_docsets = self.docsets.len();
         match self.docsets.first_mut() {
             Some(docset) => {
                 docset.seek(target);
+
+                if num_docsets == 1 {
+                    return docset.doc();
+                }
+
                 let doc = go_to_first_doc(&mut self.docsets[..]);
                 debug_assert!(self.docsets.iter().all(|docset| docset.doc() == doc));
                 debug_assert!(doc >= target);

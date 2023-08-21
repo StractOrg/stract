@@ -321,23 +321,22 @@ impl LocalSearcher {
         use std::time::Instant;
 
         use crate::{
-            ranking::models::cross_encoder::{CrossEncoderModel, DummyCrossEncoder},
-            search_prettifier::Sidebar,
+            ranking::models::cross_encoder::CrossEncoderModel, search_prettifier::Sidebar,
         };
 
         let start = Instant::now();
         let mut search_query = query.clone();
 
         let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
-            Ok(model) => RankingPipeline::reranking_for_query(
+            Ok(model) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
                 &mut search_query,
-                Arc::new(model),
+                Some(Arc::new(model)),
                 None,
                 self.collector_config.clone(),
             )?,
-            Err(_) => RankingPipeline::reranking_for_query(
+            Err(_) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
                 &mut search_query,
-                Arc::new(DummyCrossEncoder {}),
+                None,
                 None,
                 self.collector_config.clone(),
             )?,

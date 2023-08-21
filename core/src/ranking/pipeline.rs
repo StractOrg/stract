@@ -184,6 +184,12 @@ impl<T: AsRankingWebsite, M: CrossEncoder> Scorer<T> for ReRanker<M> {
     }
 }
 
+struct IdentityScorer;
+
+impl<T: AsRankingWebsite> Scorer<T> for IdentityScorer {
+    fn score(&self, _websites: &mut [T]) {}
+}
+
 fn calculate_score(
     model: &Option<Arc<LambdaMART>>,
     signal_coefficients: &Option<SignalCoefficient>,
@@ -289,12 +295,19 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
     fn create_reranking<M: CrossEncoder + 'static>(
-        crossencoder: Arc<M>,
+        crossencoder: Option<Arc<M>>,
         lambda: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
     ) -> Result<Self> {
+        let scorer = match crossencoder {
+            Some(cross_encoder) => {
+                Box::new(ReRanker::new(cross_encoder, lambda)) as Box<dyn Scorer<T>>
+            }
+            None => Box::new(IdentityScorer) as Box<dyn Scorer<T>>,
+        };
+
         let stage = RankingStage {
-            scorer: Box::new(ReRanker::new(crossencoder, lambda)),
+            scorer,
             stage_top_n: 20,
             derank_similar: true,
         };
@@ -309,7 +322,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 
     pub fn reranking_for_query<M: CrossEncoder + 'static>(
         query: &mut SearchQuery,
-        crossencoder: Arc<M>,
+        crossencoder: Option<Arc<M>>,
         lambda: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
     ) -> Result<Self> {
@@ -432,7 +445,7 @@ mod tests {
             &mut SearchQuery {
                 ..Default::default()
             },
-            Arc::new(DummyCrossEncoder {}),
+            Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
         )
@@ -463,7 +476,7 @@ mod tests {
                 num_results,
                 ..Default::default()
             },
-            Arc::new(DummyCrossEncoder {}),
+            Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
         )
@@ -497,7 +510,7 @@ mod tests {
                 num_results,
                 ..Default::default()
             },
-            Arc::new(DummyCrossEncoder {}),
+            Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
         )
@@ -511,7 +524,7 @@ mod tests {
                     page: p,
                     ..Default::default()
                 },
-                Arc::new(DummyCrossEncoder {}),
+                Some(Arc::new(DummyCrossEncoder {})),
                 None,
                 CollectorConfig::default(),
             )
