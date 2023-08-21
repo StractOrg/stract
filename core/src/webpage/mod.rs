@@ -392,10 +392,6 @@ impl Html {
             robots: None,
         };
 
-        if let Some(url) = res.canonical_url() {
-            res.url = url;
-        }
-
         let queries: Vec<_> = res
             .url
             .query_pairs()
@@ -420,7 +416,7 @@ impl Html {
         Ok(res)
     }
 
-    fn canonical_url(&self) -> Option<Url> {
+    pub fn canonical_url(&self) -> Option<Url> {
         let mut canonical_url = None;
 
         for node in self.root.select("link").unwrap() {
@@ -2234,11 +2230,6 @@ mod tests {
         assert_eq!(
             html.canonical_url(),
             Some(Url::parse("https://example.com/canonical.html").unwrap())
-        );
-
-        assert_eq!(
-            html.url(),
-            &Url::parse("https://example.com/canonical.html").unwrap()
         );
 
         let html = Html::parse(
