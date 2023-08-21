@@ -103,9 +103,7 @@ fn prettify_url(url: &Url) -> String {
         pretty_url = stripped.to_string();
     }
 
-    while pretty_url.ends_with('/') {
-        pretty_url = pretty_url[..pretty_url.len() - 1].to_string();
-    }
+    pretty_url = pretty_url.trim_end_matches('/').to_string();
 
     pretty_url = pretty_url.replace('/', " › ");
     pretty_url = scheme + "://" + pretty_url.as_str();
