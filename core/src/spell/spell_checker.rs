@@ -34,13 +34,10 @@ fn deletes_rec(
     delete_words: &mut HashSet<String>,
 ) {
     let edit_distance = edit_distance + 1;
-    let word_len = word.chars().count();
-
-    if word_len > 1 {
-        for i in 0..word_len {
+    if !word.is_empty() {
+        for (i, _) in word.char_indices() {
             let delete = word
-                .chars()
-                .enumerate()
+                .char_indices()
                 .filter(|(j, _)| *j != i)
                 .map(|(_, c)| c)
                 .collect::<String>();
