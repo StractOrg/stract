@@ -206,7 +206,7 @@ fn extract_text(nodes: &[Node]) -> (Option<Span>, Vec<Paragraph>) {
             } => {
                 const DEBUG_TEMPLATE: bool = false;
 
-                let name = name[0].as_text().unwrap_or_default();
+                let name = name.first().and_then(|n| n.as_text()).unwrap_or_default();
                 if let Some(content) = render_template(name, parameters) {
                     current_paragraph.content.text.push_str(&content)
                 } else if DEBUG_TEMPLATE {
