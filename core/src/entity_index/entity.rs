@@ -102,7 +102,7 @@ impl Span {
             }
             Node::Text { value, .. } => {
                 if *value == "\n" {
-                    if !self.text.is_empty() {
+                    if !self.text.chars().all(|c| c.is_whitespace()) {
                         self.text.push_str(". ");
                     }
                 } else {
@@ -119,6 +119,9 @@ impl Span {
                     self.text.push(' ');
                 }
                 self.text = self.text.trim_end().to_string();
+            }
+            Node::ParagraphBreak { .. } => {
+                self.text.push('\n');
             }
             _ => {}
         }

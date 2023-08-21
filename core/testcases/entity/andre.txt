@@ -1,0 +1,762 @@
+{{Short description|American tennis player (born 1970)}}
+{{Use mdy dates|date=October 2022}}
+{{Infobox tennis biography
+| name                        = Andre Agassi
+| image                       = Andre Agassi (2011).jpg
+| caption                     = Agassi at the 2011 Champions Shootout
+| fullname                    = Andre Kirk Agassi
+| country                     = {{USA}}
+| residence                   = [[Las Vegas, Nevada]], U.S.<!-- either "[[Las Vegas]], Nevada" or "[[Las Vegas, Nevada]]", NOT "[[Las Vegas]], [[Nevada]]" per MOS:GEOLINK -->
+| birth_date                  = {{birth date and age|1970|04|29}}
+| birth_place                 = Las Vegas, Nevada, U.S.
+| height                      = {{height|ft=5|in=11}}
+| turnedpro                   = 1986
+| retired                     = 2006
+| plays                       = Right-handed (two-handed backhand)
+| coach                       = {{Ubl
+  | [[Emmanuel Agassi]] (1970–83)
+  | [[Nick Bollettieri]] (1983–1993)<ref>{{cite news |url=https://www.nytimes.com/1993/07/10/sports/tennis-agassi-has-streisand-but-loses-bollettieri.html |title=TENNIS; Agassi Has Streisand But Loses Bollettieri |date=July 10, 1993 |newspaper=The New York Times |first=Robin |last=Finn |access-date=July 5, 2014}}</ref>
+  | [[Pancho Segura]] (1993)
+  | [[Brad Gilbert]] (1994–2002)
+  | [[Darren Cahill]] (2002–2006)
+  }}
+| careerprizemoney            = $31,152,975<ref>{{cite web |title=ATP Prize Money Leaders |url=http://www.protennislive.com/posting/ramr/career_prize.pdf |archive-url=https://ghostarchive.org/archive/20221009/http://www.protennislive.com/posting/ramr/career_prize.pdf |archive-date=2022-10-09 |url-status=live}}</ref>
+*&nbsp;[[Open Era tennis records – men's singles#Prize money|11th&nbsp;all-time&nbsp;in&nbsp;earnings]]
+| tennishofyear               = 2011
+| tennishofid                 = andre-agassi
+| singlesrecord               = {{tennis record|won=870|lost=274}}
+| singlestitles               = 60
+| highestsinglesranking       = [[List of ATP number 1 ranked singles players|No. '''1''']] (April 10, 1995)
+| AustralianOpenresult        = '''W''' ([[1995 Australian Open – Men's singles|1995]], [[2000 Australian Open – Men's singles|2000]], [[2001 Australian Open – Men's singles|2001]], [[2003 Australian Open – Men's singles|2003]])
+| FrenchOpenresult            = '''W''' ([[1999 French Open – Men's singles|1999]])
+| Wimbledonresult             = '''W''' ([[1992 Wimbledon Championships – Men's singles|1992]])
+| USOpenresult                = '''W''' ([[1994 US Open – Men's singles|1994]], [[1999 US Open – Men's singles|1999]])
+|Othertournaments            = Yes
+|MastersCupresult            = '''W''' ([[1990 ATP Tour World Championships – Singles|1990]])
+|Olympicsresult               = [[File:Gold medal olympic.svg|15px]] ([[Tennis at the 1996 Summer Olympics – Men's singles|1996]])
+| doublesrecord               = 40–42
+| doublestitles               = 1
+| FrenchOpenDoublesresult     = QF (1992)
+| USOpenDoublesresult         = 1R (1987)
+| highestdoublesranking       = No. 123 (August 17, 1992)
+| Team                        = yes
+| DavisCupresult              = '''W''' (1990, 1992, 1995)
+|CoachYears            = 2017–2020
+|CoachPlayers          = {{unbulleted list
+|[[Novak Djokovic]] (2017–2018)
+|[[Grigor Dimitrov]] (2018–2020)
+}}
+| medaltemplates-expand       = yes
+| medaltemplates              =
+{{MedalCompetition|Olympic Games – [[Tennis at the Summer Olympics|Tennis]]}}
+{{MedalGold | [[1996 Summer Olympics|1996 Atlanta]] | [[Tennis at the 1996 Summer Olympics – Men's singles|Singles]] }}
+| module = {{Infobox person
+  | embed     = yes
+  | signature = AndreAgassiSignature.png
+  }}<!-- Infobox person -->
+}}<!-- Infobox tennis biography -->
+'''Andre Kirk Agassi''' ({{IPAc-en|ˈ|æ|ɡ|ə|s|i}} {{respell|AG|ə|see}};<ref>{{cite web|url=https://www.youtube.com/watch?v=056sdwRMuiY&t=8s| archive-url=https://ghostarchive.org/varchive/youtube/20211122/056sdwRMuiY| archive-date=2021-11-22 | url-status=live|title=Andre Agassi: from wild child to role model|website=CNN|via=YouTube|date=August 18, 2016|access-date=January 9, 2018}}{{cbignore}}</ref><ref>{{cite web|url=https://www.youtube.com/watch?v=ayvEi_7O7fg&t=22s| archive-url=https://ghostarchive.org/varchive/youtube/20211122/ayvEi_7O7fg| archive-date=2021-11-22 | url-status=live|title=Jim Courier, Andre Agassi, and Lara Spencer PUNK'D on 'GMA' |publisher=ABC News|work=Good Morning America |via=YouTube|date=November 13, 2012|access-date=January 9, 2018}}{{cbignore}}</ref> born April 29, 1970) is an American former [[List of ATP number 1 ranked singles players|world No. 1]] tennis player.<ref name="bio">{{cite web|url=http://www.thebiographychannel.co.uk/biographies/andre-agassi.html |title=Bio:Andre Agassi |website=[[Biography Channel]] |access-date=January 27, 2011 |url-status=dead |archive-url=https://web.archive.org/web/20110131010520/http://www.thebiographychannel.co.uk/biographies/andre-agassi.html |archive-date=January 31, 2011 }}</ref> He is an eight-time [[Grand Slam (tennis)#Tournaments|major]] champion and an [[Tennis at the 1996 Summer Olympics – Men's singles|Olympic gold medalist]], as well as a runner-up in seven other majors. Agassi is widely considered one of the greatest tennis players of all time.<ref>{{Cite web |last=Tennis.com |title=The 50 Greatest Players of the Open Era (M): No. 11, Andre Agassi |url=https://www.tennis.com/news/articles/the-50-greatest-players-of-the-open-era-m-no-11-andre-agassi |access-date=2023-02-25 |website=Tennis.com |language=en}}</ref><ref>{{Cite web |last=Ashish |first=Dev |title=Andre Agassi: His 10 Greatest Achievements |url=https://bleacherreport.com/articles/60623-andre-agassi-his-10-greatest-achievements |access-date=2023-02-25 |website=Bleacher Report |language=en}}</ref>
+
+Agassi is the second of five men to achieve the [[Grand Slam (tennis)#Career Grand Slam|career Grand Slam]] in the [[Open Era]] and the fifth of eight overall to make the achievement.<ref>{{cite news |url=http://latimesblogs.latimes.com/olympics_blog/2008/08/federer-gets-hi.html |title=Roger Federer gets his gold medal |newspaper=Los Angeles Times |date=August 16, 2008 |access-date=June 6, 2011}}</ref><ref>{{cite web |url=http://www.atpworldtour.com/News/Tennis/2010/09/36-US-Open-Week-2/US-Open-Monday-Final-Nadal-Completes-Career-Slam.aspx |title=Nadal Completes Career Grand Slam With US Open Title |website=ATP Tennis |access-date=January 27, 2011}}</ref> He is also the first of two men to achieve the career Golden Slam (career Grand Slam and [[Tennis at the Olympics|Olympic gold medal]]), as well as the only man to win a [[career Super Slam]] (career Grand Slam, plus the Olympic gold medal and the [[ATP Finals|year-end championships]]).<ref name="SI" />
+
+Agassi was the first man to win all four singles majors on three different surfaces ([[Hardcourt|hard]], [[Clay court|clay]] and [[Grass court|grass]]), and remains the most recent American man to win the [[French Open]] (in [[1999 French Open|1999]])<ref>{{cite web|url=http://www.fft.fr/rolandgarros/default_en.asp?ID=1576 |title=Singles winners from 1925 to 2005 |website=[[French Open|Roland Garros]] |access-date=January 26, 2011 }}{{dead link|date=October 2016 |bot=InternetArchiveBot |fix-attempted=yes }}</ref> and the [[Australian Open]] (in [[2003 Australian Open|2003]]).<ref>{{cite web |url=http://www.australianopen.com/en_AU/event_guide/history/players/107.html |title=Australian Open Past Men's Singles Champions |website=Australian Open |access-date=January 26, 2011 |url-status=dead |archive-url=https://web.archive.org/web/20110122044440/http://www.australianopen.com/en_AU/event_guide/history/players/107.html |archive-date=January 22, 2011 }}</ref> He also won 17 [[ATP Tour Masters 1000|Masters]] titles and was part of the winning [[Davis Cup]] teams in [[1990 Davis Cup|1990]], [[1992 Davis Cup|1992]] and [[1995 Davis Cup|1995]].<ref name="tennis" /> Agassi reached the world No. 1 ranking for the first time in 1995, but was troubled by personal issues during the mid-to-late 1990s and sank to No. 141 in 1997, prompting many to believe that his career was over.<ref name="greatath" /> Agassi returned to No. 1 in 1999 and enjoyed the most successful run of his career over the next four years. During his 20-plus year tour career, Agassi was known by the nickname "The Punisher".<ref>Jhabvala, Nick. [http://sportsillustrated.cnn.com/2009/extramustard/10/30/chad-ochocinco-andre-agassi-tale/index.html "Tale of the Tape"]. {{Webarchive|url=https://web.archive.org/web/20130126063425/http://sportsillustrated.cnn.com/2009/extramustard/10/30/chad-ochocinco-andre-agassi-tale/index.html |date=January 26, 2013 }} ''[[Sports Illustrated]]''. November 2, 2009. Retrieved July 21, 2012.</ref><ref>
+Mehrotra, Abhishek. [http://www.espnstar.com/editorial/news/detail/item640226/Agassi:-Last-of-the-great-Americans/ "Agassi: Last of the great Americans"] {{Webarchive|url=https://web.archive.org/web/20120111084538/http://www.espnstar.com/editorial/news/detail/item640226/Agassi%3A-Last-of-the-great-Americans/ |date=January 11, 2012 }}  ''[[espnstar.com|ESPN Star]]''. Retrieved July 21, 2012.
+</ref><ref>[https://archive.today/20130104003210/http://sports.in.msn.com/gallery/nickometer-popular-nicknames-in-the-world-of-sport?page=37 "Nickometer: Popular nicknames in the world of sport"]. [[MSN]] Sport. May 3, 2012. Retrieved July 21, 2012.</ref><ref>Calvert, Sean. [http://betting.betfair.com/tennis/australian-open-betting/australian-open-betting-the-best-finals-ever-100111.html "Australian Open Betting: The best finals ever"]. [[Betfair]]. January 10, 2011. Retrieved July 21, 2012.</ref>
+
+After suffering from [[sciatica]] caused by two bulging discs in his back, a [[spondylolisthesis]] ([[vertebra]]l displacement) and a [[bone spur]] that interfered with the [[nerve]], Agassi retired from professional tennis on September 3, 2006, after losing in the third round of the [[2006 US Open – Men's singles|US Open]]. He is the founder of the Andre Agassi Charitable Foundation,<ref>{{cite web|url=http://www.agassifoundation.org/ |title=Andre Agassi Foundation For Education |access-date=January 26, 2011 |archive-url=http://webarchive.loc.gov/all/20021029135656/http://www.agassifoundation.org/ |archive-date=October 29, 2002 |url-status=live  }}</ref> which has raised over $60&nbsp;million for at-risk children in Southern Nevada.<ref>{{cite web|url=http://www.atptennis.com/en/players/tribute/agassi/agassi_charity.asp |website=ATP Tour, Inc. |title=Tribute to a legend: Andre Agassi Charitable Foundation |access-date=February 15, 2007 }}{{dead link|date=October 2016 |bot=InternetArchiveBot |fix-attempted=yes }}</ref> In 2001, the Foundation opened the Andre Agassi College Preparatory Academy in Las Vegas, a K–12 public charter school for at-risk children.<ref>{{cite web |url=http://www.agassiprep.org |website=Andre Agassi Preparatory Academy |title=Homepage of |access-date=February 15, 2007 |archive-url=https://web.archive.org/web/20070225092139/http://www.agassiprep.org/ |archive-date=February 25, 2007 |url-status=dead}}</ref> He has been married to fellow tennis player [[Steffi Graf]] since 2001.<ref>{{cite web|last=Knolle |first=Sharon |url=https://abcnews.go.com/Entertainment/story?id=101751&page=1 |title=Andre Agassi and Steffi Graf Wed |work=ABC News |access-date=April 27, 2021}}</ref>
+
+==Early life==
+Andre Agassi was born in Las Vegas, Nevada, to [[Emmanuel Agassi|Emmanuel "Mike" Agassi]] (Aghassian), a former Olympic boxer from Iran,<ref>{{cite web|url=https://www.theguardian.com/sport/2017/mar/20/andre-agassi-life-after-tennis-steffi-graf|title=Andre Agassi: 'One day your entire way of life ends. It's a kind of death' – Donald McRae|first=Donald|last=McRae|date=March 20, 2017|work=The Guardian}}</ref> and American Elizabeth "Betty" Agassi (née Dudley).<ref name="bio" /><ref>{{cite web|url=http://www.netglimse.com/celebs/bio/andre_agassi.shtml |title=Andre Agassi Biography |publisher=Netglimpse.com |access-date=August 14, 2007 |archive-url=https://web.archive.org/web/20070911163118/http://www.netglimse.com/celebs/bio/andre_agassi.shtml |archive-date=September 11, 2007 |url-status=live  }}</ref> His father is of [[Iranian Armenians|Armenian]] and [[Assyrian people|Assyrian]] heritage.<ref name="persianbio">{{cite web|url=http://www.persianmirror.com/culture/famous/bios/andreagassi.cfm |title=Bio:Andre Agassi |work=Persian Mirror |access-date=January 27, 2011 |archive-url=https://web.archive.org/web/20081212151257/http://www.persianmirror.com/culture/famous/bios/andreagassi.cfm |archive-date=December 12, 2008 |url-status=dead  }}</ref><ref name="zindamagazine.com">{{cite web |url=http://www.zindamagazine.com/html/archives/1995/zn082895.html |archive-url=https://web.archive.org/web/20010412033524/http://www.zindamagazine.com/html/archives/1995/zn082895.html |url-status=dead |archive-date=April 12, 2001 |title=400 ASSYRIAN ATHLETES IN THE STATE OLYMPICS |publisher=ZENDA renamed Zinda Magazine in 1999 |date=August 28, 1995 |access-date=June 6, 2011 }}</ref><ref name="peoplebio">{{cite web|url=http://www.peopleandprofiles.com/ProfilesDet-28/Andre+Agassi.html?profile_id=127 |archive-url=https://web.archive.org/web/20070708231152/http://www.peopleandprofiles.com/ProfilesDet-28/Andre%2BAgassi.html?profile_id=127 |url-status=dead |archive-date=July 8, 2007 |title=Andre Agassi Profile |publisher=Peopleandprofiles.com |access-date=June 6, 2011 }}</ref><ref>{{cite book |url=https://books.google.com/books?id=5R1y1nvcWccC&pg=PA278 |title=Aramaic (Assyrian/Syriac) dictionary |isbn=9780781810876 |access-date=June 6, 2011|last1=Awde |first1=Nicholas |last2=Lamassu |first2=Nineb |last3=Al-Jeloo |first3=Nicholas |year=2007 }}</ref><ref name="The man behind Andre">{{cite web |url=http://www.agassi.fr/index2.php?option=com_content&do_pdf=1&id=527 |title=The man behind Andre |access-date=June 6, 2011 |archive-date=March 23, 2012 |archive-url=https://web.archive.org/web/20120323075855/http://www.agassi.fr/index2.php?option=com_content&do_pdf=1&id=527 |url-status=dead }}</ref> Andre Agassi's mother, Betty, is a breast cancer survivor.<ref>{{Cite web |date=2006-12-11 |title=Tennis star's mom, Betty Agassi, champions cause of breast cancer |url=https://www.dl-online.com/news/tennis-stars-mom-betty-agassi-champions-cause-of-breast-cancer |access-date=2022-12-14 |website=Detroit Lakes Tribune |language=en}}</ref> He has three older siblings – Rita (last wife of former number one [[Pancho Gonzales]]), Philip and Tami.<ref>{{cite web|title=Andre Agassi |url=http://www.persianmirror.com/culture/famous/bios/andreagassi.cfm |archive-url=https://web.archive.org/web/20081212151257/http://www.persianmirror.com/culture/famous/bios/andreagassi.cfm |publisher=PersianMirror |year=2004 |archive-date=December 12, 2008 |access-date=May 23, 2009 |url-status=dead  }}</ref><ref>{{cite web|url=http://www.dcourier.com/main.asp?SectionID=2&SubSectionID=2&ArticleID=127375 |title=Column: Q&A with Rita Agassi; a tennis life and journey |work=The Daily Courier |author=Howard, Chris |date=January 14, 2014 |access-date=January 25, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140120040638/http://www.dcourier.com/main.asp?SectionID=2&SubSectionID=2&ArticleID=127375 |archive-date=January 20, 2014 }}</ref> Andre was given the middle name Kirk after [[Kirk Kerkorian]], an Armenian American billionaire. Emmanuel Agassi, then a waiter at [[Tropicana Las Vegas]], had met Kerkorian in 1963.<ref>{{cite news|last1=Sassounian|first1=Harut|author-link1=Harut Sassounian|title=New Biography Portrays Kirk Kerkorian, Not Trump, as 'the Greatest Deal Maker'|url=https://www.azatutyun.am/a/29007312.html|publisher=[[RFE/RL]] via [[The California Courier]]|date=January 30, 2018}}</ref>
+
+At the age of 12, Agassi and his good friend and doubles partner, Roddy Parks, won the 1982 National Indoor Boys 14s Doubles Championship in Chicago.<ref>{{Cite web |date=2020-08-24 |title=Andre Agassi: One of the greats in tennis pantheon |url=https://www.hindustantimes.com/ht-school/andre-agassi-one-of-the-greats-in-tennis-pantheon/story-iGfIba14DLefRqpkOJsz7J.html |access-date=2022-12-14 |website=Hindustan Times |language=en}}</ref> Agassi describes memorable experiences and juvenile pranks with Roddy in his book ''Open''.<ref name=Open>{{cite book |last=Agassi |first=Andre |title=Open: An Autobiography |year=2010 |publisher=Vintage |location=London |isbn=978-0-307-38840-7 |pages=[https://archive.org/details/openautobiograph00andr/page/62 62, 83] |url=https://archive.org/details/openautobiograph00andr/page/62 }}</ref>
+
+When he was 13, Agassi was sent to [[Nick Bollettieri]]'s Tennis Academy in Florida.<ref name="greatath">{{cite book |last1=Jensen |first1=Jeffry |editor1-first=Dawn P |editor1-last=Dawson |title=Great Athletes |edition=Revised |volume=1 |year=2002 |orig-year=1992 |publisher=Salem Press |isbn=1-58765-008-8 |pages=17–19 |url=https://archive.org/details/greatathletes0000unse |url-access=limited }}</ref> He was meant to stay for only three months, because that was all his father could afford. After thirty minutes of watching Agassi play, Bollettieri, deeply impressed by his talent, called Mike and said: "Take your check back. He's here for free."<ref name="lxbpdn">{{cite news|url=http://sportsillustrated.cnn.com/2006/magazine/08/30/agassi0717/index.html |publisher=Gary Smith for Sports Illustrated |title=Coming into Focus |access-date=February 15, 2007 |archive-url=https://web.archive.org/web/20100105073645/http://sportsillustrated.cnn.com/2006/magazine/08/30/agassi0717/index.html |archive-date=January 5, 2010 |url-status=live  }}</ref> Agassi then dropped out of school in the ninth grade to pursue a full-time tennis career.<ref>{{cite news|url=https://www.nytimes.com/2009/11/12/books/12agassi.html |work=The New York Times |title=A Team, but Watch How You Put It |first=Charles |last=McGrath |date=November 12, 2009 |access-date=May 5, 2010 |archive-url=https://web.archive.org/web/20120110114052/http://www.nytimes.com/2009/11/12/books/12agassi.html |archive-date=January 10, 2012 |url-status=live  }}</ref>
+
+==Professional career==
+
+===1986–1993: Breakthrough and the first major title===
+[[File:Agassi in argentina.jpg|thumb|Agassi when he played the Davis Cup Americas zone in Buenos Aires, 1988]]
+Agassi turned professional at the age of 16 and competed in his first tournament at [[La Quinta, California]]. He won his first match against [[John Austin (tennis)|John Austin]], but then lost his second match to [[Mats Wilander]]. By the end of 1986, Agassi was ranked No. 91.<ref name="Tennis28">{{cite web |url=http://www.tennis28.com/rankings/history/agassi.html |title=Tennis28-Bio:Andre Agassi |access-date=June 12, 2009 |publisher=Tennis28}}</ref> He won his first top-level singles title in 1987 at the [[ATP Itaparica|Sul American Open]] in [[Itaparica]]<ref name="greatath" /> and ended the year ranked No. 25.<ref name="greatath" /> He won six additional tournaments in 1988 (Memphis, [[1988 U.S. Men's Clay Court Championships|U.S. Men's Clay Court Championships]], [[World Championship Tennis#WCT 1988|Forest Hills WCT]], Stuttgart Outdoor, [[1988 Volvo International|Volvo International]] and [[1988 Livingston Open|Livingston Open]]),<ref name="greatath" /> and, by December of that year, he had surpassed US$1&nbsp;million in career prize money after playing in just 43 tournaments—the fastest anyone in history had reached that level.<ref>{{cite web|url=https://www.imdb.com/name/nm1152468/bio|title=Andre Agassi|publisher=IMDb}}</ref><ref>{{Cite web |title=Andre Agassi |url=https://www.athletespeakers.com/speaker/andre-agassi |access-date=2022-12-14 |website=Celebrity Speakers For Speaking Engagements {{!}} AthleteSpeakers |language=en}}</ref> During 1988, he also set the open-era record for most consecutive victories by a male teenager (a record that stood for 17 years until [[Rafael Nadal]] broke it in 2005).<ref>{{cite news |title=Teen Nadal gives Spain reign over French Open |date=June 5, 2006 |url=https://www.usatoday.com/sports/tennis/french/2005-06-05-day-14_x.htm |agency=Associated Press (USA Today) |access-date=April 6, 2010}}</ref> His year-end ranking was No. 3, behind second-ranked [[Ivan Lendl]] and top-ranked [[Mats Wilander]]. Both the [[Association of Tennis Professionals]] and ''Tennis'' magazine named Agassi the Most Improved Player of the Year for 1988.<ref name="greatath" />
+
+In addition to not playing the Australian Open (which later became his best Grand Slam event) for the first eight years of his career, Agassi chose not to play at [[The Championships, Wimbledon|Wimbledon]] from 1988 through 1990 (although he first played there in 1987, only to lose in the first round to [[Henri Leconte]]) and publicly stated that he did not wish to play there because of the event's traditionalism, particularly its "predominantly white" dress code to which players at the event are required to conform.<ref>{{Cite web |date=2022-07-10 |title=Agassi hated Wimbledon dress code so much he boycotted it for three years |url=https://talksport.com/sport/tennis/1147060/andre-agassi-boycott-wimbledon-dress-code-white/ |access-date=2022-12-14 |website=talkSPORT |language=en-US}}</ref><ref>{{Cite web |date=2017-06-30 |title=Against the all-white rule at Wimbledon |url=https://lifestyle.livemint.com//news/talking-point/against-the-all-white-rule-at-wimbledon-111646993830455.html |access-date=2022-12-14 |website=Mintlounge |language=en}}</ref>
+
+Strong performances on the tour meant that Agassi was quickly tipped as a future Grand Slam champion. While still a teenager, he reached the semi-finals of both the French Open and the [[US Open (tennis)|US Open]] in 1988 and made the US Open semi-finals in 1989. He began the 1990s with a series of near-misses. He reached his first Grand Slam final in 1990 at the French Open, where he was favored before losing in four sets to [[Andrés Gómez]], which he later attributed in his book to worrying about his wig falling off during the match.<ref>{{cite web |url=https://www.essentiallysports.com/andre-agassi-says-he-lost-a-grand-slam-final-because-of-his-wig-tennis-news/ |title=Andre Agassi Says He Lost A Grand Slam Final Because Of His Wig |work=Essentially Sports |date=April 15, 2020 |access-date=June 27, 2021 }}</ref> He reached his second Grand Slam final of the year at the US Open, defeating defending champion [[Boris Becker]] in the semi-finals. His opponent in the final was [[Pete Sampras]]; a year earlier, Agassi had crushed Sampras, after which time he told his coach that he felt bad for Sampras because he was never going to make it as a pro. Agassi lost the US Open final to Sampras in three sets.<ref name="greatath" /> The [[Agassi-Sampras rivalry]] became the biggest one in tennis over the rest of the decade. Agassi ended 1990 on a high note as he helped the United States win its first [[Davis Cup]] in 8 years on home soil against Australia (3-2) and won his only [[Tennis Masters Cup]], beating reigning Wimbledon champion [[Stefan Edberg]] in the final.
+
+In 1991, Agassi reached his second consecutive French Open final, where he faced fellow Bollettieri Academy alumnus [[Jim Courier]]. Courier emerged the victor in a five-set final. The Las Vegan was a set and 3-1 up when came the rain. The rain delay proved to be a confidence builder for Courier. Agassi decided to play at Wimbledon in 1991, leading to weeks of speculation in the media about the clothes he would wear. He eventually emerged for the first round in a completely white outfit.<ref>{{cite news |url=http://articles.baltimoresun.com/1991-06-28/sports/1991179074_1_wimbledon-agassi-centre-court |title=Agassi makes a big splash in white on Centre Court |date=June 28, 1991 |newspaper=[[The Baltimore Sun]]}}</ref> He reached the quarterfinals on that occasion, losing in five sets to [[David Wheaton]].
+
+Agassi's Grand Slam tournament breakthrough came at Wimbledon, not at the French Open or the US Open, where he had previously enjoyed success. In 1992, he defeated [[Goran Ivanišević]] in a five-set final.<ref name="greatath" /><ref>{{cite news |url=https://www.nytimes.com/1992/07/06/sports/tennis-on-the-grass-at-wimbledon-agassi-finally-hits-pay-dirt.html |title=On the Grass at Wimbledon, Agassi Finally Hits Pay Dirt |date=July 6, 1992 |newspaper=The New York Times}}</ref> Along the way, Agassi overcame two former Wimbledon champions: [[Boris Becker]] and [[John McEnroe]]. No other baseliner would triumph at Wimbledon until [[Lleyton Hewitt]] ten years later. Agassi was named the [[BBC Sports Personality of the Year Overseas Personality|BBC Overseas Sports Personality of the Year]] in 1992. Agassi once again played on the United States' [[Davis Cup]] winning team in 1992. It was their second Davis cup title in three years. Agassi famously played the game wearing [[Oakley, Inc.|Oakley]] brand sunglasses, and a photo of him from the day appeared on the cover of [[Tennis (magazine)|''Tennis'' magazine]]. In his memoir, he wrote that he was covering up bloodshot eyes from a [[hangover]] and claimed that the founder of Oakley, [[Jim Jannard]], had sent him a [[Dodge Viper]] to thank him for the inadvertent publicity.<ref name=":0">{{cite book |last=Chrisman-Campbell |first=Kimberly |title=Worn on This Day: the Clothes That Made History |year=2019 |publisher=Running Press |url=https://books.google.com/books?id=t4WLDwAAQBAJ&q=agassi |isbn=978-0-7624-9357-9 |location=Philadelphia |page=30 |oclc=1089571878 |url-access=subscription}}</ref>
+
+In 1993, Agassi won the only doubles title of his career, at the [[Cincinnati Masters]], partnered with [[Petr Korda]]. He missed much of the early part of that year due to injuries. Although he made the quarterfinals in his Wimbledon title defense, he lost to eventual champion and No. 1 Pete Sampras in five sets. Agassi lost in the first round at the US Open to [[Thomas Enqvist]] and required wrist surgery late in the year.
+
+===1994–1997: Rise to the top, Olympic Gold and the fall===
+With new coach [[Brad Gilbert]] on board, Agassi began to employ more of a tactical, consistent approach, which fueled his resurgence. He started slowly in 1994, losing in the first week at the French Open and Wimbledon. Nevertheless, he emerged during the hard-court season, winning the [[Canada Masters|Canadian Open]]. His comeback culminated at the [[1994 US Open (tennis)|1994 US Open]] with a five-set fourth-round victory against [[Michael Chang]]. He then became the first man to capture the US Open as an [[Seed (tennis)|unseeded]] player, beating [[Michael Stich]] in the final.<ref name="greatath" /> Along the way, he beat 5 seeded players.
+
+In 1995, Agassi shaved his balding head, breaking with his old "image is everything" style. He competed in the [[1995 Australian Open]] (his first appearance at the event) and won, beating defending champion Sampras in a four-set final.<ref name="greatath" /> Agassi and Sampras met in five tournament finals in 1995, all on [[hardcourt]], with Agassi winning three. Agassi won three Masters Series events in 1995 ([[Cincinnati Masters|Cincinnati]], [[Miami Masters|Key Biscayne]], and the Canadian Open) and seven titles total.<ref name="greatath" /> He compiled a career-best 26-match winning streak during the summer hard-court circuit, with the last victory being in an intense late-night four-set semi-final of the [[1995 US Open (tennis)|US Open]] against [[Boris Becker]]. The streak ended the next day when Agassi lost the final to Sampras. Agassi admitted this loss, which gave Sampras a 9–8 lead in their head-to-head meetings, took two years for him to get over mentally.<ref name="tennis-buzz1995">{{cite web |url=https://tennis-buzz.com/1995-us-open-pete-sampras-defeats-andre-agassi/ |title=1995 US Open: Pete Sampras defeats Andre Agassi |publisher=Tennis Buzz |date=August 31, 2015 |accessdate=2022-07-19 |archive-date=August 18, 2022 |archive-url=https://web.archive.org/web/20220818223454/http://tennis-buzz.com/1995-us-open-pete-sampras-defeats-andre-agassi/ |url-status=dead }}</ref>
+
+Agassi reached the [[List of ATP number 1 ranked singles tennis players|world No. 1]] ranking for the first time in April 1995. He held that ranking until November, for a total of 30 weeks. Agassi skipped most of the fall indoor season which allowed Sampras to surpass him and finish ranked No. 1 at the year-end ranking. In terms of win–loss record, 1995 was Agassi's best year. He won 73 and lost 9 matches, and was also once again a key player on the United States' [[Davis Cup]] winning team—the third and final Davis Cup title of his career.
+
+1996 was a less successful year for Agassi, as he failed to reach any Grand Slam final. He suffered two early-round losses to [[Chris Woodruff]] and [[Doug Flach]] at the French Open and Wimbledon, respectively, and lost to Chang in straight sets in the Australian and US Open semi-finals. At the time, Agassi blamed the Australian Open loss on the windy conditions, but later said in his biography that he had lost the match on purpose, as he did not want to play Boris Becker, whom he would have faced in that final. The high point for Agassi was winning the men's singles gold medal at the [[1996 Summer Olympics|Olympic Games]] in [[Atlanta]], beating [[Sergi Bruguera]] of Spain in the final.<ref name="greatath" /> Agassi also successfully defended his singles titles in Cincinnati and Key Biscayne.
+
+1997 was the low point of Agassi's career. His wrist injury resurfaced, and he played only 24 matches during the year. He later confessed that he started using [[methamphetamine|crystal methamphetamine]] at that time, allegedly on the urging of a friend.<ref name="sports.espn.go.com">{{cite web |url=http://sports.espn.go.com/sports/tennis/news/story?id=4600027 |title=Andre Agassi book says he used crystal meth |work=[[ESPN]] |date=October 27, 2009 |access-date=January 27, 2011}}</ref> He failed an ATP drug test, but wrote a letter claiming the same friend had spiked a drink. The ATP dropped the failed drug test as a warning. In his autobiography, Agassi admitted that the letter was a lie.<ref>{{cite news |url=http://news.bbc.co.uk/sport1/hi/tennis/8329193.stm |work=BBC News |title=Agassi admits use of crystal meth |date=October 28, 2009 |access-date=March 30, 2010}}</ref> He quit the drug soon after. At this time Agassi was also in a failing marriage with actress, model, and socialite [[Brooke Shields]] and had lost interest in the game.<ref>Andre Agassi interview. ''[[The Ellen DeGeneres Show]]''. November 19, 2009.</ref> He won no top-level titles, and his ranking sank to No. 141 on November 10, 1997, prompting many to believe that his run as one of the sport's premier competitors was over and he would never again win any significant tournaments.<ref name="greatath" />
+
+===1998–2003: Return to glory and Career Super Slam===
+[[File:Andre Agassi 1999.jpg|thumb|Agassi in 1999]]
+In 1998, Agassi began a rigorous conditioning program and worked his way back up the rankings by playing in Challenger Series tournaments, a circuit for pro players ranked outside the world's top 50. After returning to top physical and mental shape, Agassi recorded the most successful period of his tennis career and also played classic matches in that period against [[Pete Sampras]] and [[Patrick Rafter]].
+
+In 1998, Agassi won five titles and leapt from No. 110 to No. 6, the highest jump into the top 10 made by any player during a calendar year.<ref name="atpbio">{{cite web|url=https://www.atptour.com/en/players/andre-agassi/a092/overview |title=Andre Agassi player profile |website=Association of Tennis Professionals (ATP) |access-date=April 13, 2021}}</ref> At Wimbledon, he had an early loss in the second round to [[Tommy Haas]]. He won five titles in ten finals and was runner-up at the [[Miami Masters|Masters Series tournament in Key Biscayne]], losing to [[Marcelo Ríos]], who became No. 1 as a result. At the year end he was awarded the ATP Most Improved Player of the Year for the second time in his career (the first being 10 years earlier in 1988).
+
+Agassi entered the history books in 1999 when he came back from two sets to love down to beat [[Andrei Medvedev (tennis)|Andrei Medvedev]] in a five-set French Open final, becoming, at the time, only the fifth male player (joining [[Rod Laver]], [[Fred Perry]], [[Roy Emerson]] and [[Don Budge]]—these have since been joined by [[Roger Federer]], [[Rafael Nadal]], and [[Novak Djokovic]]) to win all four Grand Slam singles titles during his career. Only Laver, Agassi, Federer, Nadal and Djokovic have achieved this feat during the [[Open Era]]. This win also made him the first (of only four, the next being Federer, Nadal and Djokovic respectively) male player in history to have won all four Grand Slam titles on three different surfaces (clay, grass and hard courts).  Agassi also became the only male player to win the [[Career Super Slam]], consisting of all four Grand Slam tournaments plus an Olympic gold medal in singles and a [[ATP World Tour Finals|Year-end championship]].<ref name="SI" />
+
+Agassi followed his 1999 French Open victory by reaching the Wimbledon final, where he lost to Sampras in straight sets.<ref name="greatath" /> He rebounded from his Wimbledon defeat by winning the [[1999 US Open (tennis)|US Open]], beating [[Todd Martin]] in five sets (rallying from a two sets to one deficit) in the final. Overall during the year Agassi won 5 titles including two majors and the ATP Masters Series in Paris, where he beat [[Marat Safin]]. Agassi ended 1999 as the No. 1, ending Sampras's record of six consecutive year-ending top rankings (1993–98).<ref name="greatath" /> This was the only time Agassi ended the year at No. 1.  Agassi was runner-up to Sampras at the year-end [[1999 Tennis Masters Cup|Tennis Masters Cup]] losing 1–6, 5–7, 4–6 despite beating Sampras in the round-robin 6–2, 6–2.<ref>{{cite web |url=https://www.tennismajors.com/our-features/november-28-1999-the-day-pete-sampras-won-the-atp-finals-for-the-fifth-time-310165.html |title=November 28, 1999: The day Pete Sampras won the ATP Finals for the fifth time |website=Tennis Majors |last=Sokolowski |first=Alexandre |date=November 28, 2020 |access-date=June 27, 2021 }}</ref>
+
+He began the next year 2000 by capturing his second Australian Open title, beating Sampras in a five-set semi-final and [[Yevgeny Kafelnikov]] in a four-set final.<ref name="greatath" /> He was the first male player to have reached four consecutive Grand Slam finals since [[Rod Laver]] achieved the Grand Slam in 1969.{{#tag:ref|[[Roger Federer]] has since surpassed this feat, reaching ten consecutive Grand Slam finals from 2005 to 2007.|group=lower-alpha}}  At the time, Agassi was also only the fourth player since Laver to be the reigning champion of three of four Grand Slam events, missing only the Wimbledon title.{{#tag:ref|[[Pete Sampras]] held the 1993 Wimbledon, [[1993 US Open (tennis)|1993 US Open]] and [[1994 Australian Open]] titles simultaneously. [[Jimmy Connors]] (1974), [[Roger Federer]] (2004, 2006 and 2007) and [[Novak Djokovic]] (2011) won those three majors in the same year, although Connors' Grand Slam titles were all played on grass courts. [[Mats Wilander]] won all but Wimbledon in 1988 during his similar rise to the year-end No. 1. [[Rafael Nadal]] won the French Open and Wimbledon "Channel Slam" (2008) and 2009 Australian Open, before replicating the Channel Slam alongside winning the US Open in 2010.|group=lower-alpha}}. 2000 also saw Agassi reach the semi-finals at Wimbledon, where he lost in five sets to Rafter in a match considered by many to be one of the best ever at Wimbledon.<ref>{{cite news|url=http://news.bbc.co.uk/sport2/hi/tennis/wimbledon_history/3742067.stm |title=Classic Matches: Rafter v Agassi |date=May 31, 2004 |access-date=October 25, 2007 |work=BBC Sport |archive-url=https://web.archive.org/web/20091104221251/http://news.bbc.co.uk/sport2/hi/tennis/wimbledon_history/3742067.stm |archive-date=November 4, 2009 |url-status=live  }}</ref> At the inaugural [[2000 Tennis Masters Cup|Tennis Masters Cup]] in Lisbon, Agassi reached the final after defeating Marat Safin in the semi-finals to end the Russian's hopes to become the youngest No. 1 in the history of tennis. Agassi then lost to [[Gustavo Kuerten]] in the final, allowing Kuerten to be crowned year-end No. 1.<ref>{{cite web |url=https://www.tennisworldusa.org/tennis/news/Blast_From_the_Past/49663/dec-3-2000-gustavo-kuerten-beats-andre-agassi-to-lift-masters-cup-title/ |title=Dec. 3, 2000: Gustavo Kuerten beats Andre Agassi to lift Masters Cup title |work=Tennis World |last=Ilic |first=Jovica |date=December 4, 2017 |access-date=June 27, 2021 }}</ref>
+
+Agassi opened 2001 by successfully defending his Australian Open title with a straight-sets final win over [[Arnaud Clément]].<ref name="greatath" /> En route, he beat a cramping Rafter in five sets in front of a sell-out crowd in what turned out to be the Aussie's last Australian Open. At Wimbledon, they met again in the semi-finals, where Agassi lost another close match to Rafter, 8–6 in the fifth set. In the quarterfinals at the US Open, Agassi lost a 3-hour, 33&nbsp;minute epic match<ref>{{cite magazine|url=http://sportsillustrated.cnn.com/tennis/2001/us_open/news/2001/09/05/sampras_agassi |title=Believe the hype |magazine=Sports Illustrated |date=September 6, 2001 |access-date=June 6, 2011 |archive-url=https://web.archive.org/web/20110604013156/http://sportsillustrated.cnn.com/tennis/2001/us_open/news/2001/09/05/sampras_agassi |archive-date=June 4, 2011 |url-status=live}}</ref> with Sampras, 7–6, 6–7, 6–7, 6–7,<ref>{{cite magazine |url=http://sportsillustrated.cnn.com/tennis/2001/us_open/news/2001/09/05/agassi_sidebar_ap |title=Unbreakable |date=September 6, 2001 |magazine=Sports Illustrated |access-date=January 26, 2011}}</ref> with no breaks of serve during the 52-game match. Despite the setback, Agassi finished 2001 ranked No. 3, becoming the only male tennis player to finish a year ranked in the top 3 in three different decades.<ref>{{cite web |url=http://www.sportsline.com/tennis/players/playerpage/201490/2006 |title=SportsLine:Andre Agassi |year=2006 |publisher=Sportsline |access-date=January 26, 2011 |archive-date=December 24, 2007 |archive-url=https://web.archive.org/web/20071224194727/http://www.sportsline.com/tennis/players/playerpage/201490/2006 |url-status=dead }}</ref><ref name="atpbio" />
+
+2002 opened with disappointment for Agassi, as injury forced him to skip the Australian Open, where he was a two-time defending champion.<ref>{{Cite web |author=Guardian Staff |date=2002-01-14 |title=Injured Agassi and Williams forced out |url=http://www.theguardian.com/sport/2002/jan/14/australianopen2002.australianopen2 |access-date=2022-12-14 |website=the Guardian |language=en}}</ref> Agassi recovered from the injury and later that year defended his [[Key Biscayne]] title beating then rising Roger Federer in a four-set final. At the US Open, Agassi overcame No.1 ranked and defending champion [[Lleyton Hewitt]] in the semi-finals.<ref>{{cite web|url=https://www.usopen.org/en_US/news/articles/2020-06-08/full_match_video_coco_vandeweghe_vs_alison_riske_2017_us_open_womens_singles_first_round.html|title=Full Match Video: CoCo Vandeweghe vs. Alison Riske, 2017 US Open women's singles first round|website=Usopen.org|access-date=July 19, 2022}} {{failed verification|date=July 2022}}</ref> This led to what turned out to be the last duel between Agassi and Sampras in final of the US Open, which Sampras won in four sets and left Sampras with a 20–14 edge in their 34 career meetings. The match was the last of Sampras's career. Agassi's US Open finish, along with his Masters Series victories in Key Biscayne, [[Rome Masters|Rome]] and [[Madrid Open (tennis)|Madrid]], helped him finish 2002 as the oldest year-end No. 2 at 32 years and 8 months.<ref name="atpbio" />
+
+In 2003, Agassi won the eighth (and final) Grand Slam title of his career at the Australian Open, where he beat [[Rainer Schüttler]] in straight sets in the final.<ref>{{Cite web |title=ESPN.com - Australian Open 2003 - Agassi earns eighth Grand Slam title |url=https://www.espn.com/tennis/aus03/s/2003/0125/1499001.html |access-date=2022-12-14 |website=www.espn.com}}</ref>
+
+On April 28, 2003, he recaptured the No. 1 ranking to become the oldest top-ranked male player since the ATP rankings began at 33 years and 13 days. The record was later surpassed by [[Roger Federer]] in 2018. He had held the No. 1 ranking for two weeks, when [[Lleyton Hewitt]] took it back on May 12, 2003. Agassi then recaptured the No. 1 ranking once again on June 16, 2003, which he held for 12 weeks until September 7, 2003. There he managed to reach the US Open semi-finals, where he lost to [[Juan Carlos Ferrero]], surrendering his No. 1 ranking to him. During his career, Agassi held the ranking for a total of 101 weeks. Agassi's ranking slipped when injuries forced him to withdraw from a number of events. At the year-end Tennis Masters Cup, Agassi lost in the final to Federer, his third time to finish as runner-up in the event after losses in 1999 and 2000, and finished the year ranked No. 4.<ref>{{cite web |url=https://bleacherreport.com/articles/946191-atp-world-tour-finals-counting-down-the-all-time-top-ten-champions |title=ATP World Tour Finals: Counting Down the All-Time Top 10 Champions |work=Bleacher Report |last=Allen |first=Ja |date=November 18, 2011 |access-date=June 27, 2021 }}</ref> At age 33, he had been one of the oldest players to rank in the top 5 since Connors, at age 35, was No. 4 in 1987.<ref name="atpbio" />
+
+===2004–2006: Final years===
+[[file:Andre Agassi Indian Wells 2006.jpg|thumb|Agassi in 2006]]
+In 2004, Agassi began the year with a five-set loss in the semi-finals of the Australian Open to [[Marat Safin]]; the loss ended Agassi's 26-match winning streak at the event. He won the [[Cincinnati Masters|Masters series event in Cincinnati]] to bring his career total to 59 top-level singles titles and a record 17 ATP Masters Series titles, having already won seven of the nine ATP Masters tournament—all except the tournaments in [[Monte Carlo Masters|Monte Carlo]] and [[Hamburg Masters|Hamburg]]. At 34, he became the second-oldest singles champion in Cincinnati tournament history (the tournament began in 1899), tied with Roger Federer and surpassed only by [[Ken Rosewall]], who won the title in 1970 at age 35. He finished the year ranked No. 8, one of the oldest players to finish in the top 10 since the 36-year-old Connors was No. 7 in 1988.<ref name="atpbio" /> At the time, Agassi also became the sixth male player during the [[Tennis open era|open era]] to reach 800 career wins with his first-round victory over [[Alex Bogomolov]] in [[Countrywide Classic]] in Los Angeles.
+
+Agassi's 2005 began with a quarterfinal loss to Federer at the Australian Open. Agassi had several other deep runs at tournaments, but had to withdraw from several events due to injury. He lost to [[Jarkko Nieminen]] in the first round of the French Open. He won his fourth title in Los Angeles and reached the final of the [[Canada Masters|Rogers Cup]], before falling to No. 2 [[Rafael Nadal]].
+
+Agassi's 2005 was defined by an improbable run to the US Open final. After beating [[Răzvan Sabău]] and [[Ivo Karlović]] in straight sets and [[Tomáš Berdych]] in four sets, Agassi won three consecutive five-set matches to advance to the final. The most notable of these matches was his quarterfinal victory over [[James Blake (tennis)|James Blake]], where he rallied from two sets down to win in the fifth set tie-breaker. His other five-set victories were over [[Xavier Malisse]] in the fourth round and [[Robby Ginepri]] in the semi-finals. In the final, Agassi faced Federer, who was seeking his second consecutive US Open title and his sixth Grand Slam title in two years. Federer defeated Agassi in four sets. Agassi finished 2005 ranked No. 7, his 16th time in the year-end top-10 rankings, which tied Connors for the most times ranked in the top 10 at year's end.
+
+Agassi had a poor start to 2006, as he was still recovering from an ankle injury and also suffering from back and leg pain and lack of match play. Agassi withdrew from the Australian Open because of the ankle injury, and his back injury and other pains forced him to withdraw from several other events, eventually skipping the entire clay-court season including the French Open. This caused his ranking to drop out of the top 10 for the last time. Agassi returned for the grass-court season, playing a tune-up, and then [[2006 Wimbledon Championships – Men's singles|Wimbledon]]. He was defeated in the third round by world No. 2 (and eventual runner-up) [[Rafael Nadal]]. Against conventions, Agassi, the losing player, was interviewed on court after the match.<ref>{{cite news|url=http://www.msnbc.msn.com/id/13653101 |title=Upsetting day: Agassi, then Roddick ousted |date=June 1, 2006 |access-date=October 27, 2007 |agency=Associated Press |publisher=NBC Sports |archive-url=https://web.archive.org/web/20071105214848/http://www.msnbc.msn.com/id/13653101 |archive-date=November 5, 2007 |url-status=dead  }}</ref> At Wimbledon, Agassi announced his plans to retire following the US Open. Agassi played only two events during the summer hard-court season with his best result being a quarterfinal loss at the [[Countrywide Classic]] in Los Angeles to [[Fernando González]] of Chile, which resulted in him being unseeded at the US Open.
+
+Agassi had a short, but dramatic, run in his final US Open. Because of extreme back pain, Agassi was forced to receive anti-inflammatory injections after every match. After a four-set win against [[Andrei Pavel]], Agassi faced eighth-seeded [[Marcos Baghdatis]] in the second round who had earlier advanced to the [[2006 Australian Open]] final and Wimbledon semi-finals. Agassi won in five sets as the younger Baghdatis succumbed to muscle cramping in the final set.<ref>{{Cite news |agency=Associated Press |date=2006-08-31 |title=Agassi Advances at U.S. Open |language=en-US |work=The New York Times |url=https://www.nytimes.com/2006/08/31/sports/tennis/01Agassi_wire.html |access-date=2023-05-18 |issn=0362-4331}}</ref> In his last match, Agassi fell to 112th-ranked big-serving [[Benjamin Becker]] of Germany in four sets. Agassi received a four-minute standing ovation from the crowd after the match and delivered a retirement speech.<ref>{{Cite web |last=Walker|first=Ben |publisher=The Associated Press |title=Closing it out |url=https://www.heraldtribune.com/story/news/2006/09/04/closing-it-out/28498969007/ |access-date=October 10, 2022 |website=Sarasota Herald-Tribune |language=en-US}}</ref>
+
+==Rivalries==
+{{BLP sources section|date=September 2019}}
+
+===Agassi vs. Sampras===
+{{Main|Agassi–Sampras rivalry}}
+
+The rivalry has been called the greatest of the generation of players competing in the 1990s, as [[Pete Sampras|Sampras]] and Agassi were the most successful players of that decade. They also had very contrasting playing styles, with Sampras being considered the greatest [[serve (tennis)|server]] and Agassi the greatest serve returner at the time. Agassi and Sampras met 34 times on the tour level with Agassi trailing 14–20.<ref>{{cite web |url=https://www.atptour.com/en/players/atp-head-2-head/andre-agassi-vs-pete-sampras/A092/S402 |title=Sampras-Agassi Head-to-Head Matches |work=Association of Tennis Professionals (ATP)  |access-date=April 13, 2021}}</ref>
+
+The [[1990 U.S. Open (tennis)|1990 US Open]] was their first meeting in a Grand Slam tournament final. Agassi was favored as he was ranked No. 4 at the time, compared to the No. 12 ranking of Sampras and because Agassi had defeated Sampras in their only previously completed match. Agassi, however, lost the final to Sampras in straight sets. Their next meeting in a Grand Slam was at the [[1992 French Open]], where they met in the quarterfinals. Although Sampras was ranked higher, Agassi came out winning in straight sets. They met again on a Grand Slam level at the quarterfinals of Wimbledon in 1993, where Agassi was the defending champion and Sampras was the newly minted world No. 1. Agassi dug himself out from a two-sets-to-love hole, levelling the match at two sets apiece; however, Sampras prevailed in five sets, and went on to win his first Wimbledon championship.
+
+With both Sampras and Agassi participating, the [[USA Davis Cup team|US]] won the Davis Cup in 1995. The year should be considered the peak of the rivalry as together they won three out of four major titles, meeting each other twice in the finals, and were occupying the top two spots in the rankings for the whole year. They met five times during the year, all in the title matches, including the [[1995 Australian Open|Australian Open]], the [[Indian Wells Masters|Newsweek Champions Cup]] (now Indian Wells), the [[Lipton International Players Championships]] (now Miami Open), the [[Canada Masters|Canadian Open]], and the [[1995 US Open (tennis)|US Open]]. Agassi won three of the finals, including the Australian Open; however, Sampras took the US Open title, ending Agassi's 26-match winning streak. After Agassi had taken most of the fall season off, Sampras took over the No. 1 ranking for the end of the season. Agassi admitted this loss, which gave Sampras a 9–8 lead in their head-to-head meetings, took two years for him to get over it mentally.<ref name="tennis-buzz1995"/>
+
+In the following three years, while Sampras continued winning Grand Slam titles every season, Agassi slumped in the rankings and struggled in major competitions. The next time Sampras and Agassi met in a Grand Slam final was at Wimbledon in 1999, where Sampras won in straight sets. For both, it was considered a career rejuvenation, as Sampras had suffered a string of disappointments in the previous year while Agassi was regaining his status as a top-ranked player after winning the French Open. Sampras forfeited the No. 1 ranking to Agassi when injury forced him to withdraw from that year's US Open, which Agassi went on to win. They faced each other twice in the season-ending [[Tennis Masters Cup|ATP Tour World Championships]], with Sampras losing the round-robin match, but winning the final.
+
+In the 2000s, they met three more times on the Grand Slam level offering three memorable contests. In 2000, the top-ranked Agassi defeated No. 3 Sampras in the semi-finals of the [[2000 Australian Open|Australian Open]] in five sets, which was an important win for Agassi who had lost 4 of the previous five matches against Sampras. In arguably their most memorable match ever, Sampras defeated Agassi in the [[2001 U.S. Open (tennis)|2001 US Open]] quarterfinals in four sets. There were no breaks of serve during the entire match. Reruns of the match are frequently featured on television, especially during US Open rain delays, and the match is considered one of the best in history because of the level of play presented by both players.
+
+Their last meeting was the final of the [[2002 U.S. Open (tennis)|2002 US Open]], which was their third meeting in a US Open final, but the first since 1995. The match was also notable because they had defeated several up-and-coming players en route to the final. Sampras had defeated No. 3 [[Tommy Haas]] in the fourth round and future No. 1 [[Andy Roddick]] in the quarterfinals, while Agassi had defeated No. 1 and defending champion [[Lleyton Hewitt]] in the semi-finals. Sampras defeated Agassi in four sets. This was the final [[ATP tour]] singles match of Sampras's career.<ref>{{cite magazine |last=Muir |first=Allan |url=http://sportsillustrated.cnn.com/tennis/2002/us_open/news/2002/09/07/agassi_hewitt/ |title=Breaking news, real-time scores and daily analysis from Sports Illustrated – SI.com |magazine=Sports Illustrated |access-date=August 3, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20021101220644/http://sportsillustrated.cnn.com/tennis/2002/us_open/news/2002/09/07/agassi_hewitt/ |archive-date=November 1, 2002 }}</ref>
+
+===Agassi vs. Chang===
+[[Michael Chang]] was the opponent Agassi faced most frequently from all the players other than Sampras. They met 22 times on the tour level with Agassi leading 15–7. Chang, unlike most of Agassi's big rivals, had a playing style similar to his. Both players preferred to stay at the baseline with Chang being more defensive-minded. The outcome was that most of their meetings were built on long and entertaining rallies. The rivalry began late in the 1980s with both players being considered the prodigies of the next great generation of American tennis players and both being of foreign descent.
+
+Agassi won the first four matches including a straight-set victory in round 16 of the 1988 US Open and defeating Chang, the defending champion, in the 1990 French Open in a four-set quarterfinal. Arguably their best match took place in the round of 16 of the 1994 US Open. While both players presented high-quality shot-making, the momentum changed from set to set with Agassi eventually prevailing in a five-set victory. It turned out to be the toughest contest on his way to his first US Open title. Their next two Grand Slam meetings came in 1996, with Chang recording easy straight-set victories in the semi-finals of both the Australian Open and the US Open. Years after, Agassi shockingly admitted in his book that he had lost the first of the matches on purpose as he did not want to face Boris Becker, who was awaiting the winner in the final. Agassi won the last four of their matches, with the last being in 2003 at the Miami Open with Chang being clearly past his prime.
+
+===Agassi vs. Becker===
+[[Boris Becker]] and Agassi played 14 times with Agassi leading 10–4. Becker won their first three matches in 1988 and 1989 before Agassi reversed the rivalry in 1990, and won 10 of their last 11 matches. One contributing factor is that after their third match, Agassi picked up a tell regarding Becker's serve and knew where his serves would be directed.<ref>{{cite web | url=https://money.yahoo.com/tennis-legend-andre-agassi-revealed-195432658.html | title=Tennis legend Andre Agassi revealed that he learned how to beat a rival by watching his tongue on serves | date=April 29, 2021 }}</ref> They first played at Indian Wells in 1988, with Becker prevailing. Their most notable match was the 1989 [[Davis Cup]] semi-final match, which Becker won in five sets after losing the first two in tiebreaks. Agassi, considered a baseliner with a playing style not suiting grass, shocked Becker, a three-time champion, in a five-set quarterfinal at Wimbledon in 1992 on his way to his first Grand Slam title. The intensity of the rivalry peaked in 1995. Becker won that year's Wimbledon semi-final after being down a set and two breaks, to eventually win in four sets. In a highly anticipated rematch in the US Open semi-final, this time it was Agassi who came out victorious in four tight sets. Their final match was played at Hong Kong in 1999, which Agassi won in three sets.
+
+===Agassi vs. Rafter===
+Agassi and [[Pat Rafter]] played fifteen times with Agassi leading 10–5. The rivalry has been considered special and delivered memorable encounters, because of the players' contrasting styles of play, with Rafter using traditional serve-&-volley methods against Agassi's variety of return of serves and passing shots as his main weapons. Agassi led 8–2 on hard courts, but Rafter surprisingly won their sole match on clay at the [[1999 Italian Open (tennis)|1999 Rome Masters]]. They played four matches at [[The Championships, Wimbledon|Wimbledon]] with both winning two matches each. Agassi won the first two in 1993 and 1999, while Rafter took their 2000 and 2001 encounters, the latter two matches being gruelling 5-setters often being presented on the lists of best matches ever played. Agassi also won both their meetings at the Australian Open, in 1995 and 2001, on his way to the title on both occasions. Rafter, however, took their only US Open encounter in 1997 and went on to win the title.
+
+===Agassi vs. Federer===
+Agassi and [[Roger Federer]] played 11 times, and Federer led their head-to-head series 8–3. With the retirement of Sampras, the rivalry against the 11-years-younger Federer, who was another great server like Sampras, became Agassi's main rivalry for the final years of his career. Agassi won their first three matches, but then went on to lose eight consecutive ones. They first met in just the third tournament of Federer's career at the 1998 Swiss Indoors in Federer's hometown, with Agassi prevailing over the 17-year-old. Agassi also defeated Federer at the [[2001 US Open (tennis)|2001 US Open]] and the finals of the [[Miami Open (tennis)|Miami Open]] in 2002. Federer began to turn the tide at the Masters Cup in 2003, when he defeated Agassi in both the round-robin and the final. They played a quarterfinal match at the [[2004 US Open (tennis)|2004 US Open]] that spanned over two windy days, with Federer eventually prevailing in five sets. At the 2005 Dubai Championships, Federer and Agassi attracted worldwide headlines with a publicity stunt that saw the two tennis legends play on a helipad almost 220 meters above sea level at the hotel Burj al-Arab. Their final duel took place in the final of the [[2005 US Open (tennis)|2005 US Open]]. Federer was victorious in four sets in front of a pro-Agassi crowd. The match was the last appearance by Agassi in any tournament final.
+
+===Agassi vs. Lendl===
+Agassi and [[Ivan Lendl]] played eight times, and Lendl led their head-to-head series 6–2.<ref>{{cite web|url=http://www.atptour.com/en/players/fedex-head-2-head/ivan-lendl-vs-andre-agassi/L018/A092|title=Ivan Lendl VS Andre Agassi &#124; Tennis|website=ATP Tour}}</ref>
+
+===Agassi vs. Edberg===
+Agassi and [[Stefan Edberg]] played nine times, and Agassi led their head-to-head series 6–3.<ref>{{cite web|url=http://www.atptour.com/en/players/fedex-head-2-head/stefan-edberg-vs-andre-agassi/E004/A092|title=Stefan Edberg VS Andre Agassi &#124; Tennis|website=ATP Tour}}</ref>
+
+==Earnings==
+Agassi earned more than $30&nbsp;million in prize-money during his career, sixth only to Djokovic, Federer, Nadal, Sampras and Murray to date (May 2018). He also earned more than $25&nbsp;million a year through endorsements during his career, which was ranked fourth in all sports at the time.<ref>{{cite news |url=https://www.forbes.com/lists/2005/53/1YUQ.html |title=Forbes:Andre Agassi |work=Forbes |access-date=January 26, 2011}}</ref>
+
+==Post-retirement==
+Since retiring after the [[2006 US Open (tennis)|2006 US Open]], Agassi has participated in a series of charity tournaments and continues his work with his own charity. On September 5, 2007, he was a surprise guest commentator for the [[Andy Roddick]]/[[Roger Federer]] [[2007 US Open (tennis)|US Open]] quarterfinal. He played an exhibition match at Wimbledon, teaming with his wife, Steffi Graf, to play with [[Tim Henman]] and [[Kim Clijsters]]. He played [[World Team Tennis]] for the [[Philadelphia Freedoms]] in the summer of 2009.<ref>[http://sportsillustrated.cnn.com/2009/tennis/02/26/agassi.ap/index.html Andre Agassi Will Play WTT] ''Sports Illustrated'', March 1, 2009  {{webarchive |url=https://web.archive.org/web/20121026001825/http://sportsillustrated.cnn.com/2009/tennis/02/26/agassi.ap/index.html |date=October 26, 2012 }}</ref> At the [[2009 French Open]], Agassi was on hand to present Roger Federer, who completed his Career Grand Slam by winning the tournament and joined Agassi as one of six men to complete the Career Grand Slam, with the trophy.<ref>{{cite news |url=https://www.theguardian.com/sport/2009/jun/07/roger-federer-wins-french-open |title=Roger Federer beats Robin Soderling to win French Open tennis |work=The Guardian |date=June 7, 2009 |access-date=September 7, 2014}}</ref>
+
+Also in 2009, Agassi played at the [[Outback Champions Series]] event for the first time. He played the [[Cancer Treatment Centers of America Championship at Surprise|Cancer Treatment Centers of America Tennis Championships]] at [[Surprise, Arizona]], where he reached the final before bowing to eventual champion [[Todd Martin]].<ref>{{cite web |url=http://www.championsseriestennis.com/events/event-results/ |title=Champions Series Tennis – Arizona 2009 |year=2009 |access-date=April 12, 2012}}</ref> Agassi returned to the tour renamed for the PowerShares Series in 2011 and participated in a total of seven events while winning two. Agassi beat Courier in the final of the Staples Champions Cup in [[Boston]]<ref>{{cite web |url=http://www.powersharesseries.com/agassi-thrills-the-crowd-and-wins-staples-champions-cup/ |title=Agassi thrills the crowd and wins Staples Champions Cup |date=October 2, 2011 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> and later defeated Sampras at the CTCA Championships at his hometown Las Vegas.<ref>{{cite web |url=http://www.powersharesseries.com/vegas-crowd-lifts-hometown-hero-to-victory/ |title=Hometown crowd lifts Agassi to victory in Las Vegas |date=October 16, 2011 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref>
+
+In 2012, Agassi took part in five tournaments, winning three of those. In November, at first he won BILT Champions Showdown in [[San Jose, California|San Jose]], beating [[John McEnroe]] in the final.<ref>{{cite web |url=http://www.powersharesseries.com/steve-g-tennis-agassi-defeats-mcenroe-to-win-san-jose-powershares-series-event/ |title=Agassi Defeats McEnroe To Win San Jose Powershares Series Event |date=November 17, 2012 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> The following day, he defended his title of the CTCA Championships, while defeating Courier in the decisive match.<ref>{{cite web |url=http://www.powersharesseries.com/agassi-beats-mcenroe-and-courier-to-capture-home-town-victory-in-las-vegas/ |title=Agassi Beats McEnroe And Courier To Capture Home Town Victory in Las Vegas |date=November 18, 2012 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> In the series season finale, he beat [[Michael Chang]] for the Acura Champions Cup.<ref>{{cite web |url=http://www.powersharesseries.com/agassi-wins-final-powershares-event-of-the-season/ |title=Agassi Wins Final Powershares Event of the Season |date=December 2012 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> The series and Agassi came back to action in 2014. Agassi won both tournaments he participated in. At the Camden Wealth Advisors Cup's final in Houston, Agassi beat [[James Blake (tennis)|James Blake]] for a rematch of their 2005 US Open quarterfinal.<ref>{{cite web |url=http://www.powersharesseries.com/in-reprise-of-2005-u-s-open-epic-andre-agassi-beats-james-blake-to-win/ |title=In Reprise of 2005 U.S. Open Epic, Andre Agassi Beats James Blake to Win |date=February 21, 2014 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> He defeated Blake again in [[Portland, Oregon|Portland]] to win the title of the Cancer Treatment Centers of America Championships.<ref>{{cite web |url=http://www.powersharesseries.com/agassi-ends-blake-run-with-powershares-series-title-in-portland/ |title=Agassi Ends Blake Run with PowerShares Series Title in Portland |date=February 28, 2014 |publisher=PowerShares Series |access-date=May 29, 2014}}</ref> In 2015, Agassi took part in just one event of the PowerShares Series, losing to [[Mark Philippoussis]] in the final of the Champions Shootout.<ref>{{cite web |url=http://www.powersharesseries.com/mark-philippoussis-defeats-andre-agassi-to-win-15-powershares-series-opener-in-salt-lake-city/ |title=Mark Philippoussis Defeats Andre Agassi to Win '15 PowerShares Series Opener in Salt Lake City |date=March 25, 2015 |publisher=PowerShares Series |access-date=September 18, 2015}}</ref> The following year he took part in two events, at first losing to Blake in Chicago, and the next day defeating Mardy Fish, but losing to Roddick in Charleston.<ref>{{cite web |url=http://invescoseries.com/2016-event-results/  |title=2016 Event Results |publisher=PowerShares Series |access-date=April 4, 2018}}</ref>
+
+In 2009, in [[Macau]] Agassi and Sampras met for the first time on court since the 2002 US Open final. Sampras won the exhibition in three sets.<ref>{{cite web |url=http://sports.ndtv.com/tennis/news/113944-sampras-beats-agassi-in-macau-exhibition |title=Sampras beats Agassi in Macau exhibition |publisher=NDTV Sports |access-date=May 29, 2014 |archive-url=https://web.archive.org/web/20140610183932/http://sports.ndtv.com/tennis/news/113944-sampras-beats-agassi-in-macau-exhibition |archive-date=June 10, 2014 |url-status=dead  }}</ref> The rivalry between the former champions headlined sports media again in March 2010 after the two participated in the "Hit for Haiti" charity event organized to raise money for the victims of the [[2010 Haiti earthquake|earthquake]]. Partnered with Roger Federer and [[Rafael Nadal]], the old rivals began making jokes at each other's expense, which ended up with Sampras intentionally striking a serve at Agassi's body. After the event, Agassi admitted that he had crossed the line with his jokes and publicly apologized to Sampras.<ref>{{cite news |url=https://www.theguardian.com/sport/2010/mar/16/andre-agassi-apologises-pete-sampras |title=Andre Agassi apologises for mocking Pete Sampras in charity match |work=The Guardian |location=London |date=March 16, 2010 |access-date=May 29, 2014}}</ref> Agassi and Sampras met again one year later for an exhibition match at [[Madison Square Garden]] in New York in front of 19 000 spectators as Sampras defeated Agassi in two sets.<ref>{{cite news |url=https://www.nytimes.com/2011/03/01/sports/tennis/01tennis.html|title=Agassi and Sampras Meet a Year After Flare-Up |newspaper=The New York Times |date=March 1, 2011 |access-date=May 29, 2014}}</ref> On March 3, 2014, Agassi and Sampras squared off for an exhibition in London for the annual [[World Tennis Day]]. This time, it was Agassi who came out on top in two straight sets.<ref>{{cite web |url=http://www.stevegtennis.com/2014/03/world-tennis-day-exhibition-showdown-results-from-hong-kong-london-and-new-york/ |title=World Tennis Day Exhibition Showdown Results From Hong Kong, London and New York |publisher=SteveG Tennis |date=March 2014 |access-date=May 29, 2014}}</ref>
+
+He returned to the tour in May 2017 in the position of coach to [[Novak Djokovic]] for the French Open.<ref>{{cite news|url=https://www.nytimes.com/2017/05/21/sports/novak-djokovic-andre-agassi-coach.html|title=Novak Djokovic Picks Andre Agassi to Be His Coach at the French Open|first=Ben|last=Rothenberg|date=May 21, 2017|work=The New York Times}}</ref> Agassi announced the end of the partnership on March 31, 2018, stating that there were too many disagreements in the relationship.<ref>{{cite web |url=http://www.tennis.com/pro-game/2018/03/novak-djokovic-andre-agassi-coaching-partnership/73034/|title=Novak Djokovic and Andre Agassi end player-coach partnership |publisher=Tennis.com |date=March 31, 2018 |access-date=March 31, 2018}}</ref>
+
+==Playing style==
+Early in his career, Agassi would look to end points quickly by playing first-strike tennis, typically by inducing a weak return with a deep, hard shot, and then playing a winner at an extreme angle. On the rare occasion that he charged the net, Agassi liked to take the ball in the air and hit a swinging volley for a winner. His favored groundstroke was his flat, accurate two-handed backhand, hit well cross-court but especially down the line. His forehand was nearly as strong, especially his inside-out to the ad court.<ref>{{cite web |author =Nick Bollettieri |url=http://www.tennisplayer.net/public/tour_strokes/nick_bollettieri/nick_bollet_agassi_backhand_images/nick_bollet_agassi_backhand.html?format=print |title=Building the Agassi Backhand |website=tennisplayer.net |access-date=June 4, 2014}}</ref>
+
+Agassi's strength was in dictating play from the baseline, and he was able to consistently take the ball on the rise.<ref>{{cite web|url=https://bleacherreport.com/articles/1783460-rafael-nadal-vs-andre-agassi-was-a-transition-of-tennis-generations|title=Rafael Nadal vs. Andre Agassi Was a Transition of Tennis Generations|website=Bleacher Report}}</ref> While he was growing up, his father and Nick Bollettieri trained him in this way.<ref name="ReferenceA">Open: Andre Agassi HarpersCollins 2009</ref> When in control of a point, Agassi would often pass up an opportunity to attempt a winner and hit a conservative shot to minimize his errors, and to make his opponent run more. This change to more methodical, less aggressive baseline play was largely initiated by his longtime coach, Brad Gilbert, in their first year together in 1994. Gilbert encouraged Agassi to wear out opponents with his deep, flat groundstrokes and to use his fitness to win attrition wars, and noted Agassi's two-handed backhand down the line as his very best shot.<ref name="ReferenceA" /> A signature play later in his career was a change-up drop shot to the deuce court after deep penetrating groundstrokes. This would often be followed by a passing shot or lob if the opponent was fast enough to retrieve it.
+
+Agassi was raised on hardcourts, but found much of his early major-tournament success on the red clay of Roland Garros, reaching two consecutive finals there early in his career. Despite grass being his worst surface, his first major win was at the slick grass of Wimbledon in 1992, a tournament that he professed to hating at the time.<ref name="ReferenceA" /> His strongest surface over the course of his career, was indeed hardcourt, where he won six of his eight majors.
+
+==Business ventures==
+Agassi established a [[limited liability company]] named Andre Agassi Ventures (formerly named Agassi Enterprises).<ref>{{cite news |url=https://www.reviewjournal.com/sports/rogers-steps-down-as-agassi-enterprises-president/ |title=Rogers steps down as Agassi Enterprises president |newspaper=Las Vegas Review Journal |date=October 16, 2008 |access-date=September 9, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20180512181941/https://www.reviewjournal.com/sports/rogers-steps-down-as-agassi-enterprises-president/ |archive-date=May 12, 2018 }}</ref> Agassi, along with five athlete partners (including [[Wayne Gretzky]], [[Joe Montana]], [[Shaquille O'Neal]], [[Ken Griffey Jr.]], and [[Monica Seles]]) opened a chain of sports-themed restaurant named [[Official All Star Café]] in April 1996. The restaurant closed down in 2001.<ref>{{cite news |url=http://www.lasvegassun.com/news/1999/nov/29/its-official-strips-all-star-cafe-to-close/ |title=It's official: Strip's All Star Cafe to close |newspaper=[[Las Vegas Sun]] |date=November 29, 1999 |access-date=September 9, 2014}}</ref>
+
+In 1999, he paid $1&nbsp;million for a 10 percent stake in Nevada First Bank and made a $10&nbsp;million profit when it was sold to Western Alliance Bancorp in 2006.<ref name="bloomberg2007">{{cite web |url=https://www.bloomberg.com/apps/news?pid=newsarchive&sid=aOozd2LtdR1M |title=Agassi, Graf Stake Tennis Winnings on $600 Million Idaho Resort |publisher=Bloomberg |date=July 26, 2007 |first=Anthony |last=Effinger |access-date=September 9, 2014}}</ref>
+
+In 2002, he joined the [[Tennis Channel]] to promote the channel to consumers and cable and satellite industry, and made an equity investment in the network.<ref>{{cite web |url=http://pwww.sportsbusinessdaily.com/Journal/Issues/2002/09/20020909/For-The-Record/Complete-For-The-Record.aspx |title=Complete For the Record |newspaper=[[American City Business Journals|Sports Business Daily]] |date=September 9, 2002 |access-date=September 9, 2014 }}{{dead link|date=July 2017 |bot=InternetArchiveBot |fix-attempted=yes }}</ref> After meeting chef [[Michael Mina]] at one of his restaurants in San Francisco, Agassi partnered with him in 2002 to start Mina Group Inc. and opened 18 concept restaurants in San Francisco, [[San Jose, California|San Jose]], [[Dana Point]], [[Atlantic City]] and Las Vegas.<ref>{{cite web |url=http://www.starchefs.com/cook/chefs/bio/michael-mina |title=Chef Michael Mina of Michael Mina – Biography |publisher=Starchefs.com |date=November 2011 |access-date=September 11, 2014}}</ref><ref>{{cite web |url=http://www.andreagassi.com/michael-mina/ |title=COMMON TASTES |website=Andre Agassi Ventures |access-date=September 11, 2014 |archive-url=https://web.archive.org/web/20140911145117/http://www.andreagassi.com/michael-mina/ |archive-date=September 11, 2014 |url-status=dead  }}</ref> Agassi was an equity investor of a group that acquired [[Golden Nugget Las Vegas]] and [[Golden Nugget Laughlin]] from [[Mirage Resorts|MGM Mirage]] for $215&nbsp;million in 2004.<ref name="bloomberg2007" /><ref>{{cite news |url=http://www.lasvegassun.com/news/2004/jan/23/golden-nugget-buyers-land-four-year-license/ |title=Golden Nugget buyers land four-year license |newspaper=Las Vegas Sun |date=January 23, 2004 |first=Liz |last=Benston |access-date=September 11, 2014}}</ref> One year later, the group sold the hotel-casino to [[Landry's, Inc.]] for $163&nbsp;million in cash and $182&nbsp;million in assumed debt.<ref name="bloomberg2007" /><ref>{{cite news |url=http://www.lasvegassun.com/news/2005/feb/11/golden-nugget-owners-vow-to-return-to-vegas-market/ |title=Golden Nugget owners vow to return to Vegas market |newspaper=Las Vegas Sun |date=February 11, 2005 |first=Liz |last=Benston |access-date=September 11, 2014}}</ref> In 2007, he sat on the board of Meadows Bank, an independent bank in Nevada.<ref>{{cite news |url=http://www.reviewjournal.com/business/independent-bank-have-agassi-board |title=Independent bank to have Agassi on board |newspaper=Las Vegas Review-Journal |date=September 5, 2007 |access-date=September 11, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140911150759/http://www.reviewjournal.com/business/independent-bank-have-agassi-board |archive-date=September 11, 2014}}</ref> He has invested in start-up companies backed by [[Allen & Company]].<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2004/03/20040322/SBJ-In-Depth/The-Dealmaker.aspx |title=The dealmaker |newspaper=SportsBusiness Daily |date=March 22, 2004 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref>
+
+Agassi and Graf formed a company called Agassi Graf Holdings. They invested in PURE, a nightclub at [[Caesars Palace]], which opened in 2004,<ref name="bloomberg2007" /> and sold it to Angel Management Group in 2010.<ref>{{cite news |url=http://www.lasvegassun.com/news/2011/mar/16/agassi-graf-lawsuit-over/ |title=Andre Agassi, Steffi Graf allege default in sale of Pure nightclub stake |newspaper=Las Vegas Sun |date=March 16, 2011 |first=Steve |last=Green |access-date=September 11, 2014}}</ref> In August 2006, Agassi and Graf developed a joint venture with high-end furniture maker [[Kreiss]] Enterprises.<ref name="bloomberg2007" /> They launched a furniture line called Agassi Graf Collection.<ref>{{cite web |url=http://www.apartmenttherapy.com/agassi-graf-furniture-by-kreis-43301 |title=Agassi Graf Furniture by Kreiss |website=Apartment therapy |access-date=September 9, 2014}}</ref><ref>{{cite news |url=https://www.nytimes.com/2006/08/24/style/home%20and%20garden/currents-furniture-a-swan-song-for-agassi-but-a-duet.html |title=CURRENTS: FURNITURE; A Swan Song for Agassi, but a Duet With Graf |newspaper=The New York Times |date=August 24, 2006 |first=Elaine |last=Louie |access-date=September 9, 2014}}</ref> In September, Agassi and Graf, through their company Agassi Graf Development LLC, along with Bayview Financial LP, finalized an agreement to develop a condominium hotel, Fairmont Tamarack, at [[Tamarack Resort]] in [[Donnelly, Idaho]].<ref name="bloomberg2007" /><ref>{{cite web |url=http://tamarackidaho.com/about/media_room/news_releases.php?pressid=141 |title=News Releases |publisher=Tamarack Resort |date=September 6, 2006 |access-date=September 9, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140910195719/http://tamarackidaho.com/about/media_room/news_releases.php?pressid=141 |archive-date=September 10, 2014}}</ref> Owing to difficult market conditions and delays, they withdrew from the project in 2009.<ref>{{cite web |url=http://www.usta.com/News/APNews/2008/07/21/Agassi-terminates-contract-to-buy-at-Idaho-resort/ |title=Agassi terminates contract to buy at Idaho resort |website=USTA |date=June 6, 2008 |access-date=September 9, 2014 |archive-date=September 10, 2014 |archive-url=https://web.archive.org/web/20140910195358/http://www.usta.com/News/APNews/2008/07/21/Agassi-terminates-contract-to-buy-at-Idaho-resort/ |url-status=dead}}</ref><ref>{{cite web |url=https://www.cnbc.com/id/100773005# |title=Andre Agassi: Las Vegas is back in business |website=CNBC |date=June 10, 2013 |first=Kiran |last=Moodley |access-date=September 9, 2014}}</ref> The group still owns three small chunks of land.<ref>{{cite news |url=https://www.newspapers.com/image/692275499/?terms=Tamarack&match=1 |title=Tamarack's Waiting Game |newspaper=[[Idaho Statesman]] |location=Boise |page=A12 |date=December 22, 2013 |first=Zach |last=Kyle |access-date=June 15, 2022}}</ref> In September, they collaborated with [[Steve Case]]'s Exclusive Resorts to co-develop luxury resorts and design Agassi-Graf Tennis and Fitness Centers.<ref>{{cite press release |url=http://www.prnewswire.com/news-releases/andre-agassi-partners-with-exclusive-resorts-57128267.html |title=Andre Agassi Partners with Exclusive Resorts |publisher=Exclusive Resorts |via=PR Newswire |date=September 25, 2006 |access-date=June 15, 2022 |archive-url=https://web.archive.org/web/20140911162214/http://www.prnewswire.com/news-releases/andre-agassi-partners-with-exclusive-resorts-57128267.html |archive-date=September 11, 2014 |url-status=dead}}</ref>
+
+They also invested in online ticket reseller [[viagogo]] in 2009 and both serve as board members and advisors of the company.<ref>{{cite news |url=https://blogs.wsj.com/digits/2009/02/04/andre-agassi-and-steffi-graf-invest-in-online-ticketing/ |title=Andre Agassi and Steffi Graf Invest in Online Ticketing |newspaper=The Wall Street Journal |date=February 4, 2009 |first=Ty |last=McMahan |access-date=September 9, 2014}}</ref><ref>{{cite news |url=https://techcrunch.com/2009/02/05/viagogo-raises-15-million-round-and-signs-tennis-stars-to-battle-seatwave/ |title=Viagogo Raises $15&nbsp;million Round And Signs Tennis Stars To Battle Seatwave |work=TechCrunch |date=February 5, 2009 |first=Mike |last=Butcher |access-date=September 9, 2014}}</ref>
+
+In October 2012, [[Village Roadshow]] and investors including Agassi and Graf announced plans to build a new water park called [[Wet'n'Wild Las Vegas]] in Las Vegas. Village Roadshow has a 51% stake in the park while Agassi, Graf, and other private investors hold the remaining 49%.<ref>{{cite news |url=https://blogs.wsj.com/dealjournalaustralia/2012/10/05/agassi-graf-score-aussie-investor-for-vegas-water-park/ |title=Agassi, Graf Score Aussie Investor for Vegas Water Park |newspaper=The Wall Street Journal |date=October 5, 2012 |first=Ross |last=Kelly |access-date=September 9, 2014}}</ref><ref>{{cite news |url=http://www.lasvegassun.com/news/2012/oct/04/wet-n-wild-water-park-returning-las-vegas/ |title=Wet 'n' Wild water park coming to Las Vegas |newspaper=Las Vegas Sun |date=October 4, 2012 |first=Richard N. |last=Velotta |access-date=September 9, 2014}}</ref> The park opened in May 2013.<ref>{{cite news |url=http://www.lasvegasweekly.com/as-we-see-it/2013/may/17/wet-n-wild-returns-sort-fill-las-vegas-water-park-/ |title=WET 'N' WILD RETURNS, SORT OF, TO FILL THE LAS VEGAS WATER PARK VOID |newspaper=Las Vegas Weekly |date=May 17, 2013 |first=Brock |last=Radke |access-date=September 9, 2014}}</ref>
+
+[[IMG (company)|IMG]] managed Agassi from the time he turned pro in 1986 through January 2000 before switching to SFX Sports Group.<ref>{{cite news |url=https://www.nytimes.com/2000/01/12/sports/plus-tennis-atp-tour-agassi-jumps-from-img-to-sfx.html |title=PLUS: TENNIS – ATP TOUR; Agassi Jumps From I.M.G. to SFX |newspaper=The New York Times |date=January 12, 2000 |access-date=September 9, 2014}}</ref><ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2001/04/20010409/No-Topic-Name/Shuffled-Exec-Stays-At-SFX-For-Agassi-Account.aspx |title=Shuffled exec stays at SFX for Agassi account |publisher=SportsBusiness Journal |date=April 9, 2001 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref> His business manager, lawyer and agent was childhood friend Perry Rogers, but they have been estranged since 2008.<ref>{{cite web |url=http://sports.espn.go.com/sports/tennis/columns/story?id=6695878 |title=Andre Agassi's triumphs are his own |work=ESPN |date=July 8, 2011 |first=Joel |last=Drucker |access-date=September 9, 2014}}</ref><ref>{{cite web |url=http://www.sportsbusinessdaily.com/Daily/Issues/2008/10/Issue-23/Sports-Industrialists/Andre-Agassi-Ends-Business-Relationship-With-Perry-Rogers.aspx |title=Andre Agassi Ends Business Relationship With Perry Rogers |publisher=SportsBusiness Journal |date=October 16, 2008 |access-date=September 9, 2014}}</ref> In 2009, he and Graf signed with [[Creative Artists Agency|CAA]].<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2009/04/20090406/This-Weeks-News/CAA-Continues-Sports-Push-Signs-Agassi-Graf.aspx |title=CAA continues sports push, signs Agassi, Graf |publisher=SportsBusiness Journal |date=April 6, 2009 |first1=Liz |last1=Mullen |first2=Daniel |last2=Kaplan |access-date=September 10, 2014}}</ref>
+
+===Equipment and endorsements===
+Agassi used [[Prince Sports|Prince]] [[Prince original graphite|Graphite]] rackets early in his career.<ref>{{cite web |url=http://www.tennis.com/pro-game/2012/05/prince-of-a-racquet/37907/#.VA-dyPldUrU |title=Prince of a Racquet |publisher=Tennis.com |date=May 1, 2012 |first=Steve |last=Tignor |access-date=September 9, 2014}}</ref><ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2013/06/03/Marketing-and-Sponsorship/Prince.aspx |title=Racket brand regroups and looks to rebound |publisher=SportsBusiness Journal |date=June 3, 2013 |first=John |last=George |access-date=September 9, 2014}}</ref> He signed a $7&nbsp;million endorsement contract with Belgian tennis racquet makers [[Donnay (sports)|Donnay]].<ref name="LATimes1990">{{cite news |url=http://articles.latimes.com/1990-06-26/business/fi-640_1_tennis-star |title=Athletic Firms Going to the Net in Quest for Next Tennis Celebrity |newspaper=Los Angeles Times |date=June 26, 1990 |first=Bruce |last=Horovitz |access-date=September 11, 2014}}</ref> He later switched to [[Head (company)|Head Ti Radical]] racket<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2000/08/20000828/No-Topic-Name/WHAT-THEYRE-WEARING-AND-HITTING-WITH-AT-THE-US-OPEN.aspx |title=WHAT THEY'RE WEARING (AND HITTING WITH) AT THE U.S. OPEN |publisher=SportsBusiness Journal |date=August 28, 2000 |access-date=September 9, 2014}}</ref> and Head's LiquidMetal Radical racket, having signed a multimillion-dollar endorsement deal with Head in 1993.<ref name="head2003">{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2003/11/20031110/Marketingsponsorship/Headpenn-Signs-Agassi-Beyond-Playing-Days.aspx |title=Head/Penn signs Agassi beyond playing days |publisher=SportsBusiness Journal |date=November 10, 2003 |access-date=September 9, 2014}}</ref><ref>{{cite web |url=https://www.head.com/corporate/history.php |title=OUR HISTORY |publisher=HEAD |access-date=September 9, 2014 |archive-date=September 10, 2014 |archive-url=https://web.archive.org/web/20140910200243/https://www.head.com/corporate/history.php |url-status=dead }}</ref> He renewed his contract in 1999, and in November 2003 he signed a lifetime agreement with Head.<ref name="head2003" /><ref name="forbes2004">{{cite magazine |url=https://www.forbes.com/forbes/2004/0705/093.html |title=King of the Court |magazine=Forbes |date=July 5, 2004 |first=Kurt |last=Badenhausen |access-date=September 9, 2014}}</ref> He also endorses Penn tennis balls. On July 25, 2005, Agassi left [[Nike, Inc.|Nike]] after 17 years and signed an endorsement deal with [[Adidas]].<ref>{{cite web |url=http://sports.espn.go.com/sports/tennis/news/story?id=2116135 |title=Agassi signs Adidas deal after long-term deal with Nike |author =Darren Rovell |date=July 25, 2005 |work=[[ESPN]] |access-date=January 26, 2011}}</ref> A major reason for Agassi leaving Nike was because Nike refused to donate to Agassi's charities, and Adidas was more than happy to do so. On May 13, 2013, Agassi rejoined Nike.<ref>{{cite magazine |url=http://tennis.si.com/2013/05/14/andre-agassi-nike-commercials/ |title=Andre Agassi re-signs with Nike: A look back at his memorable commercials |magazine=Sports Illustrated |date=May 14, 2013 |access-date=May 15, 2013 |url-status=dead |archive-url=https://web.archive.org/web/20130609011401/http://tennis.si.com/2013/05/14/andre-agassi-nike-commercials/ |archive-date=June 9, 2013 }}</ref><ref>{{cite web |url=http://www.nicekicks.com/andre-agassi-rejoins-nike/ |title=Andre Agassi Rejoins Nike |author=Matt Halfhill |publisher=[[Nice Kicks]] |date=May 13, 2013}}</ref><ref>{{cite web |url=https://www.sportsbusinessdaily.com/Daily/Issues/2013/05/14/Marketing-and-Sponsorship/Agassi.aspx |title=Back Home: Andre Agassi Returns To Nike After Eight Years With Adidas |publisher=Street & Smith |date=May 14, 2013 |access-date=May 15, 2013}}</ref>
+
+Agassi was sponsored by [[DuPont (1802–2017)|DuPont]],<ref>{{cite web |url=https://twitter.com/darrenrovell/status/224595325262905344 |title=1989 Andre Agassi ad for DuPont's CoolMax material |publisher=Twitter |date=July 15, 2012 |access-date=September 9, 2014}}</ref>{{Primary source inline|date=January 2020}}<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/1998/08/19980831/No-Topic-Name/Sponsor-Deals-To-Gauge-Tennis-Appeal.aspx |title=Sponsor deals to gauge tennis' appeal |publisher=SportsBusiness Journal |date=August 31, 1998 |first=Mike |last=Reynolds |access-date=September 9, 2014}}</ref> [[Ebel]],<ref name="LATimes1990" /> [[Mountain Dew]] in 1993,<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2002/08/20020812/Special-Report/Soft-Drink-Recasts-Image-To-Mirror-Teen-Spirit.aspx |title=Soft drink recasts image to mirror teen spirit |publisher=SportsBusiness Journal |date=August 12, 2002 |access-date=September 9, 2014}}</ref> [[Mazda]] in 1997,<ref name="kiamotors">{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2002/09/20020930/This-Weeks-Issue/Kia-After-Good-Agassi-Mileage.aspx |title=Kia after good Agassi mileage |publisher=SportsBusiness Journal |date=September 30, 2002 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref> [[Kia Motors]] in 2002,<ref name="forbes2004" /><ref name="kiamotors" /> [[American Express]]<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2003/08/20030804/Marketingsponsorship/Mastercard-Mounts-Challenge-As-Visas-NFL-Deal-Enters-Final-Year.aspx |title=MasterCard mounts challenge as Visa's NFL deal enters final year |publisher=SportsBusiness Journal |date=August 4, 2003 |access-date=September 9, 2014}}</ref> and [[Deutsche Bank]] in 2003.<ref>{{cite news |url=http://www.theage.com.au/articles/2003/03/03/1046540132230.html |title=Sporting Life |newspaper=The Age |date=March 4, 2003 |first=Geoff |last=McClure |access-date=September 9, 2014}}</ref> In 1990, he appeared in a television commercial for [[Canon Inc.]], promoting the [[Canon EOS]] Rebel camera.<ref name="canon2004">{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2004/08/20040809/Marketingsponsorship/Agassi-Still-In-Canons-Picture.aspx |title=Agassi still in Canon's picture |publisher=SportsBusiness Journal |date=August 9, 2004 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref> Between 1999 and 2000, he signed a multimillion-dollar, multiyear endorsement deal with [[Schick (razors)|Schick]] and became the worldwide spokesman for the company.<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2000/04/20000410/No-Topic-Name/IMG-SFX-Both-Claim-Deal146s-Theirs.aspx |title=IMG, SFX both claim deal's theirs |publisher=SportsBusiness Journal |date=April 10, 2000 |first=Liz |last=Mullen |access-date=September 9, 2014}}</ref> Agassi signed a multiyear contract with [[Twinlab]] and promoted the company's nutritional supplements.<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2000/03/20000313/Marketingsponsorship/Marketingsponsorship.aspx |title=Marketing/Sponsorship |publisher=SportsBusiness Journal |date=March 13, 2000 |access-date=September 9, 2014}}</ref> In mid-2003, he was named the spokesman of Aramis Life, a fragrance by [[Estée Lauder Companies|Aramis]], and signed a five-year deal with the company.<ref>{{cite web |url=http://www.highbeam.com/doc/1G1-105786446.html |archive-url=https://web.archive.org/web/20140921210153/http://www.highbeam.com/doc/1G1-105786446.html |url-status=dead |archive-date=September 21, 2014 |title=THE AGASSI AND THE FRAGRANCY.(Andre Agassi to market Aramis Life)(Brief Article) |publisher=Daily News Record |date=July 21, 2003 |last=Palmieri |first=Jean E. |access-date=September 9, 2014}}</ref><ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2003/02/20030224/This-Weeks-Issue/Agassi-Sniffs-Out-5-Year-Endorsement.aspx |title=Agassi sniffs out 5-year endorsement |publisher=SportsBusiness Daily |date=February 24, 2003 |first=Liz |last=Mullen |access-date=September 9, 2014}}</ref> In March 2004, he signed a ten-year agreement worth $1.5&nbsp;million a year with [[24 Hour Fitness]], which will open five Andre Agassi fitness centers by year-end.<ref name="forbes2004" /> Prior to the 2012 Australian Open, Agassi and Australian winemaker [[Jacobs Creek (Australia)|Jacobs Creek]] announced a three-year partnership and created the Open Film Series to "[share] personal stories about the life defining moments that shaped his character on and off the court."<ref>{{cite web|url=http://jacobscreek.com/australia/news/australian-open-success! |title=Australian Open Success! |publisher=Jacobs Creek |date=March 20, 2012 |access-date=September 9, 2014 }}{{dead link|date=October 2016 |bot=InternetArchiveBot |fix-attempted=yes }}</ref> In 2007, watchmaker [[Longines]] named Agassi as their brand ambassador.<ref>{{cite web|url=http://www.longines.com/ambassadors/andre-agassi |title=AMBASSADORS – Andre Agassi |publisher=Longines |access-date=September 9, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140924222916/http://www.longines.com/ambassadors/andre-agassi |archive-date=September 24, 2014 }}</ref><ref>{{cite web |url=http://vegasmagazine.com/watches/articles/andre-agassi-teams-with-longines |title=Andre Agassi Teams with Longines |work=Vegas Magazine |first=Matt |last=Stewart |access-date=September 19, 2014 |archive-url=https://web.archive.org/web/20140814163518/http://vegasmagazine.com/watches/articles/andre-agassi-teams-with-longines |archive-date=August 14, 2014 |url-status=dead }}</ref>
+
+Agassi and his mother appeared in a [[Got Milk?]] advertisement in 2002.
+
+Agassi has appeared in many advertisements and television commercials with Graf. They both endorsed [[Deutsche Telekom]] in 2002,<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2002/04/20020422/This-Weeks-Issue/Newlyweds-Will-Pitch-Cellular-Online-Products.aspx |title=Newlyweds will pitch cellular, online products |publisher=SportsBusiness Journal |date=April 22, 2002 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref> [[Genworth Financial]]<ref name="genworth">{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2004/06/20040607/Marketingsponsorship/Agassi-Graf-United-In-Genworth-Ad-Campaign.aspx |title=Agassi, Graf united in Genworth ad campaign |publisher=Sports |date=June 7, 2004 |first=Daniel |last=Kaplan |access-date=September 9, 2014}}</ref> and [[Canon Inc.]]<ref name="canon2004" /> in 2004, [[LVMH]] in 2007,<ref>{{cite news |url=https://www.nytimes.com/2007/08/08/business/media/08adco.html?pagewanted=print |title=Mr. Gorbachev, Show Off This Bag |newspaper=The New York Times |first=Eric |last=Pfanner |date=August 8, 2007 |access-date=September 9, 2014}}</ref> and [[Nintendo]] [[Wii]]<ref>{{cite magazine |url=https://www.si.com/tennis/beyond-baseline/2013/11/06/daily-bagel-andre-agassi-steffi-graf-commercial |title=Daily Bagel: Andre Agassi, Steffi Graf star in video-game commercial |magazine=Sports Illustrated |date=November 6, 2013 |first=Courtney |last=Nguyen |access-date=September 9, 2014}}</ref> and [[Wii Fit U]]<ref>{{cite web |url=http://www.videogamer.com/wiiu/wii_fit_u/news/andre_agassi_and_steffi_graf_promote_wii_fit_u.html |title=Andre Agassi and Steffi Graf promote Wii Fit U |website=VideoGamer.com |date=November 13, 2013 |first=James |last=Orry |access-date=September 9, 2014}}</ref> and [[Longines]] in 2013.<ref>{{cite web |url=http://www.tennis.com/photos-video/2013/05/video-agassi-and-graf-new-longines-watch-ad/47677/ |title=Video: Agassi and Graf in new Longines watch ad |publisher=Tennis.com |date=May 29, 2013 |first=Jonathan |last=Scott |access-date=September 19, 2014}}</ref>
+
+==Personal life==
+===Relationships and family===
+In the early 1990s, after dating Wendi Stewart,<ref>{{cite web|url=https://www.tennis.com/pro-game/2015/08/image-everything-andre-agassis-infamous-ad/55425/|title=1989: Image is Everything—Andre Agassi's infamous ad|publisher=Tennis.com|access-date=December 15, 2019}}</ref> Agassi dated American singer and entertainer [[Barbra Streisand]]. He wrote about the relationship in his 2009 autobiography, "We agree that we're good for each other, and so what if she's twenty-eight years older? We're sympatico, and the public outcry only adds spice to our connection. It makes our friendship feel forbidden, taboo – another piece of my overall rebellion. Dating Barbra Streisand is like wearing Hot Lava."<ref>{{cite magazine |url=http://www.people.com/people/archive/article/0,,20128036,00.html |title=Double Fault |magazine=People |date=April 26, 2014 |first=Tom |last=Gliatto |access-date=September 7, 2014 |archive-date=September 18, 2018 |archive-url=https://web.archive.org/web/20180918085353/https://people.com/people/archive/article/0,,20128036,00.html |url-status=dead }}</ref>
+
+He was married to [[Brooke Shields]] from 1997 to 1999.
+
+He married [[Steffi Graf]] on October 22, 2001, at their [[Las Vegas]] home; the only witnesses were their mothers.<ref>{{cite web|last=Knolle |first=Sharon |url=https://abcnews.go.com/Entertainment/story?id=101751&page=1 |title=Andre Agassi and Steffi Graf Wed |work=ABC News |access-date=May 17, 2011}}</ref> They have two children: son Jaden Gil (born 2001) and daughter Jaz Elle (born 2003).<ref>{{cite web|last=Knolle |first=Sharon |url=https://abcnews.go.com/Entertainment/story?id=101751&page=1 |title=Andre Agassi and Steffi Graf Wed |work=ABC News |access-date=June 6, 2011 |archive-url=https://web.archive.org/web/20110522145516/https://abcnews.go.com/Entertainment/story?id=101751&page=1 |archive-date=May 22, 2011 |url-status=live  }}</ref> Agassi has said that he and Graf are not pushing their children toward becoming tennis players.<ref>[http://www.nzherald.co.nz/sport/news/article.cfm?c_id=4&objectid=10861440 "Tennis: Agassi taking different {{sic|ta|ct|nolink=y}} with fatherhood"], ''The New Zealand Herald'', January 25, 2013</ref> The Graf-Agassi family resides in [[Summerlin, Nevada|Summerlin]], a community in the [[Las Vegas Valley]].<ref>{{cite news |url=http://www.reviewjournal.com/sports/love-everything-graf-now |title=Love is everything to Graf now |newspaper=Las Vegas Review-Journal |date=May 20, 2010 |access-date=September 18, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20141025081858/http://www.reviewjournal.com/sports/love-everything-graf-now |archive-date=October 25, 2014 }}</ref> Graf's mother and brother, Michael, with his four children, also live there.<ref>{{cite web|url=http://www.hellomagazine.com/celebrities/2014062019501/tennis-legendsteffi-graff-talks-royal-ascot-and-career/|title=Tennis legend Steffi Graf talks Royal Ascot and her career to HELLO! Online|work=Hello|date=June 20, 2014}}</ref>
+
+Long-time trainer [[Gil Reyes (tennis)|Gil Reyes]] has been called one of Agassi's closest friends; some have described him as being a "father figure" to Agassi.<ref>{{cite magazine |url=http://sportsillustrated.cnn.com/features/1999/year_in_review/flashbacks/father_best/ |title=Father Knew Best |magazine=Sports Illustrated |access-date=January 26, 2011 |url-status=dead |archive-url=https://web.archive.org/web/20110217090140/http://sportsillustrated.cnn.com/features/1999/year_in_review/flashbacks/father_best/ |archive-date=February 17, 2011 }}</ref><ref>{{cite web |url=http://safinhantuchova.blogspot.com/2008/07/papa-gil.html |title=Peter Bodo Blog: Papa Gil |access-date=January 26, 2011}}</ref> In 2012, Agassi and Reyes introduced their own line of fitness equipment, BILT By Agassi and Reyes.<ref>{{cite news |url=http://www.thepostgame.com/blog/training-day/201209/bilt-andre-agassi-gil-reyes-fitness-gym-equipment-safety |title=Andre Agassi and Trainer Introduce Their Personalized Fitness Equipment to the Public |work=ThePostGame.com |access-date=September 7, 2012}}</ref> In December 2008, Agassi's childhood friend and former business manager, Perry Rogers, sued Graf for $50,000 in management fees he claimed that she owed him.<ref>[http://media.lasvegassun.com/media/pdfs/blogs/documents/2008/12/06/Complaint_and_Summons.pdf ''Alliance Sports Management v. Stephanie Graf''] ''[[Las Vegas Sun]]''. Retrieved October 23, 2009.</ref><ref>[http://www.lvrj.com/news/35674229.html "Ex-manager for Agassi sues Graf"] ''[[Las Vegas Review-Journal]]'' December 7, 2008. Retrieved October 23, 2009.</ref>
+
+===Autobiography===
+{{Main|Open: An Autobiography}}
+
+Agassi's autobiography, ''[[Open: An Autobiography]]'', (written with assistance from [[J. R. Moehringer]]<ref>[https://www.nytimes.com/2009/11/09/books/09book.html?_r=1 "Agassi Basks in His Own Spotlight" by Janet Malin ''New York Times'' November 8, 2009]. Retrieved December 11, 2009.</ref>), was published in November 2009. In it, Agassi talks about his childhood and his unconventional Armenian father, who came to the United States from Iran, where he was a professional boxer. Overly demanding and emotionally abusive to the whole family, his father groomed young Agassi for tennis greatness by building a tennis court in their backyard and sending Agassi to tennis boarding school under the supervision of Nick Bollettieri, who later coached and managed part of Agassi's professional career.<ref>{{cite news|url=https://www.nytimes.com/2009/11/22/books/review/Tanenhaus-t.html|title=Andre Agassi's Hate of the Game|newspaper= The New York Times|first=Sam|last=Tanenhausnov|date=November 20, 2009|access-date=November 30, 2018}}</ref>
+
+There is also mention in the book of using and testing positive for [[methamphetamine]] in 1997.<ref name="sports.espn.go.com" /><ref>{{cite news |url=http://www.nydailynews.com/sports/more_sports/2009/10/27/2009-10-27_agassi.html |location=New York |work=Daily News |title=Andre Agassi admits to using crystal meth in forthcoming autobiography |first=Nathaniel |last=Vinton |date=October 27, 2009}}</ref><ref>{{cite web |url=http://www.nbcwashington.com/news/sports/NATL-Andre-Agassi-Admits-to-Using-Crystal-Meth-66510482.html |title=Andre Agassi Admits to Using Crystal Meth |date=October 27, 2009 |access-date=January 26, 2011}}</ref> In response to this revelation, [[Roger Federer]] declared himself shocked and disappointed, while [[Marat Safin]] argued that Agassi should return his prize money and be stripped of his titles.<ref>{{cite web |url=http://sport.repubblica.it/news/sport/tennis-federer-deluso-e-scioccato-da-agassi/3730572.html |title=TENNIS, FEDERER: DELUSO E SCIOCCATO DA AGASSI |language=it }}</ref><ref>{{cite news |url=https://www.theguardian.com/sport/2009/nov/10/andre-agassi-marat-safin-drugs |location=London |work=The Guardian |title=Marat Safin tells Andre Agassi to relinquish titles after drug admission |date=November 10, 2009}}</ref> In an interview with CBS, Agassi justified himself and asked for understanding, saying that "It was a period in my life where I needed help."<ref>{{cite web |url=http://www.sportmediaset.mediaset.it/altrisport/articoli/articolo27870.shtml |title=Agassi: 'Ora chiedo comprensione'. Droga, ex tennista si giustifica in tv |language=it |publisher=Sport-[[Mediaset]] |access-date=November 22, 2013}}</ref>
+
+Agassi said that he had always hated tennis during his career because of the constant pressure it exerted on him. He also said he wore a hairpiece earlier in his career and thought [[Pete Sampras]] was "robotic".<ref>{{cite news |url=https://www.theguardian.com/sport/2009/oct/29/andre-agassi-hate-tennis |title=Why did Andre Agassi hate tennis? |first=Stuart |last=Jeffries |work=The Guardian |location=London |date=October 29, 2009 |access-date=January 25, 2010}}</ref>
+
+The book reached No. 1 on the [[New York Times Best Seller list|''New York Times'' Best Seller list]]<ref>{{cite news |url=https://www.nytimes.com/2009/11/29/books/bestseller/besthardnonfiction.html?ref=bestseller |work=The New York Times |title=Hardcover Nonfiction |date=November 29, 2009 |access-date=March 30, 2010 |first=Jennifer |last=Schuessler}}</ref> and received favorable reviews.<ref>{{cite news |url=http://latimesblogs.latimes.com/jacketcopy/2009/11/book-reviews-agassi-mayle-mourlevat-palin.html |work=Los Angeles Times |title=Jacket Copy |date=November 20, 2009}}</ref> It won the Autobiography category of the 2010 [[British Sports Book Awards]].<ref>{{cite news |url=http://blogs.telegraph.co.uk/sport/simonbriggs/100005984/the-british-sports-book-awards-go-global/ |archive-url=https://web.archive.org/web/20110202231911/http://blogs.telegraph.co.uk/sport/simonbriggs/100005984/the-british-sports-book-awards-go-global/ |url-status=dead |archive-date=February 2, 2011 |title=Andre Agassi's 'Open' wins at the British Sports Book Awards. Pity about the gloopy speech |work=[[The Daily Telegraph]] |author =Simon Briggs |date=March 12, 2010 |access-date=November 26, 2012 |location=London}}</ref> In 2018, the book was listed on ''[[Esquire (magazine)|Esquire]]'' as one of "The 30 Best Sports Books Ever Written",<ref>{{cite web|url=https://www.esquire.com/uk/culture/books/a22033403/best-sports-books-ever-written/|title=The 30 Best Sports Books Ever Written|last=Wilson|first=Paul|date=March 7, 2018|work=Esquire|access-date=November 30, 2018}}</ref> and was also recommended by self-help author [[Tim Ferriss]] who described it as "very candid, very amusing, and very instructional".<ref>{{cite web|url=https://www.fastcompany.com/3024245/6-must-read-book-recommendations-from-our-favorite-leaders|title=6 Must Read Book Recommendations From Our Favorite Leaders|last=Baer|first=Drake|date=January 7, 2014|publisher=Fast Company|access-date=November 30, 2018}}</ref>
+
+==In media==
+In 2017, Agassi appeared in the documentary film ''[[Love Means Zero]]'', which highlighted the troubled relationship between his coach [[Nick Bollettieri]] and him.<ref>{{cite magazine|url=https://ew.com/movies/2017/09/08/love-means-zero-explores-family-drama-between-nick-bollettieri-and-andre-agassi/amp/|title=''Love Means Zero'' explores 'family drama' between Nick Bollettieri and Andre Agassi|magazine=[[Entertainment Weekly]]|access-date=July 5, 2018|date=September 8, 2017}}</ref><ref>{{cite web|url=http://www.businessinsider.com/andre-agassi-troubled-relationship-with-his-coach-led-to-powerful-sports-documentary-love-means-zero-2018-6|title=Andre Agassi's troubled relationship with his coach led to a powerful new sports documentary you shouldn't miss|website=[[Business Insider]]|access-date=July 5, 2018|date=June 22, 2018}}</ref>
+
+==Politics==
+Agassi has donated more than $100,000 to Democratic candidates, and $2,000 to Republicans.<ref>{{cite web|url=https://www.campaignmoney.com/political/contributions/andre-agassi.asp?cycle=16|title=Andre Agassi – $2,000 in Political Contributions for 2016|website=campaignmoney.com}}</ref><ref>{{cite web|url=http://www.newsmeat.com/sports_political_donations/Andre_Agassi.php |title=Andre Agassi's Federal Campaign Contribution Report |publisher=NewsMeat |access-date=January 26, 2011 |url-status=dead |archive-url=https://web.archive.org/web/20110514010427/http://www.newsmeat.com/sports_political_donations/Andre_Agassi.php |archive-date=May 14, 2011 }}</ref> On September 1, 2010, when he appeared on daily [[WNYC]] public radio program ''[[The Brian Lehrer Show]]'', he stated that he is registered as Independent.<ref>{{cite web|url=http://beta.wnyc.org/shows/bl/2010/sep/01/net-effects/ |title=Andre Agassi: Net Effects |work=The Brian Lehrer Show |access-date=January 26, 2011 |url-status=dead |archive-url=https://web.archive.org/web/20100907044241/http://beta.wnyc.org/shows/bl/2010/sep/01/net-effects/ |archive-date=September 7, 2010 }}</ref>
+
+==Philanthropy==
+Agassi founded the [[Andre Agassi Charitable Association]] in 1994, which assists Las Vegas' young people. He was awarded the [[ATP Arthur Ashe Humanitarian award]] in 1995 for his efforts to help disadvantaged youth. He has been cited as the most charitable and socially involved player in professional tennis. It has also been claimed that he may be the most charitable athlete of his generation.<ref>{{cite web |url=http://www.blackvoices.com/black_sports/columnists/roysjohnson/_a/sportsmanperson-of-the-year/20061002123009990001 |title=Sportsman/Person of the Year |access-date=January 26, 2011}}</ref>
+
+Agassi's charities help in assisting children reach their athletic potential. His Boys & Girls Club sees 2,000 children throughout the year and boasts a world-class junior tennis team. It also has a basketball program (the Agassi Stars) and a rigorous system that encourages a mix of academics and athletics.
+
+In 2001, Agassi opened the Andre Agassi College Preparatory Academy<ref name=Prep>{{cite web |url=http://www.agassiprep.org |title=Andre Agassi College Preparatory Academy |access-date=January 26, 2011 |archive-url=https://web.archive.org/web/20110211235357/http://agassiprep.org/ |archive-date=February 11, 2011 |url-status=dead  }}</ref> in Las Vegas, a tuition-free charter school for at-risk children in the area. He personally donated $35&nbsp;million to the school.<ref>{{cite web |url=http://www.sportsbusinessdaily.com/Journal/Issues/2006/03/20060306/Opinion/Stern-NBA-Make-Doing-Well-By-Doing-Good-Contagious.aspx |title=Stern, NBA make doing well by doing good contagious |publisher=SportsBusiness Journal |date=March 6, 2006 |first=Marc |last=Pollick |access-date=September 10, 2014}}</ref> In 2009, the graduating class had a 100 percent graduation rate and expected a 100 percent college acceptance rate.<ref>{{cite web|last=Smith |first=Karen |url=http://www.cw.edu/page.php?subj=about&page=president-blog&id=20 |title=CW President's Blog |publisher=[[College of Westchester]] |date=September 23, 2009 |access-date=June 6, 2011 |archive-url=https://web.archive.org/web/20110719183024/http://www.cw.edu/page.php?subj=about&page=president-blog&id=20 |archive-date=July 19, 2011 |url-status=live  }}</ref> Among other child-related programs that Agassi supports through his Andre Agassi Charitable Foundation is Clark County's only residential facility for abused and neglected children, Child Haven. In 1997, Agassi donated funding to Child Haven for a six-room classroom building now named the Agassi Center for Education. His foundation also provided $720,000 to assist in the building of the Andre Agassi Cottage for Medically Fragile Children. This 20-bed facility opened in December 2001, and accommodates developmentally delayed or handicapped children and children quarantined for infectious diseases.<ref>{{cite web |url=http://www.athlete.com/profile.php?id=351 |title=Andre Agassi |publisher=Athlete.com |access-date=June 6, 2011 |archive-url=https://web.archive.org/web/20110707182451/http://www.athlete.com/profile.php?id=351 |archive-date=July 7, 2011 |url-status=dead  }}</ref>
+
+In 2007, along with several other athletes, Agassi founded the charity [[Athletes for Hope]], which helps professional athletes get involved in charitable causes and aims to inspire all people to volunteer and support their communities.<ref>{{cite web |title=History |url=http://www.athletesforhope.org/history.html |publisher=[[Athletes for Hope]]}}</ref> He created the Canyon-Agassi Charter School Facilities Fund, now known as the Turner-Agassi Charter School Facilities Fund. The Fund is an investment initiative for social change, focusing on the "nationwide effort to move charters from stopgap buildings into permanent campuses."<ref>{{cite web|url=https://www.reviewjournal.com/news/agassi-school-fund-makes-first-investment-in-las-vegas/|title=Agassi school fund makes first investment in Las Vegas|date=February 3, 2014|website=Las Vegas Review-Journal|access-date=February 28, 2019}}</ref>
+
+In September 2013, the Andre Agassi Foundation for Education formed a partnership with V20 Foods to launch Box Budd!es, a line of kids' healthy snacks. All proceeds go to the Foundation.<ref>{{cite news |url=http://www.reviewjournal.com/business/food-thought-agassis-box-buddes-raises-educations-funds-healthful-snacks |title=Food for thought: Agassi's Box Budd!es raises educations funds with healthful snacks |newspaper=[[Las Vegas Review-Journal]] |date=October 7, 2013 |first=Laura |last=Carroll |access-date=September 11, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140911152745/http://www.reviewjournal.com/business/food-thought-agassis-box-buddes-raises-educations-funds-healthful-snacks |archive-date=September 11, 2014 }}</ref><ref>{{cite web |url=http://www.foodnavigator-usa.com/Manufacturers/Andre-Agassi-teams-up-with-V20-Foods-to-launch-Box-Budd!es-snacks-for-kids |title=Andre Agassi teams up with V20 Foods to launch Box Budd!es snacks for kids |publisher=Foodnavigator-usa.com |date=September 25, 2013 |first=Elaine |last=Watson |access-date=September 11, 2014}}</ref>
+
+In February 2014, Agassi remodeled the vacant [[University of Phoenix]] building in Las Vegas as a new school, called the Doral Academy West through the Canyon-Agassi Charter School Facilities Fund. Doral Academy opened in August 2014.<ref>{{cite news |url=http://www.reviewjournal.com/news/agassi-school-fund-makes-first-investment-las-vegas |title=Agassi school fund makes first investment in Las Vegas |newspaper=Las Vegas Review-Journal |date=February 2, 2014 |first=Jennifer |last=Robinson |access-date=September 10, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140726215916/http://www.reviewjournal.com/news/agassi-school-fund-makes-first-investment-las-vegas |archive-date=July 26, 2014 }}</ref> The Fund purchased a 4.6-acre plot in [[Henderson, Nevada]], to house the Somerset Academy of Las Vegas, which will relocate from its campus inside a church.<ref>{{cite news |url=http://www.reviewjournal.com/business/canyon-agassi-group-buys-46-acre-plot-academy |title=Canyon-Agassi group buys 4.6-acre plot for academy |newspaper=Las Vegas Review-Journal |date=February 7, 2014 |access-date=September 10, 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140910195401/http://www.reviewjournal.com/business/canyon-agassi-group-buys-46-acre-plot-academy |archive-date=September 10, 2014 }}</ref>
+
+On April 2, 2023, Agassi participated with Michael Chang, Andy Roddick and John McEnroe in the first live airing of Pickleball on ESPN in the Million dollar Pickleball Slam at the Hard Rock Casino in Hollywood, Fla.<ref>[https://www.seminolehardrockhollywood.com/events/pickleball-slam Pickleball Slam] seminolehardrockhollywood.com {{Webarchive|url=https://web.archive.org/web/20230402174412/https://www.seminolehardrockhollywood.com/events/pickleball-slam |date=April 2, 2023 }}</ref>
+
+==Career statistics==
+{{Main|Andre Agassi career statistics}}
+
+===Singles performance timeline===
+{{Performance key|short=yes|active=no}}
+
+{| class=wikitable style=text-align:center;font-size:95%
+! Tournament !![[1986 Grand Prix (tennis)|1986]]!![[1987 Grand Prix (tennis)|1987]]!![[1988 Grand Prix (tennis)|1988]]!![[1989 Grand Prix (tennis)|1989]]!![[1990 ATP Tour|1990]]!![[1991 ATP Tour|1991]]!![[1992 ATP Tour|1992]]!![[1993 ATP Tour|1993]]!![[1994 ATP Tour|1994]]!![[1995 ATP Tour|1995]]!![[1996 ATP Tour|1996]]!![[1997 ATP Tour|1997]]!![[1998 ATP Tour|1998]]!![[1999 ATP Tour|1999]]!![[2000 ATP Tour|2000]]!![[2001 ATP Tour|2001]]!![[2002 ATP Tour|2002]]!![[2003 ATP Tour|2003]]!![[2004 ATP Tour|2004]]!![[2005 ATP Tour|2005]]!![[2006 ATP Tour|2006]]!! {{abbr| SR | Strike rate}} !! {{abbr| W–L | Win–loss}}
+|-
+! colspan="24" style="text-align:left;"| Grand Slam tournaments
+|-
+| align=left | [[Australian Open]]
+| style=color:#767676|NH
+| A
+| A
+| A
+| A
+| A
+| A
+| A
+| A
+| style="background:lime;"| [[1995 Australian Open – Men's singles|'''W''']]
+| style="background:yellow;"| [[1996 Australian Open – Men's singles|SF]]
+| A
+| style="background:#afeeee;"| [[1998 Australian Open – Men's singles|4R]]
+| style="background:#afeeee;"| [[1999 Australian Open – Men's singles|4R]]
+| style="background:lime;"| [[2000 Australian Open – Men's singles|'''W''']]
+| style="background:lime;"| [[2001 Australian Open – Men's singles|'''W''']]
+| A
+| style="background:lime;"| [[2003 Australian Open – Men's singles|'''W''']]
+| style="background:yellow;"| [[2004 Australian Open – Men's singles|SF]]
+| style="background:#ffebcd;"| [[2005 Australian Open – Men's singles|QF]]
+| A
+| 4 / 9
+| 48–5
+|-
+| align=left | [[French Open]]
+| A
+| style="background:#afeeee;"| [[1987 French Open – Men's singles|2R]]
+| style="background:yellow;"| [[1988 French Open – Men's singles|SF]]
+| style="background:#afeeee;"| [[1989 French Open – Men's singles|3R]]
+| style="background:thistle;"| [[1990 French Open – Men's singles|F]]
+| style="background:thistle;"| [[1991 French Open – Men's singles|F]]
+| style="background:yellow;"| [[1992 French Open – Men's singles|SF]]
+| A
+| style="background:#afeeee;"| [[1994 French Open – Men's singles|2R]]
+| style="background:#ffebcd;"| [[1995 French Open – Men's singles|QF]]
+| style="background:#afeeee;"| [[1996 French Open – Men's singles|2R]]
+| A
+| style="background:#afeeee;"| [[1998 French Open – Men's singles|1R]]
+| style="background:lime;"| [[1999 French Open – Men's singles|'''W''']]
+| style="background:#afeeee;"| [[2000 French Open – Men's singles|2R]]
+| style="background:#ffebcd;"| [[2001 French Open – Men's singles|QF]]
+| style="background:#ffebcd;"| [[2002 French Open – Men's singles|QF]]
+| style="background:#ffebcd;"| [[2003 French Open – Men's singles|QF]]
+| style="background:#afeeee;"| [[2004 French Open – Men's singles|1R]]
+| style="background:#afeeee;"| [[2005 French Open – Men's singles|1R]]
+| A
+| 1 / 17
+| 51–16
+|-
+| align=left | [[Wimbledon Championships|Wimbledon]]
+| A
+| style="background:#afeeee;"| [[1987 Wimbledon Championships – Men's singles|1R]]
+| A
+| A
+| A
+| style="background:#ffebcd;"| [[1991 Wimbledon Championships – Men's singles|QF]]
+| style="background:lime;"| [[1992 Wimbledon Championships – Men's singles|'''W''']]
+| style="background:#ffebcd;"| [[1993 Wimbledon Championships – Men's singles|QF]]
+| style="background:#afeeee;"| [[1994 Wimbledon Championships – Men's singles|4R]]
+| style="background:yellow;"| [[1995 Wimbledon Championships – Men's singles|SF]]
+| style="background:#afeeee;"| [[1996 Wimbledon Championships – Men's singles|1R]]
+| A
+| style="background:#afeeee;"| [[1998 Wimbledon Championships – Men's singles|2R]]
+| style="background:thistle;"| [[1999 Wimbledon Championships – Men's singles|F]]
+| style="background:yellow;"| [[2000 Wimbledon Championships – Men's singles|SF]]
+| style="background:yellow;"| [[2001 Wimbledon Championships – Men's singles|SF]]
+| style="background:#afeeee;"| [[2002 Wimbledon Championships – Men's singles|2R]]
+| style="background:#afeeee;"| [[2003 Wimbledon Championships – Men's singles|4R]]
+| A
+| A
+| style="background:#afeeee;"| [[2006 Wimbledon Championships – Men's singles|3R]]
+| 1 / 14
+| 46–13
+|-
+| align=left | [[US Open (tennis)|US Open]]
+| style="background:#afeeee;"| [[1986 US Open – Men's singles|1R]]
+| style="background:#afeeee;"| [[1987 US Open – Men's singles|1R]]
+| style="background:yellow;"| [[1988 US Open – Men's singles|SF]]
+| style="background:yellow;"| [[1989 US Open – Men's singles|SF]]
+| style="background:thistle;"| [[1990 US Open – Men's singles|F]]
+| style="background:#afeeee;"| [[1991 US Open – Men's singles|1R]]
+| style="background:#ffebcd;"| [[1992 US Open – Men's singles|QF]]
+| style="background:#afeeee;"| [[1993 US Open – Men's singles|1R]]
+| style="background:lime;"| [[1994 US Open – Men's singles|'''W''']]
+| style="background:thistle;"| [[1995 US Open – Men's singles|F]]
+| style="background:yellow;"| [[1996 US Open – Men's singles|SF]]
+| style="background:#afeeee;"| [[1997 US Open – Men's singles|4R]]
+| style="background:#afeeee;"| [[1998 US Open – Men's singles|4R]]
+| style="background:lime;"| [[1999 US Open – Men's singles|'''W''']]
+| style="background:#afeeee;"| [[2000 US Open – Men's singles|2R]]
+| style="background:#ffebcd;"| [[2001 US Open – Men's singles|QF]]
+| style="background:thistle;"| [[2002 US Open – Men's singles|F]]
+| style="background:yellow;"| [[2003 US Open – Men's singles|SF]]
+| style="background:#ffebcd;"| [[2004 US Open – Men's singles|QF]]
+| style="background:thistle;"| [[2005 US Open – Men's singles|F]]
+| style="background:#afeeee;"| [[2006 US Open – Men's singles|3R]]
+| 2 / 21
+| 79–19
+|-
+! colspan="24" style="text-align:left;"| Year-end championships
+|-
+| align=left | [[Tennis Masters Cup|Masters Cup]]
+|DNQ
+|DNQ
+| style="background:#afeeee;"| [[1988 Nabisco Masters – Singles|RR]]
+| style="background:#afeeee;"| [[1989 Nabisco Masters – Singles|RR]]
+| style="background:lime;"| [[1990 ATP Tour World Championships – Singles|'''W''']]
+| style="background:yellow;"| [[1991 ATP Tour World Championships – Singles|SF]]
+|DNQ
+|DNQ
+| style="background:yellow;"| [[1994 ATP Tour World Championships – Singles|SF]]
+| A
+| style="background:#afeeee;"| [[1996 ATP Tour World Championships – Singles|RR]]
+|DNQ
+| style="background:#afeeee;"| [[1998 ATP Tour World Championships – Singles|RR]]
+| style="background:thistle;"| [[1999 ATP Tour World Championships – Singles|F]]
+| style="background:thistle;"| [[2000 Tennis Masters Cup – Singles|F]]
+| style="background:#afeeee;"| [[2001 Tennis Masters Cup – Singles|RR]]
+| style="background:#afeeee;"| [[2002 Tennis Masters Cup – Singles|RR]]
+| style="background:thistle;"| [[2003 Tennis Masters Cup – Singles|F]]
+| A
+| style="background:#afeeee;"| [[2005 Tennis Masters Cup – Singles|RR]]
+| style=color:#767676|RET
+| 1 / 13
+| 22–20
+|-
+| align=left | '''Year-end ranking'''
+| 91
+| 25
+| style="background:#9cf;"| 3
+| style="background:#eee8aa;"| 7
+| style="background:#eee8aa;"| 4
+| style="background:#eee8aa;"| 10
+| style="background:#eee8aa;"| 9
+| 24
+| style="background:thistle;"| 2
+| style="background:thistle;"| 2
+| style="background:#eee8aa;"| 8
+| 110
+| style="background:#eee8aa;"| 6
+| style="background:lime;"| '''1'''
+| style="background:#eee8aa;"| 6
+| style="background:#9cf;"| 3
+| style="background:thistle;"| 2
+| style="background:#eee8aa;"| 4
+| style="background:#eee8aa;"| 8
+| style="background:#eee8aa;"| 7
+| 150
+| colspan=2 | {{tooltip|'''$31,152,975'''|Career Prize Money}}
+|}
+
+===Grand Slam finals (8 titles, 7 runners-up)===
+By winning the [[1999 French Open]], Agassi completed a men's singles Career Grand Slam. He is the 5th of 8 male players in history (after [[Don Budge|Budge]], [[Fred Perry|Perry]], [[Rod Laver|Laver]] and [[Roy Emerson|Emerson]], and before [[Roger Federer|Federer]], [[Rafael Nadal|Nadal]] and [[Novak Djokovic|Djokovic]]) to achieve this.
+{| class="sortable wikitable"
+|-
+!Result
+!Year
+!Tournament
+!Surface
+!Opponent
+! class="unsortable"|Score
+|- style="background:#ebc2af;"
+| style="background:#ffa07a;"|Loss
+| [[1990 French Open – Men's singles|1990]]
+| French Open
+| Clay
+| {{flagicon|ECU}} [[Andrés Gómez]]
+| 3–6, 6–2, 4–6, 4–6
+|- style="background:#ccf;"
+| style="background:#ffa07a;"|Loss
+| [[1990 US Open – Men's singles|1990]]
+| [[US Open (tennis)|US Open]]
+| Hard
+| {{flagicon|US}} [[Pete Sampras]]
+| 4–6, 3–6, 2–6
+|- style="background:#ebc2af;"
+| style="background:#ffa07a;"|Loss
+| [[1991 French Open – Men's singles|1991]]
+| French Open
+| Clay
+| {{flagicon|US}} [[Jim Courier]]
+| 6–3, 4–6, 6–2, 1–6, 4–6
+|- style="background:#cfc;"
+| style="background:#98fb98;"|Win
+| [[1992 Wimbledon Championships – Men's singles|1992]]
+| [[Wimbledon Championships|Wimbledon]]
+| Grass
+| {{flagicon|CRO}} [[Goran Ivanišević]]
+| 6–7<sup>(8–10)</sup>, 6–4, 6–4, 1–6, 6–4
+|- style="background:#ccf;"
+| style="background:#98fb98;"|Win
+| [[1994 US Open – Men's singles|1994]]
+| US Open
+| Hard
+| {{flagicon|GER}} [[Michael Stich]]
+| 6–1, 7–6<sup>(7–5)</sup>, 7–5
+|- style="background:#ffc;"
+| style="background:#98fb98;"|Win
+| [[1995 Australian Open – Men's singles|1995]]
+| Australian Open
+| Hard
+| {{flagicon|US}} Pete Sampras
+| 4–6, 6–1, 7–6<sup>(8–6)</sup>, 6–4
+|- style="background:#ccf;"
+| style="background:#ffa07a;"|Loss
+| [[1995 US Open – Men's singles|1995]]
+| US Open
+| Hard
+| {{flagicon|US}} Pete Sampras
+| 4–6, 3–6, 6–4, 5–7
+|- style="background:#ebc2af;"
+| style="background:#98fb98;"|Win
+| [[1999 French Open – Men's singles|1999]]
+| French Open
+| Clay
+| {{flagicon|UKR}} [[Andrei Medvedev (tennis)|Andrei Medvedev]]
+| 1–6, 2–6, 6–4, 6–3, 6–4
+|- style="background:#cfc;"
+| style="background:#ffa07a;"|Loss
+| [[1999 Wimbledon Championships – Men's singles|1999]]
+| Wimbledon
+| Grass
+| {{flagicon|US}} Pete Sampras
+| 3–6, 4–6, 5–7
+|- style="background:#ccf;"
+| style="background:#98fb98;"|Win
+| [[1999 US Open – Men's singles|1999]]
+| US Open
+| Hard
+| {{flagicon|US}} [[Todd Martin]]
+| 6–4, 6–7<sup>(5–7)</sup>, 6–7<sup>(2–7)</sup>, 6–3, 6–2
+|- style="background:#ffc;"
+| style="background:#98fb98;"|Win
+| [[2000 Australian Open – Men's singles|2000]]
+| Australian Open
+| Hard
+| {{flagicon|RUS}} [[Yevgeny Kafelnikov]]
+| 3–6, 6–3, 6–2, 6–4
+|- style="background:#ffc;"
+| style="background:#98fb98;"|Win
+| [[2001 Australian Open – Men's singles|2001]]
+| Australian Open
+| Hard
+| {{flagicon|FRA}} [[Arnaud Clément]]
+| 6–4, 6–2, 6–2
+|- style="background:#ccf;"
+| style="background:#ffa07a;"|Loss
+| [[2002 US Open – Men's singles|2002]]
+| US Open
+| Hard
+| {{flagicon|US}} Pete Sampras
+| 3–6, 4–6, 7–5, 4–6
+|- style="background:#ffc;"
+| style="background:#98fb98;"|Win
+| [[2003 Australian Open – Men's singles|2003]]
+| Australian Open
+| Hard
+| {{flagicon|GER}} [[Rainer Schüttler]]
+| 6–2, 6–2, 6–1
+|- style="background:#ccf;"
+| style="background:#ffa07a;"|Loss
+| [[2005 US Open – Men's singles|2005]]
+| US Open
+| Hard
+| {{flagicon|SUI}} [[Roger Federer]]
+| 3–6, 6–2, 6–7<sup>(1–7)</sup>, 1–6
+|}
+
+==== Open Era records ====
+* These records were attained in the [[Open Era]] of tennis and in [[ATP World Tour Masters 1000]] series since 1990.
+* Records in '''bold''' indicate peer-less achievements.
+
+{| class="wikitable"
+|-
+! Time span
+! Selected Grand Slam tournament records
+! Players matched
+|-
+| 1990 YEC{{#tag:ref|Abbreviation for "[[ATP World Tour Finals|Year-end championship]]".|group=lower-alpha}} – 1999 French Open || Career "Super Slam"{{#tag:ref|A "Career Super Slam" entails winning all four [[Grand Slam (tennis)|majors]], the [[ATP World Tour Finals|Year-End Championship]] and the [[Tennis at the Summer Olympics|Olympic]] gold medal in singles.|group=lower-alpha}}<ref name="SI" /> || '''Stands alone'''
+|-
+| 1992 Wimbledon – 1999 French Open || Career Golden Slam<ref>{{cite news |url=https://www.tsn.ca/tennis/story/?id=333700 |title=Nadal Captures U.S. Open To Complete Career Grand Slam |publisher=The Sports Network (TSN) |date=September 14, 2010 |access-date=June 12, 2012 |quote=Nadal...also owns an Olympic gold medal, which makes him one of only two men to corral the career Golden Slam, with the great Agassi being the other. |archive-url=https://web.archive.org/web/20131105221727/http://www.tsn.ca/tennis/story/?id=333700 |archive-date=November 5, 2013 |url-status=dead  }}</ref> || [[Rafael Nadal]]
+|-
+| 1992 Wimbledon – 1999 French Open || Career Grand Slam<ref>{{cite news |url=https://www.nytimes.com/1999/06/07/sports/tennis-agassi-revival-reaches-a-peak-in-french-open.html?pagewanted=all&src=pm |title=Agassi Revival Reaches a Peak in French Open |first=Robin |last=Finn |newspaper=The New York Times |date=June 7, 1999 |access-date=July 9, 2012}}</ref> || {{Ubl | [[Rod Laver]] | [[Roger Federer]] | Rafael Nadal | [[Novak Djokovic]]}}
+|-
+| 1999 French Open||Won a Grand Slam final from two sets down.<ref name="comeback">{{cite web |url=https://www.atptour.com/en/news/djokovic-roland-garros-2021-final-historic-comeback |title=Djokovic Completes Historic Two-Set Comeback In Roland Garros Final |date=June 13, 2021 |publisher=[[Association of Tennis Professionals]] |access-date=June 15, 2021 }}</ref>|| {{Ubl | [[Björn Borg]] | [[Ivan Lendl]] | [[Gastón Gaudio]] | [[Dominic Thiem]] | [[Novak Djokovic]] | [[Rafael Nadal]]}}
+|}
+
+{| class="wikitable"
+|-
+! Grand Slam tournaments
+! Time span
+! Records at each Grand Slam tournament
+! Players matched
+|-
+|rowspan=2| Australian Open || 1995 || Won tournament on the first attempt || {{Ubl | [[Jimmy Connors]] | [[Roscoe Tanner]] | [[Vitas Gerulaitis]] | [[Johan Kriek]]}}
+|-
+| 2003 || 71.6% (121–48) games winning percentage in 1 tournament || '''Stands alone'''
+|-
+| US Open || 1986–2006 || 21 consecutive tournaments played<ref>{{cite web|title=US Open Singles Record Book |url=http://www.usopen.org/pdf/Record_Book_Singles_Records.pdf |access-date=August 26, 2012 |publisher=US Open |url-status=dead |archive-url=https://web.archive.org/web/20120906233151/http://www.usopen.org/pdf/Record_Book_Singles_Records.pdf |archive-date=September 6, 2012 }}</ref> || '''Stands alone'''
+|}
+
+{| class="wikitable"
+|-
+! Time span
+! Other selected records
+! Players matched
+|-
+| 1990–2003 || 6 [[Miami Masters]] titles<ref>{{cite web |title=Sony Open – Records and Stats |url=http://www.sonyopentennis.com/en/the-open/records-and-stats |access-date=March 29, 2014 |publisher=Sony Open Tennis}}</ref> || Novak Djokovic
+|-
+| 2001–2003 || 3 consecutive [[Miami Masters]] titles || Novak Djokovic
+|-
+| 1990–2003 || 8 [[Miami Masters]] finals || '''Stands alone'''
+|-
+| 1988–2005 || 61 match wins at [[Miami Masters]] || '''Stands alone'''
+|-
+| 2001–2004 || 19 consecutive wins at [[Miami Masters]] || '''Stands alone'''
+|-
+| 1990–1999 || 5 [[Washington Open (tennis)|Washington Open]] titles || '''Stands alone'''
+|-
+| 1993–2002 || 4 [[Los Angeles Open (tennis)|Los Angeles Open]] titles || {{Ubl | [[Jimmy Connors]] | [[Roy Emerson]] | [[Frank Parker (tennis)|Frank Parker]]}}
+|}
+
+==Legacy==
+Considered by numerous sources to be one of the greatest tennis players of all time,<ref name="SI">{{cite magazine|title=Top 10 Men's Tennis Players of All Time |magazine=Sports Illustrated |url=http://sportsillustrated.cnn.com/multimedia/photo_gallery/1009/top.ten.tennis/content.4.html |access-date=July 21, 2012 |url-status=dead |archive-url=https://web.archive.org/web/20100918231717/http://sportsillustrated.cnn.com/multimedia/photo_gallery/1009/top.ten.tennis/content.4.html |archive-date=September 18, 2010 }}</ref><ref name="tennis">{{cite journal |title=Tennis Magazine: 40 Greatest Players |journal=Tennis Magazine |date=December 2005}}</ref><ref name="cba">{{cite news |url=http://www.cbc.ca/sports/columns/newsmakers/andre-agassi.html |title=Tennis's love affair with Agassi comes to an end |publisher=[[CBC Sports]] |access-date=May 15, 2010 |url-status=dead |archive-url=https://web.archive.org/web/20090725010912/http://www.cbc.ca/sports/columns/newsmakers/andre-agassi.html |archive-date=July 25, 2009}}</ref><ref>{{cite news|url=https://www.telegraph.co.uk/sport/tennis/wimbledon/3030108/Grand-slammed.html |title=Grand-slammed |work=The Daily Telegraph |location=London |access-date=May 15, 2010 |first=John |last=Parsons |date=June 26, 2002 |archive-url=https://web.archive.org/web/20100525021835/http://www.telegraph.co.uk/sport/tennis/wimbledon/3030108/Grand-slammed.html |archive-date=May 25, 2010 |url-status=live  }}</ref><ref name="stars">[http://news.bbc.co.uk/sport1/hi/tennis/5113548.stm "Stars pay tribute to Agassi"]. [[BBC]]. Retrieved May 15, 2010.</ref> Agassi has also been called one of the greatest service returners ever to play the game, and was described by the [[BBC]] upon his retirement as "perhaps the biggest worldwide star in the sport's history".<ref name="cba" /><ref name="stars" /><ref>[http://uk.eurosport.yahoo.com/tennis/simon-reed/article/1176/ "Reed's shotmakers: Men's return of serve"]. [[Yahoo! Sports]]. Retrieved May 15, 2010.</ref><ref>[https://www.nytimes.com/2005/09/13/sports/tennis/13tv.html "Adjectives Tangled in the Net"]. ''[[The New York Times]]''. Retrieved May 15, 2010.</ref><ref>[http://articles.latimes.com/1995-03-14/sports/sp-42741_1_andre-agassi?pg=1 "Sampras, Agassi Have Just Begun to Fight"] ''[[Los Angeles Times]]''. Retrieved 15, 2010.</ref> As a result, he is credited for helping to revive the popularity of tennis during the 1990s.<ref name="cba" /><ref name="stars" /><ref>{{cite news|url=https://www.independent.co.uk/sport/tennis/dont-walk-away-andre-charismatic-gifts-of-agassi-should-not-be-allowed-to-slip-through-net-406318.html |title=Don't Walk Away, Andre |work=The Independent |location=UK |date=July 2, 2006 |access-date=June 6, 2011 |first=Ronald |last=Atkin |archive-url=https://web.archive.org/web/20110606110540/http://www.independent.co.uk/sport/tennis/dont-walk-away-andre-charismatic-gifts-of-agassi-should-not-be-allowed-to-slip-through-net-406318.html |archive-date=June 6, 2011 |url-status=live  }}</ref>
+
+==Professional awards==
+* [[Tennis world champions named by the International Tennis Federation|ITF World Champion]]: 1999.
+* [[ATP Awards|ATP Player of the Year]]: 1999.
+* [[ATP Awards|ATP Most Improved Player]]: 1988, 1998
+
+==Recognition==
+* In 1992, Agassi was named the [[BBC Overseas Sports Personality of the Year]].
+* In 2010, ''[[Sports Illustrated]]'' named Agassi the 7th greatest male player of all time.<ref name="SI" />
+* On July 9, 2011, Agassi was inducted into the [[International Tennis Hall of Fame]] at a ceremony in Newport, Rhode Island.<ref name="tennis" />
+
+==Video==
+* ''Wimbledon 2000 Semi-final – Agassi vs. Rafter (2003)'' Starring: Andre Agassi, Patrick Rafter; Standing Room Only, DVD Release Date: August 16, 2005, Run Time: 213&nbsp;minutes, {{OCLC|61774054}}.
+* ''Charlie Rose with Andre Agassi (May 7, 2001)'' Charlie Rose, Inc., DVD Release Date: August 15, 2006, Run Time: 57&nbsp;minutes.
+* ''Wimbledon: The Record Breakers (2005)'' Starring: Andre Agassi, Boris Becker; Standing Room Only, DVD Release Date: August 16, 2005, Run Time: 52&nbsp;minutes, {{OCLC|61658553}}.
+
+==Video games==
+* ''[[Andre Agassi Tennis]]'' for the Super Nintendo Entertainment System, Genesis, Game Gear, Master System]. and mobile phones<ref name="mobygames">{{cite web|url=https://www.mobygames.com/game/andre-agassi-tennis|title=Andre Agassi Tennis for Game Gear (1994)|website=MobyGames}}</ref>
+* ''[[Agassi Tennis Generation]]'' for PlayStation 2 and Game Boy Advance
+* ''Agassi Tennis Generation 2002'' for Windows<ref name="uvlist.net">{{cite web|url=https://www.uvlist.net/game-190548-Agassi+Tennis+Generation+2002|title=Agassi Tennis Generation 2002 (2002) by Aqua Pacific Windows game|website=Universal Videogame List}}</ref>
+* ''Smash Court Pro Tournament'' for PlayStation 2
+* ''[[Top Spin 4]]'' for Xbox 360, PlayStation 3, and Wii
+
+==See also==
+{{Portal|Biography|Tennis}}
+* [[All-time tennis records – men's singles]]
+* [[List of Grand Slam men's singles champions]]
+* [[Tennis male players statistics]]
+* [[Tennis records of the Open Era – men's singles]]
+
+== Notes ==
+{{reflist|group=lower-alpha}}
+
+==References==
+{{reflist|colwidth=30em}}
+
+==Further reading==
+* {{Cite book |last=Agassi |first=Andre |title=Open: An Autobiography |publisher=Vintage |location=London |year=2010 |isbn=978-0-307-38840-7 |url=https://archive.org/details/openautobiograph00andr }}
+* {{Cite book |last1=Agassi |first1=Mike |author2=Cobello, Dominic |author3=Welsh, Kate |title=The Agassi Story |publisher=ECW Press |location=Toronto |year=2004 |isbn=978-1-55022-656-0 |url=https://archive.org/details/agassistory00mike }}
+
+==External links==
+{{Commons category|Andre Agassi}}
+{{wikiquote}}
+* {{ATP}}
+* {{ITF profile}}
+* {{DavisCup player}}
+* {{Tennis Hall of Fame}}
+* [https://web.archive.org/web/20180118081134/http://www.andreagassi.com/ Andre Agassi Ventures]
+* [https://www.americanrhetoric.com/speeches/andreagassifarewelltotennis.htm Farewell to Tennis Speech at the U.S. Open]
+* [https://www.americanrhetoric.com/speeches/andreagassistefgrafinduction.htm Agassi's Tennis Hall of Fame Induction for Steffi Graf]
+* {{IMDb name}}
+
+{{Navboxes
+|title=Articles and topics related to Andre Agassi
+|state=collapsed
+|list1=
+{{Navboxes
+|title=Andre Agassi (achievement predecessor and successor)
+|state={{{state|autocollapse}}}
+|list1=<div>
+{{s-start}}
+{{s-sports}}
+{{s-bef|before = {{flagicon|USA}} [[Pete Sampras]]<br />{{flagicon|USA}} Pete Sampras<br />{{flagicon|USA}} Pete Sampras<br />{{flagicon|USA}} Pete Sampras<br />{{flagicon|AUS}} [[Lleyton Hewitt]]<br />{{flagicon|AUS}} Lleyton Hewitt}}
+{{s-ttl|title = [[List of ATP number 1 ranked singles players|World No. 1]]|years = April 10, 1995 – November 5, 1995<br />January 29, 1996 – February 11, 1996<br />July 5, 1999 – July 25, 1999<br />September 13, 1999 – September 10, 2000<br />April 28, 2003 – May 11, 2003<br />June 16, 2003 – September 7, 2003}}
+{{s-aft|after = {{flagicon|USA}} Pete Sampras<br />{{flagicon|AUT}} [[Thomas Muster]]<br />{{flagicon|AUS}} [[Patrick Rafter]]<br />{{flagicon|USA}} Pete Sampras<br />{{flagicon|AUS}} Lleyton Hewitt<br />{{flagicon|ESP}} [[Juan Carlos Ferrero]]}}
+
+{{s-ach}}
+{{s-bef|before={{flagicon|USA}} [[Mike Powell (long jumper)|Mike Powell]]}}
+{{s-ttl|title=[[BBC Overseas Sports Personality of the Year]]|years=1992}}
+{{s-aft|after={{flagicon|AUS}} [[Greg Norman]]}}
+
+{{s-bef|before = {{flagicon|AUS}} [[Paul McNamee]]<br />{{flagicon|NED}} [[Richard Krajicek]]}}
+{{s-ttl|title = [[ATP World Tour Awards|ATP Arthur Ashe Humanitarian of the Year]]|years = 1995<br />2001}}
+{{s-aft|after = {{flagicon|USA}} [[Paul Flory]]<br />{{flagicon|ISR}} [[Amir Hadad]] & {{flagicon|PAK}} [[Aisam-ul-Haq Qureshi]]}}
+
+{{s-bef|before = {{flagicon|USA}} Pete Sampras}}
+{{s-ttl|title = [[International Tennis Federation#Men's singles|ITF World Champion]]|years = 1999}}
+{{s-aft|after = {{flagicon|BRA}} [[Gustavo Kuerten]]}}
+
+{{s-bef|before = {{flagicon|USA}} Pete Sampras}}
+{{s-ttl|title = [[ATP World Tour Awards|ATP Player of the Year]]|years = 1999}}
+{{s-aft|after = {{flagicon|BRA}} Gustavo Kuerten}}
+
+{{s-bef|before={{flagicon|FRA}} [[Zinedine Zidane]]}}
+{{s-ttl|title=[[L'Équipe Champion of Champions]]|years=1999}}
+{{s-aft|after={{flagicon|USA}} [[Tiger Woods]]}}
+
+{{s-bef|before = {{flagicon|SWE}} [[Peter Lundgren]]<br />{{flagicon|AUS}} [[Patrick Rafter]]}}
+{{s-ttl|title = [[ATP Awards|ATP Most Improved Player]]|years = 1988<br />1998}}
+{{s-aft|after = {{flagicon|USA}}  [[Michael Chang]]<br />{{flagicon|ECU}} [[Nicolás Lapentti]]}}
+
+{{s-bef|before = {{flagicon|USA}} Pete Sampras}}
+{{s-ttl|title = [[ESPY Awards|ESPY Best Male Tennis Player]]|years = 2000}}
+{{s-aft|after = {{flagicon|USA}} Pete Sampras}}
+
+{{s-bef|before = {{flagicon|AUS}} Lleyton Hewitt}}
+{{s-ttl|title = [[ESPY Awards|ESPY Best Male Tennis Player]]|years = 2003}}
+{{s-aft|after = {{flagicon|USA}} [[Andy Roddick]]}}
+
+{{s-end}}
+</div>
+}}
+{{navboxes
+| title = Andre Agassi in the [[Grand Slam (tennis)|Grand Slam tournaments]]
+| list1 =
+{{Australian Open men's singles champions}}
+{{French Open men's singles champions}}
+{{US Open men's singles champions}}
+{{Wimbledon men's singles champions}}
+{{Tennis Career Grand Slam Champions}}
+{{Men's tennis players who won two or more Grand Slam singles titles in one calendar year}}
+}}
+{{navboxes
+| title = Andre Agassi's [[Andre Agassi career statistics|achievements]]
+| list1 =
+{{Tennis World Number Ones (men)}}
+{{Year-End Championships winners}}
+{{ATP Masters Series tournament winners}}
+{{ATP Masters Series tournament doubles winners}}
+{{Footer Olympic Champions Tennis Men}}
+}}
+{{BBC Sports Personality World Sport Star of the Year}}
+{{International Tennis Hall of Fame members}}
+{{Novak Djokovic}}
+{{Petr Korda}}
+{{L'Équipe Champion of Champions}}
+}}
+{{Authority control}}
+
+{{DEFAULTSORT:Agassi, Andre}}
+[[Category:Andre Agassi| ]]
+[[Category:1970 births]]
+[[Category:Living people]]
+[[Category:20th-century American businesspeople]]
+[[Category:21st-century American businesspeople]]
+[[Category:American autobiographers]]
+[[Category:American investors]]
+[[Category:American male tennis players]]
+[[Category:American people of Iranian descent]]
+[[Category:American people of Iranian-Assyrian descent]]
+[[Category:American people of Armenian descent]]
+[[Category:American real estate businesspeople]]
+[[Category:American sportspeople in doping cases]]
+[[Category:Armenian-American tennis players]]
+[[Category:Assyrian sportspeople]]
+[[Category:Australian Open (tennis) champions]]
+[[Category:Doping cases in tennis]]
+[[Category:Ethnic Armenian sportspeople]]
+[[Category:French Open champions]]
+[[Category:Grand Slam (tennis) champions in men's singles]]
+[[Category:International Tennis Hall of Fame inductees]]
+[[Category:Iranian Assyrian people]]
+[[Category:Iranian people of Armenian descent]]
+[[Category:Medalists at the 1996 Summer Olympics]]
+[[Category:Nevada Democrats]]
+[[Category:Novak Djokovic coaches]]
+[[Category:Olympic gold medalists for the United States in tennis]]
+[[Category:Philanthropists from Nevada]]
+[[Category:Sportspeople from Las Vegas]]
+[[Category:Sportspeople of Iranian descent]]
+[[Category:Steffi Graf]]
+[[Category:Tennis people from Nevada]]
+[[Category:Tennis players at the 1996 Summer Olympics]]
+[[Category:US Open (tennis) champions]]
+[[Category:Wimbledon champions]]
+[[Category:Writers from Las Vegas]]
+[[Category:ATP number 1 ranked singles tennis players]]
+[[Category:ITF World Champions]]
