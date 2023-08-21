@@ -29,8 +29,6 @@ pub mod search_server;
 mod webgraph;
 pub mod webgraph_server;
 
-use std::path::Path;
-
 pub use centrality::Centrality;
 pub use entity::EntityIndexer;
 pub use indexer::Indexer;
@@ -42,14 +40,7 @@ use crate::{config, warc::WarcFile};
 fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
     source: &'a config::WarcSource,
-    base_path: &'a str,
 ) -> impl Iterator<Item = WarcFile> + 'a {
-    let download_path = Path::new(base_path).join("warc_files");
-
-    if !download_path.exists() {
-        std::fs::create_dir_all(&download_path).unwrap();
-    }
-
     let warc_paths: Vec<_> = warc_paths
         .iter()
         .map(|warc_path| warc_path.to_string())

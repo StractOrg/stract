@@ -107,7 +107,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     let source: config::WarcSource = job.source_config.clone().into();
 
-    let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.base_path);
+    let warc_files = download_all_warc_files(&job.warc_paths, &source);
     pin!(warc_files);
 
     let current_timestamp = Utc::now().timestamp().max(0) as usize;

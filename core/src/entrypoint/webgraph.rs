@@ -89,7 +89,7 @@ impl WebgraphWorker {
 
         let source = WarcSource::from(job.config.clone());
 
-        let warc_files = download_all_warc_files(&job.warc_paths, &source, &job.graph_base_path);
+        let warc_files = download_all_warc_files(&job.warc_paths, &source);
         pin!(warc_files);
 
         for file in warc_files.by_ref() {
