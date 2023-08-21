@@ -164,6 +164,18 @@ fn extract_text(nodes: &[Node]) -> (Option<Span>, Vec<Paragraph>) {
                 // NOTE: For debugging
                 // format!("@@IPA({parameters:?})@@")
             }
+            // https://en.wikipedia.org/wiki/Template:Respell
+            "respell" => {
+                parameters
+                    .iter()
+                    .filter(|p| p.name.is_none())
+                    .flat_map(|p| &p.value)
+                    .filter_map(|v| v.as_text())
+                    .join("-")
+                    .replace('_', " ")
+
+                // format!("@@respell({parameters:?})@@")
+            }
             _ => return None,
         })
     }
