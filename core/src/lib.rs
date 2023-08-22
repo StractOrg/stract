@@ -58,6 +58,7 @@ mod kv;
 mod leaky_queue;
 mod llm_utils;
 mod metrics;
+mod naive_bayes;
 pub mod prehashed;
 mod qa_model;
 mod query;

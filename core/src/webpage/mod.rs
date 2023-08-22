@@ -33,6 +33,7 @@ use whatlang::Lang;
 
 mod just_text;
 pub mod region;
+pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
 

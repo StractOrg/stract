@@ -95,6 +95,7 @@ utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 publicsuffix = { workspace = true }
 rkyv = { workspace = true }
+hashbrown = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { workspace = true }

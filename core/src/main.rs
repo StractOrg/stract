@@ -25,7 +25,7 @@ use stract::entrypoint::autosuggest_scrape::{self, Gl};
 use stract::entrypoint::configure;
 
 use stract::entrypoint::indexer::IndexPointer;
-use stract::entrypoint::{self, frontend, search_server, webgraph_server};
+use stract::entrypoint::{self, frontend, safety_classifier, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -103,6 +103,12 @@ enum Commands {
     /// and sending newly discovered urls back to the crawl coordinator.
     Crawler { config_path: String },
 
+    /// Train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
+    SafetyClassifier {
+        #[clap(subcommand)]
+        options: SafetyClassifierOptions,
+    },
+
     /// Setup dev environment.
     #[cfg(feature = "dev")]
     Configure {
@@ -121,6 +127,19 @@ enum AliceOptions {
     Serve { config_path: String },
     /// Generate a new keypair for Alice to sign states.
     GenerateKey,
+}
+
+/// Commands to train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
+#[derive(Subcommand)]
+enum SafetyClassifierOptions {
+    /// Train the classifier
+    Train {
+        dataset_path: String,
+        output_path: String,
+    },
+
+    /// Run a single prediction to test the model
+    Predict { model_path: String, text: String },
 }
 
 #[derive(Subcommand)]
@@ -311,6 +330,15 @@ fn main() -> Result<()> {
                 .build()?
                 .block_on(entrypoint::crawler::worker(config))?
         }
+        Commands::SafetyClassifier { options } => match options {
+            SafetyClassifierOptions::Train {
+                dataset_path,
+                output_path,
+            } => safety_classifier::train(dataset_path, output_path)?,
+            SafetyClassifierOptions::Predict { model_path, text } => {
+                safety_classifier::predict(model_path, &text)?
+            }
+        },
     }
 
     Ok(())

@@ -1,3 +1,4 @@
+#!.venv/bin/python3
 import requests
 import pandas as pd
 from tqdm import tqdm
@@ -10,32 +11,50 @@ stopwords = [
     "our",
     "he",
     "she",
+    "they",
+    "it",
+    "a",
+    "is",
 ]
 
-queries = stopwords + [
-    "season",
-    "call",
-    "aol mail login",
-    "ao3",
-    "france",
-    "vanguard login",
-    "kanye",
-    "recipe",
-    "zion",
-    "garfield",
-    "amazon customer service",
-    "height",
-    "apple stock",
-    "qr code generator",
-    "ups tracking",
-    "uk",
-    "lakers",
-    "aioli",
-    "food",
-    "credit karma",
-    "american express",
-    "airline tickets",
-]
+queries = set(
+    stopwords
+    + [
+        "season",
+        "call",
+        "aol mail login",
+        "ao3",
+        "france",
+        "vanguard login",
+        "kanye",
+        "recipe",
+        "zion",
+        "garfield",
+        "amazon customer service",
+        "height",
+        "apple stock",
+        "qr code generator",
+        "ups tracking",
+        "uk",
+        "lakers",
+        "aioli",
+        "food",
+        "credit karma",
+        "american express",
+        "airline tickets",
+        "adidas kanye",
+        "kanye",
+        "airbnb",
+        "amazon",
+        "python",
+        "ant man",
+        "aol mail",
+        "apple stock",
+        "apple",
+        "ariana grande",
+        "papa",
+    ]
+)
 
 
 ## exported from https://trystract.com/explore
@@ -5047,12 +5066,13 @@ Like(Site("redtube.com"));
 
 
 def search(json):
+    json["numResults"] = 50
     r = requests.post(
         "https://trystract.com/beta/api/search",
         json=json,
     ).json()
 
-    time.sleep(1)
+    time.sleep(5)
 
     return r
 
@@ -5067,31 +5087,35 @@ def search_sfw(q):
 
 def content(search_results):
     return [
-        {"url": result["url"], "body": result["body"]}
+        {"url": result["url"], "text": result["title"] + " " + result["body"]}
         for result in search_results["webpages"]
     ]
 
 
-data = {"query": [], "url": [], "body": [], "nsfw": []}
+data = {"query": [], "url": [], "text": [], "nsfw": []}
 
 for query in tqdm(queries):
     results = content(search_nsfw(query))
     for result in results:
         data["query"].append(query)
         data["url"].append(result["url"])
-        data["body"].append(result["body"])
+        data["text"].append(result["text"])
         data["nsfw"].append(True)
 
     results = content(search_sfw(query))
     for result in results:
         data["query"].append(query)
         data["url"].append(result["url"])
-        data["body"].append(result["body"])
+        data["text"].append(result["text"])
         data["nsfw"].append(False)
 
 
 df = pd.DataFrame(data)
 
 df = df.drop_duplicates(subset=["url"])
+
+df = df.rename(columns={"text": "text", "nsfw": "label"})
+df["label"] = df["label"].map({True: "NSFW", False: "SFW"})
+df = df[["text", "label"]]
 
 df.to_csv("data/nsfw.csv", index=False)

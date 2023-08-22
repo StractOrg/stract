@@ -89,6 +89,7 @@ rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
 rusqlite = { version = "0.29.0", features = ["bundled", "modern-full", "buildtime_bindgen"] }
 async-channel = "1.8.0"
 url = { version = "2.4.0", features = ["serde"] }
+hashbrown = { version = "0.14.0", features = ["serde"] }
 anyhow = { version = "1.0.72", features = ["backtrace"] }
 bytemuck = { version = "1.13.1", features = ["derive"] }
 proptest = "1.2.0"
