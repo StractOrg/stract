@@ -58,8 +58,10 @@ impl TfidfVectorizer {
     /// Helper function to calculate document frequencies
     fn calculate_document_frequencies(&self, corpus: &[String]) -> HashMap<String, usize> {
         let mut doc_freq: HashMap<String, usize> = HashMap::new();
+        let mut doc_words: HashSet<&str> = HashSet::new();
+
         for doc in corpus {
-            let mut doc_words: HashSet<&str> = HashSet::new();
+            doc_words.clear();
             for word in doc.split_whitespace() {
                 if doc_words.insert(word) {
                     *doc_freq.entry(word.to_string()).or_insert(0) += 1;
@@ -130,6 +132,12 @@ pub struct NaiveBayes<L: Label> {
     classes: Vec<L>,
     class_prior: Vec<f32>,
     feature_log_prob: Vec<IntMap<u64, f32>>,
+}
+
+impl Default for NaiveBayes<String> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<L: Label> NaiveBayes<L> {
@@ -256,6 +264,12 @@ impl<L: Label> NaiveBayes<L> {
 pub struct Pipeline<L: Label> {
     vectorizer: TfidfVectorizer,
     classifier: NaiveBayes<L>,
+}
+
+impl Default for Pipeline<String> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<L: Label> Pipeline<L> {

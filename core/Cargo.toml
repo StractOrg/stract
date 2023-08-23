@@ -144,3 +144,7 @@ harness = false
 [[bench]]
 name = "hyperloglog"
 harness = false
+
+[[bench]]
+name = "naive-bayes"
+harness = false
