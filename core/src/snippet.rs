@@ -231,6 +231,10 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
         None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
     };
 
+    if text.is_empty() {
+        return text.to_string();
+    }
+
     let snippet = snippet_string(text, query.simple_terms(), lang, config);
 
     snippet.to_html()
