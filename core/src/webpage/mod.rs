@@ -764,6 +764,13 @@ impl Html {
         self.all_text.clone()
     }
 
+    pub fn empty_all_text(&self) -> bool {
+        match &self.all_text {
+            Some(text) => text.is_empty(),
+            None => true,
+        }
+    }
+
     pub fn title(&self) -> Option<String> {
         if let Some(title) = self.root.select_first("title") {
             let title = title.text_contents().trim().to_string();

@@ -156,6 +156,11 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
             }
 
             html.parse_text();
+
+            if html.empty_all_text() {
+                continue;
+            }
+
             if let Some(minimum_clean_words) = job.minimum_clean_words {
                 match html.clean_text() {
                     Some(clean_text) => {
