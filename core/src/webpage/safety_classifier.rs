@@ -88,12 +88,12 @@ impl Model {
         self.pipeline.fit(&datapoints);
     }
 
-    pub fn predict_text(&self, text: &str) -> Label {
+    pub fn predict_text(&self, text: &str) -> naive_bayes::Prediction<Label> {
         let text = normalize(text);
         self.pipeline.predict(&text)
     }
 
-    pub fn predict(&self, page: &crate::webpage::Webpage) -> Label {
+    pub fn predict(&self, page: &crate::webpage::Webpage) -> naive_bayes::Prediction<Label> {
         let text = normalize(&page_text(page));
         self.predict_text(&text)
     }
@@ -105,17 +105,22 @@ impl Model {
         let mut false_negatives = 0;
 
         for datapoint in datapoints {
-            let label = self.predict_text(&datapoint.text);
+            let pred = self.predict_text(&datapoint.text);
 
-            match (label, datapoint.label) {
+            match (pred.label, datapoint.label) {
                 (Label::NSFW, Label::NSFW) => true_positives += 1,
                 (Label::NSFW, Label::SFW) => false_positives += 1,
                 (Label::SFW, Label::SFW) => true_negatives += 1,
                 (Label::SFW, Label::NSFW) => false_negatives += 1,
             }
 
-            if label != datapoint.label {
-                tracing::debug!("got {:?} expected {:?}:", label, datapoint.label);
+            if pred.label != datapoint.label {
+                tracing::debug!(
+                    "got {:?} expected {:?} ({:.2}):",
+                    pred.label,
+                    datapoint.label,
+                    pred.confidence
+                );
                 tracing::debug!("{}\n", datapoint.text);
             }
         }

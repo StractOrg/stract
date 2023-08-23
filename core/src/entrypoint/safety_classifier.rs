@@ -57,9 +57,9 @@ pub fn train<P: AsRef<Path>>(dataset: P, output: P) -> Result<()> {
 
 pub fn predict<P: AsRef<Path>>(model: P, text: &str) -> Result<()> {
     let model = webpage::safety_classifier::Model::load(model)?;
-    let label = model.predict_text(text);
+    let pred = model.predict_text(text);
 
-    info!("label: {:?}", label);
+    info!("{:#?}", pred);
 
     Ok(())
 }

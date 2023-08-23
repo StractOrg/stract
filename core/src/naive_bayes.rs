@@ -118,6 +118,12 @@ pub struct Datapoint<L: Label> {
     pub label: L,
 }
 
+#[derive(Debug)]
+pub struct Prediction<L> {
+    pub label: L,
+    pub confidence: f32,
+}
+
 /// Naive Bayes Classifier
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct NaiveBayes<L: Label> {
@@ -145,14 +151,25 @@ impl<L: Label> NaiveBayes<L> {
     }
 
     /// Predicts the class for a given sample
-    pub fn predict(&self, sample: &[TfIdf]) -> L {
+    pub fn predict(&self, sample: &[TfIdf]) -> Prediction<L> {
         let class_log_probs = self.calculate_class_log_probs(sample);
 
-        let best_class_index = class_log_probs
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(index, _)| index)
-            .unwrap();
-        self.classes[best_class_index].clone()
+        let mut best_class_index = 0;
+        let mut best_class_log_prob = f32::INFINITY;
+
+        let mut s = 0.0;
+
+        for (class_id, class_log_prob) in class_log_probs {
+            if class_log_prob < best_class_log_prob {
+                best_class_index = class_id;
+                best_class_log_prob = class_log_prob;
+            }
+            s += class_log_prob;
+        }
+
+        let label = self.classes[best_class_index].clone();
+        let confidence = (best_class_log_prob / s).max(0.0);
+        Prediction { label, confidence }
     }
 
     /// Helper function to extract unique classes from the data points
@@ -264,7 +281,7 @@ impl<L: Label> Pipeline<L> {
         self.classifier.fit(&datapoints);
     }
 
-    pub fn predict(&self, doc: &str) -> L {
+    pub fn predict(&self, doc: &str) -> Prediction<L> {
         let features = self.vectorizer.transform(doc);
         self.classifier.predict(&features)
     }
@@ -329,13 +346,13 @@ mod tests {
             term_id: 0,
             value: 1.0,
         }]);
-        assert_eq!(pred, "ham".to_owned());
+        assert_eq!(pred.label, "ham".to_owned());
 
         let pred = model.predict(&[TfIdf {
             term_id: 2,
             value: 1.0,
         }]);
 
-        assert_eq!(pred, "spam".to_owned());
+        assert_eq!(pred.label, "spam".to_owned());
     }
 }
