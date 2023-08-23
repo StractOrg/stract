@@ -97,5 +97,5 @@ utoipa = { version = "3.4.4", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
 tikv-jemallocator = "0.5"
 publicsuffix = "2.2.3"
-rkyv = { version = "0.7.42", features = ["validation"] }
+rkyv = { version = "0.7.42", default_features = false, features = ["std", "validation", "size_64"] }
 

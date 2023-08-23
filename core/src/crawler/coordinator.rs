@@ -85,7 +85,6 @@ impl CrawlCoordinator {
         let mut db = self.db.lock().unwrap();
 
         db.insert_urls(responses).unwrap();
-        db.update_url_status(responses).unwrap();
 
         for response in responses.iter() {
             db.set_domain_status(&response.domain, DomainStatus::Pending)

@@ -26,6 +26,8 @@ use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
+const URLS_PER_SHARD: usize = 5_000;
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Archive)]
 #[archive(check_bytes)]
 pub enum UrlStatus {
@@ -103,6 +105,7 @@ struct UrlState {
 struct DomainState {
     weight: f64,
     status: DomainStatus,
+    max_shard_id: u64,
 }
 
 pub struct RedirectDb {
@@ -149,6 +152,13 @@ impl RedirectDb {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
+struct DomainShard {
+    domain: Domain,
+    shard_id: u64,
+}
+
 struct UrlToInsert {
     url: Url,
     different_domain: bool,
@@ -183,7 +193,7 @@ impl UrlStateDb {
         Ok(Self { db })
     }
 
-    pub fn get(&mut self, key: &Domain) -> Result<Option<BTreeMap<UrlString, UrlState>>> {
+    pub fn get(&mut self, key: &DomainShard) -> Result<Option<BTreeMap<UrlString, UrlState>>> {
         let key_bytes = rkyv::to_bytes::<_, 1024>(key)?;
         let value_bytes = self.db.get(key_bytes)?;
 
@@ -199,7 +209,7 @@ impl UrlStateDb {
         }
     }
 
-    pub fn put(&mut self, key: &Domain, value: &BTreeMap<UrlString, UrlState>) -> Result<()> {
+    pub fn put(&mut self, key: &DomainShard, value: &BTreeMap<UrlString, UrlState>) -> Result<()> {
         let key_bytes = rkyv::to_bytes::<_, 1024>(key)?;
         let value_bytes = rkyv::to_bytes::<_, 1024>(value)?;
 
@@ -301,25 +311,21 @@ impl From<&UrlString> for Url {
 }
 
 pub struct CrawlDb {
-    redirects: RedirectDb,
-
     domain_state: DomainStateDb,
-
     urls: UrlStateDb,
+    redirects: RedirectDb,
 }
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // if Path::new(path.as_ref()).exists() {
-        //     return Err(anyhow::anyhow!(
-        //         "crawl db already exists and might be in incorrect state"
-        //     ));
-        // }
-
-        let redirects = RedirectDb::open(path.as_ref().join("redirects"))?;
+        if Path::new(path.as_ref()).exists() {
+            return Err(anyhow::anyhow!(
+                "crawl db already exists and might be in incorrect state"
+            ));
+        }
 
         Ok(Self {
-            redirects,
+            redirects: RedirectDb::open(path.as_ref().join("redirects"))?,
             domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
             urls: UrlStateDb::open(path.as_ref().join("urls"))?,
         })
@@ -334,10 +340,16 @@ impl CrawlDb {
                 &DomainState {
                     weight: 0.0,
                     status: DomainStatus::Pending,
+                    max_shard_id: 0,
                 },
             )?;
 
-            let mut urls = self.urls.get(&domain)?.unwrap_or_default();
+            let sharded_domain = DomainShard {
+                domain,
+                shard_id: 0,
+            };
+
+            let mut urls = self.urls.get(&sharded_domain)?.unwrap_or_default();
 
             urls.insert(
                 url.into(),
@@ -347,7 +359,7 @@ impl CrawlDb {
                 },
             );
 
-            self.urls.put(&domain, &urls)?;
+            self.urls.put(&sharded_domain, &urls)?;
         }
 
         Ok(())
@@ -366,6 +378,12 @@ impl CrawlDb {
                     different_domain,
                 });
             }
+
+            for url_res in &res.url_responses {
+                if let UrlResponse::Redirected { url, new_url } = url_res {
+                    self.redirects.put(url, new_url).unwrap();
+                }
+            }
         });
 
         for (domain, urls) in domains.into_iter() {
@@ -375,6 +393,7 @@ impl CrawlDb {
                     let state = DomainState {
                         weight: 0.0,
                         status: DomainStatus::Pending,
+                        max_shard_id: 0,
                     };
                     self.domain_state.put(&domain, &state)?;
 
@@ -382,7 +401,19 @@ impl CrawlDb {
                 }
             };
 
-            let mut url_states = self.urls.get(&domain)?.unwrap_or_default();
+            let mut sharded_domain = DomainShard {
+                domain,
+                shard_id: domain_state.max_shard_id,
+            };
+
+            let mut url_states = self.urls.get(&sharded_domain)?.unwrap_or_default();
+
+            if url_states.len() >= URLS_PER_SHARD {
+                domain_state.max_shard_id += 1;
+                sharded_domain.shard_id = domain_state.max_shard_id;
+
+                url_states = BTreeMap::new();
+            }
 
             for url in urls {
                 let mut url_state = url_states
@@ -404,94 +435,10 @@ impl CrawlDb {
                 url_states.insert(url.url.into(), url_state);
             }
 
-            self.domain_state.put(&domain, &domain_state)?;
+            self.domain_state
+                .put(&sharded_domain.domain, &domain_state)?;
 
-            self.urls.put(&domain, &url_states)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn update_url_status(&mut self, job_responses: &[JobResponse]) -> Result<()> {
-        let mut url_responses: HashMap<Domain, Vec<UrlResponse>> = HashMap::new();
-
-        for res in job_responses {
-            for url_response in &res.url_responses {
-                match url_response {
-                    UrlResponse::Success { url } => {
-                        let domain = Domain::from(url);
-                        url_responses
-                            .entry(domain)
-                            .or_default()
-                            .push(url_response.clone());
-                    }
-                    UrlResponse::Failed {
-                        url,
-                        status_code: _,
-                    } => {
-                        let domain = Domain::from(url);
-                        url_responses
-                            .entry(domain)
-                            .or_default()
-                            .push(url_response.clone());
-                    }
-                    UrlResponse::Redirected { url, new_url: _ } => {
-                        let domain = Domain::from(url);
-                        url_responses
-                            .entry(domain)
-                            .or_default()
-                            .push(url_response.clone());
-                    }
-                }
-            }
-        }
-
-        for (domain, responses) in url_responses {
-            if self.domain_state.get(&domain)?.is_none() {
-                self.domain_state.put(
-                    &domain,
-                    &DomainState {
-                        weight: 0.0,
-                        status: DomainStatus::Pending,
-                    },
-                )?;
-            }
-
-            let mut url_states = self.urls.get(&domain)?.unwrap_or_default();
-            for response in responses {
-                match response {
-                    UrlResponse::Success { url } => {
-                        let mut url_state = url_states
-                            .get(&UrlString::from(&url))
-                            .cloned()
-                            .unwrap_or(UrlState {
-                                weight: 0.0,
-                                status: UrlStatus::Pending,
-                            });
-
-                        url_state.status = UrlStatus::Done;
-
-                        url_states.insert(UrlString::from(&url), url_state);
-                    }
-                    UrlResponse::Failed { url, status_code } => {
-                        let mut url_state = url_states
-                            .get(&UrlString::from(&url))
-                            .cloned()
-                            .unwrap_or(UrlState {
-                                weight: 0.0,
-                                status: UrlStatus::Pending,
-                            });
-
-                        url_state.status = UrlStatus::Failed { status_code };
-                        url_states.insert(url.into(), url_state);
-                    }
-                    UrlResponse::Redirected { url, new_url } => {
-                        self.redirects.put(&url, &new_url).ok();
-                    }
-                }
-            }
-
-            self.urls.put(&domain, &url_states)?;
+            self.urls.put(&sharded_domain, &url_states)?;
         }
 
         Ok(())
@@ -501,6 +448,7 @@ impl CrawlDb {
         let mut domain_state = self.domain_state.get(domain)?.unwrap_or(DomainState {
             weight: 0.0,
             status,
+            max_shard_id: 0,
         });
 
         domain_state.status = status;
@@ -534,7 +482,16 @@ impl CrawlDb {
     pub fn prepare_jobs(&mut self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
         let mut jobs = Vec::with_capacity(domains.len());
         for domain in domains {
-            let mut urls = self.urls.get(domain)?.unwrap_or_default();
+            let state = self.domain_state.get(domain)?.unwrap();
+
+            let shard_id = rand::thread_rng().gen_range(0..=state.max_shard_id);
+
+            let shard = DomainShard {
+                domain: domain.clone(),
+                shard_id,
+            };
+
+            let mut urls = self.urls.get(&shard)?.unwrap_or_default();
             let available_urls: Vec<_> = urls
                 .iter()
                 .filter_map(|(url, state)| {
@@ -586,7 +543,7 @@ impl CrawlDb {
 
             jobs.push(job);
 
-            self.urls.put(domain, &urls)?;
+            self.urls.put(&shard, &urls)?;
         }
 
         Ok(jobs)
