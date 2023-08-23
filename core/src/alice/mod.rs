@@ -394,7 +394,7 @@ impl Tokenizer {
 
         let output = self
             .tokenizer
-            .decode(tokens, true)
+            .decode(&tokens, true)
             .map_err(|e| anyhow!(e))?;
 
         Ok(output)

@@ -52,7 +52,7 @@ impl CrossEncoderModel {
         let mut tokenizer =
             tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
 
-        tokenizer.with_truncation(Some(truncation));
+        tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
         let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;

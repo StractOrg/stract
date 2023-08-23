@@ -373,7 +373,7 @@ impl DualEncoder {
         let mut tokenizer =
             tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
 
-        tokenizer.with_truncation(Some(truncation));
+        tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
         let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
@@ -455,7 +455,7 @@ impl AbstractiveModel {
         let mut tokenizer =
             tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
 
-        tokenizer.with_truncation(Some(truncation));
+        tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
         let encoder = tch::CModule::load(folder.as_ref().join("traced_encoder.pt"))?;
@@ -750,7 +750,7 @@ impl Iterator for StringStreamingGenerator {
                         .token_streamer
                         .model
                         .tokenizer
-                        .decode(self.tokens.clone(), true)
+                        .decode(&self.tokens, true)
                         .ok()
                         .and_then(|s| {
                             if !s.contains('\u{fffd}') {
@@ -773,7 +773,7 @@ impl Iterator for StringStreamingGenerator {
                             .token_streamer
                             .model
                             .tokenizer
-                            .decode(self.tokens.clone(), true)
+                            .decode(&self.tokens, true)
                         {
                             Ok(s) => {
                                 self.tokens.clear();
