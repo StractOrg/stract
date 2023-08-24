@@ -86,6 +86,8 @@ fn main() -> Result<()> {
         pb.inc(1);
         let responses = random_responses(1024);
         coordinator.add_responses(&responses)?;
+
+        coordinator.sample_jobs(1024)?;
     }
 
     Ok(())
