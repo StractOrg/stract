@@ -9,7 +9,7 @@ fn rand_domain() -> Domain {
     // and appending .com
     let mut rng = rand::thread_rng();
     let mut domain = String::new();
-    for _ in 0..rng.gen_range(1..3) {
+    for _ in 0..rng.gen_range(1..10) {
         domain.push(rng.gen_range(b'a'..=b'z') as char);
     }
     domain.push_str(".com");

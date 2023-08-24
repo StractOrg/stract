@@ -16,8 +16,9 @@
 
 use hashbrown::HashMap;
 use rand::Rng;
-use rkyv::{Archive, Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
+use rkyv::Deserialize;
+use std::hash::Hash;
+use std::ops::Range;
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, VecDeque},
@@ -27,10 +28,7 @@ use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
-const URLS_PER_SHARD: usize = 10_000;
-
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Archive)]
-#[archive(check_bytes)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UrlStatus {
     Pending,
     Crawling,
@@ -38,7 +36,7 @@ pub enum UrlStatus {
     Done,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Archive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, rkyv::Serialize, rkyv::Deserialize, rkyv::Archive)]
 #[archive(check_bytes)]
 pub enum DomainStatus {
     Pending,
@@ -94,20 +92,37 @@ fn weighted_sample<T>(items: impl Iterator<Item = (T, f64)>, num_items: usize) -
     sampled_items.into_iter().map(|s| s.item).collect()
 }
 
-#[derive(Clone, Serialize, Deserialize, Archive)]
-#[archive(check_bytes)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct UrlState {
     weight: f64,
     status: UrlStatus,
 }
 
-#[derive(Clone, Serialize, Deserialize, Archive)]
+impl Default for UrlState {
+    fn default() -> Self {
+        Self {
+            weight: 0.0,
+            status: UrlStatus::Pending,
+        }
+    }
+}
+
+#[derive(Clone, rkyv::Serialize, rkyv::Deserialize, rkyv::Archive)]
 #[archive(check_bytes)]
 struct DomainState {
     weight: f64,
     status: DomainStatus,
     total_urls: u64,
-    num_shards: u64,
+}
+
+impl Default for DomainState {
+    fn default() -> Self {
+        Self {
+            weight: 0.0,
+            status: DomainStatus::Pending,
+            total_urls: 0,
+        }
+    }
 }
 
 pub struct RedirectDb {
@@ -154,25 +169,14 @@ impl RedirectDb {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Archive, Hash, PartialEq, Eq)]
-#[archive(check_bytes)]
-struct DomainShard {
-    domain: Domain,
-    shard_id: u64,
-}
-
 struct UrlToInsert {
     url: Url,
     different_domain: bool,
 }
 
-/// The UrlStateDb is a key-value store that maps a domain shard to a map of urls to their state.
-/// The domain shard is a combination of a domain and a shard id. The shard id is used to split the
-/// domain into multiple shards, so that we can store more urls per domain. Some domains have a lot (!)
-/// of urls, and it would be slow to store all of them in a single key-value pair as we would then need to
-/// read gb's of data from disk to update a single url state.
 struct UrlStateDb {
     db: rocksdb::DB,
+    ranges: HashMap<Domain, Range<Vec<u8>>>,
 }
 
 impl UrlStateDb {
@@ -184,41 +188,64 @@ impl UrlStateDb {
         let mut block_options = rocksdb::BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
 
+        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024)?; // 1GB
+        block_options.set_block_cache(&cache);
+
         options.set_block_based_table_factory(&block_options);
-        options.set_optimize_filters_for_hits(true);
         options.set_max_background_jobs(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
-        options.optimize_for_point_lookup(512);
         options.set_max_subcompactions(8);
         options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
         options.set_compression_type(rocksdb::DBCompressionType::None);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
-        Ok(Self { db })
+        Ok(Self {
+            db,
+            ranges: HashMap::new(),
+        })
     }
 
-    pub fn get(&mut self, key: &DomainShard) -> Result<Option<HashMap<UrlString, UrlState>>> {
-        let key_bytes = rkyv::to_bytes::<_, 4096>(key)?;
-        let value_bytes = self.db.get(key_bytes)?;
+    pub fn get(&mut self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
+        let url_bytes = bincode::serialize(url)?;
+        let domain_bytes = bincode::serialize(domain)?;
 
-        match value_bytes {
-            Some(value_bytes) => {
-                let archived =
-                    rkyv::check_archived_root::<HashMap<UrlString, UrlState>>(&value_bytes[..])
-                        .unwrap();
-                let value = archived.deserialize(&mut rkyv::Infallible).unwrap();
-                Ok(Some(value))
+        let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+
+        let state_bytes = self.db.get(key_bytes)?;
+
+        match state_bytes {
+            Some(state_bytes) => {
+                let state = bincode::deserialize(&state_bytes).unwrap();
+                Ok(Some(state))
             }
             None => Ok(None),
         }
     }
 
-    pub fn put(&mut self, key: &DomainShard, value: &HashMap<UrlString, UrlState>) -> Result<()> {
-        let key_bytes = rkyv::to_bytes::<_, 4096>(key)?;
-        let value_bytes = rkyv::to_bytes::<_, 4096>(value)?;
+    pub fn put(&mut self, domain: &Domain, url: &UrlString, value: &UrlState) -> Result<()> {
+        let url_bytes = bincode::serialize(url)?;
+        let domain_bytes = bincode::serialize(domain)?;
+
+        let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+
+        // update ranges
+        let range = self.ranges.entry(domain.clone()).or_insert_with(|| Range {
+            start: key_bytes.clone(),
+            end: key_bytes.clone(),
+        });
+
+        if key_bytes < range.start {
+            range.start = key_bytes.clone();
+        }
+
+        if key_bytes > range.end {
+            range.end = key_bytes.clone();
+        }
+
+        let value_bytes = bincode::serialize(value)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -227,49 +254,37 @@ impl UrlStateDb {
         Ok(())
     }
 
-    fn rebuild_shards(&mut self, domain: &Domain, domain_state: &mut DomainState) -> Result<()> {
-        let mut urls = HashMap::new();
+    pub fn get_all_urls(&mut self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
+        match self.ranges.get(domain) {
+            Some(range) => {
+                let domain_bytes = bincode::serialize(domain)?;
+                let start = range.start.clone();
+                let end = range.end.clone();
 
-        for shard_id in 0..domain_state.num_shards {
-            let shard = DomainShard {
-                domain: domain.clone(),
-                shard_id,
-            };
+                let iter = self.db.iterator(rocksdb::IteratorMode::From(
+                    &start,
+                    rocksdb::Direction::Forward,
+                ));
 
-            let shard_urls = self.get(&shard)?.unwrap_or_default();
+                Ok(iter
+                    .take_while(|r| {
+                        let (key, _) = r.as_ref().unwrap();
+                        &**key <= end.as_slice()
+                    })
+                    .filter_map(|r| {
+                        let (key, value) = r.ok()?;
 
-            urls.extend(shard_urls);
+                        let url = bincode::deserialize(&key[domain_bytes.len() + 1..]) // +1 for '/'
+                            .ok()?;
+
+                        let state = bincode::deserialize(&value[..]).ok()?;
+
+                        Some((url, state))
+                    })
+                    .collect())
+            }
+            None => Ok(Vec::new()),
         }
-
-        let new_num_shards = domain_state.num_shards * 2;
-
-        let mut new_shards: HashMap<DomainShard, HashMap<UrlString, UrlState>> = HashMap::new();
-
-        for (url, state) in urls {
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            url.hash(&mut hasher);
-            let hash = hasher.finish();
-
-            let shard_id = hash % new_num_shards;
-
-            let shard = DomainShard {
-                domain: domain.clone(),
-                shard_id,
-            };
-
-            new_shards
-                .entry(shard)
-                .or_default()
-                .insert(url, state.clone());
-        }
-
-        for (shard, urls) in new_shards {
-            self.put(&shard, &urls)?;
-        }
-
-        domain_state.num_shards = new_num_shards;
-
-        Ok(())
     }
 }
 
@@ -300,7 +315,7 @@ impl DomainStateDb {
     }
 
     fn get(&self, domain: &Domain) -> Result<Option<DomainState>> {
-        let domain_bytes = rkyv::to_bytes::<_, 1024>(domain)?;
+        let domain_bytes = rkyv::to_bytes::<_, 256>(domain)?;
         let value_bytes = self.db.get(domain_bytes)?;
 
         if let Some(value_bytes) = &value_bytes {
@@ -313,8 +328,8 @@ impl DomainStateDb {
     }
 
     fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
-        let domain_bytes = rkyv::to_bytes::<_, 1024>(domain)?;
-        let state_bytes = rkyv::to_bytes::<_, 1024>(state)?;
+        let domain_bytes = rkyv::to_bytes::<_, 256>(domain)?;
+        let state_bytes = rkyv::to_bytes::<_, 256>(state)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -339,9 +354,9 @@ impl DomainStateDb {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Archive, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Hash, PartialEq, Eq, PartialOrd, Ord))]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 struct UrlString(String);
 
 impl From<&Url> for UrlString {
@@ -398,27 +413,12 @@ impl CrawlDb {
                         weight: 0.0,
                         status: DomainStatus::Pending,
                         total_urls: 1,
-                        num_shards: 1,
                     },
                 )?,
             }
 
-            let sharded_domain = DomainShard {
-                domain,
-                shard_id: 0,
-            };
-
-            let mut urls = self.urls.get(&sharded_domain)?.unwrap_or_default();
-
-            urls.insert(
-                url.into(),
-                UrlState {
-                    weight: 0.0,
-                    status: UrlStatus::Pending,
-                },
-            );
-
-            self.urls.put(&sharded_domain, &urls)?;
+            self.urls
+                .put(&domain, &UrlString::from(url), &UrlState::default())?;
         }
 
         Ok(())
@@ -452,7 +452,6 @@ impl CrawlDb {
                     let state = DomainState {
                         weight: 0.0,
                         status: DomainStatus::Pending,
-                        num_shards: 1,
                         total_urls: 0,
                     };
                     self.domain_state.put(&domain, &state)?;
@@ -461,51 +460,25 @@ impl CrawlDb {
                 }
             };
 
-            if domain_state.total_urls / domain_state.num_shards > URLS_PER_SHARD as u64 {
-                self.urls.rebuild_shards(&domain, &mut domain_state)?;
-            }
-            let mut shards: HashMap<DomainShard, Vec<UrlToInsert>> = HashMap::new();
-
             for url in urls {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                let url_string = UrlString::from(&url.url);
-                url_string.hash(&mut hasher);
-                let hash = hasher.finish();
-
-                let shard_id = hash % domain_state.num_shards;
-                let shard = DomainShard {
-                    domain: domain.clone(),
-                    shard_id,
+                let mut url_state = match self.urls.get(&domain, &UrlString::from(&url.url))? {
+                    Some(state) => state,
+                    None => {
+                        domain_state.total_urls += 1;
+                        UrlState::default()
+                    }
                 };
 
-                shards.entry(shard).or_default().push(url);
-            }
-
-            for (sharded_domain, urls) in shards {
-                let mut url_states = self.urls.get(&sharded_domain)?.unwrap_or_default();
-
-                for url in urls {
-                    let mut url_state = url_states
-                        .get(&UrlString::from(&url.url))
-                        .cloned()
-                        .unwrap_or(UrlState {
-                            weight: 0.0,
-                            status: UrlStatus::Pending,
-                        });
-
-                    if url.different_domain {
-                        url_state.weight += 1.0;
-                    }
-
-                    if url_state.weight > domain_state.weight {
-                        domain_state.weight = url_state.weight;
-                    }
-
-                    if url_states.insert(url.url.into(), url_state).is_none() {
-                        domain_state.total_urls += 1;
-                    }
+                if url.different_domain {
+                    url_state.weight += 1.0;
                 }
-                self.urls.put(&sharded_domain, &url_states)?;
+
+                if url_state.weight > domain_state.weight {
+                    domain_state.weight = url_state.weight;
+                }
+
+                self.urls
+                    .put(&domain, &UrlString::from(&url.url), &url_state)?;
             }
 
             self.domain_state.put(&domain, &domain_state)?;
@@ -515,12 +488,7 @@ impl CrawlDb {
     }
 
     pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
-        let mut domain_state = self.domain_state.get(domain)?.unwrap_or(DomainState {
-            weight: 0.0,
-            status,
-            num_shards: 1,
-            total_urls: 0,
-        });
+        let mut domain_state = self.domain_state.get(domain)?.unwrap_or_default();
 
         domain_state.status = status;
 
@@ -553,16 +521,8 @@ impl CrawlDb {
     pub fn prepare_jobs(&mut self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
         let mut jobs = Vec::with_capacity(domains.len());
         for domain in domains {
-            let state = self.domain_state.get(domain)?.unwrap();
+            let urls = self.urls.get_all_urls(domain)?;
 
-            let shard_id = rand::thread_rng().gen_range(0..state.num_shards);
-
-            let shard = DomainShard {
-                domain: domain.clone(),
-                shard_id,
-            };
-
-            let mut urls = self.urls.get(&shard)?.unwrap_or_default();
             let available_urls: Vec<_> = urls
                 .iter()
                 .filter_map(|(url, state)| {
@@ -580,10 +540,10 @@ impl CrawlDb {
             );
 
             for url in &sampled {
-                let mut state = urls.get(*url).unwrap().clone();
+                let mut state = self.urls.get(domain, url)?.unwrap();
                 state.status = UrlStatus::Crawling;
 
-                urls.insert((*url).clone(), state);
+                self.urls.put(domain, url, &state)?;
             }
 
             let mut domain_state = self.domain_state.get(domain)?.unwrap();
@@ -613,8 +573,6 @@ impl CrawlDb {
             }
 
             jobs.push(job);
-
-            self.urls.put(&shard, &urls)?;
         }
 
         Ok(jobs)
@@ -667,5 +625,26 @@ mod tests {
 
         let new_sample = db.sample_domains(128).unwrap();
         assert_eq!(new_sample.len(), 0);
+    }
+
+    #[test]
+    fn get_all_urls() {
+        let mut db = CrawlDb::open(gen_temp_path()).unwrap();
+
+        db.insert_seed_urls(&[
+            Url::parse("https://a.com").unwrap(),
+            Url::parse("https://b.com").unwrap(),
+        ])
+        .unwrap();
+
+        let domain = Domain::from(&Url::parse("https://a.com").unwrap());
+
+        let urls = db.urls.get_all_urls(&domain).unwrap();
+
+        assert_eq!(urls.len(), 1);
+        assert_eq!(
+            urls[0].0,
+            UrlString::from(&Url::parse("https://a.com").unwrap())
+        );
     }
 }
