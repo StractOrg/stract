@@ -339,7 +339,7 @@ fn parse_term(term: &str) -> Box<Term> {
 
 #[allow(clippy::vec_box)]
 pub fn parse(query: &str) -> Vec<Box<Term>> {
-    let query = query.to_lowercase();
+    let query = query.to_lowercase().replace(['“', '”'], "\"");
 
     let mut res = Vec::new();
 
@@ -467,11 +467,6 @@ mod tests {
         assert_eq!(
             parse("\"this is a\" inurl:test"),
             vec![
-                // Box::new(Term::Phrase(vec![
-                //     "this".to_string(),
-                //     "is".to_string(),
-                //     "a".to_string()
-                // ])),
                 Box::new(Term::Phrase("this is a".to_string(),)),
                 Box::new(Term::Url("test".to_string()))
             ]
@@ -503,6 +498,13 @@ mod tests {
         assert_eq!(
             parse("\"\""),
             vec![Box::new(Term::Phrase("".to_string(),)),]
+        );
+        assert_eq!(
+            parse("“this is a“ inurl:test"),
+            vec![
+                Box::new(Term::Phrase("this is a".to_string(),)),
+                Box::new(Term::Url("test".to_string()))
+            ]
         );
     }
 }
