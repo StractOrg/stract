@@ -17,8 +17,12 @@
 use std::fs::OpenOptions;
 use std::path::Path;
 
+use itertools::Itertools;
+
 use crate::naive_bayes;
 use crate::Result;
+
+const MAX_NUM_WORDS: usize = 1000;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -26,6 +30,27 @@ use crate::Result;
 pub enum Label {
     SFW,
     NSFW,
+}
+
+impl ToString for Label {
+    fn to_string(&self) -> String {
+        match self {
+            Label::SFW => "SFW".to_string(),
+            Label::NSFW => "NSFW".to_string(),
+        }
+    }
+}
+
+impl TryFrom<&str> for Label {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "SFW" => Ok(Label::SFW),
+            "NSFW" => Ok(Label::NSFW),
+            _ => Err(format!("invalid label: {}", value)),
+        }
+    }
 }
 
 impl naive_bayes::Label for Label {}
@@ -47,7 +72,10 @@ pub fn load_dataset<P: AsRef<Path>>(path: P) -> Result<Vec<Datapoint>> {
 }
 
 fn normalize(text: &str) -> String {
-    text.to_string()
+    text.split_whitespace()
+        .take(MAX_NUM_WORDS)
+        .join(" ")
+        .to_lowercase()
 }
 
 pub fn page_text(page: &crate::webpage::Webpage) -> String {
@@ -150,7 +178,7 @@ impl Model {
         Ok(())
     }
 
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path)?;
 
         let model = bincode::deserialize_from(file)?;

@@ -277,6 +277,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -305,6 +306,7 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -403,6 +405,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -430,6 +433,7 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -506,6 +510,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -534,6 +539,7 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -562,6 +568,7 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -664,6 +671,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 
                 dmoz_description: None,
+                safety_classification: None,
                 node_id: Some(Node::from("www.a.com").into_host().id()),
             })
             .expect("failed to insert webpage");
@@ -692,6 +700,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
+                safety_classification: None,
                 node_id: Some(Node::from("www.b.com").into_host().id()),
             })
             .expect("failed to insert webpage");
@@ -720,6 +729,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
+                safety_classification: None,
                 node_id: Some(Node::from("www.c.com").into_host().id()),
             })
             .expect("failed to insert webpage");
@@ -796,6 +806,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -839,6 +850,7 @@ mod tests {
                 fetch_time_ms: 500,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -973,6 +985,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -1047,6 +1060,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -1076,6 +1090,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -1130,6 +1145,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -1188,6 +1204,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -1349,6 +1366,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -1422,6 +1440,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -1482,6 +1501,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -1511,6 +1531,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -1609,6 +1630,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
 
         page.html.set_clean_text("".to_string());
@@ -1688,6 +1710,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
 
         page.html.set_clean_text("".to_string());
@@ -1716,6 +1739,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
 
         page.html.set_clean_text("".to_string());

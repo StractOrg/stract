@@ -176,6 +176,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -204,6 +205,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -251,6 +253,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -279,6 +282,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -325,6 +329,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -353,6 +358,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -395,6 +401,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -432,6 +439,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
         })
             .expect("failed to insert webpage");
 
@@ -475,6 +483,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -500,6 +509,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -543,6 +553,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -569,6 +580,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -596,6 +608,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 
@@ -670,6 +683,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
         w.html.set_clean_text(format!(
             "{CONTENT} termA termB d d d d d d d d d {}",
@@ -702,6 +716,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
         w.html.set_clean_text(format!(
             "{CONTENT} termA d d d d d d d d d termB {}",
@@ -734,6 +749,7 @@ mod tests {
             
             node_id: None,
             dmoz_description: None,
+                safety_classification: None,
         };
         w.html.set_clean_text(format!(
             "{CONTENT} termA d d d d termB d d d d d {}",
@@ -788,6 +804,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -816,6 +833,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -865,6 +883,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -893,6 +912,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -921,6 +941,7 @@ mod tests {
                 
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

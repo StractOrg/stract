@@ -104,6 +104,7 @@ mod tests {
 
                 dmoz_description: None,
                 node_id: Some(Node::from("https://www.first.com").into_host().id()),
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -133,6 +134,7 @@ mod tests {
 
                 dmoz_description: None,
                 node_id: Some(Node::from("https://www.second.com").into_host().id()),
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -162,6 +164,7 @@ mod tests {
 
                 dmoz_description: None,
                 node_id: Some(Node::from("https://www.third.com").into_host().id()),
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

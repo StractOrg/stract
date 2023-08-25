@@ -102,6 +102,7 @@ pub struct SearchParams {
     pub gl: Option<String>,
     pub optic: Option<String>,
     pub sr: Option<String>,
+    pub safe: Option<bool>,
 }
 
 #[allow(clippy::unused_async)]
@@ -166,6 +167,7 @@ pub async fn route(
             site_rankings,
             num_results: NUM_RESULTS_PER_PAGE,
             return_ranking_signals: false,
+            safe_search: params.safe.unwrap_or(defaults::SearchQuery::safe_search()),
         })
         .await
     {
@@ -287,6 +289,7 @@ pub struct ApiSearchQuery {
     pub selected_region: Option<Region>,
     pub optic: Option<String>,
     pub site_rankings: Option<SiteRankings>,
+    pub safe_search: Option<bool>,
 
     #[serde(default = "defaults::SearchQuery::return_ranking_signals")]
     pub return_ranking_signals: bool,
@@ -315,6 +318,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             optic,
             site_rankings: api.site_rankings,
             return_ranking_signals: api.return_ranking_signals,
+            safe_search: api.safe_search.unwrap_or(default.safe_search),
         })
     }
 }

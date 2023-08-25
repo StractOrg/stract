@@ -124,4 +124,8 @@ impl SearchQuery {
     pub fn return_ranking_signals() -> bool {
         false
     }
+
+    pub fn safe_search() -> bool {
+        false
+    }
 }

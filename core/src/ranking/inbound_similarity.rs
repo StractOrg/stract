@@ -372,6 +372,7 @@ mod tests {
 
                 node_id: Some(Node::from("e.com").id()),
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -401,6 +402,7 @@ mod tests {
 
                 node_id: Some(Node::from("d.com").id()),
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 

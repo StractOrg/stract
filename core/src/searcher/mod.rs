@@ -67,6 +67,7 @@ pub struct SearchQuery {
     pub optic: Option<Optic>,
     pub site_rankings: Option<SiteRankings>,
     pub return_ranking_signals: bool,
+    pub safe_search: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +92,7 @@ impl Default for SearchQuery {
             optic: Default::default(),
             site_rankings: Default::default(),
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
+            safe_search: defaults::SearchQuery::safe_search(),
         }
     }
 }
