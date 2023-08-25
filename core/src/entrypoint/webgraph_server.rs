@@ -39,6 +39,7 @@ use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 
 #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ScoredSite {
     pub site: String,
     pub score: f64,

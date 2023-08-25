@@ -26,6 +26,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: String,
@@ -49,10 +50,8 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(
         .map(|(key, value)| {
             let mut value = entity_link_to_html(value, 150).replace('*', "•");
 
-            if value.starts_with('•') || value.starts_with("\n•") {
-                if let Some(first_bullet) = value.find('•') {
-                    value = value[first_bullet + '•'.len_utf8()..].to_string();
-                }
+            if let Some((_, rest)) = value.split_once('•') {
+                value = rest.to_string();
             }
 
             let value = maybe_prettify_entity_date(value);

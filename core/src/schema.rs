@@ -558,10 +558,6 @@ impl Field {
             self,
             Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SchemaOrgJson)
-                | Field::Text(TextField::CleanBodyBigrams)
-                | Field::Text(TextField::TitleBigrams)
-                | Field::Text(TextField::CleanBodyTrigrams)
-                | Field::Text(TextField::TitleTrigrams)
                 | Field::Text(TextField::MicroformatTags)
         ) && !self.is_fast()
     }

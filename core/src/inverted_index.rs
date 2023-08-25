@@ -311,8 +311,17 @@ impl InvertedIndex {
             .collect();
 
         for page in &mut webpages {
-            page.snippet =
-                snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
+            if !page.body.is_empty() {
+                page.snippet =
+                    snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
+            } else {
+                page.snippet = snippet::generate(
+                    query,
+                    page.description.as_deref().unwrap_or_default(),
+                    &page.region,
+                    self.snippet_config.clone(),
+                );
+            }
         }
 
         Ok(webpages)

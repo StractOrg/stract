@@ -225,6 +225,9 @@ pub struct SnippetConfig {
 
     #[serde(default = "defaults::Snippet::min_passage_width")]
     pub min_passage_width: usize,
+
+    pub max_considered_words: Option<usize>,
+    pub num_words_for_lang_detection: Option<usize>,
 }
 
 impl Default for SnippetConfig {
@@ -233,6 +236,8 @@ impl Default for SnippetConfig {
             desired_num_chars: defaults::Snippet::desired_num_chars(),
             delta_num_chars: defaults::Snippet::delta_num_chars(),
             min_passage_width: defaults::Snippet::min_passage_width(),
+            max_considered_words: None,
+            num_words_for_lang_detection: None,
         }
     }
 }

@@ -15,12 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::{
-    query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
+    query::{BooleanQuery, Occur, TermQuery},
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
 
 use crate::{
     bangs::BANG_PREFIX,
+    floor_char_boundary,
     schema::{Field, TextField, ALL_FIELDS},
 };
 
@@ -46,7 +47,7 @@ impl ToString for Term {
             Term::Title(title) => "intitle:".to_string() + title.as_str(),
             Term::Body(body) => "inbody:".to_string() + body.as_str(),
             Term::Url(url) => "inurl:".to_string() + url.as_str(),
-            Term::PossibleBang(bang) => "!".to_string() + bang.as_str(),
+            Term::PossibleBang(bang) => BANG_PREFIX.to_string() + bang.as_str(),
         }
     }
 }
@@ -55,36 +56,15 @@ fn simple_into_tantivy(
     term: &str,
     fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
     tokenizer_manager: &TokenizerManager,
-) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
-    let (backlink_field, backlink_field_entry) = fields
-        .iter()
-        .find(|(field, _)| {
-            matches!(
-                ALL_FIELDS[field.field_id() as usize],
-                Field::Text(TextField::BacklinkText)
-            )
-        })
-        .unwrap();
-
-    vec![
-        (
-            Occur::Must,
-            Box::new(BooleanQuery::new(Term::into_tantivy_simple(
-                term,
-                fields,
-                tokenizer_manager,
-            ))),
-        ),
-        (
-            Occur::Should,
-            Box::new(Term::tantivy_text_query(
-                backlink_field,
-                backlink_field_entry,
-                tokenizer_manager,
-                term,
-            )),
-        ),
-    ]
+) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
+    (
+        Occur::Must,
+        Box::new(BooleanQuery::new(Term::into_tantivy_simple(
+            term,
+            fields,
+            tokenizer_manager,
+        ))),
+    )
 }
 
 impl Term {
@@ -105,7 +85,7 @@ impl Term {
         &self,
         fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
         tokenizer_manager: &TokenizerManager,
-    ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
+    ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
         match self {
             Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager),
             Term::Phrase(phrase) => {
@@ -122,22 +102,22 @@ impl Term {
                     ));
                 }
 
-                vec![(Occur::Must, Box::new(BooleanQuery::new(phrases)))]
+                (Occur::Must, Box::new(BooleanQuery::new(phrases)))
             }
-            Term::Not(subterm) => vec![(
+            Term::Not(subterm) => (
                 Occur::MustNot,
-                Box::new(BooleanQuery::new(
-                    subterm.as_tantivy_query(fields, tokenizer_manager),
-                )),
-            )],
-            Term::Site(site) => vec![(
+                Box::new(BooleanQuery::new(vec![
+                    subterm.as_tantivy_query(fields, tokenizer_manager)
+                ])),
+            ),
+            Term::Site(site) => (
                 Occur::Must,
                 Box::new(BooleanQuery::new(Term::into_tantivy_site(
                     site,
                     fields,
                     tokenizer_manager,
                 ))),
-            )],
+            ),
             Term::Title(title) => {
                 let (field, entry) = fields
                     .iter()
@@ -149,10 +129,10 @@ impl Term {
                     })
                     .unwrap();
 
-                vec![(
+                (
                     Occur::Must,
                     Term::tantivy_text_query(field, entry, tokenizer_manager, title),
-                )]
+                )
             }
             Term::Body(body) => {
                 let (field, entry) = fields
@@ -165,10 +145,10 @@ impl Term {
                     })
                     .unwrap();
 
-                vec![(
+                (
                     Occur::Must,
                     Term::tantivy_text_query(field, entry, tokenizer_manager, body),
-                )]
+                )
             }
             Term::Url(url) => {
                 let (field, entry) = fields
@@ -181,10 +161,10 @@ impl Term {
                     })
                     .unwrap();
 
-                vec![(
+                (
                     Occur::Must,
                     Term::tantivy_text_query(field, entry, tokenizer_manager, url),
-                )]
+                )
             }
             Term::PossibleBang(text) => {
                 let mut term = String::new();
@@ -237,7 +217,7 @@ impl Term {
             .collect()
     }
 
-    fn tantivy_text_query(
+    pub fn tantivy_text_query(
         field: &tantivy::schema::Field,
         entry: &tantivy::schema::FieldEntry,
         tokenizer_manager: &TokenizerManager,
@@ -246,18 +226,28 @@ impl Term {
         let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
         let mut processed_terms = Term::process_tantivy_term(term, analyzer, *field);
 
-        let processed_query =
-            if processed_terms.len() > 1 && ALL_FIELDS[field.field_id() as usize].has_pos() {
-                Box::new(PhraseQuery::new(processed_terms)) as Box<dyn tantivy::query::Query>
-            } else {
-                let option = ALL_FIELDS[field.field_id() as usize]
-                    .as_text()
-                    .unwrap()
-                    .index_option();
+        let option = ALL_FIELDS[field.field_id() as usize]
+            .as_text()
+            .unwrap()
+            .index_option();
 
-                let term = processed_terms.remove(0);
-                Box::new(TermQuery::new(term, option))
-            };
+        let processed_query = if processed_terms.len() == 1 {
+            let term = processed_terms.remove(0);
+            Box::new(TermQuery::new(term, option)) as Box<dyn tantivy::query::Query + 'static>
+        } else {
+            Box::new(BooleanQuery::new(
+                processed_terms
+                    .into_iter()
+                    .map(|term| {
+                        (
+                            Occur::Must,
+                            Box::new(TermQuery::new(term, option))
+                                as Box<dyn tantivy::query::Query + 'static>,
+                        )
+                    })
+                    .collect(),
+            )) as Box<dyn tantivy::query::Query + 'static>
+        };
 
         Box::new(processed_query)
     }
@@ -339,7 +329,7 @@ fn parse_term(term: &str) -> Box<Term> {
 
 #[allow(clippy::vec_box)]
 pub fn parse(query: &str) -> Vec<Box<Term>> {
-    let query = query.to_lowercase();
+    let query = query.to_lowercase().replace(['“', '”'], "\"");
 
     let mut res = Vec::new();
 
@@ -349,6 +339,8 @@ pub fn parse(query: &str) -> Vec<Box<Term>> {
         if cur_term_begin > offset {
             continue;
         }
+
+        cur_term_begin = floor_char_boundary(&query, cur_term_begin);
 
         if query[cur_term_begin..].starts_with('"') {
             if let Some(offset) = query[cur_term_begin + 1..].find('"') {
@@ -467,11 +459,6 @@ mod tests {
         assert_eq!(
             parse("\"this is a\" inurl:test"),
             vec![
-                // Box::new(Term::Phrase(vec![
-                //     "this".to_string(),
-                //     "is".to_string(),
-                //     "a".to_string()
-                // ])),
                 Box::new(Term::Phrase("this is a".to_string(),)),
                 Box::new(Term::Url("test".to_string()))
             ]
@@ -503,6 +490,13 @@ mod tests {
         assert_eq!(
             parse("\"\""),
             vec![Box::new(Term::Phrase("".to_string(),)),]
+        );
+        assert_eq!(
+            parse("“this is a“ inurl:test"),
+            vec![
+                Box::new(Term::Phrase("this is a".to_string(),)),
+                Box::new(Term::Url("test".to_string()))
+            ]
         );
     }
 }

@@ -125,7 +125,7 @@ function updateSimilarSites() {
         },
         body: JSON.stringify({
             sites: sites,
-            top_n: parseInt(limit.value)
+            topN: parseInt(limit.value)
         })
     })
         .then(response => response.json())

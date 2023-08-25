@@ -16,7 +16,7 @@ fn rand_domain() -> Domain {
     // and appending .com
     let mut rng = rand::thread_rng();
     let mut domain = String::new();
-    for _ in 0..rng.gen_range(1..10) {
+    for _ in 0..rng.gen_range(1..3) {
         domain.push(rng.gen_range(b'a'..=b'z') as char);
     }
     domain.push_str(".com");
@@ -86,6 +86,8 @@ fn main() -> Result<()> {
         pb.inc(1);
         let responses = random_responses(1024);
         coordinator.add_responses(&responses)?;
+
+        coordinator.sample_jobs(1024)?;
     }
 
     Ok(())

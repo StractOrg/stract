@@ -47,8 +47,8 @@ def search(q: str, top_n, optic=None):
         json={
             "query": q,
             "page": 0,
-            "num_results": top_n,
-            "return_ranking_signals": True,
+            "numResults": top_n,
+            "returnRankingSignals": True,
             "optic": optic,
         },
     )
@@ -66,7 +66,7 @@ def search(q: str, top_n, optic=None):
                 "domain": r["domain"],
                 "title": r["title"],
                 "url": r["url"],
-                "ranking_signals": r["ranking_signals"],
+                "rankingSignals": r["rankingSignals"],
                 "snippet": snip,
                 "body": r["body"],
             }
@@ -78,7 +78,7 @@ def search(q: str, top_n, optic=None):
 def score_prompt(query: str, res):
     r = {k: v for (k, v) in res.items() if k in ["domain", "title", "snippet"]}
     # r['domain_score'] = '{:f}'.format(
-    #     res['ranking_signals']['host_centrality'])
+    #     res['rankingSignals']['host_centrality'])
     encoded = json.dumps(r)
 
     inst = "You are a search engine evaluator. Evaluate the following result based on the query. A good search result is relevant to the query and comes from a trustworthy domain. The score for the search result should be between 0.0 and 1.0."
@@ -257,7 +257,7 @@ with tqdm(total=NUM_QUERIES) as pbar:
                     continue
 
                 url = res[i]["url"]
-                signals = res[i]["ranking_signals"]
+                signals = res[i]["rankingSignals"]
 
                 scores["query"].append(query)
                 scores["url"].append(url)
@@ -274,7 +274,7 @@ df = pd.DataFrame(scores)
 df = df.groupby(["query", "url"])
 df = df.mean().sort_values(by="score", ascending=False).reset_index()
 df["rank"] = df.groupby("query")["score"].rank(ascending=False)
-df["ranking_signals"] = df["url"].map(ranking_signals)
+df["rankingSignals"] = df["url"].map(ranking_signals)
 
 # convert to object
 res = json.loads(df.to_json(orient="records"))

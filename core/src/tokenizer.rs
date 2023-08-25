@@ -308,7 +308,6 @@ struct NGramTokenStream<'a, const N: usize> {
     inner: BoxTokenStream<'a>,
     token: tantivy::tokenizer::Token,
     token_window: [tantivy::tokenizer::Token; N],
-    is_first: bool,
     next_pos: usize,
 }
 
@@ -318,7 +317,6 @@ impl<'a, const N: usize> NGramTokenStream<'a, N> {
             inner,
             token: tantivy::tokenizer::Token::default(),
             token_window: array::from_fn(|_| tantivy::tokenizer::Token::default()),
-            is_first: true,
             next_pos: 0,
         }
     }
@@ -333,122 +331,47 @@ fn reuse_token_alloc(token: &mut tantivy::tokenizer::Token, new_token: &tantivy:
     token.position_length = new_token.position_length;
 }
 
-impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 1> {
+impl<'a, const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, N> {
     fn advance(&mut self) -> bool {
-        self.is_first = false;
-        let res = self.inner.advance();
-
-        self.token_window[0].text.clear();
-
-        if res {
-            self.token_window[0].text += self.inner.token().text.as_str();
-            self.next_pos += 1;
-        }
-
-        reuse_token_alloc(&mut self.token, &self.token_window[0]);
-        self.token.position_length = 1;
-
-        res
-    }
-
-    fn token(&self) -> &tantivy::tokenizer::Token {
-        &self.token
-    }
-
-    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
-        &mut self.token
-    }
-}
-
-impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 2> {
-    fn advance(&mut self) -> bool {
-        if self.is_first {
-            if !self.inner.advance() {
-                return false;
-            }
-            reuse_token_alloc(&mut self.token_window[0], self.inner.token());
-
-            if !self.inner.advance() {
-                return false;
-            }
-            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
-        } else {
-            if !self.inner.advance() {
-                return false;
+        if !self.inner.advance() {
+            while self.token_window[0].text.is_empty()
+                && !self.token_window.iter().all(|token| token.text.is_empty())
+            {
+                self.token_window.rotate_left(1);
             }
 
             self.token_window.rotate_left(1);
-            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
+
+            reuse_token_alloc(
+                &mut self.token_window[N - 1],
+                &tantivy::tokenizer::Token::default(),
+            );
+
+            if self.token_window.iter().all(|token| token.text.is_empty()) {
+                return false;
+            }
+        } else {
+            self.token_window.rotate_left(1);
+            reuse_token_alloc(&mut self.token_window[N - 1], self.inner.token());
         }
 
-        self.is_first = false;
         self.next_pos += 1;
 
+        let begin = self
+            .token_window
+            .iter()
+            .position(|token| !token.text.is_empty())
+            .unwrap_or(N - 1);
+
         self.token.position = self.next_pos;
-        self.token.offset_from = self.token_window[0].offset_from;
-        self.token.offset_to = self.token_window[1].offset_to;
-        self.token.position_length = 2;
+        self.token.offset_from = self.token_window[begin].offset_from;
+        self.token.offset_to = self.token_window[N - 1].offset_to;
+        self.token.position_length = N - begin;
 
         self.token.text.clear();
         for token in &self.token_window {
             self.token.text += token.text.as_str();
-            self.token.text += " ";
         }
-        self.token.text.pop();
-
-        true
-    }
-
-    fn token(&self) -> &tantivy::tokenizer::Token {
-        &self.token
-    }
-
-    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
-        &mut self.token
-    }
-}
-
-impl<'a> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, 3> {
-    fn advance(&mut self) -> bool {
-        if self.is_first {
-            if !self.inner.advance() {
-                return false;
-            }
-
-            reuse_token_alloc(&mut self.token_window[0], self.inner.token());
-
-            if !self.inner.advance() {
-                return false;
-            }
-            reuse_token_alloc(&mut self.token_window[1], self.inner.token());
-
-            if !self.inner.advance() {
-                return false;
-            }
-            reuse_token_alloc(&mut self.token_window[2], self.inner.token());
-        } else {
-            if !self.inner.advance() {
-                return false;
-            }
-
-            self.token_window.rotate_left(1);
-            reuse_token_alloc(&mut self.token_window[2], self.inner.token());
-        }
-
-        self.is_first = false;
-        self.next_pos += 1;
-
-        self.token.position = self.next_pos;
-        self.token.offset_from = self.token_window[0].offset_from;
-        self.token.offset_to = self.token_window[2].offset_to;
-        self.token.position_length = 3;
-
-        self.token.text.clear();
-        for token in &self.token_window {
-            self.token.text += token.text.as_str();
-            self.token.text += " ";
-        }
-        self.token.text.pop();
 
         true
     }
@@ -892,38 +815,72 @@ key1.key2="this\" is @ a # test""#;
     #[test]
     fn bigram_tokenizer() {
         assert!(tokenize_bigram("").is_empty());
-        assert!(tokenize_bigram("test").is_empty());
+        assert_eq!(tokenize_bigram("test"), vec!["test".to_string()]);
 
-        assert_eq!(tokenize_bigram("this is"), vec!["this is".to_string()]);
+        assert_eq!(
+            tokenize_bigram("this is"),
+            vec!["this".to_string(), "thisis".to_string(), "is".to_string()]
+        );
         assert_eq!(
             tokenize_bigram("this is a"),
-            vec!["this is".to_string(), "is a".to_string()]
+            vec![
+                "this".to_string(),
+                "thisis".to_string(),
+                "isa".to_string(),
+                "a".to_string()
+            ]
         );
         assert_eq!(
             tokenize_bigram("this is a test"),
             vec![
-                "this is".to_string(),
-                "is a".to_string(),
-                "a test".to_string()
+                "this".to_string(),
+                "thisis".to_string(),
+                "isa".to_string(),
+                "atest".to_string(),
+                "test".to_string()
             ]
         );
 
         assert_eq!(
             tokenize_bigram("this.is"),
-            vec!["this .".to_string(), ". is".to_string()]
+            vec![
+                "this".to_string(),
+                "this.".to_string(),
+                ".is".to_string(),
+                "is".to_string()
+            ]
         );
     }
 
     #[test]
     fn trigram_tokenizer() {
         assert!(tokenize_trigram("").is_empty());
-        assert!(tokenize_trigram("test").is_empty());
-        assert!(tokenize_trigram("this is").is_empty());
+        assert_eq!(tokenize_trigram("test"), vec!["test".to_string()]);
+        assert_eq!(
+            tokenize_trigram("this is"),
+            vec!["this".to_string(), "thisis".to_string(), "is".to_string()]
+        );
 
-        assert_eq!(tokenize_trigram("this is a"), vec!["this is a".to_string()]);
+        assert_eq!(
+            tokenize_trigram("this is a"),
+            vec![
+                "this".to_string(),
+                "thisis".to_string(),
+                "thisisa".to_string(),
+                "isa".to_string(),
+                "a".to_string()
+            ]
+        );
         assert_eq!(
             tokenize_trigram("this is a test"),
-            vec!["this is a".to_string(), "is a test".to_string(),]
+            vec![
+                "this".to_string(),
+                "thisis".to_string(),
+                "thisisa".to_string(),
+                "isatest".to_string(),
+                "atest".to_string(),
+                "test".to_string()
+            ]
         );
     }
 

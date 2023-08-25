@@ -108,6 +108,7 @@ fn parse(expr: &str) -> Result<Box<Expr>> {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Calculation {
     pub input: String,
     pub expr: Box<Expr>,

@@ -16,21 +16,24 @@ macro_rules! bench {
         desc.push('\'');
         $c.bench_function(desc.as_str(), |b| {
             b.iter(|| {
-                $searcher
-                    .search(&SearchQuery {
-                        query: $query.to_string(),
-                        site_rankings: Some(SiteRankings {
-                            liked: vec![
-                                "docs.rs".to_string(),
-                                "news.ycombinator.com".to_string(),
-                                "pubmed.ncbi.nlm.nih.gov".to_string(),
-                            ],
-                            disliked: vec!["www.pinterest.com".to_string()],
-                            blocked: vec![],
-                        }),
-                        ..Default::default()
-                    })
-                    .unwrap()
+                dbg!(
+                    $searcher
+                        .search(&SearchQuery {
+                            query: $query.to_string(),
+                            site_rankings: Some(SiteRankings {
+                                liked: vec![
+                                    "docs.rs".to_string(),
+                                    "news.ycombinator.com".to_string(),
+                                    "pubmed.ncbi.nlm.nih.gov".to_string(),
+                                ],
+                                disliked: vec!["www.pinterest.com".to_string()],
+                                blocked: vec![],
+                            }),
+                            ..Default::default()
+                        })
+                        .unwrap()
+                        .num_hits
+                )
             })
         });
     };
@@ -41,11 +44,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut searcher = LocalSearcher::new(index);
     searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
 
-    for _ in 0..10 {
-        bench!("the", searcher, c);
-        bench!("dtu", searcher, c);
-        bench!("the best", searcher, c);
-        bench!("the circle of life", searcher, c);
+    for _ in 0..1000 {
+        // bench!("the", searcher, c);
+        // bench!("dtu", searcher, c);
+        // bench!("the best", searcher, c);
+        // bench!("the circle of life", searcher, c);
+        bench!("runescape is old the", searcher, c);
     }
 }
 
