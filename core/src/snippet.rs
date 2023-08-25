@@ -20,7 +20,7 @@ use crate::search_prettifier::html_escape;
 use crate::spell::sentence_ranges;
 use crate::tokenizer::{BigramTokenizer, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::webpage::region::Region;
-use std::collections::{HashMap, HashSet};
+use hashbrown::{HashMap, HashSet};
 use std::ops::Range;
 
 use itertools::Itertools;
@@ -239,16 +239,36 @@ fn snippet_string(
 pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> String {
     let lang = match region.lang() {
         Some(lang) => lang,
-        None => whatlang::detect_lang(text).unwrap_or(Lang::Eng),
+        None => match config.num_words_for_lang_detection {
+            Some(num_words) => whatlang::detect_lang(
+                text.split_whitespace()
+                    .take(num_words)
+                    .collect::<String>()
+                    .as_str(),
+            ),
+            None => whatlang::detect_lang(text),
+        }
+        .unwrap_or(Lang::Eng),
     };
 
     if text.is_empty() {
         return text.to_string();
     }
 
-    let snippet = snippet_string(text, query.simple_terms(), lang, config);
+    match config.max_considered_words {
+        Some(num_words) => {
+            let text = text.split_whitespace().take(num_words).join(" ");
 
-    snippet.to_html()
+            let snippet = snippet_string(&text, query.simple_terms(), lang, config);
+
+            snippet.to_html()
+        }
+        None => {
+            let snippet = snippet_string(text, query.simple_terms(), lang, config);
+
+            snippet.to_html()
+        }
+    }
 }
 
 #[cfg(test)]

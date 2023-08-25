@@ -8,3 +8,7 @@ entity_index_path = "data/entity"
 host_centrality_store_path = "data/centrality"
 # linear_model_path = "data/linear_model.json"
 # lambda_model_path = "data/lambdamart.txt"
+
+[snippet]
+max_considered_words = 10_000
+num_words_for_lang_detection = 1_000
