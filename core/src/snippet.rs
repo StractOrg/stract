@@ -18,7 +18,7 @@ use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::search_prettifier::html_escape;
 use crate::spell::sentence_ranges;
-use crate::tokenizer::{Stemmed, Tokenizer};
+use crate::tokenizer::{BigramTokenizer, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::webpage::region::Region;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -59,7 +59,7 @@ impl SnippetString {
         let mut html = String::new();
         let mut start_from: usize = 0;
 
-        for item in self.highlighted.iter() {
+        for item in self.highlighted.iter().filter(|item| item.start < item.end) {
             if item.start < start_from {
                 start_from = item.end;
                 continue;
@@ -77,13 +77,24 @@ impl SnippetString {
     }
 
     fn highlight(&mut self, terms: &HashSet<String>, lang: whatlang::Lang) {
-        let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
-        let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, &self.fragment);
-        while let Some(tok) = stream.next() {
-            if terms.contains(&tok.text) {
-                self.highlighted.push(tok.offset_from..tok.offset_to);
+        for tokenizer in [
+            Tokenizer::Stemmed(Stemmed::with_forced_language(lang)),
+            Tokenizer::Bigram(BigramTokenizer {}),
+            Tokenizer::Trigram(TrigramTokenizer {}),
+        ] {
+            let mut stream =
+                tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, &self.fragment);
+            while let Some(tok) = stream.next() {
+                if terms.contains(&tok.text) {
+                    self.highlighted.push(tok.offset_from..tok.offset_to);
+                }
             }
         }
+
+        // remove overlapping ranges
+        self.highlighted.sort_by(|a, b| a.start.cmp(&b.start));
+        self.highlighted
+            .dedup_by(|a, b| a.start == b.start && a.end > b.end);
     }
 }
 
@@ -427,5 +438,21 @@ Survey in 2016, 2017, and 2018."#;
                 .as_str(),
             ""
         );
+    }
+
+    #[test]
+    fn compounded_terms() {
+        let mut snip = snippet_string(
+            "this is a test",
+            &["thisis".to_string()],
+            whatlang::Lang::Eng,
+            SnippetConfig::default(),
+        );
+
+        let mut terms = HashSet::new();
+        terms.insert("thisis".to_string());
+
+        snip.highlight(&terms, whatlang::Lang::Eng);
+        assert_eq!(snip.to_html().as_str(), "<b>this is</b> a test");
     }
 }

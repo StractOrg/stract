@@ -73,7 +73,7 @@ impl Query {
 
         let queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
-            .flat_map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
+            .map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
             .collect();
 
         let simple_terms_text: Vec<String> = terms
@@ -736,5 +736,44 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 0);
         assert_eq!(result.webpages.len(), 0);
+    }
+
+    #[test]
+    fn match_compound_words() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "testwebsite".to_string(),
+            ..Default::default()
+        };
+
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
 }

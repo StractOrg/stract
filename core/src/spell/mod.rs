@@ -23,14 +23,12 @@ use std::ops::Range;
 
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
-use tantivy::tokenizer::Tokenizer as _;
 use tracing::info;
 
 use crate::index::Index;
 use crate::query::parser::Term;
 use crate::schema::TextField;
 use crate::searcher::SearchQuery;
-use crate::tokenizer::Tokenizer;
 use crate::{floor_char_boundary, query};
 
 use self::dictionary::DictionaryBuilder;
@@ -149,75 +147,6 @@ impl Spell {
                         .all(|c| c.is_ascii_alphabetic() || c.is_whitespace())
                 {
                     dict.add_monogram(term.to_ascii_lowercase(), info.doc_freq as u64);
-                    count += 1;
-                }
-            }
-        }
-
-        for segment in searcher.segment_readers() {
-            let inv_index = segment
-                .inverted_index(
-                    schema
-                        .get_field(TextField::CleanBodyBigrams.name())
-                        .unwrap(),
-                )
-                .unwrap();
-            let term_dict = inv_index.terms();
-            let mut stream = term_dict.stream().unwrap();
-            let mut count = 0;
-
-            while let Some((term, info)) = stream.next() {
-                if let Some(limit) = limit_terms {
-                    if count > limit {
-                        break;
-                    }
-                }
-
-                let term = std::str::from_utf8(term).unwrap();
-                if !term.is_empty()
-                    && term
-                        .chars()
-                        .all(|c| c.is_ascii_alphabetic() || c.is_whitespace())
-                {
-                    let mut tokenizer = Tokenizer::default().token_stream(term);
-                    let first = tokenizer.next().unwrap().text.to_ascii_lowercase();
-                    let second = tokenizer.next().unwrap().text.to_ascii_lowercase();
-                    dict.add_bigram((first, second), info.doc_freq as u64);
-                    count += 1;
-                }
-            }
-        }
-
-        for segment in searcher.segment_readers() {
-            let inv_index = segment
-                .inverted_index(
-                    schema
-                        .get_field(TextField::CleanBodyTrigrams.name())
-                        .unwrap(),
-                )
-                .unwrap();
-            let term_dict = inv_index.terms();
-            let mut stream = term_dict.stream().unwrap();
-            let mut count = 0;
-
-            while let Some((term, info)) = stream.next() {
-                if let Some(limit) = limit_terms {
-                    if count > limit {
-                        break;
-                    }
-                }
-
-                let term = std::str::from_utf8(term).unwrap();
-                if !term.is_empty()
-                    && term
-                        .chars()
-                        .all(|c| c.is_ascii_alphabetic() || c.is_whitespace())
-                {
-                    let mut tokenizer = Tokenizer::default().token_stream(term);
-                    let first = tokenizer.next().unwrap().text.to_ascii_lowercase();
-                    let second = tokenizer.next().unwrap().text.to_ascii_lowercase();
-                    let third = tokenizer.next().unwrap().text.to_ascii_lowercase();
-                    dict.add_trigram((first, second, third), info.doc_freq as u64);
                     count += 1;
                 }
             }

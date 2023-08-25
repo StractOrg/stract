@@ -57,7 +57,7 @@ impl RobotsTxtManager {
         let mut res = self
             .client
             .get(&format!("http://{}/robots.txt", site.0))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(60))
             .send()
             .await;
 
@@ -65,7 +65,7 @@ impl RobotsTxtManager {
             res = self
                 .client
                 .get(&format!("https://{}/robots.txt", site.0))
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(60))
                 .send()
                 .await;
         }

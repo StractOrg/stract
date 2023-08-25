@@ -41,11 +41,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut searcher = LocalSearcher::new(index);
     searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
 
-    for _ in 0..10 {
-        bench!("the", searcher, c);
-        bench!("dtu", searcher, c);
-        bench!("the best", searcher, c);
-        bench!("the circle of life", searcher, c);
+    for _ in 0..1000 {
+        // bench!("the", searcher, c);
+        // bench!("dtu", searcher, c);
+        // bench!("the best", searcher, c);
+        // bench!("the circle of life", searcher, c);
+        bench!("runescape is old the", searcher, c);
     }
 }
 
