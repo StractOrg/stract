@@ -139,6 +139,7 @@ fn create_inverted_index() -> Result<()> {
                 .unwrap()
                 .to_string(),
         ),
+        None,
     );
 
     let index = indexer::process_job(&job, &worker);

@@ -33,6 +33,7 @@ use whatlang::Lang;
 
 mod just_text;
 pub mod region;
+pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
 
@@ -121,6 +122,7 @@ pub struct Webpage {
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
     pub dmoz_description: Option<String>,
+    pub safety_classification: Option<safety_classifier::Label>,
 }
 
 impl Webpage {
@@ -137,6 +139,7 @@ impl Webpage {
             pre_computed_score: 0.0,
             node_id: None,
             dmoz_description: None,
+            safety_classification: None,
         })
     }
 
@@ -187,6 +190,18 @@ impl Webpage {
                 .get_field(Field::Text(TextField::BacklinkText).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
+        );
+
+        let safety = self
+            .safety_classification
+            .map(|label| label.to_string())
+            .unwrap_or_default();
+
+        doc.add_text(
+            schema
+                .get_field(Field::Text(TextField::SafetyClassification).name())
+                .expect("Failed to get safety_classification field"),
+            safety,
         );
 
         doc.add_u64(
@@ -1236,6 +1251,7 @@ impl Html {
                     doc.add_u64(tantivy_field, num_digits as u64);
                 }
                 Field::Text(TextField::BacklinkText)
+                | Field::Text(TextField::SafetyClassification)
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::PageCentrality)
                 | Field::Fast(FastField::FetchTimeMs)
@@ -2138,6 +2154,7 @@ mod tests {
             pre_computed_score: 0.0,
             node_id: None,
             dmoz_description: Some("dmoz description".to_string()),
+            safety_classification: None,
         };
 
         assert_eq!(
@@ -2172,6 +2189,7 @@ mod tests {
             pre_computed_score: 0.0,
             node_id: None,
             dmoz_description: Some("dmoz description".to_string()),
+            safety_classification: None,
         };
 
         assert_eq!(webpage.dmoz_description(), None)

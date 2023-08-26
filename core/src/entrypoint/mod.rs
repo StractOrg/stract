@@ -25,6 +25,7 @@ pub mod dmoz_parser;
 mod entity;
 pub mod frontend;
 pub mod indexer;
+pub mod safety_classifier;
 pub mod search_server;
 mod webgraph;
 pub mod webgraph_server;

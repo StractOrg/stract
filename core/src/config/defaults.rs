@@ -78,7 +78,7 @@ impl Crawler {
     }
 
     pub fn min_crawl_delay_ms() -> u64 {
-        4_000
+        1_000
     }
 
     pub fn max_crawl_delay_ms() -> u64 {
@@ -122,6 +122,10 @@ impl SearchQuery {
     }
 
     pub fn return_ranking_signals() -> bool {
+        false
+    }
+
+    pub fn safe_search() -> bool {
         false
     }
 }

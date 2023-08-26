@@ -15,12 +15,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    inverted_index::InvertedIndex, ranking::SignalCoefficient, search_ctx::Ctx,
-    searcher::SearchQuery, webpage::region::Region, Result,
+    inverted_index::InvertedIndex,
+    ranking::SignalCoefficient,
+    schema::{Field, TextField},
+    search_ctx::Ctx,
+    searcher::SearchQuery,
+    webpage::{region::Region, safety_classifier},
+    Result,
 };
 use optics::{Optic, SiteRankings};
 use std::collections::HashMap;
-use tantivy::query::{BooleanQuery, Occur, QueryClone};
+use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
 
 mod const_query;
 pub mod intersection;
@@ -71,10 +76,28 @@ impl Query {
         let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
             schema.fields().collect();
 
-        let queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
+        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
             .map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
             .collect();
+
+        if query.safe_search {
+            let field = Field::Text(TextField::SafetyClassification);
+            let field = schema.get_field(field.name()).unwrap();
+
+            queries.push((
+                Occur::MustNot,
+                Box::new(TermQuery::new(
+                    tantivy::Term::from_field_text(
+                        field,
+                        safety_classifier::Label::NSFW.to_string().as_str(),
+                    ),
+                    tantivy::schema::IndexRecordOption::Basic,
+                )),
+            ));
+        }
+
+        let mut tantivy_query = Box::new(BooleanQuery::new(queries));
 
         let simple_terms_text: Vec<String> = terms
             .clone()
@@ -86,8 +109,6 @@ impl Query {
                     .collect::<Vec<_>>()
             })
             .collect();
-
-        let mut tantivy_query = Box::new(BooleanQuery::new(queries));
 
         let mut optics = Vec::new();
         if let Some(site_rankigns_optic) = query.site_rankings.clone().map(|sr| sr.into_optic()) {
@@ -775,5 +796,78 @@ mod tests {
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
+    }
+
+    #[test]
+    fn safe_search() {
+        let mut index = Index::temporary().expect("Unable to open index");
+        let mut webpage = Webpage::new(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website</title>
+                    </head>
+                    <body>
+                        This is a test website {}
+                    </body>
+                </html>
+            "#,
+                rand_words(1000)
+            ),
+            "https://www.sfw.com",
+        )
+        .unwrap();
+
+        webpage.safety_classification = Some(safety_classifier::Label::SFW);
+        webpage.html.set_clean_text("sfw".to_string());
+
+        index.insert(webpage).expect("failed to insert webpage");
+
+        let mut webpage = Webpage::new(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website</title>
+                    </head>
+                    <body>
+                        This is a test website {}
+                    </body>
+                </html>
+            "#,
+                rand_words(1000)
+            ),
+            "https://www.nsfw.com",
+        )
+        .unwrap();
+
+        webpage.safety_classification = Some(safety_classifier::Label::NSFW);
+        webpage.html.set_clean_text("nsfw".to_string());
+
+        index.insert(webpage).expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "test".to_string(),
+            safe_search: false,
+            ..Default::default()
+        };
+
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 2);
+
+        let query = SearchQuery {
+            query: "test".to_string(),
+            safe_search: true,
+            ..Default::default()
+        };
+
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+
+        assert_eq!(result.webpages[0].url, "https://www.sfw.com/");
     }
 }

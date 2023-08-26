@@ -1,0 +1,90 @@
+---
+import SettingsLayout from "../../layouts/Settings.astro";
+import { askama } from "../../askama";
+---
+
+<SettingsLayout>
+  <div class="content">
+    <div class="space-y-3">
+      <h1 class="text-2xl font-medium">Manage Optics</h1>
+      <div class="text-sm">
+        Optics lets you control almost everything about which search results
+        that gets returned to you. You can discard results from specific
+        sites, boost results from other sites and much more.
+      </div>
+      <div class="text-sm">
+        See our <a
+          href="https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic"
+          >quickstart</a
+        > for how to get started. Once you have developed your optic, you can add
+        it here to be used during your search.
+      </div>
+      <div class="text-sm">
+        Simply host the optic on a url that returns a plain-text HTTP response
+        with the optic. We use raw.githubusercontent.com, but you are free to
+        host them elsewhere.
+      </div>
+    </div>
+    <div
+      class="mt-16"
+    >
+      <div class="flex w-full justify-between px-5 h-10">
+        <input id="name" type="text" placeholder="Name" />
+        <input id="url" type="text" placeholder="Url" />
+        <button
+          class="w-20 rounded-full border-0 bg-brand text-sm text-white"
+          id="add-btn"
+          >Add</button
+        >
+      </div>
+      <div class="flex w-full px-5 h-10 mt-2">
+        <input id="description" type="text" placeholder="Description" />
+      </div>
+      <div class="mt-5">
+        <div class="grid w-full space-y-5" id="optics-list">
+          <div class="flex pl-10">
+            <div class="flex-1 font-medium mr-5">Name</div>
+            <div class="flex-1 font-medium mr-5">Description</div>
+            <div class="flex-1 font-medium">Link</div>
+          </div>
+          {
+            askama.for_("optic in default_optics", () => (
+              <div class="flex">
+                <div class="mr-5 w-5">
+                  <img src="/images/disabled-delete.svg" class="h-5 w-5" />
+                </div>
+                <div class="col-data mr-5">{askama`optic.name $ {{random.words}}`}</div>
+                <div class="col-data mr-5">{askama`optic.description $ {{random.words}}`}</div>
+                <div class="col-data"><a href={askama`optic.url $ {{internet.url}}`}>Source</a></div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</SettingsLayout>
+
+<style is:inline>
+  .content a {
+    text-decoration: underline;
+    font-weight: 500;
+  }
+
+  .delete-btn {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .delete-btn:hover {
+    cursor: pointer;
+  }
+
+  .col-data {
+    flex: 1 1 0%;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+</style>
+
+<script is:inline src="/js/optics_settings.js"></script>

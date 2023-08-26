@@ -907,6 +907,7 @@ mod tests {
                 pre_computed_score: 0.0,
                 node_id: None,
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 

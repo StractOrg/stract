@@ -37,7 +37,8 @@ fn deletes_rec(
     if !word.is_empty() {
         for (i, _) in word.char_indices() {
             let delete = word
-                .char_indices()
+                .chars()
+                .enumerate()
                 .filter(|(j, _)| *j != i)
                 .map(|(_, c)| c)
                 .collect::<String>();

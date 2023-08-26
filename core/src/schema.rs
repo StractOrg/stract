@@ -52,6 +52,8 @@ pub enum TextField {
     CleanBodyTrigrams,
     TitleTrigrams,
     MicroformatTags,
+    /// can either be NSFW or SFW (see safety classifier)
+    SafetyClassification,
 }
 
 impl From<TextField> for usize {
@@ -88,6 +90,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::TitleTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::MicroformatTags => Tokenizer::default(),
+            TextField::SafetyClassification => Tokenizer::Identity(Identity {}),
         }
     }
 
@@ -126,6 +129,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => false,
             TextField::TitleTrigrams => false,
             TextField::MicroformatTags => true,
+            TextField::SafetyClassification => false,
         }
     }
 
@@ -156,6 +160,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => "clean_body_trigrams",
             TextField::TitleTrigrams => "title_trigrams",
             TextField::MicroformatTags => "microformat_tags",
+            TextField::SafetyClassification => "safety_classification",
         }
     }
 }
@@ -245,7 +250,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 56] = [
+pub static ALL_FIELDS: [Field; 57] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -271,6 +276,7 @@ pub static ALL_FIELDS: [Field; 56] = [
     Field::Text(TextField::CleanBodyTrigrams),
     Field::Text(TextField::TitleTrigrams),
     Field::Text(TextField::MicroformatTags),
+    Field::Text(TextField::SafetyClassification),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -393,6 +399,9 @@ impl Field {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::MicroformatTags) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::SafetyClassification) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(

@@ -30,7 +30,7 @@ use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::centrality_store::IndexerCentralityStore;
 use crate::ranking::SignalAggregator;
 use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
-use crate::webpage::{Html, Webpage};
+use crate::webpage::{safety_classifier, Html, Webpage};
 use crate::{human_website_annotations, Result};
 
 pub struct Indexer {}
@@ -76,6 +76,7 @@ pub struct IndexingWorker {
     page_centrality_store: Option<IndexerCentralityStore>,
     webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
+    safety_classifier: Option<safety_classifier::Model>,
 }
 
 impl IndexingWorker {
@@ -84,12 +85,15 @@ impl IndexingWorker {
         page_centrality_store_path: Option<String>,
         webgraph_path: Option<String>,
         topics_path: Option<String>,
+        safety_classifier_path: Option<String>,
     ) -> Self {
         Self {
             host_centrality_store: IndexerCentralityStore::open(host_centrality_store_path),
             page_centrality_store: page_centrality_store_path.map(IndexerCentralityStore::open),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
+            safety_classifier: safety_classifier_path
+                .map(|path| safety_classifier::Model::open(path).unwrap()),
         }
     }
 }
@@ -230,7 +234,12 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 pre_computed_score: 0.0,
                 node_id: Some(host_node_id),
                 dmoz_description,
+                safety_classification: None,
             };
+
+            if let Some(model) = worker.safety_classifier.as_ref() {
+                webpage.safety_classification = Some(model.predict(&webpage).label);
+            }
 
             let mut signal_aggregator = SignalAggregator::new(None);
             signal_aggregator.set_current_timestamp(current_timestamp);
@@ -327,6 +336,7 @@ impl Indexer {
             config.page_centrality_store_path.clone(),
             config.page_webgraph_path.clone(),
             config.topics_path.clone(),
+            config.safety_classifier_path.clone(),
         );
 
         let indexes = warc_paths
