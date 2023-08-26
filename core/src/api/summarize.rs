@@ -25,12 +25,13 @@ use http::StatusCode;
 use serde::Deserialize;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::StreamExt as _;
+use utoipa::IntoParams;
 
 use super::State;
 use crate::Result;
 
-#[derive(Deserialize, Debug)]
-pub struct Params {
+#[derive(Deserialize, Debug, IntoParams)]
+pub struct SummarizeParams {
     pub url: String,
     pub query: String,
 }
@@ -42,7 +43,7 @@ fn summarize_blocking(iter: impl Iterator<Item = String>, tx: UnboundedSender<St
 }
 
 async fn summarize(
-    params: Params,
+    params: SummarizeParams,
     state: Arc<State>,
 ) -> Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>> {
     let webpage = state.searcher.get_webpage(&params.url).await?;
@@ -66,8 +67,16 @@ async fn summarize(
 }
 
 #[allow(clippy::unused_async)]
-pub async fn route(
-    extract::Query(params): extract::Query<Params>,
+#[utoipa::path(
+    get,
+    path = "/beta/api/summarize",
+    params(SummarizeParams),
+    responses(
+        (status = 200, description = "Summarize a website", body = String),
+    )
+)]
+pub async fn summarize_route(
+    extract::Query(params): extract::Query<SummarizeParams>,
     extract::State(state): extract::State<Arc<State>>,
 ) -> std::result::Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>, StatusCode>
 {

@@ -200,20 +200,26 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .route("/privacy-and-happy-lawyers", get(privacy::route))
         .route("/webmasters", get(crawler::info_route))
         .route("/opensearch.xml", get(opensearch::route))
-        .route("/improvement/click", post(improvement::click))
-        .route("/improvement/store", post(improvement::store))
+        .merge(
+            Router::new()
+                .route("/improvement/click", post(improvement::click))
+                .route("/improvement/store", post(improvement::store))
+                .layer(tower_http::cors::CorsLayer::permissive()),
+        )
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
         .merge(docs::router())
         .nest(
             "/beta",
             Router::new()
-                .route("/api/summarize", get(summarize::route))
+                .route("/api/autosuggest", post(autosuggest::route))
+                .route("/api/summarize", get(summarize::summarize_route))
                 .route("/api/webgraph/similar_sites", post(webgraph::similar_sites))
-                .route("/api/webgraph/knows_site", get(webgraph::knows_site))
-                .route("/api/alice", get(alice::route))
+                .route("/api/webgraph/knows_site", post(webgraph::knows_site))
+                .route("/api/alice", get(alice::alice_route))
                 .route("/api/alice/save_state", post(alice::save_state))
-                .route("/api/fact_check", post(fact_check::route)),
+                .route("/api/fact_check", post(fact_check::fact_check_route))
+                .layer(tower_http::cors::CorsLayer::permissive()),
         )
         .with_state(state))
 }

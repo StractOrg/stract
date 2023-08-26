@@ -24,6 +24,7 @@ use eventsource_stream::Eventsource;
 use http::StatusCode;
 use rand::seq::SliceRandom;
 use tokio_stream::{Stream, StreamExt};
+use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     distributed::member::Service,
@@ -91,7 +92,7 @@ pub async fn save_state(
     Ok(EncodedSavedState::encode(saved_state).0)
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, ToSchema)]
 pub struct EncodedSavedState(String);
 
 impl EncodedSavedState {
@@ -108,17 +109,26 @@ impl EncodedSavedState {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, IntoParams)]
 #[serde(rename_all = "camelCase")]
-pub struct Params {
+pub struct AliceParams {
     message: String,
     optic: Option<String>,
     prev_state: Option<EncodedSavedState>,
 }
 
-pub async fn route(
+#[allow(clippy::unused_async)]
+#[utoipa::path(
+    get,
+    path = "/beta/api/alice",
+    params(AliceParams),
+    responses(
+        (status = 200, description = "Interact with Alice", body = ExecutionState),
+    )
+)]
+pub async fn alice_route(
     extract::State(state): extract::State<Arc<super::State>>,
-    extract::Query(params): extract::Query<Params>,
+    extract::Query(params): extract::Query<AliceParams>,
 ) -> std::result::Result<
     Sse<impl Stream<Item = std::result::Result<axum::response::sse::Event, Infallible>>>,
     StatusCode,

@@ -40,6 +40,7 @@ use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
 use tch::Tensor;
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::{
     api::search::ApiSearchQuery,
@@ -90,7 +91,7 @@ pub enum Error {
     LastMessageNotUser,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct SimplifiedWebsite {
     pub title: String,
     pub text: String,
@@ -112,7 +113,7 @@ impl SimplifiedWebsite {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(tag = "@type", rename_all = "camelCase")]
 pub enum ExecutionState {
     BeginSearch {
@@ -401,7 +402,7 @@ impl Tokenizer {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 /// base64 encoded `EncryptedState`
 pub struct EncodedEncryptedState(String);
 
