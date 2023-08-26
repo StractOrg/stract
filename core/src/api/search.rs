@@ -97,12 +97,17 @@ fn extract_site_rankings(params: &SearchParams) -> Option<SiteRankings> {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct SearchParams {
+    /// Query
     pub q: Option<String>,
+    /// Page
     pub p: Option<usize>,
+    /// Language
     pub gl: Option<String>,
     pub optic: Option<String>,
+    /// Site rankings
     pub sr: Option<String>,
-    pub safe: Option<bool>,
+    /// Safe search
+    pub ss: Option<bool>,
 }
 
 #[allow(clippy::unused_async)]
@@ -167,7 +172,7 @@ pub async fn route(
             site_rankings,
             num_results: NUM_RESULTS_PER_PAGE,
             return_ranking_signals: false,
-            safe_search: params.safe.unwrap_or(defaults::SearchQuery::safe_search()),
+            safe_search: params.ss.unwrap_or(defaults::SearchQuery::safe_search()),
         })
         .await
     {
