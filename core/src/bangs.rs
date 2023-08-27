@@ -118,24 +118,23 @@ impl Bangs {
             }
         }) {
             if let Some(bang) = self.bangs.get(possible_bang) {
-                let mut url = bang.url.replace(
-                    "{{{s}}}",
-                    intersperse(
-                        terms
-                            .iter()
-                            .filter(|term| {
-                                if let Term::PossibleBang(bang) = term.as_ref() {
-                                    bang != possible_bang
-                                } else {
-                                    true
-                                }
-                            })
-                            .map(|term| term.as_ref().to_string()),
-                        " ".to_string(),
-                    )
-                    .collect::<String>()
-                    .as_str(),
-                );
+                let query = intersperse(
+                    terms
+                        .iter()
+                        .filter(|term| {
+                            if let Term::PossibleBang(bang) = term.as_ref() {
+                                bang != possible_bang
+                            } else {
+                                true
+                            }
+                        })
+                        .map(|term| term.as_ref().to_string()),
+                    " ".to_string(),
+                )
+                .collect::<String>();
+
+                let query = urlencoding::encode(query.as_str()).to_string();
+                let mut url = bang.url.replace("{{{s}}}", query.as_str());
 
                 if !url.contains("://") {
                     url = "http://".to_string() + url.as_str();
