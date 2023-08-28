@@ -16,24 +16,21 @@ macro_rules! bench {
         desc.push('\'');
         $c.bench_function(desc.as_str(), |b| {
             b.iter(|| {
-                dbg!(
-                    $searcher
-                        .search(&SearchQuery {
-                            query: $query.to_string(),
-                            site_rankings: Some(SiteRankings {
-                                liked: vec![
-                                    "docs.rs".to_string(),
-                                    "news.ycombinator.com".to_string(),
-                                    "pubmed.ncbi.nlm.nih.gov".to_string(),
-                                ],
-                                disliked: vec!["www.pinterest.com".to_string()],
-                                blocked: vec![],
-                            }),
-                            ..Default::default()
-                        })
-                        .unwrap()
-                        .num_hits
-                )
+                $searcher
+                    .search(&SearchQuery {
+                        query: $query.to_string(),
+                        site_rankings: Some(SiteRankings {
+                            liked: vec![
+                                "docs.rs".to_string(),
+                                "news.ycombinator.com".to_string(),
+                                "pubmed.ncbi.nlm.nih.gov".to_string(),
+                            ],
+                            disliked: vec!["www.pinterest.com".to_string()],
+                            blocked: vec![],
+                        }),
+                        ..Default::default()
+                    })
+                    .unwrap()
             })
         });
     };

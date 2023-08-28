@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::{
-    query::{BooleanQuery, Occur, TermQuery},
+    query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
     tokenizer::{TextAnalyzer, TokenizerManager},
 };
 
@@ -96,10 +96,29 @@ impl Term {
                     .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
                     .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].has_pos())
                 {
-                    phrases.push((
-                        Occur::Should,
-                        Term::tantivy_text_query(field, entry, tokenizer_manager, phrase),
-                    ));
+                    if let Some(analyzer) = Term::get_tantivy_analyzer(entry, tokenizer_manager) {
+                        let mut processed_terms =
+                            Term::process_tantivy_term(phrase, Some(analyzer), *field);
+
+                        if processed_terms.len() == 1 {
+                            let options = ALL_FIELDS[field.field_id() as usize]
+                                .as_text()
+                                .unwrap()
+                                .index_option();
+
+                            phrases.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(processed_terms.pop().unwrap(), options))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        } else {
+                            phrases.push((
+                                Occur::Should,
+                                Box::new(PhraseQuery::new(processed_terms))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                    }
                 }
 
                 (Occur::Must, Box::new(BooleanQuery::new(phrases)))

@@ -56,7 +56,6 @@ pub struct Query {
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
         let parsed_terms = parser::parse(&query.query);
-
         let mut term_count = HashMap::new();
         let mut terms = Vec::new();
 
