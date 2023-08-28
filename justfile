@@ -1,10 +1,14 @@
 @frontend-rerun *ARGS:
-    cd frontend; npm run build
     ./scripts/run_frontend.py {{ARGS}}
 
 @frontend *ARGS:
-    cd frontend; npm install
-    cargo watch -s 'just frontend-rerun {{ARGS}}'
+    # TODO: This step should be removed when the old frontend is removed
+    cd frontend; npm install; npm run build
+    cd webstract; deno task generateIcons
+    cargo watch -i webstract -s 'just frontend-rerun {{ARGS}}'
+
+@frontend-openapi:
+    deno run -A npm:openapi-typescript http://localhost:3000/beta/api/docs/openapi.json -o webstract/search/schema.d.ts
 
 @astro:
     cd frontend; npm run dev

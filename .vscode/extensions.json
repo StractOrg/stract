@@ -1,3 +1,6 @@
 {
-  "recommendations": ["astro-build.astro-vscode"]
+  "recommendations": [
+    "denoland.vscode-deno",
+    "bradlc.vscode-tailwindcss"
+  ]
 }
