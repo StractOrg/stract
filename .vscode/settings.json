@@ -22,6 +22,7 @@
     "tx\\.\\w+`([^`]*)", // tx.xxx`...`
     "tx\\(.*?\\)`([^`]*)" // tx(Component)`...`
   ],
+  "tailwindCSS.experimental.configFile": "webstract/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "optics-lsp/Cargo.toml",
