@@ -568,6 +568,8 @@ impl Field {
             Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SchemaOrgJson)
                 | Field::Text(TextField::MicroformatTags)
+                | Field::Text(TextField::SafetyClassification)
+                | Field::Text(TextField::FlattenedSchemaOrgJson)
         ) && !self.is_fast()
     }
 
