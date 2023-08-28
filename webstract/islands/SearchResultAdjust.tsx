@@ -1,4 +1,4 @@
-import { Signal, signal } from "@preact/signals";
+import { Signal } from "@preact/signals";
 import * as search from "../search/index.ts";
 import { useEffect } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
@@ -34,8 +34,6 @@ export default function SearchResultAdjust(
       class="adjust-button hidden min-w-fit items-center justify-center md:flex w-5 text-gray-500/25 hover:cursor-pointer hover:text-gray-500 bg-transparent"
       data-site={item.site}
       data-url={item.url}
-      data-idx="{{ loop.index0 }}"
-      data-has-clean-body="{{ !item.body.is_empty() }}"
       onClick={(e) => {
         e.stopPropagation();
         selected.value = { button: e.currentTarget as HTMLElement, item };
@@ -124,12 +122,12 @@ export const SearchResultAdjustModal = (
       </div>
       <div class="mt-4 flex justify-center">
         <button
-          className={[
+          className={tx(
             "rounded-full px-2 py-1 border bg-white",
             // #summarize-btn:not(:disabled)
             "hover:border-brand hover:text-brand",
             "[&.active]:border-brand [&.active]:text-brand",
-          ].join(" ")}
+          )}
           onClick={() => {
             const item = selected.value?.item;
             if (!item) return;

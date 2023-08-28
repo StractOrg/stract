@@ -298,7 +298,6 @@ const Webpage = (
               click={click}
               class="truncate text-gray-800 hover:no-underline improvement-on-click max-w-[calc(100%-100px)]"
               href={item.url}
-              data-idx="{{ loop.index0 }}"
             >
               {item.prettyUrl}
             </TrackClick>
@@ -308,7 +307,6 @@ const Webpage = (
             class="text-blue-800 visited:text-purple-800 sr-title-link truncate text-xl font-medium improvement-on-click max-w-[calc(100%-30px)]"
             title={item.title}
             href={item.url}
-            data-idx="{{ loop.index0 }}"
           >
             {item.title}
           </TrackClick>

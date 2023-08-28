@@ -76,7 +76,9 @@ const Entity = ({ entity }: { entity: search.Entity }) => (
                   {entity.imageBase64 &&
                     (
                       <div class="mb-3 h-20 w-20">
-                        <a href="/search?q={{ entity.title|urlencode }}">
+                        <a
+                          href={`/search?q=${encodeURIComponent(entity.title)}`}
+                        >
                           <img
                             class="h-full w-full rounded-full object-cover"
                             src={`data:image/png;base64, ${entity.imageBase64}`}
