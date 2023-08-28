@@ -106,7 +106,7 @@ pub struct KnowsSiteParams {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
-#[serde(tag = "@type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum KnowsSite {
     Known { site: String },
     Unknown,

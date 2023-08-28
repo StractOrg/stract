@@ -329,7 +329,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
-#[serde(tag = "@type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
     Bang(Box<BangHit>),

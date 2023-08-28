@@ -113,7 +113,7 @@ impl SimplifiedWebsite {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "@type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ExecutionState {
     BeginSearch {
         query: String,
