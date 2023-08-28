@@ -1,0 +1,20 @@
+[files]
+extend-exclude = [
+    "*.dat",
+    "*.optic",
+    "*.srx",
+    "*.min.js",
+    "testcases",
+    "stopwords",
+    "spell_checker.rs",
+    "generate_nsfw_dataset.py",
+]
+
+[default.extend-identifiers]
+# common danish worlds
+som = "som"
+ned = "ned"
+alle = "alle"
+# top-level domains
+ba = "ba"
+fo = "fo"
