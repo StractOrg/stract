@@ -20,6 +20,7 @@ import { HiChevronLeft } from "../icons/HiChevronLeft.tsx";
 import { HiChevronRight } from "../icons/HiChevronRight.tsx";
 import { TrackClick, TrackQueryId } from "../islands/Improvements.tsx";
 import { DEFAULT_ROUTE_CONFIG } from "../search/utils.ts";
+import { Discussions } from "../islands/Discussions.tsx";
 
 export const config = DEFAULT_ROUTE_CONFIG;
 
@@ -58,6 +59,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     hasMoreResults,
     widget,
     displayedAnswer,
+    discussions,
   } = match(results).with({ type: "websites" }, (res) => ({
     numHits: res.numHits,
     searchDurationSec: res.searchDurationMs / 1000,
@@ -65,6 +67,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     hasMoreResults: res.hasMoreResults,
     widget: res.widget ?? void 0,
     displayedAnswer: res.directAnswer ?? void 0,
+    discussions: res.discussions ?? void 0,
   })).exhaustive();
 
   const prevPageSearchParams = match(currentPage > 1).with(true, () => {
@@ -146,6 +149,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
             selected={selected}
             widget={widget}
             displayedAnswer={displayedAnswer}
+            discussions={discussions}
           />
 
           {sidebar &&
@@ -208,6 +212,7 @@ const ResultsWebsites = (
     selected,
     widget,
     displayedAnswer,
+    discussions,
   }: {
     results: search.WebsitesResult;
     prevPageUrl: string | void;
@@ -216,6 +221,7 @@ const ResultsWebsites = (
     selected: Signal<SelectedAdjust>;
     widget?: search.Widget;
     displayedAnswer?: search.DisplayedAnswer;
+    discussions?: search.Webpage[];
   },
 ) => (
   <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-10">
@@ -236,7 +242,16 @@ const ResultsWebsites = (
     {widget && <Widget widget={widget} />}
     {displayedAnswer && <DisplayedAnswer displayedAnswer={displayedAnswer} />}
 
-    {results.webpages.map((item, idx) => (
+    {results.webpages.slice(0, 4).map((item, idx) => (
+      <Webpage
+        key={item.url}
+        click={idx.toString()}
+        item={item}
+        selected={selected}
+      />
+    ))}
+    {discussions && <Discussions discussions={discussions} />}
+    {results.webpages.slice(4).map((item, idx) => (
       <Webpage
         key={item.url}
         click={idx.toString()}
