@@ -85,10 +85,10 @@ export const ExploreSites = () => {
             search.api.knowsSite({
               site: inputWebsite.value,
             }).data.then((res) => {
-              match(res).with({ "@type": "known" }, () => {
+              match(res).with({ type: "known" }, () => {
                 sites.value = [...sites.value, inputWebsite.value];
                 inputWebsite.value = "";
-              }).with({ "@type": "unknown" }, () => {
+              }).with({ type: "unknown" }, () => {
                 errorMessage.value = true;
               }).exhaustive();
             });

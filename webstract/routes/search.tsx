@@ -47,7 +47,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
   });
   const results = await data;
 
-  if (results["@type"] == "bang") {
+  if (results.type == "bang") {
     return Response.redirect(results.redirectTo);
   }
 
@@ -58,7 +58,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     hasMoreResults,
     widget,
     displayedAnswer,
-  } = match(results).with({ "@type": "websites" }, (res) => ({
+  } = match(results).with({ type: "websites" }, (res) => ({
     numHits: res.numHits,
     searchDurationSec: res.searchDurationMs / 1000,
     sidebar: res.sidebar,
@@ -86,7 +86,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
 
       <TrackQueryId
         query={query}
-        urls={results["@type"] == "websites"
+        urls={results.type == "websites"
           ? results.webpages.map((wp) => wp.url)
           : []}
       />

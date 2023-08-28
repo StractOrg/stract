@@ -56,10 +56,10 @@ export interface components {
     };
     ApiSearchResult: (components["schemas"]["WebsitesResult"] & {
       /** @enum {string} */
-      "@type": "websites";
+      type: "websites";
     }) | (components["schemas"]["BangHit"] & {
       /** @enum {string} */
-      "@type": "bang";
+      type: "bang";
     });
     Bang: {
       c?: string | null;
@@ -122,22 +122,22 @@ export interface components {
     EncodedEncryptedState: string;
     EncodedSavedState: string;
     ExecutionState: {
-      /** @enum {string} */
-      "@type": "beginSearch";
       query: string;
-    } | {
       /** @enum {string} */
-      "@type": "searchResult";
+      type: "beginSearch";
+    } | {
       query: string;
       result: components["schemas"]["SimplifiedWebsite"][];
-    } | {
       /** @enum {string} */
-      "@type": "speaking";
+      type: "searchResult";
+    } | {
       text: string;
-    } | {
       /** @enum {string} */
-      "@type": "done";
+      type: "speaking";
+    } | {
       state: components["schemas"]["EncodedEncryptedState"];
+      /** @enum {string} */
+      type: "done";
     };
     Expr: OneOf<[{
       /** Format: double */
@@ -158,12 +158,12 @@ export interface components {
       raw: string;
     };
     KnowsSite: {
-      /** @enum {string} */
-      "@type": "known";
       site: string;
+      /** @enum {string} */
+      type: "known";
     } | {
       /** @enum {string} */
-      "@type": "unknown";
+      type: "unknown";
     };
     /** @enum {string} */
     Region: "All" | "Denmark" | "France" | "Germany" | "Spain" | "US";
