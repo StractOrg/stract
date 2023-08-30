@@ -16,7 +16,7 @@
 
 use tantivy::{
     query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
-    tokenizer::{TextAnalyzer, TokenizerManager},
+    tokenizer::{TextAnalyzer, Tokenizer},
 };
 
 use crate::{
@@ -54,16 +54,11 @@ impl ToString for Term {
 
 fn simple_into_tantivy(
     term: &str,
-    fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
-    tokenizer_manager: &TokenizerManager,
+    fields: &[tantivy::schema::Field],
 ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
     (
         Occur::Must,
-        Box::new(BooleanQuery::new(Term::into_tantivy_simple(
-            term,
-            fields,
-            tokenizer_manager,
-        ))),
+        Box::new(BooleanQuery::new(Term::into_tantivy_simple(term, fields))),
     )
 }
 
@@ -83,41 +78,37 @@ impl Term {
 
     pub fn as_tantivy_query(
         &self,
-        fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
-        tokenizer_manager: &TokenizerManager,
+        fields: &[tantivy::schema::Field],
     ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
         match self {
-            Term::Simple(term) => simple_into_tantivy(term, fields, tokenizer_manager),
+            Term::Simple(term) => simple_into_tantivy(term, fields),
             Term::Phrase(phrase) => {
                 let mut phrases = Vec::with_capacity(fields.len());
 
-                for (field, entry) in fields
+                for field in fields
                     .iter()
-                    .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
-                    .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].has_pos())
+                    .filter(|field| ALL_FIELDS[field.field_id() as usize].is_searchable())
+                    .filter(|field| ALL_FIELDS[field.field_id() as usize].has_pos())
                 {
-                    if let Some(analyzer) = Term::get_tantivy_analyzer(entry, tokenizer_manager) {
-                        let mut processed_terms =
-                            Term::process_tantivy_term(phrase, Some(analyzer), *field);
+                    let mut processed_terms = Term::process_tantivy_term(phrase, *field);
 
-                        if processed_terms.len() == 1 {
-                            let options = ALL_FIELDS[field.field_id() as usize]
-                                .as_text()
-                                .unwrap()
-                                .index_option();
+                    if processed_terms.len() == 1 {
+                        let options = ALL_FIELDS[field.field_id() as usize]
+                            .as_text()
+                            .unwrap()
+                            .index_option();
 
-                            phrases.push((
-                                Occur::Should,
-                                Box::new(TermQuery::new(processed_terms.pop().unwrap(), options))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        } else {
-                            phrases.push((
-                                Occur::Should,
-                                Box::new(PhraseQuery::new(processed_terms))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
+                        phrases.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(processed_terms.pop().unwrap(), options))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
+                    } else {
+                        phrases.push((
+                            Occur::Should,
+                            Box::new(PhraseQuery::new(processed_terms))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
                     }
                 }
 
@@ -125,22 +116,16 @@ impl Term {
             }
             Term::Not(subterm) => (
                 Occur::MustNot,
-                Box::new(BooleanQuery::new(vec![
-                    subterm.as_tantivy_query(fields, tokenizer_manager)
-                ])),
+                Box::new(BooleanQuery::new(vec![subterm.as_tantivy_query(fields)])),
             ),
             Term::Site(site) => (
                 Occur::Must,
-                Box::new(BooleanQuery::new(Term::into_tantivy_site(
-                    site,
-                    fields,
-                    tokenizer_manager,
-                ))),
+                Box::new(BooleanQuery::new(Term::into_tantivy_site(site, fields))),
             ),
             Term::Title(title) => {
-                let (field, entry) = fields
+                let field = fields
                     .iter()
-                    .find(|(field, _)| {
+                    .find(|field| {
                         matches!(
                             ALL_FIELDS[field.field_id() as usize],
                             Field::Text(TextField::Title)
@@ -148,15 +133,12 @@ impl Term {
                     })
                     .unwrap();
 
-                (
-                    Occur::Must,
-                    Term::tantivy_text_query(field, entry, tokenizer_manager, title),
-                )
+                (Occur::Must, Term::tantivy_text_query(field, title))
             }
             Term::Body(body) => {
-                let (field, entry) = fields
+                let field = fields
                     .iter()
-                    .find(|(field, _)| {
+                    .find(|field| {
                         matches!(
                             ALL_FIELDS[field.field_id() as usize],
                             Field::Text(TextField::AllBody)
@@ -164,15 +146,12 @@ impl Term {
                     })
                     .unwrap();
 
-                (
-                    Occur::Must,
-                    Term::tantivy_text_query(field, entry, tokenizer_manager, body),
-                )
+                (Occur::Must, Term::tantivy_text_query(field, body))
             }
             Term::Url(url) => {
-                let (field, entry) = fields
+                let field = fields
                     .iter()
-                    .find(|(field, _)| {
+                    .find(|field| {
                         matches!(
                             ALL_FIELDS[field.field_id() as usize],
                             Field::Text(TextField::Url)
@@ -180,10 +159,7 @@ impl Term {
                     })
                     .unwrap();
 
-                (
-                    Occur::Must,
-                    Term::tantivy_text_query(field, entry, tokenizer_manager, url),
-                )
+                (Occur::Must, Term::tantivy_text_query(field, url))
             }
             Term::PossibleBang(text) => {
                 let mut term = String::new();
@@ -191,59 +167,44 @@ impl Term {
                 term.push(BANG_PREFIX);
                 term.push_str(text);
 
-                simple_into_tantivy(&term, fields, tokenizer_manager)
+                simple_into_tantivy(&term, fields)
             }
         }
     }
 
     fn into_tantivy_simple(
         term: &str,
-        fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
-        tokenizer_manager: &TokenizerManager,
+        fields: &[tantivy::schema::Field],
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
-            .filter(|(field, _)| ALL_FIELDS[field.field_id() as usize].is_searchable())
-            .map(|(field, entry)| {
-                (
-                    Occur::Should,
-                    Term::tantivy_text_query(field, entry, tokenizer_manager, term),
-                )
-            })
+            .filter(|field| ALL_FIELDS[field.field_id() as usize].is_searchable())
+            .map(|field| (Occur::Should, Term::tantivy_text_query(field, term)))
             .collect()
     }
 
     fn into_tantivy_site(
         term: &str,
-        fields: &[(tantivy::schema::Field, &tantivy::schema::FieldEntry)],
-        tokenizer_manager: &TokenizerManager,
+        fields: &[tantivy::schema::Field],
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
-            .filter(|(field, _)| {
+            .filter(|field| {
                 matches!(
                     ALL_FIELDS[field.field_id() as usize],
                     Field::Text(TextField::DomainNoTokenizer)
                         | Field::Text(TextField::SiteNoTokenizer)
                 )
             })
-            .map(|(field, entry)| {
-                (
-                    Occur::Should,
-                    Term::tantivy_text_query(field, entry, tokenizer_manager, term),
-                )
-            })
+            .map(|field| (Occur::Should, Term::tantivy_text_query(field, term)))
             .collect()
     }
 
     pub fn tantivy_text_query(
         field: &tantivy::schema::Field,
-        entry: &tantivy::schema::FieldEntry,
-        tokenizer_manager: &TokenizerManager,
         term: &str,
     ) -> Box<dyn tantivy::query::Query + 'static> {
-        let analyzer = Term::get_tantivy_analyzer(entry, tokenizer_manager);
-        let mut processed_terms = Term::process_tantivy_term(term, analyzer, *field);
+        let mut processed_terms = Term::process_tantivy_term(term, *field);
 
         let option = ALL_FIELDS[field.field_id() as usize]
             .as_text()
@@ -288,14 +249,13 @@ impl Term {
 
     pub fn process_tantivy_term(
         term: &str,
-        analyzer: Option<TextAnalyzer>,
         tantivy_field: tantivy::schema::Field,
     ) -> Vec<tantivy::Term> {
-        match analyzer {
-            None => vec![tantivy::Term::from_field_text(tantivy_field, term)],
-            Some(tokenizer) => {
+        match ALL_FIELDS[tantivy_field.field_id() as usize] {
+            Field::Fast(_) => vec![tantivy::Term::from_field_text(tantivy_field, term)],
+            Field::Text(text_field) => {
                 let mut terms: Vec<tantivy::Term> = Vec::new();
-                let mut token_stream = tokenizer.token_stream(term);
+                let mut token_stream = text_field.query_tokenizer().token_stream(term);
                 token_stream.process(&mut |token| {
                     let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
                     terms.push(term);

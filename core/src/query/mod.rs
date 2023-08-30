@@ -70,14 +70,12 @@ impl Query {
         }
 
         let schema = index.schema();
-        let tokenizer_manager = index.tokenizers();
 
-        let fields: Vec<(tantivy::schema::Field, &tantivy::schema::FieldEntry)> =
-            schema.fields().collect();
+        let fields: Vec<tantivy::schema::Field> = schema.fields().map(|(field, _)| field).collect();
 
         let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
             .iter()
-            .map(|term| term.as_tantivy_query(&fields, tokenizer_manager))
+            .map(|term| term.as_tantivy_query(&fields))
             .collect();
 
         if query.safe_search {

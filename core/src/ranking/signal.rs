@@ -849,7 +849,8 @@ impl SignalAggregator {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut stream = text_field.tokenizer().token_stream(&simple_query);
+                        let mut stream =
+                            text_field.indexing_tokenizer().token_stream(&simple_query);
 
                         while let Some(token) = stream.next() {
                             let term = tantivy::Term::from_field_text(tv_field, &token.text);
@@ -941,7 +942,7 @@ impl SignalAggregator {
                     let mut queries = Vec::new();
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
-                        let tokenizer = field.tokenizer();
+                        let tokenizer = field.indexing_tokenizer();
                         let mut terms = Vec::with_capacity(query.simple_terms.len());
 
                         for term in &query.simple_terms {

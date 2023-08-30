@@ -63,7 +63,17 @@ impl From<TextField> for usize {
 }
 
 impl TextField {
-    pub fn tokenizer(&self) -> Tokenizer {
+    pub fn query_tokenizer(&self) -> Tokenizer {
+        match self {
+            TextField::TitleBigrams => Tokenizer::default(),
+            TextField::CleanBodyBigrams => Tokenizer::default(),
+            TextField::TitleTrigrams => Tokenizer::default(),
+            TextField::CleanBodyTrigrams => Tokenizer::default(),
+            _ => self.indexing_tokenizer(),
+        }
+    }
+
+    pub fn indexing_tokenizer(&self) -> Tokenizer {
         match self {
             TextField::Title => Tokenizer::default(),
             TextField::CleanBody => Tokenizer::default(),
@@ -313,7 +323,7 @@ pub static ALL_FIELDS: [Field; 57] = [
 
 impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
-        let tokenizer = self.as_text().unwrap().tokenizer();
+        let tokenizer = self.as_text().unwrap().indexing_tokenizer();
         let option = self.as_text().unwrap().index_option();
 
         TextOptions::default().set_indexing_options(
