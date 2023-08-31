@@ -205,7 +205,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
             Router::new()
                 .route("/improvement/click", post(improvement::click))
                 .route("/improvement/store", post(improvement::store))
-                .layer(tower_http::cors::CorsLayer::permissive()),
+                .layer(cors_layer()),
         )
         .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
@@ -220,9 +220,18 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
                 .route("/api/alice", get(alice::alice_route))
                 .route("/api/alice/save_state", post(alice::save_state))
                 .route("/api/fact_check", post(fact_check::fact_check_route))
-                .layer(tower_http::cors::CorsLayer::permissive()),
+                .layer(cors_layer()),
         )
         .with_state(state))
+}
+
+/// Enables CORS for development where the API and Deno frontend are on
+/// different hosts.
+fn cors_layer() -> tower_http::cors::CorsLayer {
+    #[cfg(feature = "cors")]
+    return tower_http::cors::CorsLayer::permissive();
+    #[cfg(not(feature = "cors"))]
+    tower_http::cors::CorsLayer::new()
 }
 
 pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Router {
