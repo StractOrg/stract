@@ -68,7 +68,11 @@ const processFolder = async (path: string) => {
   }
 };
 
-await Deno.remove("./icons/", { recursive: true });
+try {
+  await Deno.remove("./icons/", { recursive: true });
+} catch (_) {
+  // Doesn't exist...
+}
 
 console.info("Building Heroicons...");
 await processFolder(`${buildDir}/heroicons/optimized`);
