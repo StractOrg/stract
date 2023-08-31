@@ -22,6 +22,9 @@ import { TrackClick, TrackQueryId } from "../islands/Improvements.tsx";
 import { DEFAULT_ROUTE_CONFIG } from "../search/utils.ts";
 import { Discussions } from "../islands/Discussions.tsx";
 
+import { ALL_REGIONS } from "../search/region.ts";
+import { RegionSelector } from "../islands/RegionSelector.tsx";
+
 export const config = DEFAULT_ROUTE_CONFIG;
 
 export default async function Search(_req: Request, ctx: RouteContext) {
@@ -31,6 +34,9 @@ export default async function Search(_req: Request, ctx: RouteContext) {
   const currentPage = parseInt(ctx.url.searchParams.get("p") ?? "1") || 1;
   const optic = ctx.url.searchParams.get("optic") ?? void 0;
   const selectedRegion = ctx.url.searchParams.get("gl") ?? void 0;
+  const selectedRegionSignal = signal<search.Region>(
+    selectedRegion as search.Region,
+  );
   const safeSearch = ctx.url.searchParams.get("ss") == "true";
 
   if (!query) {
@@ -42,7 +48,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     optic: optic && await fetchRemoteOptic({ opticUrl: optic }),
     page: currentPage - 1,
     safeSearch: safeSearch,
-    selectedRegion: search.ALL_REGIONS.includes(selectedRegion as search.Region)
+    selectedRegion: ALL_REGIONS.includes(selectedRegion as search.Region)
       ? selectedRegion as search.Region
       : void 0,
   });
@@ -69,6 +75,9 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     displayedAnswer: res.directAnswer ?? void 0,
     discussions: res.discussions ?? void 0,
   })).exhaustive();
+
+  const numHitsFormatted = numHits.toLocaleString();
+  const searchDurationSecFormatted = searchDurationSec.toFixed(2);
 
   const prevPageSearchParams = match(currentPage > 1).with(true, () => {
     const params = new URLSearchParams(ctx.url.searchParams);
@@ -108,7 +117,8 @@ export default async function Search(_req: Request, ctx: RouteContext) {
             <div class="mx-auto flex w-full justify-between">
               <div class="flex space-x-2 h-full flex-col justify-center text-sm text-gray-600">
                 <p class="h-fit">
-                  Found {numHits} results in {searchDurationSec} seconds
+                  Found {numHitsFormatted} results in{" "}
+                  {searchDurationSecFormatted} seconds
                 </p>
               </div>
               <div class="flex space-x-2">
@@ -116,25 +126,10 @@ export default async function Search(_req: Request, ctx: RouteContext) {
                   defaultOptics={DEFAULT_OPTICS}
                   searchOnChange={true}
                 />
-                <div class="select-region flex h-full flex-col justify-center">
-                  <Select
-                    form="searchbar-form"
-                    id="region-selector"
-                    name="gl"
-                  >
-                    <option>
-                      All Languages
-                    </option>
-                    {search.ALL_REGIONS.slice(1).map((region) => (
-                      <option
-                        value={region}
-                        selected={region == selectedRegion}
-                      >
-                        {region}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+
+                <RegionSelector
+                  selectedRegion={selectedRegionSignal}
+                />
               </div>
             </div>
           </div>

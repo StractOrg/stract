@@ -11,7 +11,7 @@ export const OpticSelector = ({ defaultOptics, searchOnChange }: {
         form="searchbar-form"
         id="optics-selector"
         name="optic"
-        class="m-0"
+        class="m-0 font-light"
         onChange={(e) => {
           const form = (e.target as HTMLSelectElement).form;
           if (searchOnChange && form) form.submit();

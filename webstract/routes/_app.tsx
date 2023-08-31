@@ -24,9 +24,9 @@ export default function App({ Component }: AppProps) {
             title="Stract Search"
             href="/opensearch.xml"
           />
-          <title>WebStract</title>
+          <title>Stract</title>
         </head>
-        <body class="font-light h-full">
+        <body class="font-light h-full antialiased">
           <Component />
         </body>
       </html>

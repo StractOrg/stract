@@ -249,20 +249,11 @@ export type Widget = components["schemas"]["Widget"];
 export type DisplayedAnswer = components["schemas"]["DisplayedAnswer"];
 export type ScoredSite = components["schemas"]["ScoredSite"];
 export type Suggestion = components["schemas"]["Suggestion"];
+export type Region = components["schemas"]["Region"];
 
 export type StackOverflowAnswer = components["schemas"]["StackOverflowAnswer"];
 export type StackOverflowQuestion =
   components["schemas"]["StackOverflowQuestion"];
-
-export type Region = components["schemas"]["Region"];
-export const ALL_REGIONS = [
-  "All",
-  "Denmark",
-  "France",
-  "Germany",
-  "Spain",
-  "US",
-] satisfies Region[];
 
 export type FactCheckResponse = components["schemas"]["FactCheckResponse"];
 export type ExecutionState = components["schemas"]["ExecutionState"];

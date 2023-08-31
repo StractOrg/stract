@@ -72,7 +72,7 @@ export const Searchbar = (
             autofocus={autofocus}
             name="q"
             default
-            class="searchbar-input peer inset-y-0 col-[1/3] row-start-1 flex h-full w-full grow border-none bg-transparent py-0 pl-12 outline-none focus:ring-0"
+            class="searchbar-input font-light peer inset-y-0 col-[1/3] row-start-1 flex h-full w-full grow border-none bg-transparent py-0 pl-12 outline-none focus:ring-0"
             placeholder="Search"
             onInput={(e) => {
               selectedSignal.value = -1;
@@ -82,14 +82,22 @@ export const Searchbar = (
               match(e.key)
                 .with("ArrowUp", () => {
                   e.preventDefault();
-                  selectedSignal.value = Math.max(-1, selectedSignal.value - 1);
+                  if (selectedSignal.value == -1) {
+                    selectedSignal.value = suggestions.value.length - 1;
+                  } else {
+                    selectedSignal.value = (selectedSignal.value - 1) %
+                      suggestions.value.length;
+                  }
                 })
                 .with("ArrowDown", () => {
                   e.preventDefault();
-                  selectedSignal.value = Math.min(
-                    selectedSignal.value + 1,
-                    suggestions.value.length - 1,
-                  );
+
+                  if (selectedSignal.value == suggestions.value.length - 1) {
+                    selectedSignal.value = -1;
+                  } else {
+                    selectedSignal.value = (selectedSignal.value + 1) %
+                      suggestions.value.length;
+                  }
                 })
                 .with("Escape", () => {
                   (e.target as HTMLInputElement).blur();

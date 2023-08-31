@@ -22,11 +22,12 @@ import * as $$3 from "./islands/Improvements.tsx";
 import * as $$4 from "./islands/ManageOptics.tsx";
 import * as $$5 from "./islands/OpticsSelector.tsx";
 import * as $$6 from "./islands/PrivacySelector.tsx";
-import * as $$7 from "./islands/SafeSearchSettings.tsx";
-import * as $$8 from "./islands/SearchResultAdjust.tsx";
-import * as $$9 from "./islands/Searchbar.tsx";
-import * as $$10 from "./islands/SiteRanking.tsx";
-import * as $$11 from "./islands/Snippet.tsx";
+import * as $$7 from "./islands/RegionSelector.tsx";
+import * as $$8 from "./islands/SafeSearchSettings.tsx";
+import * as $$9 from "./islands/SearchResultAdjust.tsx";
+import * as $$10 from "./islands/Searchbar.tsx";
+import * as $$11 from "./islands/SiteRanking.tsx";
+import * as $$12 from "./islands/Snippet.tsx";
 
 const manifest = {
   routes: {
@@ -52,11 +53,12 @@ const manifest = {
     "./islands/ManageOptics.tsx": $$4,
     "./islands/OpticsSelector.tsx": $$5,
     "./islands/PrivacySelector.tsx": $$6,
-    "./islands/SafeSearchSettings.tsx": $$7,
-    "./islands/SearchResultAdjust.tsx": $$8,
-    "./islands/Searchbar.tsx": $$9,
-    "./islands/SiteRanking.tsx": $$10,
-    "./islands/Snippet.tsx": $$11,
+    "./islands/RegionSelector.tsx": $$7,
+    "./islands/SafeSearchSettings.tsx": $$8,
+    "./islands/SearchResultAdjust.tsx": $$9,
+    "./islands/Searchbar.tsx": $$10,
+    "./islands/SiteRanking.tsx": $$11,
+    "./islands/Snippet.tsx": $$12,
   },
   baseUrl: import.meta.url,
 };
