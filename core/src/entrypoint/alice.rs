@@ -83,7 +83,7 @@ pub async fn save_state(
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Params {
+pub struct AliceParams {
     pub message: String,
     pub optic: Option<String>,
     pub prev_state: Option<uuid::Uuid>,
@@ -91,7 +91,7 @@ pub struct Params {
 
 pub async fn route(
     extract::State(state): extract::State<Arc<State>>,
-    extract::Query(params): extract::Query<Params>,
+    extract::Query(params): extract::Query<AliceParams>,
 ) -> std::result::Result<
     Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>,
     http::StatusCode,

@@ -182,7 +182,7 @@ pub async fn alice_route(
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
     };
 
-    let params = entrypoint::alice::Params {
+    let params = entrypoint::alice::AliceParams {
         message: params.message,
         prev_state: saved_state.map(|s| s.uuid),
         optic: params.optic,
