@@ -931,6 +931,17 @@ impl Html {
         let description = self.pretokenize_description();
         let microformats = self.pretokenize_microformats();
 
+        let domain_name = self
+            .url()
+            .root_domain()
+            .unwrap_or_default()
+            .find('.')
+            .map(|index| {
+                &domain.text[..ceil_char_boundary(&domain.text, index).min(domain.text.len())]
+            })
+            .unwrap_or_default()
+            .to_string();
+
         let schemas: Vec<_> = self.schema_org();
 
         let schema_json = serde_json::to_string(&schemas).ok().unwrap_or_default();
@@ -1109,19 +1120,23 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
+                Field::Text(TextField::DomainNameNoTokenizer) => {
+                    doc.add_pre_tokenized_text(
+                        tantivy_field,
+                        PreTokenizedString {
+                            text: domain_name.to_string(),
+                            tokens: vec![tantivy::tokenizer::Token {
+                                offset_from: 0,
+                                offset_to: domain_name.len(),
+                                position: 0,
+                                text: domain_name.to_string(),
+                                position_length: 1,
+                            }],
+                        },
+                    );
+                }
                 Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
                     if self.is_homepage() {
-                        let domain_name = self
-                            .url()
-                            .root_domain()
-                            .unwrap_or_default()
-                            .find('.')
-                            .map(|index| {
-                                &domain.text[..ceil_char_boundary(&domain.text, index)
-                                    .min(domain.text.len())]
-                            })
-                            .unwrap_or_default();
-
                         doc.add_pre_tokenized_text(
                             tantivy_field,
                             PreTokenizedString {

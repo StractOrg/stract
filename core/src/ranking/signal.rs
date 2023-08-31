@@ -89,6 +89,8 @@ pub enum Signal {
     Bm25SiteNoTokenizer,
     #[serde(rename = "bm25_domain_no_tokenizer")]
     Bm25DomainNoTokenizer,
+    #[serde(rename = "bm25_domain_name_no_tokenizer")]
+    Bm25DomainNameNoTokenizer,
     #[serde(rename = "bm25_domain_if_homepage")]
     Bm25DomainIfHomepage,
     #[serde(rename = "bm25_domain_name_if_homepage_no_tokenizer")]
@@ -114,6 +116,7 @@ pub enum Signal {
     /// We need to figure out how to make them faster.
     #[serde(rename = "proximity_slop_2")]
     ProximitySlop2,
+
     /// All proximity signals are disabled for now.
     /// We need to figure out how to make them faster.
     #[serde(rename = "proximity_slop_4")]
@@ -158,7 +161,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 38] = [
+pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -174,6 +177,7 @@ pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::Bm25Domain,
     Signal::Bm25SiteNoTokenizer,
     Signal::Bm25DomainNoTokenizer,
+    Signal::Bm25DomainNameNoTokenizer,
     Signal::Bm25DomainIfHomepage,
     Signal::Bm25DomainNameIfHomepageNoTokenizer,
     Signal::Bm25TitleIfHomepage,
@@ -281,6 +285,7 @@ impl Signal {
             Signal::Bm25Domain => 0.00005,
             Signal::Bm25SiteNoTokenizer => 0.00005,
             Signal::Bm25DomainNoTokenizer => 0.00005,
+            Signal::Bm25DomainNameNoTokenizer => 0.00005,
             Signal::Bm25DomainIfHomepage => 0.0002,
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0002,
             Signal::Bm25TitleIfHomepage => 0.00002,
@@ -450,6 +455,7 @@ impl Signal {
             | Signal::Bm25Domain
             | Signal::Bm25SiteNoTokenizer
             | Signal::Bm25DomainNoTokenizer
+            | Signal::Bm25DomainNameNoTokenizer
             | Signal::Bm25DomainIfHomepage
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
@@ -572,6 +578,7 @@ impl Signal {
             | Signal::Bm25Domain
             | Signal::Bm25SiteNoTokenizer
             | Signal::Bm25DomainNoTokenizer
+            | Signal::Bm25DomainNameNoTokenizer
             | Signal::Bm25DomainIfHomepage
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
@@ -642,6 +649,7 @@ impl Signal {
             Signal::Bm25Domain => Some(TextField::Domain),
             Signal::Bm25SiteNoTokenizer => Some(TextField::SiteNoTokenizer),
             Signal::Bm25DomainNoTokenizer => Some(TextField::DomainNoTokenizer),
+            Signal::Bm25DomainNameNoTokenizer => Some(TextField::DomainNameNoTokenizer),
             Signal::Bm25DomainIfHomepage => Some(TextField::DomainIfHomepage),
             Signal::Bm25DomainNameIfHomepageNoTokenizer => {
                 Some(TextField::DomainNameIfHomepageNoTokenizer)

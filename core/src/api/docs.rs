@@ -83,7 +83,9 @@ impl Modify for ApiModifier {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         openapi.info.description = Some(
             r#"Stract is an open source web search engine. The API is totally free while in beta, but some endpoints will most likely be paid by consumption in the future.
-The API might also change quite a bit during the beta period, but we will try to keep it as stable as possible. We look forward to see what you will build!"#.to_string(),
+The API might also change quite a bit during the beta period, but we will try to keep it as stable as possible. We look forward to see what you will build!
+
+Remember to always give proper attributions to the sources you use from the search results."#.to_string(),
         );
     }
 }
