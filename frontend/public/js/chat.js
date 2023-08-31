@@ -175,7 +175,7 @@ function streamMessage(data) {
         return;
     }
 
-    if (data["@type"] == "speaking") {
+    if (data["type"] == "speaking") {
         const status = document.querySelector("#active-status");
 
         if (status) {
@@ -191,15 +191,15 @@ function streamMessage(data) {
         const lastMessage = messages[messages.length - 1];
         lastMessage.message = aliceStreamingMessage;
         renderLastMessage();
-    } else if (data["@type"] == "beginSearch") {
+    } else if (data["type"] == "beginSearch") {
         const status = document.querySelector("#active-status");
         status.querySelector("#info").innerHTML = `Looking up <span style="font-weight: bold;">${data["query"]}</span>`;
-    } else if (data["@type"] == "searchResult") {
+    } else if (data["type"] == "searchResult") {
         currentQueries.push({
             query: data["query"],
             results: data["result"]
         });
-    } else if (data["@type"] == "done") {
+    } else if (data["type"] == "done") {
         prevState = data["state"];
         endAliceStream();
     }

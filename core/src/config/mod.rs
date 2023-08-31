@@ -35,6 +35,7 @@ pub struct IndexingLocalConfig {
     pub topics_path: Option<String>,
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
+    pub safety_classifier_path: Option<String>,
     pub minimum_clean_words: Option<usize>,
 }
 

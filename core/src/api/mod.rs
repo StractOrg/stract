@@ -65,6 +65,7 @@ mod index;
 mod metrics;
 mod opensearch;
 mod optics;
+mod preferences;
 mod privacy;
 pub mod search;
 mod sites;
@@ -192,7 +193,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .route("/explore/export", get(explore::export))
         .route("/chat", get(chat::route))
         .route("/about", get(about::route))
-        .route("/settings", get(optics::route))
+        .route("/settings", get(preferences::route))
         .route("/settings/optics", get(optics::route))
         .route("/settings/sites", get(sites::route))
         .route("/settings/sites/export", get(sites::export))

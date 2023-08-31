@@ -52,6 +52,8 @@ pub enum TextField {
     CleanBodyTrigrams,
     TitleTrigrams,
     MicroformatTags,
+    /// can either be NSFW or SFW (see safety classifier)
+    SafetyClassification,
 }
 
 impl From<TextField> for usize {
@@ -61,7 +63,17 @@ impl From<TextField> for usize {
 }
 
 impl TextField {
-    pub fn tokenizer(&self) -> Tokenizer {
+    pub fn query_tokenizer(&self) -> Tokenizer {
+        match self {
+            TextField::TitleBigrams => Tokenizer::default(),
+            TextField::CleanBodyBigrams => Tokenizer::default(),
+            TextField::TitleTrigrams => Tokenizer::default(),
+            TextField::CleanBodyTrigrams => Tokenizer::default(),
+            _ => self.indexing_tokenizer(),
+        }
+    }
+
+    pub fn indexing_tokenizer(&self) -> Tokenizer {
         match self {
             TextField::Title => Tokenizer::default(),
             TextField::CleanBody => Tokenizer::default(),
@@ -88,6 +100,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::TitleTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::MicroformatTags => Tokenizer::default(),
+            TextField::SafetyClassification => Tokenizer::Identity(Identity {}),
         }
     }
 
@@ -126,6 +139,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => false,
             TextField::TitleTrigrams => false,
             TextField::MicroformatTags => true,
+            TextField::SafetyClassification => false,
         }
     }
 
@@ -156,6 +170,7 @@ impl TextField {
             TextField::CleanBodyTrigrams => "clean_body_trigrams",
             TextField::TitleTrigrams => "title_trigrams",
             TextField::MicroformatTags => "microformat_tags",
+            TextField::SafetyClassification => "safety_classification",
         }
     }
 }
@@ -245,7 +260,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 56] = [
+pub static ALL_FIELDS: [Field; 57] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -271,6 +286,7 @@ pub static ALL_FIELDS: [Field; 56] = [
     Field::Text(TextField::CleanBodyTrigrams),
     Field::Text(TextField::TitleTrigrams),
     Field::Text(TextField::MicroformatTags),
+    Field::Text(TextField::SafetyClassification),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -307,7 +323,7 @@ pub static ALL_FIELDS: [Field; 56] = [
 
 impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
-        let tokenizer = self.as_text().unwrap().tokenizer();
+        let tokenizer = self.as_text().unwrap().indexing_tokenizer();
         let option = self.as_text().unwrap().index_option();
 
         TextOptions::default().set_indexing_options(
@@ -393,6 +409,9 @@ impl Field {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::MicroformatTags) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::SafetyClassification) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
@@ -559,6 +578,8 @@ impl Field {
             Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SchemaOrgJson)
                 | Field::Text(TextField::MicroformatTags)
+                | Field::Text(TextField::SafetyClassification)
+                | Field::Text(TextField::FlattenedSchemaOrgJson)
         ) && !self.is_fast()
     }
 

@@ -15,8 +15,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::Ordering,
-    collections::BinaryHeap,
     fs::File,
     io::{BufReader, BufWriter, Read},
     path::Path,
@@ -33,8 +31,7 @@ use crate::{
     Result,
 };
 
-use super::{bitvec_similarity, centrality_store::HarmonicCentralityStore};
-const DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_NODES: usize = 1_000_000;
+use super::bitvec_similarity;
 
 pub struct Scorer {
     liked: Vec<NodeScorer>,
@@ -120,79 +117,22 @@ impl Scorer {
     }
 }
 
-#[derive(Clone, Debug)]
-struct ScoredNode {
-    node: NodeID,
-    score: f64,
-}
-
-impl PartialOrd for ScoredNode {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
-    }
-}
-
-impl PartialEq for ScoredNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
-    }
-}
-
-impl Ord for ScoredNode {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
-    }
-}
-
-impl Eq for ScoredNode {}
-
 #[derive(Serialize, Deserialize, Default)]
 pub struct InboundSimilarity {
     vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
 }
 
 impl InboundSimilarity {
-    pub fn build(graph: &Webgraph, harmonic: &HarmonicCentralityStore) -> Self {
-        Self::build_with_threshold(graph, harmonic, DEFAULT_NUM_TOP_HARMONIC_CENTRALITY_NODES)
-    }
-
-    fn build_with_threshold(
-        graph: &Webgraph,
-        harmonic: &HarmonicCentralityStore,
-        num_top_nodes: usize,
-    ) -> Self {
+    pub fn build(graph: &Webgraph) -> Self {
         let mut vectors = IntMap::new();
 
-        let mut top_nodes: BinaryHeap<ScoredNode> = BinaryHeap::with_capacity(num_top_nodes);
-
-        for (node, centrality) in harmonic.iter() {
-            let scored_node = ScoredNode {
-                node,
-                score: centrality,
-            };
-
-            if top_nodes.len() >= num_top_nodes {
-                if let Some(mut worst) = top_nodes.peek_mut() {
-                    if worst.score < scored_node.score {
-                        *worst = scored_node.clone();
-                    }
-                }
-            } else {
-                top_nodes.push(scored_node);
-            }
-        }
-
-        let top_nodes: IntSet<NodeID> = top_nodes.into_iter().map(|n| n.node).collect();
-
-        let adjacency: DashMap<NodeID, Vec<NodeID>> = DashMap::new();
+        let adjacency: DashMap<NodeID, IntSet<NodeID>> = DashMap::new();
 
         graph.par_edges().for_each(|edge| {
-            if top_nodes.contains(&edge.from) {
-                adjacency
-                    .entry(edge.to)
-                    .or_insert_with(Vec::new)
-                    .push(edge.from);
-            }
+            adjacency
+                .entry(edge.to)
+                .or_insert_with(IntSet::new)
+                .insert(edge.from);
         });
 
         for (node_id, inbound) in adjacency {
@@ -274,11 +214,10 @@ mod tests {
     use crate::{
         gen_temp_path,
         index::Index,
-        kv::rocksdb_store::RocksDbStore,
         rand_words,
         ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{centrality::harmonic::HarmonicCentrality, Node, WebgraphBuilder},
+        webgraph::{Node, WebgraphBuilder},
         webpage::{Html, Webpage},
     };
 
@@ -300,16 +239,7 @@ mod tests {
 
         graph.commit();
 
-        let harmonic = HarmonicCentrality::calculate(&graph);
-
-        let harmonic_centrality_store = RocksDbStore::open(crate::gen_temp_path());
-        for (node, centrality) in harmonic.iter() {
-            harmonic_centrality_store.insert(*node, centrality);
-        }
-        harmonic_centrality_store.flush();
-
-        let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
+        let inbound = InboundSimilarity::build(&graph);
 
         let scorer = inbound.scorer(&[Node::from("b.com").id()], &[], false);
         let e = Node::from("e.com").id();
@@ -329,16 +259,7 @@ mod tests {
 
         graph.commit();
 
-        let harmonic = HarmonicCentrality::calculate(&graph);
-
-        let harmonic_centrality_store = RocksDbStore::open(crate::gen_temp_path());
-        for (node, centrality) in harmonic.iter() {
-            harmonic_centrality_store.insert(*node, centrality);
-        }
-        harmonic_centrality_store.flush();
-
-        let inbound =
-            InboundSimilarity::build_with_threshold(&graph, &harmonic_centrality_store, 1000);
+        let inbound = InboundSimilarity::build(&graph);
 
         let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
         centrality_store.inbound_similarity = inbound;
@@ -372,6 +293,7 @@ mod tests {
 
                 node_id: Some(Node::from("e.com").id()),
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
         index
@@ -401,6 +323,7 @@ mod tests {
 
                 node_id: Some(Node::from("d.com").id()),
                 dmoz_description: None,
+                safety_classification: None,
             })
             .expect("failed to insert webpage");
 

@@ -76,7 +76,7 @@ pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl In
 }
 
 #[derive(Template)]
-#[template(path = "settings/index.html")]
+#[template(path = "settings/optics/index.html")]
 struct OpticsTemplate {
     default_optics: Vec<OpticLink>,
     with_alice: Option<bool>,

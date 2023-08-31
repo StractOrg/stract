@@ -101,7 +101,11 @@ impl PatternQuery {
         for pattern in &patterns {
             match pattern {
                 PatternPart::Raw(text) => {
-                    let mut stream = field.as_text().unwrap().tokenizer().token_stream(text);
+                    let mut stream = field
+                        .as_text()
+                        .unwrap()
+                        .indexing_tokenizer()
+                        .token_stream(text);
 
                     while let Some(token) = stream.next() {
                         new_patterns.push(PatternPart::Raw(token.text.clone()));

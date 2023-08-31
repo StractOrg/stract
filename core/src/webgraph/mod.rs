@@ -510,7 +510,8 @@ impl Webgraph {
     }
 
     fn inner_ingoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
-        self.executor
+        let mut edges: Vec<_> = self
+            .executor
             .map(
                 |segment| segment.ingoing_edges(node, load_labels),
                 self.segments.iter(),
@@ -518,7 +519,12 @@ impl Webgraph {
             .unwrap()
             .into_iter()
             .flatten()
-            .collect()
+            .collect();
+
+        edges.sort_unstable_by_key(|edge| edge.from);
+        edges.dedup_by_key(|edge| edge.from);
+
+        edges
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge> {
@@ -526,7 +532,8 @@ impl Webgraph {
     }
 
     fn inner_outgoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
-        self.executor
+        let mut edges: Vec<_> = self
+            .executor
             .map(
                 |segment| segment.outgoing_edges(node, load_labels),
                 self.segments.iter(),
@@ -534,7 +541,12 @@ impl Webgraph {
             .unwrap()
             .into_iter()
             .flatten()
-            .collect()
+            .collect();
+
+        edges.sort_unstable_by_key(|edge| edge.to);
+        edges.dedup_by_key(|edge| edge.to);
+
+        edges
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
@@ -560,6 +572,9 @@ impl Webgraph {
         self.id2node.iter().map(|(id, node)| (node, id))
     }
 
+    /// Iterate all edges in the graph at least once.
+    /// Some edges may be returned multiple times.
+    /// This happens if they are present in more than one segment.
     pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
         self.segments.iter().flat_map(|segment| segment.edges())
     }

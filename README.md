@@ -22,6 +22,7 @@ Stract is an open source web search engine hosted at [trystract.com](https://try
 
 # 💡 Features
 * Keyword search that respects your search query.
+* Fully independent search index.
 * Advanced query syntax (`site:`, `intitle:` etc.).
 * DDG-style [!bang syntax](https://duckduckgo.com/bang)
 * Wikipedia and stackoverflow sidebar

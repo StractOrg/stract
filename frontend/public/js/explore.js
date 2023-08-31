@@ -70,7 +70,7 @@ function addSiteIfKnown() {
     fetch(KNOWS_SITE_API + "?site=" + site)
         .then(response => response.json())
         .then(data => {
-            if (data["@type"] === "known") {
+            if (data["type"] === "known") {
                 addSite(data["site"]);
                 siteInput.value = "";
             } else {

@@ -268,11 +268,11 @@ impl Signal {
         match self {
             Signal::Bm25 => 0.0002,
             Signal::Bm25Title => 0.004,
-            Signal::Bm25TitleBigrams => 0.005,
-            Signal::Bm25TitleTrigrams => 0.005,
-            Signal::Bm25CleanBody => 0.005,
-            Signal::Bm25CleanBodyBigrams => 0.005,
-            Signal::Bm25CleanBodyTrigrams => 0.005,
+            Signal::Bm25TitleBigrams => 0.0025,
+            Signal::Bm25TitleTrigrams => 0.0025,
+            Signal::Bm25CleanBody => 0.004,
+            Signal::Bm25CleanBodyBigrams => 0.0015,
+            Signal::Bm25CleanBodyTrigrams => 0.0015,
             Signal::Bm25StemmedTitle => 0.0005,
             Signal::Bm25StemmedCleanBody => 0.0005,
             Signal::Bm25AllBody => 0.0,
@@ -284,7 +284,7 @@ impl Signal {
             Signal::Bm25DomainIfHomepage => 0.0002,
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0002,
             Signal::Bm25TitleIfHomepage => 0.00002,
-            Signal::Bm25BacklinkText => 0.001,
+            Signal::Bm25BacklinkText => 0.004,
             Signal::Bm25Description => 0.00001,
             Signal::ProximitySlop0 => 0.01,
             Signal::ProximitySlop1 => 0.01,
@@ -299,7 +299,7 @@ impl Signal {
             Signal::FetchTimeMs => 0.001,
             Signal::UpdateTimestamp => 0.001,
             Signal::TrackerScore => 0.02,
-            Signal::Region => 0.005,
+            Signal::Region => 0.01,
             Signal::InboundSimilarity => 1.0,
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
@@ -849,7 +849,8 @@ impl SignalAggregator {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut stream = text_field.tokenizer().token_stream(&simple_query);
+                        let mut stream =
+                            text_field.indexing_tokenizer().token_stream(&simple_query);
 
                         while let Some(token) = stream.next() {
                             let term = tantivy::Term::from_field_text(tv_field, &token.text);
@@ -941,7 +942,7 @@ impl SignalAggregator {
                     let mut queries = Vec::new();
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
-                        let tokenizer = field.tokenizer();
+                        let tokenizer = field.indexing_tokenizer();
                         let mut terms = Vec::with_capacity(query.simple_terms.len());
 
                         for term in &query.simple_terms {

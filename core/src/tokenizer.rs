@@ -50,7 +50,7 @@ impl From<Lang> for MyStemmer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Tokenizer {
     Normal(Normal),
     Identity(Identity),
@@ -83,7 +83,7 @@ impl Default for Tokenizer {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Normal {
     stopwords: Option<Vec<String>>,
 }
@@ -100,7 +100,7 @@ impl Normal {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct BigramTokenizer {}
 
 impl BigramTokenizer {
@@ -109,7 +109,7 @@ impl BigramTokenizer {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct TrigramTokenizer {}
 
 impl TrigramTokenizer {
@@ -118,7 +118,7 @@ impl TrigramTokenizer {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Stemmed {
     force_language: Option<Lang>,
 }
@@ -134,7 +134,7 @@ impl Stemmed {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Identity {}
 
 impl Identity {
@@ -334,23 +334,17 @@ fn reuse_token_alloc(token: &mut tantivy::tokenizer::Token, new_token: &tantivy:
 impl<'a, const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, N> {
     fn advance(&mut self) -> bool {
         if !self.inner.advance() {
-            while self.token_window[0].text.is_empty()
-                && !self.token_window.iter().all(|token| token.text.is_empty())
-            {
-                self.token_window.rotate_left(1);
-            }
+            return false;
+        }
 
-            self.token_window.rotate_left(1);
+        self.token_window.rotate_left(1);
+        reuse_token_alloc(&mut self.token_window[N - 1], self.inner.token());
 
-            reuse_token_alloc(
-                &mut self.token_window[N - 1],
-                &tantivy::tokenizer::Token::default(),
-            );
-
-            if self.token_window.iter().all(|token| token.text.is_empty()) {
+        while self.token_window[0].text.is_empty() {
+            if !self.inner.advance() {
                 return false;
             }
-        } else {
+
             self.token_window.rotate_left(1);
             reuse_token_alloc(&mut self.token_window[N - 1], self.inner.token());
         }
@@ -469,7 +463,7 @@ impl FlattenedJson {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JsonField;
 
 impl JsonField {
@@ -815,72 +809,34 @@ key1.key2="this\" is @ a # test""#;
     #[test]
     fn bigram_tokenizer() {
         assert!(tokenize_bigram("").is_empty());
-        assert_eq!(tokenize_bigram("test"), vec!["test".to_string()]);
+        assert!(tokenize_bigram("test").is_empty());
 
-        assert_eq!(
-            tokenize_bigram("this is"),
-            vec!["this".to_string(), "thisis".to_string(), "is".to_string()]
-        );
+        assert_eq!(tokenize_bigram("this is"), vec!["thisis".to_string()]);
         assert_eq!(
             tokenize_bigram("this is a"),
-            vec![
-                "this".to_string(),
-                "thisis".to_string(),
-                "isa".to_string(),
-                "a".to_string()
-            ]
+            vec!["thisis".to_string(), "isa".to_string(),]
         );
         assert_eq!(
             tokenize_bigram("this is a test"),
-            vec![
-                "this".to_string(),
-                "thisis".to_string(),
-                "isa".to_string(),
-                "atest".to_string(),
-                "test".to_string()
-            ]
+            vec!["thisis".to_string(), "isa".to_string(), "atest".to_string(),]
         );
 
         assert_eq!(
             tokenize_bigram("this.is"),
-            vec![
-                "this".to_string(),
-                "this.".to_string(),
-                ".is".to_string(),
-                "is".to_string()
-            ]
+            vec!["this.".to_string(), ".is".to_string(),]
         );
     }
 
     #[test]
     fn trigram_tokenizer() {
         assert!(tokenize_trigram("").is_empty());
-        assert_eq!(tokenize_trigram("test"), vec!["test".to_string()]);
-        assert_eq!(
-            tokenize_trigram("this is"),
-            vec!["this".to_string(), "thisis".to_string(), "is".to_string()]
-        );
+        assert!(tokenize_trigram("test").is_empty());
+        assert!(tokenize_trigram("this is").is_empty());
 
-        assert_eq!(
-            tokenize_trigram("this is a"),
-            vec![
-                "this".to_string(),
-                "thisis".to_string(),
-                "thisisa".to_string(),
-                "isa".to_string(),
-                "a".to_string()
-            ]
-        );
+        assert_eq!(tokenize_trigram("this is a"), vec!["thisisa".to_string(),]);
         assert_eq!(
             tokenize_trigram("this is a test"),
-            vec![
-                "this".to_string(),
-                "thisis".to_string(),
-                "thisisa".to_string(),
-                "isatest".to_string(),
-                "atest".to_string(),
-                "test".to_string()
-            ]
+            vec!["thisisa".to_string(), "isatest".to_string(),]
         );
     }
 

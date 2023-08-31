@@ -67,6 +67,7 @@ const { autofocus, query } = Astro.props;
   </div>
 
   <input type="hidden" value="" name="sr" id="siteRankingsUuid" />
+  <input type="hidden" value="" name="ss" id="safeSearch" />
 </form>
 
 <script is:inline src="/js/lz-string.min.js"></script>
@@ -76,6 +77,8 @@ const { autofocus, query } = Astro.props;
     document.querySelector("#searchbar-form")!;
   const siteRankingsUuid: HTMLInputElement =
     document.querySelector("#siteRankingsUuid")!;
+  const safeSearch: HTMLInputElement =
+    document.querySelector("#safeSearch")!;
   const searchbarInput: HTMLInputElement =
     document.querySelector(".searchbar-input")!;
 
@@ -265,7 +268,12 @@ const { autofocus, query } = Astro.props;
     this._submit();
   };
 
-  searchbarForm.addEventListener("submit", () => encodeSiteRankings(), false);
+  searchbarForm.addEventListener("submit", () => encodeClientData(), false);
+
+  function encodeClientData() {
+    encodeSiteRankings();
+    encodeSafeSearch();
+  }
 
   function encodeSiteRankings() {
     const BLOCKED = 0;
@@ -298,5 +306,10 @@ const { autofocus, query } = Astro.props;
     );
 
     siteRankingsUuid.value = compressed;
+  }
+
+  function encodeSafeSearch() {
+    let safeSearchValue = window.localStorage.getItem("safeSearch") || "false";
+    safeSearch.value = safeSearchValue;
   }
 </script>
