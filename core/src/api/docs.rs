@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{search, webgraph};
+use super::{alice, autosuggest, fact_check, search, summarize, webgraph};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -24,7 +24,11 @@ use utoipa_swagger_ui::SwaggerUi;
         paths(
             search::api,
             webgraph::similar_sites,
-            webgraph::knows_site
+            webgraph::knows_site,
+            autosuggest::route,
+            summarize::summarize_route,
+            fact_check::fact_check_route,
+            alice::alice_route,
         ),
         components(
             schemas(
@@ -55,6 +59,15 @@ use utoipa_swagger_ui::SwaggerUi;
                 webgraph::SimilarSitesParams,
                 webgraph::KnowsSite,
                 crate::entrypoint::webgraph_server::ScoredSite,
+
+                autosuggest::Suggestion,
+                fact_check::FactCheckParams,
+                fact_check::FactCheckResponse,
+
+                crate::alice::SimplifiedWebsite,
+                crate::alice::ExecutionState,
+                crate::alice::EncodedEncryptedState,
+                alice::EncodedSavedState,
             ),
         ),
         modifiers(&ApiModifier),

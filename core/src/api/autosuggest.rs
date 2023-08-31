@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use axum::{extract, response::IntoResponse, Json};
 use serde::Serialize;
+use utoipa::{IntoParams, ToSchema};
 
 use super::State;
 
@@ -38,13 +39,28 @@ fn highlight(query: &str, suggestion: &str) -> String {
     new_suggestion
 }
 
-#[derive(Serialize)]
-struct Suggestion {
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Suggestion {
     highlighted: String,
     raw: String,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct AutosuggestQuery {
+    q: String,
+}
+
 #[allow(clippy::unused_async)]
+#[utoipa::path(
+    post,
+    path = "/beta/api/autosuggest",
+    params(AutosuggestQuery),
+    responses(
+        (status = 200, description = "Autosuggest", body = Vec<Suggestion>),
+    )
+)]
 pub async fn route(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,

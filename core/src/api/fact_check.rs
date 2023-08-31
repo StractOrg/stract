@@ -17,26 +17,35 @@
 use std::sync::Arc;
 
 use axum::{extract, response::IntoResponse, Json};
+use utoipa::ToSchema;
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
-pub struct Params {
+#[derive(serde::Deserialize, serde::Serialize, Debug, ToSchema)]
+pub struct FactCheckParams {
     claim: String,
     evidence: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
-pub struct Response {
+#[derive(serde::Deserialize, serde::Serialize, Debug, ToSchema)]
+pub struct FactCheckResponse {
     score: f64,
 }
 
-pub async fn route(
+#[utoipa::path(
+    post,
+    path = "/beta/api/fact_check",
+    request_body(content = FactCheckParams),
+    responses(
+        (status = 200, description = "Fact check the given claim against the given evidence", body = FactCheckResponse),
+    )
+)]
+pub async fn fact_check_route(
     extract::State(state): extract::State<Arc<super::State>>,
-    extract::Json(params): extract::Json<Params>,
+    extract::Json(params): extract::Json<FactCheckParams>,
 ) -> Result<impl IntoResponse, http::StatusCode> {
     let score = state
         .fact_checker
         .run(&params.claim, &params.evidence)
         .map_err(|_| http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(Response { score }))
+    Ok(Json(FactCheckResponse { score }))
 }

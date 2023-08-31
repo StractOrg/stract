@@ -9,7 +9,9 @@ default-run = "stract"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-dev = []
+default = ["cors"]
+dev = ["cors"]
+cors = []
 
 [[bin]]
 name = "stract"
