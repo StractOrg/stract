@@ -193,6 +193,10 @@ impl<K: Key> IntSet<K> {
     pub fn contains(&self, item: &K) -> bool {
         self.map.contains_key(item)
     }
+
+    pub fn into_iter(self) -> impl Iterator<Item = K> {
+        self.map.into_iter().map(|(k, _)| k)
+    }
 }
 
 impl<K: Key> std::iter::FromIterator<K> for IntSet<K> {

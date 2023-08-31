@@ -140,7 +140,7 @@ impl CentralityStore {
         let mut store = CentralityStore::open(output_path.as_ref());
 
         debug!("Begin inbound similarity index construction");
-        store.inbound_similarity = InboundSimilarity::build(graph, &store.harmonic);
+        store.inbound_similarity = InboundSimilarity::build(graph);
 
         store.flush();
         store
