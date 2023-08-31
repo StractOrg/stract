@@ -114,7 +114,7 @@ impl SimplifiedWebsite {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
-#[serde(tag = "@type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ExecutionState {
     BeginSearch {
         query: String,
@@ -172,6 +172,7 @@ impl Searcher {
             site_rankings: None,
             return_ranking_signals: false,
             flatten_response: false,
+            safe_search: Some(false),
         };
         tracing::debug!("searching at {:?}: {:#?}", self.url, query);
 
