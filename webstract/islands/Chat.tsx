@@ -215,24 +215,26 @@ const ChatInput = ({ onSend }: { onSend: (message: string) => void }) => {
           <p class="text-transparent pointer-events-none whitespace-pre">
             {currentInput.value}.
           </p>
-          <textarea
-            autofocus
-            class="absolute inset-0 resize-none outline-none focus:ring-0 max-h-52 border-none p-0"
-            placeholder="Type a message..."
-            value={currentInput.value}
-            onKeyDown={(e) => {
-              match(e.key)
-                .with("Enter", () => {
-                  if (e.shiftKey || currentInput.value == "") return;
-                  e.preventDefault();
-                  (e.target as HTMLTextAreaElement).form?.requestSubmit();
-                })
-                .otherwise(() => {});
-            }}
-            onInput={(e) => {
-              currentInput.value = (e.target as HTMLTextAreaElement).value;
-            }}
-          />
+          <div class="absolute inset-0">
+            <textarea
+              autofocus
+              class="w-full h-full resize-none outline-none focus:ring-0 max-h-52 border-none p-0"
+              placeholder="Type a message..."
+              value={currentInput.value}
+              onKeyDown={(e) => {
+                match(e.key)
+                  .with("Enter", () => {
+                    if (e.shiftKey || currentInput.value == "") return;
+                    e.preventDefault();
+                    (e.target as HTMLTextAreaElement).form?.requestSubmit();
+                  })
+                  .otherwise(() => {});
+              }}
+              onInput={(e) => {
+                currentInput.value = (e.target as HTMLTextAreaElement).value;
+              }}
+            />
+          </div>
         </div>
         <div class="flex place-items-end">
           <button
