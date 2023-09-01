@@ -17,7 +17,7 @@ await new Deno.Command("git", {
   args: ["clone", "git@github.com:tailwindlabs/heroicons.git"],
 }).output();
 
-let index = "";
+const index: string[] = [];
 
 const generateComponent = async (opts: { name: string; rawSvg: string }) => {
   const svg = opts.rawSvg
@@ -32,7 +32,7 @@ const generateComponent = async (opts: { name: string; rawSvg: string }) => {
       ${svg}
   );
   `.trim();
-  index += `export * from "./${opts.name}.tsx";\n`;
+  index.push(opts.name);
   try {
     await Deno.mkdir("icons");
   } catch (_) {
@@ -93,4 +93,15 @@ for (const item of Object.values(Si)) {
   await generateComponent({ name, rawSvg: item.svg });
 }
 
-await Deno.writeTextFile("icons/index.ts", index);
+// NOTE: This code is left if we want to create an index.ts in the future
+// const indexContent = [
+//   ...index.map((name) => `import { ${name} } from './${name}.tsx';`),
+//   "export const Icons = {",
+//   ...index.map((name) => `  ${name},`),
+//   "};\n",
+// ].join("\n");
+// await Deno.writeTextFile("icons/index.ts", indexContent);
+
+await new Deno.Command(Deno.execPath(), {
+  args: ["fmt", "icons/"],
+}).output();
