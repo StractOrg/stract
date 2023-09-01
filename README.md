@@ -32,8 +32,6 @@ Stract is an open source web search engine hosted at [trystract.com](https://try
   * Customize how signals are combined during search for the final search result
 * Prioritize links (centrality) from the sites you trust.
 * Explore the web and find sites similar to the ones you like.
-* Chat with an AI assistant that searches the web for you and cites its sources.
-  * (This is currently not available on the hosted version due to resource limitations, but you can run it locally by following the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md))
 * And much more!
 
 # 👩‍💻 Setup
