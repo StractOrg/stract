@@ -4,7 +4,6 @@
 @frontend *ARGS:
     # TODO: This step should be removed when the old frontend is removed
     cd frontend; npm install; npm run build
-    cd webstract; deno task generateIcons
     cargo watch -i webstract -s 'just frontend-rerun {{ARGS}}'
 
 @frontend-openapi:
