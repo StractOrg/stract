@@ -2,8 +2,6 @@ import { AppProps } from "$fresh/server.ts";
 import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 import { DefaultCSP } from "../search/utils.ts";
 
-const ENABLE_CSP = false;
-
 export default function App({ Component }: AppProps) {
   return (
     <>
