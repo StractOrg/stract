@@ -95,7 +95,7 @@ export const ExploreSites = () => {
           }}
         >
           <input
-            class="outline-none focus:ring-0 grow"
+            class="border-none outline-none focus:ring-0 grow"
             type="text"
             id="site-input"
             name="site"
@@ -145,7 +145,7 @@ export const ExploreSites = () => {
                 <div class="flex space-x-1">
                   <select
                     id="limit"
-                    class="styled-selector"
+                    class="styled-selector border-none cursor-pointer rounded"
                     value={limit.value}
                     onChange={(e) =>
                       limit.value = parseInt(
