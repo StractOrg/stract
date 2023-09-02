@@ -97,6 +97,7 @@ export const SearchResultAdjustModal = (
           <span class="text-brand">
             <AdjustButton
               ranking={liked}
+              others={[disliked, blocked]}
               selected={selected}
             >
               <HiHandThumbUpOutline class="w-4" />
@@ -105,6 +106,7 @@ export const SearchResultAdjustModal = (
           <span class="text-amber-400">
             <AdjustButton
               ranking={disliked}
+              others={[liked, blocked]}
               selected={selected}
             >
               <HiHandThumbDownOutline class="w-4" />
@@ -113,6 +115,7 @@ export const SearchResultAdjustModal = (
           <span class="text-red-500">
             <AdjustButton
               ranking={blocked}
+              others={[liked, disliked]}
               selected={selected}
             >
               <HiNoSymbol class="w-4" />
@@ -163,8 +166,9 @@ export const SearchResultAdjustModal = (
 };
 
 function AdjustButton(
-  { ranking, selected, children }: {
+  { ranking, others, selected, children }: {
     ranking: RankingSignal;
+    others: RankingSignal[];
     selected: Signal<SelectedAdjust>;
     children: ComponentChildren;
   },
@@ -189,6 +193,12 @@ function AdjustButton(
             sites.filter((s) => s != domain));
         } else {
           updateStorageSignal(ranking.signal, (sites) => [...sites, domain]);
+        }
+        for (const other of others) {
+          updateStorageSignal(other.signal, (sites) =>
+            sites.filter((s) =>
+              s != domain
+            ));
         }
       }}
     >
