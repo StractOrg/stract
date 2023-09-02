@@ -17,7 +17,7 @@ export const SiteRanking = ({ section }: { section: SiteRankingSection }) => {
     <div class="flex flex-wrap gap-x-5 gap-y-3" id="sites-list">
       {ranking.signal.value.data.map((site) => (
         <SiteWithDelete
-          href={site}
+          href={`https://${site}`}
           onDelete={() => {
             updateStorageSignal(
               ranking.signal,

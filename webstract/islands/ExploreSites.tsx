@@ -189,7 +189,7 @@ export const ExploreSites = () => {
                     <a
                       target="_blank"
                       class="underline"
-                      href={site.site}
+                      href={`https://${site.site}`}
                     >
                       {site.site}
                     </a>
