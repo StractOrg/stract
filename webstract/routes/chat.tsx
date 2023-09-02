@@ -1,6 +1,6 @@
 import { Footer } from "../components/Footer.tsx";
 import { Header } from "../components/Header.tsx";
-import { Chat } from "../islands/Chat.tsx";
+import { Chat } from "../islands/chat/Chat.tsx";
 import { DEFAULT_ROUTE_CONFIG } from "../search/utils.ts";
 
 export const config = DEFAULT_ROUTE_CONFIG;
