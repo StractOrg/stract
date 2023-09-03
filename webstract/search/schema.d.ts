@@ -22,6 +22,9 @@ export interface paths {
   "/beta/api/search": {
     post: operations["api"];
   };
+  "/beta/api/sites/export": {
+    post: operations["export_optic_route"];
+  };
   "/beta/api/summarize": {
     get: operations["summarize_route"];
   };
@@ -138,6 +141,9 @@ export interface components {
       state: components["schemas"]["EncodedEncryptedState"];
       /** @enum {string} */
       type: "done";
+    };
+    ExportOpticParams: {
+      siteRankings: components["schemas"]["SiteRankings"];
     };
     Expr: OneOf<[{
       /** Format: double */
@@ -325,6 +331,21 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["ApiSearchResult"];
+        };
+      };
+    };
+  };
+  export_optic_route: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExportOpticParams"];
+      };
+    };
+    responses: {
+      /** @description Export site rankings as an optic */
+      200: {
+        content: {
+          "text/plain": string;
         };
       };
     };

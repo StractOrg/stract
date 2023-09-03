@@ -220,6 +220,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
                 .route("/api/alice", get(alice::alice_route))
                 .route("/api/alice/save_state", post(alice::save_state))
                 .route("/api/fact_check", post(fact_check::fact_check_route))
+                .route("/api/sites/export", post(sites::export_optic_route))
                 .layer(cors_layer()),
         )
         .with_state(state))

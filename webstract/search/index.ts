@@ -202,6 +202,15 @@ export const api = {
         .exhaustive();
     });
   },
+  sitesExportOptic: (props: Props<"/beta/api/sites/export", "post">) => {
+    const { data, cancel } = send(
+      "/beta/api/sites/export",
+      "post",
+      "json",
+      props,
+    );
+    return { data: data.then((res) => res[200]), cancel };
+  },
 
   queryId: (
     { query, urls }: { query: string; urls: string[] },

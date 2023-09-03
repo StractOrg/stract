@@ -18,9 +18,10 @@ use std::sync::Arc;
 
 use super::{HtmlTemplate, State};
 use askama::Template;
-use axum::{extract, response::IntoResponse};
+use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
 use optics::{Optic, SiteRankings};
+use utoipa::ToSchema;
 
 #[allow(clippy::unused_async)]
 pub async fn route(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
@@ -74,4 +75,29 @@ pub async fn export(
             Err(StatusCode::BAD_REQUEST)
         }
     }
+}
+
+#[derive(serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportOpticParams {
+    site_rankings: SiteRankings,
+}
+
+#[allow(clippy::unused_async)]
+#[utoipa::path(post,
+    path = "/beta/api/sites/export",
+    request_body(content = ExportOpticParams),
+    responses(
+        (status = 200, description = "Export site rankings as an optic", body = String),
+    )
+)]
+pub async fn export_optic_route(
+    extract::Json(ExportOpticParams { site_rankings }): extract::Json<ExportOpticParams>,
+) -> Result<Json<String>, StatusCode> {
+    let optic = Optic {
+        site_rankings,
+        ..Default::default()
+    };
+
+    Ok(Json(optic.to_string()))
 }
