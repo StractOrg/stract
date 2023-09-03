@@ -2,16 +2,18 @@ import { LayoutProps } from "$fresh/server.ts";
 import { Footer } from "../../components/Footer.tsx";
 import { Header } from "../../components/Header.tsx";
 
-export default function Layout({ Component, state }: LayoutProps) {
+export default function Layout({ Component, url }: LayoutProps) {
   const with_alice = false;
+
+  const queryUrlPart = url.searchParams.toString();
 
   return (
     <>
       <div class="flex h-full w-full flex-col">
-        <Header withAlice={with_alice} />
+        <Header withAlice={with_alice} queryUrlPart={queryUrlPart} />
 
         <div class="flex h-fit w-full justify-center pt-10">
-          <SettingsMenu />
+          <SettingsMenu queryUrlPart={queryUrlPart} />
           <div class="flex w-full max-w-2xl flex-col">
             <Component />
           </div>
@@ -23,7 +25,9 @@ export default function Layout({ Component, state }: LayoutProps) {
   );
 }
 
-const SettingsMenu = () => {
+const SettingsMenu = ({ queryUrlPart: query }: {
+  queryUrlPart?: string;
+}) => {
   const links = [
     { url: "/settings", title: "Preferences" },
     { url: "/settings/optics", title: "Manage Optics" },
@@ -36,7 +40,7 @@ const SettingsMenu = () => {
       {links.map((l) => (
         <a
           class="transition hover:bg-brand/5 hover:text-brand hover:no-underline rounded-full px-2 py-1 text-center"
-          href={l.url}
+          href={`${l.url}${query ? "?" + query : ""}`}
         >
           {l.title}
         </a>

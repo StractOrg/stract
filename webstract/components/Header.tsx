@@ -1,5 +1,4 @@
 import { Navbar } from "./Navbar.tsx";
-import * as React from "preact/compat";
 
 export type HeaderProps = {
   active?: Section;
@@ -36,7 +35,7 @@ export const Header = (
         </div>
       )}
       <div>
-        <Navbar />
+        <Navbar queryUrlPart={queryUrlPart} />
       </div>
     </div>
 

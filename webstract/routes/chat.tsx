@@ -1,3 +1,4 @@
+import { defineRoute } from "$fresh/server.ts";
 import { Footer } from "../components/Footer.tsx";
 import { Header } from "../components/Header.tsx";
 import { Chat } from "../islands/chat/Chat.tsx";
@@ -5,7 +6,7 @@ import { DEFAULT_ROUTE_CONFIG } from "../search/utils.ts";
 
 export const config = DEFAULT_ROUTE_CONFIG;
 
-export default function ChatRoute() {
+export default defineRoute((req) => {
   const withAlice = false;
 
   return (
@@ -16,6 +17,7 @@ export default function ChatRoute() {
             withAlice={withAlice}
             showDivider={true}
             active="Chat"
+            queryUrlPart={new URL(req.url).searchParams.toString()}
           />
         </div>
         <div class="flex flex-col row-start-2 mt-10 px-2 items-center">
@@ -27,4 +29,4 @@ export default function ChatRoute() {
       </div>
     </>
   );
-}
+});

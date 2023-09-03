@@ -21,13 +21,15 @@ const icons = [
   },
 ];
 
-export const Navbar = () => (
+export const Navbar = ({ queryUrlPart: query }: {
+  queryUrlPart?: string;
+}) => (
   <>
     <nav class="hidden items-center space-x-1 sm:flex md:space-x-2 lg:space-x-4">
       {links.map((l) => (
         <Link
           class="rounded-full text-sm px-2 py-1"
-          href={l.url}
+          href={`${l.url}${query ? "?" + query : ""}`}
         >
           {l.title}
         </Link>

@@ -1,4 +1,4 @@
-import { RouteContext } from "$fresh/server.ts";
+import { defineRoute, RouteContext } from "$fresh/server.ts";
 import { Searchbar } from "../islands/Searchbar.tsx";
 import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 import * as search from "../search/index.ts";
@@ -23,25 +23,59 @@ import { Discussions } from "../islands/Discussions.tsx";
 
 import { ALL_REGIONS } from "../search/region.ts";
 import { RegionSelector } from "../islands/RegionSelector.tsx";
-import { decompressCombinedRankingsBase64 } from "../search/ranking.ts";
+import {
+  decompressCombinedRankingsBase64,
+  Ranking,
+  SiteRankingSection,
+} from "../search/ranking.ts";
 
 export const config = DEFAULT_ROUTE_CONFIG;
 
-export default async function Search(_req: Request, ctx: RouteContext) {
-  const selected = signal<SelectedAdjust>(null);
+type SearchParams = {
+  query: string;
+  currentPage: number;
+  optic: string | undefined;
+  selectedRegion: string | undefined;
+  safeSearch: boolean;
+  siteRankings: Record<SiteRankingSection, Ranking> | undefined;
+};
 
-  const query = ctx.url.searchParams.get("q") ?? "";
-  const currentPage = parseInt(ctx.url.searchParams.get("p") ?? "1") || 1;
-  const optic = ctx.url.searchParams.get("optic") ?? void 0;
-  const selectedRegion = ctx.url.searchParams.get("gl") ?? void 0;
-  const selectedRegionSignal = signal<search.Region>(
-    selectedRegion as search.Region,
-  );
-  const safeSearch = ctx.url.searchParams.get("ss") == "true";
-  const siteRankingsParam = ctx.url.searchParams.get("sr");
+const extractSearchParams = (searchParams: URLSearchParams): SearchParams => {
+  const query = searchParams.get("q") ?? "";
+  const currentPage = parseInt(searchParams.get("p") ?? "1") || 1;
+  const optic = searchParams.get("optic") ?? void 0;
+  const selectedRegion = searchParams.get("gl") ?? void 0;
+  const safeSearch = searchParams.get("ss") == "true";
+  const siteRankingsParam = searchParams.get("sr");
   const siteRankings = siteRankingsParam
     ? decompressCombinedRankingsBase64(siteRankingsParam)
     : void 0;
+
+  return {
+    query,
+    currentPage,
+    optic,
+    selectedRegion,
+    safeSearch,
+    siteRankings,
+  };
+};
+
+export default defineRoute(async (_req, ctx) => {
+  const selected = signal<SelectedAdjust>(null);
+
+  const {
+    query,
+    currentPage,
+    optic,
+    selectedRegion,
+    safeSearch,
+    siteRankings,
+  } = extractSearchParams(ctx.url.searchParams);
+
+  const selectedRegionSignal = signal<search.Region>(
+    selectedRegion as search.Region,
+  );
 
   if (!query) {
     return Response.redirect(ctx.url.origin);
@@ -109,7 +143,11 @@ export default async function Search(_req: Request, ctx: RouteContext) {
       />
 
       <main class="flex w-full flex-col">
-        <Header active="Search" showDivider={true} />
+        <Header
+          active="Search"
+          showDivider={true}
+          queryUrlPart={ctx.url.searchParams.toString()}
+        />
 
         <div class="search-content w-screen m-0 grid gap-y-6 pt-4 px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36">
           <div class="flex flex-col space-y-5 max-w-2xl">
@@ -167,7 +205,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
       <Footer />
     </>
   );
-}
+});
 
 injectGlobal`
 .search-content {
