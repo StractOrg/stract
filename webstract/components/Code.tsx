@@ -1,7 +1,12 @@
-import { all, createStarryNight } from "https://esm.sh/@wooorm/starry-night@2";
+import {
+  all,
+  createStarryNight,
+} from "https://esm.sh/@wooorm/starry-night@2.1.1";
 import { match } from "ts-pattern";
 import { Element, Node, Root, Text } from "npm:@types/hast";
 import { JSX } from "preact";
+import hljs from "https://esm.sh/highlight.js@11.8.0";
+import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 
 const languages = [
   ["ts", /(export\s+(const|function|let))|\b(var|async)\b/g],
@@ -28,6 +33,39 @@ export type CodeProps = {
   code: string;
 };
 export const Code = (
+  { code, lang }: CodeProps,
+) => {
+  const USE_INTERNAL = false;
+  if (USE_INTERNAL) {
+    return <InternalHighlighter code={code} lang={lang} />;
+  }
+
+  const highlightedCode: { language: string; value: string } =
+    // deno-lint-ignore ban-ts-comment
+    // @ts-ignore
+    hljs.highlightAuto(code);
+
+  if (["javascript", "rust"].includes(highlightedCode.language)) {
+    return <InternalHighlighter code={code} lang={highlightedCode.language} />;
+  }
+
+  return (
+    <pre data-langauge={highlightedCode.language}>
+      <code class="text-gray-600" dangerouslySetInnerHTML={{__html: highlightedCode.value}} />
+    </pre>
+  );
+};
+
+injectGlobal`
+.hljs-keyword { @apply text-brand; }
+.hljs-number,
+.hljs-literal { @apply text-teal-700; }
+.hljs-string  { @apply text-green-700; }
+.hljs-comment { @apply text-teal-800/80; }
+.hljs-title   { @apply text-emerald-600; }
+`;
+
+const InternalHighlighter = (
   { code, lang = detectLanguage(code) ?? "js" }: CodeProps,
 ) => {
   const scope = starryNight.flagToScope(lang)!;
@@ -37,7 +75,9 @@ export const Code = (
   );
 
   return (
-    <pre><code class="text-gray-600 [&>i]:not-italic"><CodeI node={root} /></code></pre>
+    <pre data-language={lang}>
+      <code class="text-gray-600 [&>i]:not-italic"><CodeI node={root} /></code>
+    </pre>
   );
 };
 const CodeI = ({ node }: { node: Node }) =>
