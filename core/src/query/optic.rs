@@ -268,13 +268,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -297,11 +298,12 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.01,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
@@ -396,13 +398,14 @@ mod tests {
                 "#
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -424,11 +427,12 @@ mod tests {
                 "#
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
@@ -501,13 +505,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -530,11 +535,12 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
@@ -559,11 +565,12 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
@@ -663,13 +670,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/this/is/a/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 dmoz_description: None,
                 safety_classification: None,
                 node_id: Some(Node::from("www.a.com").into_host().id()),
@@ -692,11 +700,12 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.b.com/this/is/b/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
@@ -721,11 +730,12 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.c.com/this/is/c/pattern",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0002,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 dmoz_description: None,
@@ -797,13 +807,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://www.a.com/",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -845,7 +856,7 @@ mod tests {
                 backlink_labels: vec![],
                 host_centrality: 0.0001,
                 page_centrality: 0.0,
-                
+
                 pre_computed_score: 0.0,
                 fetch_time_ms: 500,
                 node_id: None,
@@ -976,13 +987,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://chat.stackoverflow.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1051,13 +1063,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://a.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1081,13 +1094,14 @@ mod tests {
                         crate::rand_words(100)
                     ),
                     "https://b.com/",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1136,13 +1150,14 @@ mod tests {
                 html: Html::parse(
                     include_str!("../../testcases/schema_org/infinity_war.html"),
                     "https://a.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1195,13 +1210,14 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1357,13 +1373,14 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1431,13 +1448,14 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1492,13 +1510,14 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1522,13 +1541,14 @@ mod tests {
                         crate::rand_words(1000)
                     ),
                     "https://example.com",
-                ).unwrap(),
+                )
+                .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 0.0,
                 page_centrality: 0.0,
                 fetch_time_ms: 500,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,
@@ -1621,16 +1641,17 @@ mod tests {
                         </html>
                     "#,
                 "https://example.com/",
-            ).unwrap(),
+            )
+            .unwrap(),
             backlink_labels: vec![],
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            
+
             node_id: None,
             dmoz_description: None,
-                safety_classification: None,
+            safety_classification: None,
         };
 
         page.html.set_clean_text("".to_string());
@@ -1707,7 +1728,7 @@ mod tests {
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            
+
             node_id: None,
             dmoz_description: None,
                 safety_classification: None,
@@ -1716,7 +1737,7 @@ mod tests {
         page.html.set_clean_text("".to_string());
 
         index.insert(page).expect("failed to insert webpage");
-        
+
         let mut page = Webpage {
             html: Html::parse(
                 r#"
@@ -1730,16 +1751,17 @@ mod tests {
                         </html>
                     "#,
                 "https://non-indie-example.com/",
-            ).unwrap(),
+            )
+            .unwrap(),
             backlink_labels: vec![],
             host_centrality: 0.0,
             page_centrality: 0.0,
             fetch_time_ms: 500,
             pre_computed_score: 0.0,
-            
+
             node_id: None,
             dmoz_description: None,
-                safety_classification: None,
+            safety_classification: None,
         };
 
         page.html.set_clean_text("".to_string());
@@ -1762,8 +1784,10 @@ mod tests {
             .search(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
-                    Optic::parse("DiscardNonMatching; Rule { Matches { MicroformatTag(\"|h-*\") } }")
-                        .unwrap(),
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { MicroformatTag(\"|h-*\") } }",
+                    )
+                    .unwrap(),
                 ),
                 ..Default::default()
             })

@@ -16,7 +16,6 @@
 
 use std::sync::Arc;
 
-use askama::Template;
 use axum::{extract, response::IntoResponse};
 use serde::Deserialize;
 use url::Url;
@@ -24,7 +23,7 @@ use uuid::Uuid;
 
 use crate::improvement::{ImprovementEvent, StoredQuery};
 
-use super::{HtmlTemplate, State};
+use super::State;
 
 #[derive(Deserialize, Debug)]
 pub struct ClickParams {
@@ -80,19 +79,4 @@ pub async fn store(
         },
         None => String::new(),
     }
-}
-
-#[allow(clippy::unused_async)]
-pub async fn settings(extract::State(state): extract::State<Arc<State>>) -> impl IntoResponse {
-    let template = SettingsTemplate {
-        with_alice: state.config.with_alice,
-    };
-
-    HtmlTemplate(template)
-}
-
-#[derive(Template)]
-#[template(path = "settings/privacy/index.html")]
-struct SettingsTemplate {
-    with_alice: Option<bool>,
 }

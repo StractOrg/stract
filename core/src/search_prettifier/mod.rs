@@ -20,7 +20,6 @@ mod stack_overflow;
 use std::collections::HashMap;
 
 use chrono::{NaiveDateTime, Utc};
-use itertools::{intersperse, Itertools};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
@@ -217,25 +216,6 @@ pub enum Sidebar {
     },
 }
 
-pub fn thousand_sep_number(num: usize) -> String {
-    let s = num.to_string();
-    let c = s.chars().rev().chunks(3);
-    let chunks = c.into_iter().map(|chunk| {
-        chunk
-            .into_iter()
-            .collect::<Vec<char>>()
-            .into_iter()
-            .rev()
-            .collect::<String>()
-    });
-
-    intersperse(
-        chunks.collect::<Vec<_>>().into_iter().rev(),
-        ".".to_string(),
-    )
-    .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,17 +245,5 @@ mod tests {
             .unwrap()
             .naive_local();
         assert_eq!(prettify_date(date), "19. Dec. 1996".to_string());
-    }
-
-    #[test]
-    fn sep_number() {
-        assert_eq!(thousand_sep_number(0), "0".to_string());
-        assert_eq!(thousand_sep_number(10), "10".to_string());
-        assert_eq!(thousand_sep_number(100), "100".to_string());
-        assert_eq!(thousand_sep_number(1000), "1.000".to_string());
-        assert_eq!(thousand_sep_number(10_000), "10.000".to_string());
-        assert_eq!(thousand_sep_number(100_000), "100.000".to_string());
-        assert_eq!(thousand_sep_number(512_854), "512.854".to_string());
-        assert_eq!(thousand_sep_number(9_512_854), "9.512.854".to_string());
     }
 }

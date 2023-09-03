@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::defaults;
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use optics::{Optic, SiteRankings};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -25,75 +25,13 @@ use axum_macros::debug_handler;
 
 use crate::{
     bangs::BangHit,
-    search_prettifier::{
-        thousand_sep_number, CodeOrText, DisplayedAnswer, DisplayedWebpage,
-        HighlightedSpellCorrection, Sidebar, Snippet,
-    },
-    searcher::{self, SearchQuery, SearchResult, WebsitesResult, NUM_RESULTS_PER_PAGE},
-    webpage::region::{Region, ALL_REGIONS},
-    widgets::Widget,
+    searcher::{self, SearchQuery, SearchResult, WebsitesResult},
+    webpage::region::Region,
 };
 
-use super::{
-    optics::{OpticLink, DEFAULT_OPTICS},
-    HtmlTemplate, State,
-};
-use askama::Template;
-use axum::{
-    extract,
-    response::{IntoResponse, Redirect},
-};
+use super::State;
 
-#[derive(Template)]
-#[template(path = "search/index.html")]
-struct SearchTemplate {
-    search_result: Vec<DisplayedWebpage>,
-    discussions: Option<Vec<DisplayedWebpage>>,
-    query: String,
-    sidebar: Option<Sidebar>,
-    widget: Option<Widget>,
-    direct_answer: Option<DisplayedAnswer>,
-    spell_correction: Option<HighlightedSpellCorrection>,
-    num_matches: String,
-    search_duration_sec: String,
-    all_regions: Vec<RegionSelection>,
-    current_page: usize,
-    next_page_url: String,
-    prev_page_url: Option<String>,
-    default_optics: Vec<OpticLink>,
-    has_more_results: bool,
-    has_code: bool,
-    alerts: Vec<String>,
-    query_url_part: String,
-    with_alice: Option<bool>,
-}
-
-enum RegionSelection {
-    Selected(Region),
-    Unselected(Region),
-}
-
-fn extract_site_rankings(params: &SearchParams) -> Option<SiteRankings> {
-    match &params.sr {
-        Some(sr) => {
-            if !sr.is_empty() {
-                let sr = sr.replace(' ', "+");
-                if let Some(uncompressed) = lz_str::decompress_from_base64(&sr) {
-                    if let Ok(site_rankings) = String::from_utf16(&uncompressed) {
-                        serde_json::from_str(&site_rankings).ok()
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        None => None,
-    }
-}
+use axum::{extract, response::IntoResponse};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct SearchParams {
@@ -108,180 +46,6 @@ pub struct SearchParams {
     pub sr: Option<String>,
     /// Safe search
     pub ss: Option<bool>,
-}
-
-#[allow(clippy::unused_async)]
-#[allow(clippy::match_wild_err_arm)]
-#[debug_handler]
-pub async fn route(
-    extract::Query(params): extract::Query<SearchParams>,
-    extract::State(state): extract::State<Arc<State>>,
-    extract::OriginalUri(uri): extract::OriginalUri,
-) -> Result<impl IntoResponse, StatusCode> {
-    let query = params.q.clone().unwrap_or_default();
-
-    let skip_pages = params.p.unwrap_or_default();
-
-    let mut optic = None;
-    let mut alerts = Vec::new();
-
-    if let Some(url) = &params.optic {
-        if !url.is_empty() {
-            if let Ok(res) = reqwest::get(url).await {
-                let status = res.status();
-                if let Ok(text) = res.text().await {
-                    if status.is_success() {
-                        match Optic::parse(&text) {
-                            Ok(parsed_optic) => optic = Some(parsed_optic),
-                            Err(err) => {
-                                alerts.push(format!("Could not parse optic: {}", err));
-                            }
-                        }
-                    } else {
-                        alerts.push(format!(
-                            "HTTP error when retrieving optic: {}",
-                            status.as_u16()
-                        ));
-                    }
-                } else {
-                    alerts.push("Could not retrieve optic as text".to_string());
-                }
-            } else {
-                alerts.push("Could not retrieve optic".to_string());
-            }
-        }
-    }
-
-    let selected_region = params.gl.as_ref().and_then(|gl| {
-        if let Ok(region) = Region::from_gl(gl) {
-            Some(region)
-        } else {
-            None
-        }
-    });
-
-    let site_rankings = extract_site_rankings(&params);
-
-    match state
-        .searcher
-        .search(&SearchQuery {
-            query: query.clone(),
-            selected_region,
-            optic,
-            page: skip_pages,
-            site_rankings,
-            num_results: NUM_RESULTS_PER_PAGE,
-            return_ranking_signals: false,
-            safe_search: params.ss.unwrap_or(defaults::SearchQuery::safe_search()),
-        })
-        .await
-    {
-        Ok(result) => match result {
-            SearchResult::Websites(result) => {
-                let num_matches = thousand_sep_number(result.num_hits);
-
-                let search_duration_sec =
-                    format!("{:.2}", result.search_duration_ms as f64 / 1000.0);
-
-                let all_regions = generate_regions(selected_region);
-                let next_page_url = next_page_url(&uri, params.clone(), skip_pages);
-                let prev_page_url = prev_page_url(&uri, params.clone(), skip_pages);
-                let has_code = has_code(&result);
-
-                let current_page = skip_pages + 1;
-
-                let template = SearchTemplate {
-                    with_alice: state.config.with_alice,
-                    search_result: result.webpages,
-                    discussions: result.discussions,
-                    query,
-                    sidebar: result.sidebar,
-                    widget: result.widget,
-                    direct_answer: result.direct_answer,
-                    spell_correction: result.spell_corrected_query,
-                    num_matches,
-                    search_duration_sec,
-                    all_regions,
-                    current_page,
-                    next_page_url,
-                    prev_page_url,
-                    default_optics: DEFAULT_OPTICS.to_vec(),
-                    has_more_results: result.has_more_results,
-                    has_code,
-                    alerts,
-                    query_url_part: serde_urlencoded::to_string(&params).unwrap(),
-                };
-
-                Ok(HtmlTemplate(template).into_response())
-            }
-            SearchResult::Bang(result) => {
-                Ok(Redirect::to(result.redirect_to.as_str()).into_response())
-            }
-        },
-        Err(err) => match err.downcast_ref() {
-            Some(searcher::distributed::Error::EmptyQuery) => Ok(Redirect::to("/").into_response()),
-            _ => {
-                tracing::error!("{:?}", err);
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        },
-    }
-}
-
-fn has_code(result: &WebsitesResult) -> bool {
-    if let Some(Sidebar::StackOverflow { .. }) = result.sidebar.as_ref() {
-        return true;
-    }
-
-    result
-        .webpages
-        .iter()
-        .any(|page| matches!(page.snippet, Snippet::StackOverflowQA { .. }))
-}
-
-fn generate_regions(selected_region: Option<Region>) -> Vec<RegionSelection> {
-    ALL_REGIONS
-        .into_iter()
-        .map(|region| {
-            if let Some(selected_region) = selected_region {
-                if region == selected_region {
-                    RegionSelection::Selected(region)
-                } else {
-                    RegionSelection::Unselected(region)
-                }
-            } else {
-                RegionSelection::Unselected(region)
-            }
-        })
-        .collect()
-}
-
-fn prev_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> Option<String> {
-    if skip_pages > 0 {
-        let mut prev_page_params = params;
-        prev_page_params.p = Some(skip_pages - 1);
-        Some(
-            uri.path().to_string()
-                + "?"
-                + serde_urlencoded::to_string(&prev_page_params)
-                    .unwrap()
-                    .as_str(),
-        )
-    } else {
-        None
-    }
-}
-
-fn next_page_url(uri: &Uri, params: SearchParams, skip_pages: usize) -> String {
-    let mut next_page_params = params;
-    next_page_params.p = Some(skip_pages + 1);
-    let next_page_url = uri.path().to_string()
-        + "?"
-        + serde_urlencoded::to_string(&next_page_params)
-            .unwrap()
-            .as_str();
-
-    next_page_url
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]

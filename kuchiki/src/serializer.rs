@@ -60,9 +60,7 @@ impl Serialize for NodeRef {
 
             (ChildrenOnly(_), _) => Ok(()),
 
-            (IncludeNode, NodeData::Doctype(doctype)) => {
-                serializer.write_doctype(&doctype.name)
-            }
+            (IncludeNode, NodeData::Doctype(doctype)) => serializer.write_doctype(&doctype.name),
             (IncludeNode, NodeData::Text(text)) => serializer.write_text(&text.borrow()),
             (IncludeNode, NodeData::Comment(text)) => serializer.write_comment(&text.borrow()),
             (IncludeNode, NodeData::ProcessingInstruction(contents)) => {
