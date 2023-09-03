@@ -56,13 +56,6 @@ export const ExploreSites = () => {
     return () => cancel();
   });
 
-  const data: { chosen_sites: string[]; similar_sites: string[] } = {
-    chosen_sites: sites.value,
-    similar_sites: similarSites.value.map((s) => s.site),
-  };
-  const compressed = LZString.compressToBase64(JSON.stringify(data));
-  const exportUrl = `${window.location}/export?data=${compressed}`;
-
   return (
     <div class="flex flex-col grow max-w-3xl">
       <div class="flex flex-col mb-4 items-center">
@@ -156,14 +149,19 @@ export const ExploreSites = () => {
                   </select>
                 </div>
               </div>
-              <a
-                href={exportUrl}
-                download="exported.optic"
+              <button
                 class="bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5"
-                id="export-optic"
+                onClick={async () => {
+                  const { data } = search.api.exploreExportOptic({
+                    chosenSites: sites.value,
+                    similarSites: similarSites.value.map((s) => s.site),
+                  });
+                  const { default: fileSaver } = await import("file-saver");
+                  fileSaver.saveAs(new Blob([await data]), "exported.optic");
+                }}
               >
                 Export as optic
-              </a>
+              </button>
             </div>
             <div id="result" class="grid grid-cols-[1fr_1fr_6fr] gap-y-2">
               {similarSites.value.map((site) => (

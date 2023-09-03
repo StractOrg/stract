@@ -55,9 +55,7 @@ export const ClearAndExportSiteRankingButton = (
           const { data } = search.api.sitesExportOptic({
             siteRankings: combined,
           });
-          const { default: fileSaver } = await import(
-            "https://esm.sh/file-saver@2.0.5"
-          );
+          const { default: fileSaver } = await import("file-saver");
           fileSaver.saveAs(new Blob([await data]), "exported.optic");
         }
 
