@@ -5,7 +5,6 @@ import * as search from "../search/index.ts";
 import { match, P } from "ts-pattern";
 import { Header } from "../components/Header.tsx";
 import { OpticSelector } from "../islands/OpticsSelector.tsx";
-import { Select } from "../components/Select.tsx";
 import SearchResultAdjust, {
   SearchResultAdjustModal,
   SelectedAdjust,
@@ -24,6 +23,7 @@ import { Discussions } from "../islands/Discussions.tsx";
 
 import { ALL_REGIONS } from "../search/region.ts";
 import { RegionSelector } from "../islands/RegionSelector.tsx";
+import { decompressCombinedRankingsBase64 } from "../search/ranking.ts";
 
 export const config = DEFAULT_ROUTE_CONFIG;
 
@@ -38,6 +38,10 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     selectedRegion as search.Region,
   );
   const safeSearch = ctx.url.searchParams.get("ss") == "true";
+  const siteRankingsParam = ctx.url.searchParams.get("sr");
+  const siteRankings = siteRankingsParam
+    ? decompressCombinedRankingsBase64(siteRankingsParam)
+    : void 0;
 
   if (!query) {
     return Response.redirect(ctx.url.origin);
@@ -51,6 +55,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
     selectedRegion: ALL_REGIONS.includes(selectedRegion as search.Region)
       ? selectedRegion as search.Region
       : void 0,
+    siteRankings,
   });
   const results = await data;
 
