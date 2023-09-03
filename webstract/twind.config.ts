@@ -5,16 +5,14 @@ import presetLineClamp from "https://esm.sh/@twind/preset-line-clamp@1.0.7";
 import presetTypography from "https://esm.sh/@twind/preset-typography@1.0.7";
 import presetForms from "https://esm.sh/@twind/preset-tailwind-forms@1.1.2";
 
+import tailwindConfig from "./tailwind.config.ts";
+
 export default {
   ...defineConfig({
     darkMode: "media",
     theme: {
       extend: {
-        colors: {
-          brand: "rgb(11 123 255 / <alpha-value>)",
-          brand_contrast: "rgb(255 105 11 / <alpha-value>)",
-          snippet: "#4d5156",
-        },
+        ...tailwindConfig.theme.extend,
         fontFamily: {
           sans: [
             "Helvetica",
