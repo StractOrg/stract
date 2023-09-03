@@ -15,6 +15,7 @@ import * as $9 from "./routes/settings/index.tsx";
 import * as $10 from "./routes/settings/optics.tsx";
 import * as $11 from "./routes/settings/privacy.tsx";
 import * as $12 from "./routes/settings/sites.tsx";
+import * as $13 from "./routes/webmasters.tsx";
 import * as $$0 from "./islands/Discussions.tsx";
 import * as $$1 from "./islands/ExploreSites.tsx";
 import * as $$2 from "./islands/Improvements.tsx";
@@ -46,6 +47,7 @@ const manifest = {
     "./routes/settings/optics.tsx": $10,
     "./routes/settings/privacy.tsx": $11,
     "./routes/settings/sites.tsx": $12,
+    "./routes/webmasters.tsx": $13,
   },
   islands: {
     "./islands/Discussions.tsx": $$0,
