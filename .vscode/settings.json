@@ -1,7 +1,7 @@
 {
   "deno.enable": true,
   "deno.lint": true,
-  "deno.config": "webstract/deno.json",
+  "deno.config": "frontend/deno.json",
   "deno.unstable": true,
   "[typescriptreact]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
@@ -22,7 +22,7 @@
     "tx\\.\\w+`([^`]*)", // tx.xxx`...`
     "tx\\(.*?\\)`([^`]*)" // tx(Component)`...`
   ],
-  "tailwindCSS.experimental.configFile": "webstract/tailwind.config.ts",
+  "tailwindCSS.experimental.configFile": "frontend/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "optics-lsp/Cargo.toml",

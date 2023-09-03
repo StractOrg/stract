@@ -46,7 +46,7 @@ processes.append(
 processes.append(
     subprocess.Popen(
         ["deno", "task", "start"],
-        cwd="webstract"
+        cwd="frontend"
     )
 )
 
