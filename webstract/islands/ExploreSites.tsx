@@ -32,7 +32,7 @@ export const ExploreSites = () => {
   const limit = useSignal(10);
   const errorMessage = useSignal(false);
   const inputWebsite = useSignal("");
-  const sites = useSignal<string[]>(["facebook.com"]);
+  const sites = useSignal<string[]>([]);
   const loading = useSignal(false);
 
   const similarSites = useSignal<search.ScoredSite[]>([]);
@@ -88,7 +88,7 @@ export const ExploreSites = () => {
           }}
         >
           <input
-            class="border-none outline-none focus:ring-0 grow"
+            class="border-none outline-none focus:ring-0 grow placeholder:opacity-50"
             type="text"
             id="site-input"
             name="site"
