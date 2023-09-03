@@ -16,6 +16,9 @@ export interface paths {
   "/beta/api/autosuggest": {
     post: operations["route"];
   };
+  "/beta/api/explore/export": {
+    post: operations["explore_export_optic"];
+  };
   "/beta/api/fact_check": {
     post: operations["fact_check_route"];
   };
@@ -23,7 +26,7 @@ export interface paths {
     post: operations["api"];
   };
   "/beta/api/sites/export": {
-    post: operations["export_optic_route"];
+    post: operations["sites_export_optic"];
   };
   "/beta/api/summarize": {
     get: operations["summarize_route"];
@@ -142,8 +145,9 @@ export interface components {
       /** @enum {string} */
       type: "done";
     };
-    ExportOpticParams: {
-      siteRankings: components["schemas"]["SiteRankings"];
+    ExploreExportOpticParams: {
+      chosenSites: string[];
+      similarSites: string[];
     };
     Expr: OneOf<[{
       /** Format: double */
@@ -211,6 +215,9 @@ export interface components {
       blocked: string[];
       disliked: string[];
       liked: string[];
+    };
+    SitesExportOpticParams: {
+      siteRankings: components["schemas"]["SiteRankings"];
     };
     Snippet: ({
       date?: string | null;
@@ -305,6 +312,21 @@ export interface operations {
       };
     };
   };
+  explore_export_optic: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExploreExportOpticParams"];
+      };
+    };
+    responses: {
+      /** @description Export explored sites as an optic */
+      200: {
+        content: {
+          "text/plain": string;
+        };
+      };
+    };
+  };
   fact_check_route: {
     requestBody: {
       content: {
@@ -335,10 +357,10 @@ export interface operations {
       };
     };
   };
-  export_optic_route: {
+  sites_export_optic: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ExportOpticParams"];
+        "application/json": components["schemas"]["SitesExportOpticParams"];
       };
     };
     responses: {

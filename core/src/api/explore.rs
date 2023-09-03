@@ -17,9 +17,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use askama::Template;
-use axum::{extract, response::IntoResponse};
+use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
 use optics::{Optic, SiteRankings};
+use utoipa::ToSchema;
 
 use super::{HtmlTemplate, State};
 
@@ -105,4 +106,53 @@ pub async fn export(
             Err(StatusCode::BAD_REQUEST)
         }
     }
+}
+
+#[derive(serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExploreExportOpticParams {
+    chosen_sites: Vec<String>,
+    similar_sites: Vec<String>,
+}
+
+#[allow(clippy::unused_async)]
+#[utoipa::path(post,
+    path = "/beta/api/explore/export",
+    request_body(content = ExploreExportOpticParams),
+    responses(
+        (status = 200, description = "Export explored sites as an optic", body = String),
+    )
+)]
+pub async fn explore_export_optic(
+    extract::Json(ExploreExportOpticParams {
+        chosen_sites,
+        similar_sites,
+    }): extract::Json<ExploreExportOpticParams>,
+) -> Result<Json<String>, StatusCode> {
+    let rules = similar_sites
+        .into_iter()
+        .map(|site| optics::Rule {
+            matches: vec![optics::Matching {
+                pattern: vec![
+                    optics::PatternPart::Anchor,
+                    optics::PatternPart::Raw(site),
+                    optics::PatternPart::Anchor,
+                ],
+                location: optics::MatchLocation::Site,
+            }],
+            action: optics::Action::Boost(0),
+        })
+        .collect();
+
+    let optic = Optic {
+        site_rankings: SiteRankings {
+            liked: chosen_sites,
+            ..Default::default()
+        },
+        rules,
+        discard_non_matching: true,
+        ..Default::default()
+    };
+
+    Ok(Json(optic.to_string()))
 }

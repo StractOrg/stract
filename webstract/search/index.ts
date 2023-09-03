@@ -211,6 +211,15 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+  exploreExportOptic: (props: Props<"/beta/api/explore/export", "post">) => {
+    const { data, cancel } = send(
+      "/beta/api/explore/export",
+      "post",
+      "json",
+      props,
+    );
+    return { data: data.then((res) => res[200]), cancel };
+  },
 
   queryId: (
     { query, urls }: { query: string; urls: string[] },

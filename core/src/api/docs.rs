@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{alice, autosuggest, fact_check, search, sites, summarize, webgraph};
+use super::{alice, autosuggest, explore, fact_check, search, sites, summarize, webgraph};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -29,7 +29,8 @@ use utoipa_swagger_ui::SwaggerUi;
             summarize::summarize_route,
             fact_check::fact_check_route,
             alice::alice_route,
-            sites::export_optic_route,
+            sites::sites_export_optic,
+            explore::explore_export_optic,
         ),
         components(
             schemas(
@@ -69,7 +70,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::alice::ExecutionState,
                 crate::alice::EncodedEncryptedState,
                 alice::EncodedSavedState,
-                sites::ExportOpticParams,
+                sites::SitesExportOpticParams,
+                explore::ExploreExportOpticParams,
             ),
         ),
         modifiers(&ApiModifier),

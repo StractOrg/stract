@@ -79,20 +79,20 @@ pub async fn export(
 
 #[derive(serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ExportOpticParams {
+pub struct SitesExportOpticParams {
     site_rankings: SiteRankings,
 }
 
 #[allow(clippy::unused_async)]
 #[utoipa::path(post,
     path = "/beta/api/sites/export",
-    request_body(content = ExportOpticParams),
+    request_body(content = SitesExportOpticParams),
     responses(
         (status = 200, description = "Export site rankings as an optic", body = String),
     )
 )]
-pub async fn export_optic_route(
-    extract::Json(ExportOpticParams { site_rankings }): extract::Json<ExportOpticParams>,
+pub async fn sites_export_optic(
+    extract::Json(SitesExportOpticParams { site_rankings }): extract::Json<SitesExportOpticParams>,
 ) -> Result<Json<String>, StatusCode> {
     let optic = Optic {
         site_rankings,
