@@ -22,6 +22,13 @@ export default function App({ Component }: AppProps) {
             title="Stract Search"
             href="/opensearch.xml"
           />
+          <noscript
+            dangerouslySetInnerHTML={{
+              __html:
+                `<style>.noscript\\:hidden{display:none!important;}</style>`,
+            }}
+          >
+          </noscript>
           <title>Stract</title>
         </head>
         <body class="font-light h-full antialiased">
@@ -72,5 +79,17 @@ button:focus {
 
 pre > code {
   font-size: 0.8rem;
+}
+
+@media (scripting: none) {
+  .script-none:hidden {
+    @apply hidden;
+  }
+}
+
+@media (scripting: initial-only) {
+}
+
+@media (scripting: enabled) {
 }
 `;
