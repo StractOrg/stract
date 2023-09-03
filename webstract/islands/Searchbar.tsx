@@ -10,6 +10,7 @@ import { HiMagnifyingGlass } from "../icons/HiMagnifyingGlass.tsx";
 import { useSyncSignalWithLocalStorage } from "../search/utils.ts";
 import { safeSearchSignal } from "../search/preferences.ts";
 import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { ComponentChild } from "preact";
 
 export const Searchbar = (
   { autofocus = false, defaultQuery = "" }: {
@@ -30,7 +31,7 @@ export const Searchbar = (
   useSyncSignalWithLocalStorage(safeSearchSignal);
 
   const suggestions = useSignal<search.Suggestion[]>([]);
-  const selectedSignal = useSignal(-1);
+  const selectedSignal = useSignal(0);
 
   useSignalEffect(() => {
     if (query.value == "") {
@@ -47,9 +48,11 @@ export const Searchbar = (
     return () => cancel();
   });
 
-  const hoveredSuggestion = selectedSignal.value >= 0 &&
-      suggestions.value.length > selectedSignal.value
-    ? suggestions.value[selectedSignal.value]
+  const numEntries = suggestions.value.length + 1;
+
+  const hoveredSuggestion = selectedSignal.value > 0 &&
+      numEntries > selectedSignal.value
+    ? suggestions.value[selectedSignal.value - 1]
     : null;
 
   return (
@@ -75,29 +78,20 @@ export const Searchbar = (
             class="searchbar-input font-light peer inset-y-0 col-[1/3] row-start-1 flex h-full w-full grow border-none bg-transparent py-0 pl-12 outline-none focus:ring-0"
             placeholder="Search"
             onInput={(e) => {
-              selectedSignal.value = -1;
+              selectedSignal.value = 0;
               query.value = (e.target as HTMLInputElement).value;
             }}
             onKeyDown={(e) => {
               match(e.key)
                 .with("ArrowUp", () => {
                   e.preventDefault();
-                  if (selectedSignal.value == -1) {
-                    selectedSignal.value = suggestions.value.length - 1;
-                  } else {
-                    selectedSignal.value = (selectedSignal.value - 1) %
-                      suggestions.value.length;
-                  }
+                  selectedSignal.value =
+                    (selectedSignal.value + numEntries - 1) % numEntries;
                 })
                 .with("ArrowDown", () => {
                   e.preventDefault();
-
-                  if (selectedSignal.value == suggestions.value.length - 1) {
-                    selectedSignal.value = -1;
-                  } else {
-                    selectedSignal.value = (selectedSignal.value + 1) %
-                      suggestions.value.length;
-                  }
+                  selectedSignal.value =
+                    (selectedSignal.value + numEntries + 1) % numEntries;
                 })
                 .with("Escape", () => {
                   (e.target as HTMLInputElement).blur();
@@ -125,20 +119,33 @@ export const Searchbar = (
             <button
               class={tx(
                 "col-span-full py-1.5 pl-5 hidden group-focus-within:flex cursor-pointer hover:bg-gray-50",
-                selectedSignal.value == idx ? "bg-gray-50" : "bg-white",
+                selectedSignal.value == idx + 1 ? "bg-gray-50" : "bg-white",
               )}
               onClick={(e) => {
-                selectedSignal.value = idx;
+                selectedSignal.value = idx + 1;
                 (e.target as HTMLButtonElement).form!.submit();
               }}
             >
               <div class="flex w-4 mr-3 items-center">
                 <img class="h-5" loading="lazy" src="/images/search.svg" />
               </div>
-              <div
-                class="font-light"
-                dangerouslySetInnerHTML={{ __html: sug.highlighted }}
-              />
+              <div>
+                {Array.from({ length: sug.raw.length }).reduce<
+                  [boolean, ComponentChild[]]
+                >(
+                  ([matching, acc], _, idx) =>
+                    (!matching || sug.raw[idx] != query.value[idx])
+                      ? [false, [
+                        ...acc,
+                        <span class="font-medium">{sug.raw[idx]}</span>,
+                      ]]
+                      : [true, [
+                        ...acc,
+                        <b class="font-light">{sug.raw[idx]}</b>,
+                      ]],
+                  [true, []],
+                )[1]}
+              </div>
             </button>
           ))}
         </div>
