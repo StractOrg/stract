@@ -1,9 +1,10 @@
 import { Select } from "../components/Select.tsx";
 import { OpticOption, opticsSignal } from "../search/optics.ts";
 
-export const OpticSelector = ({ defaultOptics, searchOnChange }: {
+export const OpticSelector = ({ defaultOptics, searchOnChange, selected }: {
   defaultOptics: OpticOption[];
   searchOnChange: boolean;
+  selected?: string;
 }) => {
   return (
     <div class="m-0 flex h-full flex-col justify-center p-0">
@@ -16,6 +17,7 @@ export const OpticSelector = ({ defaultOptics, searchOnChange }: {
           const form = (e.target as HTMLSelectElement).form;
           if (searchOnChange && form) form.submit();
         }}
+        value={selected}
       >
         <option value="">No Optic</option>
         {[...opticsSignal.value.data, ...defaultOptics].map((optic) => (

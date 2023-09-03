@@ -130,6 +130,7 @@ export default async function Search(_req: Request, ctx: RouteContext) {
                 <OpticSelector
                   defaultOptics={DEFAULT_OPTICS}
                   searchOnChange={true}
+                  selected={optic}
                 />
 
                 <RegionSelector
