@@ -1,6 +1,8 @@
+import { ComponentChildren } from "preact";
 import { SiteWithDelete } from "../components/Site.tsx";
+import * as search from "../search/index.ts";
 import {
-  generateCombinedRankingsBase64,
+  generateCombinedRankings,
   SiteRankingSection,
   useAllRankings,
   useRanking,
@@ -32,31 +34,41 @@ export const SiteRanking = ({ section }: { section: SiteRankingSection }) => {
   );
 };
 
-export const ClearAndExportSiteRankingButton = () => {
+export const ClearAndExportSiteRankingButton = (
+  { clear = false, export: exportOptic = false, children }: {
+    clear?: boolean;
+    export?: boolean;
+    children: ComponentChildren;
+  },
+) => {
   const rankings = useAllRankings();
 
-  const compressed = generateCombinedRankingsBase64(
+  const combined = generateCombinedRankings(
     rankings.map(([section, { signal }]) => [section, signal.value.data]),
   );
-  const url = `${window.location}/export?data=${compressed}`;
 
   return (
-    <a
-      id="export-optic"
-      href={url}
-      download="exported.optic"
+    <button
       class="w-fit bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5"
-      onClick={() => {
-        for (const [, { signal }] of rankings) {
-          updateStorageSignal(signal, () => []);
+      onClick={async () => {
+        if (exportOptic) {
+          const { data } = search.api.sitesExportOptic({
+            siteRankings: combined,
+          });
+          const { default: fileSaver } = await import(
+            "https://esm.sh/file-saver@2.0.5"
+          );
+          fileSaver.saveAs(new Blob([await data]), "exported.optic");
         }
 
-        // TODO: potentially use file-saver instead
-        // const fileSaver = await import("https://esm.sh/file-saver@2.0.5");
-        // fileSaver.saveAs()
+        if (clear) {
+          for (const [, { signal }] of rankings) {
+            updateStorageSignal(signal, () => []);
+          }
+        }
       }}
     >
-      Clear all and export as optic
-    </a>
+      {children}
+    </button>
   );
 };

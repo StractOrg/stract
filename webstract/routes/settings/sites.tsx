@@ -43,8 +43,13 @@ export default function Sites() {
         </div>
       </div>
 
-      <div class="flex justify-center">
-        <ClearAndExportSiteRankingButton />
+      <div class="flex justify-center space-x-4">
+        <ClearAndExportSiteRankingButton export>
+          Export as optic
+        </ClearAndExportSiteRankingButton>
+        <ClearAndExportSiteRankingButton clear export>
+          Clear all and export as optic
+        </ClearAndExportSiteRankingButton>
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ export const useSaveRanking = (ranking: RankingSignal) =>
 
 export const useAllRankings = (): [SiteRankingSection, RankingSignal][] =>
   SITE_RANKING_SECTIONS.map((sec) => [sec, useRanking(sec)]);
-const generateCombinedRankings = (
+export const generateCombinedRankings = (
   rankings: [SiteRankingSection, Ranking][],
 ) => {
   const result: Record<SiteRankingSection, Ranking> = {
@@ -57,3 +57,7 @@ export const generateCombinedRankingsBase64 = (
   rankings: [SiteRankingSection, Ranking][],
 ) =>
   LZString.compressToBase64(JSON.stringify(generateCombinedRankings(rankings)));
+export const decompressCombinedRankingsBase64 = (
+  compressed: string,
+): ReturnType<typeof generateCombinedRankings> =>
+  JSON.parse(LZString.decompressFromBase64(compressed));
