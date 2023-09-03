@@ -2,7 +2,7 @@ import { Signal } from "@preact/signals";
 import * as search from "../search/index.ts";
 import { useEffect } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
-import { ComponentChildren } from "preact";
+import { JSX } from "preact";
 import {
   RankingSignal,
   useRanking,
@@ -97,6 +97,7 @@ export const SearchResultAdjustModal = (
               ranking={liked}
               others={[disliked, blocked]}
               selected={selected}
+              form="searchbar-form"
             >
               <HiHandThumbUpOutline class="w-4" />
             </AdjustButton>
@@ -106,6 +107,7 @@ export const SearchResultAdjustModal = (
               ranking={disliked}
               others={[liked, blocked]}
               selected={selected}
+              form="searchbar-form"
             >
               <HiHandThumbDownOutline class="w-4" />
             </AdjustButton>
@@ -115,6 +117,7 @@ export const SearchResultAdjustModal = (
               ranking={blocked}
               others={[liked, disliked]}
               selected={selected}
+              form="searchbar-form"
             >
               <HiNoSymbol class="w-4" />
             </AdjustButton>
@@ -164,12 +167,11 @@ export const SearchResultAdjustModal = (
 };
 
 function AdjustButton(
-  { ranking, others, selected, children }: {
+  { ranking, others, selected, children, ...props }: {
     ranking: RankingSignal;
     others: RankingSignal[];
     selected: Signal<SelectedAdjust>;
-    children: ComponentChildren;
-  },
+  } & Omit<JSX.HTMLAttributes<HTMLButtonElement>, "selected">,
 ) {
   const active = ranking.signal.value.data.includes(
     selected.value?.item.domain ?? " selected",
@@ -177,6 +179,7 @@ function AdjustButton(
 
   return (
     <button
+      {...props}
       class={tx(
         "group rounded-full border bg-white px-2 py-2",
         "hover:border-current hover:text-current",
