@@ -2,7 +2,6 @@ import { injectGlobal, tx } from "https://esm.sh/@twind/core@1.1.3";
 import { DEFAULT_OPTICS } from "../../search/optics.ts";
 import { OpticSelector } from "../OpticsSelector.tsx";
 import { Signal, signal, useSignal } from "@preact/signals";
-import { IS_BROWSER } from "$fresh/runtime.ts";
 import { ComponentChildren } from "preact";
 import { HiPaperAirplaneOutline } from "../../icons/HiPaperAirplaneOutline.tsx";
 import { match, P } from "ts-pattern";

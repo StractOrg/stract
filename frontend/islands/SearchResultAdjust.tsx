@@ -29,7 +29,7 @@ export default function SearchResultAdjust(
 ) {
   return (
     <button
-      class="adjust-button hidden min-w-fit items-center justify-center md:flex w-5 text-gray-500/25 hover:cursor-pointer hover:text-gray-500 bg-transparent noscript:hidden"
+      class="adjust-button hidden min-w-fit items-center justify-center md:flex w-5 text-gray-700/50 hover:cursor-pointer hover:text-gray-700 bg-transparent noscript:hidden"
       data-site={item.site}
       data-url={item.url}
       onClick={(e) => {

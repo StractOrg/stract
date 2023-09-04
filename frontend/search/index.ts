@@ -120,6 +120,7 @@ export const api = {
     const { data, cancel } = send("/beta/api/search", "post", "json", props);
     return { data: data.then((res) => res[200]), cancel };
   },
+
   autosuggest: (props: Props<"/beta/api/autosuggest", "post">) => {
     const { data, cancel } = send(
       "/beta/api/autosuggest",
@@ -129,6 +130,7 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+
   similarSites: (props: Props<"/beta/api/webgraph/similar_sites", "post">) => {
     const { data, cancel } = send(
       "/beta/api/webgraph/similar_sites",
@@ -138,6 +140,7 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+
   knowsSite: (props: Props<"/beta/api/webgraph/knows_site", "post">) => {
     const { data, cancel } = send(
       "/beta/api/webgraph/knows_site",
@@ -147,6 +150,7 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+
   factCheck: (props: Props<"/beta/api/fact_check", "post">) => {
     const { data, cancel } = send(
       "/beta/api/fact_check",
@@ -156,6 +160,7 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+
   alice: (
     props: Props<"/beta/api/alice", "get">,
     stream: (
@@ -179,6 +184,7 @@ export const api = {
         .exhaustive();
     });
   },
+
   summarize: (
     props: Props<"/beta/api/summarize", "get">,
     stream: (
@@ -202,6 +208,7 @@ export const api = {
         .exhaustive();
     });
   },
+
   sitesExportOptic: (props: Props<"/beta/api/sites/export", "post">) => {
     const { data, cancel } = send(
       "/beta/api/sites/export",
@@ -211,6 +218,7 @@ export const api = {
     );
     return { data: data.then((res) => res[200]), cancel };
   },
+
   exploreExportOptic: (props: Props<"/beta/api/explore/export", "post">) => {
     const { data, cancel } = send(
       "/beta/api/explore/export",
@@ -240,6 +248,7 @@ export const api = {
       finished = true;
       return data;
     });
+
     return {
       data,
       abort: () => {
@@ -249,6 +258,7 @@ export const api = {
       },
     };
   },
+
   sendImprovementClick: (
     { queryId, click }: { queryId: string; click: string },
   ) => {

@@ -67,7 +67,7 @@ export const ExploreSites = () => {
           </p>
         </div>
         <form
-          class="flex border rounded-full w-full max-w-lg p-[2px] pl-3 mb-2"
+          class="flex border border-gray-300 rounded-full w-full max-w-lg p-[2px] pl-3 mb-2"
           id="site-input-container"
           onSubmit={(e) => {
             e.preventDefault();

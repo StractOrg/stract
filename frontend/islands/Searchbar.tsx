@@ -66,7 +66,7 @@ export const Searchbar = (
       <div class="h-10">
         <div
           id="searchbar"
-          class="group absolute z-40 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border bg-white transition-shadow focus-within:shadow overflow-hidden"
+          class="group absolute z-40 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border border-gray-300 bg-white transition-shadow focus-within:shadow overflow-hidden"
         >
           <HiMagnifyingGlass class="col-[1/2] row-start-1 w-5 self-center ml-5 text-gray-400" />
           <input
