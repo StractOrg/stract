@@ -1,13 +1,11 @@
 @frontend-rerun *ARGS:
-    cd frontend; npm run build
     ./scripts/run_frontend.py {{ARGS}}
 
 @frontend *ARGS:
-    cd frontend; npm install
-    cargo watch -s 'just frontend-rerun {{ARGS}}'
+    cargo watch -i frontend -s 'just frontend-rerun {{ARGS}}'
 
-@astro:
-    cd frontend; npm run dev
+@frontend-openapi:
+    deno run -A npm:openapi-typescript http://localhost:3000/beta/api/docs/openapi.json -o frontend/search/schema.d.ts
 
 @setup *ARGS:
     just setup_python_env
@@ -17,7 +15,6 @@
     ./scripts/export_abstractive_summary_model
     ./scripts/export_dual_encoder
     ./scripts/export_fact_model
-    cd frontend; npm install; npm run build
 
 @configure *ARGS:
     just setup {{ARGS}}

@@ -35,7 +35,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 whatlang = { workspace = true }
 tokio = { workspace = true }
-askama = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
 html-escape = { workspace = true }

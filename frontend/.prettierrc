@@ -1,4 +1,0 @@
-{
-  "pluginSearchDirs": ["./node_modules"],
-  "plugins": ["prettier-plugin-astro", "prettier-plugin-tailwindcss"]
-}

@@ -43,7 +43,11 @@ pub fn parse_fragment(ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever
 }
 
 /// Parse an HTML fragment with html5ever with custom configuration.
-pub fn parse_fragment_with_options(opts: ParseOpts, ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever::Parser<Sink> {
+pub fn parse_fragment_with_options(
+    opts: ParseOpts,
+    ctx_name: QualName,
+    ctx_attr: Vec<Attribute>,
+) -> html5ever::Parser<Sink> {
     let sink = Sink {
         document_node: NodeRef::new_document(),
         on_parse_error: opts.on_parse_error,

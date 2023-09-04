@@ -214,7 +214,7 @@ mod tests {
                 site_rankings: Some(SiteRankings {
                     liked: vec![],
                     disliked: vec!["www.second.com".to_string()],
-                    blocked: vec!["www.first.com".to_string()],
+                    blocked: vec!["first.com".to_string()],
                 }),
                 return_ranking_signals: true,
                 ..Default::default()

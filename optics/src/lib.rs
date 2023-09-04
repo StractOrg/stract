@@ -425,7 +425,7 @@ impl SiteRankings {
                         PatternPart::Raw(site.clone()),
                         PatternPart::Anchor,
                     ],
-                    location: MatchLocation::Site,
+                    location: MatchLocation::Domain,
                 }],
                 action: Action::Discard,
             })

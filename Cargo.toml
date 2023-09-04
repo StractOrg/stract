@@ -1,9 +1,5 @@
 [workspace]
-members = [
-    "core",
-    "optics",
-    "kuchiki"
-]
+members = ["core", "optics", "kuchiki"]
 resolver = "2"
 
 [profile.release]
@@ -35,7 +31,6 @@ tracing = "0.1.34"
 tracing-subscriber = "0.3.11"
 whatlang = "0.16.0"
 tokio = { version = "1.23.1", features = ["full"] }
-askama = "0.11.1"
 axum = "0.6.9"
 axum-extra = { version = "0.6.0", features = ["spa"] }
 axum-macros = "0.3.4"
@@ -45,7 +40,7 @@ csv = "1.1.6"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 rocksdb = { version = "0.19.0", features = ["default", "jemalloc", "io-uring"] }
 image = "0.24.3"
-chrono = {version = "0.4.23", features = ["serde"] }
+chrono = { version = "0.4.23", features = ["serde"] }
 uuid = "1.1.2"
 futures = "0.3.21"
 quick-xml = "0.23.0"
@@ -86,7 +81,11 @@ lz-str = "0.2.1"
 safetensors = "0.3.1"
 robotstxt-with-cache = "0.4.0"
 rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
-rusqlite = { version = "0.29.0", features = ["bundled", "modern-full", "buildtime_bindgen"] }
+rusqlite = { version = "0.29.0", features = [
+    "bundled",
+    "modern-full",
+    "buildtime_bindgen",
+] }
 async-channel = "1.8.0"
 url = { version = "2.4.0", features = ["serde"] }
 anyhow = { version = "1.0.72", features = ["backtrace"] }
@@ -98,5 +97,8 @@ utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
 tikv-jemallocator = "0.5"
 publicsuffix = "2.2.3"
 hashbrown = { version = "0.14.0", features = ["serde", "rkyv"] }
-rkyv = { version = "0.7.42", default_features = false, features = ["std", "validation", "size_64"] }
-
+rkyv = { version = "0.7.42", default_features = false, features = [
+    "std",
+    "validation",
+    "size_64",
+] }

@@ -1,13 +1,28 @@
 {
-  "prettier.documentSelectors": [
-    "**/*.astro"
-  ],
-  "prettier.configPath": "frontend/.prettierrc",
-  "prettier.prettierPath": "frontend/node_modules/prettier",
-  "tailwindCSS.experimental.configFile": "frontend/tailwind.config.cjs",
-  "[astro]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.config": "frontend/deno.json",
+  "deno.unstable": true,
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
   },
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "tailwindCSS.experimental.classRegex": [
+    "tx`([^`]*)", // tx`...`
+    "tx=\"([^\"]*)", // <div tx="..." />
+    "tx={\"([^\"}]*)", // <div tx={"..."} />
+    "tx\\.\\w+`([^`]*)", // tx.xxx`...`
+    "tx\\(.*?\\)`([^`]*)" // tx(Component)`...`
+  ],
+  "tailwindCSS.experimental.configFile": "frontend/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "optics-lsp/Cargo.toml",

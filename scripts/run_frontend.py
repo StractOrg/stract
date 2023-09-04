@@ -43,6 +43,12 @@ processes.append(
         ]
     )
 )
+processes.append(
+    subprocess.Popen(
+        ["deno", "task", "start"],
+        cwd="frontend"
+    )
+)
 
 if args.alice:
     processes.append(

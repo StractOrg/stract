@@ -19,9 +19,9 @@
 //! The frontend is served using a combination of axum, askama and astro
 //! (with some funky astro hacks to make askama and astro play nice together).
 
-use axum::{body::Body, extract, middleware, routing::get_service, Router};
+use axum::{body::Body, extract, middleware, Router};
 use tokio::sync::Mutex;
-use tower_http::{compression::CompressionLayer, services::ServeDir};
+use tower_http::compression::CompressionLayer;
 
 use crate::{
     autosuggest::Autosuggest,
@@ -42,37 +42,26 @@ use crate::{
 use anyhow::Result;
 use std::sync::Arc;
 
-use askama::Template;
 use axum::{
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::get,
     routing::post,
 };
 
 use self::webgraph::RemoteWebgraph;
 
-mod about;
 mod alice;
 mod autosuggest;
-mod chat;
-mod crawler;
 mod docs;
 mod explore;
 mod fact_check;
 pub mod improvement;
-mod index;
 mod metrics;
-mod opensearch;
-mod optics;
-mod preferences;
-mod privacy;
 pub mod search;
 mod sites;
 mod summarize;
 mod webgraph;
-
-pub struct HtmlTemplate<T>(T);
 
 pub struct Counters {
     pub search_counter_success: crate::metrics::Counter,
@@ -92,28 +81,12 @@ pub struct State {
     pub cluster: Arc<Cluster>,
 }
 
-impl<T> IntoResponse for HtmlTemplate<T>
-where
-    T: Template,
-{
-    fn into_response(self) -> Response {
-        match self.0.render() {
-            Ok(html) => Html(html).into_response(),
-            Err(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to render template. Error: {err}"),
-            )
-                .into_response(),
-        }
-    }
-}
-
 #[allow(clippy::unused_async)]
 pub async fn favicon() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(
-            include_bytes!("../../../frontend/dist/favicon.ico").to_vec(),
+            include_bytes!("../../../frontend/static/favicon.ico").to_vec(),
         ))
         .unwrap()
 }
@@ -179,35 +152,18 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
     });
 
     Ok(Router::new()
-        .route("/", get(index::route))
         .merge(
             Router::new()
-                .route("/search", get(search::route))
                 .route("/beta/api/search", post(search::api))
                 .route_layer(middleware::from_fn_with_state(state.clone(), search_metric)),
         )
-        .route("/autosuggest", get(autosuggest::route))
-        .route("/autosuggest/browser", get(autosuggest::browser))
         .route("/favicon.ico", get(favicon))
-        .route("/explore", get(explore::route))
-        .route("/explore/export", get(explore::export))
-        .route("/chat", get(chat::route))
-        .route("/about", get(about::route))
-        .route("/settings", get(preferences::route))
-        .route("/settings/optics", get(optics::route))
-        .route("/settings/sites", get(sites::route))
-        .route("/settings/sites/export", get(sites::export))
-        .route("/settings/privacy", get(improvement::settings))
-        .route("/privacy-and-happy-lawyers", get(privacy::route))
-        .route("/webmasters", get(crawler::info_route))
-        .route("/opensearch.xml", get(opensearch::route))
         .merge(
             Router::new()
                 .route("/improvement/click", post(improvement::click))
                 .route("/improvement/store", post(improvement::store))
                 .layer(cors_layer()),
         )
-        .fallback(get_service(ServeDir::new("frontend/dist/")))
         .layer(CompressionLayer::new())
         .merge(docs::router())
         .nest(
@@ -220,6 +176,8 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
                 .route("/api/alice", get(alice::alice_route))
                 .route("/api/alice/save_state", post(alice::save_state))
                 .route("/api/fact_check", post(fact_check::fact_check_route))
+                .route("/api/sites/export", post(sites::sites_export_optic))
+                .route("/api/explore/export", post(explore::explore_export_optic))
                 .layer(cors_layer()),
         )
         .with_state(state))
