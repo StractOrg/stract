@@ -9,24 +9,29 @@ export const config = DEFAULT_ROUTE_CONFIG;
 export default defineRoute((req) => {
   const withAlice = false;
 
-  return (
-    <>
-      <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
-        <div id="header" class="row-start-1">
-          <Header
-            withAlice={withAlice}
-            showDivider={true}
-            active="Chat"
-            queryUrlPart={new URL(req.url).searchParams.toString()}
-          />
+  if (withAlice) {
+    return (
+      <>
+        <div class="relative grid h-full grid-rows-[auto_1fr_auto]">
+          <div id="header" class="row-start-1">
+            <Header
+              withAlice={withAlice}
+              showDivider={true}
+              active="Chat"
+              queryUrlPart={new URL(req.url).searchParams.toString()}
+            />
+          </div>
+          <div class="flex flex-col row-start-2 mt-10 px-2 items-center">
+            <Chat />
+          </div>
+          <div id="footer" class="row-start-3">
+            <Footer />
+          </div>
         </div>
-        <div class="flex flex-col row-start-2 mt-10 px-2 items-center">
-          <Chat />
-        </div>
-        <div id="footer" class="row-start-3">
-          <Footer />
-        </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  } else {
+    // 404
+    return new Response("Not found", { status: 404 });
+  }
 });

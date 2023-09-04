@@ -61,37 +61,28 @@ export const IndexBar = (
     { url: "/chat", title: "Chat" },
   ] satisfies { url: string; title: Section }[];
 
+  let availableLinks: { url: string; title: Section }[] = [];
+  if (withAlice) {
+    availableLinks = links;
+  } else {
+    availableLinks = links.filter((l) => l.title != "Chat");
+  }
+
   return (
     <>
-      {links.map((l) => (
-        l.url == "/chat" &&
-          (withAlice && (
-            <div class="inline relative z-0">
-              <a
-                class="link px-2 py-1 rounded-full text-sm"
-                href={`${l.url}${query ? "?" + query : ""}`}
-              >
-                {l.title}
-              </a>
-              {active === l.title && (
-                <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-brand_contrast">
-                </div>
-              )}
+      {availableLinks.map((l) => (
+        <div class="inline relative z-0">
+          <a
+            class="link px-2 py-1 rounded-full text-sm"
+            href={`${l.url}${query ? "?" + query : ""}`}
+          >
+            {l.title}
+          </a>
+          {active === l.title && (
+            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-brand_contrast">
             </div>
-          )) || (
-          <div class="inline relative z-0">
-            <a
-              class="link px-2 py-1 rounded-full text-sm"
-              href={`${l.url}${query ? "?" + query : ""}`}
-            >
-              {l.title}
-            </a>
-            {active === l.title && (
-              <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-brand_contrast">
-              </div>
-            )}
-          </div>
-        )
+          )}
+        </div>
       ))}
     </>
   );
