@@ -6,7 +6,8 @@
     "build": "deno run -A dev.ts build",
     "preview": "deno run -A main.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update .",
-    "generateIcons": "deno run -A generateIcons.ts"
+    "generateIcons": "deno run -A generateIcons.ts",
+    "openapi": "deno run -A npm:openapi-typescript http://localhost:3000/beta/api/docs/openapi.json -o frontend/search/schema.d.ts"
   },
   "lint": {
     "rules": {
