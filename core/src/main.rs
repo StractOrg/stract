@@ -25,7 +25,7 @@ use stract::entrypoint::autosuggest_scrape::{self, Gl};
 use stract::entrypoint::configure;
 
 use stract::entrypoint::indexer::IndexPointer;
-use stract::entrypoint::{self, frontend, safety_classifier, search_server, webgraph_server};
+use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -83,9 +83,9 @@ enum Commands {
     /// Deploy the search server.
     SearchServer { config_path: String },
 
-    /// Deploy the frontend. The frontend is a web server that serves the search UI and interacts with
+    /// Deploy the API. The API is a web server that serves the search UI and interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
-    Frontend { config_path: String },
+    Api { config_path: String },
 
     /// Scrape the Google autosuggest API for search queries.
     AutosuggestScrape {
@@ -264,13 +264,13 @@ fn main() -> Result<()> {
                     .block_on(webgraph_server::run(config))?
             }
         },
-        Commands::Frontend { config_path } => {
-            let config: config::FrontendConfig = load_toml_config(config_path);
+        Commands::Api { config_path } => {
+            let config: config::ApiConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?
-                .block_on(frontend::run(config))?
+                .block_on(api::run(config))?
         }
         Commands::SearchServer { config_path } => {
             let config: config::SearchServerConfig = load_toml_config(config_path);

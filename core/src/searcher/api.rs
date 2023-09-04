@@ -25,7 +25,7 @@ use optics::Optic;
 use url::Url;
 
 use crate::bangs::{Bang, BangHit};
-use crate::config::{CollectorConfig, FrontendThresholds};
+use crate::config::{ApiThresholds, CollectorConfig};
 use crate::inverted_index::RetrievedWebpage;
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
@@ -50,17 +50,17 @@ use super::{
     SearchResult, WebsitesResult,
 };
 
-pub struct FrontendSearcher {
+pub struct ApiSearcher {
     distributed_searcher: DistributedSearcher,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
-    thresholds: FrontendThresholds,
+    thresholds: ApiThresholds,
 }
 
-impl FrontendSearcher {
+impl ApiSearcher {
     pub fn new(
         cluster: Arc<Cluster>,
         cross_encoder: Option<CrossEncoderModel>,
@@ -68,7 +68,7 @@ impl FrontendSearcher {
         qa_model: Option<QaModel>,
         bangs: Bangs,
         collector_config: CollectorConfig,
-        thresholds: FrontendThresholds,
+        thresholds: ApiThresholds,
     ) -> Self {
         Self {
             distributed_searcher: DistributedSearcher::new(cluster),
@@ -519,22 +519,22 @@ mod tests {
             "this is a test".to_string()
         );
         let input = r#"
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
-this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test 
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
+this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test this is a long test
             "#;
 
         let res = generate_answer_snippet(input, 0..500);

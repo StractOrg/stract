@@ -16,6 +16,7 @@
 
 //! The entrypoint module contains all entrypoints that runs the executables.
 pub mod alice;
+pub mod api;
 pub mod autosuggest_scrape;
 mod centrality;
 #[cfg(feature = "dev")]
@@ -23,7 +24,6 @@ pub mod configure;
 pub mod crawler;
 pub mod dmoz_parser;
 mod entity;
-pub mod frontend;
 pub mod indexer;
 pub mod safety_classifier;
 pub mod search_server;
