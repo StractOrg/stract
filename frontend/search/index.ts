@@ -2,6 +2,7 @@
 
 import { match } from "ts-pattern";
 import type { components, paths } from "./schema.d.ts";
+import { signal } from "@preact/signals";
 
 type Values<T> = T[keyof T];
 
@@ -17,7 +18,10 @@ type Produces<P extends keyof paths, M extends keyof paths[P]> =
     }
     : never;
 
-const API_BASE = Deno.env.get("STRACT_API_BASE") ?? "http://localhost:3000";
+export const apiBaseFromEnv = () =>
+  (typeof Deno != "undefined" && Deno.env.get("STRACT_API_BASE")) ||
+  "http://localhost:3000";
+export const API_BASE = signal(apiBaseFromEnv());
 
 export const send = <
   P extends keyof paths,

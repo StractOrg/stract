@@ -1,6 +1,8 @@
 import { AppProps } from "$fresh/server.ts";
 import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 import { DefaultCSP } from "../search/utils.ts";
+import { ApiClient } from "../islands/ApiClient.tsx";
+import { apiBaseFromEnv } from "../search/index.ts";
 
 export default function App({ Component }: AppProps) {
   injectGlobal`
@@ -61,6 +63,7 @@ export default function App({ Component }: AppProps) {
   return (
     <>
       <DefaultCSP />
+      <ApiClient apiBase={apiBaseFromEnv()} />
       <html lang="en" class="h-full">
         <head>
           <meta charSet="UTF-8" />
