@@ -1497,7 +1497,7 @@ impl Html {
     }
 
     pub fn is_homepage(&self) -> bool {
-        self.url().path() == "/"
+        self.url().path() == "/" && self.url().query().is_none()
     }
 }
 
