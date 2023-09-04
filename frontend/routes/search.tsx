@@ -43,7 +43,12 @@ type SearchParams = {
 const extractSearchParams = (searchParams: URLSearchParams): SearchParams => {
   const query = searchParams.get("q") ?? "";
   const currentPage = parseInt(searchParams.get("p") ?? "1") || 1;
-  const optic = searchParams.get("optic") ?? void 0;
+  let optic = searchParams.get("optic") ?? void 0;
+
+  if (optic == "") {
+    optic = void 0;
+  }
+
   const selectedRegion = searchParams.get("gl") ?? void 0;
   const safeSearch = searchParams.get("ss") == "true";
   const siteRankingsParam = searchParams.get("sr");
