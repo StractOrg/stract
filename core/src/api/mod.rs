@@ -86,7 +86,7 @@ pub async fn favicon() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(
-            include_bytes!("../../../webstract/static/favicon.ico").to_vec(),
+            include_bytes!("../../../frontend/static/favicon.ico").to_vec(),
         ))
         .unwrap()
 }
