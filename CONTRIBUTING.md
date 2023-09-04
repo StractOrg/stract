@@ -34,4 +34,4 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 * (Optional) run `just configure --alice` to download the weights for Alice (the AI assistant that can search on the web).
 * (Optional) Install cargo-watch by running `cargo install cargo-watch`. This makes frontend development easier.
 
-After the non optional steps you can now run `just cargo test` and should see all tests passing. If you have installced `cargo-watch`, you should be able to run `just dev` to start the search server and launch the frontend at `0.0.0.0:3000`. You can add the `--alice` flag to enable Alice.
+After the non optional steps you can now run `just cargo test` and should see all tests passing. If you have installced `cargo-watch`, you should be able to run `just dev` to start the search server and launch the frontend at `0.0.0.0:8000`.

@@ -206,7 +206,7 @@ struct ScoredDoc<T: Doc> {
 
 impl<T: Doc> PartialOrd for ScoredDoc<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.adjusted_score.partial_cmp(&other.adjusted_score)
+        Some(self.cmp(other))
     }
 }
 
@@ -218,7 +218,7 @@ impl<T: Doc> PartialEq for ScoredDoc<T> {
 
 impl<T: Doc> Ord for ScoredDoc<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.adjusted_score.total_cmp(&other.adjusted_score)
     }
 }
 

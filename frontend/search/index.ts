@@ -17,7 +17,7 @@ type Produces<P extends keyof paths, M extends keyof paths[P]> =
     }
     : never;
 
-export const API_BASE = "http://localhost:3000";
+const API_BASE = Deno.env.get("STRACT_API_BASE") ?? "http://localhost:3000";
 
 export const send = <
   P extends keyof paths,

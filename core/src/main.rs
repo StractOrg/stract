@@ -82,7 +82,7 @@ enum Commands {
     /// Deploy the search server.
     SearchServer { config_path: String },
 
-    /// Deploy the API. The API is a web server that serves the search UI and interacts with
+    /// Deploy the json http api. The api interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
     Api { config_path: String },
 
