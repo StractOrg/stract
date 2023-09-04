@@ -58,15 +58,13 @@ impl<T> Eq for SampledItem<T> {}
 
 impl<T> PartialOrd for SampledItem<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.priority.partial_cmp(&other.priority)
+        Some(self.cmp(other))
     }
 }
 
 impl<T> Ord for SampledItem<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.priority
-            .partial_cmp(&other.priority)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        self.priority.total_cmp(&other.priority)
     }
 }
 

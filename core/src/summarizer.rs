@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::{Ordering, Reverse},
+    cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     ops::Range,
     path::Path,
@@ -62,13 +62,13 @@ struct CandidatePassage<'a> {
 
 impl<'a> PartialOrd for CandidatePassage<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
+        Some(self.cmp(other))
     }
 }
 
 impl<'a> Ord for CandidatePassage<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.score.total_cmp(&other.score)
     }
 }
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cell::RefCell, cmp::Ordering};
+use std::cell::RefCell;
 
 use min_max_heap::MinMaxHeap;
 use tantivy::{
@@ -29,13 +29,13 @@ struct DocsetHead<T> {
 
 impl<T> PartialOrd for DocsetHead<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.min_doc.partial_cmp(&other.min_doc)
+        Some(self.cmp(other))
     }
 }
 
 impl<T> Ord for DocsetHead<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.min_doc.cmp(&other.min_doc)
     }
 }
 

@@ -186,7 +186,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                         .map(|edge| edge.label.loaded().unwrap())
                         .collect()
                 })
-                .unwrap_or_else(Vec::new);
+                .unwrap_or_default();
 
             let mut page_centrality = 0.0;
 
