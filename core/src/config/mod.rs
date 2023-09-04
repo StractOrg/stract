@@ -171,29 +171,29 @@ impl Default for CollectorConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FrontendThresholds {
-    #[serde(default = "defaults::Frontend::stackoverflow")]
+pub struct ApiThresholds {
+    #[serde(default = "defaults::Api::stackoverflow")]
     pub stackoverflow: f64,
 
-    #[serde(default = "defaults::Frontend::entity_sidebar")]
+    #[serde(default = "defaults::Api::entity_sidebar")]
     pub entity_sidebar: f64,
 
-    #[serde(default = "defaults::Frontend::discussions_widget")]
+    #[serde(default = "defaults::Api::discussions_widget")]
     pub discussions_widget: f64,
 }
 
-impl Default for FrontendThresholds {
+impl Default for ApiThresholds {
     fn default() -> Self {
         Self {
-            stackoverflow: defaults::Frontend::stackoverflow(),
-            entity_sidebar: defaults::Frontend::entity_sidebar(),
-            discussions_widget: defaults::Frontend::discussions_widget(),
+            stackoverflow: defaults::Api::stackoverflow(),
+            entity_sidebar: defaults::Api::entity_sidebar(),
+            discussions_widget: defaults::Api::discussions_widget(),
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FrontendConfig {
+pub struct ApiConfig {
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
@@ -213,7 +213,7 @@ pub struct FrontendConfig {
     pub collector: CollectorConfig,
 
     #[serde(default)]
-    pub thresholds: FrontendThresholds,
+    pub thresholds: ApiThresholds,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

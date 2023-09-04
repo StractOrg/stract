@@ -23,7 +23,7 @@ use crate::searcher::ShardId;
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {
     Searcher { host: SocketAddr, shard: ShardId },
-    Frontend { host: SocketAddr },
+    Api { host: SocketAddr },
     Webgraph { host: SocketAddr },
     Alice { host: SocketAddr },
 }

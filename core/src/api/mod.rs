@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! The api module contains the http api and frontend.
+//! The api module contains the http api.
 //! All http requests are handled using axum.
-//! The frontend is served using a combination of axum, askama and astro
-//! (with some funky astro hacks to make askama and astro play nice together).
 
 use axum::{body::Body, extract, middleware, Router};
 use tokio::sync::Mutex;
@@ -26,7 +24,7 @@ use tower_http::compression::CompressionLayer;
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
-    config::FrontendConfig,
+    config::ApiConfig,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -36,7 +34,7 @@ use crate::{
     leaky_queue::LeakyQueue,
     qa_model::QaModel,
     ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
-    searcher::frontend::FrontendSearcher,
+    searcher::api::ApiSearcher,
     summarizer::Summarizer,
 };
 use anyhow::Result;
@@ -70,8 +68,8 @@ pub struct Counters {
 }
 
 pub struct State {
-    pub config: FrontendConfig,
-    pub searcher: FrontendSearcher,
+    pub config: ApiConfig,
+    pub searcher: ApiSearcher,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
@@ -91,7 +89,7 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Router> {
+pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
     let mut cross_encoder = None;
 
@@ -121,7 +119,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         Cluster::join(
             Member {
                 id: config.cluster_id.clone(),
-                service: Service::Frontend { host: config.host },
+                service: Service::Api { host: config.host },
             },
             config.gossip_addr,
             config.gossip_seed_nodes.clone().unwrap_or_default(),
@@ -129,7 +127,7 @@ pub async fn router(config: &FrontendConfig, counters: Counters) -> Result<Route
         .await?,
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-    let searcher = FrontendSearcher::new(
+    let searcher = ApiSearcher::new(
         cluster.clone(),
         cross_encoder,
         lambda_model,

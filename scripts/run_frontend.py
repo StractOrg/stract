@@ -21,7 +21,7 @@ processes = []
 
 processes.append(
     subprocess.Popen(
-        ["cargo", "run"] + release + ["--", "frontend", "configs/frontend.toml"]
+        ["cargo", "run"] + release + ["--", "api", "configs/api.toml"]
     )
 )
 processes.append(

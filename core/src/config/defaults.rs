@@ -34,9 +34,9 @@ impl Collector {
     }
 }
 
-pub struct Frontend;
+pub struct Api;
 
-impl Frontend {
+impl Api {
     pub fn stackoverflow() -> f64 {
         0.5
     }

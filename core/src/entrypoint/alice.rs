@@ -115,14 +115,14 @@ pub async fn route(
         .await
         .into_iter()
         .find_map(|m| {
-            if let Service::Frontend { host } = m.service {
+            if let Service::Api { host } = m.service {
                 Some(host)
             } else {
                 None
             }
         })
         .ok_or_else(|| {
-            info!("no frontend found");
+            info!("no api found");
 
             http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
