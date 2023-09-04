@@ -3,13 +3,7 @@ import * as search from "../search/index.ts";
 import { summarySignals } from "../search/summary.ts";
 import { HiHandThumbUpOutline } from "../icons/HiHandThumbUpOutline.tsx";
 import { HiCheck } from "../icons/HiCheck.tsx";
-import {
-  animation,
-  injectGlobal,
-  keyframes,
-  tx,
-} from "https://esm.sh/@twind/core@1.1.3";
-import { IS_BROWSER } from "$fresh/runtime.ts";
+import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 
 const SAMPLE_SUMMARY = {
   inProgress: true,
@@ -18,6 +12,14 @@ const SAMPLE_SUMMARY = {
 };
 
 export const Snippet = ({ item }: { item: search.Webpage }) => {
+  injectGlobal`
+    @keyframes blink {
+      0% {
+        opacity: 0;
+      }
+    }
+  `;
+
   const summary = summarySignals.value[item.url];
 
   return (
@@ -94,16 +96,6 @@ export const Snippet = ({ item }: { item: search.Webpage }) => {
     </div>
   );
 };
-
-if (!IS_BROWSER) {
-  injectGlobal`
-    @keyframes blink {
-      0% {
-        opacity: 0;
-      }
-    }
-  `;
-}
 
 const StackOverflowQA = (
   { answers, question }: {
