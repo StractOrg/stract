@@ -16,21 +16,22 @@ import * as $10 from "./routes/settings/optics.tsx";
 import * as $11 from "./routes/settings/privacy.tsx";
 import * as $12 from "./routes/settings/sites.tsx";
 import * as $13 from "./routes/webmasters.tsx";
-import * as $$0 from "./islands/Discussions.tsx";
-import * as $$1 from "./islands/ExploreSites.tsx";
-import * as $$2 from "./islands/Improvements.tsx";
-import * as $$3 from "./islands/ManageOptics.tsx";
-import * as $$4 from "./islands/OpticsSelector.tsx";
-import * as $$5 from "./islands/PrivacySelector.tsx";
-import * as $$6 from "./islands/RegionSelector.tsx";
-import * as $$7 from "./islands/SafeSearchSettings.tsx";
-import * as $$8 from "./islands/SearchResultAdjust.tsx";
-import * as $$9 from "./islands/Searchbar.tsx";
-import * as $$10 from "./islands/SiteRanking.tsx";
-import * as $$11 from "./islands/Snippet.tsx";
-import * as $$12 from "./islands/chat/Chat.tsx";
-import * as $$13 from "./islands/chat/state.ts";
-import * as $$14 from "./islands/chat/traces.ts";
+import * as $$0 from "./islands/ApiClient.tsx";
+import * as $$1 from "./islands/Discussions.tsx";
+import * as $$2 from "./islands/ExploreSites.tsx";
+import * as $$3 from "./islands/Improvements.tsx";
+import * as $$4 from "./islands/ManageOptics.tsx";
+import * as $$5 from "./islands/OpticsSelector.tsx";
+import * as $$6 from "./islands/PrivacySelector.tsx";
+import * as $$7 from "./islands/RegionSelector.tsx";
+import * as $$8 from "./islands/SafeSearchSettings.tsx";
+import * as $$9 from "./islands/SearchResultAdjust.tsx";
+import * as $$10 from "./islands/Searchbar.tsx";
+import * as $$11 from "./islands/SiteRanking.tsx";
+import * as $$12 from "./islands/Snippet.tsx";
+import * as $$13 from "./islands/chat/Chat.tsx";
+import * as $$14 from "./islands/chat/state.ts";
+import * as $$15 from "./islands/chat/traces.ts";
 
 const manifest = {
   routes: {
@@ -50,21 +51,22 @@ const manifest = {
     "./routes/webmasters.tsx": $13,
   },
   islands: {
-    "./islands/Discussions.tsx": $$0,
-    "./islands/ExploreSites.tsx": $$1,
-    "./islands/Improvements.tsx": $$2,
-    "./islands/ManageOptics.tsx": $$3,
-    "./islands/OpticsSelector.tsx": $$4,
-    "./islands/PrivacySelector.tsx": $$5,
-    "./islands/RegionSelector.tsx": $$6,
-    "./islands/SafeSearchSettings.tsx": $$7,
-    "./islands/SearchResultAdjust.tsx": $$8,
-    "./islands/Searchbar.tsx": $$9,
-    "./islands/SiteRanking.tsx": $$10,
-    "./islands/Snippet.tsx": $$11,
-    "./islands/chat/Chat.tsx": $$12,
-    "./islands/chat/state.ts": $$13,
-    "./islands/chat/traces.ts": $$14,
+    "./islands/ApiClient.tsx": $$0,
+    "./islands/Discussions.tsx": $$1,
+    "./islands/ExploreSites.tsx": $$2,
+    "./islands/Improvements.tsx": $$3,
+    "./islands/ManageOptics.tsx": $$4,
+    "./islands/OpticsSelector.tsx": $$5,
+    "./islands/PrivacySelector.tsx": $$6,
+    "./islands/RegionSelector.tsx": $$7,
+    "./islands/SafeSearchSettings.tsx": $$8,
+    "./islands/SearchResultAdjust.tsx": $$9,
+    "./islands/Searchbar.tsx": $$10,
+    "./islands/SiteRanking.tsx": $$11,
+    "./islands/Snippet.tsx": $$12,
+    "./islands/chat/Chat.tsx": $$13,
+    "./islands/chat/state.ts": $$14,
+    "./islands/chat/traces.ts": $$15,
   },
   baseUrl: import.meta.url,
 };
