@@ -462,21 +462,7 @@ const ChatInput = (
   );
 };
 
-const ChatBubble = () => (
-  <div class="flex items-center space-x-1">
-    {Array.from({ length: 3 }).map((_, idx) => (
-      <div
-        class={"dot h-2 w-2 bg-brand/70 rounded-full"}
-        style={{
-          animation: "mercuryTypingAnimation 1.8s infinite ease-in-out",
-          animationDelay: `${200 + idx * 100}ms`,
-        }}
-      />
-    ))}
-  </div>
-);
-
-if (!IS_BROWSER) {
+const ChatBubble = () => {
   injectGlobal`
 @keyframes mercuryTypingAnimation {
   0% {
@@ -493,4 +479,18 @@ if (!IS_BROWSER) {
   }
 }
 `;
-}
+
+  return (
+    <div class="flex items-center space-x-1">
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <div
+          class={"dot h-2 w-2 bg-brand/70 rounded-full"}
+          style={{
+            animation: "mercuryTypingAnimation 1.8s infinite ease-in-out",
+            animationDelay: `${200 + idx * 100}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};

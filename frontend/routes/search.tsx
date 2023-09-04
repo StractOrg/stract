@@ -1,4 +1,4 @@
-import { defineRoute, RouteContext } from "$fresh/server.ts";
+import { defineRoute } from "$fresh/server.ts";
 import { Searchbar } from "../islands/Searchbar.tsx";
 import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 import * as search from "../search/index.ts";
@@ -62,6 +62,30 @@ const extractSearchParams = (searchParams: URLSearchParams): SearchParams => {
 };
 
 export default defineRoute(async (_req, ctx) => {
+  injectGlobal`
+    .search-content {
+      text-rendering: optimizeLegibility;
+      font-smooth: always;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .change-page-inactive {
+      @apply w-6 text-gray-500;
+    }
+
+    .change-page-active {
+      @apply w-6 text-brand/80 hover:text-brand;
+    }
+
+    .text-snippet {
+      font-weight: 400;
+    }
+    .text-snippet > b {
+      font-weight: 700;
+    }
+  `;
+
   const selected = signal<SelectedAdjust>(null);
 
   const {
@@ -206,30 +230,6 @@ export default defineRoute(async (_req, ctx) => {
     </>
   );
 });
-
-injectGlobal`
-.search-content {
-  text-rendering: optimizeLegibility;
-  font-smooth: always;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.change-page-inactive {
-  @apply w-6 text-gray-500;
-}
-
-.change-page-active {
-  @apply w-6 text-brand/80 hover:text-brand;
-}
-
-.text-snippet {
-  font-weight: 400;
-}
-.text-snippet > b {
-  font-weight: 700;
-}
-`;
 
 /**
  * Fetces the given `opticUrl` if allowed. The rules for which are allowed
