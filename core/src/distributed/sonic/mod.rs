@@ -143,7 +143,7 @@ where
 
     pub async fn accept(&self) -> Result<Request<Req, Res>> {
         let (mut stream, client) = self.listener.accept().await?;
-        tracing::debug!("accepted connection from: {}", &client);
+        tracing::debug!(?client, "accepted connection");
 
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
         stream.read_exact(&mut header_buf).await?;
@@ -152,7 +152,6 @@ where
         let mut buf = vec![0; header.body_size];
 
         stream.read_exact(&mut buf).await?;
-        tracing::debug!("received bytes: {:?}", &buf);
 
         let body = Some(bincode::deserialize(&buf).unwrap());
 

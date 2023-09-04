@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
@@ -27,8 +27,7 @@ use stract::entrypoint::configure;
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::prelude::*;
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -189,15 +188,23 @@ enum IndexingOptions {
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
-    let raw_config = fs::read_to_string(path).expect("Failed to read config file");
-    toml::from_str(&raw_config).expect("Failed to parse config")
+    let path = path.as_ref();
+    let raw_config = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read config: '{}'", path.display()))
+        .unwrap();
+    toml::from_str(&raw_config)
+        .with_context(|| format!("Failed to parse config: '{}'", path.display()))
+        .unwrap()
 }
 
 fn main() -> Result<()> {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .without_time()
+        .with_target(false)
+        .finish()
+        .init();
 
     let args = Args::parse();
 

@@ -1,11 +1,23 @@
-@frontend-rerun *ARGS:
-    ./scripts/run_frontend.py {{ARGS}}
+@dev *ARGS:
+    ./scripts/run_dev.py {{ARGS}}
 
-@frontend *ARGS:
-    cargo watch -i frontend -s 'just frontend-rerun {{ARGS}}'
+export RUST_LOG := "info,stract=debug"
 
-@frontend-openapi:
-    deno run -A npm:openapi-typescript http://localhost:3000/beta/api/docs/openapi.json -o frontend/search/schema.d.ts
+export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
+
+@dev-api:
+    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- api configs/api.toml"
+@dev-search-server:
+    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- search-server configs/search_server.toml"
+@dev-webgraph:
+    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- webgraph server configs/webgraph/server.toml"
+@dev-alice:
+    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- alice serve configs/alice.toml"
+@dev-frontend:
+    cd frontend && deno task start
+
+@openapi:
+    cd frontend && deno task openapi
 
 @setup *ARGS:
     just setup_python_env
