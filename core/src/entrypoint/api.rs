@@ -22,7 +22,7 @@ use crate::{
     metrics::Label,
 };
 
-pub async fn run(config: config::FrontendConfig) -> Result<()> {
+pub async fn run(config: config::ApiConfig) -> Result<()> {
     let search_counter_success = crate::metrics::Counter::default();
     let search_counter_fail = crate::metrics::Counter::default();
     let explore_counter = crate::metrics::Counter::default();
@@ -69,7 +69,7 @@ pub async fn run(config: config::FrontendConfig) -> Result<()> {
     let metrics_app = metrics_router(registry);
 
     let addr = config.host;
-    tracing::info!("frontend server listening on {}", addr);
+    tracing::info!("api server listening on {}", addr);
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
 
     let addr = config.prometheus_host;
