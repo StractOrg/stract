@@ -154,7 +154,7 @@ impl StoredSegment {
         })
     }
 
-    fn merge_adjacency<F1>(edges_fn: F1, packet: &mut MergePacket, segments: &[Self])
+    fn merge_adjacency<F1>(edges_fn: F1, packet: &MergePacket, segments: &[Self])
     where
         F1: Fn(&Self, &NodeID) -> Option<HashSet<FullStoredEdge>>,
     {
@@ -201,14 +201,14 @@ impl StoredSegment {
         let new_full_adjacency = Store::open(new_path.join(FULL_ADJACENCY_STORE));
         let new_small_adjacency = Store::open(new_path.join(SMALL_ADJACENCY_STORE));
 
-        let mut packet = MergePacket {
+        let packet = MergePacket {
             new_full_adjacency,
             new_small_adjacency,
         };
 
         Self::merge_adjacency(
             |segment: &StoredSegment, node_id: &NodeID| segment.full_adjacency.get(node_id),
-            &mut packet,
+            &packet,
             &segments,
         );
         let new_adjacency = packet.new_full_adjacency;
@@ -218,7 +218,7 @@ impl StoredSegment {
         let new_small_reversed_adjacency =
             Store::open(new_path.join(SMALL_REVERSED_ADJACENCY_STORE));
 
-        let mut packet = MergePacket {
+        let packet = MergePacket {
             new_full_adjacency: new_full_reversed_adjacency,
             new_small_adjacency: new_small_reversed_adjacency,
         };
@@ -227,7 +227,7 @@ impl StoredSegment {
             |segment: &StoredSegment, node_id: &NodeID| {
                 segment.full_reversed_adjacency.get(node_id)
             },
-            &mut packet,
+            &packet,
             &segments,
         );
 

@@ -1154,6 +1154,13 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
+                Field::Text(TextField::DomainIfHomepageNoTokenizer) => {
+                    if self.is_homepage() {
+                        doc.add_pre_tokenized_text(tantivy_field, domain.clone());
+                    } else {
+                        doc.add_text(tantivy_field, "");
+                    }
+                }
                 Field::Text(TextField::AllBody) => {
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
                 }

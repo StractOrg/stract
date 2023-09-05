@@ -266,7 +266,7 @@ struct TimeMix {
     block_idx: i64,
 }
 impl TimeMix {
-    fn forward(&self, x: &Tensor, state: &mut Tensor) -> Tensor {
+    fn forward(&self, x: &Tensor, state: &Tensor) -> Tensor {
         let x = x.squeeze();
         let xk = &x * &self.time_mix_k + state.i(5 * self.block_idx + 1) * (1 - &self.time_mix_k);
         let xv = &x * &self.time_mix_v + state.i(5 * self.block_idx + 1) * (1 - &self.time_mix_v);
@@ -345,7 +345,7 @@ struct ChannelMix {
     block_idx: i64,
 }
 impl ChannelMix {
-    fn forward(&self, x: &Tensor, state: &mut Tensor) -> Tensor {
+    fn forward(&self, x: &Tensor, state: &Tensor) -> Tensor {
         let x = x.squeeze();
         let xk = &x * &self.time_mix_k + state.i(5 * self.block_idx) * (1 - &self.time_mix_k);
         let xr = &x * &self.time_mix_r + state.i(5 * self.block_idx) * (1 - &self.time_mix_r);
@@ -473,11 +473,11 @@ impl Block {
 
         x += self
             .att
-            .forward(&self.ln1.forward_t(&x, false), &mut state)
+            .forward(&self.ln1.forward_t(&x, false), &state)
             .reshape([1, -1]);
         x += self
             .ffn
-            .forward(&self.ln2.forward_t(&x, false), &mut state)
+            .forward(&self.ln2.forward_t(&x, false), &state)
             .reshape([1, -1]);
 
         (x, state)

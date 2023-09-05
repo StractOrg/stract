@@ -88,7 +88,7 @@ impl CentralityStore {
 
     fn store_harmonic<P: AsRef<Path>>(
         output_path: P,
-        store: &mut CentralityStore,
+        store: &CentralityStore,
         harmonic_centrality: HarmonicCentrality,
         graph: &Webgraph,
     ) {
@@ -127,10 +127,10 @@ impl CentralityStore {
     }
 
     pub fn build_harmonic<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
-        let mut store = CentralityStore::open(output_path.as_ref());
+        let store = CentralityStore::open(output_path.as_ref());
 
         let harmonic_centrality = HarmonicCentrality::calculate(graph);
-        Self::store_harmonic(&output_path, &mut store, harmonic_centrality, graph);
+        Self::store_harmonic(&output_path, &store, harmonic_centrality, graph);
 
         store.flush();
         store

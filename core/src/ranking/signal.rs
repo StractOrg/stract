@@ -95,6 +95,8 @@ pub enum Signal {
     Bm25DomainIfHomepage,
     #[serde(rename = "bm25_domain_name_if_homepage_no_tokenizer")]
     Bm25DomainNameIfHomepageNoTokenizer,
+    #[serde(rename = "bm25_domain_if_homepage_no_tokenizer")]
+    Bm25DomainIfHomepageNoTokenizer,
     #[serde(rename = "bm25_title_if_homepage")]
     Bm25TitleIfHomepage,
     #[serde(rename = "bm25_backlink_text")]
@@ -161,7 +163,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 39] = [
+pub const ALL_SIGNALS: [Signal; 40] = [
     Signal::Bm25,
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
@@ -180,6 +182,7 @@ pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::Bm25DomainNameNoTokenizer,
     Signal::Bm25DomainIfHomepage,
     Signal::Bm25DomainNameIfHomepageNoTokenizer,
+    Signal::Bm25DomainIfHomepageNoTokenizer,
     Signal::Bm25TitleIfHomepage,
     Signal::Bm25BacklinkText,
     Signal::Bm25Description,
@@ -288,6 +291,7 @@ impl Signal {
             Signal::Bm25DomainNameNoTokenizer => 0.00005,
             Signal::Bm25DomainIfHomepage => 0.0002,
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.007,
+            Signal::Bm25DomainIfHomepageNoTokenizer => 0.007,
             Signal::Bm25TitleIfHomepage => 0.00002,
             Signal::Bm25BacklinkText => 0.003,
             Signal::Bm25Description => 0.00001,
@@ -458,6 +462,7 @@ impl Signal {
             | Signal::Bm25DomainNameNoTokenizer
             | Signal::Bm25DomainIfHomepage
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
+            | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
             | Signal::Bm25BacklinkText
             | Signal::Bm25Description => signal_aggregator.segment_reader.as_mut().map(|reader| {
@@ -581,6 +586,7 @@ impl Signal {
             | Signal::Bm25DomainNameNoTokenizer
             | Signal::Bm25DomainIfHomepage
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
+            | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
             | Signal::Bm25BacklinkText
             | Signal::Bm25Description
@@ -657,6 +663,7 @@ impl Signal {
             Signal::Bm25TitleIfHomepage => Some(TextField::TitleIfHomepage),
             Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
             Signal::Bm25Description => Some(TextField::Description),
+            Signal::Bm25DomainIfHomepageNoTokenizer => Some(TextField::DomainIfHomepageNoTokenizer),
             _ => None,
         }
     }

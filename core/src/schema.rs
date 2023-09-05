@@ -34,13 +34,16 @@ pub enum TextField {
     SiteWithout,
     Domain,
     SiteNoTokenizer,
-    SiteIfHomepageNoTokenizer,
     DomainNoTokenizer,
     DomainNameNoTokenizer,
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    SiteIfHomepageNoTokenizer,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     DomainIfHomepage,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     DomainNameIfHomepageNoTokenizer,
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    DomainIfHomepageNoTokenizer,
     /// this field is only set if the webpage is the homepage for the site. Allows us to boost
     TitleIfHomepage,
     BacklinkText,
@@ -91,6 +94,7 @@ impl TextField {
             TextField::DomainNameNoTokenizer => Tokenizer::Identity(Identity {}),
             TextField::DomainIfHomepage => Tokenizer::default(),
             TextField::DomainNameIfHomepageNoTokenizer => Tokenizer::Identity(Identity {}),
+            TextField::DomainIfHomepageNoTokenizer => Tokenizer::Identity(Identity {}),
             TextField::TitleIfHomepage => Tokenizer::default(),
             TextField::BacklinkText => Tokenizer::default(),
             TextField::Description => Tokenizer::default(),
@@ -131,6 +135,7 @@ impl TextField {
             TextField::DomainNameNoTokenizer => false,
             TextField::DomainIfHomepage => false,
             TextField::DomainNameIfHomepageNoTokenizer => false,
+            TextField::DomainIfHomepageNoTokenizer => false,
             TextField::TitleIfHomepage => false,
             TextField::BacklinkText => false,
             TextField::Description => true,
@@ -163,6 +168,7 @@ impl TextField {
             TextField::StemmedCleanBody => "stemmed_body",
             TextField::DomainIfHomepage => "domain_if_homepage",
             TextField::DomainNameIfHomepageNoTokenizer => "domain_name_if_homepage_no_tokenizer",
+            TextField::DomainIfHomepageNoTokenizer => "domain_if_homepage_no_tokenizer",
             TextField::Description => "description",
             TextField::TitleIfHomepage => "title_if_homepage",
             TextField::AllBody => "all_body",
@@ -264,7 +270,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 58] = [
+pub static ALL_FIELDS: [Field; 59] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -280,6 +286,7 @@ pub static ALL_FIELDS: [Field; 58] = [
     Field::Text(TextField::DomainNameNoTokenizer),
     Field::Text(TextField::DomainIfHomepage),
     Field::Text(TextField::DomainNameIfHomepageNoTokenizer),
+    Field::Text(TextField::DomainIfHomepageNoTokenizer),
     Field::Text(TextField::TitleIfHomepage),
     Field::Text(TextField::BacklinkText),
     Field::Text(TextField::Description),
@@ -381,6 +388,9 @@ impl Field {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::DomainIfHomepageNoTokenizer) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::BacklinkText) => {

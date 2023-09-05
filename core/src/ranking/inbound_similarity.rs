@@ -129,10 +129,7 @@ impl InboundSimilarity {
         let adjacency: DashMap<NodeID, IntSet<NodeID>> = DashMap::new();
 
         graph.par_edges().for_each(|edge| {
-            adjacency
-                .entry(edge.to)
-                .or_insert_with(IntSet::new)
-                .insert(edge.from);
+            adjacency.entry(edge.to).or_default().insert(edge.from);
         });
 
         for (node_id, inbound) in adjacency {
