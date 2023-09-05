@@ -51,18 +51,18 @@ export const Code = (
 
   return (
     <pre data-langauge={highlightedCode.language}>
-      <code class="text-gray-600" dangerouslySetInnerHTML={{__html: highlightedCode.value}} />
+      <code class="text-gray-600 dark:text-brand-200" dangerouslySetInnerHTML={{__html: highlightedCode.value}} />
     </pre>
   );
 };
 
 injectGlobal`
-.hljs-keyword { @apply text-brand; }
+.hljs-keyword { @apply text-brand-600 dark:text-brand-400; }
 .hljs-number,
-.hljs-literal { @apply text-teal-700; }
-.hljs-string  { @apply text-green-700; }
-.hljs-comment { @apply text-teal-800/80; }
-.hljs-title   { @apply text-emerald-600; }
+.hljs-literal { @apply text-teal-700 dark:text-teal-300; }
+.hljs-string  { @apply text-green-700 dark:text-green-300; }
+.hljs-comment { @apply text-teal-800/80 dark:text-teal-200/50; }
+.hljs-title   { @apply text-emerald-600 dark:text-emerald-300; }
 `;
 
 const InternalHighlighter = (
@@ -98,7 +98,7 @@ const CodeI = ({ node }: { node: Node }) =>
       (n) => {
         const c = match(n.properties.className)
           // .with(["pl-k"], () => "text-purple-700")
-          .with(["pl-k"], () => "text-brand")
+          .with(["pl-k"], () => "text-brand-600")
           // entity
           .with(["pl-en"], () => "text-teal-700")
           .with(["pl-e"], () => "text-emerald-600")
@@ -165,10 +165,10 @@ const CodeI = ({ node }: { node: Node }) =>
         <span
           class={match(n.properties.className).with(
             ["pl-k"],
-            () => "text-brand",
+            () => "text-brand-600",
           ).with(
             ["pl-en"],
-            () => "text-brand_contrast",
+            () => "text-contrast-500",
           ).otherwise((c) => {
             console.log("Unknown class:", c);
             return "";

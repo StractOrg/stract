@@ -12,10 +12,11 @@ import { match } from "ts-pattern";
 import { summarySignals } from "../search/summary.ts";
 import { updateStorageSignal } from "../search/utils.ts";
 import { HiAdjustmentsVerticalOutline } from "../icons/HiAdjustmentsVerticalOutline.tsx";
-import { HiHandThumbUpOutline } from "../icons/HiHandThumbUpOutline.tsx";
-import { HiHandThumbDownOutline } from "../icons/HiHandThumbDownOutline.tsx";
-import { HiNoSymbol } from "../icons/HiNoSymbol.tsx";
+import { HiHandThumbUpMini } from "../icons/HiHandThumbUpMini.tsx";
+import { HiHandThumbDownMini } from "../icons/HiHandThumbDownMini.tsx";
+import { HiNoSymbolMini } from "../icons/HiNoSymbolMini.tsx";
 import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { Button } from "../components/Button.tsx";
 
 export type SelectedAdjust =
   | { button: HTMLElement; item: search.Webpage }
@@ -29,7 +30,11 @@ export default function SearchResultAdjust(
 ) {
   return (
     <button
-      class="adjust-button hidden min-w-fit items-center justify-center md:flex w-5 text-gray-700/50 hover:cursor-pointer hover:text-gray-700 bg-transparent noscript:hidden"
+      class={tx`
+      adjust-button hidden min-w-fit items-center justify-center md:flex w-5 hover:cursor-pointer bg-transparent noscript:hidden
+      text-gray-700/50 hover:text-gray-700
+      dark:(text-stone-400 hover:text-stone-300)
+      `}
       data-site={item.site}
       data-url={item.url}
       onClick={(e) => {
@@ -72,10 +77,12 @@ export const SearchResultAdjustModal = (
 
   return (
     <div
-      class={tx(
-        "absolute h-fit w-52 origin-left flex-col items-center overflow-hidden rounded-lg border bg-white py-5 px-2 text-sm drop-shadow-md -translate-y-1/2",
-        rect ? "flex transition-all scale-1" : "scale-0",
-      )}
+      class={tx`
+        absolute h-fit w-52 origin-left flex-col items-center overflow-hidden rounded-lg py-5 px-2 text-sm drop-shadow-md -translate-y-1/2
+        border dark:border-stone-700
+        bg-white dark:bg-stone-800
+        ${rect ? "flex transition-all scale-1" : "scale-0"}
+      `}
       id="modal"
       style={rect && {
         left: rect.left + rect.width + 5 + "px",
@@ -92,46 +99,38 @@ export const SearchResultAdjustModal = (
           {selected.value ? selected.value.item.domain : "EXAMPLE.com"}?
         </h2>
         <div class="flex space-x-1.5 pt-2 justify-center">
-          <span class="text-brand">
-            <AdjustButton
-              ranking={liked}
-              others={[disliked, blocked]}
-              selected={selected}
-              form="searchbar-form"
-            >
-              <HiHandThumbUpOutline class="w-4" />
-            </AdjustButton>
-          </span>
-          <span class="text-amber-400">
-            <AdjustButton
-              ranking={disliked}
-              others={[liked, blocked]}
-              selected={selected}
-              form="searchbar-form"
-            >
-              <HiHandThumbDownOutline class="w-4" />
-            </AdjustButton>
-          </span>
-          <span class="text-red-500">
-            <AdjustButton
-              ranking={blocked}
-              others={[liked, disliked]}
-              selected={selected}
-              form="searchbar-form"
-            >
-              <HiNoSymbol class="w-4" />
-            </AdjustButton>
-          </span>
+          <AdjustButton
+            base="brand"
+            ranking={liked}
+            others={[disliked, blocked]}
+            selected={selected}
+            form="searchbar-form"
+          >
+            <HiHandThumbUpMini class="w-4" />
+          </AdjustButton>
+          <AdjustButton
+            base="amber"
+            ranking={disliked}
+            others={[liked, blocked]}
+            selected={selected}
+            form="searchbar-form"
+          >
+            <HiHandThumbDownMini class="w-4" />
+          </AdjustButton>
+          <AdjustButton
+            base="red"
+            ranking={blocked}
+            others={[liked, disliked]}
+            selected={selected}
+            form="searchbar-form"
+          >
+            <HiNoSymbolMini class="w-4" />
+          </AdjustButton>
         </div>
       </div>
       <div class="mt-4 flex justify-center">
-        <button
-          className={tx(
-            "rounded-full px-2 py-1 border bg-white",
-            // #summarize-btn:not(:disabled)
-            "hover:border-brand hover:text-brand",
-            "[&.active]:border-brand [&.active]:text-brand",
-          )}
+        <Button
+          pale
           onClick={() => {
             const item = selected.value?.item;
             if (!item) return;
@@ -160,14 +159,15 @@ export const SearchResultAdjustModal = (
           }}
         >
           Summarize Result
-        </button>
+        </Button>
       </div>
     </div>
   );
 };
 
 function AdjustButton(
-  { ranking, others, selected, children, ...props }: {
+  { base, ranking, others, selected, children, ...props }: {
+    base: string;
     ranking: RankingSignal;
     others: RankingSignal[];
     selected: Signal<SelectedAdjust>;
@@ -178,13 +178,11 @@ function AdjustButton(
   );
 
   return (
-    <button
+    <Button
       {...props}
-      class={tx(
-        "group rounded-full border bg-white px-2 py-2",
-        "hover:border-current hover:text-current",
-        active && "border-current text-inherit",
-      )}
+      class="!px-2 border text-opacity-80"
+      pale={!active}
+      base={active ? base : "gray"}
       onClick={() => {
         const domain = selected.value?.item.domain;
         if (!domain) return;
@@ -203,14 +201,7 @@ function AdjustButton(
         }
       }}
     >
-      <span
-        class={tx(
-          active ? "text-inherit" : "text-[#333]",
-          "group-hover:text-inherit",
-        )}
-      >
-        {children}
-      </span>
-    </button>
+      {children}
+    </Button>
   );
 }

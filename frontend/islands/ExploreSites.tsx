@@ -1,10 +1,12 @@
 import { HiChevronDown } from "../icons/HiChevronDown.tsx";
 import { useSignal, useSignalEffect } from "@preact/signals";
-import LZString from "npm:lz-string";
 import { IS_BROWSER } from "$fresh/runtime.ts";
 import * as search from "../search/index.ts";
-import { Site, SiteWithDelete } from "../components/Site.tsx";
+import { SiteWithDelete } from "../components/Site.tsx";
 import { match } from "ts-pattern";
+import { Button } from "../components/Button.tsx";
+import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { HiPlusCircleOutline } from "../icons/HiPlusCircleOutline.tsx";
 
 const LIMIT_OPTIONS = [
   10,
@@ -67,7 +69,11 @@ export const ExploreSites = () => {
           </p>
         </div>
         <form
-          class="flex border border-gray-300 rounded-full w-full max-w-lg p-[2px] pl-3 mb-2"
+          class={tx`
+            flex rounded-full w-full max-w-lg p-[2px] pl-3 mb-2 transition
+            border border-gray-300 focus-within:border-gray-400 dark:border-stone-700 focus-within:dark:border-stone-600
+            bg-white dark:bg-stone-800
+          `}
           id="site-input-container"
           onSubmit={(e) => {
             e.preventDefault();
@@ -88,7 +94,7 @@ export const ExploreSites = () => {
           }}
         >
           <input
-            class="border-none outline-none focus:ring-0 grow placeholder:opacity-50"
+            class="border-none outline-none bg-transparent focus:ring-0 grow placeholder:opacity-50"
             type="text"
             id="site-input"
             name="site"
@@ -98,12 +104,9 @@ export const ExploreSites = () => {
             onInput={(e) =>
               inputWebsite.value = (e.target as HTMLInputElement).value}
           />
-          <button
-            id="add-site-btn"
-            class="bg-brand text-sm text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5"
-          >
+          <Button id="add-site-btn">
             Add
-          </button>
+          </Button>
         </form>
         {errorMessage.value && (
           <label
@@ -114,7 +117,10 @@ export const ExploreSites = () => {
             Unfortunately, we don't know about that site yet.
           </label>
         )}
-        <div class="flex flex-wrap gap-x-5 gap-y-3" id="sites-list">
+        <div
+          class="flex flex-wrap gap-x-5 gap-y-3 justify-center"
+          id="sites-list"
+        >
           {sites.value.map((site) => (
             <SiteWithDelete
               key={site}
@@ -138,7 +144,7 @@ export const ExploreSites = () => {
                 <div class="flex space-x-1">
                   <select
                     id="limit"
-                    class="styled-selector border-none cursor-pointer rounded"
+                    class="styled-selector border-none cursor-pointer rounded dark:bg-transparent"
                     value={limit.value}
                     onChange={(e) =>
                       limit.value = parseInt(
@@ -149,8 +155,7 @@ export const ExploreSites = () => {
                   </select>
                 </div>
               </div>
-              <button
-                class="bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5"
+              <Button
                 onClick={async () => {
                   const { data } = search.api.exploreExportOptic({
                     chosenSites: sites.value,
@@ -161,28 +166,25 @@ export const ExploreSites = () => {
                 }}
               >
                 Export as optic
-              </button>
+              </Button>
             </div>
-            <div id="result" class="grid grid-cols-[1fr_1fr_6fr] gap-y-2">
+            <div
+              id="result"
+              class="grid grid-cols-[auto_auto_minmax(auto,66%)] gap-x-3 gap-y-2 items-center"
+            >
               {similarSites.value.map((site) => (
                 <>
-                  {sites.value.includes(site.site)
-                    ? (
-                      <div class="w-4">
-                        <img src="/images/disabled-add.svg" />
-                      </div>
-                    )
-                    : (
-                      <div
-                        class="w-4 cursor-pointer"
-                        onClick={() => {
-                          sites.value = [...sites.value, site.site];
-                        }}
-                      >
-                        <img src="/images/add.svg" />
-                      </div>
-                    )}
-                  <div>{site.score.toFixed(2)}</div>
+                  <button
+                    class={tx`
+                      transition
+                      text-green-500 disabled:text-gray-400 enabled:hover:text-green-400 active:text-green-300
+                    `}
+                    disabled={sites.value.includes(site.site)}
+                    onClick={() => sites.value = [...sites.value, site.site]}
+                  >
+                    <HiPlusCircleOutline class="w-6" />
+                  </button>
+                  <div class="tabular-nums">{site.score.toFixed(2)}</div>
                   <div>
                     <a
                       target="_blank"
@@ -198,7 +200,7 @@ export const ExploreSites = () => {
             </div>
             <div class="w-full flex justify-center">
               <div
-                class="w-6 h-6 cursor-pointer rounded-full text-brand_contrast"
+                class="w-6 h-6 cursor-pointer rounded-full text-contrast-500 dark:text-contrast-700"
                 id="more-btn"
                 onClick={() => {
                   if (limit.value == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {

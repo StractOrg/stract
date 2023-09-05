@@ -105,7 +105,7 @@ const Entity = ({ entity }: { entity: search.Entity }) => (
 const StackOverflow = (
   { title, answer }: { title: string; answer: search.StackOverflowAnswer },
 ) => (
-  <div class="flex md:max-w-lg flex-col space-y-5 rounded-lg border p-5 overflow-hidden">
+  <div class="flex md:max-w-lg flex-col space-y-5 rounded-lg border p-5 overflow-hidden dark:border-stone-700">
     <div class="flex flex-col space-y-1">
       <div class="flex grow justify-between space-x-2">
         <div>
@@ -127,7 +127,7 @@ const StackOverflow = (
         <div>{answer.date}</div>
       </div>
     </div>
-    <hr />
+    <hr class="border-stone-700" />
     <div class="flex flex-col space-y-3">
       {answer.body.map((part) => (
         <div class="">
@@ -136,7 +136,7 @@ const StackOverflow = (
             .with(
               { "type": "code" },
               (p) => (
-                <div class="rounded-lg bg-slate-50">
+                <div class="rounded-lg bg-slate-50 dark:bg-stone-800">
                   <div class="overflow-auto px-3 py-2">
                     <Code
                       lang="js"

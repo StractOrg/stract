@@ -6,6 +6,7 @@ import {
   useSyncSignalWithLocalStorage,
 } from "../search/utils.ts";
 import { HiMinusCircleOutline } from "../icons/HiMinusCircleOutline.tsx";
+import { Button } from "../components/Button.tsx";
 
 export const ManageOptics = () => {
   const newOptic = useSignal<OpticOption>({
@@ -21,7 +22,7 @@ export const ManageOptics = () => {
       {IS_BROWSER &&
         (
           <form
-            class="grid w-full px-8 grid-cols-[1fr_1fr_5rem] gap-x-5 gap-y-2 [&>input]:border-none [&>input]:rounded"
+            class="grid w-full px-8 grid-cols-[1fr_1fr_5rem] gap-x-5 gap-y-2 [&>input]:border-none [&>input]:rounded [&>input]:bg-transparent"
             onSubmit={(e) => {
               e.preventDefault();
               updateStorageSignal(
@@ -51,12 +52,9 @@ export const ManageOptics = () => {
               onInput={(e) =>
                 newOptic.value.url = (e.target as HTMLInputElement).value}
             />
-            <button
-              class="rounded-full border-0 bg-brand text-sm text-white"
-              title="Remove optic"
-            >
+            <Button title="Remove optic">
               Add
-            </button>
+            </Button>
             <input
               class="col-span-2"
               type="text"

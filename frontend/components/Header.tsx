@@ -1,3 +1,4 @@
+import { tx } from "https://esm.sh/@twind/core@1.1.3";
 import { Navbar } from "./Navbar.tsx";
 
 export type HeaderProps = {
@@ -30,7 +31,8 @@ export const Header = (
       {showLogo && (
         <div class="w-20 absolute left-1/2 translate-x-[-50%]">
           <a href="/">
-            <img src="/images/biglogo-beta.svg" />
+            <img class="block dark:hidden" src="/images/biglogo-beta.svg" />
+            <img class="hidden dark:block" src="/images/biglogo-beta-alt.svg" />
           </a>
         </div>
       )}
@@ -40,7 +42,13 @@ export const Header = (
     </div>
 
     {showDivider && (
-      <div class="w-full h-[1px] bg-gradient-to-r from-cyan-400 via-brand to-cyan-400">
+      <div
+        class={tx`
+          w-full h-[1px] bg-gradient-to-r
+          from-brand-400 via-brand-600 to-brand-400
+          dark:from-brand-900 dark:via-brand-700 dark:to-brand-900
+        `}
+      >
       </div>
     )}
   </>
@@ -79,8 +87,7 @@ export const IndexBar = (
             {l.title}
           </a>
           {active === l.title && (
-            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-brand_contrast">
-            </div>
+            <div class="w-full h-[1px] absolute left-0 right-0 bottom-[-11px] bg-contrast-500 dark:bg-contrast-600" />
           )}
         </div>
       ))}

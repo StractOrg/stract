@@ -72,8 +72,14 @@ export const Chat = () => {
       <div class="max-w-3xl w-full gap-y-5 flex flex-col h-full">
         {events.value.length > 0 &&
           (
-            <details class="group transition-all border border-transparent opacity-25 open:opacity-100 open:border-slate-50 rounded-xl bg-white open:bg-slate-50 open:py-2 px-5 space-y-2">
-              <summary class="text-lg font-semibold cursor-pointer group-open:border-b group-open:pb-2">
+            <details
+              class={tx`
+                group transition-all border opacity-25 open:opacity-100 rounded-xl open:py-2 px-5 space-y-2
+                border-transparent open:border-slate-50 dark:open:border-brand-900
+                bg-white open:bg-brand-50 dark:bg-stone-800 dark:open:bg-stone-800
+              `}
+            >
+              <summary class="text-lg font-semibold cursor-pointer group-open:border-b group-open:pb-2 dark:border-stone-700">
                 Debugging
               </summary>
               <details>
@@ -181,7 +187,7 @@ const ChatView = (
                 <div class="w-20">
                   <img src="/images/warning.svg" />
                 </div>
-                <p class="text-brand_contrast/75">
+                <p class="text-contrast-400">
                   Alice is <b class="font-bold">highly experimental</b>{" "}
                   and might produce bad or downright wrong answers.
                 </p>
@@ -215,8 +221,8 @@ const ChatMessage = (
             class={tx(
               "p-2 rounded-xl border relative",
               isUser
-                ? "bg-brand/5 border-brand/30 rounded-br-none"
-                : "bg-black bg-opacity-[0.025] border-black border-opacity-[0.15] rounded-bl-none",
+                ? "bg-brand-50 border-brand-300 dark:bg-brand-950 dark:border-brand-800 rounded-br-none"
+                : "bg-gray-50 border-gray-300 dark:bg-stone-800 dark:border-stone-700 rounded-bl-none",
             )}
           >
             <ReactMarkdown
@@ -362,18 +368,27 @@ const FactReference = (
         target="__blank"
         class={tx(
           "text-xs",
-          source ? "font-semibold" : "text-slate-400 animate-pulse",
+          source
+            ? "font-semibold"
+            : "text-slate-400 dark:text-stone-500 animate-pulse",
         )}
         style={{ color }}
       >
         [{nr + 1}]
       </a>
-      <div class="absolute flex flex-col text-sm group-hover:opacity-100 opacity-0 transition -left-2 -bottom-1 translate-y-full bg-white p-2 rounded z-10 shadow pointer-events-none space-y-2">
+      <div
+        class={tx`
+        absolute flex flex-col text-sm group-hover:opacity-100 opacity-0 transition -left-2 -bottom-1 translate-y-full p-2 rounded z-10 shadow pointer-events-none space-y-2
+        bg-white dark:bg-stone-900 dark:border dark:border-stone-700
+      `}
+      >
         {source
           ? (
             <>
-              <p class="line-clamp-1 text-xs text-slate-500">{source.url}</p>
-              <p class="line-clamp-6 prose prose-sm w-[45ch] border-l pl-2">
+              <p class="line-clamp-1 text-xs text-slate-500 dark:text-brand-100">
+                {source.url}
+              </p>
+              <p class="line-clamp-6 prose dark:prose-invert prose-sm w-[45ch] border-l pl-2">
                 {source.text}
               </p>
               {typeof correctness == "number"
@@ -415,7 +430,7 @@ const ChatInput = (
         currentInput.value = "";
       }}
     >
-      <div class="flex w-full border rounded-xl p-2 pl-3">
+      <div class="flex w-full border rounded-xl p-2 pl-3 dark:border-slate-700">
         <div class="relative grow">
           <p class="text-transparent pointer-events-none whitespace-pre">
             {currentInput}.
@@ -423,7 +438,7 @@ const ChatInput = (
           <div class="absolute inset-0">
             <textarea
               autofocus
-              class="w-full h-full resize-none outline-none focus:ring-0 max-h-52 border-none p-0"
+              class="w-full h-full resize-none outline-none focus:ring-0 max-h-52 border-none p-0 bg-transparent"
               placeholder="Type a message..."
               value={currentInput}
               onKeyDown={(e) => {
@@ -444,7 +459,7 @@ const ChatInput = (
         <div class="flex place-items-end">
           <button
             id="send-button"
-            class="w-6 h-6 text-brand_contrast/50 hover:text-brand_contrast cursor-pointer !bg-transparent"
+            class="w-6 h-6 text-contrast-300 hover:text-contrast-500 cursor-pointer !bg-transparent"
             disabled={disabled}
           >
             <HiPaperAirplaneOutline />
@@ -466,15 +481,15 @@ const ChatBubble = () => {
 @keyframes mercuryTypingAnimation {
   0% {
     transform: translateY(0px);
-    @apply bg-brand/70;
+    @apply bg-brand-500 dark:bg-brand-950;
   }
   28% {
     transform: translateY(-70px);
-    @apply bg-brand/40;
+    @apply bg-brand-300 dark:bg-brand-800;
   }
   44% {
     transform: translateY(0px);
-    @apply bg-brand/20;
+    @apply bg-brand-100 dark:bg-brand-600;
   }
 }
 `;
@@ -483,7 +498,7 @@ const ChatBubble = () => {
     <div class="flex items-center space-x-1">
       {Array.from({ length: 3 }).map((_, idx) => (
         <div
-          class={"dot h-2 w-2 bg-brand/70 rounded-full"}
+          class={"dot h-2 w-2 bg-brand-500 rounded-full"}
           style={{
             animation: "mercuryTypingAnimation 1.8s infinite ease-in-out",
             animationDelay: `${200 + idx * 100}ms`,

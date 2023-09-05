@@ -1,6 +1,6 @@
 import { defineRoute } from "$fresh/server.ts";
 import { Searchbar } from "../islands/Searchbar.tsx";
-import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
+import { injectGlobal, tx } from "https://esm.sh/@twind/core@1.1.3";
 import * as search from "../search/index.ts";
 import { match, P } from "ts-pattern";
 import { Header } from "../components/Header.tsx";
@@ -69,15 +69,6 @@ export default defineRoute(async (_req, ctx) => {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
-
-    .change-page-inactive {
-      @apply w-6 text-gray-500;
-    }
-
-    .change-page-active {
-      @apply w-6 text-brand/80 hover:text-brand;
-    }
-
     .text-snippet {
       font-weight: 400;
     }
@@ -299,24 +290,25 @@ const ResultsWebsites = (
       />
     ))}
 
-    <div class="flex w-full items-center justify-center">
-      {prevPageUrl
-        ? (
-          <a href={prevPageUrl}>
-            <HiChevronLeft class="change-page-active" />
+    <div class="flex justify-center">
+      <div class="grid items-center justify-center grid-cols-[repeat(3,auto)] gap-2">
+        <div class="row-start-1 col-start-2">
+          Page {currentPage}
+        </div>
+        {[
+          { url: prevPageUrl, Icon: HiChevronLeft },
+          { url: nextPageUrl, Icon: HiChevronRight },
+        ].map(({ url, Icon }) => (
+          <a href={url || void 0}>
+            <Icon
+              class={tx(
+                "w-6",
+                url ? "text-brand-500 hover:text-brand-600" : "text-gray-500",
+              )}
+            />
           </a>
-        )
-        : <HiChevronLeft class="change-page-inactive" />}
-      <div class="mx-2">
-        Page {currentPage}
+        ))}
       </div>
-      {nextPageUrl
-        ? (
-          <a href={nextPageUrl}>
-            <HiChevronRight class="change-page-active" />
-          </a>
-        )
-        : <HiChevronRight class="change-page-inactive" />}
     </div>
   </div>
 );
@@ -335,7 +327,7 @@ const Webpage = (
           <div class="flex items-center text-sm">
             <TrackClick
               click={click}
-              class="truncate text-gray-800 hover:no-underline improvement-on-click max-w-[calc(100%-100px)]"
+              class="truncate text-gray-800 dark:text-brand-100 hover:no-underline improvement-on-click max-w-[calc(100%-100px)]"
               href={item.url}
             >
               {item.prettyUrl}
@@ -343,7 +335,7 @@ const Webpage = (
           </div>
           <TrackClick
             click={click}
-            class="text-blue-800 visited:text-purple-800 sr-title-link truncate text-xl font-medium improvement-on-click max-w-[calc(100%-30px)]"
+            class="text-blue-800 dark:text-blue-500 visited:text-purple-800 dark:visited:text-purple-500 sr-title-link truncate text-xl font-medium improvement-on-click max-w-[calc(100%-30px)]"
             title={item.title}
             href={item.url}
           >
@@ -352,7 +344,7 @@ const Webpage = (
         </div>
         <SearchResultAdjust item={item} selected={selected} />
       </div>
-      <div class="text-sm text-snippet">
+      <div class="text-sm text-snippet dark:text-stone-400">
         <Snippet item={item} />
       </div>
     </div>

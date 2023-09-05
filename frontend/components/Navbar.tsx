@@ -42,7 +42,7 @@ export const Navbar = ({ queryUrlPart: query }: {
     </nav>
 
     <nav class="group relative flex items-center text-lg sm:hidden">
-      <button class="mx-1 aspect-square rounded-full bg-transparent px-3 text-gray-400 transition group-hover:text-brand/30">
+      <button class="mx-1 aspect-square rounded-full bg-transparent px-3 text-gray-400 transition group-hover:text-brand-200">
         <HiBars2 class="w-6" />
       </button>
       <div class="pointer-events-none absolute bottom-0 right-0 z-50 translate-y-full flex-col pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100">
@@ -71,10 +71,12 @@ const Icon = (
   { "class": c, ...props }: JSX.HTMLAttributes<HTMLAnchorElement>,
 ) => (
   <a
-    class={tx(
-      "flex justify-center rounded-full p-2 text-gray-500 transition hover:bg-brand/10 hover:text-brand",
-      c?.toString(),
-    )}
+    class={tx`
+      flex justify-center rounded-full p-2 transition
+      text-gray-500 hover:bg-brand-100 hover:text-brand-600
+      dark:(hover:bg-brand-900 hover:text-stone-50)
+      ${c?.toString()}
+    `}
     {...props}
   />
 );
@@ -83,10 +85,11 @@ const Link = (
   { "class": c, ...props }: JSX.HTMLAttributes<HTMLAnchorElement>,
 ) => (
   <a
-    class={tx(
-      "transition hover:bg-brand/5 hover:text-brand hover:no-underline",
-      c?.toString(),
-    )}
+    class={tx`
+      transition hover:bg-brand-50 hover:text-brand-600 hover:no-underline
+      dark:(hover:bg-brand-900 hover:text-stone-50)
+      ${c?.toString()}
+    `}
     {...props}
   />
 );

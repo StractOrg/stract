@@ -8,19 +8,22 @@ export const Site = (
     children?: ComponentChildren;
   },
 ) => (
-  <span class="bg-brand/5 transition rounded-lg flex">
+  <span class="group bg-brand-500 transition rounded-lg flex dark:bg-brand-800 overflow-hidden">
     <a
       href={href}
-      class={tx(
-        "le-site text-brand/90 hover:text-brand hover:no-underline py-2",
-        right ? "pl-3 pr-2" : "px-3",
-      )}
+      class={tx`
+        transition hover:no-underline py-2
+        text-white
+        bg-brand-500 hover:bg-brand-600 active:bg-brand-700
+        dark:bg-brand-800 dark:hover:bg-brand-700 dark:active:bg-brand-600
+        ${right ? "pl-3 pr-2" : "px-3"}
+      `}
     >
       {children ?? href}
     </a>
     {right && (
       <>
-        <span class="w-px bg-brand/10 my-2" />
+        <span class="w-px bg-brand-100 my-2 dark:bg-brand-950 group-hover:bg-transparent transition" />
         {right}
       </>
     )}
@@ -38,7 +41,12 @@ export const SiteWithDelete = (
     href={href}
     right={
       <button
-        class="remove-site cursor-pointer bg-transparent px-2 text-brand/40 text-sm hover:text-brand transition"
+        class={tx`
+          remove-site cursor-pointer px-2 text-sm transition
+        text-white
+        bg-brand-500 hover:bg-brand-600 active:bg-brand-700
+          dark:bg-brand-800 dark:hover:bg-brand-700 dark:active:bg-brand-600
+        `}
         onClick={() => onDelete()}
       >
         ×

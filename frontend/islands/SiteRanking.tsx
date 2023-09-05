@@ -9,6 +9,7 @@ import {
   useSaveRanking,
 } from "../search/ranking.ts";
 import { updateStorageSignal } from "../search/utils.ts";
+import { Button } from "../components/Button.tsx";
 
 export const SiteRanking = ({ section }: { section: SiteRankingSection }) => {
   const ranking = useRanking(section);
@@ -48,8 +49,7 @@ export const ClearAndExportSiteRankingButton = (
   );
 
   return (
-    <button
-      class="w-fit bg-brand text-white opacity-75 hover:opacity-100 transition-colors duration-50 rounded-full py-2 px-5"
+    <Button
       onClick={async () => {
         if (exportOptic) {
           const { data } = search.api.sitesExportOptic({
@@ -67,6 +67,6 @@ export const ClearAndExportSiteRankingButton = (
       }}
     >
       {children}
-    </button>
+    </Button>
   );
 };

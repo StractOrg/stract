@@ -21,7 +21,7 @@ export default function Home() {
             <img src="/images/biglogo-with-text.svg" class="h-full w-full" />
           </div>
           <Searchbar autofocus />
-          <div class="mt-3 text-gray-600 flex space-x-2">
+          <div class="mt-3 text-gray-600 flex space-x-2 dark:text-gray-500">
             <div>
               Customise your search with an{" "}
               <a class="underline font-medium" href="/settings">optic</a>:

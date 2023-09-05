@@ -17,7 +17,7 @@ export const Article = (
         <Header withAlice={with_alice} />
 
         <div class="flex h-fit w-full flex-col items-center pt-10 px-5">
-          <div class="prose prose-sm leading-6 prose-headings:text-center prose-headings:font-medium prose-h4:float-left prose-h4:my-0 prose-h4:mr-3 prose-h4:leading-7">
+          <div class="prose prose-sm dark:prose-invert leading-6 prose-headings:text-center prose-headings:font-medium prose-h4:float-left prose-h4:my-0 prose-h4:mr-3 prose-h4:leading-7">
             {children}
           </div>
         </div>

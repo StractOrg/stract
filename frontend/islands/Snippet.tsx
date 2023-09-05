@@ -26,11 +26,11 @@ export const Snippet = ({ item }: { item: search.Webpage }) => {
     <div class="snippet">
       {summary
         ? (
-          <div class="p-4 rounded-lg bg-slate-100">
+          <div class="p-4 rounded-lg bg-slate-100 dark:bg-stone-800">
             <div class="font-light flex justify-between mb-2">
               <span>Summary</span>
               <button
-                class="rounded px-2 text-xs bg-slate-200 text-slate-700"
+                class="rounded px-2 text-xs bg-slate-200 text-slate-700 dark:bg-stone-700 dark:text-stone-100"
                 onClick={() => {
                   summarySignals.value = {
                     ...summarySignals.value,

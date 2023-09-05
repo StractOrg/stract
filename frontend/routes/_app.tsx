@@ -5,6 +5,8 @@ import { ApiClient } from "../islands/ApiClient.tsx";
 import { apiBaseFromEnv } from "../search/index.ts";
 
 export default function App({ Component }: AppProps) {
+  injectColorScheme();
+
   injectGlobal`
     html,
     body {
@@ -19,28 +21,6 @@ export default function App({ Component }: AppProps) {
 
     label {
       display: block;
-    }
-
-    input:disabled {
-      color: #ccc;
-    }
-
-    button {
-      color: #333;
-      background-color: #f4f4f4;
-      outline: none;
-    }
-
-    button:disabled {
-      color: #999;
-    }
-
-    button:not(:disabled):active {
-      background-color: #ddd;
-    }
-
-    button:focus {
-      border-color: #666;
     }
 
     pre > code {
@@ -89,10 +69,40 @@ export default function App({ Component }: AppProps) {
           </noscript>
           <title>Stract</title>
         </head>
-        <body class="font-light h-full antialiased">
+        <body class="font-light h-full antialiased dark:bg-stone-900 dark:text-white">
           <Component />
         </body>
       </html>
     </>
   );
 }
+
+const injectColorScheme = () => {
+  return injectGlobal`
+  :root {
+    --brand-50: 237 249 255;
+    --brand-100: 215 239 255;
+    --brand-200: 185 228 255;
+    --brand-300: 136 213 255;
+    --brand-400: 80 189 255;
+    --brand-500: 40 156 255;
+    --brand-600: 11 123 255;
+    --brand-700: 10 102 235;
+    --brand-800: 15 82 190;
+    --brand-900: 19 72 149;
+    --brand-950: 17 45 90;
+
+    --contrast-50: 255 247 237;
+    --contrast-100: 255 236 212;
+    --contrast-200: 255 213 168;
+    --contrast-300: 255 183 112;
+    --contrast-400: 255 140 55;
+    --contrast-500: 255 105 11;
+    --contrast-600: 240 80 6;
+    --contrast-700: 199 58 7;
+    --contrast-800: 158 46 14;
+    --contrast-900: 127 41 15;
+    --contrast-950: 69 17 5;
+  }
+  `;
+};

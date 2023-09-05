@@ -11,6 +11,7 @@ import { useSyncSignalWithLocalStorage } from "../search/utils.ts";
 import { safeSearchSignal } from "../search/preferences.ts";
 import { tx } from "https://esm.sh/@twind/core@1.1.3";
 import { ComponentChild } from "preact";
+import { Button } from "../components/Button.tsx";
 
 export const Searchbar = (
   { autofocus = false, defaultQuery = "" }: {
@@ -66,7 +67,13 @@ export const Searchbar = (
       <div class="h-10">
         <div
           id="searchbar"
-          class="group absolute z-40 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-3xl border border-gray-300 bg-white transition-shadow focus-within:shadow overflow-hidden"
+          class={tx`
+            group absolute z-40 inset-x-0 top-0 grid grid-cols-[auto_1fr_auto] grid-rows-[2.5rem] rounded-[1.25rem]
+            overflow-hidden
+            transition focus-within:shadow
+            border border-gray-300 focus-within:border-gray-400 dark:border-stone-700 focus-within:dark:border-stone-600
+            bg-white dark:bg-stone-800
+          `}
         >
           <HiMagnifyingGlass class="col-[1/2] row-start-1 w-5 self-center ml-5 text-gray-400" />
           <input
@@ -100,27 +107,25 @@ export const Searchbar = (
             }}
           />
           <div class="flex items-center justify-center p-[2px]">
-            <button
-              type="submit"
-              class="rounded-full h-full px-2 md:px-5 bg-brand opacity-75 text-sm text-white hover:opacity-100 transition-colors duration-50"
-              style="border: none"
-              title="Search"
-            >
-              search
-            </button>
+            <Button type="submit" title="Search">search</Button>
           </div>
           {suggestions.value.length > 0 &&
             (
               <div class="relative w-full col-span-full hidden group-focus-within:block">
-                <div class="inset-x-4 bg-gray-200 h-px absolute -top-px" />
+                <div class="inset-x-4 bg-gray-200 dark:bg-stone-700 h-px absolute -top-px" />
               </div>
             )}
           {suggestions.value.map((sug, idx) => (
             <button
-              class={tx(
-                "col-span-full py-1.5 pl-5 hidden group-focus-within:flex cursor-pointer hover:bg-gray-50",
-                selectedSignal.value == idx + 1 ? "bg-gray-50" : "bg-white",
-              )}
+              class={tx`
+                col-span-full py-1.5 pl-5 hidden group-focus-within:flex cursor-pointer
+                hover:bg-gray-50 dark:hover:bg-stone-900
+                ${
+                selectedSignal.value == idx + 1
+                  ? "bg-gray-50 dark:bg-stone-900"
+                  : "bg-white dark:bg-stone-800"
+              }
+              `}
               onClick={(e) => {
                 selectedSignal.value = idx + 1;
                 (e.target as HTMLButtonElement).form!.submit();
