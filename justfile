@@ -1,7 +1,7 @@
 @dev *ARGS:
     ./scripts/run_dev.py {{ARGS}}
 
-export RUST_LOG := "info,stract=debug"
+export RUST_LOG := env_var_or_default("RUST_LOG", "info,stract=debug")
 
 export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
