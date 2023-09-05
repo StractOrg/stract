@@ -11,6 +11,7 @@ default-run = "stract"
 [features]
 default = ["cors", "with_alice"]
 dev = ["cors"]
+prod = ["cors"]
 cors = []
 with_alice = []
 
