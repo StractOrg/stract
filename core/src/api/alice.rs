@@ -41,7 +41,21 @@ pub async fn save_state(
     extract::State(state): extract::State<Arc<super::State>>,
     extract::Json(params): extract::Json<SaveStateParams>,
 ) -> Result<impl IntoResponse, http::StatusCode> {
-    if !state.config.with_alice.unwrap_or(true) {
+    // We don't use
+    // #[cfg(not(feature = "with_alice"))]
+    // {
+    //     return Err(StatusCode::NOT_FOUND);
+    // }
+    // here since this would result in a bunch of lint warnings.
+    // The following is a bit hacky, but works and is easily readable.
+
+    #[cfg(not(feature = "with_alice"))]
+    let with_alice = false;
+
+    #[cfg(feature = "with_alice")]
+    let with_alice = true;
+
+    if !with_alice {
         return Err(StatusCode::NOT_FOUND);
     }
 
@@ -133,7 +147,21 @@ pub async fn alice_route(
     Sse<impl Stream<Item = std::result::Result<axum::response::sse::Event, Infallible>>>,
     StatusCode,
 > {
-    if !state.config.with_alice.unwrap_or(true) {
+    // We don't use
+    // #[cfg(not(feature = "with_alice"))]
+    // {
+    //     return Err(StatusCode::NOT_FOUND);
+    // }
+    // here since this would result in a bunch of lint warnings.
+    // The following is a bit hacky, but works and is easily readable.
+
+    #[cfg(not(feature = "with_alice"))]
+    let with_alice = false;
+
+    #[cfg(feature = "with_alice")]
+    let with_alice = true;
+
+    if !with_alice {
         return Err(StatusCode::NOT_FOUND);
     }
 

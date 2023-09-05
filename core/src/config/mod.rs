@@ -200,7 +200,6 @@ pub struct ApiConfig {
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub qa_model_path: Option<String>,
-    pub with_alice: Option<bool>,
     pub bangs_path: String,
     pub summarizer_path: String,
     pub fact_check_model_path: String,

@@ -91,6 +91,22 @@ The API might also change quite a bit during the beta period, but we will try to
 
 Remember to always give proper attributions to the sources you use from the search results."#.to_string(),
         );
+
+        #[cfg(not(feature = "with_alice"))]
+        {
+            openapi.paths.paths.remove("/beta/api/alice");
+            openapi.paths.paths.remove("/beta/api/alice/save_state");
+            openapi.paths.paths.remove("/beta/api/fact_check");
+
+            if let Some(components) = openapi.components.as_mut() {
+                components.schemas.remove("SimplifiedWebsite");
+                components.schemas.remove("ExecutionState");
+                components.schemas.remove("EncodedEncryptedState");
+                components.schemas.remove("EncodedSavedState");
+                components.schemas.remove("FactCheckParams");
+                components.schemas.remove("FactCheckResponse");
+            }
+        }
     }
 }
 
