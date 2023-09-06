@@ -137,7 +137,8 @@ impl RedirectDb {
 
         options.create_if_missing(true);
 
-        let block_options = rocksdb::BlockBasedOptions::default();
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.set_format_version(5);
 
         options.set_block_based_table_factory(&block_options);
 
@@ -183,9 +184,11 @@ impl RangesDb {
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
+        block_options.set_format_version(5);
 
         options.set_block_based_table_factory(&block_options);
         options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
@@ -255,12 +258,14 @@ impl UrlStateDbShard {
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
+        block_options.set_format_version(5);
 
         let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024)?; // 1GB
         block_options.set_block_cache(&cache);
 
         options.set_block_based_table_factory(&block_options);
         options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
@@ -468,10 +473,12 @@ impl DomainStateDb {
 
         let mut block_options = rocksdb::BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
+        block_options.set_format_version(5);
 
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
         options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
