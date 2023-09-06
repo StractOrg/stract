@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use rand::Rng;
 use rkyv::Deserialize;
 use std::hash::Hash;
 use std::ops::Range;
+use std::path::PathBuf;
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, VecDeque},
@@ -27,6 +28,8 @@ use std::{
 use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
+
+const MAX_URL_DB_SIZE_BYTES: u64 = 5 * 1024 * 1024 * 1024; // 5GB
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UrlStatus {
@@ -40,6 +43,7 @@ pub enum UrlStatus {
 #[archive(check_bytes)]
 pub enum DomainStatus {
     Pending,
+    NoUncrawledUrls,
     CrawlInProgress,
 }
 
@@ -167,17 +171,83 @@ impl RedirectDb {
     }
 }
 
+struct RangesDb {
+    db: rocksdb::DB, // domain -> range<vec<u8>>
+}
+
+impl RangesDb {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut options = rocksdb::Options::default();
+
+        options.create_if_missing(true);
+
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.set_ribbon_filter(10.0);
+
+        options.set_block_based_table_factory(&block_options);
+        options.set_max_background_jobs(8);
+        options.set_write_buffer_size(512 * 1024 * 1024);
+        options.set_allow_mmap_reads(true);
+        options.set_allow_mmap_writes(true);
+        options.set_max_subcompactions(8);
+        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
+        options.set_compression_type(rocksdb::DBCompressionType::None);
+
+        let db = rocksdb::DB::open(&options, path.as_ref())?;
+
+        Ok(Self { db })
+    }
+
+    pub fn get(&self, domain: &Domain) -> Result<Option<Range<Vec<u8>>>> {
+        let domain_bytes = bincode::serialize(domain)?;
+        let range_bytes = self.db.get(domain_bytes)?;
+
+        if let Some(range_bytes) = range_bytes {
+            let range: Range<Vec<u8>> = bincode::deserialize(&range_bytes)?;
+            return Ok(Some(range));
+        }
+
+        Ok(None)
+    }
+
+    pub fn put(&self, domain: &Domain, range: &Range<Vec<u8>>) -> Result<()> {
+        let domain_bytes = bincode::serialize(domain)?;
+        let range_bytes = bincode::serialize(range)?;
+
+        let mut write_options = rocksdb::WriteOptions::default();
+        write_options.disable_wal(true);
+        self.db.put_opt(domain_bytes, range_bytes, &write_options)?;
+
+        Ok(())
+    }
+}
+
+struct CachedValue<T> {
+    value: T,
+    last_updated: std::time::Instant,
+}
+
+impl<T> From<T> for CachedValue<T> {
+    fn from(value: T) -> Self {
+        Self {
+            value,
+            last_updated: std::time::Instant::now(),
+        }
+    }
+}
+
 struct UrlToInsert {
     url: Url,
     different_domain: bool,
 }
 
-struct UrlStateDb {
+struct UrlStateDbShard {
     db: rocksdb::DB,
-    ranges: HashMap<Domain, Range<Vec<u8>>>,
+    ranges: RangesDb,
+    approx_size_bytes: CachedValue<u64>,
 }
 
-impl UrlStateDb {
+impl UrlStateDbShard {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut options = rocksdb::Options::default();
 
@@ -198,15 +268,20 @@ impl UrlStateDb {
         options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
         options.set_compression_type(rocksdb::DBCompressionType::None);
 
-        let db = rocksdb::DB::open(&options, path.as_ref())?;
+        let db = rocksdb::DB::open(&options, path.as_ref().join("urls"))?;
+        let approx_size_bytes = db
+            .property_int_value(rocksdb::properties::TOTAL_SST_FILES_SIZE)?
+            .unwrap()
+            .into();
 
         Ok(Self {
             db,
-            ranges: HashMap::new(),
+            approx_size_bytes,
+            ranges: RangesDb::open(path.as_ref().join("ranges"))?,
         })
     }
 
-    pub fn get(&mut self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
+    pub fn get(&self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
         let url_bytes = bincode::serialize(url)?;
         let domain_bytes = bincode::serialize(domain)?;
 
@@ -230,7 +305,7 @@ impl UrlStateDb {
         let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
 
         // update ranges
-        let range = self.ranges.entry(domain.clone()).or_insert_with(|| Range {
+        let mut range = self.ranges.get(domain)?.unwrap_or_else(|| Range {
             start: key_bytes.clone(),
             end: key_bytes.clone(),
         });
@@ -243,6 +318,8 @@ impl UrlStateDb {
             range.end = key_bytes.clone();
         }
 
+        self.ranges.put(domain, &range)?;
+
         let value_bytes = bincode::serialize(value)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
@@ -253,7 +330,7 @@ impl UrlStateDb {
     }
 
     pub fn get_all_urls(&mut self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
-        match self.ranges.get(domain) {
+        match self.ranges.get(domain)? {
             Some(range) => {
                 let domain_bytes = bincode::serialize(domain)?;
                 let start = range.start.clone();
@@ -283,6 +360,99 @@ impl UrlStateDb {
             }
             None => Ok(Vec::new()),
         }
+    }
+
+    pub fn approximate_size_bytes(&mut self) -> Result<u64> {
+        if self.approx_size_bytes.last_updated.elapsed().as_secs() > 10 {
+            self.approx_size_bytes = self
+                .db
+                .property_int_value(rocksdb::properties::TOTAL_SST_FILES_SIZE)?
+                .unwrap()
+                .into();
+        }
+
+        Ok(self.approx_size_bytes.value)
+    }
+}
+
+struct UrlStateDb {
+    shards: Vec<UrlStateDbShard>,
+    path: PathBuf,
+}
+
+impl UrlStateDb {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if path.as_ref().exists() {
+            let mut shards = Vec::new();
+
+            for entry in std::fs::read_dir(path.as_ref())? {
+                let entry = entry?;
+                let path = entry.path();
+
+                if path.is_dir() {
+                    let shard = UrlStateDbShard::open(&path)?;
+                    shards.push(shard);
+                }
+            }
+
+            Ok(Self {
+                shards,
+                path: path.as_ref().to_path_buf(),
+            })
+        } else {
+            let shard_id = uuid::Uuid::new_v4().to_string();
+            let shard_path = path.as_ref().join(shard_id);
+
+            std::fs::create_dir_all(&shard_path)?;
+
+            let shard = UrlStateDbShard::open(&shard_path)?;
+
+            Ok(Self {
+                shards: vec![shard],
+                path: path.as_ref().to_path_buf(),
+            })
+        }
+    }
+
+    pub fn get(&self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
+        for shard in self.shards.iter().rev() {
+            if let Some(state) = shard.get(domain, url)? {
+                return Ok(Some(state));
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub fn put(&mut self, domain: &Domain, url: &UrlString, value: &UrlState) -> Result<()> {
+        let last_shard = self.shards.last_mut().unwrap();
+
+        if last_shard.approximate_size_bytes()? > MAX_URL_DB_SIZE_BYTES {
+            let shard_id = uuid::Uuid::new_v4().to_string();
+            let shard_path = self.path.as_path().join(shard_id);
+
+            std::fs::create_dir_all(&shard_path)?;
+
+            let shard = UrlStateDbShard::open(&shard_path)?;
+
+            self.shards.push(shard);
+        }
+
+        self.shards.last_mut().unwrap().put(domain, url, value)?;
+
+        Ok(())
+    }
+
+    pub fn get_all_urls(&mut self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
+        let mut res = HashMap::new();
+
+        for shard in self.shards.iter_mut() {
+            for (url, state) in shard.get_all_urls(domain)? {
+                res.insert(url, state);
+            }
+        }
+
+        Ok(res.into_iter().collect())
     }
 }
 
@@ -383,12 +553,6 @@ pub struct CrawlDb {
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if Path::new(path.as_ref()).exists() {
-            return Err(anyhow::anyhow!(
-                "crawl db already exists and might be in incorrect state"
-            ));
-        }
-
         Ok(Self {
             redirects: RedirectDb::open(path.as_ref().join("redirects"))?,
             domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
@@ -422,8 +586,9 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<()> {
+    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<HashSet<Domain>> {
         let mut domains: HashMap<Domain, Vec<UrlToInsert>> = HashMap::new();
+        let mut nonempty_domains = HashSet::new();
 
         responses.iter().for_each(|res| {
             for url in &res.discovered_urls {
@@ -458,6 +623,10 @@ impl CrawlDb {
                 }
             };
 
+            if !urls.is_empty() {
+                nonempty_domains.insert(domain.clone());
+            }
+
             for url in urls {
                 let mut url_state = match self.urls.get(&domain, &UrlString::from(&url.url))? {
                     Some(state) => state,
@@ -482,7 +651,7 @@ impl CrawlDb {
             self.domain_state.put(&domain, &domain_state)?;
         }
 
-        Ok(())
+        Ok(nonempty_domains)
     }
 
     pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {

@@ -84,11 +84,17 @@ impl CrawlCoordinator {
 
         let mut db = self.db.lock().unwrap();
 
-        db.insert_urls(responses).unwrap();
+        let nonempty_domains = db.insert_urls(responses).unwrap();
+
+        for domain in &nonempty_domains {
+            db.set_domain_status(domain, DomainStatus::Pending).unwrap();
+        }
 
         for response in responses.iter() {
-            db.set_domain_status(&response.domain, DomainStatus::Pending)
-                .unwrap();
+            if !nonempty_domains.contains(&response.domain) {
+                db.set_domain_status(&response.domain, DomainStatus::NoUncrawledUrls)
+                    .unwrap();
+            }
         }
 
         tracing::info!("inserted responses in {:?}", start.elapsed());
