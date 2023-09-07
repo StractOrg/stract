@@ -77,7 +77,7 @@ where
         }
     }
 
-    pub async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
+    async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::serialize(&request).unwrap();
 
         // disable linger to avoid TIME_WAIT.
@@ -141,10 +141,7 @@ where
         })
     }
 
-    pub async fn accept(&self) -> Result<Request<Req, Res>> {
-        let (mut stream, client) = self.listener.accept().await?;
-        tracing::debug!(?client, "accepted connection");
-
+    async fn parse_incoming_stream(&self, mut stream: TcpStream) -> Result<Request<Req, Res>> {
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
         stream.read_exact(&mut header_buf).await?;
         let header: Header = *bytemuck::from_bytes(&header_buf);
@@ -161,6 +158,15 @@ where
             marker: PhantomData,
         })
     }
+
+    pub async fn accept(&self) -> Result<Request<Req, Res>> {
+        let (stream, client) = self.listener.accept().await?;
+        tracing::debug!(?client, "accepted connection");
+
+        tokio::time::timeout(Duration::from_secs(60), self.parse_incoming_stream(stream))
+            .await
+            .map_err(|_| Error::ConnectionTimeout)?
+    }
 }
 
 pub struct Request<Req, Res> {
@@ -173,7 +179,7 @@ impl<Req, Res> Request<Req, Res>
 where
     Res: Serialize,
 {
-    pub async fn respond(mut self, response: Res) -> Result<()> {
+    async fn respond_without_timeout(mut self, response: Res) -> Result<()> {
         let bytes = bincode::serialize(&response).unwrap();
         let header = Header {
             body_size: bytes.len(),
@@ -190,6 +196,15 @@ where
             .ok();
 
         Ok(())
+    }
+
+    pub async fn respond(self, response: Res) -> Result<()> {
+        tokio::time::timeout(
+            Duration::from_secs(90),
+            self.respond_without_timeout(response),
+        )
+        .await
+        .map_err(|_| Error::RequestTimeout)?
     }
 
     pub fn body(&self) -> &Req {

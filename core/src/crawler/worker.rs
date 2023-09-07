@@ -1,3 +1,4 @@
+use encoding_rs::{Encoding, UTF_8};
 // Stract is an open source web search engine.
 // Copyright (C) 2023 Stract ApS
 //
@@ -14,7 +15,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use futures::{future::BoxFuture, FutureExt};
+use mime::Mime;
 use quick_xml::events::Event;
+use tokio_stream::StreamExt;
 
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -38,6 +41,8 @@ use super::{
     robots_txt::RobotsTxtManager, Command, CrawlDatum, Error, Result, Site, UrlResponse,
     WarcWriter, WorkerJob,
 };
+
+const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 
 pub struct WorkerThread {
     current_job: Option<WorkerJob>,
@@ -419,7 +424,7 @@ impl WorkerThread {
 
         // check if content length is too large
         if let Some(content_length) = headers.get("content-length") {
-            if content_length.parse::<usize>().unwrap_or(0) > 10_000_000 {
+            if content_length.parse::<usize>().unwrap_or(0) > MAX_CONTENT_LENGTH {
                 return Err(Error::ContentTooLarge.into());
             }
         }
@@ -455,7 +460,37 @@ impl WorkerThread {
         }
 
         let res_url = res.url().clone();
-        let body = res.text().await?;
+
+        let content_type = res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<Mime>().ok());
+        let encoding_name = content_type
+            .as_ref()
+            .and_then(|mime| mime.get_param("charset").map(|charset| charset.as_str()))
+            .unwrap_or("utf-8");
+        let encoding = Encoding::for_label(encoding_name.as_bytes()).unwrap_or(UTF_8);
+
+        let mut bytes = Vec::new();
+
+        let mut stream = res.bytes_stream();
+        while let Some(b) = stream.next().await {
+            if b.is_err() {
+                return Err(Error::ContentTooLarge.into());
+            }
+
+            let b = b.unwrap();
+
+            bytes.extend_from_slice(&b);
+
+            if bytes.len() > MAX_CONTENT_LENGTH {
+                return Err(Error::ContentTooLarge.into());
+            }
+        }
+
+        let (text, _, _) = encoding.decode(&bytes);
+        let body = text.to_string();
 
         Ok(CrawlDatum {
             url: res_url,

@@ -31,6 +31,7 @@ enum Lookup<T> {
 
 pub struct RobotsTxtManager {
     cache: HashMap<Site, Lookup<RobotsTxt>>,
+    last_prune: std::time::Instant,
     client: reqwest::Client,
     cache_expiration: Duration,
 }
@@ -40,6 +41,7 @@ impl RobotsTxtManager {
         Self {
             client,
             cache_expiration,
+            last_prune: std::time::Instant::now(),
             cache: HashMap::new(),
         }
     }
@@ -84,7 +86,21 @@ impl RobotsTxtManager {
         }
     }
 
+    fn maybe_prune(&mut self) {
+        if self.last_prune.elapsed() < Duration::from_secs(60) {
+            return;
+        }
+
+        self.cache.retain(|_, v| match v {
+            Lookup::Found(robots_txt) => !robots_txt.is_expired(&self.cache_expiration),
+            _ => true,
+        });
+
+        self.last_prune = std::time::Instant::now();
+    }
+
     async fn get_mut(&mut self, url: &Url) -> &mut Lookup<RobotsTxt> {
+        self.maybe_prune();
         let site = Site(url.host_str().unwrap_or_default().to_string());
 
         let cache_should_update = match self.cache.get_mut(&site) {

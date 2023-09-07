@@ -102,3 +102,4 @@ rkyv = { version = "0.7.42", default_features = false, features = [
     "validation",
     "size_64",
 ] }
+mime = "0.3.17"

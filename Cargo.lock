@@ -4214,6 +4214,7 @@ dependencies = [
  "md5",
  "memmap",
  "memmap2",
+ "mime",
  "min-max-heap",
  "num_cpus",
  "once_cell",
