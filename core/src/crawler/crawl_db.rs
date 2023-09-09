@@ -18,7 +18,6 @@ use dashmap::DashMap;
 use hashbrown::{HashMap, HashSet};
 use rand::Rng;
 use rayon::prelude::*;
-use rkyv::Deserialize;
 use std::hash::Hash;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -31,7 +30,7 @@ use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
-const MAX_URL_DB_SIZE_BYTES: u64 = 5 * 1024 * 1024 * 1024; // 5GB
+const MAX_URL_DB_SIZE_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10GB
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UrlStatus {
@@ -41,8 +40,7 @@ pub enum UrlStatus {
     Done,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, rkyv::Serialize, rkyv::Deserialize, rkyv::Archive)]
-#[archive(check_bytes)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DomainStatus {
     Pending,
     NoUncrawledUrls,
@@ -111,8 +109,7 @@ impl Default for UrlState {
     }
 }
 
-#[derive(Clone, rkyv::Serialize, rkyv::Deserialize, rkyv::Archive)]
-#[archive(check_bytes)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct DomainState {
     weight: f64,
     status: DomainStatus,
@@ -352,7 +349,9 @@ impl UrlStateDbShard {
 
         self.db.write_opt(batch, &write_options)?;
 
-        self.ranges.put(domain, range.as_ref().unwrap())?;
+        if let Some(range) = range {
+            self.ranges.put(domain, &range)?;
+        }
 
         Ok(())
     }
@@ -371,8 +370,11 @@ impl UrlStateDbShard {
 
                 Ok(iter
                     .take_while(|r| {
-                        let (key, _) = r.as_ref().unwrap();
-                        &**key <= end.as_slice()
+                        if let Ok((key, _)) = r.as_ref() {
+                            &**key <= end.as_slice()
+                        } else {
+                            false
+                        }
                     })
                     .filter_map(|r| {
                         let (key, value) = r.ok()?;
@@ -395,7 +397,7 @@ impl UrlStateDbShard {
             self.approx_size_bytes = self
                 .db
                 .property_int_value(rocksdb::properties::TOTAL_SST_FILES_SIZE)?
-                .unwrap()
+                .unwrap_or_default()
                 .into();
         }
 
@@ -523,21 +525,19 @@ impl DomainStateDb {
     }
 
     fn get(&self, domain: &Domain) -> Result<Option<DomainState>> {
-        let domain_bytes = rkyv::to_bytes::<_, 256>(domain)?;
+        let domain_bytes = bincode::serialize(&domain)?;
         let value_bytes = self.db.get(domain_bytes)?;
 
         if let Some(value_bytes) = &value_bytes {
-            let archived = rkyv::check_archived_root::<DomainState>(&value_bytes[..]).unwrap();
-            let value = archived.deserialize(&mut rkyv::Infallible).unwrap();
-            return Ok(Some(value));
+            return Ok(Some(bincode::deserialize(&value_bytes[..])?));
         }
 
         Ok(None)
     }
 
     fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
-        let domain_bytes = rkyv::to_bytes::<_, 256>(domain)?;
-        let state_bytes = rkyv::to_bytes::<_, 256>(state)?;
+        let domain_bytes = bincode::serialize(domain)?;
+        let state_bytes = bincode::serialize(state)?;
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
@@ -551,11 +551,8 @@ impl DomainStateDb {
 
         iter.filter_map(|r| {
             let (key, value) = r.ok()?;
-            let domain_archive = rkyv::check_archived_root::<Domain>(&key[..]).ok()?;
-            let state_archive = rkyv::check_archived_root::<DomainState>(&value[..]).ok()?;
-
-            let domain: Domain = domain_archive.deserialize(&mut rkyv::Infallible).ok()?;
-            let state: DomainState = state_archive.deserialize(&mut rkyv::Infallible).ok()?;
+            let domain = bincode::deserialize(&key[..]).ok()?;
+            let state = bincode::deserialize(&value[..]).ok()?;
 
             Some((domain, state))
         })
@@ -642,7 +639,7 @@ impl CrawlDb {
 
             for url_res in &res.url_responses {
                 if let UrlResponse::Redirected { url, new_url } = url_res {
-                    self.redirects.put(url, new_url).unwrap();
+                    self.redirects.put(url, new_url).ok();
                 }
             }
         });
@@ -721,7 +718,7 @@ impl CrawlDb {
         );
 
         for domain in sampled.iter() {
-            let mut state = self.domain_state.get(domain)?.unwrap();
+            let mut state = self.domain_state.get(domain)?.unwrap_or_default();
             state.status = DomainStatus::CrawlInProgress;
             self.domain_state.put(domain, &state)?;
         }
@@ -753,7 +750,7 @@ impl CrawlDb {
             let mut new_url_states = Vec::new();
 
             for url in &sampled {
-                let mut state = self.urls.get(domain, url)?.unwrap();
+                let mut state = self.urls.get(domain, url)?.unwrap_or_default();
                 state.status = UrlStatus::Crawling;
 
                 new_url_states.push(((*url).clone(), state));
@@ -761,7 +758,7 @@ impl CrawlDb {
 
             self.urls.put_batch(domain, &new_url_states)?;
 
-            let mut domain_state = self.domain_state.get(domain)?.unwrap();
+            let mut domain_state = self.domain_state.get(domain)?.unwrap_or_default();
 
             domain_state.weight = urls
                 .iter()
