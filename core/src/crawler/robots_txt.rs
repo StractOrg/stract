@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, panic, time::Duration};
+use std::{collections::BTreeMap, panic, time::Duration};
 
 use robotstxt_with_cache::matcher::{
     CachingRobotsMatcher, LongestMatchRobotsMatchStrategy, RobotsMatcher,
@@ -30,7 +30,7 @@ enum Lookup<T> {
 }
 
 pub struct RobotsTxtManager {
-    cache: HashMap<Site, Lookup<RobotsTxt>>,
+    cache: BTreeMap<Site, Lookup<RobotsTxt>>,
     last_prune: std::time::Instant,
     client: reqwest::Client,
     cache_expiration: Duration,
@@ -42,8 +42,13 @@ impl RobotsTxtManager {
             client,
             cache_expiration,
             last_prune: std::time::Instant::now(),
-            cache: HashMap::new(),
+            cache: BTreeMap::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.last_prune = std::time::Instant::now();
     }
 
     pub async fn is_allowed(&mut self, url: &Url, user_agent: &str) -> bool {
@@ -76,6 +81,15 @@ impl RobotsTxtManager {
 
         if res.status() != reqwest::StatusCode::OK {
             return Err(Error::FetchFailed(res.status()).into());
+        }
+
+        if !res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .map(|h| h.to_str().unwrap_or_default().starts_with("text/plain"))
+            .unwrap_or(false)
+        {
+            return Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
         }
 
         let body = res.text().await?;

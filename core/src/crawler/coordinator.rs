@@ -75,7 +75,6 @@ impl CrawlCoordinator {
     }
 
     pub fn add_responses(&self, responses: &[JobResponse]) -> Result<()> {
-        let start = Instant::now();
         let num_crawled_urls = responses.iter().map(|res| res.url_responses.len()).sum();
 
         self.log_crawls_per_second(num_crawled_urls);
@@ -83,6 +82,7 @@ impl CrawlCoordinator {
             .fetch_add(num_crawled_urls as u64, Ordering::SeqCst);
 
         let mut db = self.db.lock().unwrap();
+        let start = Instant::now();
 
         let nonempty_domains = db.insert_urls(responses).unwrap();
 
@@ -107,9 +107,8 @@ impl CrawlCoordinator {
     }
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {
-        let start = Instant::now();
-
         let mut db = self.db.lock().unwrap();
+        let start = Instant::now();
 
         let domains = db.sample_domains(num_jobs)?;
         tracing::debug!("sampled domains: {:?}", domains);

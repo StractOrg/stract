@@ -137,7 +137,7 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
 
 impl WarcWriter {
     pub fn new(s3: S3Config) -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel(1000);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
 
         tokio::spawn(writer_task(rx, s3));
 

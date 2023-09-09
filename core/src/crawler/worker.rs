@@ -44,6 +44,8 @@ use super::{
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 
+const MAX_URL_LENGTH: usize = 8192;
+
 pub struct WorkerThread {
     current_job: Option<WorkerJob>,
     pending_commands: Arc<Mutex<VecDeque<Command>>>,
@@ -188,6 +190,8 @@ impl WorkerThread {
         let mut job = self.current_job.take().unwrap();
         tracing::info!("Processing job: {:?}", job.domain);
 
+        self.robotstxt.clear();
+
         let mut url_responses: Vec<UrlResponse> = Vec::new();
         let mut discovered_urls: HashSet<Url> = HashSet::new();
 
@@ -218,7 +222,11 @@ impl WorkerThread {
 
                 if let Some(sitemap) = self.robotstxt.sitemap(&retryable_url.url).await {
                     let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
-                    discovered_urls.extend(sitemap_urls);
+                    discovered_urls.extend(
+                        sitemap_urls
+                            .into_iter()
+                            .filter(|url| url.as_str().len() < MAX_URL_LENGTH),
+                    );
                 }
             }
 
@@ -249,14 +257,21 @@ impl WorkerThread {
                 }
             }
 
-            discovered_urls.extend(res.new_urls);
+            discovered_urls.extend(
+                res.new_urls
+                    .into_iter()
+                    .filter(|url| url.as_str().len() < MAX_URL_LENGTH),
+            );
             url_responses.push(res.response);
         }
 
         let job_response = JobResponse {
             domain: job.domain,
             url_responses,
-            discovered_urls: discovered_urls.into_iter().collect(),
+            discovered_urls: discovered_urls
+                .into_iter()
+                .filter(|url| url.as_str().len() < MAX_URL_LENGTH)
+                .collect(),
         };
 
         self.results.lock().await.push(job_response);

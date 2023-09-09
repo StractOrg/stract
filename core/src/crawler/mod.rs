@@ -55,7 +55,20 @@ pub enum Error {
 
 type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    rkyv::Archive,
+)]
 struct Site(String);
 
 #[derive(
