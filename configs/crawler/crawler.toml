@@ -1,4 +1,5 @@
 num_worker_threads = 10
+num_jobs_per_fetch  = 10
 politeness_factor = 1.0
 timeout_seconds = 30
 coordinator_host = "0.0.0.0:8080"

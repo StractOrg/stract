@@ -101,7 +101,7 @@ impl WorkerThread {
             results,
             current_job: None,
             pending_commands,
-            num_jobs_per_fetch: config.num_worker_threads,
+            num_jobs_per_fetch: config.num_jobs_per_fetch,
             politeness_factor: config.politeness_factor,
             config,
             coordinator_host,
@@ -152,9 +152,9 @@ impl WorkerThread {
                     .send_with_timeout(
                         &NewJobs {
                             responses: results,
-                            num_jobs: 2 * self.num_jobs_per_fetch,
+                            num_jobs: self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(60 * 60),
+                        Duration::from_secs(10 * 60),
                     )
                     .await;
 

@@ -88,7 +88,7 @@ pub struct Domain(String);
 
 impl From<&Url> for Domain {
     fn from(url: &Url) -> Self {
-        Self(url.root_domain().unwrap_or_default().to_string())
+        Self(url.icann_domain().unwrap_or_default().to_string())
     }
 }
 

@@ -283,6 +283,7 @@ pub struct UserAgent {
 pub struct CrawlerConfig {
     pub num_worker_threads: usize,
     pub user_agent: UserAgent,
+    pub num_jobs_per_fetch: usize,
 
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
     pub robots_txt_cache_sec: u64,

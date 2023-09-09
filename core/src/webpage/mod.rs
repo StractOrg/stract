@@ -574,7 +574,7 @@ impl Html {
 
         while let Some((text, attributes)) = open_links.pop() {
             if let Some(rel) = attributes.borrow().get("rel") {
-                if rel.contains("nofollow") {
+                if rel.contains("nofollow") || rel.contains("sponsored") || rel.contains("ugc") {
                     continue;
                 }
             }
