@@ -1,9 +1,10 @@
-# dotenv environment variable files
+.DS_Store
+node_modules
+/build
+/.svelte-kit
+/package
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
-# Fresh build directory
-_fresh/
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*

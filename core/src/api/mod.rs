@@ -153,7 +153,8 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         .merge(
             Router::new()
                 .route("/beta/api/search", post(search::api))
-                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric)),
+                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
+                .layer(cors_layer()),
         )
         .route("/favicon.ico", get(favicon))
         .merge(
