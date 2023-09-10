@@ -136,8 +136,8 @@ export const api = {
     };
   },
 
-  sendImprovementClick: ({ queryId, click }: { queryId: string; click: string }) => {
-    window.navigator.sendBeacon(`${API_BASE}/improvement/click?qid=${queryId}&click=${click}`);
+  sendImprovementClick: ({ queryId, clickIndex }: { queryId: string; clickIndex: number }) => {
+    window.navigator.sendBeacon(`${API_BASE}/improvement/click?qid=${queryId}&click=${clickIndex}`);
   },
 };
 

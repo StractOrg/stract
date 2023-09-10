@@ -8,7 +8,7 @@ const queryIdStore = writable<string | undefined>();
 export const updateQueryId = async ({ query, webpages }: { query: string; webpages: Webpage[] }) =>
   queryIdStore.set(await api.queryId({ query, urls: webpages.map((wp) => wp.url) }).data);
 
-export const improvements: Action<HTMLAnchorElement, Webpage> = (node, webpage) => {
+export const improvements: Action<HTMLAnchorElement, number> = (node, webpageIndex) => {
   let queryId: string | undefined;
   let allowStats: boolean | undefined;
 
@@ -17,7 +17,7 @@ export const improvements: Action<HTMLAnchorElement, Webpage> = (node, webpage) 
 
   const listener = () => {
     if (!queryId || !allowStats) return;
-    api.sendImprovementClick({ queryId, click: webpage.url });
+    api.sendImprovementClick({ queryId, clickIndex: webpageIndex });
   };
 
   node.addEventListener('click', listener);

@@ -191,9 +191,9 @@
 
       {#if results.webpages}
         <div class="grid grid-cols-1 space-y-10 place-self-start">
-          {#each results.webpages as webpage (webpage.url)}
+          {#each results.webpages as webpage, resultIndex (webpage.url)}
             <div animate:flip={{ duration: 150 }}>
-              <Result {webpage} on:modal={openSearchModal(webpage)} />
+              <Result {webpage} {resultIndex} on:modal={openSearchModal(webpage)} />
             </div>
           {/each}
           {#if results.discussions}

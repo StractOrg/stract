@@ -8,6 +8,7 @@
   import { improvements } from '$lib/improvements';
 
   export let webpage: Webpage;
+  export let resultIndex: number;
 
   const summary = derived(summariesStore, ($summaries) => $summaries[webpage.url]);
 
@@ -23,7 +24,7 @@
         <a
           class="max-w-[calc(100%-100px)] truncate text-gray-800 dark:text-brand-100"
           href={webpage.url}
-          use:improvements={webpage}
+          use:improvements={resultIndex}
         >
           {webpage.prettyUrl}
         </a>
@@ -32,7 +33,7 @@
         class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-blue-800 visited:text-purple-800 hover:underline dark:text-blue-500 dark:visited:text-purple-500"
         title={webpage.title}
         href={webpage.url}
-        use:improvements={webpage}
+        use:improvements={resultIndex}
       >
         {webpage.title}
       </a>
