@@ -1,4 +1,5 @@
 @dev *ARGS:
+    cd frontend && npm install
     ./scripts/run_dev.py {{ARGS}}
 
 export RUST_LOG := env_var_or_default("RUST_LOG", "info,stract=debug")
@@ -14,10 +15,10 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 @dev-alice:
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- alice serve configs/alice.toml"
 @dev-frontend:
-    cd frontend && deno task start
+    cd frontend && npm run dev
 
 @openapi:
-    cd frontend && deno task openapi
+    cd frontend && npm run openapi
 
 @setup *ARGS:
     just setup_python_env

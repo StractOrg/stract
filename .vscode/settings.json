@@ -1,27 +1,19 @@
 {
-  "deno.enable": true,
-  "deno.lint": true,
-  "deno.config": "frontend/deno.json",
-  "deno.unstable": true,
   "[typescriptreact]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[javascriptreact]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[javascript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "tailwindCSS.experimental.classRegex": [
-    "tx`([^`]*)", // tx`...`
-    "tx=\"([^\"]*)", // <div tx="..." />
-    "tx={\"([^\"}]*)", // <div tx={"..."} />
-    "tx\\.\\w+`([^`]*)", // tx.xxx`...`
-    "tx\\(.*?\\)`([^`]*)" // tx(Component)`...`
-  ],
+  "prettier.configPath": "frontend/.prettierrc",
+  "prettier.requireConfig": true,
+  "svelte.enable-ts-plugin": true,
   "tailwindCSS.experimental.configFile": "frontend/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
