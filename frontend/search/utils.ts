@@ -57,7 +57,7 @@ export const useDefaultCSP = (
   useCSP((csp) => {
     csp.directives.defaultSrc = ["'self'"];
     (csp.directives.scriptSrc ??= []).push("'self'");
-    (csp.directives.connectSrc ??= []).push(search.API_BASE);
+    (csp.directives.connectSrc ??= []).push(search.API_BASE.value);
     (csp.directives.imgSrc ??= []).push("'self'", "data:");
 
     mutator?.(csp);

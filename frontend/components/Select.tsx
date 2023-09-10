@@ -1,4 +1,4 @@
-import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import { JSX } from "preact";
 
 export const Select = (
@@ -11,7 +11,7 @@ export const Select = (
 
   return (
     <select
-      class={tx("py-0 rounded pl-1 pr-5", c?.toString())}
+      class={twMerge("py-0 rounded pl-1 pr-5", c?.toString())}
       style={{
         backgroundColor: `rgba(0, 0, 0, 0)`,
         backgroundImage: svgThingy,

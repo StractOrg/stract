@@ -1,4 +1,3 @@
-import { injectGlobal, tx } from "https://esm.sh/@twind/core@1.1.3";
 import { DEFAULT_OPTICS } from "../../search/optics.ts";
 import { OpticSelector } from "../OpticsSelector.tsx";
 import { Signal, signal, useSignal } from "@preact/signals";
@@ -17,6 +16,7 @@ import {
   Source,
 } from "./state.ts";
 import { CHAT_TRACES } from "./traces.ts";
+import { twMerge } from "tailwind-merge";
 
 function useInterval(callback: () => void, delay: number | null) {
   const savedCallback = useRef(callback);
@@ -73,11 +73,11 @@ export const Chat = () => {
         {events.value.length > 0 &&
           (
             <details
-              class={tx`
+              class={twMerge(`
                 group transition-all border opacity-25 open:opacity-100 rounded-xl open:py-2 px-5 space-y-2
                 border-transparent open:border-slate-50 dark:open:border-brand-900
                 bg-white open:bg-brand-50 dark:bg-stone-800 dark:open:bg-stone-800
-              `}
+              `)}
             >
               <summary class="text-lg font-semibold cursor-pointer group-open:border-b group-open:pb-2 dark:border-stone-700">
                 Debugging
@@ -214,11 +214,11 @@ const ChatMessage = (
   return (
     <div>
       <div
-        class={tx("flex", isUser && "flex-row-reverse")}
+        class={twMerge("flex", isUser && "flex-row-reverse")}
       >
         {message.body.find((x) => x != "") && (
           <div
-            class={tx(
+            class={twMerge(
               "p-2 rounded-xl border relative",
               isUser
                 ? "bg-brand-50 border-brand-300 dark:bg-brand-950 dark:border-brand-800 rounded-br-none"
@@ -366,7 +366,7 @@ const FactReference = (
       <a
         href={href ?? void 0}
         target="__blank"
-        class={tx(
+        class={twMerge(
           "text-xs",
           source
             ? "font-semibold"
@@ -377,10 +377,10 @@ const FactReference = (
         [{nr + 1}]
       </a>
       <div
-        class={tx`
+        class={twMerge(`
         absolute flex flex-col text-sm group-hover:opacity-100 opacity-0 transition -left-2 -bottom-1 translate-y-full p-2 rounded z-10 shadow pointer-events-none space-y-2
         bg-white dark:bg-stone-900 dark:border dark:border-stone-700
-      `}
+      `)}
       >
         {source
           ? (
@@ -477,30 +477,12 @@ const ChatInput = (
 };
 
 const ChatBubble = () => {
-  injectGlobal`
-@keyframes mercuryTypingAnimation {
-  0% {
-    transform: translateY(0px);
-    @apply bg-brand-500 dark:bg-brand-950;
-  }
-  28% {
-    transform: translateY(-70px);
-    @apply bg-brand-300 dark:bg-brand-800;
-  }
-  44% {
-    transform: translateY(0px);
-    @apply bg-brand-100 dark:bg-brand-600;
-  }
-}
-`;
-
   return (
     <div class="flex items-center space-x-1">
       {Array.from({ length: 3 }).map((_, idx) => (
         <div
-          class={"dot h-2 w-2 bg-brand-500 rounded-full"}
+          class={"dot h-2 w-2 bg-brand-500 rounded-full animate-typing"}
           style={{
-            animation: "mercuryTypingAnimation 1.8s infinite ease-in-out",
             animationDelay: `${200 + idx * 100}ms`,
           }}
         />

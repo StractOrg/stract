@@ -3,7 +3,6 @@ import * as search from "../search/index.ts";
 import { summarySignals } from "../search/summary.ts";
 import { HiHandThumbUpOutline } from "../icons/HiHandThumbUpOutline.tsx";
 import { HiCheck } from "../icons/HiCheck.tsx";
-import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
 
 const SAMPLE_SUMMARY = {
   inProgress: true,
@@ -12,14 +11,6 @@ const SAMPLE_SUMMARY = {
 };
 
 export const Snippet = ({ item }: { item: search.Webpage }) => {
-  injectGlobal`
-    @keyframes blink {
-      0% {
-        opacity: 0;
-      }
-    }
-  `;
-
   const summary = summarySignals.value[item.url];
 
   return (
@@ -127,7 +118,7 @@ const StackOverflowAnswer = (
   { answer }: { answer: search.StackOverflowAnswer },
 ) => (
   <a
-    class="h-52 w-1/3 rounded-lg bg-slate-100 p-4 hover:cursor-pointer hover:bg-slate-600 hover:text-white hover:no-underline"
+    class="h-52 w-1/3 rounded-lg bg-slate-100 p-4 hover:cursor-pointer hover:bg-slate-600 hover:text-white"
     href={answer.url}
   >
     <div class="h-full w-full overflow-hidden">

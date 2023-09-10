@@ -1,4 +1,4 @@
-import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import { HiBars2 } from "../icons/HiBars2.tsx";
 import { SiDiscord } from "../icons/SiDiscord.tsx";
 import { SiGitHub } from "../icons/SiGitHub.tsx";
@@ -71,12 +71,12 @@ const Icon = (
   { "class": c, ...props }: JSX.HTMLAttributes<HTMLAnchorElement>,
 ) => (
   <a
-    class={tx`
+    class={twMerge(`
       flex justify-center rounded-full p-2 transition
       text-gray-500 hover:bg-brand-100 hover:text-brand-600
-      dark:(hover:bg-brand-900 hover:text-stone-50)
+      dark:hover:bg-brand-900 dark:hover:text-stone-50
       ${c?.toString()}
-    `}
+    `)}
     {...props}
   />
 );
@@ -85,11 +85,11 @@ const Link = (
   { "class": c, ...props }: JSX.HTMLAttributes<HTMLAnchorElement>,
 ) => (
   <a
-    class={tx`
+    class={twMerge(`
       transition hover:bg-brand-50 hover:text-brand-600 hover:no-underline
-      dark:(hover:bg-brand-900 hover:text-stone-50)
+      dark:hover:bg-brand-900 dark:hover:text-stone-50
       ${c?.toString()}
-    `}
+    `)}
     {...props}
   />
 );

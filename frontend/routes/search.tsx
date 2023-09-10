@@ -1,6 +1,6 @@
 import { defineRoute } from "$fresh/server.ts";
 import { Searchbar } from "../islands/Searchbar.tsx";
-import { injectGlobal, tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import * as search from "../search/index.ts";
 import { match, P } from "ts-pattern";
 import { Header } from "../components/Header.tsx";
@@ -62,21 +62,6 @@ const extractSearchParams = (searchParams: URLSearchParams): SearchParams => {
 };
 
 export default defineRoute(async (_req, ctx) => {
-  injectGlobal`
-    .search-content {
-      text-rendering: optimizeLegibility;
-      font-smooth: always;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    .text-snippet {
-      font-weight: 400;
-    }
-    .text-snippet > b {
-      font-weight: 700;
-    }
-  `;
-
   const selected = signal<SelectedAdjust>(null);
 
   const {
@@ -164,7 +149,19 @@ export default defineRoute(async (_req, ctx) => {
           queryUrlPart={ctx.url.searchParams.toString()}
         />
 
-        <div class="search-content w-screen m-0 grid gap-y-6 pt-4 px-5 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36">
+        <div
+          class={twMerge(
+            "w-screen m-0 grid gap-y-6 pt-4 px-5",
+            "md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20",
+            "lg:px-36",
+          )}
+          style={{
+            textRendering: "optimizeLegibility",
+            fontSmooth: "always",
+            "-webkit-font-smoothing": "antialiased",
+            "-moz-osx-font-smoothing": "grayscale",
+          }}
+        >
           <div class="flex flex-col space-y-5 max-w-2xl">
             <div class="w-full">
               <Searchbar
@@ -280,7 +277,8 @@ const ResultsWebsites = (
         selected={selected}
       />
     ))}
-    {discussions && <Discussions discussions={discussions} />}
+    <Discussions discussions={results.webpages} />
+    {/* {discussions && <Discussions discussions={discussions} />} */}
     {results.webpages.slice(4).map((item, idx) => (
       <Webpage
         key={item.url}
@@ -301,7 +299,7 @@ const ResultsWebsites = (
         ].map(({ url, Icon }) => (
           <a href={url || void 0}>
             <Icon
-              class={tx(
+              class={twMerge(
                 "w-6",
                 url ? "text-brand-500 hover:text-brand-600" : "text-gray-500",
               )}
@@ -327,7 +325,7 @@ const Webpage = (
           <div class="flex items-center text-sm">
             <TrackClick
               click={click}
-              class="truncate text-gray-800 dark:text-brand-100 hover:no-underline improvement-on-click max-w-[calc(100%-100px)]"
+              class="truncate text-gray-800 dark:text-brand-100 max-w-[calc(100%-100px)]"
               href={item.url}
             >
               {item.prettyUrl}
@@ -335,7 +333,7 @@ const Webpage = (
           </div>
           <TrackClick
             click={click}
-            class="text-blue-800 dark:text-blue-500 visited:text-purple-800 dark:visited:text-purple-500 sr-title-link truncate text-xl font-medium improvement-on-click max-w-[calc(100%-30px)]"
+            class="text-blue-800 dark:text-blue-500 visited:text-purple-800 dark:visited:text-purple-500 hover:underline truncate text-xl font-medium max-w-[calc(100%-30px)]"
             title={item.title}
             href={item.url}
           >
@@ -344,7 +342,7 @@ const Webpage = (
         </div>
         <SearchResultAdjust item={item} selected={selected} />
       </div>
-      <div class="text-sm text-snippet dark:text-stone-400">
+      <div class="text-snippet text-sm font-normal [&>b]:font-bold dark:text-stone-400">
         <Snippet item={item} />
       </div>
     </div>

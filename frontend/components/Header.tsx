@@ -1,4 +1,4 @@
-import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import { Navbar } from "./Navbar.tsx";
 
 export type HeaderProps = {
@@ -43,11 +43,11 @@ export const Header = (
 
     {showDivider && (
       <div
-        class={tx`
+        class={twMerge(`
           w-full h-[1px] bg-gradient-to-r
           from-brand-400 via-brand-600 to-brand-400
           dark:from-brand-900 dark:via-brand-700 dark:to-brand-900
-        `}
+        `)}
       >
       </div>
     )}

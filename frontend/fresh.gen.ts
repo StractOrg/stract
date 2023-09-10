@@ -4,18 +4,19 @@
 
 import * as $0 from "./routes/_404.tsx";
 import * as $1 from "./routes/_app.tsx";
-import * as $2 from "./routes/about.tsx";
-import * as $3 from "./routes/chat.tsx";
-import * as $4 from "./routes/explore.tsx";
-import * as $5 from "./routes/index.tsx";
-import * as $6 from "./routes/privacy-and-happy-lawyers.tsx";
-import * as $7 from "./routes/search.tsx";
-import * as $8 from "./routes/settings/_layout.tsx";
-import * as $9 from "./routes/settings/index.tsx";
-import * as $10 from "./routes/settings/optics.tsx";
-import * as $11 from "./routes/settings/privacy.tsx";
-import * as $12 from "./routes/settings/sites.tsx";
-import * as $13 from "./routes/webmasters.tsx";
+import * as $2 from "./routes/_layout.tsx";
+import * as $3 from "./routes/about.tsx";
+import * as $4 from "./routes/chat.tsx";
+import * as $5 from "./routes/explore.tsx";
+import * as $6 from "./routes/index.tsx";
+import * as $7 from "./routes/privacy-and-happy-lawyers.tsx";
+import * as $8 from "./routes/search.tsx";
+import * as $9 from "./routes/settings/_layout.tsx";
+import * as $10 from "./routes/settings/index.tsx";
+import * as $11 from "./routes/settings/optics.tsx";
+import * as $12 from "./routes/settings/privacy.tsx";
+import * as $13 from "./routes/settings/sites.tsx";
+import * as $14 from "./routes/webmasters.tsx";
 import * as $$0 from "./islands/ApiClient.tsx";
 import * as $$1 from "./islands/Discussions.tsx";
 import * as $$2 from "./islands/ExploreSites.tsx";
@@ -37,18 +38,19 @@ const manifest = {
   routes: {
     "./routes/_404.tsx": $0,
     "./routes/_app.tsx": $1,
-    "./routes/about.tsx": $2,
-    "./routes/chat.tsx": $3,
-    "./routes/explore.tsx": $4,
-    "./routes/index.tsx": $5,
-    "./routes/privacy-and-happy-lawyers.tsx": $6,
-    "./routes/search.tsx": $7,
-    "./routes/settings/_layout.tsx": $8,
-    "./routes/settings/index.tsx": $9,
-    "./routes/settings/optics.tsx": $10,
-    "./routes/settings/privacy.tsx": $11,
-    "./routes/settings/sites.tsx": $12,
-    "./routes/webmasters.tsx": $13,
+    "./routes/_layout.tsx": $2,
+    "./routes/about.tsx": $3,
+    "./routes/chat.tsx": $4,
+    "./routes/explore.tsx": $5,
+    "./routes/index.tsx": $6,
+    "./routes/privacy-and-happy-lawyers.tsx": $7,
+    "./routes/search.tsx": $8,
+    "./routes/settings/_layout.tsx": $9,
+    "./routes/settings/index.tsx": $10,
+    "./routes/settings/optics.tsx": $11,
+    "./routes/settings/privacy.tsx": $12,
+    "./routes/settings/sites.tsx": $13,
+    "./routes/webmasters.tsx": $14,
   },
   islands: {
     "./islands/ApiClient.tsx": $$0,

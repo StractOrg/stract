@@ -1,7 +1,6 @@
 import { Signal } from "@preact/signals";
 import * as search from "../search/index.ts";
 import { useEffect } from "preact/hooks";
-import { IS_BROWSER } from "$fresh/runtime.ts";
 import { JSX } from "preact";
 import {
   RankingSignal,
@@ -15,7 +14,7 @@ import { HiAdjustmentsVerticalOutline } from "../icons/HiAdjustmentsVerticalOutl
 import { HiHandThumbUpMini } from "../icons/HiHandThumbUpMini.tsx";
 import { HiHandThumbDownMini } from "../icons/HiHandThumbDownMini.tsx";
 import { HiNoSymbolMini } from "../icons/HiNoSymbolMini.tsx";
-import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import { Button } from "../components/Button.tsx";
 
 export type SelectedAdjust =
@@ -30,11 +29,11 @@ export default function SearchResultAdjust(
 ) {
   return (
     <button
-      class={tx`
+      class={twMerge(`
       adjust-button hidden min-w-fit items-center justify-center md:flex w-5 hover:cursor-pointer bg-transparent noscript:hidden
       text-gray-700/50 hover:text-gray-700
-      dark:(text-stone-400 hover:text-stone-300)
-      `}
+      dark:text-stone-400 dark:hover:text-stone-300
+      `)}
       data-site={item.site}
       data-url={item.url}
       onClick={(e) => {
@@ -65,8 +64,6 @@ export const SearchResultAdjustModal = (
     : void 0;
   const rankingModalHeight = 0;
 
-  if (!IS_BROWSER) return null;
-
   const liked = useRanking("liked");
   const disliked = useRanking("disliked");
   const blocked = useRanking("blocked");
@@ -77,12 +74,13 @@ export const SearchResultAdjustModal = (
 
   return (
     <div
-      class={tx`
+      class={twMerge(`
+        noscript:hidden
         absolute h-fit w-52 origin-left flex-col items-center overflow-hidden rounded-lg py-5 px-2 text-sm drop-shadow-md -translate-y-1/2
         border dark:border-stone-700
         bg-white dark:bg-stone-800
-        ${rect ? "flex transition-all scale-1" : "scale-0"}
-      `}
+        ${rect ? "flex transition-all scale-100" : "scale-0"}
+      `)}
       id="modal"
       style={rect && {
         left: rect.left + rect.width + 5 + "px",

@@ -1,6 +1,5 @@
 import { useSignal } from "@preact/signals";
 import { DEFAULT_OPTICS, OpticOption, opticsSignal } from "../search/optics.ts";
-import { IS_BROWSER } from "$fresh/runtime.ts";
 import {
   updateStorageSignal,
   useSyncSignalWithLocalStorage,
@@ -19,54 +18,50 @@ export const ManageOptics = () => {
 
   return (
     <div>
-      {IS_BROWSER &&
-        (
-          <form
-            class="grid w-full px-8 grid-cols-[1fr_1fr_5rem] gap-x-5 gap-y-2 [&>input]:border-none [&>input]:rounded [&>input]:bg-transparent"
-            onSubmit={(e) => {
-              e.preventDefault();
-              updateStorageSignal(
-                opticsSignal,
-                (optics) => [...optics, newOptic.value],
-              );
-              newOptic.value = {
-                name: "",
-                url: "",
-                description: "",
-              };
-            }}
-          >
-            <input
-              type="text"
-              required
-              placeholder="Name"
-              value={newOptic.value.name}
-              onInput={(e) =>
-                newOptic.value.name = (e.target as HTMLInputElement).value}
-            />
-            <input
-              type="text"
-              required
-              placeholder="Url"
-              value={newOptic.value.url}
-              onInput={(e) =>
-                newOptic.value.url = (e.target as HTMLInputElement).value}
-            />
-            <Button title="Remove optic">
-              Add
-            </Button>
-            <input
-              class="col-span-2"
-              type="text"
-              required
-              placeholder="Description"
-              value={newOptic.value.description}
-              onInput={(e) =>
-                newOptic.value.description =
-                  (e.target as HTMLInputElement).value}
-            />
-          </form>
-        )}
+      <form
+        class="noscript:hidden grid w-full px-8 grid-cols-[1fr_1fr_5rem] gap-x-5 gap-y-2 [&>input]:border-none [&>input]:rounded [&>input]:bg-transparent"
+        onSubmit={(e) => {
+          e.preventDefault();
+          updateStorageSignal(
+            opticsSignal,
+            (optics) => [...optics, newOptic.value],
+          );
+          newOptic.value = {
+            name: "",
+            url: "",
+            description: "",
+          };
+        }}
+      >
+        <input
+          type="text"
+          required
+          placeholder="Name"
+          value={newOptic.value.name}
+          onInput={(e) =>
+            newOptic.value.name = (e.target as HTMLInputElement).value}
+        />
+        <input
+          type="text"
+          required
+          placeholder="Url"
+          value={newOptic.value.url}
+          onInput={(e) =>
+            newOptic.value.url = (e.target as HTMLInputElement).value}
+        />
+        <Button title="Remove optic">
+          Add
+        </Button>
+        <input
+          class="col-span-2"
+          type="text"
+          required
+          placeholder="Description"
+          value={newOptic.value.description}
+          onInput={(e) =>
+            newOptic.value.description = (e.target as HTMLInputElement).value}
+        />
+      </form>
       <div class="mt-5">
         <div
           class="grid grid-cols-[auto_1fr_2fr_auto] w-full gap-5"

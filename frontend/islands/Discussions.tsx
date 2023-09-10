@@ -35,7 +35,7 @@ export const Discussions = (
 const DiscussionItem = ({ discussion }: { discussion: search.Webpage }) => (
   <div class="overflow-hidden">
     <div>
-      <a class="text-sm hover:no-underline" href={discussion.url}>
+      <a class="text-sm" href={discussion.url}>
         {discussion.domain}
       </a>
     </div>

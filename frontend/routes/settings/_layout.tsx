@@ -1,5 +1,5 @@
 import { LayoutProps } from "$fresh/server.ts";
-import { tx } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 import { Footer } from "../../components/Footer.tsx";
 import { Header } from "../../components/Header.tsx";
 
@@ -40,11 +40,11 @@ const SettingsMenu = ({ queryUrlPart: query }: {
     <div class="relative right-0 md:right-5 lg:right-20 flex flex-col space-y-3">
       {links.map((l) => (
         <a
-          class={tx`
+          class={twMerge(`
             transition hover:no-underline rounded-full px-2 py-1 text-center
             hover:bg-brand-50 hover:text-brand-600
-            dark:(hover:bg-brand-900 hover:text-stone-50)
-          `}
+            dark:hover:bg-brand-900 dark:hover:text-stone-50
+          `)}
           href={`${l.url}${query ? "?" + query : ""}`}
         >
           {l.title}

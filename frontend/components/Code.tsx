@@ -6,7 +6,7 @@ import { match } from "ts-pattern";
 import { Element, Node, Root, Text } from "npm:@types/hast";
 import { JSX } from "preact";
 import hljs from "https://esm.sh/highlight.js@11.8.0";
-import { injectGlobal } from "https://esm.sh/@twind/core@1.1.3";
+import { twMerge } from "tailwind-merge";
 
 const languages = [
   ["ts", /(export\s+(const|function|let))|\b(var|async)\b/g],
@@ -51,19 +51,22 @@ export const Code = (
 
   return (
     <pre data-langauge={highlightedCode.language}>
-      <code class="text-gray-600 dark:text-brand-200" dangerouslySetInnerHTML={{__html: highlightedCode.value}} />
+      <code
+         class={twMerge(
+          "text-sm",
+          "text-gray-600 dark:text-brand-200",
+          "[&_.hljs-keyword]:text-brand-600 [&_.hljs-keyword]:dark:text-brand-400",
+          "[&_.hljs-number]:text-teal-700 [&_.hljs-number]:dark:text-teal-300",
+          "[&_.hljs-literal]:text-teal-700 [&_.hljs-literal]:dark:text-teal-300",
+          "[&_.hljs-string]:text-green-700 [&_.hljs-string]:dark:text-green-300",
+          "[&_.hljs-comment]:text-teal-800/80 [&_.hljs-comment]:dark:text-teal-200/50",
+          "[&_.hljs-title]:text-emerald-600 [&_.hljs-title]:dark:text-emerald-300",
+        )}
+        dangerouslySetInnerHTML={{__html: highlightedCode.value}}
+      />
     </pre>
   );
 };
-
-injectGlobal`
-.hljs-keyword { @apply text-brand-600 dark:text-brand-400; }
-.hljs-number,
-.hljs-literal { @apply text-teal-700 dark:text-teal-300; }
-.hljs-string  { @apply text-green-700 dark:text-green-300; }
-.hljs-comment { @apply text-teal-800/80 dark:text-teal-200/50; }
-.hljs-title   { @apply text-emerald-600 dark:text-emerald-300; }
-`;
 
 const InternalHighlighter = (
   { code, lang = detectLanguage(code) ?? "js" }: CodeProps,
