@@ -4,6 +4,6 @@
   <InputEncoding>UTF-8</InputEncoding>
   <Image width="32" height="32" type="image/x-icon">https://trystract.com/favicon.ico</Image>
   <Url rel="results" type="text/html" template="https://trystract.com/search?q={searchTerms}"/>
-  <Url rel="suggestions" type="application/x-suggestions+json" template="https://trystract.com/autosuggest/browser?q={searchTerms}"/>
+  <Url rel="suggestions" type="application/x-suggestions+json" template="https://trystract.com/beta/api/autosuggest/browser?q={searchTerms}"/>
   <moz:SearchForm>https://trystract.com/</moz:SearchForm>
 </OpenSearchDescription>

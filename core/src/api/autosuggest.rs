@@ -61,6 +61,7 @@ pub struct AutosuggestQuery {
         (status = 200, description = "Autosuggest", body = Vec<Suggestion>),
     )
 )]
+
 pub async fn route(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,
@@ -79,6 +80,17 @@ pub async fn route(
         Json(suggestions)
     } else {
         Json(Vec::new())
+    }
+}
+
+pub async fn browser(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Query(params): extract::Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    if let Some(query) = params.get("q") {
+        Json((query.clone(), state.autosuggest.suggestions(query).unwrap()))
+    } else {
+        Json((String::new(), Vec::new()))
     }
 }
 

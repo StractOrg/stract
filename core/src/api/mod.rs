@@ -169,6 +169,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             "/beta",
             Router::new()
                 .route("/api/autosuggest", post(autosuggest::route))
+                .route("/api/autosuggest/browser", get(autosuggest::browser))
                 .route("/api/summarize", get(summarize::summarize_route))
                 .route("/api/webgraph/similar_sites", post(webgraph::similar_sites))
                 .route("/api/webgraph/knows_site", post(webgraph::knows_site))
