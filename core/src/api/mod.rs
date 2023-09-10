@@ -182,7 +182,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         .with_state(state))
 }
 
-/// Enables CORS for development where the API and Deno frontend are on
+/// Enables CORS for development where the API and frontend are on
 /// different hosts.
 fn cors_layer() -> tower_http::cors::CorsLayer {
     #[cfg(feature = "cors")]
