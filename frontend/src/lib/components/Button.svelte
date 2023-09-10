@@ -26,8 +26,8 @@
       ? [
           kind == 'brand' && [
             'text-brand-900 dark:text-brand-50',
-            'bg-white hover:bg-brand-50 active:bg-brand-100',
-            'dark:bg-transparent dark:hover:bg-brand-800 dark:active:bg-brand-700',
+            'hover:bg-brand-50 active:bg-brand-100 bg-white',
+            'dark:hover:bg-brand-800 dark:active:bg-brand-700 dark:bg-transparent',
             'border-brand-100 hover:border-brand-200 active:border-brand-300',
             'dark:border-brand-600 dark:hover:border-brand-500 dark:active:border-brand-400',
           ],

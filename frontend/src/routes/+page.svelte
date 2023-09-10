@@ -8,7 +8,7 @@
     <img alt="stract logo" src="/images/biglogo-with-text.svg" class="h-full w-full" />
   </div>
   <div class="w-full md:mx-0 md:max-w-2xl">
-    <Searchbar />
+    <Searchbar autofocus={true} />
   </div>
   <div class="mt-3 flex space-x-2 text-gray-600 dark:text-gray-500">
     <div>
