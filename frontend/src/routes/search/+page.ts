@@ -26,6 +26,10 @@ export const load: PageLoad = async ({ fetch, url }) => {
   );
   const results = await data;
 
+  if (results.type == "bang") {
+    throw redirect(300, results.redirectTo);
+  }
+
   const prevPageSearchParams = match(params.currentPage > 1)
     .with(true, () => {
       const newParams = new URLSearchParams(url.searchParams);

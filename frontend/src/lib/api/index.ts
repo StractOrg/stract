@@ -7,6 +7,7 @@ import { send, sse, type Props, API_BASE, type ApiOptions } from './com';
 export const api = {
   search: (props: Props<'/beta/api/search', 'post'>, options?: ApiOptions) => {
     const { data, cancel } = send('/beta/api/search', 'post', 'json', props, options);
+
     return { data: data.then((res) => res[200]), cancel };
   },
 
