@@ -3,15 +3,16 @@
   import Button from '$lib/components/Button.svelte';
   import { api } from '$lib/api';
   import { safeSearchStore, siteRankingsStore } from '$lib/stores';
-  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
+  import { P, match } from 'ts-pattern';
 
   export let autofocus = false;
 
   export let query = '';
+  let selected: 'none' | number = 'none';
   let suggestions: string[] = [];
 
   let cancelLastRequest: null | (() => void) = null;
@@ -28,8 +29,6 @@
     data.then((res) => (suggestions = res.map((x) => x.raw)));
   };
 
-  onMount(() => {});
-
   $: browser && updateSuggestions(query);
 
   const compressedRanked = derived(siteRankingsStore, ($siteRankings) =>
@@ -37,6 +36,30 @@
   );
 
   const selectSuggestion = (s: string) => (query = s);
+
+  const moveSelection = (step: number) => {
+    selected = match(selected)
+      .returnType<'none' | number>()
+      .with(P.string, () => (step > 0 ? 0 : suggestions.length - 1))
+      .with(
+        P.when((v) => !(0 <= v + step && v + step < suggestions.length)),
+        () => 'none',
+      )
+      .otherwise((v) => (v + suggestions.length + step) % suggestions.length);
+  };
+
+  const onKeydown = (ev: KeyboardEvent) => {
+    match(ev.key)
+      .with('ArrowUp', () => {
+        ev.preventDefault();
+        moveSelection(-1);
+      })
+      .with('ArrowDown', () => {
+        ev.preventDefault();
+        moveSelection(1);
+      })
+      .otherwise(() => {});
+  };
 </script>
 
 <form action="/search" class="flex w-full justify-center" id="searchbar-form">
@@ -61,6 +84,7 @@
       autocomplete="off"
       class="border-none bg-transparent focus:ring-0"
       bind:value={query}
+      on:keydown={onKeydown}
     />
     <Button type="submit">search</Button>
 
@@ -71,9 +95,12 @@
       <div
         class="absolute -inset-x-px bottom-0 hidden translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 bg-white shadow group-focus-within:flex dark:border-stone-700 group-focus-within:dark:border-stone-600"
       >
-        {#each suggestions as s}
+        {#each suggestions as s, index}
           <button
-            class="flex space-x-3 py-1.5 pl-5 hover:bg-gray-50 dark:bg-stone-800 dark:hover:bg-stone-900"
+            class="flex space-x-3 py-1.5 pl-5 hover:bg-gray-50 dark:bg-stone-800 dark:hover:bg-stone-900 {selected ==
+            index
+              ? 'bg-gray-50 dark:hover:bg-stone-900'
+              : ''}"
             on:click={() => selectSuggestion(s)}
             type="submit"
           >
