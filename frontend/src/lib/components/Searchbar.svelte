@@ -82,11 +82,11 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border py-0.5 pl-3 pr-0.5 transition focus-within:shadow dark:border-stone-700 dark:bg-stone-800 focus-within:dark:border-stone-600',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-gray-300 py-0.5 pl-5 pr-0.5 transition focus-within:shadow dark:border-stone-700 dark:bg-stone-800 focus-within:dark:border-stone-600',
       suggestions.length > 0 && 'focus-within:rounded-b-none',
     )}
   >
-    <MagnifyingGlass class="w-5" />
+    <MagnifyingGlass class="w-5 text-gray-400" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
       type="search"
@@ -106,7 +106,7 @@
         class="absolute inset-x-5 bottom-px hidden h-px bg-gray-200 group-focus-within:block dark:bg-stone-700"
       />
       <div
-        class="absolute -inset-x-px bottom-0 hidden translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 bg-white shadow group-focus-within:flex dark:border-stone-700 group-focus-within:dark:border-stone-600"
+        class="absolute -inset-x-px bottom-0 hidden translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-gray-300 bg-white shadow group-focus-within:flex dark:border-stone-700 group-focus-within:dark:border-stone-600"
       >
         {#each suggestions as s, index}
           <button
@@ -117,9 +117,9 @@
             on:click={() => selectSuggestion(s)}
             type="submit"
           >
-            <MagnifyingGlass class="w-4" />
+            <MagnifyingGlass class="w-4 text-gray-400" />
             <span class="inline-flex">
-              <span>{splitAtOverlap(s)[0]}</span>
+              <span class="font-light">{splitAtOverlap(s)[0]}</span>
               <span class="font-medium">{splitAtOverlap(s)[1]}</span>
             </span>
           </button>
