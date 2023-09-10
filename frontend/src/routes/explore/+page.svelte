@@ -1,4 +1,6 @@
 <script lang="ts">
+  import PlusCircleOutline from '~icons/heroicons/plus-circle';
+  import ChevronDown from '~icons/heroicons/chevron-down';
   import { api, type ScoredSite } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
@@ -6,7 +8,6 @@
   import { fade, slide } from 'svelte/transition';
   import { twJoin } from 'tailwind-merge';
   import { match } from 'ts-pattern';
-  import PlusCircleOutline from '~icons/heroicons/plus-circle';
 
   const LIMIT_OPTIONS = [10, 25, 50, 125, 250, 500, 1000];
 
@@ -153,6 +154,20 @@
               </div>
             </div>
           {/each}
+        </div>
+        <div class="flex w-full justify-center">
+          <button
+            class="h-6 w-6 cursor-pointer rounded-full text-contrast-500"
+            aria-label="Show more similar sites"
+            on:click={() => {
+              if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {
+                return;
+              }
+              limit = LIMIT_OPTIONS[LIMIT_OPTIONS.indexOf(limit) + 1];
+            }}
+          >
+            <ChevronDown />
+          </button>
         </div>
       </div>
     {/if}
