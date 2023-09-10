@@ -68,6 +68,11 @@
         didChangeInput = true;
       });
   };
+
+  const splitAtOverlap = (suggestion: string) => {
+    const lastIndex = [...suggestion].findLastIndex((a, i) => a == lastRealQuery[i]);
+    return [suggestion.slice(0, lastIndex + 1), suggestion.slice(lastIndex + 1)];
+  };
 </script>
 
 <form action="/search" class="flex w-full justify-center" id="searchbar-form">
@@ -113,7 +118,10 @@
             type="submit"
           >
             <MagnifyingGlass class="w-4" />
-            <span>{s}</span>
+            <span class="inline-flex">
+              <span>{splitAtOverlap(s)[0]}</span>
+              <span class="font-medium">{splitAtOverlap(s)[1]}</span>
+            </span>
           </button>
         {/each}
       </div>
