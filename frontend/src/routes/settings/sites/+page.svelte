@@ -60,7 +60,7 @@
       <div class="flex flex-wrap gap-x-5 gap-y-3" id="sites-list">
         {#each $ranked[section] as site (site)}
           <div animate:flip={{ duration: 150 }}>
-            <Site href="https://{site}" on:delete={unrankSite(site)}>
+            <Site href="http://{site}" on:delete={unrankSite(site)}>
               {site}
             </Site>
           </div>

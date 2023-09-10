@@ -10,6 +10,7 @@
 <span class="group flex overflow-hidden rounded-lg bg-brand-500 transition dark:bg-brand-800">
   <a
     {href}
+    target="_blank"
     class={twMerge(
       'bg-brand-500 py-2',
       'text-white',

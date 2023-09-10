@@ -95,7 +95,7 @@
         {#each chosenSites as site (site)}
           <div transition:slide={{ duration: 100 }} animate:flip={{ duration: 200 }}>
             <Site
-              href={site}
+              href="http://{site}"
               on:delete={() => (chosenSites = chosenSites.filter((s) => s != site))}
             >
               {site}
@@ -150,7 +150,7 @@
               </div>
               <span>{site.score.toFixed(2)}</span>
               <div class="flex">
-                <a href={site.site} class="underline">{site.site}</a>
+                <a href="http://{site.site}" target="_blank" class="underline">{site.site}</a>
               </div>
             </div>
           {/each}
