@@ -9,7 +9,7 @@
 </script>
 
 <div
-  class="code dark:text-brand-200 rounded-lg bg-slate-50 text-sm text-gray-600 dark:bg-stone-800"
+  class="code rounded-lg bg-slate-50 text-sm text-gray-600 dark:bg-stone-800 dark:text-brand-200"
 >
   <div class="overflow-auto px-3 py-2">
     {#await component}
