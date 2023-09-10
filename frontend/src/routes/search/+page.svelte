@@ -94,7 +94,7 @@
   const rankSite = (site: Webpage, ranking: Ranking) => () => {
     siteRankingsStore.update(($rankings) => ({
       ...$rankings,
-      [site.domain]: ranking,
+      [site.domain]: $rankings[site.domain] == ranking ? void 0 : ranking,
     }));
   };
 
