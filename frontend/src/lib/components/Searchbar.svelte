@@ -29,7 +29,11 @@
     data.then((res) => (suggestions = res.map((x) => x.raw)));
   };
 
-  $: browser && updateSuggestions(query);
+  let didChangeInput = false;
+  let lastRealQuery = query;
+
+  $: if (didChangeInput) lastRealQuery = query;
+  $: if (browser) updateSuggestions(lastRealQuery);
 
   const compressedRanked = derived(siteRankingsStore, ($siteRankings) =>
     compressRanked(rankingsToRanked($siteRankings)),
@@ -46,6 +50,8 @@
         () => 'none',
       )
       .otherwise((v) => (v + suggestions.length + step) % suggestions.length);
+    query = typeof selected == 'number' ? suggestions[selected] : (query = lastRealQuery);
+    didChangeInput = false;
   };
 
   const onKeydown = (ev: KeyboardEvent) => {
@@ -58,7 +64,9 @@
         ev.preventDefault();
         moveSelection(1);
       })
-      .otherwise(() => {});
+      .otherwise(() => {
+        didChangeInput = true;
+      });
   };
 </script>
 
