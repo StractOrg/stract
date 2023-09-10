@@ -20,7 +20,7 @@
     bind:value={selected}
   >
     <option value="">No Optic</option>
-    {#each $optics as optic (optic.url)}
+    {#each $optics as optic}
       <option value={optic.url} title={optic.description} selected={selected == optic.url}>
         {optic.name}
       </option>

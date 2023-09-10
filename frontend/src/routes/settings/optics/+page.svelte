@@ -32,7 +32,7 @@
     }
   };
   const removeOptic = (optic: OpticOption) => () => {
-    opticsStore.update(($optics) => $optics.filter((o) => o.url != optic.url));
+    opticsStore.update(($optics) => $optics.filter((o) => o != optic));
   };
 
   const optics = derived(opticsStore, ($optics) => [
@@ -114,7 +114,7 @@
         <div class="flex-1 font-medium">Name</div>
         <div class="flex-1 font-medium">Description</div>
         <div class="flex-1 font-medium">Link</div>
-        {#each $optics as { optic, removable } (optic.name + optic.url)}
+        {#each $optics as { optic, removable }}
           <button
             class="group flex w-6 items-start !bg-transparent"
             on:click={removeOptic(optic)}
