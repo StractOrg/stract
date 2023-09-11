@@ -63,8 +63,8 @@
               {/if}
 
               <div class="line-clamp-3 text-center">
-                <a href="/search?q={encodeURI(entity.title)}">
-                  {entity.title}
+                <a href="/search?q={encodeURI(related.title)}">
+                  {related.title}
                 </a>
               </div>
             </div>
