@@ -69,7 +69,7 @@ impl QaModel {
         })
     }
 
-    pub fn run(&self, question: &str, contexts: &[&str]) -> Option<Answer> {
+    pub fn run<S: AsRef<str>>(&self, question: &str, contexts: &[S]) -> Option<Answer> {
         if contexts.is_empty() {
             return None;
         }
@@ -78,7 +78,7 @@ impl QaModel {
         let mut batches = Vec::with_capacity(bs);
 
         for context in contexts {
-            batches.push((question.to_string(), context.to_string()));
+            batches.push((question.to_string(), context.as_ref().to_string()));
         }
         let encoded = self.tokenizer.encode_batch(batches, true).unwrap();
 

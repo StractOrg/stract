@@ -16,7 +16,6 @@ async fn main() {
 
     let model = Alice::open(
         "data/alice",
-        "data/summarizer/dual_encoder",
         Some(AcceleratorConfig {
             layer_fraction: 1.0,
             quantize_fraction: 0.0,

@@ -97,7 +97,6 @@ export interface components {
     };
     DisplayedAnswer: {
       answer: string;
-      body: string;
       prettyUrl: string;
       snippet: string;
       title: string;
@@ -113,7 +112,6 @@ export interface components {
       title: string;
     };
     DisplayedWebpage: {
-      body: string;
       domain: string;
       prettyUrl: string;
       rankingSignals?: {

@@ -50,6 +50,15 @@ pub enum Snippet {
     },
 }
 
+impl Snippet {
+    pub fn text(&self) -> Option<&TextSnippet> {
+        match self {
+            Snippet::Normal { text, .. } => Some(text),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HighlightedSpellCorrection {
@@ -162,7 +171,6 @@ pub struct DisplayedWebpage {
     pub domain: String,
     pub pretty_url: String,
     pub snippet: Snippet,
-    pub body: String,
     pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
 }
 
@@ -174,7 +182,6 @@ pub struct DisplayedAnswer {
     pub pretty_url: String,
     pub snippet: String,
     pub answer: String,
-    pub body: String,
 }
 
 impl From<RetrievedWebpage> for DisplayedWebpage {
@@ -192,7 +199,6 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             pretty_url,
             domain,
             snippet,
-            body: webpage.body,
             ranking_signals: None,
         }
     }

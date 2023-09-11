@@ -50,7 +50,6 @@ use crate::{
     llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
-    summarizer::ExtractiveSummarizer,
 };
 
 use self::{
@@ -100,8 +99,18 @@ pub struct SimplifiedWebsite {
 }
 
 impl SimplifiedWebsite {
-    fn new(webpage: DisplayedWebpage, query: &str, summarizer: &ExtractiveSummarizer) -> Self {
-        let text = summarizer.summarize(query, &webpage.body);
+    fn new(webpage: DisplayedWebpage) -> Self {
+        let text = webpage
+            .snippet
+            .text()
+            .map(|t| {
+                t.fragments
+                    .iter()
+                    .map(|f| f.text.clone())
+                    .collect::<String>()
+            })
+            .unwrap_or_default();
+
         let url = Url::parse(&webpage.url).unwrap();
 
         Self {
@@ -152,7 +161,6 @@ impl From<SimplifiedWebsite> for ModelWebsite {
 pub struct Searcher {
     url: String,
     optic_url: Option<String>,
-    summarizer: Arc<ExtractiveSummarizer>,
 }
 
 impl Searcher {
@@ -190,7 +198,7 @@ impl Searcher {
         let mut websites = Vec::new();
 
         for website in res.webpages {
-            websites.push(SimplifiedWebsite::new(website, query, &self.summarizer));
+            websites.push(SimplifiedWebsite::new(website));
         }
 
         tracing::debug!("search result: {:#?}", websites);
@@ -202,7 +210,6 @@ impl Searcher {
 pub struct Alice {
     inner: Rc<RawModel>,
     tokenizer: Arc<Tokenizer>,
-    summarizer: Arc<ExtractiveSummarizer>,
     end_tokens: Vec<i64>,
     initial_state: ClonableTensor,
     encryption_key: Key<Aes256Gcm>,
@@ -254,7 +261,6 @@ impl From<AliceAcceleratorConfig> for AcceleratorConfig {
 impl Alice {
     pub fn open<P: AsRef<Path>>(
         folder: P,
-        summarizer_path: P,
         accelerator: Option<AcceleratorConfig>,
         encryption_key: &[u8],
     ) -> Result<Alice> {
@@ -270,11 +276,6 @@ impl Alice {
             );
         }
 
-        let mut summarizer = ExtractiveSummarizer::open(summarizer_path, 1)?;
-        summarizer.set_window_size(50);
-
-        let summarizer = Arc::new(summarizer);
-
         let inner = Rc::new(model);
         let tokenizer = Arc::new(Tokenizer::open(folder.as_ref().join("tokenizer.json"))?);
 
@@ -286,7 +287,6 @@ impl Alice {
             inner,
             tokenizer,
             end_tokens,
-            summarizer,
             initial_state,
             encryption_key,
         })
@@ -348,7 +348,6 @@ impl Alice {
         let searcher = Searcher {
             url: search_url,
             optic_url,
-            summarizer: Arc::clone(&self.summarizer),
         };
 
         Ok(ActionExecutor::new(

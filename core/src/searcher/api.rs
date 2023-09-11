@@ -407,22 +407,32 @@ impl ApiSearcher {
             let contexts: Vec<_> = webpages
                 .iter()
                 .take(1)
-                .map(|webpage| webpage.body.as_str())
+                .filter_map(|webpage| webpage.snippet.text())
+                .map(|t| {
+                    t.fragments
+                        .iter()
+                        .map(|f| f.text.clone())
+                        .collect::<String>()
+                })
                 .collect();
 
             match qa_model.run(query, &contexts) {
                 Some(answer) => {
                     let answer_webpage = webpages.remove(answer.context_idx);
+                    let snip = answer_webpage
+                        .snippet
+                        .text()
+                        .unwrap()
+                        .fragments
+                        .iter()
+                        .map(|f| f.text.clone())
+                        .collect::<String>();
                     Some(DisplayedAnswer {
                         title: answer_webpage.title,
                         url: answer_webpage.url,
                         pretty_url: answer_webpage.pretty_url,
-                        snippet: generate_answer_snippet(
-                            &answer_webpage.body,
-                            answer.offset.clone(),
-                        ),
-                        answer: answer_webpage.body[answer.offset].to_string(),
-                        body: answer_webpage.body,
+                        snippet: generate_answer_snippet(&snip, answer.offset.clone()),
+                        answer: snip[answer.offset].to_string(),
                     })
                 }
                 None => None,

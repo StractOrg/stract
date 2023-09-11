@@ -341,7 +341,6 @@ pub struct AliceLocalConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub host: SocketAddr,
-    pub summarizer_path: String,
 
     pub alice_path: String,
     pub accelerator: Option<AliceAcceleratorConfig>,

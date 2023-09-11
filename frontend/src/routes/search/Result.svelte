@@ -1,6 +1,6 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
-  import type { Webpage, TextSnippet } from '$lib/api';
+  import type { Webpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import { clearSummary, summariesStore } from '$lib/stores';
   import Summary from './Summary.svelte';
