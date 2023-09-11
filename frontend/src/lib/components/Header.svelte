@@ -80,7 +80,7 @@
     <div
       class="pointer-events-none absolute bottom-0 right-0 z-50 translate-y-full flex-col pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100"
     >
-      <div class="rounded-xl border bg-white p-2 shadow-xl">
+      <div class="rounded-xl border bg-white p-2 shadow-xl dark:bg-stone-900">
         <div class="flex flex-col items-start space-y-1 pb-2">
           {#each nav as [url, name]}
             <Link href={url}>
