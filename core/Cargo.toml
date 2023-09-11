@@ -39,7 +39,6 @@ whatlang = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
-html-escape = { workspace = true }
 logos = { workspace = true }
 csv = { workspace = true }
 fst = { workspace = true }

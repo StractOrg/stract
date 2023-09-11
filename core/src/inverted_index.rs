@@ -44,6 +44,7 @@ use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
+use crate::snippet::TextSnippet;
 use crate::tokenizer::{BigramTokenizer, Identity, TrigramTokenizer};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
@@ -519,7 +520,7 @@ pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,
     pub body: String,
-    pub snippet: String,
+    pub snippet: TextSnippet,
     pub dirty_body: String,
     pub description: Option<String>,
     pub dmoz_description: Option<String>,

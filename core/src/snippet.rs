@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use crate::config::SnippetConfig;
 use crate::query::Query;
-use crate::search_prettifier::html_escape;
 use crate::spell::sentence_ranges;
 use crate::tokenizer::{BigramTokenizer, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
-use std::ops::Range;
+use utoipa::ToSchema;
 
 use itertools::Itertools;
 use whatlang::Lang;
@@ -45,37 +46,32 @@ struct PassageCandidate {
     doc_terms: HashMap<String, u64>,
 }
 
-#[derive(Debug)]
-struct SnippetString {
-    fragment: String,
-    highlighted: Vec<Range<usize>>,
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum TextSnippetFragmentKind {
+    Normal,
+    Highlighted,
 }
 
-const HIGHLIGHTEN_PREFIX: &str = "<b>";
-const HIGHLIGHTEN_POSTFIX: &str = "</b>";
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSnippetFragment {
+    kind: TextSnippetFragmentKind,
+    text: String,
+}
 
-impl SnippetString {
-    fn to_html(&self) -> String {
-        let mut html = String::new();
-        let mut start_from: usize = 0;
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSnippet {
+    fragments: Vec<TextSnippetFragment>,
+}
 
-        for item in self.highlighted.iter().filter(|item| item.start < item.end) {
-            if item.start < start_from {
-                start_from = item.end;
-                continue;
-            }
-            html.push_str(&html_escape(&self.fragment[start_from..item.start]));
-            html.push_str(HIGHLIGHTEN_PREFIX);
-            html.push_str(&html_escape(&self.fragment[item.clone()]));
-            html.push_str(HIGHLIGHTEN_POSTFIX);
-            start_from = item.end;
-        }
-        html.push_str(&html_escape(
-            &self.fragment[start_from..self.fragment.len()],
-        ));
-        html
-    }
+struct SnippetBuilder {
+    fragment: String,
+    highlights: Vec<Range<usize>>,
+}
 
+impl SnippetBuilder {
     fn highlight(&mut self, terms: &HashSet<String>, lang: whatlang::Lang) {
         for tokenizer in [
             Tokenizer::Stemmed(Stemmed::with_forced_language(lang)),
@@ -86,24 +82,55 @@ impl SnippetString {
                 tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, &self.fragment);
             while let Some(tok) = stream.next() {
                 if terms.contains(&tok.text) {
-                    self.highlighted.push(tok.offset_from..tok.offset_to);
+                    self.highlights.push(tok.offset_from..tok.offset_to);
                 }
             }
         }
 
         // remove overlapping ranges
-        self.highlighted.sort_by(|a, b| a.start.cmp(&b.start));
-        self.highlighted
+        self.highlights.sort_by(|a, b| a.start.cmp(&b.start));
+        self.highlights
             .dedup_by(|a, b| a.start == b.start && a.end > b.end);
+    }
+
+    fn build(self) -> TextSnippet {
+        let mut fragments = Vec::new();
+
+        let mut last_end = 0;
+
+        for range in self.highlights {
+            if range.start > last_end {
+                fragments.push(TextSnippetFragment {
+                    kind: TextSnippetFragmentKind::Normal,
+                    text: self.fragment[last_end..range.start].to_string(),
+                });
+            }
+
+            fragments.push(TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Highlighted,
+                text: self.fragment[range.start..range.end].to_string(),
+            });
+
+            last_end = range.end;
+        }
+
+        if last_end < self.fragment.len() {
+            fragments.push(TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Normal,
+                text: self.fragment[last_end..].to_string(),
+            });
+        }
+
+        TextSnippet { fragments }
     }
 }
 
-fn snippet_string(
+fn snippet_string_builder(
     text: &str,
     terms: &[String],
     lang: whatlang::Lang,
     config: SnippetConfig,
-) -> SnippetString {
+) -> SnippetBuilder {
     let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
 
     let terms: HashSet<String> = terms
@@ -144,9 +171,9 @@ fn snippet_string(
         .collect();
 
     if passages.is_empty() {
-        let mut snippet = SnippetString {
+        let mut snippet = SnippetBuilder {
             fragment: text.chars().take(config.desired_num_chars).collect(),
-            highlighted: Vec::new(),
+            highlights: Vec::new(),
         };
 
         snippet.highlight(&terms, lang);
@@ -199,9 +226,9 @@ fn snippet_string(
         .expect("passages cannot be empty at this point");
 
     let best_passage = &passages[best_idx];
-    let mut snippet = SnippetString {
+    let mut snippet = SnippetBuilder {
         fragment: best_passage.text.clone(),
-        highlighted: Vec::new(),
+        highlights: Vec::new(),
     };
 
     if snippet.fragment.len() > config.desired_num_chars + config.delta_num_chars {
@@ -236,7 +263,16 @@ fn snippet_string(
     snippet
 }
 
-pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> String {
+fn snippet_string(
+    text: &str,
+    terms: &[String],
+    lang: whatlang::Lang,
+    config: SnippetConfig,
+) -> TextSnippet {
+    snippet_string_builder(text, terms, lang, config).build()
+}
+
+pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> TextSnippet {
     let lang = match region.lang() {
         Some(lang) => lang,
         None => match config.num_words_for_lang_detection {
@@ -252,22 +288,20 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
     };
 
     if text.is_empty() {
-        return text.to_string();
+        return TextSnippet {
+            fragments: vec![TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Normal,
+                text: "".to_string(),
+            }],
+        };
     }
 
     match config.max_considered_words {
         Some(num_words) => {
             let text = text.split_whitespace().take(num_words).join(" ");
-
-            let snippet = snippet_string(&text, query.simple_terms(), lang, config);
-
-            snippet.to_html()
+            snippet_string(&text, query.simple_terms(), lang, config)
         }
-        None => {
-            let snippet = snippet_string(text, query.simple_terms(), lang, config);
-
-            snippet.to_html()
-        }
+        None => snippet_string(text, query.simple_terms(), lang, config),
     }
 }
 
@@ -293,11 +327,28 @@ to the project are from community members.[15]
 Rust won first place for "most loved programming language" in the Stack Overflow Developer
 Survey in 2016, 2017, and 2018."#;
 
-    fn snippet_text(snippet: Snippet) -> String {
+    fn text_snippet(snippet: Snippet) -> TextSnippet {
         match snippet {
             Snippet::Normal { date: _, text } => text,
             _ => panic!("The snippet was not text"),
         }
+    }
+
+    const HIGHLIGHTEN_PREFIX: &str = "<b>";
+    const HIGHLIGHTEN_POSTFIX: &str = "</b>";
+
+    fn highlight(snippet: Snippet) -> String {
+        let text = text_snippet(snippet);
+
+        text.fragments
+            .into_iter()
+            .map(|TextSnippetFragment { kind, text }| match kind {
+                TextSnippetFragmentKind::Normal => text,
+                TextSnippetFragmentKind::Highlighted => {
+                    format!("{HIGHLIGHTEN_PREFIX}{}{HIGHLIGHTEN_POSTFIX}", text)
+                }
+            })
+            .collect()
     }
 
     #[test]
@@ -337,7 +388,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(snippet_text(result.webpages[0].snippet.clone()), format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?"));
+        assert_eq!(highlight(result.webpages[0].snippet.clone()), format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?"));
     }
 
     #[test]
@@ -377,7 +428,7 @@ Survey in 2016, 2017, and 2018."#;
 
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
-        assert_eq!(snippet_text(result.webpages[0].snippet.clone()), format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?"));
+        assert_eq!(highlight(result.webpages[0].snippet.clone()), format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?"));
     }
 
     #[test]
@@ -418,7 +469,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(
-            snippet_text(result.webpages[0].snippet.clone()),
+            highlight(result.webpages[0].snippet.clone()),
             format!("Rust is a systems programming language sponsored by Mozilla which describes it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural {HIGHLIGHTEN_PREFIX}paradigms{HIGHLIGHTEN_POSTFIX}. Rust is syntactically similar to C++[according to whom?")
         );
     }
@@ -426,13 +477,15 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_query() {
         assert_eq!(
-            snippet_string(
-                "this is a test",
-                &[],
-                whatlang::Lang::Eng,
-                SnippetConfig::default()
-            )
-            .fragment
+            highlight(Snippet::Normal {
+                date: None,
+                text: snippet_string(
+                    "this is a test",
+                    &[],
+                    whatlang::Lang::Eng,
+                    SnippetConfig::default()
+                )
+            })
             .as_str(),
             "this is a test"
         );
@@ -441,28 +494,32 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_text() {
         assert_eq!(
-            snippet_string(
-                "",
-                &["test".to_string()],
-                whatlang::Lang::Eng,
-                SnippetConfig::default()
-            )
-            .fragment
+            highlight(Snippet::Normal {
+                date: None,
+                text: snippet_string(
+                    "",
+                    &["test".to_string()],
+                    whatlang::Lang::Eng,
+                    SnippetConfig::default()
+                )
+            })
             .as_str(),
             ""
         );
 
         assert_eq!(
-            snippet_string("", &[], whatlang::Lang::Eng, SnippetConfig::default())
-                .fragment
-                .as_str(),
+            highlight(Snippet::Normal {
+                date: None,
+                text: snippet_string("", &[], whatlang::Lang::Eng, SnippetConfig::default())
+            })
+            .as_str(),
             ""
         );
     }
 
     #[test]
     fn compounded_terms() {
-        let mut snip = snippet_string(
+        let mut snip = snippet_string_builder(
             "this is a test",
             &["thisis".to_string()],
             whatlang::Lang::Eng,
@@ -473,6 +530,14 @@ Survey in 2016, 2017, and 2018."#;
         terms.insert("thisis".to_string());
 
         snip.highlight(&terms, whatlang::Lang::Eng);
-        assert_eq!(snip.to_html().as_str(), "<b>this is</b> a test");
+
+        assert_eq!(
+            highlight(Snippet::Normal {
+                date: None,
+                text: snip.build()
+            })
+            .as_str(),
+            "<b>this is</b> a test"
+        );
     }
 }

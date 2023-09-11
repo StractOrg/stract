@@ -144,6 +144,7 @@ export const api = {
 export type SearchResults = components['schemas']['ApiSearchResult'];
 export type WebsitesResult = components['schemas']['WebsitesResult'];
 export type Webpage = components['schemas']['DisplayedWebpage'];
+export type TextSnippet = components['schemas']['TextSnippet'];
 export type Sidebar = components['schemas']['Sidebar'];
 export type Entity = components['schemas']['DisplayedEntity'];
 export type Widget = components['schemas']['Widget'];

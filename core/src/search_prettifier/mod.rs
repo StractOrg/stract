@@ -27,6 +27,7 @@ use utoipa::ToSchema;
 use crate::{
     inverted_index::RetrievedWebpage,
     ranking::{Signal, SignalScore},
+    snippet::TextSnippet,
     spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
 };
@@ -41,7 +42,7 @@ pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, Stack
 pub enum Snippet {
     Normal {
         date: Option<String>,
-        text: String,
+        text: TextSnippet,
     },
     StackOverflowQA {
         question: StackOverflowQuestion,
@@ -83,13 +84,6 @@ impl From<spell::Correction> for HighlightedSpellCorrection {
 
         Self { raw, highlighted }
     }
-}
-
-pub fn html_escape(s: &str) -> String {
-    html_escape::decode_html_entities(s)
-        .chars()
-        .filter(|c| !matches!(c, '<' | '>' | '&'))
-        .collect()
 }
 
 fn prettify_url(url: &Url) -> String {
@@ -191,10 +185,8 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
         let domain = url.root_domain().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
 
-        let title = html_escape(&webpage.title);
-
         Self {
-            title,
+            title: webpage.title,
             site: url.host_str().unwrap_or_default().to_string(),
             url: webpage.url,
             pretty_url,

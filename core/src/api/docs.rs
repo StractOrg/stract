@@ -49,6 +49,10 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::StackOverflowQuestion,
                 crate::search_prettifier::CodeOrText,
 
+                crate::snippet::TextSnippet,
+                crate::snippet::TextSnippetFragmentKind,
+                crate::snippet::TextSnippetFragment,
+
                 crate::bangs::UrlWrapper,
 
                 crate::widgets::Widget,

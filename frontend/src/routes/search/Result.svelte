@@ -1,6 +1,6 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
-  import type { Webpage } from '$lib/api';
+  import type { Webpage, TextSnippet } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import { clearSummary, summariesStore } from '$lib/stores';
   import Summary from './Summary.svelte';
@@ -55,7 +55,13 @@
           <div class="inline">
             <span id="snippet-text" class="snippet-text [&:nth-child(2)]:before:content-['—']">
               {webpage.snippet.date || ''}
-              {@html webpage.snippet.text}
+              {#each webpage.snippet.text.fragments as fragment}
+                {#if fragment.kind == "normal"}
+                  {fragment.text}
+                {:else if fragment.kind == "highlighted"}
+                  <b>{fragment.text}</b>
+                {/if}
+              {/each}
             </span>
           </div>
         </div>
