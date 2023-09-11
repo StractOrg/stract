@@ -64,6 +64,9 @@
         ev.preventDefault();
         moveSelection(1);
       })
+      .with('Enter', () => {
+        hasFocus = false;
+      })
       .otherwise(() => {
         didChangeInput = true;
       });
@@ -73,6 +76,9 @@
     const lastIndex = [...suggestion].findLastIndex((a, i) => a == lastRealQuery[i]);
     return [suggestion.slice(0, lastIndex + 1), suggestion.slice(lastIndex + 1)];
   };
+
+  let suggestionsDiv: HTMLDivElement | undefined;
+  let hasFocus = autofocus;
 </script>
 
 <form action="/search" class="flex w-full justify-center" id="searchbar-form">
@@ -82,8 +88,9 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-gray-300 py-0.5 pl-5 pr-0.5 transition focus-within:shadow dark:border-stone-700 dark:bg-stone-800 focus-within:dark:border-stone-600',
-      suggestions.length > 0 && 'focus-within:rounded-b-none',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-gray-300 py-0.5 pl-5 pr-0.5 transition dark:bg-stone-800',
+      hasFocus && suggestions.length > 0 && 'rounded-b-none',
+      hasFocus ? 'shadow dark:border-stone-600' : 'dark:border-stone-700',
     )}
   >
     <MagnifyingGlass class="w-5 text-gray-400" />
@@ -96,6 +103,16 @@
       placeholder="Search"
       autocomplete="off"
       class="border-none bg-transparent focus:ring-0"
+      on:focus={() => {
+        hasFocus = true;
+      }}
+      on:blur={(e) => {
+        // NOTE: If we click an element inside the suggestions,
+        // don't blur yet since the clicked element would disapper
+        if (e.relatedTarget instanceof Node && suggestionsDiv?.contains(e.relatedTarget)) return;
+
+        requestIdleCallback(() => (hasFocus = false));
+      }}
       bind:value={query}
       on:keydown={onKeydown}
     />
@@ -103,24 +120,36 @@
 
     {#if suggestions.length > 0}
       <div
-        class="absolute inset-x-5 bottom-px hidden h-px bg-gray-200 group-focus-within:block dark:bg-stone-700"
+        class={twJoin(
+          'absolute inset-x-5 bottom-px h-px bg-gray-200 dark:bg-stone-700',
+          hasFocus ? 'block' : 'hidden',
+        )}
       />
       <div
-        class="absolute -inset-x-px bottom-0 hidden translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-gray-300 bg-white shadow group-focus-within:flex dark:border-stone-700 group-focus-within:dark:border-stone-600"
+        class={twJoin(
+          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-gray-300 bg-white shadow dark:border-stone-600',
+          hasFocus ? 'flex' : 'hidden',
+        )}
+        role="listbox"
+        bind:this={suggestionsDiv}
       >
         {#each suggestions as s, index}
           <button
-            class="flex space-x-3 py-1.5 pl-5 hover:bg-gray-50 dark:bg-stone-800 dark:hover:bg-stone-900 {selected ==
-            index
-              ? 'bg-gray-50 dark:hover:bg-stone-900'
-              : ''}"
-            on:click={() => selectSuggestion(s)}
+            class={twJoin(
+              'flex space-x-3 py-1.5 pl-5 hover:bg-gray-50 dark:bg-stone-800 dark:hover:bg-stone-900',
+              selected == index && 'bg-gray-50 dark:bg-stone-900',
+            )}
+            on:click={() => {
+              selectSuggestion(s);
+              hasFocus = false;
+            }}
             type="submit"
           >
             <MagnifyingGlass class="w-4 text-gray-400" />
-            <span class="inline-flex">
-              <span class="font-light">{splitAtOverlap(s)[0]}</span>
-              <span class="font-medium">{splitAtOverlap(s)[1]}</span>
+            <span>
+              {@html splitAtOverlap(s)[0]}<span class="font-medium"
+                >{@html splitAtOverlap(s)[1]}</span
+              >
             </span>
           </button>
         {/each}
