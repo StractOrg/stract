@@ -194,12 +194,10 @@
 </main>
 
 <style lang="postcss">
-  .color-sample {
-    & h2 {
-      @apply mb-1 text-lg font-semibold capitalize;
-    }
-    & > div {
-      @apply inline-flex overflow-hidden rounded border border-base-300 [&>*]:aspect-square [&>*]:w-8;
-    }
+  .color-sample h2 {
+    @apply mb-1 text-lg font-semibold capitalize;
+  }
+  .color-sample > div {
+    @apply inline-flex overflow-hidden rounded border border-base-300 [&>*]:aspect-square [&>*]:w-8;
   }
 </style>
