@@ -23,7 +23,7 @@
     <div class="flex min-w-0 grow flex-col space-y-1">
       <div class="flex items-center text-sm">
         <a
-          class="max-w-[calc(100%-100px)] truncate text-gray-800 dark:text-brand-100"
+          class="max-w-[calc(100%-100px)] truncate text-neutral"
           href={webpage.url}
           use:improvements={resultIndex}
         >
@@ -31,7 +31,7 @@
         </a>
       </div>
       <a
-        class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-blue-800 visited:text-purple-800 hover:underline dark:text-blue-500 dark:visited:text-purple-500"
+        class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
         title={webpage.title}
         href={webpage.url}
         use:improvements={resultIndex}
@@ -40,14 +40,14 @@
       </a>
     </div>
     <button
-      class="noscript:hidden hidden w-5 min-w-fit items-center justify-center bg-transparent text-gray-700/50 hover:cursor-pointer hover:text-gray-700 dark:text-stone-400 dark:hover:text-stone-300 md:flex"
+      class="noscript:hidden hidden w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus md:flex"
       bind:this={button}
       on:click|stopPropagation={() => dispatch('modal', button)}
     >
       <AdjustVertical class="text-xl" />
     </button>
   </div>
-  <div class="text-sm font-normal text-snippet dark:text-stone-400 [&>b]:font-bold">
+  <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">
     {#if $summary}
       <Summary {...$summary} on:hide={() => clearSummary(webpage)} />
     {:else if webpage.snippet.type == 'normal'}

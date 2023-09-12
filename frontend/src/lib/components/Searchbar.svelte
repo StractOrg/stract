@@ -88,12 +88,12 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-gray-300 py-0.5 pl-5 pr-0.5 transition dark:bg-stone-800',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-300 py-0.5 pl-5 pr-0.5 transition focus-within:shadow',
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
-      hasFocus ? 'shadow dark:border-stone-600' : 'dark:border-stone-700',
+      hasFocus && 'shadow',
     )}
   >
-    <MagnifyingGlass class="w-5 text-gray-400" />
+    <MagnifyingGlass class="w-5 text-base-content" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
       type="search"
@@ -119,15 +119,16 @@
     <Button type="submit">search</Button>
 
     {#if suggestions.length > 0}
+      <div class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block" />
       <div
         class={twJoin(
-          'absolute inset-x-5 bottom-px h-px bg-gray-200 dark:bg-stone-700',
+          'absolute inset-x-5 bottom-px h-px bg-base-300',
           hasFocus ? 'block' : 'hidden',
         )}
       />
       <div
         class={twJoin(
-          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-gray-300 bg-white shadow dark:border-stone-600',
+          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-300 bg-base-100 shadow',
           hasFocus ? 'flex' : 'hidden',
         )}
         role="listbox"
@@ -136,8 +137,8 @@
         {#each suggestions as s, index}
           <button
             class={twJoin(
-              'flex space-x-3 py-1.5 pl-5 hover:bg-gray-50 dark:bg-stone-800 dark:hover:bg-stone-900',
-              selected == index && 'bg-gray-50 dark:bg-stone-900',
+              'flex space-x-3 py-1.5 pl-5 hover:bg-base-200',
+              selected == index && 'bg-base-200',
             )}
             on:click={() => {
               selectSuggestion(s);
@@ -145,13 +146,13 @@
             }}
             type="submit"
           >
-            <MagnifyingGlass class="w-4 text-gray-400" />
+            <MagnifyingGlass class="w-4 text-neutral" />
             <span>
               {@html splitAtOverlap(s)[0]}<span class="font-medium"
                 >{@html splitAtOverlap(s)[1]}</span
               >
-            </span>
-          </button>
+            </span></button
+          >
         {/each}
       </div>
     {/if}

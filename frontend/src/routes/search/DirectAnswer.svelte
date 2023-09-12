@@ -9,14 +9,14 @@
   <div class="mb-5 text-sm [&>b]:font-bold">{@html directAnswer.snippet}</div>
   <div class="flex flex-col">
     <a
-      class="m-0 inline-block max-w-[calc(100%-30px)] truncate p-0 text-sm text-gray-800 hover:no-underline"
+      class="m-0 inline-block max-w-[calc(100%-30px)] truncate p-0 text-sm text-neutral hover:no-underline"
       href={directAnswer.url}
     >
       {directAnswer.prettyUrl}
     </a>
     <div class="answer-title">
       <a
-        class="inline-block max-w-[calc(100%-30px)] truncate text-xl font-medium text-blue-800 visited:text-purple-800"
+        class="inline-block max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited"
         href={directAnswer.url}
       >
         {directAnswer.title}

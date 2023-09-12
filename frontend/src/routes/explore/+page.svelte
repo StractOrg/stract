@@ -1,19 +1,22 @@
 <script lang="ts">
+  import XMark from '~icons/heroicons/x-mark';
   import PlusCircleOutline from '~icons/heroicons/plus-circle';
   import ChevronDown from '~icons/heroicons/chevron-down';
   import { api, type ScoredSite } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { flip } from 'svelte/animate';
   import { fade, slide } from 'svelte/transition';
   import { twJoin } from 'tailwind-merge';
   import { match } from 'ts-pattern';
+  import Callout from '$lib/components/Callout.svelte';
 
   const LIMIT_OPTIONS = [10, 25, 50, 125, 250, 500, 1000];
 
   let inputWebsite = '';
   let limit = LIMIT_OPTIONS[0];
-  let chosenSites: string[] = [];
+  let chosenSites: string[] = ['facebook.com'];
   let similarSites: ScoredSite[] = [];
 
   let errorMessage = false;
@@ -65,12 +68,9 @@
         </p>
       </div>
       <form
-        class={twJoin(`
-                    mb-2 flex w-full max-w-lg rounded-full border border-gray-300
-                    bg-white p-[2px]
-                    pl-3 transition focus-within:shadow dark:border-stone-700
-                    dark:bg-stone-800 focus-within:dark:border-stone-600
-                `)}
+        class={twJoin(
+          'mb-2 flex w-full max-w-lg rounded-full border border-base-200 bg-base-100 p-[2px] pl-3 transition focus-within:shadow',
+        )}
         id="site-input-container"
         on:submit|preventDefault={() => addWebsite(inputWebsite, true)}
       >
@@ -87,9 +87,15 @@
         <Button>Add</Button>
       </form>
       {#if errorMessage}
-        <label class="mb-4 text-red-600" for="site-input">
-          Unfortunately, we don't know about that site yet.
-        </label>
+        <div class="my-2" transition:slide>
+          <Callout kind="warning" title="Unable to add page">
+            <button slot="top-right" on:click={() => (errorMessage = false)}>
+              <XMark />
+            </button>
+
+            Unfortunately, we don't know about that site yet.
+          </Callout>
+        </div>
       {/if}
       <div class="flex flex-wrap justify-center gap-x-5 gap-y-3" id="sites-list">
         {#each chosenSites as site (site)}
@@ -110,7 +116,7 @@
         <div class="grid grid-cols-[auto_auto_1fr_auto] items-center gap-5">
           <h2 class="text-2xl font-bold">Similar sites</h2>
           <div class="flex space-x-1">
-            <select
+            <Select
               id="limit"
               class="styled-selector cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
@@ -118,7 +124,7 @@
               {#each LIMIT_OPTIONS as l}
                 <option value={l}>{l}</option>
               {/each}
-            </select>
+            </Select>
           </div>
           <div />
           <Button on:click={exportAsOptic}>Export as optic</Button>
@@ -140,10 +146,8 @@
                 >
                   <PlusCircleOutline
                     class={twJoin(
-                      'text-xl transition group-hover:scale-105',
-                      chosenSites.includes(site.site)
-                        ? 'rotate-45 text-red-500 hover:text-red-400 active:text-red-300'
-                        : 'text-green-500 hover:text-green-400 active:text-green-300',
+                      'text-xl transition group-hover:scale-105 group-active:scale-95',
+                      chosenSites.includes(site.site) ? 'rotate-45 text-error' : 'text-success',
                     )}
                   />
                 </button>

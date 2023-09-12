@@ -12,7 +12,7 @@
     form="searchbar-form"
     id="region-selector"
     name="gl"
-    className="m-0 font-light dark:text-stone-400"
+    className="m-0 font-light text-neutral-focus"
     submitOnChange={searchOnChange}
     bind:value={selected}
   >

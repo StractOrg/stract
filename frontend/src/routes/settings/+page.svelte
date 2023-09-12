@@ -30,7 +30,7 @@
         </div>
       </div>
 
-      <p class="pt-5 text-neutral-300 dark:text-stone-500">More to come soon</p>
+      <p class="pt-5 text-neutral/50">More to come soon</p>
     </div>
   </div>
 </div>

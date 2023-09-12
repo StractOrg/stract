@@ -50,6 +50,16 @@ export const searchQueryStore = writableLocalStorage<string | undefined>(
   browser && sessionStorage,
 );
 
+const THEME_KEY = 'theme';
+export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
+if (browser)
+  themeStore.subscribe(($theme) => {
+    if ($theme)
+      document.documentElement.className = (
+        document.documentElement.className.replace(/theme-[^ ]+/, ``) + ` ${$theme.toLowerCase()}`
+      ).trim();
+  });
+
 export const summariesStore = writable<
   Record<string, { inProgress: boolean; data: string } | undefined>
 >({});

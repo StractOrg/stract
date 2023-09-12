@@ -1,7 +1,7 @@
 <script lang="ts">
-  import HandThumbDown from '~icons/heroicons/hand-thumb-down';
-  import HandThumbUp from '~icons/heroicons/hand-thumb-up';
-  import NoSymbol from '~icons/heroicons/no-symbol';
+  import HandThumbDown from '~icons/heroicons/hand-thumb-down-solid';
+  import HandThumbUp from '~icons/heroicons/hand-thumb-up-solid';
+  import NoSymbol from '~icons/heroicons/no-symbol-solid';
   import ChevronLeft from '~icons/heroicons/chevron-left';
   import ChevronRight from '~icons/heroicons/chevron-right';
   import OpticSelector from '$lib/components/OpticSelector.svelte';
@@ -69,6 +69,10 @@
     modal = void 0;
   }
 
+  // $: {
+  //   results.discussions = results.webpages;
+  // }
+
   $: {
     if (browser && results.type == 'websites') updateQueryId({ query, webpages: results.webpages });
   }
@@ -76,17 +80,17 @@
   const rankingChoices = [
     {
       ranking: 'liked',
-      kind: 'brand',
+      kind: 'success',
       Icon: HandThumbUp,
     },
     {
       ranking: 'disliked',
-      kind: 'amber',
+      kind: 'warning',
       Icon: HandThumbDown,
     },
     {
       ranking: 'blocked',
-      kind: 'red',
+      kind: 'error',
       Icon: NoSymbol,
     },
   ] as const;
@@ -107,7 +111,7 @@
   <div
     class={twJoin(
       'absolute -translate-y-1/2 transition-all',
-      'h-fit w-52 flex-col items-center overflow-hidden rounded-lg border bg-white px-2 py-5 text-sm drop-shadow-md dark:border-stone-700 dark:bg-stone-800',
+      'h-fit w-52 flex-col items-center overflow-hidden rounded-lg border bg-base-100 px-2 py-5 text-sm drop-shadow-md',
     )}
     style="top: {modal.top}px; left: calc({modal.left}px + 1rem)"
     transition:scale={{ duration: 150 }}
@@ -147,9 +151,7 @@
         <Searchbar {query} />
       </div>
       <div class="mx-auto flex w-full justify-between">
-        <div
-          class="flex h-full flex-col justify-center space-x-2 text-sm text-gray-600 dark:text-stone-500"
-        >
+        <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
           <p class="h-fit">
             Found {results.numHits.toLocaleString()} results in {(
               (results.searchDurationMs ?? 0) / 1000
@@ -208,18 +210,18 @@
         <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
           {#if data.prevPageSearchParams}
             <a href="/search?{data.prevPageSearchParams}">
-              <ChevronLeft class="text-xl text-brand-500 hover:text-brand-600" />
+              <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
             </a>
           {:else}
-            <ChevronLeft class="text-xl text-gray-500" />
+            <ChevronLeft class="text-xl text-neutral" />
           {/if}
           <div>Page {data.currentPage}</div>
           {#if data.nextPageSearchParams}
             <a href="/search?{data.nextPageSearchParams}">
-              <ChevronRight class="text-xl text-brand-500 hover:text-brand-600" />
+              <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
             </a>
           {:else}
-            <ChevronRight class="text-xl text-gray-500" />
+            <ChevronRight class="text-xl text-neutral" />
           {/if}
         </div>
       </div>
