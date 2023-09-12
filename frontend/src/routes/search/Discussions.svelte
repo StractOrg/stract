@@ -2,6 +2,7 @@
   import ChevronDown from '~icons/heroicons/chevron-down';
   import ChatBubbleLeftRight from '~icons/heroicons/chat-bubble-left-right';
   import type { Webpage } from '$lib/api';
+  import TextSnippet from '$lib/components/TextSnippet.svelte';
 
   export let discussions: Webpage[];
 
@@ -41,7 +42,7 @@
                 <span class="text-gray-500">{discussion.snippet.date}</span>
               {/if}
               <span class="[&:nth-child(2)]:before:content-['—']">
-                {@html discussion.snippet.text}
+                <TextSnippet snippet={discussion.snippet.text} />
               </span>
             </div>
           {/if}

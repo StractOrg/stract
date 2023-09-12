@@ -6,6 +6,7 @@
   import Summary from './Summary.svelte';
   import { derived } from 'svelte/store';
   import { improvements } from '$lib/improvements';
+  import TextSnippet from '$lib/components/TextSnippet.svelte';
 
   export let webpage: Webpage;
   export let resultIndex: number;
@@ -55,13 +56,7 @@
           <div class="inline">
             <span id="snippet-text" class="snippet-text [&:nth-child(2)]:before:content-['—']">
               {webpage.snippet.date || ''}
-              {#each webpage.snippet.text.fragments as fragment}
-                {#if fragment.kind == "normal"}
-                  {fragment.text}
-                {:else if fragment.kind == "highlighted"}
-                  <b>{fragment.text}</b>
-                {/if}
-              {/each}
+              <TextSnippet snippet={webpage.snippet.text} />
             </span>
           </div>
         </div>
