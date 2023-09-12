@@ -35,6 +35,8 @@ mod store;
 use self::segment::{LiveSegment, StoredSegment};
 use self::store::Store;
 
+pub const MAX_LABEL_LENGTH: usize = 1024;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(u128);
 
@@ -444,6 +446,7 @@ impl Webgraph {
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
         let (from_id, to_id) = (self.id_or_assign(&from), self.id_or_assign(&to));
+        let label = label.chars().take(MAX_LABEL_LENGTH).collect::<String>();
         self.live_segment.insert(from_id, to_id, label);
     }
 
@@ -962,5 +965,24 @@ mod test {
 
         assert_eq!(graph.segments.len(), 1);
         verify_graph(&graph);
+    }
+
+    #[test]
+    fn cap_label_length() {
+        let mut graph = WebgraphBuilder::new_memory().open();
+
+        graph.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "a".repeat(MAX_LABEL_LENGTH + 1),
+        );
+
+        graph.commit();
+
+        assert_eq!(graph.segments.len(), 1);
+        assert_eq!(
+            graph.outgoing_edges(Node::from("A"))[0].label,
+            "a".repeat(MAX_LABEL_LENGTH)
+        );
     }
 }

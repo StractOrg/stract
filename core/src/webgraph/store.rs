@@ -30,24 +30,24 @@ where
 {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let mut options = rocksdb::Options::default();
-        options.set_max_open_files(8);
+        options.set_max_open_files(-1);
 
         options.create_if_missing(true);
         options.increase_parallelism(8);
-        options.set_write_buffer_size(256 * 1024 * 1024); // 256 MB memtable
-        options.set_max_write_buffer_number(8);
+        options.set_max_background_jobs(8);
+        options.set_write_buffer_size(128 * 1024 * 1024); // 128 MB memtable
+        options.set_max_write_buffer_number(2);
 
         let mut block_options = BlockBasedOptions::default();
         block_options.set_ribbon_filter(5.0);
 
         block_options.disable_cache();
 
-        block_options.set_block_size(128 * 1024); // 128 KB block size
-
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
 
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 
@@ -73,7 +73,10 @@ where
         let key_bytes = bincode::serialize(key).unwrap();
         let value_bytes = bincode::serialize(value).unwrap();
 
-        self.db.put(key_bytes, value_bytes).unwrap();
+        let mut options = rocksdb::WriteOptions::default();
+        options.disable_wal(true);
+
+        self.db.put_opt(key_bytes, value_bytes, &options).unwrap();
     }
 
     pub fn batch_put<'a>(&'a self, it: impl Iterator<Item = (&'a K, &'a V)>) {
@@ -86,7 +89,10 @@ where
             batch.put(key_bytes, value_bytes);
         }
 
-        self.db.write(batch).unwrap();
+        let mut options = rocksdb::WriteOptions::default();
+        options.disable_wal(true);
+
+        self.db.write_opt(batch, &options).unwrap();
     }
 
     pub fn batch_put_owned(&self, it: impl Iterator<Item = (K, V)>) {
@@ -99,7 +105,10 @@ where
             batch.put(key_bytes, value_bytes);
         }
 
-        self.db.write(batch).unwrap();
+        let mut options = rocksdb::WriteOptions::default();
+        options.disable_wal(true);
+
+        self.db.write_opt(batch, &options).unwrap();
     }
 
     pub fn keys(&self) -> impl Iterator<Item = K> + '_ {

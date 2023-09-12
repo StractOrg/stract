@@ -35,7 +35,7 @@ impl RemoteWebgraph {
         Self { cluster }
     }
 
-    async fn host(&self) -> SocketAddr {
+    async fn host(&self) -> Option<SocketAddr> {
         self.cluster
             .members()
             .await
@@ -44,7 +44,6 @@ impl RemoteWebgraph {
                 Service::Webgraph { host } => Some(host),
                 _ => None,
             })
-            .unwrap()
     }
 }
 
@@ -68,7 +67,11 @@ pub async fn similar_sites(
     extract::Json(params): extract::Json<SimilarSitesParams>,
 ) -> std::result::Result<impl IntoResponse, StatusCode> {
     state.counters.explore_counter.inc();
-    let host = state.remote_webgraph.host().await;
+    let host = state
+        .remote_webgraph
+        .host()
+        .await
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let retry = ExponentialBackoff::from_millis(30)
         .with_limit(Duration::from_millis(200))
@@ -124,7 +127,11 @@ pub async fn knows_site(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<KnowsSiteParams>,
 ) -> std::result::Result<impl IntoResponse, StatusCode> {
-    let host = state.remote_webgraph.host().await;
+    let host = state
+        .remote_webgraph
+        .host()
+        .await
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let retry = ExponentialBackoff::from_millis(30)
         .with_limit(Duration::from_millis(200))
