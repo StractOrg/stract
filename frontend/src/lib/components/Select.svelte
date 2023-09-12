@@ -1,10 +1,12 @@
-<script lang="ts">
-  interface $$Props extends Omit<Partial<HTMLSelectElement>, 'form'> {
+<script lang="ts" generics="T extends number | string">
+  interface $$Props extends Omit<Partial<HTMLSelectElement>, 'form' | 'value'> {
+    class?: string;
+    value: T;
     form?: string;
     submitOnChange?: boolean;
   }
 
-  export let value: string = '';
+  export let value: T;
   export let form: string | undefined = void 0;
   export let submitOnChange = false;
 </script>
