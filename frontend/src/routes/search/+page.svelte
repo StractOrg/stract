@@ -191,7 +191,7 @@
 
       {#if results.webpages}
         <div class="grid grid-cols-1 space-y-10 place-self-start">
-          {#each results.webpages as webpage, resultIndex (webpage.url)}
+          {#each results.webpages as webpage, resultIndex (`${query}-${webpage.url}`)}
             <div animate:flip={{ duration: 150 }}>
               <Result {webpage} {resultIndex} on:modal={openSearchModal(webpage)} />
             </div>
