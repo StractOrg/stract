@@ -118,7 +118,7 @@
           <div class="flex space-x-1">
             <Select
               id="limit"
-              class="styled-selector cursor-pointer rounded border-none dark:bg-transparent"
+              class="cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
             >
               {#each LIMIT_OPTIONS as l}
@@ -161,7 +161,7 @@
         </div>
         <div class="flex w-full justify-center">
           <button
-            class="h-6 w-6 cursor-pointer rounded-full text-contrast-500"
+            class="h-6 w-6 cursor-pointer rounded-full text-accent"
             aria-label="Show more similar sites"
             on:click={() => {
               if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {
