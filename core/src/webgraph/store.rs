@@ -30,16 +30,13 @@ where
 {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let mut options = rocksdb::Options::default();
-        options.set_max_open_files(-1);
+        options.set_max_open_files(1);
 
         options.create_if_missing(true);
-        options.increase_parallelism(8);
-        options.set_max_background_jobs(8);
-        options.set_write_buffer_size(128 * 1024 * 1024); // 128 MB memtable
-        options.set_max_write_buffer_number(2);
 
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_ribbon_filter(5.0);
+        block_options.set_ribbon_filter(10.0);
+        block_options.set_format_version(5);
 
         block_options.disable_cache();
 
@@ -112,10 +109,7 @@ where
     }
 
     pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
-        let mut read_opts = rocksdb::ReadOptions::default();
-
-        read_opts.set_readahead_size(4_194_304); // 4 MB
-        read_opts.set_pin_data(true);
+        let read_opts = rocksdb::ReadOptions::default();
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
@@ -126,9 +120,7 @@ where
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
-        let mut read_opts = rocksdb::ReadOptions::default();
-
-        read_opts.set_readahead_size(4_194_304); // 4 MB
+        let read_opts = rocksdb::ReadOptions::default();
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)

@@ -475,6 +475,7 @@ impl Webgraph {
             match (self.commit_mode, self.segments.first_mut()) {
                 (CommitMode::SingleSegment, Some(segment)) => {
                     segment.add(live_segment);
+                    segment.flush();
                 }
                 _ => {
                     let segment = live_segment.commit(Path::new(&self.path).join("segments"));

@@ -129,7 +129,7 @@ impl StoredSegment {
         }
     }
 
-    fn flush(&mut self) {
+    pub fn flush(&mut self) {
         self.full_adjacency.flush();
         self.full_reversed_adjacency.flush();
         self.small_adjacency.flush();
