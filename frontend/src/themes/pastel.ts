@@ -1,7 +1,7 @@
 import { base, theme } from './base';
 
-export const tealTheme = theme({
-  name: 'teal',
+export const pastelTheme = theme({
+  name: 'pastel',
   scheme: 'light',
   colors: {
     primary: base.island[400],

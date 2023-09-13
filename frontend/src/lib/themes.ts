@@ -2,7 +2,7 @@ const theme = (name: string, c: string) => ({ name, class: c });
 
 export const THEMES = [
   theme('Light', 'theme-light'),
-  theme('Teal', 'theme-teal'),
+  theme('Pastel', 'theme-pastel'),
   theme('Nord Light', 'theme-nord-light'),
   theme('Retro', 'theme-ugly'),
   theme('Dark', 'theme-dark'),

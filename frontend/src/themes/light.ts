@@ -4,20 +4,18 @@ export const lightTheme = theme({
   name: 'light',
   scheme: 'light',
   colors: {
-    primary: base.navy[400],
-    primaryFocus: base.navy[500],
+    primary: 'rgb(40, 156, 255)',
     primaryContent: '#fff',
 
-    secondary: base.island[400],
-    secondaryFocus: base.island[500],
+    secondary: base.sky[400],
+    secondaryFocus: base.sky[500],
     secondaryContent: '#fff',
 
-    accent: base.cocoa[400],
-    accentFocus: base.cocoa[500],
+    accent: 'rgb(255, 105, 11)',
     accentContent: '#fff',
 
     neutral: base.slate[600],
-    neutralFocus: base.slate[700],
+    neutralFocus: base.slate[800],
     neutralContent: base.island[100],
 
     base100: '#fff',
@@ -37,7 +35,7 @@ export const lightTheme = theme({
     error: base.rose[600],
     errorContent: base.rose[50],
 
-    link: base.sky[600],
-    linkVisited: base.purple[500],
+    link: base.blue[800],
+    linkVisited: base.purple[800],
   },
 });

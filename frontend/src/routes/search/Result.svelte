@@ -23,7 +23,7 @@
     <div class="flex min-w-0 grow flex-col space-y-1">
       <div class="flex items-center text-sm">
         <a
-          class="max-w-[calc(100%-100px)] truncate text-neutral"
+          class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
           href={webpage.url}
           use:improvements={resultIndex}
         >
