@@ -1,5 +1,5 @@
 <script lang="ts">
-  import XMark from '~icons/heroicons/x-mark';
+  import XMark from '~icons/heroicons/x-mark-20-solid';
   import Callout from '$lib/components/Callout.svelte';
   import { createEventDispatcher } from 'svelte';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import IconGitHub from '~icons/simple-icons/github';
   import IconDiscord from '~icons/simple-icons/discord';
-  import Bars2 from '~icons/heroicons/bars-2';
+  import Bars2 from '~icons/heroicons/bars-2-20-solid';
 
   import { twJoin } from 'tailwind-merge';
   import { page } from '$app/stores';

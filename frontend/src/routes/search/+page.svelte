@@ -1,9 +1,9 @@
 <script lang="ts">
-  import HandThumbDown from '~icons/heroicons/hand-thumb-down-solid';
-  import HandThumbUp from '~icons/heroicons/hand-thumb-up-solid';
-  import NoSymbol from '~icons/heroicons/no-symbol-solid';
-  import ChevronLeft from '~icons/heroicons/chevron-left';
-  import ChevronRight from '~icons/heroicons/chevron-right';
+  import HandThumbDown from '~icons/heroicons/hand-thumb-down-20-solid';
+  import HandThumbUp from '~icons/heroicons/hand-thumb-up-20-solid';
+  import NoSymbol from '~icons/heroicons/no-symbol-20-solid';
+  import ChevronLeft from '~icons/heroicons/chevron-left-20-solid';
+  import ChevronRight from '~icons/heroicons/chevron-right-20-solid';
   import OpticSelector from '$lib/components/OpticSelector.svelte';
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
@@ -122,7 +122,7 @@
         Do you like results from {modal.site.domain}?
       </h2>
       <div class="flex justify-center space-x-1.5 pt-2">
-        {#each rankingChoices as { ranking, kind, Icon } (ranking)}
+        {#each rankingChoices as { ranking, kind, Icon }}
           <Button
             {kind}
             pale={$siteRankingsStore[modal.site.domain] != ranking}

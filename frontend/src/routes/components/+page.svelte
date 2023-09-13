@@ -1,7 +1,7 @@
 <script lang="ts">
   import IconGitHub from '~icons/simple-icons/github';
   import IconDiscord from '~icons/simple-icons/discord';
-  import HandThumbUp from '~icons/heroicons/hand-thumb-up-solid';
+  import HandThumbUp from '~icons/heroicons/hand-thumb-up-20-solid';
   import Button from '$lib/components/Button.svelte';
   import Callout from '$lib/components/Callout.svelte';
   import Link from '$lib/components/Link.svelte';

@@ -4,7 +4,6 @@
   import { opticsStore } from '$lib/stores';
   import { DEFAULT_OPTICS, fetchRemoteOptic, type OpticOption } from '$lib/optics';
   import { derived } from 'svelte/store';
-  import { slide } from 'svelte/transition';
   import Callout from '$lib/components/Callout.svelte';
 
   let name = '';

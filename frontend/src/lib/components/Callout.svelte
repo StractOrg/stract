@@ -1,10 +1,9 @@
 <script lang="ts">
   import type { ComponentType } from 'svelte';
-  import XMark from '~icons/heroicons/x-mark';
-  import InformationCircle from '~icons/heroicons/information-circle';
-  import CheckCircle from '~icons/heroicons/check-circle';
-  import ExclamationCircle from '~icons/heroicons/exclamation-circle';
-  import Fire from '~icons/heroicons/fire';
+  import InformationCircle from '~icons/heroicons/information-circle-20-solid';
+  import CheckCircle from '~icons/heroicons/check-circle-20-solid';
+  import ExclamationCircle from '~icons/heroicons/exclamation-circle-20-solid';
+  import Fire from '~icons/heroicons/fire-20-solid';
   import { twJoin } from 'tailwind-merge';
 
   export let kind: 'info' | 'success' | 'warning' | 'error' | 'neutral';
