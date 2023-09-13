@@ -8,6 +8,6 @@
   {#if fragment.kind == 'normal'}
     {fragment.text}
   {:else if fragment.kind == 'link'}
-    <a href={fragment.href}>{fragment.text}</a>
+    {' '}<a href={fragment.href}>{fragment.text}</a>
   {/if}
 {/each}
