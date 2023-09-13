@@ -3,6 +3,7 @@
   import ChatBubbleLeftRight from '~icons/heroicons/chat-bubble-left-right';
   import type { Webpage } from '$lib/api';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
+  import Button from '$lib/components/Button.svelte';
 
   export let discussions: Webpage[];
 
@@ -37,9 +38,9 @@
           </summary>
 
           {#if discussion.snippet.type == 'normal'}
-            <div class="mb-3 text-sm font-normal text-snippet">
+            <div class="mb-3 text-sm font-normal text-neutral-focus">
               {#if typeof discussion.snippet.date == 'string'}
-                <span class="text-gray-500">{discussion.snippet.date}</span>
+                <span class="text-neutral">{discussion.snippet.date}</span>
               {/if}
               <span class="[&:nth-child(2)]:before:content-['—']">
                 <TextSnippet snippet={discussion.snippet.text} />
@@ -49,11 +50,10 @@
         </details>
       </div>
     {/each}
-    <button
-      class="noscript:hidden mt-3 w-fit rounded-full border px-2 py-1 hover:cursor-pointer hover:bg-neutral-100"
-      on:click={() => (showMore = !showMore)}
-    >
-      {showMore ? 'Show less' : 'Show more'}
-    </button>
+    <div class="noscript:hidden mt-2">
+      <Button kind="neutral" pale on:click={() => (showMore = !showMore)}
+        >{showMore ? 'Show less' : 'Show more'}</Button
+      >
+    </div>
   </div>
 </div>

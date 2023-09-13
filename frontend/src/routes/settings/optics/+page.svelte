@@ -5,6 +5,7 @@
   import { DEFAULT_OPTICS, fetchRemoteOptic, type OpticOption } from '$lib/optics';
   import { derived } from 'svelte/store';
   import { slide } from 'svelte/transition';
+  import Callout from '$lib/components/Callout.svelte';
 
   let name = '';
   let url = '';
@@ -97,16 +98,12 @@
       />
     </form>
     {#if error}
-      <details
-        class="space-y-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2"
-        transition:slide
-      >
-        <summary class="cursor-pointer text-lg text-red-800">Validating optic failed</summary>
+      <Callout kind="error" title="Validating optic failed">
         <p>
           Failed while trying to <code class="text-sm">fetch</code> the optic url. Check your browser
           console for details.
         </p>
-      </details>
+      </Callout>
     {/if}
     <div class="mt-5">
       <div class="grid w-full grid-cols-[auto_1fr_2fr_auto] gap-5" id="optics-list">
@@ -121,7 +118,7 @@
             disabled={!removable}
           >
             <MinusCircle
-              class="transition group-enabled:text-red-500 group-enabled:group-hover:text-red-400"
+              class="transition group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
           <div class="text-sm">{optic.name}</div>

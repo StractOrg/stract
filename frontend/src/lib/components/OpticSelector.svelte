@@ -8,6 +8,11 @@
   export let selected = '';
 
   const optics = derived(opticsStore, ($optics) => [...$optics, ...DEFAULT_OPTICS]);
+
+  $: options = [
+    { value: '', label: 'No Optic' },
+    ...$optics.map((optic) => ({ value: optic.url, label: optic.name })),
+  ];
 </script>
 
 <div class="m-0 flex h-full flex-col justify-center p-0">
@@ -15,15 +20,9 @@
     form="searchbar-form"
     id="optics-selector"
     name="optic"
-    className="m-0 font-light dark:text-stone-400"
+    class="m-0 font-light text-neutral-focus"
     submitOnChange={searchOnChange}
     bind:value={selected}
-  >
-    <option value="">No Optic</option>
-    {#each $optics as optic}
-      <option value={optic.url} title={optic.description} selected={selected == optic.url}>
-        {optic.name}
-      </option>
-    {/each}
-  </Select>
+    {options}
+  />
 </div>

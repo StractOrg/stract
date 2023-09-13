@@ -12,6 +12,9 @@
       href="/opensearch.xml"
     />
     <title>Stract</title>
+    <script nonce="%sveltekit.nonce%">
+      document.documentElement.classList.add(JSON.parse(localStorage.getItem('theme')));
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

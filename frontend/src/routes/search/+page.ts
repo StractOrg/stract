@@ -26,7 +26,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
   );
   const results = await data;
 
-  if (results.type == "bang") {
+  if (results.type == 'bang') {
     throw redirect(300, results.redirectTo);
   }
 

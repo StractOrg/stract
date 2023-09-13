@@ -7,9 +7,7 @@
   export let answer: StackOverflowAnswer;
 </script>
 
-<div
-  class="flex flex-col space-y-5 overflow-hidden rounded-lg border p-5 dark:border-stone-700 md:max-w-lg"
->
+<div class="flex flex-col space-y-5 overflow-hidden rounded-lg border p-5 md:max-w-lg">
   <div class="flex flex-col space-y-1">
     <div class="flex grow justify-between space-x-2">
       <a class="flex text-lg font-medium leading-6" href={answer.url}>{title}</a>

@@ -27,7 +27,7 @@
       <span class="italic">
         source:{' '}
         <a
-          class="text-blue-600 hover:underline"
+          class="text-link visited:text-link-visited hover:underline"
           href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}"
         >
           wikipedia
@@ -38,14 +38,14 @@
       <div class="mb-2 mt-7 flex w-full flex-col px-4 text-sm">
         <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           {#each entity.info as [key, value] (key)}
-            <div class="text-gray-500">{@html key}</div>
+            <div class="text-neutral">{@html key}</div>
             <div>{@html value}</div>
           {/each}
         </div>
       </div>
     {/if}
     {#if entity.relatedEntities.length > 0}
-      <div class="mt-5 flex w-full flex-col text-gray-500">
+      <div class="mt-5 flex w-full flex-col text-neutral">
         <div class="font-light">Related Searches</div>
         <div class="flex overflow-scroll">
           {#each entity.relatedEntities as related (related.title)}

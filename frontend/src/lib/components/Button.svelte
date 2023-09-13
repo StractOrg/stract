@@ -1,7 +1,15 @@
 <script lang="ts">
   import { twMerge } from 'tailwind-merge';
 
-  type Kind = 'brand' | 'amber' | 'red';
+  type Kind =
+    | 'primary'
+    | 'seconday'
+    | 'accent'
+    | 'neutral'
+    | 'info'
+    | 'success'
+    | 'warning'
+    | 'error';
 
   export let title: string | undefined = void 0;
   export let form: string | undefined = void 0;
@@ -9,7 +17,7 @@
 
   export let pale: boolean = false;
   export let padding: boolean = true;
-  export let kind: Kind = 'brand';
+  export let kind: Kind = 'primary';
 </script>
 
 <button
@@ -18,47 +26,61 @@
   {form}
   {type}
   class={twMerge(
-    'noscript:hidden rounded-full py-2 transition',
+    'rounded-full py-2 transition active:scale-[98%]',
     padding ? 'px-4' : 'px-2',
-    'text-white dark:text-white',
     'border border-transparent',
     pale
       ? [
-          kind == 'brand' && [
-            'text-brand-900 dark:text-brand-50',
-            'bg-white hover:bg-brand-50 active:bg-brand-100',
-            'dark:bg-transparent dark:hover:bg-brand-800 dark:active:bg-brand-700',
-            'border-brand-100 hover:border-brand-200 active:border-brand-300',
-            'dark:border-brand-600 dark:hover:border-brand-500 dark:active:border-brand-400',
+          kind == 'primary' && [
+            'text-primary hover:text-primary-focus',
+            'bg-transparent hover:bg-primary/5 active:bg-primary/20',
+            'border-primary/20 hover:border-primary active:border-primary',
           ],
-          kind == 'amber' && [
-            'text-amber-900 dark:text-amber-50',
-            'bg-white hover:bg-amber-50 active:bg-amber-100',
-            'dark:bg-transparent dark:hover:bg-amber-800 dark:active:bg-amber-700',
-            'border-amber-100 hover:border-amber-200 active:border-amber-300',
-            'dark:border-amber-600 dark:hover:border-amber-500 dark:active:border-amber-400',
+          kind == 'seconday' && [
+            'text-secondary hover:text-secondary-focus',
+            'bg-transparent hover:bg-secondary/5 active:bg-secondary/20',
+            'border-secondary/20 hover:border-secondary active:border-secondary',
           ],
-          kind == 'red' && [
-            'text-red-900 dark:text-red-50',
-            'bg-white hover:bg-red-50 active:bg-red-100',
-            'dark:bg-transparent dark:hover:bg-red-800 dark:active:bg-red-700',
-            'border-red-100 hover:border-red-200 active:border-red-300',
-            'dark:border-red-600 dark:hover:border-red-500 dark:active:border-red-400',
+          kind == 'accent' && [
+            'text-accent hover:text-accent-focus',
+            'bg-transparent hover:bg-accent/5 active:bg-accent/20',
+            'border-accent/20 hover:border-accent active:border-accent',
+          ],
+          kind == 'neutral' && [
+            'text-neutral hover:text-neutral-focus',
+            'bg-transparent hover:bg-neutral/5 active:bg-neutral/20',
+            'border-neutral/20 hover:border-neutral active:border-neutral',
+          ],
+          kind == 'info' && [
+            'text-info hover:text-info-focus',
+            'bg-transparent hover:bg-info/5 active:bg-info/20',
+            'border-info/20 hover:border-info active:border-info',
+          ],
+          kind == 'success' && [
+            'text-success hover:text-success-focus',
+            'bg-transparent hover:bg-success/5 active:bg-success/20',
+            'border-success/20 hover:border-success active:border-success',
+          ],
+          kind == 'warning' && [
+            'text-warning hover:text-warning-focus',
+            'bg-transparent hover:bg-warning/5 active:bg-warning/20',
+            'border-warning/20 hover:border-warning active:border-warning',
+          ],
+          kind == 'error' && [
+            'text-error hover:text-error-focus',
+            'bg-transparent hover:bg-error/5 active:bg-error/20',
+            'border-error/20 hover:border-error active:border-error',
           ],
         ]
       : [
-          kind == 'brand' && [
-            'bg-brand-500 hover:bg-brand-600 active:bg-brand-700',
-            'dark:bg-brand-800 dark:hover:bg-brand-700 dark:active:bg-brand-600',
-          ],
-          kind == 'amber' && [
-            'bg-amber-500 hover:bg-amber-600 active:bg-amber-700',
-            'dark:bg-amber-800 dark:hover:bg-amber-700 dark:active:bg-amber-600',
-          ],
-          kind == 'red' && [
-            'bg-red-500 hover:bg-red-600 active:bg-red-700',
-            'dark:bg-red-800 dark:hover:bg-red-700 dark:active:bg-red-600',
-          ],
+          kind == 'primary' && 'bg-primary text-primary-content hover:bg-primary-focus',
+          kind == 'seconday' && 'bg-secondary text-secondary-content hover:bg-secondary-focus',
+          kind == 'accent' && 'bg-accent text-accent-content hover:bg-accent-focus',
+          kind == 'neutral' && 'bg-neutral text-neutral-content hover:bg-neutral-focus',
+          kind == 'info' && 'bg-info text-info-content hover:bg-info-focus',
+          kind == 'success' && 'bg-success text-success-content hover:bg-success-focus',
+          kind == 'warning' && 'bg-warning text-warning-content hover:bg-warning-focus',
+          kind == 'error' && 'bg-error text-error-content hover:bg-error-focus',
         ],
   )}
 >

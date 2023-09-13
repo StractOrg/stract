@@ -7,6 +7,7 @@
   import { page } from '$app/stores';
   import Link from './Link.svelte';
   import { searchQueryStore } from '$lib/stores';
+  import BiglogoBeta from '$lib/images/BiglogoBeta.svelte';
 
   $: links = [
     [`/search${typeof $searchQueryStore == 'string' ? $searchQueryStore : ''}`, 'Search'],
@@ -34,9 +35,7 @@
         href={url}
         class={twJoin(
           'relative z-10 border-b p-2',
-          $page.url.pathname.startsWith(url.split('?')[0])
-            ? 'border-contrast-500'
-            : 'border-transparent',
+          $page.url.pathname.startsWith(url.split('?')[0]) ? 'border-accent' : 'border-transparent',
         )}
       >
         {name}
@@ -47,13 +46,7 @@
   <div class="flex items-center justify-center">
     {#if showLogo}
       <a href="/" class="w-20">
-        <img alt="Stract logo" class="block dark:hidden" src="/images/biglogo-beta.svg" />
-        <img
-          alt="Stract logo dark version"
-          aria-hidden="true"
-          class="hidden dark:block"
-          src="/images/biglogo-beta-alt.svg"
-        />
+        <BiglogoBeta />
       </a>
     {/if}
   </div>
@@ -73,14 +66,14 @@
 
   <nav class="group relative flex items-center justify-end text-lg sm:hidden">
     <button
-      class="mx-1 aspect-square rounded-full bg-transparent px-3 text-gray-400 transition group-hover:text-brand-200"
+      class="mx-1 aspect-square rounded-full bg-transparent px-3 text-neutral transition group-hover:text-neutral-focus"
     >
       <Bars2 />
     </button>
     <div
-      class="pointer-events-none absolute bottom-0 right-0 z-50 translate-y-full flex-col pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100"
+      class="pointer-events-none absolute bottom-0 right-0 z-50 translate-y-[calc(100%-1px)] flex-col pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100"
     >
-      <div class="rounded-xl border bg-white p-2 shadow-xl dark:bg-stone-900">
+      <div class="rounded-xl border bg-base-100 p-2 shadow-xl">
         <div class="flex flex-col items-start space-y-1 pb-2">
           {#each nav as [url, name]}
             <Link href={url}>
@@ -101,7 +94,7 @@
 
   {#if showDivider}
     <div
-      class="absolute inset-x-0 -bottom-0 h-px bg-gradient-to-r from-brand-400 via-brand-500 to-brand-400"
+      class="absolute inset-x-0 -bottom-0 h-px bg-gradient-to-r from-primary via-primary-focus to-primary"
     />
   {/if}
 </div>
