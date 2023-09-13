@@ -47,18 +47,22 @@ struct PassageCandidate {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum TextSnippetFragment {
-    Normal { text: String },
-    Highlighted { text: String },
+#[serde(rename_all = "camelCase")]
+pub enum TextSnippetFragmentKind {
+    Normal,
+    Highlighted,
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSnippetFragment {
+    pub kind: TextSnippetFragmentKind,
+    text: String,
+}
+
 impl TextSnippetFragment {
     pub fn text(&self) -> &str {
-        match self {
-            TextSnippetFragment::Normal { text } | TextSnippetFragment::Highlighted { text } => {
-                text
-            }
-        }
+        &self.text
     }
 }
 
@@ -102,12 +106,14 @@ impl SnippetBuilder {
 
         for range in self.highlights {
             if range.start > last_end {
-                fragments.push(TextSnippetFragment::Normal {
+                fragments.push(TextSnippetFragment {
+                    kind: TextSnippetFragmentKind::Normal,
                     text: self.fragment[last_end..range.start].to_string(),
                 });
             }
 
-            fragments.push(TextSnippetFragment::Highlighted {
+            fragments.push(TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Highlighted,
                 text: self.fragment[range.start..range.end].to_string(),
             });
 
@@ -115,7 +121,8 @@ impl SnippetBuilder {
         }
 
         if last_end < self.fragment.len() {
-            fragments.push(TextSnippetFragment::Normal {
+            fragments.push(TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Normal,
                 text: self.fragment[last_end..].to_string(),
             });
         }
@@ -288,7 +295,8 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
 
     if text.is_empty() {
         return TextSnippet {
-            fragments: vec![TextSnippetFragment::Normal {
+            fragments: vec![TextSnippetFragment {
+                kind: TextSnippetFragmentKind::Normal,
                 text: "".to_string(),
             }],
         };
@@ -340,10 +348,10 @@ Survey in 2016, 2017, and 2018."#;
 
         text.fragments
             .into_iter()
-            .map(|f| match f {
-                TextSnippetFragment::Normal { text } => text,
-                TextSnippetFragment::Highlighted { text } => {
-                    format!("{HIGHLIGHTEN_PREFIX}{text}{HIGHLIGHTEN_POSTFIX}")
+            .map(|TextSnippetFragment { kind, text }| match kind {
+                TextSnippetFragmentKind::Normal => text,
+                TextSnippetFragmentKind::Highlighted => {
+                    format!("{HIGHLIGHTEN_PREFIX}{}{HIGHLIGHTEN_POSTFIX}", text)
                 }
             })
             .collect()

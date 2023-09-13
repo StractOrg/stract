@@ -149,9 +149,9 @@ fn wikipedify_url(url: &str) -> Vec<Url> {
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
-    pub image: Option<String>,
+    pub image_base64: Option<String>,
     pub related_entities: Vec<EntityMatch>,
-    pub info: BTreeMap<String, Span>,
+    pub best_info: Vec<(String, Span)>,
     pub links: Vec<Link>,
 }
 
@@ -203,6 +203,44 @@ impl EntityIndex {
             stopwords,
             attribute_occurrences,
         })
+    }
+
+    fn best_info(&self, info: BTreeMap<String, Span>) -> Vec<(String, Span)> {
+        let mut info: Vec<_> = info.into_iter().collect();
+
+        info.sort_by(|(a, _), (b, _)| {
+            self.get_attribute_occurrence(b)
+                .unwrap_or(0)
+                .cmp(&self.get_attribute_occurrence(a).unwrap_or(0))
+        });
+
+        info.into_iter()
+            .map(|(key, mut value)| {
+                value.text = value.text.replace('*', "•");
+
+                if let Some((_, rest)) = value.text.split_once('•') {
+                    value.text = rest.to_string();
+                }
+
+                (key.replace('_', " "), value)
+            })
+            .filter(|(key, _)| {
+                !matches!(
+                    key.as_str(),
+                    "caption"
+                        | "image size"
+                        | "label"
+                        | "landscape"
+                        | "signature"
+                        | "name"
+                        | "website"
+                        | "logo"
+                        | "image caption"
+                        | "alt"
+                )
+            })
+            .take(5)
+            .collect()
     }
 
     pub fn insert(&mut self, entity: Entity) {
@@ -262,7 +300,7 @@ impl EntityIndex {
 
                     EntityMatch { entity, score }
                 })
-                .filter(|m| m.entity.image.is_some())
+                .filter(|m| m.entity.image_base64.is_some())
                 .take(4)
                 .collect(),
             Err(_) => Vec::new(),
@@ -361,13 +399,17 @@ impl EntityIndex {
             BTreeMap::new()
         };
 
+        let best_info = self.best_info(info);
+
         let related_entities = if get_related {
             self.related_entities(doc_address)
         } else {
             Vec::new()
         };
 
-        let image = self.retrieve_image(&title).map(|_| title.clone());
+        let image_base64 = self
+            .retrieve_image(&title)
+            .map(|image| base64::encode(image.as_raw_bytes()));
 
         let links: Vec<Link> = if get_links {
             bincode::deserialize(
@@ -386,9 +428,9 @@ impl EntityIndex {
         StoredEntity {
             title,
             entity_abstract,
-            image,
+            image_base64,
             related_entities,
-            info,
+            best_info,
             links,
         }
     }

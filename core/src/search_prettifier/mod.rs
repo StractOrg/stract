@@ -206,7 +206,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
-pub enum Sidebar {
+pub enum DisplayedSidebar {
     Entity(DisplayedEntity),
     StackOverflow {
         title: String,

@@ -14,19 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::BTreeMap;
-
 use chrono::NaiveDate;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    entity_index::{
-        entity::{EntitySnippet, Span},
-        EntityMatch,
-    },
-    searcher::LocalSearcher,
+use crate::entity_index::{
+    entity::{EntitySnippet, Span},
+    EntityMatch,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -40,60 +35,8 @@ pub struct DisplayedEntity {
     pub match_score: f32,
 }
 
-fn prepare_info(
-    info: BTreeMap<String, Span>,
-    searcher: &LocalSearcher,
-) -> Vec<(String, EntitySnippet)> {
-    let mut info: Vec<_> = info.into_iter().collect();
-
-    info.sort_by(|(a, _), (b, _)| {
-        searcher
-            .attribute_occurrence(b)
-            .unwrap_or(0)
-            .cmp(&searcher.attribute_occurrence(a).unwrap_or(0))
-    });
-
-    info.into_iter()
-        .map(|(key, value)| {
-            let mut snippet = EntitySnippet::from_span(&value, 150);
-            if let Some(f) = snippet.fragments.first_mut() {
-                let text = f.text().replace('*', "•");
-                *f.text_mut() = if let Some((_, rest)) = text.split_once('•') {
-                    rest.to_string()
-                } else {
-                    text
-                };
-            }
-
-            for f in snippet.fragments.iter_mut() {
-                if let Some(formatted) = maybe_prettify_entity_date(f.text()) {
-                    *f.text_mut() = formatted;
-                }
-            }
-
-            (key.replace('_', " "), snippet)
-        })
-        .filter(|(key, _)| {
-            !matches!(
-                key.as_str(),
-                "caption"
-                    | "image size"
-                    | "label"
-                    | "landscape"
-                    | "signature"
-                    | "name"
-                    | "website"
-                    | "logo"
-                    | "image caption"
-                    | "alt"
-            )
-        })
-        .take(5)
-        .collect()
-}
-
-impl DisplayedEntity {
-    pub fn from(m: EntityMatch, searcher: &LocalSearcher) -> Self {
+impl From<EntityMatch> for DisplayedEntity {
+    fn from(m: EntityMatch) -> Self {
         let entity_abstract = Span {
             text: m.entity.entity_abstract,
             links: m.entity.links,
@@ -101,23 +44,31 @@ impl DisplayedEntity {
 
         let small_abstract = EntitySnippet::from_span(&entity_abstract, 300);
 
-        let image_base64 = m
-            .entity
-            .image
-            .and_then(|image| searcher.entity_image(image))
-            .map(|image| base64::encode(image.as_raw_bytes()));
-
         Self {
             title: m.entity.title,
             small_abstract,
-            image_base64,
+            image_base64: m.entity.image_base64,
             related_entities: m
                 .entity
                 .related_entities
                 .into_iter()
-                .map(|m| DisplayedEntity::from(m, searcher))
+                .map(DisplayedEntity::from)
                 .collect(),
-            info: prepare_info(m.entity.info, searcher),
+            info: m
+                .entity
+                .best_info
+                .into_iter()
+                .map(|(name, span)| (name, EntitySnippet::from_span(&span, 150)))
+                .map(|(name, mut snippet)| {
+                    for f in snippet.fragments.iter_mut() {
+                        if let Some(formatted) = maybe_prettify_entity_date(f.text()) {
+                            *f.text_mut() = formatted;
+                        }
+                    }
+
+                    (name, snippet)
+                })
+                .collect(),
             match_score: m.score,
         }
     }
