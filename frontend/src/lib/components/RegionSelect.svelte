@@ -5,6 +5,11 @@
 
   export let searchOnChange: boolean;
   export let selected: Region = ALL_REGIONS[0];
+
+  $: options = ALL_REGIONS.map((region) => ({
+    value: region,
+    label: region == 'All' ? 'All Languages' : region,
+  }));
 </script>
 
 <div class="m-0 flex h-full flex-col justify-center p-0">
@@ -15,11 +20,6 @@
     className="m-0 font-light text-neutral-focus"
     submitOnChange={searchOnChange}
     bind:value={selected}
-  >
-    {#each ALL_REGIONS as region (region)}
-      <option value={region} title={region} selected={region == selected}>
-        {region == 'All' ? 'All Languages' : region}
-      </option>
-    {/each}
-  </Select>
+    {options}
+  />
 </div>

@@ -120,11 +120,8 @@
               id="limit"
               class="cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
-            >
-              {#each LIMIT_OPTIONS as l}
-                <option value={l}>{l}</option>
-              {/each}
-            </Select>
+              options={LIMIT_OPTIONS.map((value) => ({ value, label: value.toString() }))}
+            />
           </div>
           <div />
           <Button on:click={exportAsOptic}>Export as optic</Button>
