@@ -26,7 +26,12 @@ const writableLocalStorage = <T>(
       : defaultValue,
   );
   store.subscribe(($value) => {
-    if (storage) storage.setItem(key, JSON.stringify($value));
+    if (storage)
+      if (typeof $value == 'undefined') {
+        storage.removeItem(key);
+      } else {
+        storage.setItem(key, JSON.stringify($value));
+      }
   });
   return store;
 };
@@ -54,10 +59,9 @@ const THEME_KEY = 'theme';
 export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
 if (browser)
   themeStore.subscribe(($theme) => {
-    if ($theme)
-      document.documentElement.className = (
-        document.documentElement.className.replace(/theme-[^ ]+/, ``) + ` ${$theme.toLowerCase()}`
-      ).trim();
+    const c = document.documentElement.className.replace(/theme-[^ ]+/, ``);
+    const theme = $theme?.toLowerCase() || '';
+    document.documentElement.className = `${c} ${theme}`.trim();
   });
 
 export const summariesStore = writable<
