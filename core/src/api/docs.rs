@@ -50,8 +50,10 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::CodeOrText,
 
                 crate::snippet::TextSnippet,
-                crate::snippet::TextSnippetFragmentKind,
                 crate::snippet::TextSnippetFragment,
+
+                crate::entity_index::entity::EntitySnippet,
+                crate::entity_index::entity::EntitySnippetFragment,
 
                 crate::bangs::UrlWrapper,
 

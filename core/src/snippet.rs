@@ -47,17 +47,19 @@ struct PassageCandidate {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum TextSnippetFragmentKind {
-    Normal,
-    Highlighted,
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum TextSnippetFragment {
+    Normal { text: String },
+    Highlighted { text: String },
 }
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TextSnippetFragment {
-    pub kind: TextSnippetFragmentKind,
-    pub text: String,
+impl TextSnippetFragment {
+    pub fn text(&self) -> &str {
+        match self {
+            TextSnippetFragment::Normal { text } | TextSnippetFragment::Highlighted { text } => {
+                text
+            }
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
@@ -100,14 +102,12 @@ impl SnippetBuilder {
 
         for range in self.highlights {
             if range.start > last_end {
-                fragments.push(TextSnippetFragment {
-                    kind: TextSnippetFragmentKind::Normal,
+                fragments.push(TextSnippetFragment::Normal {
                     text: self.fragment[last_end..range.start].to_string(),
                 });
             }
 
-            fragments.push(TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Highlighted,
+            fragments.push(TextSnippetFragment::Highlighted {
                 text: self.fragment[range.start..range.end].to_string(),
             });
 
@@ -115,8 +115,7 @@ impl SnippetBuilder {
         }
 
         if last_end < self.fragment.len() {
-            fragments.push(TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Normal,
+            fragments.push(TextSnippetFragment::Normal {
                 text: self.fragment[last_end..].to_string(),
             });
         }
@@ -289,8 +288,7 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
 
     if text.is_empty() {
         return TextSnippet {
-            fragments: vec![TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Normal,
+            fragments: vec![TextSnippetFragment::Normal {
                 text: "".to_string(),
             }],
         };
@@ -342,10 +340,10 @@ Survey in 2016, 2017, and 2018."#;
 
         text.fragments
             .into_iter()
-            .map(|TextSnippetFragment { kind, text }| match kind {
-                TextSnippetFragmentKind::Normal => text,
-                TextSnippetFragmentKind::Highlighted => {
-                    format!("{HIGHLIGHTEN_PREFIX}{}{HIGHLIGHTEN_POSTFIX}", text)
+            .map(|f| match f {
+                TextSnippetFragment::Normal { text } => text,
+                TextSnippetFragment::Highlighted { text } => {
+                    format!("{HIGHLIGHTEN_PREFIX}{text}{HIGHLIGHTEN_POSTFIX}")
                 }
             })
             .collect()

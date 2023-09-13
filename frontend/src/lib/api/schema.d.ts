@@ -111,11 +111,11 @@ export interface components {
     };
     DisplayedEntity: {
       imageBase64?: string | null;
-      info: (string & string)[][];
+      info: (string & components['schemas']['EntitySnippet'])[][];
       /** Format: float */
       matchScore: number;
       relatedEntities: components['schemas']['DisplayedEntity'][];
-      smallAbstract: string;
+      smallAbstract: components['schemas']['EntitySnippet'];
       title: string;
     };
     DisplayedWebpage: {
@@ -132,6 +132,21 @@ export interface components {
     /** @description base64 encoded `EncryptedState` */
     EncodedEncryptedState: string;
     EncodedSavedState: string;
+    EntitySnippet: {
+      fragments: components['schemas']['EntitySnippetFragment'][];
+    };
+    EntitySnippetFragment:
+      | {
+          /** @enum {string} */
+          kind: 'normal';
+          text: string;
+        }
+      | {
+          href: string;
+          /** @enum {string} */
+          kind: 'link';
+          text: string;
+        };
     ExecutionState:
       | {
           query: string;
@@ -268,12 +283,17 @@ export interface components {
     TextSnippet: {
       fragments: components['schemas']['TextSnippetFragment'][];
     };
-    TextSnippetFragment: {
-      kind: components['schemas']['TextSnippetFragmentKind'];
-      text: string;
-    };
-    /** @enum {string} */
-    TextSnippetFragmentKind: 'normal' | 'highlighted';
+    TextSnippetFragment:
+      | {
+          /** @enum {string} */
+          kind: 'normal';
+          text: string;
+        }
+      | {
+          /** @enum {string} */
+          kind: 'highlighted';
+          text: string;
+        };
     /**
      * Url
      * @description Wrapper around `Url` that implements `ToSchema` for `Url`.

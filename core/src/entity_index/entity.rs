@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, HashSet};
 use itertools::Itertools;
 use parse_wiki_text::{Node, Parameter};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub trait WikiNodeExt<'a> {
     fn as_text(&self) -> Option<&'a str>;
@@ -133,6 +134,106 @@ pub struct Link {
     pub start: usize,
     pub end: usize,
     pub target: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum EntitySnippetFragment {
+    Normal { text: String },
+    Link { text: String, href: String },
+}
+
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EntitySnippet {
+    pub fragments: Vec<EntitySnippetFragment>,
+}
+
+impl EntitySnippetFragment {
+    pub fn text(&self) -> &str {
+        match self {
+            EntitySnippetFragment::Normal { text } | EntitySnippetFragment::Link { text, .. } => {
+                text
+            }
+        }
+    }
+    pub fn text_mut(&mut self) -> &mut String {
+        match self {
+            EntitySnippetFragment::Normal { text } | EntitySnippetFragment::Link { text, .. } => {
+                text
+            }
+        }
+    }
+}
+
+impl EntitySnippet {
+    pub fn from_span(span: &Span, truncate_to: usize) -> Self {
+        let (s, maybe_ellipsis) = if span.text.len() > truncate_to {
+            let mut truncate_to = truncate_to;
+            while !span.text.is_char_boundary(truncate_to) {
+                truncate_to -= 1;
+            }
+            (&span.text[0..truncate_to], "...")
+        } else {
+            (&*span.text, "")
+        };
+
+        let mut last_end = 0;
+        let mut fragments = span
+            .links
+            .iter()
+            .filter(|link| s.len() > link.start)
+            .flat_map(|link| {
+                let end = link.end.min(s.len());
+                let split = std::mem::replace(&mut last_end, end);
+                [
+                    EntitySnippetFragment::Normal {
+                        text: s[split..link.start].to_string(),
+                    },
+                    EntitySnippetFragment::Link {
+                        text: s[link.start..end].to_string(),
+                        href: format!(
+                            "https://en.wikipedia.org/wiki/{}",
+                            link.target.replace(' ', "_"),
+                        ),
+                    },
+                ]
+            })
+            .filter(|s| !s.text().is_empty())
+            .collect_vec();
+
+        let remainder = s[last_end..].to_string() + maybe_ellipsis;
+
+        if !remainder.is_empty() {
+            match fragments.last_mut() {
+                Some(EntitySnippetFragment::Normal { text }) => *text += &remainder,
+                _ => fragments.push(EntitySnippetFragment::Normal { text: remainder }),
+            }
+        }
+
+        EntitySnippet { fragments }
+    }
+
+    #[cfg(test)]
+    pub fn to_md(&self, strip_href_prefix: Option<&str>) -> String {
+        self.fragments
+            .iter()
+            .map(|s| match (s, strip_href_prefix) {
+                (EntitySnippetFragment::Normal { text }, _) => text.clone(),
+                (EntitySnippetFragment::Link { text, href }, Some(prefix))
+                    if &href.trim_start_matches(prefix).replace('_', " ") == text =>
+                {
+                    format!("[[{}]]", text)
+                }
+                (EntitySnippetFragment::Link { text, href }, Some(prefix)) => {
+                    format!("[{}]({})", text, href.trim_start_matches(prefix))
+                }
+                (EntitySnippetFragment::Link { text, href }, None) => {
+                    format!("[{}]({href})", text)
+                }
+            })
+            .join("")
+    }
 }
 
 impl<'a> From<&[Node<'a>]> for Span {

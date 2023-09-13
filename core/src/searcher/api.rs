@@ -20,7 +20,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::Instant;
 
-use itertools::intersperse;
+use itertools::{intersperse, Itertools};
 use optics::Optic;
 use url::Url;
 
@@ -408,12 +408,7 @@ impl ApiSearcher {
                 .iter()
                 .take(1)
                 .filter_map(|webpage| webpage.snippet.text())
-                .map(|t| {
-                    t.fragments
-                        .iter()
-                        .map(|f| f.text.clone())
-                        .collect::<String>()
-                })
+                .map(|t| t.fragments.iter().map(|f| f.text()).join(""))
                 .collect();
 
             match qa_model.run(query, &contexts) {
@@ -425,8 +420,8 @@ impl ApiSearcher {
                         .unwrap()
                         .fragments
                         .iter()
-                        .map(|f| f.text.clone())
-                        .collect::<String>();
+                        .map(|f| f.text())
+                        .join("");
                     Some(DisplayedAnswer {
                         title: answer_webpage.title,
                         url: answer_webpage.url,

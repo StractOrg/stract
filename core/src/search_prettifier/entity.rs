@@ -22,7 +22,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    entity_index::{entity::Span, EntityMatch},
+    entity_index::{
+        entity::{EntitySnippet, Span},
+        EntityMatch,
+    },
     searcher::LocalSearcher,
 };
 
@@ -30,14 +33,17 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct DisplayedEntity {
     pub title: String,
-    pub small_abstract: String,
+    pub small_abstract: EntitySnippet,
     pub image_base64: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
-    pub info: Vec<(String, String)>,
+    pub info: Vec<(String, EntitySnippet)>,
     pub match_score: f32,
 }
 
-fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(String, String)> {
+fn prepare_info(
+    info: BTreeMap<String, Span>,
+    searcher: &LocalSearcher,
+) -> Vec<(String, EntitySnippet)> {
     let mut info: Vec<_> = info.into_iter().collect();
 
     info.sort_by(|(a, _), (b, _)| {
@@ -49,15 +55,23 @@ fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(
 
     info.into_iter()
         .map(|(key, value)| {
-            let mut value = entity_link_to_html(value, 150).replace('*', "•");
-
-            if let Some((_, rest)) = value.split_once('•') {
-                value = rest.to_string();
+            let mut snippet = EntitySnippet::from_span(&value, 150);
+            if let Some(f) = snippet.fragments.first_mut() {
+                let text = f.text().replace('*', "•");
+                *f.text_mut() = if let Some((_, rest)) = text.split_once('•') {
+                    rest.to_string()
+                } else {
+                    text
+                };
             }
 
-            let value = maybe_prettify_entity_date(value);
+            for f in snippet.fragments.iter_mut() {
+                if let Some(formatted) = maybe_prettify_entity_date(f.text()) {
+                    *f.text_mut() = formatted;
+                }
+            }
 
-            (key.replace('_', " "), value)
+            (key.replace('_', " "), snippet)
         })
         .filter(|(key, _)| {
             !matches!(
@@ -85,7 +99,7 @@ impl DisplayedEntity {
             links: m.entity.links,
         };
 
-        let small_abstract = entity_link_to_html(entity_abstract, 300);
+        let small_abstract = EntitySnippet::from_span(&entity_abstract, 300);
 
         let image_base64 = m
             .entity
@@ -109,11 +123,11 @@ impl DisplayedEntity {
     }
 }
 
-fn maybe_prettify_entity_date(value: String) -> String {
+fn maybe_prettify_entity_date(value: &str) -> Option<String> {
     let parse_ymd = |date| NaiveDate::parse_from_str(date, "%Y %-m %-d");
 
     if let Ok(date) = parse_ymd(value.trim()) {
-        return date.format("%d/%m/%Y").to_string();
+        return Some(date.format("%d/%m/%Y").to_string());
     }
 
     // the dates are reversed from the parser, so we parse the second date first
@@ -122,39 +136,15 @@ fn maybe_prettify_entity_date(value: String) -> String {
             parse_ymd(&[y1, m1, d1].join(" ")),
             parse_ymd(&[y2, m2, d2].join(" ")),
         ) {
-            return format!(
+            return Some(format!(
                 "{} - {}",
                 fst_date.format("%d/%m/%Y"),
                 snd_date.format("%d/%m/%Y"),
-            );
+            ));
         }
     }
 
-    value
-}
-
-fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
-    let (s, maybe_ellipsis) = if span.text.len() > trunace_to {
-        (&span.text[0..trunace_to], "...")
-    } else {
-        (&*span.text, "")
-    };
-
-    span.links.iter().rfold(s.to_string(), |mut acc, link| {
-        let (start, end) = (link.start, link.end.min(acc.len()));
-        if start > acc.len() {
-            return acc;
-        }
-
-        let anchor_start = format!(
-            r#"<a class="hover:underline" href="https://en.wikipedia.org/wiki/{}">"#,
-            link.target.replace(' ', "_"),
-        );
-        acc.insert_str(start, &anchor_start);
-        acc.insert_str(end + anchor_start.len(), "</a>");
-
-        acc
-    }) + maybe_ellipsis
+    None
 }
 
 #[cfg(test)]
@@ -166,8 +156,8 @@ mod tests {
     #[test]
     fn simple_link_to_html() {
         assert_eq!(
-            entity_link_to_html(
-                Span {
+            EntitySnippet::from_span(
+                &Span {
                     text: "some text with a link".to_string(),
                     links: vec![Link {
                         start: 5,
@@ -176,17 +166,17 @@ mod tests {
                     }]
                 },
                 10000
-            ),
-            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
-                .to_string()
+            )
+            .to_md(None),
+            "some [text](https://en.wikipedia.org/wiki/text_article) with a link".to_string()
         );
     }
 
     #[test]
     fn truncated_link_to_html() {
         assert_eq!(
-            entity_link_to_html(
-                Span {
+            EntitySnippet::from_span(
+                &Span {
                     text: "some text".to_string(),
                     links: vec![Link {
                         start: 5,
@@ -195,24 +185,25 @@ mod tests {
                     }]
                 },
                 7
-            ),
-            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
+            )
+            .to_md(None),
+            "some [te](https://en.wikipedia.org/wiki/text_article)...".to_string()
         );
     }
 
     #[test]
     fn einstein_date() {
         assert_eq!(
-            maybe_prettify_entity_date("1879 3 14 ".to_string()),
-            "14/03/1879".to_string()
+            maybe_prettify_entity_date("1879 3 14 ").as_deref(),
+            Some("14/03/1879")
         );
     }
 
     #[test]
     fn entity_date_span_prettify() {
         assert_eq!(
-            maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ".to_string()),
-            "14/03/1879 - 27/05/1999".to_string()
+            maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ").as_deref(),
+            Some("14/03/1879 - 27/05/1999")
         );
     }
 }
