@@ -156,7 +156,8 @@ fn render_template(name: &str, parameters: &[Parameter]) -> Option<String> {
     Some(match name {
         // https://en.wikipedia.org/wiki/Template:IPAc-en
         // https://en.wiktionary.org/wiki/Template:grc-IPA
-        "IPAc-en" | "IPA-grc" => {
+        // https://en.wiktionary.org/wiki/Template:fr-IPA
+        "IPAc-en" | "IPA-grc" | "IPA-fr" => {
             parameters
                 .iter()
                 .filter(|p| p.name.is_none())
