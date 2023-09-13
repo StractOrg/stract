@@ -7,7 +7,6 @@
   import { page } from '$app/stores';
   import Link from './Link.svelte';
   import { searchQueryStore } from '$lib/stores';
-  import ThemeSelect from './ThemeSelect.svelte';
   import BiglogoBeta from '$lib/images/BiglogoBeta.svelte';
 
   $: links = [
@@ -53,7 +52,6 @@
   </div>
 
   <nav class="hidden items-center justify-end space-x-1 sm:flex md:space-x-2 lg:space-x-4">
-    <ThemeSelect />
     {#each nav as [url, name]}
       <Link href={url}>
         {name}
