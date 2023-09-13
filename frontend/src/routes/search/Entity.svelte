@@ -24,7 +24,7 @@
       </a>
     </div>
     <div class="text-sm">
-      <span class="[&_a]:text-link"><EntitySnippet snippet={entity.smallAbstract} /></span>{' '}
+      <span><EntitySnippet snippet={entity.smallAbstract} /></span>{' '}
       <span class="italic">
         source:{' '}
         <a
