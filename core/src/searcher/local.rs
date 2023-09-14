@@ -204,13 +204,9 @@ impl LocalSearcher {
                 .map(|node| node.id())
                 .collect();
 
-            let mut scorer = store
+            let scorer = store
                 .inbound_similarity
                 .scorer(&liked_sites, &disliked_sites, false);
-
-            if liked_sites.len() + disliked_sites.len() > 1 {
-                scorer.set_self_score(0.0);
-            }
 
             aggregator.set_inbound_similarity(scorer);
         }
