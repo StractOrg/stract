@@ -19,7 +19,6 @@ use hashbrown::{HashMap, HashSet};
 use rand::Rng;
 use rayon::prelude::*;
 use std::hash::Hash;
-use std::ops::Range;
 use std::path::PathBuf;
 use std::{
     cmp::Ordering,
@@ -171,60 +170,39 @@ impl RedirectDb {
     }
 }
 
-struct RangesDb {
-    db: rocksdb::DB, // domain -> range<vec<u8>>
-    /// from rocksdb docs: "Cache must outlive DB instance which uses it."
-    _cache: rocksdb::Cache,
+struct MetaDb {
+    db: rocksdb::DB,
 }
 
-impl RangesDb {
+impl MetaDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut options = rocksdb::Options::default();
-        let cache = rocksdb::Cache::new_lru_cache(100 * 1024 * 1024)?; // 100MB
-
         options.create_if_missing(true);
-        options.set_row_cache(&cache);
-
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_ribbon_filter(10.0);
-        block_options.set_format_version(5);
-
-        options.set_block_based_table_factory(&block_options);
-        options.set_max_background_jobs(8);
-        options.increase_parallelism(8);
-        options.set_write_buffer_size(512 * 1024 * 1024);
-        options.set_allow_mmap_reads(true);
-        options.set_allow_mmap_writes(true);
-        options.set_max_subcompactions(8);
-        options.optimize_for_point_lookup(512);
-        options.set_compression_type(rocksdb::DBCompressionType::None);
 
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
-        Ok(Self { db, _cache: cache })
+        Ok(Self { db })
     }
 
-    pub fn get(&self, domain: &Domain) -> Result<Option<Range<Vec<u8>>>> {
-        let domain_bytes = bincode::serialize(domain)?;
-        let range_bytes = self.db.get(domain_bytes)?;
-
-        if let Some(range_bytes) = range_bytes {
-            let range: Range<Vec<u8>> = bincode::deserialize(&range_bytes)?;
-            return Ok(Some(range));
-        }
-
-        Ok(None)
-    }
-
-    pub fn put(&self, domain: &Domain, range: &Range<Vec<u8>>) -> Result<()> {
-        let domain_bytes = bincode::serialize(domain)?;
-        let range_bytes = bincode::serialize(range)?;
-
+    fn set_longest_url_len(&self, len: usize) -> Result<()> {
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
-        self.db.put_opt(domain_bytes, range_bytes, &write_options)?;
+
+        self.db
+            .put_opt(b"longest_url_len", len.to_be_bytes(), &write_options)?;
 
         Ok(())
+    }
+
+    fn get_longest_url_len(&self) -> Result<usize> {
+        let len_bytes = self.db.get(b"longest_url_len")?;
+
+        if let Some(len_bytes) = len_bytes {
+            let len: usize = usize::from_be_bytes(len_bytes.try_into().unwrap());
+            return Ok(len);
+        }
+
+        Ok(0)
     }
 }
 
@@ -249,10 +227,11 @@ struct UrlToInsert {
 
 struct UrlStateDbShard {
     db: rocksdb::DB,
-    ranges: RangesDb,
+    meta: MetaDb,
     /// from rocksdb docs: "Cache must outlive DB instance which uses it."
     _cache: rocksdb::Cache,
     approx_size_bytes: CachedValue<u64>,
+    longest_known_url: CachedValue<usize>,
 }
 
 impl UrlStateDbShard {
@@ -284,11 +263,16 @@ impl UrlStateDbShard {
             .unwrap()
             .into();
 
+        let meta = MetaDb::open(path.as_ref().join("meta"))?;
+
+        let longest_known_url = meta.get_longest_url_len()?.into();
+
         Ok(Self {
             db,
             approx_size_bytes,
             _cache: cache,
-            ranges: RangesDb::open(path.as_ref().join("ranges"))?,
+            longest_known_url,
+            meta,
         })
     }
 
@@ -310,8 +294,6 @@ impl UrlStateDbShard {
     }
 
     pub fn put_batch(&mut self, domain: &Domain, urls: &[(UrlString, UrlState)]) -> Result<()> {
-        let mut range = self.ranges.get(domain)?;
-
         let domain_bytes = bincode::serialize(domain)?;
 
         let mut batch = rocksdb::WriteBatch::default();
@@ -319,26 +301,14 @@ impl UrlStateDbShard {
         for (url, state) in urls {
             let url_bytes = bincode::serialize(url)?;
 
+            if url_bytes.len() > self.longest_known_url.value {
+                self.longest_known_url = url_bytes.len().into();
+                self.meta
+                    .set_longest_url_len(self.longest_known_url.value)?;
+            }
+
             let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
 
-            // update ranges
-
-            if range.is_none() {
-                range = Some(Range {
-                    start: key_bytes.clone(),
-                    end: key_bytes.clone(),
-                });
-            }
-
-            let range = range.as_mut().unwrap();
-
-            if key_bytes < range.start {
-                range.start = key_bytes.clone();
-            }
-
-            if key_bytes > range.end {
-                range.end = key_bytes.clone();
-            }
             let state_bytes = bincode::serialize(state)?;
 
             batch.put(key_bytes, state_bytes);
@@ -349,47 +319,43 @@ impl UrlStateDbShard {
 
         self.db.write_opt(batch, &write_options)?;
 
-        if let Some(range) = range {
-            self.ranges.put(domain, &range)?;
-        }
-
         Ok(())
     }
 
     pub fn get_all_urls(&self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
-        match self.ranges.get(domain)? {
-            Some(range) => {
-                let domain_bytes = bincode::serialize(domain)?;
-                let start = range.start.clone();
-                let end = range.end.clone();
+        let domain_bytes = bincode::serialize(domain)?;
 
-                let iter = self.db.iterator(rocksdb::IteratorMode::From(
-                    &start,
-                    rocksdb::Direction::Forward,
-                ));
+        let start = [
+            domain_bytes.as_slice(),
+            &[b'/'],
+            &[0].repeat(self.longest_known_url.value),
+        ]
+        .concat();
 
-                Ok(iter
-                    .take_while(|r| {
-                        if let Ok((key, _)) = r.as_ref() {
-                            &**key <= end.as_slice()
-                        } else {
-                            false
-                        }
-                    })
-                    .filter_map(|r| {
-                        let (key, value) = r.ok()?;
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            &start,
+            rocksdb::Direction::Forward,
+        ));
 
-                        let url = bincode::deserialize(&key[domain_bytes.len() + 1..]) // +1 for '/'
-                            .ok()?;
+        Ok(iter
+            .take_while(|r| {
+                if let Ok((key, _)) = r.as_ref() {
+                    key[..domain_bytes.len()] == domain_bytes[..]
+                } else {
+                    false
+                }
+            })
+            .filter_map(|r| {
+                let (key, value) = r.ok()?;
 
-                        let state = bincode::deserialize(&value[..]).ok()?;
+                let url = bincode::deserialize(&key[domain_bytes.len() + 1..]) // +1 for '/'
+                    .ok()?;
 
-                        Some((url, state))
-                    })
-                    .collect())
-            }
-            None => Ok(Vec::new()),
-        }
+                let state = bincode::deserialize(&value[..]).ok()?;
+
+                Some((url, state))
+            })
+            .collect())
     }
 
     pub fn approximate_size_bytes(&mut self) -> Result<u64> {
