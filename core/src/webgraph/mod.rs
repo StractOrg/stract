@@ -533,51 +533,84 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        self.inner_edges(|segment| segment.ingoing_edges_with_label(&node.id()).collect_vec())
-            .into_iter()
-            .map(|e| FullEdge {
-                from: self.id2node(&e.from).unwrap(),
-                to: self.id2node(&e.to).unwrap(),
-                label: e.label,
-            })
-            .collect()
+        self.inner_edges(
+            |segment| segment.ingoing_edges_with_label(&node.id()).collect_vec(),
+            |edges| {
+                edges.sort_by_key(|e| e.from);
+                edges.dedup_by_key(|e| e.from);
+            },
+        )
+        .into_iter()
+        .map(|e| FullEdge {
+            from: self.id2node(&e.from).unwrap(),
+            to: self.id2node(&e.to).unwrap(),
+            label: e.label,
+        })
+        .collect()
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.inner_edges(|segment| segment.ingoing_edges(node).collect_vec())
+        self.inner_edges(
+            |segment| segment.ingoing_edges(node).collect_vec(),
+            |edges| {
+                edges.sort_by_key(|e| e.from);
+                edges.dedup_by_key(|e| e.from);
+            },
+        )
     }
 
     pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
-        self.inner_edges(|segment| segment.ingoing_edges_with_label(node).collect_vec())
+        self.inner_edges(
+            |segment| segment.ingoing_edges_with_label(node).collect_vec(),
+            |edges| {
+                edges.sort_by_key(|e| e.from);
+                edges.dedup_by_key(|e| e.from);
+            },
+        )
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        self.inner_edges(|segment| segment.outgoing_edges_with_label(&node.id()).collect_vec())
-            .into_iter()
-            .map(|e| FullEdge {
-                from: self.id2node(&e.from).unwrap(),
-                to: self.id2node(&e.to).unwrap(),
-                label: e.label,
-            })
-            .collect()
+        self.inner_edges(
+            |segment| segment.outgoing_edges_with_label(&node.id()).collect_vec(),
+            |edges| {
+                edges.sort_by_key(|e| e.to);
+                edges.dedup_by_key(|e| e.to);
+            },
+        )
+        .into_iter()
+        .map(|e| FullEdge {
+            from: self.id2node(&e.from).unwrap(),
+            to: self.id2node(&e.to).unwrap(),
+            label: e.label,
+        })
+        .collect()
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.inner_edges(|segment| segment.outgoing_edges(node).collect_vec())
+        self.inner_edges(
+            |segment| segment.outgoing_edges(node).collect_vec(),
+            |edges| {
+                edges.sort_by_key(|e| e.to);
+                edges.dedup_by_key(|e| e.to);
+            },
+        )
     }
 
-    fn inner_edges<F, L>(&self, loader: F) -> Vec<Edge<L>>
+    fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
     where
         L: Send + Sync,
-        F: Sized + Sync + Fn(&StoredSegment) -> Vec<Edge<L>>,
+        F1: Sized + Sync + Fn(&StoredSegment) -> Vec<Edge<L>>,
+        F2: Fn(&mut Vec<Edge<L>>),
     {
-        let edges: Vec<_> = self
+        let mut edges: Vec<_> = self
             .executor
             .map(loader, self.segments.iter())
             .unwrap()
             .into_iter()
             .flatten()
             .collect();
+
+        dedup(&mut edges);
 
         edges
     }
