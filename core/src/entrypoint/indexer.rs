@@ -183,7 +183,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     webgraph
                         .raw_ingoing_edges_with_labels(&Node::from(html.url()).id())
                         .into_iter()
-                        .map(|edge| edge.label.loaded().unwrap())
+                        .map(|edge| edge.label)
                         .collect()
                 })
                 .unwrap_or_default();

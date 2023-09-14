@@ -16,29 +16,30 @@
 
 use std::path::Path;
 
+use hashbrown::HashSet;
 use rocksdb::BlockBasedOptions;
 
-pub struct Store<K, V> {
+use super::{Edge, NodeID};
+
+const MAX_BATCH_SIZE: usize = 1_000;
+
+pub struct EdgeStore<L> {
+    reversed: bool,
     db: rocksdb::DB,
-    _phantom: std::marker::PhantomData<(K, V)>,
+    _phantom: std::marker::PhantomData<L>,
 }
 
-impl<K, V> Store<K, V>
+impl<L> EdgeStore<L>
 where
-    K: serde::de::DeserializeOwned + serde::Serialize + Send,
-    V: serde::de::DeserializeOwned + serde::Serialize,
+    L: serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
 {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
         let mut options = rocksdb::Options::default();
-        options.set_max_open_files(1);
-
         options.create_if_missing(true);
 
         let mut block_options = BlockBasedOptions::default();
         block_options.set_ribbon_filter(10.0);
         block_options.set_format_version(5);
-
-        block_options.disable_cache();
 
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
@@ -50,86 +51,122 @@ where
 
         Self {
             db,
+            reversed,
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn get(&self, key: &K) -> Option<V> {
-        let bytes = bincode::serialize(key).unwrap();
+    pub fn get(&self, node: NodeID) -> impl Iterator<Item = Edge<L>> + '_ {
+        let prefix_bytes = node.bit_128().to_be_bytes();
+        let suffix = 0u128.to_be_bytes();
 
-        let mut readopts = rocksdb::ReadOptions::default();
-        readopts.set_readahead_size(4_194_304);
+        let key_bytes = [prefix_bytes, suffix].concat();
 
-        self.db
-            .get_pinned_opt(bytes, &readopts)
-            .unwrap()
-            .map(|bytes| bincode::deserialize(&bytes).unwrap())
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            &key_bytes,
+            rocksdb::Direction::Forward,
+        ));
+
+        iter.take_while(move |r| {
+            if let Ok((key, _)) = r.as_ref() {
+                let cur_prefix = &key[..16];
+
+                cur_prefix == prefix_bytes
+            } else {
+                false
+            }
+        })
+        .filter_map(move |r| {
+            let (key, value) = r.ok()?;
+
+            let suffix = u128::from_be_bytes(key[16..32].try_into().unwrap());
+
+            let label = bincode::deserialize(&value).ok()?;
+
+            if self.reversed {
+                Some(Edge {
+                    from: NodeID(suffix),
+                    to: node,
+                    label,
+                })
+            } else {
+                Some(Edge {
+                    from: node,
+                    to: NodeID(suffix),
+                    label,
+                })
+            }
+        })
     }
 
-    pub fn put(&self, key: &K, value: &V) {
-        let key_bytes = bincode::serialize(key).unwrap();
-        let value_bytes = bincode::serialize(value).unwrap();
-
-        let mut options = rocksdb::WriteOptions::default();
-        options.disable_wal(true);
-
-        self.db.put_opt(key_bytes, value_bytes, &options).unwrap();
-    }
-
-    pub fn batch_put<'a>(&'a self, it: impl Iterator<Item = (&'a K, &'a V)>) {
+    pub fn put(&self, edges: impl Iterator<Item = Edge<L>>) {
         let mut batch = rocksdb::WriteBatch::default();
+        let mut batch_keys = HashSet::new();
 
-        for (key, value) in it {
-            let key_bytes = bincode::serialize(key).unwrap();
-            let value_bytes = bincode::serialize(value).unwrap();
+        let mut opts = rocksdb::WriteOptions::default();
+        opts.disable_wal(true);
+
+        for edge in edges {
+            let (prefix, suffix) = if self.reversed {
+                (edge.to, edge.from)
+            } else {
+                (edge.from, edge.to)
+            };
+
+            let prefix_bytes = prefix.bit_128().to_be_bytes();
+            let suffix_bytes = suffix.bit_128().to_be_bytes();
+
+            let key_bytes = [prefix_bytes, suffix_bytes].concat();
+
+            if batch_keys.contains(&key_bytes) || self.db.get(&key_bytes).unwrap().is_some() {
+                continue;
+            }
+
+            batch_keys.insert(key_bytes.clone());
+
+            let value_bytes = bincode::serialize(&edge.label).unwrap();
 
             batch.put(key_bytes, value_bytes);
+
+            if batch.len() >= MAX_BATCH_SIZE {
+                self.db.write_opt(batch, &opts).unwrap();
+                batch = rocksdb::WriteBatch::default();
+                batch_keys.clear();
+            }
         }
 
-        let mut options = rocksdb::WriteOptions::default();
-        options.disable_wal(true);
-
-        self.db.write_opt(batch, &options).unwrap();
+        self.db.write_opt(batch, &opts).unwrap();
     }
 
-    pub fn batch_put_owned(&self, it: impl Iterator<Item = (K, V)>) {
-        let mut batch = rocksdb::WriteBatch::default();
-
-        for (key, value) in it {
-            let key_bytes = bincode::serialize(&key).unwrap();
-            let value_bytes = bincode::serialize(&value).unwrap();
-
-            batch.put(key_bytes, value_bytes);
-        }
-
-        let mut options = rocksdb::WriteOptions::default();
-        options.disable_wal(true);
-
-        self.db.write_opt(batch, &options).unwrap();
-    }
-
-    pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
-        let read_opts = rocksdb::ReadOptions::default();
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
-            .map(|res| {
-                let (key, _) = res.unwrap();
-                bincode::deserialize(&key).unwrap()
-            })
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Edge<L>> + '_ + Send + Sync {
         let read_opts = rocksdb::ReadOptions::default();
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
             .map(|res| {
                 let (key, val) = res.unwrap();
-                (
-                    bincode::deserialize(&key).unwrap(),
-                    bincode::deserialize(&val).unwrap(),
-                )
+
+                let (from, to) = if self.reversed {
+                    let from = u128::from_be_bytes(key[16..32].try_into().unwrap());
+                    let from = NodeID(from);
+
+                    let to = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                    let to = NodeID(to);
+
+                    (from, to)
+                } else {
+                    let from = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                    let from = NodeID(from);
+
+                    let to = u128::from_be_bytes(key[16..32].try_into().unwrap());
+                    let to = NodeID(to);
+
+                    (from, to)
+                };
+
+                let label = bincode::deserialize(&val).unwrap();
+
+                Edge { from, to, label }
             })
     }
 
@@ -143,57 +180,63 @@ where
             .unwrap()
             .unwrap_or(0) as usize
     }
+
+    pub fn merge_with(&self, other: &EdgeStore<L>) {
+        self.put(other.iter());
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-    struct TestStruct {
-        a: String,
-        b: i32,
-    }
-
     #[test]
     fn test_insert() {
-        let kv = Store::<String, TestStruct>::open(crate::gen_temp_path().join("test-segment"));
+        let kv: EdgeStore<String> =
+            EdgeStore::open(crate::gen_temp_path().join("test-segment"), false);
 
-        assert!(kv.get(&"test".to_string()).is_none());
-
-        let test_struct = TestStruct {
-            a: "test".to_string(),
-            b: 5,
+        let e = Edge {
+            from: NodeID(0),
+            to: NodeID(1),
+            label: "test".to_string(),
         };
 
-        kv.put(&"test".to_string(), &test_struct);
+        kv.put(vec![e.clone()].into_iter());
+
         kv.flush();
 
-        let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(test_struct, archived);
+        let edges: Vec<_> = kv.get(NodeID(0)).collect();
+
+        assert_eq!(edges.len(), 1);
+        assert_eq!(&edges[0], &e);
+
+        let edges: Vec<_> = kv.get(NodeID(1)).collect();
+
+        assert_eq!(edges.len(), 0);
     }
 
     #[test]
-    fn test_re_open() {
-        let path = crate::gen_temp_path();
-        let segment_name = "test-segment";
-        let test_struct = TestStruct {
-            a: "test".to_string(),
-            b: 5,
+    fn test_reversed() {
+        let kv: EdgeStore<String> =
+            EdgeStore::open(crate::gen_temp_path().join("test-segment"), true);
+
+        let e = Edge {
+            from: NodeID(0),
+            to: NodeID(1),
+            label: "test".to_string(),
         };
 
-        {
-            let kv = Store::<String, TestStruct>::open(path.join(segment_name));
+        kv.put(vec![e.clone()].into_iter());
 
-            assert!(kv.get(&"test".to_string()).is_none());
+        kv.flush();
 
-            kv.put(&"test".to_string(), &test_struct);
-            kv.flush();
-        }
+        let edges: Vec<_> = kv.get(NodeID(0)).collect();
 
-        let kv = Store::<String, TestStruct>::open(path.join(segment_name));
+        assert_eq!(edges.len(), 0);
 
-        let archived = kv.get(&"test".to_string()).unwrap();
-        assert_eq!(test_struct, archived);
+        let edges: Vec<_> = kv.get(NodeID(1)).collect();
+
+        assert_eq!(edges.len(), 1);
+        assert_eq!(&edges[0], &e);
     }
 }

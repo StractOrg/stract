@@ -31,7 +31,7 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @configure *ARGS:
     just setup {{ARGS}}
-    just cargo run --release --all-features -- configure {{ARGS}}
+    RUST_LOG="none,stract=info" just cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:
     python3 -m venv .venv || true

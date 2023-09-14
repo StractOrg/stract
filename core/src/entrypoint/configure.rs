@@ -85,8 +85,6 @@ fn create_webgraph() -> Result<()> {
     };
 
     worker.process_job(&job);
-    let graph = worker.graph;
-    std::fs::rename(graph.path, out_path)?;
 
     Ok(())
 }

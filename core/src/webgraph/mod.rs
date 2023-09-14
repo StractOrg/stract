@@ -22,20 +22,20 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
 
+use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::directory::{self, DirEntry};
 use crate::executor::Executor;
 use crate::intmap;
 
 pub mod centrality;
 mod store;
-use self::segment::{LiveSegment, StoredSegment};
-use self::store::Store;
+use self::segment::StoredSegment;
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
+const MAX_BATCH_SIZE: usize = 1_000;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(u128);
@@ -77,14 +77,20 @@ impl intmap::Key for NodeID {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub(crate) struct FullStoredEdge {
-    other: NodeID,
-    label: String,
+pub struct Edge<L>
+where
+    L: Send + Sync,
+{
+    pub from: NodeID,
+    pub to: NodeID,
+    pub label: L,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub(crate) struct SmallStoredEdge {
-    other: NodeID,
+pub struct FullEdge {
+    pub from: Node,
+    pub to: Node,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -194,57 +200,7 @@ pub fn normalize_url(url: &Url) -> String {
     normalized
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Edge {
-    pub from: NodeID,
-    pub to: NodeID,
-    pub label: Loaded<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Loaded<T> {
-    Some(T),
-    NotYet,
-}
-impl<T> Loaded<T> {
-    pub fn loaded(self) -> Option<T> {
-        match self {
-            Loaded::Some(t) => Some(t),
-            Loaded::NotYet => None,
-        }
-    }
-}
-
-impl<T> std::fmt::Display for Loaded<T>
-where
-    T: std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Loaded::Some(val) => {
-                write!(f, "{}", val)
-            }
-            Loaded::NotYet => Ok(()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FullEdge {
-    pub from: Node,
-    pub to: Node,
-    pub label: String,
-}
-
-#[derive(Default, Clone, Copy)]
-pub enum CommitMode {
-    #[default]
-    NewSegment,
-    SingleSegment,
-}
-
 pub struct WebgraphBuilder {
-    commit_mode: CommitMode,
     path: Box<Path>,
     executor: Executor,
 }
@@ -260,15 +216,9 @@ impl WebgraphBuilder {
 
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            commit_mode: CommitMode::default(),
             path: path.as_ref().into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
         }
-    }
-
-    pub fn commit_mode(mut self, mode: CommitMode) -> Self {
-        self.commit_mode = mode;
-        self
     }
 
     pub fn single_threaded(mut self) -> Self {
@@ -277,7 +227,7 @@ impl WebgraphBuilder {
     }
 
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.commit_mode, self.executor)
+        Webgraph::open(self.path, self.executor)
     }
 }
 
@@ -288,10 +238,11 @@ pub trait ShortestPaths {
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
 
-fn dijkstra<F1, F2>(source: Node, node_edges: F1, edge_node: F2) -> BTreeMap<NodeID, u8>
+fn dijkstra<F1, F2, L>(source: Node, node_edges: F1, edge_node: F2) -> BTreeMap<NodeID, u8>
 where
-    F1: Fn(NodeID) -> Vec<Edge>,
-    F2: Fn(&Edge) -> NodeID,
+    L: Send + Sync,
+    F1: Fn(NodeID) -> Vec<Edge<L>>,
+    F2: Fn(&Edge<L>) -> NodeID,
 {
     let source_id = source.id();
     let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
@@ -368,13 +319,92 @@ struct SegmentMergeCandidate {
     merges: Vec<StoredSegment>,
 }
 
+struct Id2NodeDb {
+    db: rocksdb::DB,
+}
+
+impl Id2NodeDb {
+    fn open<P: AsRef<Path>>(path: P) -> Self {
+        let mut opts = rocksdb::Options::default();
+        opts.create_if_missing(true);
+        opts.optimize_for_point_lookup(512);
+
+        let mut block_opts = rocksdb::BlockBasedOptions::default();
+        block_opts.set_ribbon_filter(5.0);
+
+        opts.set_block_based_table_factory(&block_opts);
+
+        let db = rocksdb::DB::open(&opts, path).unwrap();
+
+        Self { db }
+    }
+
+    fn put(&mut self, id: &NodeID, node: &Node) {
+        let mut opts = rocksdb::WriteOptions::default();
+        opts.disable_wal(true);
+
+        self.db
+            .put_opt(
+                id.bit_128().to_be_bytes(),
+                bincode::serialize(node).unwrap(),
+                &opts,
+            )
+            .unwrap();
+    }
+
+    fn get(&self, id: &NodeID) -> Option<Node> {
+        self.db
+            .get(id.bit_128().to_be_bytes())
+            .unwrap()
+            .map(|bytes| bincode::deserialize(&bytes).unwrap())
+    }
+
+    fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
+        self.db
+            .iterator(rocksdb::IteratorMode::Start)
+            .filter_map(|r| {
+                let (key, _) = r.ok()?;
+                Some(NodeID(u128::from_be_bytes((*key).try_into().unwrap())))
+            })
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
+        self.db
+            .iterator(rocksdb::IteratorMode::Start)
+            .filter_map(|r| {
+                let (key, value) = r.ok()?;
+
+                Some((
+                    NodeID(u128::from_be_bytes((*key).try_into().unwrap())),
+                    bincode::deserialize(&value).unwrap(),
+                ))
+            })
+    }
+
+    fn batch_put(&mut self, iter: impl Iterator<Item = (NodeID, Node)>) {
+        let mut batch = rocksdb::WriteBatch::default();
+
+        for (id, node) in iter {
+            batch.put(
+                id.bit_128().to_be_bytes(),
+                bincode::serialize(&node).unwrap(),
+            );
+        }
+
+        self.db.write(batch).unwrap();
+    }
+
+    fn flush(&self) {
+        self.db.flush().unwrap();
+    }
+}
+
 pub struct Webgraph {
     pub path: String,
-    live_segment: LiveSegment,
     segments: Vec<StoredSegment>,
     executor: Arc<Executor>,
-    id2node: Store<NodeID, Node>,
-    commit_mode: CommitMode,
+    insert_batch: Vec<Edge<String>>,
+    id2node: Id2NodeDb,
     meta: Meta,
 }
 
@@ -410,26 +440,34 @@ impl Webgraph {
         writer.write_all(json.as_bytes()).unwrap();
     }
 
-    fn open<P: AsRef<Path>>(path: P, commit_mode: CommitMode, executor: Executor) -> Self {
+    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
-        let meta = Self::meta(&path);
+        let mut meta = Self::meta(&path);
 
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
         let mut segments = Vec::new();
         for segment in &meta.comitted_segments {
             segments.push(StoredSegment::open(
-                path.as_ref().join("segments").join(segment),
+                path.as_ref().join("segments"),
                 segment.clone(),
             ));
         }
 
+        if segments.is_empty() {
+            segments.push(StoredSegment::open(
+                path.as_ref().join("segments"),
+                uuid::Uuid::new_v4().to_string(),
+            ));
+
+            meta.comitted_segments.push(segments[0].id());
+        }
+
         Self {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            live_segment: LiveSegment::default(),
             segments,
-            commit_mode,
             executor: Arc::new(executor),
-            id2node: Store::open(path.as_ref().join("id2node")),
+            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
+            insert_batch: Vec::with_capacity(MAX_BATCH_SIZE),
             meta,
         }
     }
@@ -446,19 +484,29 @@ impl Webgraph {
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
         let (from_id, to_id) = (self.id_or_assign(&from), self.id_or_assign(&to));
-        let label = label.chars().take(MAX_LABEL_LENGTH).collect::<String>();
-        self.live_segment.insert(from_id, to_id, label);
+
+        let edge = Edge {
+            from: from_id,
+            to: to_id,
+            label: label.chars().take(MAX_LABEL_LENGTH).collect(),
+        };
+
+        self.insert_batch.push(edge);
+
+        if self.insert_batch.len() >= MAX_BATCH_SIZE {
+            self.commit();
+        }
     }
 
     pub fn merge(&mut self, mut other: Webgraph) {
         other.commit();
 
-        self.id2node.batch_put_owned(other.id2node.iter());
+        self.id2node.batch_put(other.id2node.iter());
 
         for segment in other.segments {
             let id = segment.id();
-            let new_path = Path::new(&self.path).join("segments").join(segment.id());
-            std::fs::rename(segment.path(), &new_path).unwrap();
+            let new_path = Path::new(&self.path).join("segments");
+            std::fs::rename(segment.path(), &new_path.join(segment.id())).unwrap();
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
@@ -469,21 +517,11 @@ impl Webgraph {
     }
 
     pub fn commit(&mut self) {
-        if !self.live_segment.is_empty() {
-            let live_segment = std::mem::take(&mut self.live_segment);
-
-            match (self.commit_mode, self.segments.first_mut()) {
-                (CommitMode::SingleSegment, Some(segment)) => {
-                    segment.add(live_segment);
-                    segment.flush();
-                }
-                _ => {
-                    let segment = live_segment.commit(Path::new(&self.path).join("segments"));
-
-                    self.meta.comitted_segments.push(segment.id());
-                    self.segments.push(segment);
-                }
-            }
+        if !self.insert_batch.is_empty() {
+            let seg = self.segments.last_mut().unwrap();
+            seg.insert(&self.insert_batch);
+            seg.flush();
+            self.insert_batch.clear();
         }
 
         self.save_metadata();
@@ -495,73 +533,53 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        self.inner_ingoing_edges(&node.id(), true)
+        self.inner_edges(|segment| segment.ingoing_edges_with_label(&node.id()).collect_vec())
             .into_iter()
-            .map(|edge| FullEdge {
-                from: self.id2node(&edge.from).unwrap(),
-                to: self.id2node(&edge.to).unwrap(),
-                label: edge.label.loaded().unwrap(),
+            .map(|e| FullEdge {
+                from: self.id2node(&e.from).unwrap(),
+                to: self.id2node(&e.to).unwrap(),
+                label: e.label,
             })
             .collect()
     }
 
-    pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge> {
-        self.inner_ingoing_edges(node, false)
+    pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+        self.inner_edges(|segment| segment.ingoing_edges(node).collect_vec())
     }
 
-    pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge> {
-        self.inner_ingoing_edges(node, true)
-    }
-
-    fn inner_ingoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
-        let mut edges: Vec<_> = self
-            .executor
-            .map(
-                |segment| segment.ingoing_edges(node, load_labels),
-                self.segments.iter(),
-            )
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect();
-
-        edges.sort_unstable_by_key(|edge| edge.from);
-        edges.dedup_by_key(|edge| edge.from);
-
-        edges
-    }
-
-    pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge> {
-        self.inner_outgoing_edges(node, false)
-    }
-
-    fn inner_outgoing_edges(&self, node: &NodeID, load_labels: bool) -> Vec<Edge> {
-        let mut edges: Vec<_> = self
-            .executor
-            .map(
-                |segment| segment.outgoing_edges(node, load_labels),
-                self.segments.iter(),
-            )
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect();
-
-        edges.sort_unstable_by_key(|edge| edge.to);
-        edges.dedup_by_key(|edge| edge.to);
-
-        edges
+    pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
+        self.inner_edges(|segment| segment.ingoing_edges_with_label(node).collect_vec())
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        self.inner_outgoing_edges(&node.id(), true)
+        self.inner_edges(|segment| segment.outgoing_edges_with_label(&node.id()).collect_vec())
             .into_iter()
-            .map(|edge| FullEdge {
-                from: self.id2node(&edge.from).unwrap(),
-                to: self.id2node(&edge.to).unwrap(),
-                label: edge.label.loaded().unwrap(),
+            .map(|e| FullEdge {
+                from: self.id2node(&e.from).unwrap(),
+                to: self.id2node(&e.to).unwrap(),
+                label: e.label,
             })
             .collect()
+    }
+
+    pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+        self.inner_edges(|segment| segment.outgoing_edges(node).collect_vec())
+    }
+
+    fn inner_edges<F, L>(&self, loader: F) -> Vec<Edge<L>>
+    where
+        L: Send + Sync,
+        F: Sized + Sync + Fn(&StoredSegment) -> Vec<Edge<L>>,
+    {
+        let edges: Vec<_> = self
+            .executor
+            .map(loader, self.segments.iter())
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect();
+
+        edges
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
@@ -579,11 +597,11 @@ impl Webgraph {
     /// Iterate all edges in the graph at least once.
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.
-    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
+    pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ {
         self.segments.iter().flat_map(|segment| segment.edges())
     }
 
-    pub fn par_edges(&self) -> impl ParallelIterator<Item = Edge> + '_ {
+    pub fn par_edges(&self) -> impl ParallelIterator<Item = Edge<()>> + '_ {
         self.segments
             .par_iter()
             .flat_map(|segment| segment.edges().par_bridge())
@@ -647,44 +665,6 @@ impl Webgraph {
             }
         }
     }
-}
-
-impl From<FrozenWebgraph> for Webgraph {
-    fn from(frozen: FrozenWebgraph) -> Self {
-        let path = match &frozen.root {
-            DirEntry::Folder { name, entries: _ } => name.clone(),
-            DirEntry::File {
-                name: _,
-                content: _,
-            } => {
-                panic!("Cannot open webgraph from a file - must be directory.")
-            }
-        };
-
-        if Path::new(&path).exists() {
-            fs::remove_dir_all(&path).unwrap();
-        }
-
-        directory::recreate_folder(&frozen.root).unwrap();
-
-        WebgraphBuilder::new(path).open()
-    }
-}
-
-impl From<Webgraph> for FrozenWebgraph {
-    fn from(mut graph: Webgraph) -> Self {
-        graph.commit();
-        let path = graph.path.clone();
-        drop(graph);
-        let root = directory::scan_folder(path).unwrap();
-
-        Self { root }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FrozenWebgraph {
-    pub root: DirEntry,
 }
 
 #[cfg(test)]
@@ -890,26 +870,6 @@ mod test {
     }
 
     #[test]
-    fn serialize_deserialize_bincode() {
-        let graph = test_graph();
-
-        let path = graph.path.clone();
-        let frozen: FrozenWebgraph = graph.into();
-        let bytes = bincode::serialize(&frozen).unwrap();
-
-        std::fs::remove_dir_all(path).unwrap();
-
-        let deserialized_frozen: FrozenWebgraph = bincode::deserialize(&bytes).unwrap();
-        let graph: Webgraph = deserialized_frozen.into();
-
-        let distances = graph.distances(Node::from("D"));
-
-        assert_eq!(distances.get(&Node::from("C")), Some(&1));
-        assert_eq!(distances.get(&Node::from("A")), Some(&2));
-        assert_eq!(distances.get(&Node::from("B")), Some(&3));
-    }
-
-    #[test]
     fn node_lowercase_name() {
         let n = Node::from("TEST".to_string());
         assert_eq!(&n.name, "test");
@@ -936,35 +896,20 @@ mod test {
         let num_edges = edges.len();
 
         for (from, to, label) in test_edges() {
-            graph.insert(from, to, label);
-            graph.commit();
+            let mut tmp_graph = WebgraphBuilder::new_memory().open();
+            tmp_graph.insert(from, to, label);
+            tmp_graph.commit();
+            graph.merge(tmp_graph);
         }
 
         graph.commit();
 
-        assert_eq!(num_edges, graph.segments.len());
+        assert!(graph.segments.len() >= num_edges);
         verify_graph(&graph);
 
         graph.merge_segments(2);
         assert_eq!(graph.segments.len(), 2);
 
-        verify_graph(&graph);
-    }
-
-    #[test]
-    fn single_segment_commit_mode() {
-        let mut graph = WebgraphBuilder::new_memory()
-            .commit_mode(CommitMode::SingleSegment)
-            .open();
-
-        for (from, to, label) in test_edges() {
-            graph.insert(from, to, label);
-            graph.commit();
-        }
-
-        graph.commit();
-
-        assert_eq!(graph.segments.len(), 1);
         verify_graph(&graph);
     }
 

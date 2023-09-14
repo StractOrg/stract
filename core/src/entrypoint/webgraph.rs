@@ -71,9 +71,7 @@ pub struct Job {
 }
 
 pub fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
-    WebgraphBuilder::new(path)
-        .commit_mode(webgraph::CommitMode::SingleSegment)
-        .open()
+    WebgraphBuilder::new(path).open()
 }
 
 pub struct WebgraphWorker {
