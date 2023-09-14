@@ -20,7 +20,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::Instant;
 
-use itertools::intersperse;
+use itertools::{intersperse, Itertools};
 use optics::Optic;
 use url::Url;
 
@@ -29,8 +29,8 @@ use crate::config::{ApiThresholds, CollectorConfig};
 use crate::inverted_index::RetrievedWebpage;
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
-    create_stackoverflow_sidebar, DisplayedAnswer, DisplayedWebpage, HighlightedSpellCorrection,
-    Sidebar,
+    create_stackoverflow_sidebar, DisplayedAnswer, DisplayedEntity, DisplayedSidebar,
+    DisplayedWebpage, HighlightedSpellCorrection,
 };
 use crate::widgets::Widget;
 use crate::{
@@ -116,7 +116,7 @@ impl ApiSearcher {
         (res, has_more)
     }
 
-    async fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<Sidebar>> {
+    async fn stackoverflow_sidebar(&self, query: &SearchQuery) -> Result<Option<DisplayedSidebar>> {
         let query = SearchQuery {
             query: query.query.clone(),
             num_results: 1,
@@ -165,10 +165,11 @@ impl ApiSearcher {
         &self,
         initial_results: &[InitialSearchResultShard],
         query: &SearchQuery,
-    ) -> Result<Option<Sidebar>> {
+    ) -> Result<Option<DisplayedSidebar>> {
         let entity = initial_results
             .iter()
             .filter_map(|res| res.local_result.entity_sidebar.clone())
+            .map(DisplayedEntity::from)
             .filter(|entity| entity.match_score as f64 > self.thresholds.entity_sidebar)
             .max_by(|a, b| {
                 a.match_score
@@ -177,7 +178,7 @@ impl ApiSearcher {
             });
 
         match entity {
-            Some(entity) => Ok(Some(Sidebar::Entity(entity))),
+            Some(entity) => Ok(Some(DisplayedSidebar::Entity(entity))),
             None => Ok(self.stackoverflow_sidebar(query).await?),
         }
     }
@@ -408,12 +409,7 @@ impl ApiSearcher {
                 .iter()
                 .take(1)
                 .filter_map(|webpage| webpage.snippet.text())
-                .map(|t| {
-                    t.fragments
-                        .iter()
-                        .map(|f| f.text.clone())
-                        .collect::<String>()
-                })
+                .map(|t| t.fragments.iter().map(|f| f.text()).join(""))
                 .collect();
 
             match qa_model.run(query, &contexts) {
@@ -425,8 +421,8 @@ impl ApiSearcher {
                         .unwrap()
                         .fragments
                         .iter()
-                        .map(|f| f.text.clone())
-                        .collect::<String>();
+                        .map(|f| f.text())
+                        .join("");
                     Some(DisplayedAnswer {
                         title: answer_webpage.title,
                         url: answer_webpage.url,

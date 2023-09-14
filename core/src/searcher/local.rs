@@ -21,7 +21,6 @@ use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, EntityMatch};
-use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
@@ -284,9 +283,7 @@ impl LocalSearcher {
         let ctx = self.index.inverted_index.local_search_ctx();
         let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
         let correction = self.spell.as_ref().and_then(|s| s.correction(query));
-        let sidebar = self
-            .entity_sidebar(query)
-            .map(|entity| DisplayedEntity::from(entity, self));
+        let sidebar = self.entity_sidebar(query);
 
         Ok(InitialWebsiteResult {
             spell_corrected_query: correction,
@@ -321,7 +318,7 @@ impl LocalSearcher {
         use std::time::Instant;
 
         use crate::{
-            ranking::models::cross_encoder::CrossEncoderModel, search_prettifier::Sidebar,
+            ranking::models::cross_encoder::CrossEncoderModel, search_prettifier::DisplayedSidebar,
         };
 
         let start = Instant::now();
@@ -383,22 +380,13 @@ impl LocalSearcher {
             discussions: None,
             widget: None,
             direct_answer: None,
-            sidebar: search_result.entity_sidebar.map(Sidebar::Entity),
+            sidebar: search_result
+                .entity_sidebar
+                .map(DisplayedEntity::from)
+                .map(DisplayedSidebar::Entity),
             search_duration_ms: start.elapsed().as_millis(),
             has_more_results,
         })
-    }
-
-    pub fn entity_image(&self, entity: String) -> Option<Image> {
-        self.entity_index
-            .as_ref()
-            .and_then(|index| index.retrieve_image(&entity))
-    }
-
-    pub fn attribute_occurrence(&self, attribute: &String) -> Option<u32> {
-        self.entity_index
-            .as_ref()
-            .and_then(|index| index.get_attribute_occurrence(attribute))
     }
 
     pub fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {

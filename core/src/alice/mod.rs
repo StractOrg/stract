@@ -38,6 +38,7 @@ use aes_gcm::{
 use anyhow::anyhow;
 use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
+use itertools::Itertools;
 use tch::Tensor;
 use url::Url;
 use utoipa::ToSchema;
@@ -103,12 +104,7 @@ impl SimplifiedWebsite {
         let text = webpage
             .snippet
             .text()
-            .map(|t| {
-                t.fragments
-                    .iter()
-                    .map(|f| f.text.clone())
-                    .collect::<String>()
-            })
+            .map(|t| t.fragments.iter().map(|f| f.text()).join(""))
             .unwrap_or_default();
 
         let url = Url::parse(&webpage.url).unwrap();

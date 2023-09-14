@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Entity } from '$lib/api';
+  import EntitySnippet from '$lib/components/EntitySnippet.svelte';
 
   export let entity: Entity;
 </script>
@@ -23,7 +24,7 @@
       </a>
     </div>
     <div class="text-sm">
-      <span>{@html entity.smallAbstract}</span>{' '}
+      <span><EntitySnippet snippet={entity.smallAbstract} /></span>{' '}
       <span class="italic">
         source:{' '}
         <a
@@ -39,7 +40,9 @@
         <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           {#each entity.info as [key, value] (key)}
             <div class="text-neutral">{@html key}</div>
-            <div>{@html value}</div>
+            <div>
+              <EntitySnippet snippet={value} />
+            </div>
           {/each}
         </div>
       </div>

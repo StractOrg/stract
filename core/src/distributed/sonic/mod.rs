@@ -102,6 +102,7 @@ where
         self.stream.flush().await?;
         self.stream.shutdown().await?;
 
+        tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
         Ok(bincode::deserialize(&buf).unwrap())
     }
 

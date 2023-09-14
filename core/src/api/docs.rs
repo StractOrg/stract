@@ -43,15 +43,17 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::DisplayedWebpage,
                 crate::search_prettifier::DisplayedEntity,
                 crate::search_prettifier::DisplayedAnswer,
-                crate::search_prettifier::Sidebar,
+                crate::search_prettifier::DisplayedSidebar,
                 crate::search_prettifier::Snippet,
                 crate::search_prettifier::StackOverflowAnswer,
                 crate::search_prettifier::StackOverflowQuestion,
                 crate::search_prettifier::CodeOrText,
 
                 crate::snippet::TextSnippet,
-                crate::snippet::TextSnippetFragmentKind,
                 crate::snippet::TextSnippetFragment,
+
+                crate::entity_index::entity::EntitySnippet,
+                crate::entity_index::entity::EntitySnippetFragment,
 
                 crate::bangs::UrlWrapper,
 

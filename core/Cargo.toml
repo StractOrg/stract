@@ -111,6 +111,7 @@ criterion = { workspace = true }
 maplit = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+insta = { workspace = true }
 
 [[bench]]
 name = "search-preindexed"

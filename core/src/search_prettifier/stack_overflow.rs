@@ -24,7 +24,7 @@ use crate::{
     Error,
 };
 
-use super::{Sidebar, Snippet};
+use super::{DisplayedSidebar, Snippet};
 use crate::Result;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -201,7 +201,7 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
     }
 }
 
-pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: Url) -> Result<Sidebar> {
+pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: Url) -> Result<DisplayedSidebar> {
     if let Some(item) = schema_org
         .into_iter()
         .find(|item| item.types_contains("QAPage"))
@@ -223,7 +223,7 @@ pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: Url) -> Result<S
             .and_then(|ans| ans.one())
             .and_then(|prop| prop.try_into_item())
             .and_then(|item| schema_item_to_stackoverflow_answer(item, url, true))
-            .map(|answer| Sidebar::StackOverflow { title, answer })
+            .map(|answer| DisplayedSidebar::StackOverflow { title, answer })
             .ok_or(Error::InvalidStackoverflowSchema.into())
     } else {
         Err(Error::InvalidStackoverflowSchema.into())

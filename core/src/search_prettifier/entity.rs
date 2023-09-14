@@ -14,186 +14,88 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::BTreeMap;
-
 use chrono::NaiveDate;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    entity_index::{entity::Span, EntityMatch},
-    searcher::LocalSearcher,
+use crate::entity_index::{
+    entity::{EntitySnippet, Span},
+    EntityMatch,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayedEntity {
     pub title: String,
-    pub small_abstract: String,
+    pub small_abstract: EntitySnippet,
     pub image_base64: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
-    pub info: Vec<(String, String)>,
+    pub info: Vec<(String, EntitySnippet)>,
     pub match_score: f32,
 }
 
-fn prepare_info(info: BTreeMap<String, Span>, searcher: &LocalSearcher) -> Vec<(String, String)> {
-    let mut info: Vec<_> = info.into_iter().collect();
-
-    info.sort_by(|(a, _), (b, _)| {
-        searcher
-            .attribute_occurrence(b)
-            .unwrap_or(0)
-            .cmp(&searcher.attribute_occurrence(a).unwrap_or(0))
-    });
-
-    info.into_iter()
-        .map(|(key, value)| {
-            let mut value = entity_link_to_html(value, 150).replace('*', "•");
-
-            if let Some((_, rest)) = value.split_once('•') {
-                value = rest.to_string();
-            }
-
-            let value = maybe_prettify_entity_date(value);
-
-            (key.replace('_', " "), value)
-        })
-        .filter(|(key, _)| {
-            !matches!(
-                key.as_str(),
-                "caption"
-                    | "image size"
-                    | "label"
-                    | "landscape"
-                    | "signature"
-                    | "name"
-                    | "website"
-                    | "logo"
-                    | "image caption"
-                    | "alt"
-            )
-        })
-        .take(5)
-        .collect()
-}
-
-impl DisplayedEntity {
-    pub fn from(m: EntityMatch, searcher: &LocalSearcher) -> Self {
+impl From<EntityMatch> for DisplayedEntity {
+    fn from(m: EntityMatch) -> Self {
         let entity_abstract = Span {
             text: m.entity.entity_abstract,
             links: m.entity.links,
         };
 
-        let small_abstract = entity_link_to_html(entity_abstract, 300);
-
-        let image_base64 = m
-            .entity
-            .image
-            .and_then(|image| searcher.entity_image(image))
-            .map(|image| base64::encode(image.as_raw_bytes()));
+        let small_abstract = EntitySnippet::from_span(&entity_abstract, 300);
 
         Self {
             title: m.entity.title,
             small_abstract,
-            image_base64,
+            image_base64: m.entity.image_base64,
             related_entities: m
                 .entity
                 .related_entities
                 .into_iter()
-                .map(|m| DisplayedEntity::from(m, searcher))
+                .map(DisplayedEntity::from)
                 .collect(),
-            info: prepare_info(m.entity.info, searcher),
+            info: m
+                .entity
+                .best_info
+                .into_iter()
+                .map(|(name, span)| (name, EntitySnippet::from_span(&span, 150)))
+                .map(|(name, mut snippet)| {
+                    for f in snippet.fragments.iter_mut() {
+                        if let Some(formatted) = maybe_prettify_entity_date(f.text()) {
+                            *f.text_mut() = formatted;
+                        }
+                    }
+
+                    (name, snippet)
+                })
+                .collect(),
             match_score: m.score,
         }
     }
 }
 
-fn maybe_prettify_entity_date(value: String) -> String {
-    if let Ok(date) = NaiveDate::parse_from_str(value.trim(), "%Y %-m %-d") {
-        return format!("{}", date.format("%d/%m/%Y"));
+fn maybe_prettify_entity_date(value: &str) -> Option<String> {
+    let parse_ymd = |date| NaiveDate::parse_from_str(date, "%Y %-m %-d");
+
+    if let Ok(date) = parse_ymd(value.trim()) {
+        return Some(date.format("%d/%m/%Y").to_string());
     }
 
-    if value.split_whitespace().count() == 6 {
-        let first_date = NaiveDate::parse_from_str(
-            itertools::intersperse(value.split_whitespace().take(3), " ")
-                .collect::<String>()
-                .as_str(),
-            "%Y %-m %-d",
-        );
-        let second_date = NaiveDate::parse_from_str(
-            itertools::intersperse(value.split_whitespace().skip(3), " ")
-                .collect::<String>()
-                .as_str(),
-            "%Y %-m %-d",
-        );
-
-        if let (Ok(first_date), Ok(second_date)) = (first_date, second_date) {
-            // the dates are reversed from the parser, so we need to return second_date before first_date
-            return format!("{}", second_date.format("%d/%m/%Y"))
-                + " - "
-                + format!("{}", first_date.format("%d/%m/%Y")).as_str();
+    // the dates are reversed from the parser, so we parse the second date first
+    if let Some((y2, m2, d2, y1, m1, d1)) = value.split_whitespace().collect_tuple() {
+        if let (Ok(fst_date), Ok(snd_date)) = (
+            parse_ymd(&[y1, m1, d1].join(" ")),
+            parse_ymd(&[y2, m2, d2].join(" ")),
+        ) {
+            return Some(format!(
+                "{} - {}",
+                fst_date.format("%d/%m/%Y"),
+                snd_date.format("%d/%m/%Y"),
+            ));
         }
     }
 
-    value
-}
-
-fn entity_link_to_html(span: Span, trunace_to: usize) -> String {
-    let mut s = span.text;
-
-    let truncated = s.len() > trunace_to;
-    if truncated {
-        s = s.chars().take(trunace_to).collect();
-    }
-
-    let chars = s.chars();
-    let num_chars = chars.clone().count();
-
-    let mut res = String::new();
-
-    let mut last_link_end = 0;
-    for link in span.links {
-        if link.start > num_chars {
-            break;
-        }
-
-        res += chars
-            .clone()
-            .skip(last_link_end)
-            .take(link.start - last_link_end)
-            .collect::<String>()
-            .as_str();
-
-        let link_text: String = chars
-            .clone()
-            .skip(link.start)
-            .take(link.end - link.start)
-            .collect();
-
-        res += format!(
-            "<a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/{}\">",
-            link.target.replace(' ', "_")
-        )
-        .as_str();
-
-        res += link_text.as_str();
-
-        res += "</a>";
-
-        last_link_end = link.end;
-    }
-
-    res += chars
-        .clone()
-        .skip(last_link_end)
-        .collect::<String>()
-        .as_str();
-
-    if truncated {
-        res += "...";
-    }
-
-    res
+    None
 }
 
 #[cfg(test)]
@@ -205,8 +107,8 @@ mod tests {
     #[test]
     fn simple_link_to_html() {
         assert_eq!(
-            entity_link_to_html(
-                Span {
+            EntitySnippet::from_span(
+                &Span {
                     text: "some text with a link".to_string(),
                     links: vec![Link {
                         start: 5,
@@ -215,17 +117,17 @@ mod tests {
                     }]
                 },
                 10000
-            ),
-            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">text</a> with a link"
-                .to_string()
+            )
+            .to_md(None),
+            "some [text](https://en.wikipedia.org/wiki/text_article) with a link".to_string()
         );
     }
 
     #[test]
     fn truncated_link_to_html() {
         assert_eq!(
-            entity_link_to_html(
-                Span {
+            EntitySnippet::from_span(
+                &Span {
                     text: "some text".to_string(),
                     links: vec![Link {
                         start: 5,
@@ -234,24 +136,25 @@ mod tests {
                     }]
                 },
                 7
-            ),
-            "some <a class=\"hover:underline\" href=\"https://en.wikipedia.org/wiki/text_article\">te</a>...".to_string()
+            )
+            .to_md(None),
+            "some [te](https://en.wikipedia.org/wiki/text_article)...".to_string()
         );
     }
 
     #[test]
     fn einstein_date() {
         assert_eq!(
-            maybe_prettify_entity_date("1879 3 14 ".to_string()),
-            "14/03/1879".to_string()
+            maybe_prettify_entity_date("1879 3 14 ").as_deref(),
+            Some("14/03/1879")
         );
     }
 
     #[test]
     fn entity_date_span_prettify() {
         assert_eq!(
-            maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ".to_string()),
-            "14/03/1879 - 27/05/1999".to_string()
+            maybe_prettify_entity_date(" 1999 5 27 1879 3 14  ").as_deref(),
+            Some("14/03/1879 - 27/05/1999")
         );
     }
 }

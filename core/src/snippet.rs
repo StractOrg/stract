@@ -57,7 +57,13 @@ pub enum TextSnippetFragmentKind {
 #[serde(rename_all = "camelCase")]
 pub struct TextSnippetFragment {
     pub kind: TextSnippetFragmentKind,
-    pub text: String,
+    text: String,
+}
+
+impl TextSnippetFragment {
+    pub fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]

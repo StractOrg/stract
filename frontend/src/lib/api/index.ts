@@ -147,6 +147,7 @@ export type Webpage = components['schemas']['DisplayedWebpage'];
 export type TextSnippet = components['schemas']['TextSnippet'];
 export type Sidebar = components['schemas']['Sidebar'];
 export type Entity = components['schemas']['DisplayedEntity'];
+export type EntitySnippet = components['schemas']['EntitySnippet'];
 export type Widget = components['schemas']['Widget'];
 export type DisplayedAnswer = components['schemas']['DisplayedAnswer'];
 export type ScoredSite = components['schemas']['ScoredSite'];

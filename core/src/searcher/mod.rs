@@ -27,9 +27,10 @@ use utoipa::ToSchema;
 use crate::{
     bangs::BangHit,
     config::defaults,
+    entity_index::EntityMatch,
     ranking::pipeline::RankingWebsite,
     search_prettifier::{
-        DisplayedAnswer, DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection, Sidebar,
+        DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
     },
     spell::Correction,
     webpage::region::Region,
@@ -50,7 +51,7 @@ pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: usize,
-    pub sidebar: Option<Sidebar>,
+    pub sidebar: Option<DisplayedSidebar>,
     pub widget: Option<Widget>,
     pub direct_answer: Option<DisplayedAnswer>,
     pub discussions: Option<Vec<DisplayedWebpage>>,
@@ -76,7 +77,7 @@ pub struct InitialWebsiteResult {
     pub num_websites: usize,
     pub websites: Vec<RankingWebsite>,
     pub has_more: bool,
-    pub entity_sidebar: Option<DisplayedEntity>,
+    pub entity_sidebar: Option<EntityMatch>,
 }
 
 impl Default for SearchQuery {
