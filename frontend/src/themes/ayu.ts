@@ -48,6 +48,7 @@ export const ayuMirageTheme = theme({
     base100: mirage[5],
     base200: mirage[4],
     base300: mirage[3],
+    base400: mirage[2],
     info: mirage[11],
     success: mirage[17],
     warning: mirage[28],

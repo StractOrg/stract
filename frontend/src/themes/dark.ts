@@ -23,6 +23,7 @@ export const darkTheme = theme({
     base100: base.stone[900],
     base200: base.stone[800],
     base300: base.stone[700],
+    base400: base.stone[600],
     baseContent: base.island[50],
 
     info: base.navy[700],

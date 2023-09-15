@@ -33,6 +33,7 @@ export const nordTheme = theme({
     base100: nord[0],
     base200: nord[1],
     base300: nord[2],
+    base400: nord[3],
     info: nord[8],
     success: nord[14],
     warning: nord[13],

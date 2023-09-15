@@ -23,6 +23,7 @@ export const pastelTheme = theme({
     base100: 'rgb(255, 255, 255)',
     base200: base.slate[100],
     base300: base.slate[200],
+    base400: base.slate[300],
     baseContent: base.slate[900],
 
     info: base.navy[300],

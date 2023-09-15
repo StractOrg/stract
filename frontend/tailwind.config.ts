@@ -36,6 +36,7 @@ export default {
         ...color('base-100'),
         ...color('base-200'),
         ...color('base-300'),
+        ...color('base-400'),
         ...color('base-content'),
         ...colorFocusContent('info'),
         ...colorFocusContent('success'),

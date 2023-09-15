@@ -88,7 +88,7 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-300 py-0.5 pl-5 pr-0.5 transition focus-within:shadow',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-400 py-0.5 pl-5 pr-0.5 transition focus-within:shadow',
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
       hasFocus && 'shadow',
     )}
@@ -128,7 +128,7 @@
       />
       <div
         class={twJoin(
-          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-300 bg-base-100 shadow',
+          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-400 bg-base-100 shadow',
           hasFocus ? 'flex' : 'hidden',
         )}
         role="listbox"

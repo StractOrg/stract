@@ -24,6 +24,7 @@ type Colors = {
   base100: Color;
   base200?: Color;
   base300?: Color;
+  base400?: Color;
   baseContent?: Color;
 
   info: Color;
@@ -71,6 +72,7 @@ export const theme = (opts: ThemeOpts) => {
     neutralContent: opts.colors?.neutralContent ?? foreground(opts.colors.neutral),
     base200: opts.colors?.base200 ?? colord(opts.colors.base100).darken().toHex(),
     base300: opts.colors?.base300 ?? colord(opts.colors.base100).darken().darken().toHex(),
+    base400: opts.colors?.base400 ?? colord(opts.colors.base100).darken().darken().toHex(),
     baseContent: opts.colors?.baseContent ?? foreground(opts.colors.base100),
     infoFocus: opts.colors?.infoFocus ?? focus(opts.colors.info),
     infoContent: opts.colors?.infoContent ?? foreground(opts.colors.info),

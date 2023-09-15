@@ -21,6 +21,7 @@ export const lightTheme = theme({
     base100: '#fff',
     base200: base.slate[100],
     base300: base.slate[200],
+    base400: base.slate[300],
     baseContent: base.slate[900],
 
     info: base.navy[500],
