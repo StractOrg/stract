@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     config::WarcSource,
-    config::WebgraphLevel,
     config::{self, WebgraphConstructConfig},
     crawler::crawl_db::RedirectDb,
     entrypoint::download_all_warc_files,
@@ -64,10 +63,8 @@ impl From<JobConfig> for config::WarcSource {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Job {
-    pub level: WebgraphLevel,
     pub config: JobConfig,
     pub warc_paths: Vec<String>,
-    pub graph_base_path: String,
 }
 
 pub fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
@@ -75,7 +72,8 @@ pub fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
 }
 
 pub struct WebgraphWorker {
-    pub graph: webgraph::Webgraph,
+    pub host_graph: webgraph::Webgraph,
+    pub page_graph: webgraph::Webgraph,
     pub redirect: Option<Arc<RedirectDb>>,
 }
 
@@ -130,18 +128,21 @@ impl WebgraphWorker {
 
                     let mut destination = Node::from(destination);
 
-                    if let WebgraphLevel::Host = job.level {
-                        source = source.into_host();
-                        destination = destination.into_host();
-                    }
+                    self.page_graph
+                        .insert(source.clone(), destination.clone(), link.text.clone());
 
-                    self.graph.insert(source, destination, link.text);
+                    source = source.into_host();
+                    destination = destination.into_host();
+
+                    self.host_graph.insert(source, destination, link.text);
                 }
             }
 
-            self.graph.commit();
+            self.host_graph.commit();
+            self.page_graph.commit();
         }
-        self.graph.merge_segments(1);
+        self.host_graph.merge_segments(1);
+        self.page_graph.merge_segments(1);
 
         info!("{} done", name);
     }
@@ -169,31 +170,29 @@ impl Webgraph {
             .into_iter()
             .map(|warc_paths| Job {
                 config: job_config.clone(),
-                level: config.level.clone(),
                 warc_paths: warc_paths.collect_vec(),
-                graph_base_path: config
-                    .graph_base_path
-                    .clone()
-                    .unwrap_or_else(|| "data/webgraph".to_string()),
             })
             .collect_vec();
 
         let num_workers = num_cpus::get();
 
         let mut handlers = Vec::new();
-        let parent_path = config
-            .graph_base_path
-            .clone()
-            .unwrap_or_else(|| "data/webgraph".to_string());
+        let host_path = &config.host_graph_base_path;
+        let page_path = &config.page_graph_base_path;
 
         for i in 0..num_workers {
-            let path = parent_path.clone();
-            let path = Path::new(&path);
-            let path = path.join(format!("worker_{i}"));
+            let host_path = host_path.clone();
+            let host_path = Path::new(&host_path);
+            let host_path = host_path.join(format!("worker_{i}"));
+
+            let page_path = page_path.clone();
+            let page_path = Path::new(&page_path);
+            let page_path = page_path.join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
                 redirect: redirect.clone(),
-                graph: open_graph(path),
+                host_graph: open_graph(host_path),
+                page_graph: open_graph(page_path),
             };
 
             let jobs = jobs.clone();
@@ -202,7 +201,7 @@ impl Webgraph {
                     worker.process_job(job);
                 }
 
-                worker.graph
+                (worker.host_graph, worker.page_graph)
             }));
         }
 
@@ -211,11 +210,17 @@ impl Webgraph {
             graphs.push(handler.join().unwrap());
         }
 
-        let mut graph = graphs.pop().unwrap();
-        for other_graph in graphs {
-            let other_path = other_graph.path.clone();
-            graph.merge(other_graph);
-            fs::remove_dir_all(other_path)?;
+        let (mut host_graph, mut page_graph) = graphs.pop().unwrap();
+
+        for (other_host, other_page) in graphs {
+            let other_host_path = other_host.path.clone();
+            let other_page_path = other_page.path.clone();
+
+            host_graph.merge(other_host);
+            page_graph.merge(other_page);
+
+            fs::remove_dir_all(other_host_path)?;
+            fs::remove_dir_all(other_page_path)?;
         }
 
         Ok(())

@@ -39,20 +39,13 @@ pub struct IndexingLocalConfig {
     pub minimum_clean_words: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum WebgraphLevel {
-    Page,
-    Host,
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
-    pub level: WebgraphLevel,
+    pub host_graph_base_path: String,
+    pub page_graph_base_path: String,
+    pub warc_source: WarcSource,
     pub redirect_db_path: Option<String>,
     pub limit_warc_files: Option<usize>,
-    pub warc_source: WarcSource,
-    pub graph_base_path: Option<String>,
     pub batch_size: Option<usize>,
 }
 

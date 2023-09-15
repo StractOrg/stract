@@ -61,10 +61,15 @@ fn download_files() {
 
 fn create_webgraph() -> Result<()> {
     debug!("Creating webgraph");
-    let out_path = Path::new(DATA_PATH).join("webgraph");
+    let out_path_host = Path::new(DATA_PATH).join("webgraph_host");
+    let out_path_page = Path::new(DATA_PATH).join("webgraph_page");
 
-    if out_path.exists() {
-        std::fs::remove_dir_all(&out_path)?;
+    if out_path_host.exists() {
+        std::fs::remove_dir_all(&out_path_host)?;
+    }
+
+    if out_path_page.exists() {
+        std::fs::remove_dir_all(&out_path_page)?;
     }
 
     let warc_path = Path::new(DATA_PATH).join("sample.warc.gz");
@@ -75,13 +80,12 @@ fn create_webgraph() -> Result<()> {
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
-        graph_base_path: out_path.to_str().unwrap().to_string(),
-        level: crate::config::WebgraphLevel::Host,
     };
 
     let mut worker = webgraph::WebgraphWorker {
         redirect: None,
-        graph: webgraph::open_graph(&job.graph_base_path),
+        host_graph: webgraph::open_graph(&out_path_host),
+        page_graph: webgraph::open_graph(&out_path_page),
     };
 
     worker.process_job(&job);
@@ -91,7 +95,7 @@ fn create_webgraph() -> Result<()> {
 
 fn calculate_centrality() {
     debug!("Calculating centrality");
-    let webgraph_path = Path::new(DATA_PATH).join("webgraph");
+    let webgraph_path = Path::new(DATA_PATH).join("webgraph_host");
     let out_path = Path::new(DATA_PATH).join("centrality");
 
     Centrality::build_harmonic(&webgraph_path, &out_path);
@@ -123,7 +127,7 @@ fn create_inverted_index() -> Result<()> {
         minimum_clean_words: None,
     };
 
-    let webgraph_path = Path::new(DATA_PATH).join("webgraph");
+    let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");
     let centrality_path = Path::new(DATA_PATH).join("centrality");
 
     let worker = indexer::IndexingWorker::new(

@@ -1,6 +1,6 @@
-level = "host"
 limit_warc_files = 5
-graph_base_path = "data/webgraph"
+host_graph_base_path = "data/webgraph"
+page_graph_base_path = "data/webgraph_page"
 batch_size = 1
 
 [warc_source]
