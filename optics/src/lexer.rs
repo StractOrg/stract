@@ -94,7 +94,7 @@ impl<'a> ToString for Token<'a> {
 #[derive(Logos, Debug, PartialEq, Clone)]
 enum Outer<'a> {
     #[error]
-    #[regex(r"[ \t\n\f]+", logos::skip)]
+    #[regex(r"[ \t\r\n\f]+", logos::skip)]
     Error,
 
     #[token("\"")]

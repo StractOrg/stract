@@ -312,36 +312,41 @@ mod tests {
 
     #[test]
     fn quickstart_parse() {
-        assert!(parse(include_str!("../testcases/quickstart.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/quickstart.optic")).is_ok());
     }
 
     #[test]
     fn hacker_news_parse() {
-        assert!(parse(include_str!("../testcases/hacker_news.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/hacker_news.optic")).is_ok());
     }
 
     #[test]
     fn copycats_parse() {
-        assert!(parse(include_str!("../testcases/copycats_removal.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/copycats_removal.optic")).is_ok());
     }
 
     #[test]
     fn optics_10kshort_parse() {
-        assert!(parse(include_str!("../testcases/10k_short.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/10k_short.optic")).is_ok());
     }
 
     #[test]
     fn blogroll_parse() {
-        assert!(parse(include_str!("../testcases/indieweb_blogroll.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/indieweb_blogroll.optic")).is_ok());
     }
 
     #[test]
     fn devdocs_parse() {
-        assert!(parse(include_str!("../testcases/devdocs.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/devdocs.optic")).is_ok());
     }
 
     #[test]
     fn academic_parse() {
-        assert!(parse(include_str!("../testcases/academic.optic")).is_ok());
+        assert!(parse(include_str!("../testcases/samples/academic.optic")).is_ok());
+    }
+
+    #[test]
+    fn crlf_linebreaks() {
+        assert!(parse(include_str!("../testcases/crlf.optic")).is_ok());
     }
 }

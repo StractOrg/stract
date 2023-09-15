@@ -448,20 +448,10 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
-                    Optic::parse(include_str!("../../../optics/testcases/quickstart.optic"))
-                        .unwrap(),
-                ),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-
-        let _ = searcher
-            .search(&SearchQuery {
-                query: "website".to_string(),
-                optic: Some(
-                    Optic::parse(include_str!("../../../optics/testcases/hacker_news.optic"))
-                        .unwrap(),
+                    Optic::parse(include_str!(
+                        "../../../optics/testcases/samples/quickstart.optic"
+                    ))
+                    .unwrap(),
                 ),
                 ..Default::default()
             })
@@ -473,7 +463,21 @@ mod tests {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(include_str!(
-                        "../../../optics/testcases/copycats_removal.optic"
+                        "../../../optics/testcases/samples/hacker_news.optic"
+                    ))
+                    .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+
+        let _ = searcher
+            .search(&SearchQuery {
+                query: "website".to_string(),
+                optic: Some(
+                    Optic::parse(include_str!(
+                        "../../../optics/testcases/samples/copycats_removal.optic"
                     ))
                     .unwrap(),
                 ),

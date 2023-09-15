@@ -1,0 +1,6 @@
+DiscardNonMatching;
+Rule{
+    Matches{
+        Url("example.com")
+    }
+}
