@@ -250,10 +250,10 @@ impl UrlStateDbShard {
         options.set_block_based_table_factory(&block_options);
         options.set_max_background_jobs(8);
         options.increase_parallelism(8);
+        options.set_max_subcompactions(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
-        options.set_max_subcompactions(8);
         options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
         options.set_compression_type(rocksdb::DBCompressionType::None);
 

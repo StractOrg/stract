@@ -35,7 +35,7 @@ mod store;
 use self::segment::StoredSegment;
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
-const MAX_BATCH_SIZE: usize = 1_000;
+const MAX_BATCH_SIZE: usize = 50_000;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(u128);

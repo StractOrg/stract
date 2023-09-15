@@ -21,7 +21,7 @@ use rocksdb::BlockBasedOptions;
 
 use super::{Edge, NodeID};
 
-const MAX_BATCH_SIZE: usize = 1_000;
+const MAX_BATCH_SIZE: usize = 50_000;
 
 pub struct EdgeStore<L> {
     reversed: bool,
@@ -43,6 +43,10 @@ where
 
         options.set_block_based_table_factory(&block_options);
         options.set_optimize_filters_for_hits(true);
+
+        options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
+        options.set_max_subcompactions(8);
 
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
         options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
