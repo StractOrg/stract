@@ -128,4 +128,8 @@ impl SearchQuery {
     pub fn safe_search() -> bool {
         false
     }
+
+    pub fn fetch_discussions() -> bool {
+        false
+    }
 }

@@ -225,7 +225,7 @@ impl ApiSearcher {
         &self,
         query: &SearchQuery,
     ) -> Result<Option<Vec<DisplayedWebpage>>> {
-        if query.optic.is_some() || query.page > 0 {
+        if !query.fetch_discussions || query.optic.is_some() || query.page > 0 {
             return Ok(None);
         }
 
@@ -333,6 +333,7 @@ impl ApiSearcher {
             .await;
 
         let sidebar = self.sidebar(&initial_results, query).await?;
+
         let discussions = self.discussions_widget(query).await?;
 
         let widget = self.widget(query);

@@ -65,6 +65,9 @@ pub struct ApiSearchQuery {
 
     #[serde(default = "defaults::SearchQuery::flatten_response")]
     pub flatten_response: bool,
+
+    #[serde(default = "defaults::SearchQuery::fetch_discussions")]
+    pub fetch_discussions: bool,
 }
 
 impl TryFrom<ApiSearchQuery> for SearchQuery {
@@ -88,6 +91,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             site_rankings: api.site_rankings,
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
+            fetch_discussions: api.fetch_discussions,
         })
     }
 }

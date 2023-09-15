@@ -21,6 +21,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
       optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
       selectedRegion: params.selectedRegion,
       siteRankings: params.siteRankings,
+      fetchDiscussions: true,
     },
     { fetch },
   );

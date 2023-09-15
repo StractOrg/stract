@@ -177,6 +177,7 @@ impl Searcher {
             return_ranking_signals: false,
             flatten_response: false,
             safe_search: Some(false),
+            fetch_discussions: false,
         };
         tracing::debug!("searching at {:?}: {:#?}", self.url, query);
 

@@ -69,6 +69,7 @@ pub struct SearchQuery {
     pub site_rankings: Option<SiteRankings>,
     pub return_ranking_signals: bool,
     pub safe_search: bool,
+    pub fetch_discussions: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +95,7 @@ impl Default for SearchQuery {
             site_rankings: Default::default(),
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
+            fetch_discussions: defaults::SearchQuery::fetch_discussions(),
         }
     }
 }
