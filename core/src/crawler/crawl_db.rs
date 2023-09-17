@@ -240,21 +240,28 @@ impl UrlStateDbShard {
 
         options.create_if_missing(true);
 
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_ribbon_filter(10.0);
-        block_options.set_format_version(5);
-
-        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024)?; // 1GB
-        block_options.set_block_cache(&cache);
-
-        options.set_block_based_table_factory(&block_options);
         options.set_max_background_jobs(8);
         options.increase_parallelism(8);
         options.set_max_subcompactions(8);
         options.set_write_buffer_size(512 * 1024 * 1024);
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
-        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
+
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        options.set_level_compaction_dynamic_level_bytes(true);
+        options.set_bytes_per_sync(1048576);
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024)?; // 1GB
+        block_options.set_block_cache(&cache);
+        block_options.set_ribbon_filter(10.0);
+        block_options.set_format_version(5);
+        block_options.set_block_size(16 * 1024);
+        block_options.set_cache_index_and_filter_blocks(true);
+        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
+        options.set_block_based_table_factory(&block_options);
+        options.set_optimize_filters_for_hits(true);
+
         options.set_compression_type(rocksdb::DBCompressionType::None);
 
         let db = rocksdb::DB::open(&options, path.as_ref().join("urls"))?;

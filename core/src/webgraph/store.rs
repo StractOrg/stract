@@ -19,48 +19,45 @@ use std::path::Path;
 use hashbrown::HashSet;
 use rocksdb::BlockBasedOptions;
 
-use super::{Edge, NodeID};
+use super::{Edge, EdgeLabel, NodeID};
 
 const MAX_BATCH_SIZE: usize = 50_000;
 
-pub struct EdgeStore<L> {
+pub struct EdgeStore {
     reversed: bool,
     db: rocksdb::DB,
-    _phantom: std::marker::PhantomData<L>,
 }
 
-impl<L> EdgeStore<L>
-where
-    L: serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
-{
+impl EdgeStore {
     pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
-
-        let mut block_options = BlockBasedOptions::default();
-        block_options.set_ribbon_filter(10.0);
-        block_options.set_format_version(5);
-
-        options.set_block_based_table_factory(&block_options);
-        options.set_optimize_filters_for_hits(true);
 
         options.set_max_background_jobs(8);
         options.increase_parallelism(8);
         options.set_max_subcompactions(8);
 
+        options.set_allow_mmap_reads(true);
+        options.set_allow_mmap_writes(true);
+
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        options.set_level_compaction_dynamic_level_bytes(true);
+        options.set_bytes_per_sync(1048576);
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_block_size(16 * 1024);
+        block_options.set_format_version(5);
+        block_options.set_cache_index_and_filter_blocks(true);
+        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
+        options.set_block_based_table_factory(&block_options);
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
-        options.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 
-        Self {
-            db,
-            reversed,
-            _phantom: std::marker::PhantomData,
-        }
+        Self { db, reversed }
     }
 
-    pub fn get(&self, node: NodeID) -> impl Iterator<Item = Edge<L>> + '_ {
+    pub fn get<L: EdgeLabel>(&self, node: NodeID) -> impl Iterator<Item = Edge<L>> + '_ {
         let prefix_bytes = node.bit_128().to_be_bytes();
         let suffix = 0u128.to_be_bytes();
 
@@ -85,7 +82,7 @@ where
 
             let suffix = u128::from_be_bytes(key[16..32].try_into().unwrap());
 
-            let label = bincode::deserialize(&value).ok()?;
+            let label = L::from_bytes(&value).ok()?;
 
             if self.reversed {
                 Some(Edge {
@@ -103,7 +100,7 @@ where
         })
     }
 
-    pub fn put(&self, edges: impl Iterator<Item = Edge<L>>) {
+    pub fn put<'a, L: EdgeLabel + 'a>(&'a self, edges: impl Iterator<Item = &'a Edge<L>>) {
         let mut batch = rocksdb::WriteBatch::default();
         let mut batch_keys = HashSet::new();
 
@@ -128,7 +125,7 @@ where
 
             batch_keys.insert(key_bytes.clone());
 
-            let value_bytes = bincode::serialize(&edge.label).unwrap();
+            let value_bytes = edge.label.to_bytes().unwrap();
 
             batch.put(key_bytes, value_bytes);
 
@@ -142,7 +139,7 @@ where
         self.db.write_opt(batch, &opts).unwrap();
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Edge<L>> + '_ + Send + Sync {
+    pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = Edge<L>> + '_ + Send + Sync {
         let read_opts = rocksdb::ReadOptions::default();
 
         self.db
@@ -168,7 +165,7 @@ where
                     (from, to)
                 };
 
-                let label = bincode::deserialize(&val).unwrap();
+                let label = L::from_bytes(&val).unwrap();
 
                 Edge { from, to, label }
             })
@@ -185,8 +182,19 @@ where
             .unwrap_or(0) as usize
     }
 
-    pub fn merge_with(&self, other: &EdgeStore<L>) {
-        self.put(other.iter());
+    pub fn merge_with(&self, other: &EdgeStore) {
+        let mut batch = Vec::with_capacity(MAX_BATCH_SIZE);
+
+        for edge in other.iter::<String>() {
+            batch.push(edge);
+
+            if batch.len() >= MAX_BATCH_SIZE {
+                self.put(batch.iter());
+                batch.clear();
+            }
+        }
+
+        self.put(batch.iter());
     }
 }
 
@@ -196,8 +204,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let kv: EdgeStore<String> =
-            EdgeStore::open(crate::gen_temp_path().join("test-segment"), false);
+        let kv: EdgeStore = EdgeStore::open(crate::gen_temp_path().join("test-segment"), false);
 
         let e = Edge {
             from: NodeID(0),
@@ -205,7 +212,7 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put(vec![e.clone()].into_iter());
+        kv.put([e.clone()].iter());
 
         kv.flush();
 
@@ -214,15 +221,14 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &e);
 
-        let edges: Vec<_> = kv.get(NodeID(1)).collect();
+        let edges: Vec<Edge<String>> = kv.get(NodeID(1)).collect();
 
         assert_eq!(edges.len(), 0);
     }
 
     #[test]
     fn test_reversed() {
-        let kv: EdgeStore<String> =
-            EdgeStore::open(crate::gen_temp_path().join("test-segment"), true);
+        let kv: EdgeStore = EdgeStore::open(crate::gen_temp_path().join("test-segment"), true);
 
         let e = Edge {
             from: NodeID(0),
@@ -230,15 +236,15 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put(vec![e.clone()].into_iter());
+        kv.put([e.clone()].iter());
 
         kv.flush();
 
-        let edges: Vec<_> = kv.get(NodeID(0)).collect();
+        let edges: Vec<Edge<String>> = kv.get(NodeID(0)).collect();
 
         assert_eq!(edges.len(), 0);
 
-        let edges: Vec<_> = kv.get(NodeID(1)).collect();
+        let edges: Vec<Edge<String>> = kv.get(NodeID(1)).collect();
 
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &e);

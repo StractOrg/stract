@@ -18,16 +18,12 @@ use std::path::{Path, PathBuf};
 
 use super::{store::EdgeStore, Edge, NodeID};
 
-const FULL_ADJACENCY_STORE: &str = "full_adjacency";
-const FULL_REVERSED_ADJACENCY_STORE: &str = "full_reversed_adjacency";
-const SMALL_ADJACENCY_STORE: &str = "small_adjacency";
-const SMALL_REVERSED_ADJACENCY_STORE: &str = "small_reversed_adjacency";
+const ADJACENCY_STORE: &str = "adjacency";
+const REVERSED_ADJACENCY_STORE: &str = "reversed_adjacency";
 
 pub struct StoredSegment {
-    full_adjacency: EdgeStore<String>,
-    full_reversed_adjacency: EdgeStore<String>,
-    small_adjacency: EdgeStore<()>,
-    small_reversed_adjacency: EdgeStore<()>,
+    full_adjacency: EdgeStore,
+    full_reversed_adjacency: EdgeStore,
     id: String,
     folder_path: String,
 }
@@ -36,25 +32,14 @@ impl StoredSegment {
     pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
         StoredSegment {
             full_adjacency: EdgeStore::open(
-                folder_path.as_ref().join(&id).join(FULL_ADJACENCY_STORE),
+                folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 false,
             ),
             full_reversed_adjacency: EdgeStore::open(
                 folder_path
                     .as_ref()
                     .join(&id)
-                    .join(FULL_REVERSED_ADJACENCY_STORE),
-                true,
-            ),
-            small_adjacency: EdgeStore::open(
-                folder_path.as_ref().join(&id).join(SMALL_ADJACENCY_STORE),
-                false,
-            ),
-            small_reversed_adjacency: EdgeStore::open(
-                folder_path
-                    .as_ref()
-                    .join(&id)
-                    .join(SMALL_REVERSED_ADJACENCY_STORE),
+                    .join(REVERSED_ADJACENCY_STORE),
                 true,
             ),
             folder_path: folder_path
@@ -68,7 +53,7 @@ impl StoredSegment {
     }
 
     pub fn estimate_num_nodes(&self) -> usize {
-        self.small_adjacency.estimate_len()
+        self.full_adjacency.estimate_len()
     }
 
     pub fn outgoing_edges_with_label(
@@ -79,7 +64,7 @@ impl StoredSegment {
     }
 
     pub fn outgoing_edges(&self, node: &NodeID) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.small_adjacency.get(*node)
+        self.full_adjacency.get(*node)
     }
 
     pub fn ingoing_edges_with_label(
@@ -90,14 +75,12 @@ impl StoredSegment {
     }
 
     pub fn ingoing_edges(&self, node: &NodeID) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.small_reversed_adjacency.get(*node)
+        self.full_reversed_adjacency.get(*node)
     }
 
     pub fn flush(&mut self) {
         self.full_adjacency.flush();
         self.full_reversed_adjacency.flush();
-        self.small_adjacency.flush();
-        self.small_reversed_adjacency.flush();
     }
 
     pub fn id(&self) -> String {
@@ -109,16 +92,13 @@ impl StoredSegment {
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
-        self.small_adjacency.iter()
+        self.full_adjacency.iter()
     }
 
     fn merge_with(&self, other: &StoredSegment) {
         self.full_adjacency.merge_with(&other.full_adjacency);
         self.full_reversed_adjacency
             .merge_with(&other.full_reversed_adjacency);
-        self.small_adjacency.merge_with(&other.small_adjacency);
-        self.small_reversed_adjacency
-            .merge_with(&other.small_reversed_adjacency);
     }
 
     pub fn merge(mut segments: Vec<StoredSegment>) -> Self {
@@ -139,20 +119,8 @@ impl StoredSegment {
     }
 
     pub fn insert(&mut self, edges: &[Edge<String>]) {
-        let small_edges: Vec<_> = edges
-            .iter()
-            .map(|e| Edge {
-                from: e.from,
-                to: e.to,
-                label: (),
-            })
-            .collect();
-
-        self.full_adjacency.put(edges.iter().cloned());
-        self.full_reversed_adjacency.put(edges.iter().cloned());
-        self.small_adjacency.put(small_edges.iter().cloned());
-        self.small_reversed_adjacency
-            .put(small_edges.iter().cloned());
+        self.full_adjacency.put(edges.iter());
+        self.full_reversed_adjacency.put(edges.iter());
     }
 }
 

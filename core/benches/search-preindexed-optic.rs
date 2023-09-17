@@ -30,7 +30,7 @@ macro_rules! bench {
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let searcher = LocalSearcher::new(index);
-    let optic = include_str!("../../optics/testcases/discussions.optic");
+    let optic = include_str!("../../optics/testcases/samples/discussions.optic");
 
     for _ in 0..10_000 {
         bench!("the", searcher, optic, c);

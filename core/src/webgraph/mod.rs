@@ -76,10 +76,38 @@ impl intmap::Key for NodeID {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub trait EdgeLabel
+where
+    Self: Send + Sync + Sized,
+{
+    fn to_bytes(&self) -> anyhow::Result<Vec<u8>>;
+    fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self>;
+}
+
+impl EdgeLabel for String {
+    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.as_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        Ok(String::from_utf8(bytes.to_vec())?)
+    }
+}
+
+impl EdgeLabel for () {
+    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(Vec::new())
+    }
+
+    fn from_bytes(_bytes: &[u8]) -> anyhow::Result<Self> {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Edge<L>
 where
-    L: Send + Sync,
+    L: EdgeLabel,
 {
     pub from: NodeID,
     pub to: NodeID,
@@ -240,7 +268,7 @@ pub trait ShortestPaths {
 
 fn dijkstra<F1, F2, L>(source: Node, node_edges: F1, edge_node: F2) -> BTreeMap<NodeID, u8>
 where
-    L: Send + Sync,
+    L: EdgeLabel,
     F1: Fn(NodeID) -> Vec<Edge<L>>,
     F2: Fn(&Edge<L>) -> NodeID,
 {
@@ -598,7 +626,7 @@ impl Webgraph {
 
     fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
     where
-        L: Send + Sync,
+        L: EdgeLabel,
         F1: Sized + Sync + Fn(&StoredSegment) -> Vec<Edge<L>>,
         F2: Fn(&mut Vec<Edge<L>>),
     {
