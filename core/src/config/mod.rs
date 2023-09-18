@@ -344,7 +344,8 @@ pub struct AliceLocalConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
-    pub graph_path: String,
+    pub host_graph_path: String,
+    pub page_graph_path: String,
     pub inbound_similarity_path: String,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,

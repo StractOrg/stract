@@ -23,8 +23,12 @@ use utoipa_swagger_ui::SwaggerUi;
 #[openapi(
         paths(
             search::api,
-            webgraph::similar_sites,
-            webgraph::knows_site,
+            webgraph::host::similar,
+            webgraph::host::knows,
+            webgraph::host::ingoing_hosts,
+            webgraph::host::outgoing_hosts,
+            webgraph::page::ingoing_pages,
+            webgraph::page::outgoing_pages,
             autosuggest::route,
             summarize::summarize_route,
             fact_check::fact_check_route,
@@ -64,7 +68,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::bangs::BangHit,
                 crate::bangs::Bang,
 
-                webgraph::SimilarSitesParams,
+                webgraph::host::SimilarSitesParams,
                 webgraph::KnowsSite,
                 crate::entrypoint::webgraph_server::ScoredSite,
 
@@ -78,6 +82,9 @@ use utoipa_swagger_ui::SwaggerUi;
                 alice::EncodedSavedState,
                 sites::SitesExportOpticParams,
                 explore::ExploreExportOpticParams,
+
+                crate::webgraph::Node,
+                crate::webgraph::FullEdge,
             ),
         ),
         modifiers(&ApiModifier),

@@ -31,11 +31,23 @@ export interface paths {
   "/beta/api/summarize": {
     get: operations["summarize_route"];
   };
-  "/beta/api/webgraph/knows_site": {
-    post: operations["knows_site"];
+  "/beta/api/webgraph/host/ingoing": {
+    post: operations["ingoing_hosts"];
   };
-  "/beta/api/webgraph/similar_sites": {
-    post: operations["similar_sites"];
+  "/beta/api/webgraph/host/knows": {
+    post: operations["knows"];
+  };
+  "/beta/api/webgraph/host/outgoing": {
+    post: operations["outgoing_hosts"];
+  };
+  "/beta/api/webgraph/host/similar": {
+    post: operations["similar"];
+  };
+  "/beta/api/webgraph/page/ingoing": {
+    post: operations["ingoing_pages"];
+  };
+  "/beta/api/webgraph/page/outgoing": {
+    post: operations["outgoing_pages"];
   };
 }
 
@@ -187,6 +199,11 @@ export interface components {
       /** Format: double */
       score: number;
     };
+    FullEdge: {
+      from: components["schemas"]["Node"];
+      label: string;
+      to: components["schemas"]["Node"];
+    };
     HighlightedSpellCorrection: {
       highlighted: string;
       raw: string;
@@ -198,6 +215,9 @@ export interface components {
     } | {
       /** @enum {string} */
       type: "unknown";
+    };
+    Node: {
+      name: string;
     };
     /** @enum {string} */
     Region: "All" | "Denmark" | "France" | "Germany" | "Spain" | "US";
@@ -407,7 +427,22 @@ export interface operations {
       };
     };
   };
-  knows_site: {
+  ingoing_hosts: {
+    parameters: {
+      query: {
+        site: string;
+      };
+    };
+    responses: {
+      /** @description Incoming links for a particular host */
+      200: {
+        content: {
+          "application/json": components["schemas"]["FullEdge"][];
+        };
+      };
+    };
+  };
+  knows: {
     parameters: {
       query: {
         site: string;
@@ -422,7 +457,22 @@ export interface operations {
       };
     };
   };
-  similar_sites: {
+  outgoing_hosts: {
+    parameters: {
+      query: {
+        site: string;
+      };
+    };
+    responses: {
+      /** @description Outgoing links for a particular host */
+      200: {
+        content: {
+          "application/json": components["schemas"]["FullEdge"][];
+        };
+      };
+    };
+  };
+  similar: {
     requestBody: {
       content: {
         "application/json": components["schemas"]["SimilarSitesParams"];
@@ -433,6 +483,36 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["ScoredSite"][];
+        };
+      };
+    };
+  };
+  ingoing_pages: {
+    parameters: {
+      query: {
+        page: string;
+      };
+    };
+    responses: {
+      /** @description Incoming links for a particular page */
+      200: {
+        content: {
+          "application/json": components["schemas"]["FullEdge"][];
+        };
+      };
+    };
+  };
+  outgoing_pages: {
+    parameters: {
+      query: {
+        page: string;
+      };
+    };
+    responses: {
+      /** @description Outgoing links for a particular page */
+      200: {
+        content: {
+          "application/json": components["schemas"]["FullEdge"][];
         };
       };
     };

@@ -17,11 +17,11 @@ export const api = {
   },
 
   similarSites: (
-    props: Props<'/beta/api/webgraph/similar_sites', 'post'>,
+    props: Props<'/beta/api/webgraph/host/similar', 'post'>,
     options?: ApiOptions,
   ) => {
     const { data, cancel } = send(
-      '/beta/api/webgraph/similar_sites',
+      '/beta/api/webgraph/host/similar',
       'post',
       'json',
       props,
@@ -30,9 +30,9 @@ export const api = {
     return { data: data.then((res) => res[200]), cancel };
   },
 
-  knowsSite: (props: Props<'/beta/api/webgraph/knows_site', 'post'>, options?: ApiOptions) => {
+  knowsSite: (props: Props<'/beta/api/webgraph/host/knows', 'post'>, options?: ApiOptions) => {
     const { data, cancel } = send(
-      '/beta/api/webgraph/knows_site',
+      '/beta/api/webgraph/host/knows',
       'post',
       'parameters',
       props,

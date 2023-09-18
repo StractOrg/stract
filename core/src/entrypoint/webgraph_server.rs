@@ -34,7 +34,9 @@ use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
 use crate::sonic_service;
+use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
+use crate::webgraph::Webgraph;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 
@@ -51,15 +53,21 @@ const MAX_SITES: usize = 20;
 pub struct WebGraphService {
     searcher: DistributedSearcher,
     similar_sites_finder: SimilarSitesFinder,
+    host_graph: Arc<Webgraph>,
+    page_graph: Arc<Webgraph>,
 }
 
-sonic_service!(WebGraphService, [SimilarSites, Knows]);
+sonic_service!(
+    WebGraphService,
+    [SimilarSites, Knows, IngoingLinks, OutgoingLinks]
+);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimilarSites {
     pub sites: Vec<String>,
     pub top_n: usize,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Knows {
     pub site: String,
@@ -116,6 +124,54 @@ impl Message<WebGraphService> for Knows {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GraphLevel {
+    Host,
+    Page,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngoingLinks {
+    pub node: Node,
+    pub level: GraphLevel,
+}
+
+#[async_trait::async_trait]
+impl Message<WebGraphService> for IngoingLinks {
+    type Response = Vec<FullEdge>;
+
+    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+        match self.level {
+            GraphLevel::Host => {
+                let node = self.node.into_host();
+                Ok(server.host_graph.ingoing_edges(node))
+            }
+            GraphLevel::Page => Ok(server.page_graph.ingoing_edges(self.node)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutgoingLinks {
+    pub node: Node,
+    pub level: GraphLevel,
+}
+
+#[async_trait::async_trait]
+impl Message<WebGraphService> for OutgoingLinks {
+    type Response = Vec<FullEdge>;
+
+    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+        match self.level {
+            GraphLevel::Host => {
+                let node = self.node.into_host();
+                Ok(server.host_graph.outgoing_edges(node))
+            }
+            GraphLevel::Page => Ok(server.page_graph.outgoing_edges(self.node)),
+        }
+    }
+}
+
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
@@ -133,16 +189,19 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     );
     let searcher = DistributedSearcher::new(cluster);
 
-    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
+    let host_graph = Arc::new(WebgraphBuilder::new(config.host_graph_path).open());
+    let page_graph = Arc::new(WebgraphBuilder::new(config.page_graph_path).open());
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
     let similar_sites_finder = SimilarSitesFinder::new(
-        Arc::clone(&graph),
+        Arc::clone(&host_graph),
         inbound_similarity,
         config.max_similar_sites,
     );
 
     let server = WebGraphService {
+        host_graph,
+        page_graph,
         searcher,
         similar_sites_finder,
     }

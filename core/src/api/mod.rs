@@ -171,8 +171,24 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                 .route("/api/autosuggest", post(autosuggest::route))
                 .route("/api/autosuggest/browser", get(autosuggest::browser))
                 .route("/api/summarize", get(summarize::summarize_route))
-                .route("/api/webgraph/similar_sites", post(webgraph::similar_sites))
-                .route("/api/webgraph/knows_site", post(webgraph::knows_site))
+                .route("/api/webgraph/host/similar", post(webgraph::host::similar))
+                .route("/api/webgraph/host/knows", post(webgraph::host::knows))
+                .route(
+                    "/api/webgraph/host/ingoing",
+                    post(webgraph::host::ingoing_hosts),
+                )
+                .route(
+                    "/api/webgraph/host/outgoing",
+                    post(webgraph::host::outgoing_hosts),
+                )
+                .route(
+                    "/api/webgraph/page/ingoing",
+                    post(webgraph::page::ingoing_pages),
+                )
+                .route(
+                    "/api/webgraph/page/outgoing",
+                    post(webgraph::page::outgoing_pages),
+                )
                 .route("/api/alice", get(alice::alice_route))
                 .route("/api/alice/save_state", post(alice::save_state))
                 .route("/api/fact_check", post(fact_check::fact_check_route))

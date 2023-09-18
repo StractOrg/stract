@@ -1,5 +1,6 @@
 host = "0.0.0.0:3003"
 cluster_id = "dev_webgraph"
 gossip_addr = "0.0.0.0:3007"
-graph_path = "data/webgraph_host"
+host_graph_path = "data/webgraph_host"
+page_graph_path = "data/webgraph_page"
 inbound_similarity_path = "data/centrality/inbound_similarity"

@@ -26,6 +26,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::executor::Executor;
 use crate::intmap;
@@ -114,14 +115,16 @@ where
     pub label: L,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FullEdge {
     pub from: Node,
     pub to: Node,
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Node {
     pub name: String,
 }
