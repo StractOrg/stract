@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{array, str::CharIndices};
+use std::{array, collections::VecDeque, str::CharIndices};
 
 use logos::{Lexer, Logos};
 use tantivy::tokenizer::{
@@ -24,6 +24,11 @@ use tantivy::tokenizer::{
 use whatlang::Lang;
 
 use crate::{ceil_char_boundary, floor_char_boundary};
+
+use self::{add_space_last::AddSpaceLast, split_preserve::StrSplitPreserve};
+
+mod add_space_last;
+mod split_preserve;
 
 struct MyStemmer(Stemmer);
 
@@ -58,6 +63,7 @@ pub enum Tokenizer {
     Bigram(BigramTokenizer),
     Trigram(TrigramTokenizer),
     Json(JsonField),
+    SiteOperator(SiteOperatorUrlTokenizer),
 }
 
 impl Tokenizer {
@@ -73,6 +79,7 @@ impl Tokenizer {
             Tokenizer::Bigram(_) => BigramTokenizer::as_str(),
             Tokenizer::Trigram(_) => TrigramTokenizer::as_str(),
             Tokenizer::Json(_) => JsonField::as_str(),
+            Tokenizer::SiteOperator(_) => SiteOperatorUrlTokenizer::as_str(),
         }
     }
 }
@@ -152,6 +159,7 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
             Tokenizer::Json(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Bigram(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Trigram(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::SiteOperator(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }
@@ -553,6 +561,131 @@ impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
     }
 }
 
+#[derive(Clone, Default)]
+struct ParsedUrl {
+    protocol: Option<VecDeque<String>>,
+    domain: Option<VecDeque<String>>,
+    path: VecDeque<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SiteOperatorUrlTokenizer;
+
+impl SiteOperatorUrlTokenizer {
+    pub fn as_str() -> &'static str {
+        "site_operator_url_tokenizer"
+    }
+}
+
+impl tantivy::tokenizer::Tokenizer for SiteOperatorUrlTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+        let parsed_url = url::Url::parse(text)
+            .or_else(|_| url::Url::parse(&format!("http://{}", text)))
+            .map(|url| {
+                let domain = Some(
+                    url.host_str()
+                        .unwrap_or("")
+                        .split_preserve(|c| matches!(c, '.'))
+                        .filter(|s| !(*s).is_empty())
+                        .map(|s| s.to_string())
+                        .add_space_last()
+                        .collect(),
+                );
+                let path: VecDeque<_> = url
+                    .path()
+                    .split_preserve(|c| matches!(c, '/' | '-' | '_'))
+                    .filter(|s| !(*s).is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+
+                if matches!(url.scheme(), "http" | "https") {
+                    ParsedUrl {
+                        protocol: None,
+                        domain,
+                        path,
+                    }
+                } else {
+                    let mut v = VecDeque::new();
+                    v.push_back(url.scheme().to_string());
+
+                    ParsedUrl {
+                        protocol: Some(v),
+                        domain,
+                        path,
+                    }
+                }
+            })
+            .unwrap_or_default();
+
+        BoxTokenStream::from(SiteOperatorUrlTokenStream {
+            url: parsed_url,
+            token: tantivy::tokenizer::Token::default(),
+        })
+    }
+}
+
+pub struct SiteOperatorUrlTokenStream {
+    url: ParsedUrl,
+    token: tantivy::tokenizer::Token,
+}
+
+impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
+    fn advance(&mut self) -> bool {
+        if let Some(protocol) = self.url.protocol.as_mut() {
+            self.token.position = self.token.position.wrapping_add(1);
+            self.token.text.clear();
+
+            if let Some(s) = protocol.pop_front() {
+                self.token.text.push_str(&s);
+                self.token.offset_from = 0;
+                self.token.offset_to = s.len();
+            } else {
+                self.token.offset_from = self.token.offset_to;
+                self.token.text.push_str("://");
+                self.token.offset_to += self.token.text.len();
+
+                self.url.protocol = None;
+            }
+
+            return true;
+        }
+
+        if let Some(domain) = self.url.domain.as_mut() {
+            if let Some(s) = domain.pop_front() {
+                self.token.text.clear();
+                self.token.position = self.token.position.wrapping_add(1);
+
+                self.token.text.push_str(&s);
+
+                self.token.offset_from = self.token.offset_to;
+                self.token.offset_to += self.token.text.len();
+                return true;
+            }
+        }
+
+        if let Some(s) = self.url.path.pop_front() {
+            self.token.text.clear();
+            self.token.position = self.token.position.wrapping_add(1);
+
+            self.token.text.push_str(&s);
+            self.token.offset_from = self.token.offset_to;
+            self.token.offset_to += self.token.text.len();
+
+            return true;
+        }
+
+        false
+    }
+
+    fn token(&self) -> &tantivy::tokenizer::Token {
+        &self.token
+    }
+
+    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
+        &mut self.token
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tantivy::tokenizer::Tokenizer as _;
@@ -595,6 +728,17 @@ mod tests {
     fn tokenize_trigram(s: &str) -> Vec<String> {
         let mut res = Vec::new();
         let mut stream = Tokenizer::Trigram(TrigramTokenizer::default()).token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
+    fn tokenize_url(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut stream = SiteOperatorUrlTokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -903,5 +1047,55 @@ key1.key2="this\" is @ a # test""#;
                 "com".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn url() {
+        assert_eq!(
+            tokenize_url("https://www.example.com"),
+            vec![
+                "www".to_string(),
+                ".".to_string(),
+                "example".to_string(),
+                ".".to_string(),
+                "com ".to_string(),
+            ]
+        );
+
+        assert_eq!(
+            tokenize_url("https://www.example.com/test"),
+            vec![
+                "www".to_string(),
+                ".".to_string(),
+                "example".to_string(),
+                ".".to_string(),
+                "com ".to_string(),
+                "/".to_string(),
+                "test".to_string(),
+            ]
+        );
+
+        assert_eq!(
+            tokenize_url("example.com"),
+            vec!["example".to_string(), ".".to_string(), "com ".to_string(),]
+        );
+
+        assert_eq!(
+            tokenize_url("example.com/another/path"),
+            vec![
+                "example".to_string(),
+                ".".to_string(),
+                "com ".to_string(),
+                "/".to_string(),
+                "another".to_string(),
+                "/".to_string(),
+                "path".to_string(),
+            ]
+        );
+
+        assert_eq!(
+            tokenize_url(".com"),
+            vec![".".to_string(), "com ".to_string(),]
+        )
     }
 }

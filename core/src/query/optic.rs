@@ -144,7 +144,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Site => ConstQuery::new(
                 PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::SiteWithout,
+                    TextField::UrlForSiteOperator,
                     schema,
                     fastfield_reader.clone(),
                 )

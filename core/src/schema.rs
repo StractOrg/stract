@@ -18,7 +18,9 @@ use tantivy::schema::{
     Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
 };
 
-use crate::tokenizer::{BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer};
+use crate::tokenizer::{
+    BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
+};
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
@@ -31,6 +33,7 @@ pub enum TextField {
     AllBody,
     Url,
     UrlNoTokenizer,
+    UrlForSiteOperator,
     SiteWithout,
     Domain,
     SiteNoTokenizer,
@@ -86,6 +89,7 @@ impl TextField {
             TextField::AllBody => Tokenizer::default(),
             TextField::Url => Tokenizer::default(),
             TextField::UrlNoTokenizer => Tokenizer::Identity(Identity {}),
+            TextField::UrlForSiteOperator => Tokenizer::SiteOperator(SiteOperatorUrlTokenizer),
             TextField::SiteWithout => Tokenizer::default(),
             TextField::Domain => Tokenizer::default(),
             TextField::SiteNoTokenizer => Tokenizer::Identity(Identity {}),
@@ -127,6 +131,7 @@ impl TextField {
             TextField::AllBody => false,
             TextField::Url => true,
             TextField::UrlNoTokenizer => false,
+            TextField::UrlForSiteOperator => true,
             TextField::SiteWithout => true,
             TextField::Domain => true,
             TextField::SiteNoTokenizer => false,
@@ -157,6 +162,7 @@ impl TextField {
             TextField::CleanBody => "body",
             TextField::Url => "url",
             TextField::UrlNoTokenizer => "url_no_tokenizer",
+            TextField::UrlForSiteOperator => "url_for_site_operator",
             TextField::SiteWithout => "site",
             TextField::Domain => "domain",
             TextField::SiteNoTokenizer => "site_no_tokenizer",
@@ -198,7 +204,7 @@ pub enum FastField {
     NumTitleTokens,
     NumCleanBodyTokens,
     NumDescriptionTokens,
-    NumSiteTokens,
+    NumUrlForSiteOperatorTokens,
     NumDomainTokens,
     NumMicroformatTagsTokens,
     SiteHash1,
@@ -235,7 +241,7 @@ impl FastField {
             FastField::NumCleanBodyTokens => "num_clean_body_tokens",
             FastField::NumDescriptionTokens => "num_description_tokens",
             FastField::NumDomainTokens => "num_domain_tokens",
-            FastField::NumSiteTokens => "num_site_tokens",
+            FastField::NumUrlForSiteOperatorTokens => "num_url_for_site_operator_tokens",
             FastField::NumFlattenedSchemaTokens => "num_flattened_schema_tokens",
             FastField::NumMicroformatTagsTokens => "num_microformat_tags_tokens",
             FastField::SiteHash1 => "site_hash1",
@@ -270,7 +276,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 59] = [
+pub static ALL_FIELDS: [Field; 60] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -278,6 +284,7 @@ pub static ALL_FIELDS: [Field; 59] = [
     Field::Text(TextField::AllBody),
     Field::Text(TextField::Url),
     Field::Text(TextField::UrlNoTokenizer),
+    Field::Text(TextField::UrlForSiteOperator),
     Field::Text(TextField::SiteWithout),
     Field::Text(TextField::Domain),
     Field::Text(TextField::SiteNoTokenizer),
@@ -312,7 +319,7 @@ pub static ALL_FIELDS: [Field; 59] = [
     Field::Fast(FastField::NumCleanBodyTokens),
     Field::Fast(FastField::NumDescriptionTokens),
     Field::Fast(FastField::NumDomainTokens),
-    Field::Fast(FastField::NumSiteTokens),
+    Field::Fast(FastField::NumUrlForSiteOperatorTokens),
     Field::Fast(FastField::NumFlattenedSchemaTokens),
     Field::Fast(FastField::NumMicroformatTagsTokens),
     Field::Fast(FastField::SiteHash1),
@@ -362,6 +369,9 @@ impl Field {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Text(TextField::UrlNoTokenizer) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::UrlForSiteOperator) => {
                 IndexingOption::Text(self.default_text_options())
             }
             Field::Text(TextField::SiteWithout) => {
@@ -499,7 +509,7 @@ impl Field {
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
             ),
-            Field::Fast(FastField::NumSiteTokens) => IndexingOption::Integer(
+            Field::Fast(FastField::NumUrlForSiteOperatorTokens) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast(Cardinality::SingleValue)
                     .set_indexed(),
@@ -598,6 +608,7 @@ impl Field {
                 | Field::Text(TextField::MicroformatTags)
                 | Field::Text(TextField::SafetyClassification)
                 | Field::Text(TextField::FlattenedSchemaOrgJson)
+                | Field::Text(TextField::UrlForSiteOperator)
         ) && !self.is_fast()
     }
 
@@ -661,7 +672,7 @@ impl FastField {
             FastField::NumCleanBodyTokens => DataType::U64,
             FastField::NumDescriptionTokens => DataType::U64,
             FastField::NumDomainTokens => DataType::U64,
-            FastField::NumSiteTokens => DataType::U64,
+            FastField::NumUrlForSiteOperatorTokens => DataType::U64,
             FastField::NumFlattenedSchemaTokens => DataType::U64,
             FastField::SiteHash1 => DataType::U64,
             FastField::SiteHash2 => DataType::U64,

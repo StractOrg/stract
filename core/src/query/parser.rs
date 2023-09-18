@@ -92,6 +92,10 @@ impl Term {
                 {
                     let mut processed_terms = Term::process_tantivy_term(phrase, *field);
 
+                    if processed_terms.is_empty() {
+                        continue;
+                    }
+
                     if processed_terms.len() == 1 {
                         let options = ALL_FIELDS[field.field_id() as usize]
                             .as_text()
@@ -192,11 +196,29 @@ impl Term {
             .filter(|field| {
                 matches!(
                     ALL_FIELDS[field.field_id() as usize],
-                    Field::Text(TextField::DomainNoTokenizer)
-                        | Field::Text(TextField::SiteNoTokenizer)
+                    Field::Text(TextField::UrlForSiteOperator)
                 )
             })
-            .map(|field| (Occur::Should, Term::tantivy_text_query(field, term)))
+            .map(|field| {
+                let processed_terms = Term::process_tantivy_term(term, *field);
+
+                if processed_terms.len() == 1 {
+                    let term = processed_terms.get(0).unwrap().clone();
+                    (
+                        Occur::Should,
+                        Box::new(TermQuery::new(
+                            term,
+                            tantivy::schema::IndexRecordOption::Basic,
+                        )) as Box<dyn tantivy::query::Query>,
+                    )
+                } else {
+                    (
+                        Occur::Should,
+                        Box::new(PhraseQuery::new(processed_terms))
+                            as Box<dyn tantivy::query::Query>,
+                    )
+                }
+            })
             .collect()
     }
 

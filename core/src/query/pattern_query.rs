@@ -59,22 +59,27 @@ impl PatternQuery {
         schema: &tantivy::schema::Schema,
         fastfield_reader: FastFieldReader,
     ) -> Self {
-        let field = Field::Text(field);
-        let tv_field = schema.get_field(field.name()).unwrap();
+        let mut field = Field::Text(field);
+        let mut tv_field = schema.get_field(field.name()).unwrap();
 
         if can_optimize_site_domain(&patterns, field) {
             if patterns.len() == 3 {
-                if let PatternPart::Raw(term) = &patterns[1] {
-                    return Self {
-                        patterns: Vec::new(),
-                        field: tv_field,
-                        can_optimize_site_domain: true,
-                        raw_terms: vec![tantivy::Term::from_field_text(tv_field, term.as_str())],
-                        fastfield_reader,
-                    };
-                } else {
+                let PatternPart::Raw(term) = &patterns[1] else {
                     unreachable!()
+                };
+
+                if let Field::Text(TextField::UrlForSiteOperator) = field {
+                    field = Field::Text(TextField::SiteWithout);
+                    tv_field = schema.get_field(field.name()).unwrap();
                 }
+
+                return Self {
+                    patterns: Vec::new(),
+                    field: tv_field,
+                    can_optimize_site_domain: true,
+                    raw_terms: vec![tantivy::Term::from_field_text(tv_field, term.as_str())],
+                    fastfield_reader,
+                };
             } else {
                 let term: String = patterns
                     .iter()
@@ -324,7 +329,9 @@ impl PatternWeight {
             Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
             Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
             Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
-            Field::Text(TextField::SiteWithout) => Ok(FastField::NumSiteTokens),
+            Field::Text(TextField::UrlForSiteOperator) => {
+                Ok(FastField::NumUrlForSiteOperatorTokens)
+            }
             Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
             Field::Text(TextField::MicroformatTags) => Ok(FastField::NumMicroformatTagsTokens),
             Field::Text(TextField::FlattenedSchemaOrgJson) => {
