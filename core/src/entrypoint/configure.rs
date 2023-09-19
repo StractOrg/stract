@@ -84,8 +84,8 @@ fn create_webgraph() -> Result<()> {
 
     let mut worker = webgraph::WebgraphWorker {
         redirect: None,
-        host_graph: webgraph::open_graph(&out_path_host),
-        page_graph: webgraph::open_graph(&out_path_page),
+        host_graph: webgraph::open_host_graph(&out_path_host),
+        page_graph: webgraph::open_page_graph(&out_path_page),
     };
 
     worker.process_job(&job);

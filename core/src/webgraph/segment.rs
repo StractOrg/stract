@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{store::EdgeStore, Edge, NodeID};
+use super::{store::EdgeStore, Deduplication, Edge, NodeID};
 
 const ADJACENCY_STORE: &str = "adjacency";
 const REVERSED_ADJACENCY_STORE: &str = "reversed_adjacency";
@@ -29,11 +29,17 @@ pub struct StoredSegment {
 }
 
 impl StoredSegment {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, dedup: Deduplication) -> Self {
+        let dedup_insert = match dedup {
+            Deduplication::OnlyQuery => false,
+            Deduplication::QueryAndInserts => true,
+        };
+
         StoredSegment {
             full_adjacency: EdgeStore::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 false,
+                dedup_insert,
             ),
             full_reversed_adjacency: EdgeStore::open(
                 folder_path
@@ -41,6 +47,7 @@ impl StoredSegment {
                     .join(&id)
                     .join(REVERSED_ADJACENCY_STORE),
                 true,
+                dedup_insert,
             ),
             folder_path: folder_path
                 .as_ref()
@@ -137,7 +144,11 @@ mod test {
         // ▼      │ │
         // 1─────►2◄┘
 
-        let mut store = StoredSegment::open(crate::gen_temp_path(), "test".to_string());
+        let mut store = StoredSegment::open(
+            crate::gen_temp_path(),
+            "test".to_string(),
+            Deduplication::OnlyQuery,
+        );
 
         let mut edges = Vec::new();
 

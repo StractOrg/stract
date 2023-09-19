@@ -25,11 +25,12 @@ const MAX_BATCH_SIZE: usize = 50_000;
 
 pub struct EdgeStore {
     reversed: bool,
+    dedup: bool,
     db: rocksdb::DB,
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, reversed: bool, dedup: bool) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -54,7 +55,11 @@ impl EdgeStore {
 
         let db = rocksdb::DB::open(&options, path.as_ref().to_str().unwrap()).unwrap();
 
-        Self { db, reversed }
+        Self {
+            db,
+            reversed,
+            dedup,
+        }
     }
 
     pub fn get<L: EdgeLabel>(&self, node: NodeID) -> impl Iterator<Item = Edge<L>> + '_ {
@@ -119,11 +124,13 @@ impl EdgeStore {
 
             let key_bytes = [prefix_bytes, suffix_bytes].concat();
 
-            if batch_keys.contains(&key_bytes) || self.db.get(&key_bytes).unwrap().is_some() {
-                continue;
-            }
+            if self.dedup {
+                if batch_keys.contains(&key_bytes) || self.db.get(&key_bytes).unwrap().is_some() {
+                    continue;
+                }
 
-            batch_keys.insert(key_bytes.clone());
+                batch_keys.insert(key_bytes.clone());
+            }
 
             let value_bytes = edge.label.to_bytes().unwrap();
 
@@ -204,7 +211,8 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let kv: EdgeStore = EdgeStore::open(crate::gen_temp_path().join("test-segment"), false);
+        let kv: EdgeStore =
+            EdgeStore::open(crate::gen_temp_path().join("test-segment"), false, false);
 
         let e = Edge {
             from: NodeID(0),
@@ -228,7 +236,8 @@ mod tests {
 
     #[test]
     fn test_reversed() {
-        let kv: EdgeStore = EdgeStore::open(crate::gen_temp_path().join("test-segment"), true);
+        let kv: EdgeStore =
+            EdgeStore::open(crate::gen_temp_path().join("test-segment"), true, false);
 
         let e = Edge {
             from: NodeID(0),

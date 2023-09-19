@@ -67,8 +67,14 @@ pub struct Job {
     pub warc_paths: Vec<String>,
 }
 
-pub fn open_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
+pub fn open_host_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
     WebgraphBuilder::new(path).open()
+}
+
+pub fn open_page_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
+    WebgraphBuilder::new(path)
+        .deduplication(webgraph::Deduplication::OnlyQuery)
+        .open()
 }
 
 pub struct WebgraphWorker {
@@ -191,8 +197,8 @@ impl Webgraph {
 
             let mut worker = WebgraphWorker {
                 redirect: redirect.clone(),
-                host_graph: open_graph(host_path),
-                page_graph: open_graph(page_path),
+                host_graph: open_host_graph(host_path),
+                page_graph: open_page_graph(page_path),
             };
 
             let jobs = jobs.clone();

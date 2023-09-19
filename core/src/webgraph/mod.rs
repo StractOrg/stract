@@ -231,9 +231,21 @@ pub fn normalize_url(url: &Url) -> String {
     normalized
 }
 
+#[derive(Default, Clone, Copy)]
+pub enum Deduplication {
+    /// Do not deduplicate the inserted edges in the segment. Only deduplicate
+    /// the edges when querying all the segments.
+    OnlyQuery,
+    /// Deduplicate the inserted edges in the segmnt by first checking if the
+    /// edge is already present in the segment.
+    #[default]
+    QueryAndInserts,
+}
+
 pub struct WebgraphBuilder {
     path: Box<Path>,
     executor: Executor,
+    deduplication: Deduplication,
 }
 
 impl WebgraphBuilder {
@@ -249,7 +261,13 @@ impl WebgraphBuilder {
         Self {
             path: path.as_ref().into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
+            deduplication: Deduplication::default(),
         }
+    }
+
+    pub fn deduplication(mut self, deduplication: Deduplication) -> Self {
+        self.deduplication = deduplication;
+        self
     }
 
     pub fn single_threaded(mut self) -> Self {
@@ -258,7 +276,7 @@ impl WebgraphBuilder {
     }
 
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor)
+        Webgraph::open(self.path, self.executor, self.deduplication)
     }
 }
 
@@ -437,6 +455,7 @@ pub struct Webgraph {
     insert_batch: Vec<Edge<String>>,
     id2node: Id2NodeDb,
     meta: Meta,
+    deduplication: Deduplication,
 }
 
 impl Webgraph {
@@ -471,16 +490,18 @@ impl Webgraph {
         writer.write_all(json.as_bytes()).unwrap();
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
+    fn open<P: AsRef<Path>>(path: P, executor: Executor, deduplication: Deduplication) -> Self {
         fs::create_dir_all(&path).unwrap();
         let mut meta = Self::meta(&path);
 
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
+
         let mut segments = Vec::new();
         for segment in &meta.comitted_segments {
             segments.push(StoredSegment::open(
                 path.as_ref().join("segments"),
                 segment.clone(),
+                deduplication,
             ));
         }
 
@@ -488,6 +509,7 @@ impl Webgraph {
             segments.push(StoredSegment::open(
                 path.as_ref().join("segments"),
                 uuid::Uuid::new_v4().to_string(),
+                deduplication,
             ));
 
             meta.comitted_segments.push(segments[0].id());
@@ -495,6 +517,7 @@ impl Webgraph {
 
         Self {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
+            deduplication,
             segments,
             executor: Arc::new(executor),
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
@@ -541,7 +564,8 @@ impl Webgraph {
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments.push(StoredSegment::open(new_path, id));
+            self.segments
+                .push(StoredSegment::open(new_path, id, self.deduplication));
         }
 
         self.commit();
@@ -564,12 +588,18 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
+        let dedup = match self.deduplication {
+            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
+                |edges: &mut Vec<Edge<String>>| {
+                    edges.sort_by_key(|e| e.from);
+                    edges.dedup_by_key(|e| e.from);
+                }
+            }
+        };
+
         self.inner_edges(
             |segment| segment.ingoing_edges_with_label(&node.id()).collect_vec(),
-            |edges| {
-                edges.sort_by_key(|e| e.from);
-                edges.dedup_by_key(|e| e.from);
-            },
+            dedup,
         )
         .into_iter()
         .map(|e| FullEdge {
@@ -581,32 +611,47 @@ impl Webgraph {
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.inner_edges(
-            |segment| segment.ingoing_edges(node).collect_vec(),
-            |edges| {
-                edges.sort_by_key(|e| e.from);
-                edges.dedup_by_key(|e| e.from);
-            },
-        )
+        let dedup = match self.deduplication {
+            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
+                |edges: &mut Vec<Edge<()>>| {
+                    edges.sort_by_key(|e| e.from);
+                    edges.dedup_by_key(|e| e.from);
+                }
+            }
+        };
+
+        self.inner_edges(|segment| segment.ingoing_edges(node).collect_vec(), dedup)
     }
 
     pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
+        let dedup = match self.deduplication {
+            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
+                |edges: &mut Vec<Edge<String>>| {
+                    edges.sort_by_key(|e| e.from);
+                    edges.dedup_by_key(|e| e.from);
+                }
+            }
+        };
+
         self.inner_edges(
             |segment| segment.ingoing_edges_with_label(node).collect_vec(),
-            |edges| {
-                edges.sort_by_key(|e| e.from);
-                edges.dedup_by_key(|e| e.from);
-            },
+            dedup,
         )
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
+        let dedup = match self.deduplication {
+            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
+                |edges: &mut Vec<Edge<String>>| {
+                    edges.sort_by_key(|e| e.to);
+                    edges.dedup_by_key(|e| e.to);
+                }
+            }
+        };
+
         self.inner_edges(
             |segment| segment.outgoing_edges_with_label(&node.id()).collect_vec(),
-            |edges| {
-                edges.sort_by_key(|e| e.to);
-                edges.dedup_by_key(|e| e.to);
-            },
+            dedup,
         )
         .into_iter()
         .map(|e| FullEdge {
@@ -618,13 +663,16 @@ impl Webgraph {
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.inner_edges(
-            |segment| segment.outgoing_edges(node).collect_vec(),
-            |edges| {
-                edges.sort_by_key(|e| e.to);
-                edges.dedup_by_key(|e| e.to);
-            },
-        )
+        let dedup = match self.deduplication {
+            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
+                |edges: &mut Vec<Edge<()>>| {
+                    edges.sort_by_key(|e| e.to);
+                    edges.dedup_by_key(|e| e.to);
+                }
+            }
+        };
+
+        self.inner_edges(|segment| segment.outgoing_edges(node).collect_vec(), dedup)
     }
 
     fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
