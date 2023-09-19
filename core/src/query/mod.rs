@@ -867,4 +867,115 @@ mod tests {
 
         assert_eq!(result.webpages[0].url, "https://www.sfw.com/");
     }
+
+    #[test]
+    fn suffix_domain_prefix_path_site_operator() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.first.com/example",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.third.io",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "test site:.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
+
+        let query = SearchQuery {
+            query: "test site:.com/example".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test site:first.com/example".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test site:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test site:www.first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
+    }
 }
