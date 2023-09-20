@@ -40,6 +40,7 @@ impl EdgeStore {
 
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
+        options.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         options.set_level_compaction_dynamic_level_bytes(true);

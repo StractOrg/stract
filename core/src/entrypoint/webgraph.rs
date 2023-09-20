@@ -68,7 +68,9 @@ pub struct Job {
 }
 
 pub fn open_host_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
-    WebgraphBuilder::new(path).open()
+    WebgraphBuilder::new(path)
+        .deduplication(webgraph::Deduplication::OnlyQuery)
+        .open()
 }
 
 pub fn open_page_graph<P: AsRef<Path>>(path: P) -> webgraph::Webgraph {
