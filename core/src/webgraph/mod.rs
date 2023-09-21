@@ -36,7 +36,6 @@ mod store;
 use self::segment::StoredSegment;
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
-const MAX_BATCH_SIZE: usize = 50_000;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeID(u128);
@@ -521,7 +520,7 @@ impl Webgraph {
             segments,
             executor: Arc::new(executor),
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
-            insert_batch: Vec::with_capacity(MAX_BATCH_SIZE),
+            insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
             meta,
         }
     }
@@ -547,7 +546,7 @@ impl Webgraph {
 
         self.insert_batch.push(edge);
 
-        if self.insert_batch.len() >= MAX_BATCH_SIZE {
+        if self.insert_batch.len() >= store::MAX_BATCH_SIZE {
             self.commit();
         }
     }

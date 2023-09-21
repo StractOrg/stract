@@ -404,7 +404,7 @@ where
     }
 
     fn requires_scoring(&self) -> bool {
-        true
+        false
     }
 
     fn merge_fruits(

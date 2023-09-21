@@ -21,7 +21,7 @@ use rocksdb::BlockBasedOptions;
 
 use super::{Edge, EdgeLabel, NodeID};
 
-const MAX_BATCH_SIZE: usize = 50_000;
+pub const MAX_BATCH_SIZE: usize = 100_000;
 
 pub struct EdgeStore {
     reversed: bool,
@@ -43,6 +43,11 @@ impl EdgeStore {
         options.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
         options.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
         options.set_target_file_size_multiplier(10);
+
+        options.set_max_write_buffer_number(4);
+        options.set_min_write_buffer_number_to_merge(2);
+        options.set_level_zero_slowdown_writes_trigger(-1);
+        options.set_level_zero_stop_writes_trigger(-1);
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         options.set_level_compaction_dynamic_level_bytes(true);

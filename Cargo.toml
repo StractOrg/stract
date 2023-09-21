@@ -37,7 +37,7 @@ axum-macros = "0.3.4"
 logos = "0.12.1"
 csv = "1.1.6"
 fst = { version = "0.4.7", features = ["levenshtein"] }
-rocksdb = { version = "0.19.0", features = ["default", "jemalloc", "io-uring"] }
+rocksdb = { version = "0.21.0", features = ["default", "jemalloc", "io-uring"] }
 image = "0.24.3"
 chrono = { version = "0.4.23", features = ["serde"] }
 uuid = "1.1.2"

@@ -609,6 +609,16 @@ impl Field {
                 | Field::Text(TextField::SafetyClassification)
                 | Field::Text(TextField::FlattenedSchemaOrgJson)
                 | Field::Text(TextField::UrlForSiteOperator)
+                | Field::Text(TextField::Description)
+                | Field::Text(TextField::DmozDescription)
+                | Field::Text(TextField::SiteIfHomepageNoTokenizer)
+                | Field::Text(TextField::DomainIfHomepage)
+                | Field::Text(TextField::DomainNameIfHomepageNoTokenizer)
+                | Field::Text(TextField::DomainIfHomepageNoTokenizer)
+                | Field::Text(TextField::TitleIfHomepage)
+                | Field::Text(TextField::SiteWithout) // will match url
+                | Field::Text(TextField::Domain) // will match url
+                | Field::Text(TextField::CleanBody) // will match all_body
         ) && !self.is_fast()
     }
 
