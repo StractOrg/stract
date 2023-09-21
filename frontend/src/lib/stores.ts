@@ -39,6 +39,9 @@ const writableLocalStorage = <T>(
 const SAFE_SEARCH_KEY = 'safeSearch';
 export const safeSearchStore = writableLocalStorage<boolean>(SAFE_SEARCH_KEY, false);
 
+const POST_SEARCH_KEY = 'postSearch';
+export const postSearchStore = writableLocalStorage<boolean>(POST_SEARCH_KEY, false);
+
 const OPTICS_KEY = 'optics';
 export const opticsStore = writableLocalStorage<OpticOption[]>(OPTICS_KEY, []);
 

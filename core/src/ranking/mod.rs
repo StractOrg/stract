@@ -609,7 +609,7 @@ mod tests {
                     <meta property="og:description" content="example" />
                 </head>
                 <body>
-                    test
+                    test example
                 </body>
             </html>
             "#,

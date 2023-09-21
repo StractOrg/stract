@@ -3,11 +3,21 @@ import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 import { fetchRemoteOptic } from '$lib/optics';
 import { match } from 'ts-pattern';
-import { decompressRanked, type RankedSites } from '$lib/rankings';
+import { extractSearchParams } from '$lib/search';
 import { globals } from '$lib/globals';
 
-export const load: PageLoad = async ({ fetch, url }) => {
-  const params = extractSearchParams(url.searchParams);
+export const load: PageLoad = async (req) => {
+  const { fetch, url } = req;
+  var params = extractSearchParams(url.searchParams);
+
+  if (!params.query.trim()) {
+    const form = req.data['form'];
+    if (form) {
+      params = form;
+    } else {
+      throw redirect(300, '/');
+    }
+  }
 
   if (!params.query.trim()) {
     throw redirect(300, '/');
@@ -55,35 +65,5 @@ export const load: PageLoad = async ({ fetch, url }) => {
       title: `${params.query} – Stract`,
       header: { divider: true },
     }),
-  };
-};
-
-type SearchParams = {
-  query: string;
-  currentPage: number;
-  optic: string | undefined;
-  selectedRegion: Region | undefined;
-  safeSearch: boolean;
-  compressedSiteRankings: string | null;
-  siteRankings: RankedSites | undefined;
-};
-
-const extractSearchParams = (searchParams: URLSearchParams): SearchParams => {
-  const query = searchParams.get('q') ?? '';
-  const currentPage = parseInt(searchParams.get('p') ?? '1') || 1;
-  const optic = searchParams.get('optic') || void 0;
-  const selectedRegion = (searchParams.get('gl') || void 0) as Region | undefined;
-  const safeSearch = searchParams.get('ss') == 'true';
-  const compressedSiteRankings = searchParams.get('sr');
-  const siteRankings = compressedSiteRankings ? decompressRanked(compressedSiteRankings) : void 0;
-
-  return {
-    query,
-    currentPage,
-    optic,
-    selectedRegion,
-    safeSearch,
-    compressedSiteRankings,
-    siteRankings,
   };
 };

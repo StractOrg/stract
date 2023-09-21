@@ -2,7 +2,7 @@
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
   import { api } from '$lib/api';
-  import { safeSearchStore, siteRankingsStore } from '$lib/stores';
+  import { safeSearchStore, siteRankingsStore, postSearchStore } from '$lib/stores';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
@@ -81,7 +81,7 @@
   let hasFocus = autofocus;
 </script>
 
-<form action="/search" class="flex w-full justify-center" id="searchbar-form">
+<form action="/search" class="flex w-full justify-center" id="searchbar-form" method={$postSearchStore ? "POST" : "GET"}>
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
   <input type="hidden" value={$compressedRanked} name="sr" id="siteRankingsUuid" />
 
