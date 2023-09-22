@@ -16,7 +16,7 @@
 
 use tantivy::{
     query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
-    tokenizer::{TextAnalyzer, Tokenizer},
+    tokenizer::Tokenizer,
 };
 
 use crate::{
@@ -25,9 +25,49 @@ use crate::{
     schema::{Field, TextField, ALL_FIELDS},
 };
 
+#[derive(Debug, Clone)]
+pub struct TermCompound {
+    pub terms: Vec<SimpleTerm>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompoundAwareTerm {
+    pub term: Term,
+    pub adjacent_terms: Vec<TermCompound>,
+}
+impl CompoundAwareTerm {
+    pub fn as_tantivy_query(
+        &self,
+        fields: &[tantivy::schema::Field],
+    ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
+        if !self.adjacent_terms.is_empty() {
+            if let Term::Simple(simple_term) = &self.term {
+                return simple_into_tantivy(simple_term, &self.adjacent_terms, fields);
+            }
+        }
+
+        self.term.as_tantivy_query(fields)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SimpleTerm(String);
+
+impl From<String> for SimpleTerm {
+    fn from(value: String) -> Self {
+        SimpleTerm(value)
+    }
+}
+
+impl From<SimpleTerm> for String {
+    fn from(value: SimpleTerm) -> Self {
+        value.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
-    Simple(String),
+    Simple(SimpleTerm),
     Phrase(String),
     Not(Box<Term>),
     Site(String),
@@ -40,7 +80,7 @@ pub enum Term {
 impl ToString for Term {
     fn to_string(&self) -> String {
         match self {
-            Term::Simple(term) => term.clone(),
+            Term::Simple(term) => term.0.clone(),
             Term::Phrase(phrase) => "\"".to_string() + phrase.as_str() + "\"",
             Term::Not(term) => "-".to_string() + term.to_string().as_str(),
             Term::Site(site) => "site:".to_string() + site.as_str(),
@@ -53,19 +93,44 @@ impl ToString for Term {
 }
 
 fn simple_into_tantivy(
-    term: &str,
+    term: &SimpleTerm,
+    adjacent_terms: &[TermCompound],
     fields: &[tantivy::schema::Field],
 ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
-    (
-        Occur::Must,
-        Box::new(BooleanQuery::new(Term::into_tantivy_simple(term, fields))),
-    )
+    let mut queries = Term::into_tantivy_simple(term, fields);
+
+    let fields = fields
+        .iter()
+        .filter(|field| {
+            matches!(
+                ALL_FIELDS[field.field_id() as usize],
+                Field::Text(TextField::AllBody)
+                    | Field::Text(TextField::Title)
+                    | Field::Text(TextField::Url)
+            )
+        })
+        .copied()
+        .collect::<Vec<_>>();
+
+    for adjacent_term in adjacent_terms {
+        let combined = adjacent_term
+            .terms
+            .iter()
+            .map(|term| term.0.as_str())
+            .collect::<String>();
+
+        for field in &fields {
+            queries.push((Occur::Should, Term::tantivy_text_query(field, &combined)))
+        }
+    }
+
+    (Occur::Must, Box::new(BooleanQuery::new(queries)))
 }
 
 impl Term {
     pub fn as_simple_text(&self) -> &str {
         match self {
-            Term::Simple(term) => term,
+            Term::Simple(term) => &term.0,
             Term::Phrase(terms) => terms,
             Term::Not(term) => term.as_simple_text(),
             Term::Site(term) => term,
@@ -76,12 +141,12 @@ impl Term {
         }
     }
 
-    pub fn as_tantivy_query(
+    fn as_tantivy_query(
         &self,
         fields: &[tantivy::schema::Field],
     ) -> (Occur, Box<dyn tantivy::query::Query + 'static>) {
         match self {
-            Term::Simple(term) => simple_into_tantivy(term, fields),
+            Term::Simple(term) => simple_into_tantivy(term, &[], fields),
             Term::Phrase(phrase) => {
                 let mut phrases = Vec::with_capacity(fields.len());
 
@@ -171,19 +236,19 @@ impl Term {
                 term.push(BANG_PREFIX);
                 term.push_str(text);
 
-                simple_into_tantivy(&term, fields)
+                simple_into_tantivy(&term.into(), &[], fields)
             }
         }
     }
 
     fn into_tantivy_simple(
-        term: &str,
+        term: &SimpleTerm,
         fields: &[tantivy::schema::Field],
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
             .filter(|field| ALL_FIELDS[field.field_id() as usize].is_searchable())
-            .map(|field| (Occur::Should, Term::tantivy_text_query(field, term)))
+            .map(|field| (Occur::Should, Term::tantivy_text_query(field, &term.0)))
             .collect()
     }
 
@@ -222,7 +287,7 @@ impl Term {
             .collect()
     }
 
-    pub fn tantivy_text_query(
+    fn tantivy_text_query(
         field: &tantivy::schema::Field,
         term: &str,
     ) -> Box<dyn tantivy::query::Query + 'static> {
@@ -254,22 +319,7 @@ impl Term {
         Box::new(processed_query)
     }
 
-    pub fn get_tantivy_analyzer(
-        entry: &tantivy::schema::FieldEntry,
-        tokenizer_manager: &tantivy::tokenizer::TokenizerManager,
-    ) -> Option<TextAnalyzer> {
-        match entry.field_type() {
-            tantivy::schema::FieldType::Str(options) => {
-                options.get_indexing_options().and_then(|indexing_options| {
-                    let tokenizer_name = indexing_options.tokenizer();
-                    tokenizer_manager.get(tokenizer_name)
-                })
-            }
-            _ => None,
-        }
-    }
-
-    pub fn process_tantivy_term(
+    fn process_tantivy_term(
         term: &str,
         tantivy_field: tantivy::schema::Field,
     ) -> Vec<tantivy::Term> {
@@ -295,36 +345,36 @@ fn parse_term(term: &str) -> Box<Term> {
         if !not_term.is_empty() && !not_term.starts_with('-') {
             Box::new(Term::Not(parse_term(not_term)))
         } else {
-            Box::new(Term::Simple(term.to_string()))
+            Box::new(Term::Simple(term.to_string().into()))
         }
     } else if let Some(site) = term.strip_prefix("site:") {
         if !site.is_empty() {
             Box::new(Term::Site(site.to_string()))
         } else {
-            Box::new(Term::Simple(term.to_string()))
+            Box::new(Term::Simple(term.to_string().into()))
         }
     } else if let Some(title) = term.strip_prefix("intitle:") {
         if !title.is_empty() {
             Box::new(Term::Title(title.to_string()))
         } else {
-            Box::new(Term::Simple(term.to_string()))
+            Box::new(Term::Simple(term.to_string().into()))
         }
     } else if let Some(body) = term.strip_prefix("inbody:") {
         if !body.is_empty() {
             Box::new(Term::Body(body.to_string()))
         } else {
-            Box::new(Term::Simple(term.to_string()))
+            Box::new(Term::Simple(term.to_string().into()))
         }
     } else if let Some(url) = term.strip_prefix("inurl:") {
         if !url.is_empty() {
             Box::new(Term::Url(url.to_string()))
         } else {
-            Box::new(Term::Simple(term.to_string()))
+            Box::new(Term::Simple(term.to_string().into()))
         }
     } else if let Some(bang) = term.strip_prefix(BANG_PREFIX) {
         Box::new(Term::PossibleBang(bang.to_string()))
     } else {
-        Box::new(Term::Simple(term.to_string()))
+        Box::new(Term::Simple(term.to_string().into()))
     }
 }
 
@@ -381,16 +431,16 @@ mod tests {
         assert_eq!(
             parse("this -that"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
-                Box::new(Term::Not(Box::new(Term::Simple("that".to_string()))))
+                Box::new(Term::Simple("this".to_string().into())),
+                Box::new(Term::Not(Box::new(Term::Simple("that".to_string().into()))))
             ]
         );
 
         assert_eq!(
             parse("this -"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
-                Box::new(Term::Simple("-".to_string()))
+                Box::new(Term::Simple("this".to_string().into())),
+                Box::new(Term::Simple("-".to_string().into()))
             ]
         );
     }
@@ -400,8 +450,8 @@ mod tests {
         assert_eq!(
             parse("this --that"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
-                Box::new(Term::Simple("--that".to_string()))
+                Box::new(Term::Simple("this".to_string().into())),
+                Box::new(Term::Simple("--that".to_string().into()))
             ]
         );
     }
@@ -411,7 +461,7 @@ mod tests {
         assert_eq!(
             parse("this site:test.com"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Simple("this".to_string().into())),
                 Box::new(Term::Site("test.com".to_string()))
             ]
         );
@@ -422,7 +472,7 @@ mod tests {
         assert_eq!(
             parse("this intitle:test"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Simple("this".to_string().into())),
                 Box::new(Term::Title("test".to_string()))
             ]
         );
@@ -433,7 +483,7 @@ mod tests {
         assert_eq!(
             parse("this inbody:test"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Simple("this".to_string().into())),
                 Box::new(Term::Body("test".to_string()))
             ]
         );
@@ -444,7 +494,7 @@ mod tests {
         assert_eq!(
             parse("this inurl:test"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
+                Box::new(Term::Simple("this".to_string().into())),
                 Box::new(Term::Url("test".to_string()))
             ]
         );
@@ -467,18 +517,18 @@ mod tests {
         assert_eq!(
             parse("\"this is a inurl:test"),
             vec![
-                Box::new(Term::Simple("\"this".to_string())),
-                Box::new(Term::Simple("is".to_string())),
-                Box::new(Term::Simple("a".to_string())),
+                Box::new(Term::Simple("\"this".to_string().into())),
+                Box::new(Term::Simple("is".to_string().into())),
+                Box::new(Term::Simple("a".to_string().into())),
                 Box::new(Term::Url("test".to_string()))
             ]
         );
         assert_eq!(
             parse("this is a\" inurl:test"),
             vec![
-                Box::new(Term::Simple("this".to_string())),
-                Box::new(Term::Simple("is".to_string())),
-                Box::new(Term::Simple("a\"".to_string())),
+                Box::new(Term::Simple("this".to_string().into())),
+                Box::new(Term::Simple("is".to_string().into())),
+                Box::new(Term::Simple("a\"".to_string().into())),
                 Box::new(Term::Url("test".to_string()))
             ]
         );

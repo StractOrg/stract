@@ -16,6 +16,7 @@
 
 use crate::{
     inverted_index::InvertedIndex,
+    query::parser::TermCompound,
     ranking::SignalCoefficient,
     schema::{Field, TextField},
     search_ctx::Ctx,
@@ -36,7 +37,7 @@ pub mod union;
 
 use parser::Term;
 
-use self::optic::AsMultipleTantivyQuery;
+use self::{optic::AsMultipleTantivyQuery, parser::CompoundAwareTerm};
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -69,11 +70,41 @@ impl Query {
             *count += 1;
         }
 
+        let mut compound_terms: Vec<_> = terms
+            .clone()
+            .into_iter()
+            .map(|term| CompoundAwareTerm {
+                term: *term,
+                adjacent_terms: Vec::new(),
+            })
+            .collect();
+
+        let term_ids: Vec<_> = compound_terms.iter().enumerate().map(|(i, _)| i).collect();
+
+        for window_size in 2..=3 {
+            for window in term_ids.windows(window_size) {
+                let mut window_terms = Vec::new();
+                for i in window {
+                    if let Term::Simple(t) = &compound_terms[*i].term {
+                        window_terms.push(t.clone());
+                    }
+                }
+
+                let compound = TermCompound {
+                    terms: window_terms,
+                };
+
+                for i in window {
+                    compound_terms[*i].adjacent_terms.push(compound.clone());
+                }
+            }
+        }
+
         let schema = index.schema();
 
         let fields: Vec<tantivy::schema::Field> = schema.fields().map(|(field, _)| field).collect();
 
-        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = terms
+        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = compound_terms
             .iter()
             .map(|term| term.as_tantivy_query(&fields))
             .collect();
@@ -782,6 +813,28 @@ mod tests {
             )
             .expect("failed to insert webpage");
 
+        index
+            .insert(
+                Webpage::new(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Testwebsite</title>
+                            </head>
+                            <body>
+                                This is a testwebsite {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
 
@@ -791,8 +844,15 @@ mod tests {
         };
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+        assert_eq!(result.num_hits, 2);
+
+        let query = SearchQuery {
+            query: "test website".to_string(),
+            ..Default::default()
+        };
+
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.num_hits, 2);
     }
 
     #[test]

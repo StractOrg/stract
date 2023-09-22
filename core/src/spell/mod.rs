@@ -227,7 +227,7 @@ impl Spell {
         let terms: Vec<_> = query::parser::parse(&query.query)
             .into_iter()
             .filter_map(|term| match *term {
-                Term::Simple(s) => Some(s),
+                Term::Simple(s) => Some(String::from(s)),
                 _ => None,
             })
             .map(|s| s.to_ascii_lowercase())
