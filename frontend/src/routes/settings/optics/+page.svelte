@@ -1,8 +1,10 @@
 <script lang="ts">
   import MinusCircle from '~icons/heroicons/minus-circle';
+  import EyeSlash from "~icons/heroicons/eye-slash";
+  import Eye from "~icons/heroicons/eye";
   import Button from '$lib/components/Button.svelte';
-  import { opticsStore } from '$lib/stores';
-  import { DEFAULT_OPTICS, fetchRemoteOptic, type OpticOption } from '$lib/optics';
+  import { opticsShowStore, opticsStore } from '$lib/stores';
+  import { DEFAULT_OPTICS, fetchRemoteOptic, opticKey, type OpticOption } from '$lib/optics';
   import { derived } from 'svelte/store';
   import Callout from '$lib/components/Callout.svelte';
 
@@ -20,7 +22,12 @@
         fetch,
       });
 
-      opticsStore.update(($optics) => [...$optics, { name, url, description }]);
+      opticsShowStore.update(($opticsShow) => ({
+        ...$opticsShow,
+        [opticKey({ name, url, description })]: true,
+      }));
+      opticsStore.update(($optics) => [...$optics, { name, url, description, shown: true }]);
+
       name = '';
       url = '';
       description = '';
@@ -31,9 +38,23 @@
       console.error(e);
     }
   };
+  
   const removeOptic = (optic: OpticOption) => () => {
     opticsStore.update(($optics) => $optics.filter((o) => o != optic));
+    opticsShowStore.update(($opticsShow) => {
+      const { [opticKey(optic)]: _, ...rest } = $opticsShow;
+      return rest;
+    });
   };
+
+  for (const optic of DEFAULT_OPTICS) {
+    if ($opticsShowStore[opticKey(optic)] !== undefined) continue;
+
+    opticsShowStore.update(($opticsShow) => ({
+      ...$opticsShow,
+      [opticKey(optic)]: optic.shown,
+    }));
+  }
 
   const optics = derived(opticsStore, ($optics) => [
     ...$optics.map((optic) => ({
@@ -105,7 +126,8 @@
       </Callout>
     {/if}
     <div class="mt-5">
-      <div class="grid w-full grid-cols-[auto_1fr_2fr_auto] gap-5" id="optics-list">
+      <div class="grid w-full grid-cols-[auto_auto_1fr_2fr_auto] gap-5" id="optics-list">
+        <span />
         <span />
         <div class="flex-1 font-medium">Name</div>
         <div class="flex-1 font-medium">Description</div>
@@ -117,9 +139,18 @@
             disabled={!removable}
           >
             <MinusCircle
-              class="transition group-enabled:text-error group-enabled:group-hover:text-error"
+              class="transition text-neutral group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
+          <label class="hover:cursor-pointer">
+            <input type="checkbox" bind:checked={$opticsShowStore[opticKey(optic)]} class="hidden peer" />
+            <EyeSlash
+              class="transition text-neutral inline-flex peer-checked:hidden"
+            />
+            <Eye
+              class="transition text-neutral peer-checked:inline-flex hidden"
+            />
+          </label>
           <div class="text-sm">{optic.name}</div>
           <div class="text-sm">
             {optic.description}

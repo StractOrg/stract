@@ -39,6 +39,7 @@
   const unrankSite = (site: string) => () => {
     siteRankingsStore.update(($rankings) => ({ ...$rankings, [site]: void 0 }));
   };
+
   const clearAndExport =
     ({ clear }: { clear: boolean }) =>
     async () => {

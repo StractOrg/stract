@@ -45,6 +45,9 @@ export const postSearchStore = writableLocalStorage<boolean>(POST_SEARCH_KEY, fa
 const OPTICS_KEY = 'optics';
 export const opticsStore = writableLocalStorage<OpticOption[]>(OPTICS_KEY, []);
 
+const OPTICS_SHOW_KEY = 'opticsShow';
+export const opticsShowStore = writableLocalStorage<Record<string, boolean>>(OPTICS_SHOW_KEY, {});
+
 const ALLOW_STATS_KEY = 'allowStats';
 export const allowStatsStore = writableLocalStorage<boolean>(ALLOW_STATS_KEY, true);
 

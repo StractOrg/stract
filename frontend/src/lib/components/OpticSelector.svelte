@@ -1,17 +1,26 @@
 <script lang="ts">
-  import { DEFAULT_OPTICS } from '$lib/optics';
-  import { opticsStore } from '$lib/stores';
+  import { DEFAULT_OPTICS, opticKey } from '$lib/optics';
+  import { opticsStore, opticsShowStore } from '$lib/stores';
   import Select from './Select.svelte';
   import { derived } from 'svelte/store';
 
   export let searchOnChange: boolean;
   export let selected = '';
 
+  for (const optic of DEFAULT_OPTICS) {
+    if ($opticsShowStore[opticKey(optic)] !== undefined) continue;
+
+    opticsShowStore.update(($opticsShow) => ({
+      ...$opticsShow,
+      [opticKey(optic)]: optic.shown,
+    }));
+  }
+
   const optics = derived(opticsStore, ($optics) => [...$optics, ...DEFAULT_OPTICS]);
 
   $: options = [
     { value: '', label: 'No Optic' },
-    ...$optics.map((optic) => ({ value: optic.url, label: optic.name })),
+    ...$optics.filter((optic) => $opticsShowStore[opticKey(optic)]).map((optic) => ({ value: optic.url, label: optic.name })),
   ];
 </script>
 
