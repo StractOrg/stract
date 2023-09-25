@@ -20,7 +20,9 @@
 
   $: options = [
     { value: '', label: 'No Optic' },
-    ...$optics.filter((optic) => $opticsShowStore[opticKey(optic)]).map((optic) => ({ value: optic.url, label: optic.name })),
+    ...$optics
+      .filter((optic) => $opticsShowStore[opticKey(optic)])
+      .map((optic) => ({ value: optic.url, label: optic.name })),
   ];
 </script>
 
