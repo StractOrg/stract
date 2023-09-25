@@ -54,6 +54,31 @@ export default {
       keyframes: {
         blink: { '0%': { opacity: '0' } },
       },
+      typography: () => {
+        const c = (name: string) => `rgb(var(--${name}))`;
+        return {
+          DEFAULT: {
+            css: {
+              '--tw-prose-body': c('base-content'),
+              '--tw-prose-headings': c('primary-focus'),
+              // '--tw-prose-lead': c('error'),
+              '--tw-prose-links': c('link'),
+              '--tw-prose-bold': c('base-content'),
+              '--tw-prose-counters': c('secondary-focus'),
+              '--tw-prose-bullets': c('secondary-focus'),
+              '--tw-prose-hr': c('primary'),
+              '--tw-prose-quotes': c('base-content'),
+              '--tw-prose-quote-borders': c('primary'),
+              // '--tw-prose-captions': c('error'),
+              '--tw-prose-code': c('accent-focus'),
+              '--tw-prose-pre-code': c('accent-focus'),
+              '--tw-prose-pre-bg': c('base-200'),
+              '--tw-prose-th-borders': c('base-400'),
+              '--tw-prose-td-borders': c('base-300'),
+            },
+          },
+        };
+      },
     },
   },
   plugins: [typographyPlugin, formsPlugin, noscriptPlugin, ...themes],
