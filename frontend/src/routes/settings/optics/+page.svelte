@@ -1,7 +1,7 @@
 <script lang="ts">
   import MinusCircle from '~icons/heroicons/minus-circle';
-  import EyeSlash from "~icons/heroicons/eye-slash";
-  import Eye from "~icons/heroicons/eye";
+  import EyeSlash from '~icons/heroicons/eye-slash';
+  import Eye from '~icons/heroicons/eye';
   import Button from '$lib/components/Button.svelte';
   import { opticsShowStore, opticsStore } from '$lib/stores';
   import { DEFAULT_OPTICS, fetchRemoteOptic, opticKey, type OpticOption } from '$lib/optics';
@@ -38,7 +38,7 @@
       console.error(e);
     }
   };
-  
+
   const removeOptic = (optic: OpticOption) => () => {
     opticsStore.update(($optics) => $optics.filter((o) => o != optic));
     opticsShowStore.update(($opticsShow) => {
@@ -139,17 +139,17 @@
             disabled={!removable}
           >
             <MinusCircle
-              class="transition text-neutral group-enabled:text-error group-enabled:group-hover:text-error"
+              class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
           <label class="hover:cursor-pointer">
-            <input type="checkbox" bind:checked={$opticsShowStore[opticKey(optic)]} class="hidden peer" />
-            <EyeSlash
-              class="transition text-neutral inline-flex peer-checked:hidden"
+            <input
+              type="checkbox"
+              bind:checked={$opticsShowStore[opticKey(optic)]}
+              class="peer hidden"
             />
-            <Eye
-              class="transition text-neutral peer-checked:inline-flex hidden"
-            />
+            <EyeSlash class="inline-flex text-neutral transition peer-checked:hidden" />
+            <Eye class="hidden text-neutral transition peer-checked:inline-flex" />
           </label>
           <div class="text-sm">{optic.name}</div>
           <div class="text-sm">

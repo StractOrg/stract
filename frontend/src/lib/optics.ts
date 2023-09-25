@@ -8,8 +8,7 @@ export type DefaultOpticOption = OpticOption & {
   shown: boolean;
 };
 
-export const opticKey = (optic: OpticOption) => optic.name + "_" + optic.url;
-
+export const opticKey = (optic: OpticOption) => optic.name + '_' + optic.url;
 
 export const DEFAULT_OPTICS = [
   {
