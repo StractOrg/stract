@@ -556,6 +556,11 @@ impl Webgraph {
         Meta::open(meta_path)
     }
 
+    fn save_metadata(&mut self) {
+        let path = Path::new(&self.path).join("metadata.json");
+        self.meta.save(path);
+    }
+
     fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
@@ -592,6 +597,7 @@ impl Webgraph {
             self.segments.push(Segment::open(new_path, id));
         }
 
+        self.save_metadata();
         self.id2node.flush();
     }
 
@@ -799,6 +805,8 @@ mod test {
         for other in graphs {
             graph.merge(other);
         }
+
+        dbg!(&graph.path);
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),

@@ -35,7 +35,7 @@ pub struct IndexerCentralityStore {
 impl IndexerCentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            harmonic: RocksDbStore::open(path.as_ref().join("harmonic")),
+            harmonic: Box::new(RocksDbStore::open(path.as_ref().join("harmonic"))),
         }
     }
 }
@@ -78,7 +78,7 @@ pub struct CentralityStore {
 impl CentralityStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            harmonic: RocksDbStore::open(path.as_ref().join("harmonic")),
+            harmonic: Box::new(RocksDbStore::open(path.as_ref().join("harmonic"))),
             inbound_similarity: InboundSimilarity::open(path.as_ref().join("inbound_similarity"))
                 .ok()
                 .unwrap_or_default(),

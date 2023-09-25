@@ -147,6 +147,7 @@ impl EdgeStoreWriter {
 pub struct EdgeStore {
     reversed: bool,
     ranges: rocksdb::DB, // column[nodes] = nodeid -> (start, end); column[labels] = nodeid -> (start, end)
+    _cache: rocksdb::Cache,
     edge_labels_file: File,
     edge_labels_len: usize,
     edge_labels: Mmap,
@@ -225,6 +226,7 @@ impl EdgeStore {
         Self {
             reversed,
             ranges,
+            _cache: cache,
             edge_labels,
             edge_labels_len,
             edge_labels_file,
@@ -333,6 +335,12 @@ impl EdgeStore {
 
     fn flush(&mut self) {
         self.ranges.flush().unwrap();
+        self.ranges
+            .flush_cf(self.ranges.cf_handle("nodes").unwrap())
+            .unwrap();
+        self.ranges
+            .flush_cf(self.ranges.cf_handle("labels").unwrap())
+            .unwrap();
 
         self.edge_nodes_file.flush().unwrap();
         self.edge_labels_file.flush().unwrap();

@@ -17,51 +17,74 @@
 use std::{fs, marker::PhantomData};
 
 use rocksdb::{
-    DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, Options, SingleThreaded, DB,
+    BlockBasedOptions, DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, Options,
+    SingleThreaded, DB,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::kv::Kv;
 
-pub struct RocksDbStore {}
+pub struct RocksDbStore {
+    db: DB,
+    _cache: rocksdb::Cache,
+}
 
 impl RocksDbStore {
-    pub fn open<K, V, P>(path: P) -> Box<dyn Kv<K, V> + Send + Sync>
+    pub fn open<P>(path: P) -> Self
     where
         P: AsRef<std::path::Path>,
-        K: Serialize + DeserializeOwned + 'static,
-        V: Serialize + DeserializeOwned + 'static,
     {
         if !path.as_ref().exists() {
             fs::create_dir_all(path.as_ref()).expect("faild to create dir");
         }
 
         let mut options = Options::default();
-
         options.create_if_missing(true);
-        options.set_max_open_files(1);
-        options.set_max_file_opening_threads(1);
-        options.optimize_for_point_lookup(512 * 1024 * 1024); // 512 MB
 
-        Box::new(DB::open(&options, path).expect("unable to open rocks db"))
+        options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
+        options.set_max_subcompactions(8);
+
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024); // 256 mb
+
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        options.set_level_compaction_dynamic_level_bytes(true);
+        options.set_bytes_per_sync(1048576);
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_block_size(16 * 1024);
+        block_options.set_format_version(5);
+        block_options.set_cache_index_and_filter_blocks(true);
+        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
+        block_options.set_ribbon_filter(10.0);
+
+        options.set_block_based_table_factory(&block_options);
+        options.set_row_cache(&cache);
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+        options.optimize_for_point_lookup(512); // 512 MB
+
+        let db = DB::open(&options, path).expect("unable to open rocks db");
+
+        Self { db, _cache: cache }
     }
 }
 
-impl<K, V> Kv<K, V> for rocksdb::DB
+impl<K, V> Kv<K, V> for RocksDbStore
 where
     K: Serialize + DeserializeOwned + 'static,
     V: Serialize + DeserializeOwned + 'static,
 {
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.get(key).expect("failed to retrieve key")
+        self.db.get(key).expect("failed to retrieve key")
     }
 
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>) {
-        self.put(key, value).expect("failed to insert value");
+        self.db.put(key, value).expect("failed to insert value");
     }
 
     fn flush(&self) {
-        if let Err(err) = self.flush() {
+        if let Err(err) = self.db.flush() {
             match err.kind() {
                 rocksdb::ErrorKind::NotSupported => {}
                 _ => panic!("failed to flush: {err:?}"),
@@ -70,7 +93,7 @@ where
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
-        let iter = self.iterator(IteratorMode::Start);
+        let iter = self.db.iterator(IteratorMode::Start);
 
         Box::new(IntoIter {
             inner: iter,
@@ -80,7 +103,7 @@ where
     }
 
     fn delete_raw(&mut self, key: &[u8]) {
-        rocksdb::DB::delete(self, key).unwrap();
+        self.db.delete(key).unwrap();
     }
 }
 

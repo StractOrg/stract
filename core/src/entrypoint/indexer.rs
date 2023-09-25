@@ -257,6 +257,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
             if let Err(err) = index.insert(webpage) {
                 warn!("{:?}", err);
+                panic!();
             }
         }
 

@@ -176,7 +176,9 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
-        let attribute_occurrences = RocksDbStore::open(path.as_ref().join("attribute_occurrences"));
+        let attribute_occurrences = Box::new(RocksDbStore::open(
+            path.as_ref().join("attribute_occurrences"),
+        ));
 
         let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
             .lines()

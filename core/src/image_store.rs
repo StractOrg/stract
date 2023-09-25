@@ -92,7 +92,7 @@ impl BaseImageStore {
     }
 
     fn open_with_filters<P: AsRef<Path>>(path: P, filters: Vec<Box<dyn ImageFilter>>) -> Self {
-        let store = RocksDbStore::open(path);
+        let store = Box::new(RocksDbStore::open(path));
 
         Self { store, filters }
     }
