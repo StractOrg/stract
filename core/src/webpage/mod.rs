@@ -113,6 +113,7 @@ impl<const N: usize> Preprocessor<N> {
     }
 }
 
+#[derive(Debug)]
 pub struct Webpage {
     pub html: Html,
     pub backlink_labels: Vec<String>,

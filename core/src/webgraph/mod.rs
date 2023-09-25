@@ -15,14 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod segment;
 
-use std::collections::{BTreeMap, BinaryHeap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
 
-use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -33,7 +32,7 @@ use crate::intmap;
 
 pub mod centrality;
 mod store;
-use self::segment::StoredSegment;
+use self::segment::{Segment, SegmentWriter};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
 
@@ -230,43 +229,17 @@ pub fn normalize_url(url: &Url) -> String {
     normalized
 }
 
-#[derive(Default, Clone, Copy)]
-pub enum Deduplication {
-    /// Do not deduplicate the inserted edges in the segment. Only deduplicate
-    /// the edges when querying all the segments.
-    OnlyQuery,
-    /// Deduplicate the inserted edges in the segmnt by first checking if the
-    /// edge is already present in the segment.
-    #[default]
-    QueryAndInserts,
-}
-
 pub struct WebgraphBuilder {
     path: Box<Path>,
     executor: Executor,
-    deduplication: Deduplication,
 }
 
 impl WebgraphBuilder {
-    #[cfg(test)]
-    pub fn new_memory() -> Self {
-        use crate::gen_temp_path;
-
-        let path = gen_temp_path();
-        Self::new(path)
-    }
-
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self {
             path: path.as_ref().into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
-            deduplication: Deduplication::default(),
         }
-    }
-
-    pub fn deduplication(mut self, deduplication: Deduplication) -> Self {
-        self.deduplication = deduplication;
-        self
     }
 
     pub fn single_threaded(mut self) -> Self {
@@ -275,7 +248,7 @@ impl WebgraphBuilder {
     }
 
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor, self.deduplication)
+        Webgraph::open(self.path, self.executor)
     }
 }
 
@@ -362,9 +335,35 @@ struct Meta {
     comitted_segments: Vec<SegmentID>,
 }
 
-struct SegmentMergeCandidate {
-    segment: StoredSegment,
-    merges: Vec<StoredSegment>,
+impl Meta {
+    fn open<P: AsRef<Path>>(path: P) -> Self {
+        let mut reader = BufReader::new(
+            File::options()
+                .create(true)
+                .write(true)
+                .read(true)
+                .open(path)
+                .unwrap(),
+        );
+        let mut buf = String::new();
+        reader.read_to_string(&mut buf).unwrap();
+        serde_json::from_str(&buf).unwrap_or_default()
+    }
+
+    fn save<P: AsRef<Path>>(&self, path: P) {
+        let mut writer = BufWriter::new(
+            File::options()
+                .create(true)
+                .write(true)
+                .read(true)
+                .truncate(true)
+                .open(path)
+                .unwrap(),
+        );
+
+        let json = serde_json::to_string_pretty(&self).unwrap();
+        writer.write_all(json.as_bytes()).unwrap();
+    }
 }
 
 struct Id2NodeDb {
@@ -447,82 +446,50 @@ impl Id2NodeDb {
     }
 }
 
-pub struct Webgraph {
+pub struct WebgraphWriter {
     pub path: String,
-    segments: Vec<StoredSegment>,
-    executor: Arc<Executor>,
+    segment: SegmentWriter,
     insert_batch: Vec<Edge<String>>,
     id2node: Id2NodeDb,
+    executor: Executor,
     meta: Meta,
-    deduplication: Deduplication,
 }
 
-impl Webgraph {
+impl WebgraphWriter {
     fn meta<P: AsRef<Path>>(path: P) -> Meta {
         let meta_path = path.as_ref().join("metadata.json");
-        let mut reader = BufReader::new(
-            File::options()
-                .create(true)
-                .write(true)
-                .read(true)
-                .open(meta_path)
-                .unwrap(),
-        );
-        let mut buf = String::new();
-        reader.read_to_string(&mut buf).unwrap();
-        serde_json::from_str(&buf).unwrap_or_default()
+        Meta::open(meta_path)
     }
 
     fn save_metadata(&mut self) {
         let path = Path::new(&self.path).join("metadata.json");
-        let mut writer = BufWriter::new(
-            File::options()
-                .create(true)
-                .write(true)
-                .read(true)
-                .truncate(true)
-                .open(path)
-                .unwrap(),
-        );
-
-        let json = serde_json::to_string_pretty(&self.meta).unwrap();
-        writer.write_all(json.as_bytes()).unwrap();
+        self.meta.save(path);
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor, deduplication: Deduplication) -> Self {
+    pub fn new<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
         let mut meta = Self::meta(&path);
+        meta.comitted_segments.clear();
 
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
 
-        let mut segments = Vec::new();
-        for segment in &meta.comitted_segments {
-            segments.push(StoredSegment::open(
-                path.as_ref().join("segments"),
-                segment.clone(),
-                deduplication,
-            ));
-        }
+        let id = uuid::Uuid::new_v4().to_string();
+        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone());
 
-        if segments.is_empty() {
-            segments.push(StoredSegment::open(
-                path.as_ref().join("segments"),
-                uuid::Uuid::new_v4().to_string(),
-                deduplication,
-            ));
-
-            meta.comitted_segments.push(segments[0].id());
-        }
+        meta.comitted_segments.push(id);
 
         Self {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            deduplication,
-            segments,
-            executor: Arc::new(executor),
+            segment,
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
             insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
+            executor,
             meta,
         }
+    }
+
+    pub fn id2node(&self, id: &NodeID) -> Option<Node> {
+        self.id2node.get(id)
     }
 
     fn id_or_assign(&mut self, node: &Node) -> NodeID {
@@ -551,9 +518,68 @@ impl Webgraph {
         }
     }
 
-    pub fn merge(&mut self, mut other: Webgraph) {
-        other.commit();
+    pub fn commit(&mut self) {
+        if !self.insert_batch.is_empty() {
+            self.segment.insert(&self.insert_batch);
+            self.segment.flush();
+            self.insert_batch.clear();
+        }
 
+        self.save_metadata();
+        self.id2node.flush();
+    }
+
+    pub fn finalize(mut self) -> Webgraph {
+        self.commit();
+
+        Webgraph {
+            path: self.path,
+            segments: vec![self.segment.finalize()],
+            executor: self.executor.into(),
+            id2node: self.id2node,
+            meta: self.meta,
+        }
+    }
+}
+
+pub struct Webgraph {
+    pub path: String,
+    segments: Vec<Segment>,
+    executor: Arc<Executor>,
+    id2node: Id2NodeDb,
+    meta: Meta,
+}
+
+impl Webgraph {
+    fn meta<P: AsRef<Path>>(path: P) -> Meta {
+        let meta_path = path.as_ref().join("metadata.json");
+        Meta::open(meta_path)
+    }
+
+    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
+        fs::create_dir_all(&path).unwrap();
+        let meta = Self::meta(&path);
+
+        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
+
+        let mut segments = Vec::new();
+        for segment in &meta.comitted_segments {
+            segments.push(Segment::open(
+                path.as_ref().join("segments"),
+                segment.clone(),
+            ));
+        }
+
+        Self {
+            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
+            segments,
+            executor: Arc::new(executor),
+            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
+            meta,
+        }
+    }
+
+    pub fn merge(&mut self, other: Webgraph) {
         self.id2node.batch_put(other.id2node.iter());
 
         for segment in other.segments {
@@ -563,41 +589,20 @@ impl Webgraph {
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments
-                .push(StoredSegment::open(new_path, id, self.deduplication));
+            self.segments.push(Segment::open(new_path, id));
         }
 
-        self.commit();
-    }
-
-    pub fn commit(&mut self) {
-        if !self.insert_batch.is_empty() {
-            let seg = self.segments.last_mut().unwrap();
-            seg.insert(&self.insert_batch);
-            seg.flush();
-            self.insert_batch.clear();
-        }
-
-        self.save_metadata();
         self.id2node.flush();
-
-        if self.segments.len() > 2 * num_cpus::get() {
-            self.merge_segments(num_cpus::get());
-        }
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        let dedup = match self.deduplication {
-            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
-                |edges: &mut Vec<Edge<String>>| {
-                    edges.sort_by_key(|e| e.from);
-                    edges.dedup_by_key(|e| e.from);
-                }
-            }
+        let dedup = |edges: &mut Vec<Edge<String>>| {
+            edges.sort_by_key(|e| e.from);
+            edges.dedup_by_key(|e| e.from);
         };
 
         self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(&node.id()).collect_vec(),
+            |segment| segment.ingoing_edges_with_label(&node.id()),
             dedup,
         )
         .into_iter()
@@ -610,46 +615,31 @@ impl Webgraph {
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        let dedup = match self.deduplication {
-            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
-                |edges: &mut Vec<Edge<()>>| {
-                    edges.sort_by_key(|e| e.from);
-                    edges.dedup_by_key(|e| e.from);
-                }
-            }
+        let dedup = |edges: &mut Vec<Edge<()>>| {
+            edges.sort_by_key(|e| e.from);
+            edges.dedup_by_key(|e| e.from);
         };
 
-        self.inner_edges(|segment| segment.ingoing_edges(node).collect_vec(), dedup)
+        self.inner_edges(|segment| segment.ingoing_edges(node), dedup)
     }
 
     pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
-        let dedup = match self.deduplication {
-            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
-                |edges: &mut Vec<Edge<String>>| {
-                    edges.sort_by_key(|e| e.from);
-                    edges.dedup_by_key(|e| e.from);
-                }
-            }
+        let dedup = |edges: &mut Vec<Edge<String>>| {
+            edges.sort_by_key(|e| e.from);
+            edges.dedup_by_key(|e| e.from);
         };
 
-        self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(node).collect_vec(),
-            dedup,
-        )
+        self.inner_edges(|segment| segment.ingoing_edges_with_label(node), dedup)
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
-        let dedup = match self.deduplication {
-            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
-                |edges: &mut Vec<Edge<String>>| {
-                    edges.sort_by_key(|e| e.to);
-                    edges.dedup_by_key(|e| e.to);
-                }
-            }
+        let dedup = |edges: &mut Vec<Edge<String>>| {
+            edges.sort_by_key(|e| e.to);
+            edges.dedup_by_key(|e| e.to);
         };
 
         self.inner_edges(
-            |segment| segment.outgoing_edges_with_label(&node.id()).collect_vec(),
+            |segment| segment.outgoing_edges_with_label(&node.id()),
             dedup,
         )
         .into_iter()
@@ -662,22 +652,18 @@ impl Webgraph {
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        let dedup = match self.deduplication {
-            Deduplication::OnlyQuery | Deduplication::QueryAndInserts => {
-                |edges: &mut Vec<Edge<()>>| {
-                    edges.sort_by_key(|e| e.to);
-                    edges.dedup_by_key(|e| e.to);
-                }
-            }
+        let dedup = |edges: &mut Vec<Edge<()>>| {
+            edges.sort_by_key(|e| e.to);
+            edges.dedup_by_key(|e| e.to);
         };
 
-        self.inner_edges(|segment| segment.outgoing_edges(node).collect_vec(), dedup)
+        self.inner_edges(|segment| segment.outgoing_edges(node), dedup)
     }
 
     fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
     where
         L: EdgeLabel,
-        F1: Sized + Sync + Fn(&StoredSegment) -> Vec<Edge<L>>,
+        F1: Sized + Sync + Fn(&Segment) -> Vec<Edge<L>>,
         F2: Fn(&mut Vec<Edge<L>>),
     {
         let mut edges: Vec<_> = self
@@ -717,65 +703,6 @@ impl Webgraph {
             .par_iter()
             .flat_map(|segment| segment.edges().par_bridge())
     }
-
-    pub fn merge_segments(&mut self, num_segments: usize) {
-        if num_segments >= self.segments.len() {
-            return;
-        }
-
-        self.segments
-            .sort_by_key(|segment| std::cmp::Reverse(segment.estimate_num_nodes()));
-
-        let mut candidates = Vec::with_capacity(num_segments);
-
-        for segment in self.segments.drain(0..num_segments) {
-            candidates.push(SegmentMergeCandidate {
-                segment,
-                merges: Vec::new(),
-            });
-        }
-
-        let num_candidates = candidates.len();
-
-        for (next_candidate, segment) in self.segments.drain(0..).enumerate() {
-            candidates[next_candidate % num_candidates]
-                .merges
-                .push(segment);
-        }
-
-        self.segments = self
-            .executor
-            .map(
-                |mut candidate| {
-                    let mut segments = vec![candidate.segment];
-                    segments.append(&mut candidate.merges);
-
-                    StoredSegment::merge(segments)
-                },
-                candidates.into_iter(),
-            )
-            .unwrap();
-
-        self.meta.comitted_segments = self.segments.iter().map(|segment| segment.id()).collect();
-        self.save_metadata();
-
-        self.garbage_collect();
-    }
-
-    fn garbage_collect(&self) {
-        let path = Path::new(&self.path).join("segments");
-        let segments: HashSet<_> = self.meta.comitted_segments.iter().cloned().collect();
-
-        for path in fs::read_dir(path).unwrap() {
-            let path = path.unwrap();
-            let file_name = path.file_name();
-            let name = file_name.as_os_str().to_str().unwrap();
-
-            if !segments.contains(name) {
-                fs::remove_dir_all(path.path()).unwrap();
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -804,7 +731,7 @@ mod test {
         //        │
         //        D
 
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut graph = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
 
         for (from, to, label) in test_edges() {
             graph.insert(from, to, label);
@@ -812,69 +739,7 @@ mod test {
 
         graph.commit();
 
-        graph
-    }
-
-    fn verify_graph(graph: &Webgraph) {
-        let mut res = graph.outgoing_edges(Node::from("A"));
-        res.sort_by(|a, b| a.to.name.cmp(&b.to.name));
-
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("B"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                }
-            ]
-        );
-
-        let mut res = graph.ingoing_edges(Node::from("C"));
-        res.sort_by(|a, b| a.from.name.cmp(&b.from.name));
-
-        assert_eq!(
-            res,
-            vec![
-                FullEdge {
-                    from: Node::from("A"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("B"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-                FullEdge {
-                    from: Node::from("D"),
-                    to: Node::from("C"),
-                    label: String::new()
-                },
-            ]
-        );
-
-        let res = graph.outgoing_edges(Node::from("D"));
-
-        assert_eq!(
-            res,
-            vec![FullEdge {
-                from: Node::from("D"),
-                to: Node::from("C"),
-                label: String::new()
-            },]
-        );
-
-        let distances = graph.distances(Node::from("D"));
-
-        assert_eq!(distances.get(&Node::from("C")), Some(&1));
-        assert_eq!(distances.get(&Node::from("A")), Some(&2));
-        assert_eq!(distances.get(&Node::from("B")), Some(&3));
+        graph.finalize()
     }
 
     #[test]
@@ -924,10 +789,9 @@ mod test {
             (Node::from("F"), Node::from("G"), String::new()),
             (Node::from("G"), Node::from("H"), String::new()),
         ] {
-            let mut graph = WebgraphBuilder::new_memory().open();
-            graph.insert(from.clone(), to.clone(), label.clone());
-            graph.commit();
-            graphs.push(graph);
+            let mut wrt = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+            wrt.insert(from.clone(), to.clone(), label.clone());
+            graphs.push(wrt.finalize());
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -940,12 +804,6 @@ mod test {
             graph.distances(Node::from("A")).get(&Node::from("H")),
             Some(&7)
         );
-
-        graph.merge_segments(1);
-        assert_eq!(
-            graph.distances(Node::from("A")).get(&Node::from("H")),
-            Some(&7)
-        )
     }
     #[test]
     fn merge_cycle() {
@@ -956,10 +814,9 @@ mod test {
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
         ] {
-            let mut graph = WebgraphBuilder::new_memory().open();
-            graph.insert(from.clone(), to.clone(), label.clone());
-            graph.commit();
-            graphs.push(graph);
+            let mut wrt = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+            wrt.insert(from.clone(), to.clone(), label.clone());
+            graphs.push(wrt.finalize());
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -972,12 +829,6 @@ mod test {
             graph.distances(Node::from("A")).get(&Node::from("C")),
             Some(&2)
         );
-
-        graph.merge_segments(1);
-        assert_eq!(
-            graph.distances(Node::from("A")).get(&Node::from("C")),
-            Some(&2)
-        )
     }
 
     #[test]
@@ -1000,41 +851,16 @@ mod test {
     }
 
     #[test]
-    fn merge_segments() {
-        let mut graph = WebgraphBuilder::new_memory().open();
-
-        let edges = test_edges();
-        let num_edges = edges.len();
-
-        for (from, to, label) in test_edges() {
-            let mut tmp_graph = WebgraphBuilder::new_memory().open();
-            tmp_graph.insert(from, to, label);
-            tmp_graph.commit();
-            graph.merge(tmp_graph);
-        }
-
-        graph.commit();
-
-        assert!(graph.segments.len() >= num_edges);
-        verify_graph(&graph);
-
-        graph.merge_segments(2);
-        assert_eq!(graph.segments.len(), 2);
-
-        verify_graph(&graph);
-    }
-
-    #[test]
     fn cap_label_length() {
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut writer = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
 
-        graph.insert(
+        writer.insert(
             Node::from("A"),
             Node::from("B"),
             "a".repeat(MAX_LABEL_LENGTH + 1),
         );
 
-        graph.commit();
+        let graph = writer.finalize();
 
         assert_eq!(graph.segments.len(), 1);
         assert_eq!(

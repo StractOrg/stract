@@ -237,9 +237,9 @@ impl HarmonicCentrality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webgraph::{Node, WebgraphBuilder};
+    use crate::webgraph::{Node, WebgraphWriter};
 
-    fn test_graph() -> Webgraph {
+    fn test_edges() -> Vec<(Node, Node, String)> {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -250,96 +250,107 @@ mod tests {
         //        │
         //        │
         //        D
+        vec![
+            (Node::from("A"), Node::from("B"), String::new()),
+            (Node::from("B"), Node::from("C"), String::new()),
+            (Node::from("A"), Node::from("C"), String::new()),
+            (Node::from("C"), Node::from("A"), String::new()),
+            (Node::from("D"), Node::from("C"), String::new()),
+        ]
+    }
 
-        let mut graph = WebgraphBuilder::new_memory().open();
+    fn test_graph() -> Webgraph {
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+        );
 
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.insert(Node::from("B"), Node::from("C"), String::new());
-        graph.insert(Node::from("A"), Node::from("C"), String::new());
-        graph.insert(Node::from("C"), Node::from("A"), String::new());
-        graph.insert(Node::from("D"), Node::from("C"), String::new());
+        for (from, to, label) in test_edges() {
+            writer.insert(from, to, label);
+        }
 
-        graph.commit();
-
-        graph
+        writer.finalize()
     }
 
     #[test]
     fn host_harmonic_centrality() {
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+        );
 
-        graph.insert(
+        writer.insert(
             Node::from("A.com/1").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/1").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/1").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("C.com").into_host(),
             Node::from("B.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("D.com").into_host(),
             Node::from("B.com").into_host(),
             String::new(),
         );
 
-        graph.commit();
+        let graph = writer.finalize();
 
         let centrality = HarmonicCentrality::calculate(&graph);
 
@@ -367,51 +378,37 @@ mod tests {
 
     #[test]
     fn additional_edges_ignored() {
-        let mut graph = test_graph();
-
+        let graph = test_graph();
         let centrality = HarmonicCentrality::calculate(&graph);
 
-        graph.insert(Node::from("A"), Node::from("B"), "1".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "2".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "3".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "4".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "5".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "6".to_string());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("B"), "7".to_string());
-        graph.commit();
+        let mut other = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+        );
+
+        for (from, to, label) in test_edges() {
+            other.insert(from, to, label);
+        }
+
+        other.insert(Node::from("A"), Node::from("B"), "1".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "2".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "3".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "4".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "5".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "6".to_string());
+        other.commit();
+        other.insert(Node::from("A"), Node::from("B"), "7".to_string());
+        other.commit();
+
+        let graph = other.finalize();
 
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 
         assert_eq!(centrality.0, centrality_extra.0);
-    }
-
-    #[test]
-    fn same_centrality_after_segment_merge() {
-        let mut graph = WebgraphBuilder::new_memory().open();
-
-        graph.insert(Node::from("A"), Node::from("B"), String::new());
-        graph.commit();
-        graph.insert(Node::from("B"), Node::from("C"), String::new());
-        graph.commit();
-        graph.insert(Node::from("A"), Node::from("C"), String::new());
-        graph.commit();
-        graph.insert(Node::from("C"), Node::from("A"), String::new());
-        graph.commit();
-        graph.insert(Node::from("D"), Node::from("C"), String::new());
-        graph.commit();
-
-        graph.merge_segments(1);
-        let centrality = HarmonicCentrality::calculate(&graph);
-
-        let orig_graph = test_graph();
-        let orig_centrality = HarmonicCentrality::calculate(&orig_graph);
-
-        assert_eq!(centrality.0, orig_centrality.0);
     }
 }

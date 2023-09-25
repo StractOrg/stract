@@ -23,7 +23,7 @@ mod tests {
         index::Index,
         ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphBuilder},
+        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
@@ -32,50 +32,51 @@ mod tests {
     fn site_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut wrt =
+            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
 
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.first.com").into_host(),
             Node::from("https://www.nan.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.nan.com").into_host(),
             Node::from("https://www.first.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.third.com").into_host(),
             Node::from("https://www.third.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.nan.com").into_host(),
             Node::from("https://www.second.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.nan.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.third.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.extra.com").into_host(),
             Node::from("https://www.first.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.extra.com").into_host(),
             String::new(),
         );
 
-        graph.commit();
+        let graph = wrt.finalize();
 
         index
             .insert(Webpage {

@@ -158,13 +158,10 @@ enum WebgraphOptions {
     /// Create a new webgraph.
     Create { config_path: String },
 
-    /// Merge multiple webgraphs into a single graph with the specified number of segments.
-    /// Can also be used to merge segments of a single webgraph.
+    /// Merge multiple webgraphs into a single graph.
     Merge {
         #[clap(required = true)]
         paths: Vec<String>,
-        #[clap(long)]
-        num_segments: Option<usize>,
     },
 
     /// Deploy the webgraph server. The webgraph server is responsible for serving the webgraph to the search servers.
@@ -246,20 +243,13 @@ fn main() -> Result<()> {
                 let config = load_toml_config(config_path);
                 entrypoint::Webgraph::run(&config)?;
             }
-            WebgraphOptions::Merge {
-                mut paths,
-                num_segments,
-            } => {
+            WebgraphOptions::Merge { mut paths } => {
                 let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open();
 
                 for other_path in paths {
                     let other = WebgraphBuilder::new(&other_path).open();
                     webgraph.merge(other);
                     std::fs::remove_dir_all(other_path).unwrap();
-                }
-
-                if let Some(num_segments) = num_segments {
-                    webgraph.merge_segments(num_segments)
                 }
             }
             WebgraphOptions::Server { config_path } => {

@@ -214,7 +214,7 @@ mod tests {
         rand_words,
         ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphBuilder},
+        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
@@ -222,19 +222,20 @@ mod tests {
 
     #[test]
     fn it_favors_liked_sites() {
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut wrt =
+            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
 
-        graph.insert(Node::from("a.com"), Node::from("b.com"), String::new());
-        graph.insert(Node::from("c.com"), Node::from("d.com"), String::new());
-        graph.insert(Node::from("a.com"), Node::from("e.com"), String::new());
+        wrt.insert(Node::from("a.com"), Node::from("b.com"), String::new());
+        wrt.insert(Node::from("c.com"), Node::from("d.com"), String::new());
+        wrt.insert(Node::from("a.com"), Node::from("e.com"), String::new());
 
-        graph.insert(Node::from("z.com"), Node::from("a.com"), String::new());
-        graph.insert(Node::from("z.com"), Node::from("b.com"), String::new());
-        graph.insert(Node::from("z.com"), Node::from("c.com"), String::new());
-        graph.insert(Node::from("z.com"), Node::from("d.com"), String::new());
-        graph.insert(Node::from("z.com"), Node::from("e.com"), String::new());
+        wrt.insert(Node::from("z.com"), Node::from("a.com"), String::new());
+        wrt.insert(Node::from("z.com"), Node::from("b.com"), String::new());
+        wrt.insert(Node::from("z.com"), Node::from("c.com"), String::new());
+        wrt.insert(Node::from("z.com"), Node::from("d.com"), String::new());
+        wrt.insert(Node::from("z.com"), Node::from("e.com"), String::new());
 
-        graph.commit();
+        let graph = wrt.finalize();
 
         let inbound = InboundSimilarity::build(&graph);
 
@@ -247,14 +248,17 @@ mod tests {
 
     #[test]
     fn it_ranks_search_results() {
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut wrt = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+        );
 
-        graph.insert(Node::from("b.com"), Node::from("a.com"), String::new());
-        graph.insert(Node::from("c.com"), Node::from("d.com"), String::new());
-        graph.insert(Node::from("b.com"), Node::from("e.com"), String::new());
-        graph.insert(Node::from("c.com"), Node::from("b.com"), String::new());
+        wrt.insert(Node::from("b.com"), Node::from("a.com"), String::new());
+        wrt.insert(Node::from("c.com"), Node::from("d.com"), String::new());
+        wrt.insert(Node::from("b.com"), Node::from("e.com"), String::new());
+        wrt.insert(Node::from("c.com"), Node::from("b.com"), String::new());
 
-        graph.commit();
+        let graph = wrt.finalize();
 
         let inbound = InboundSimilarity::build(&graph);
 

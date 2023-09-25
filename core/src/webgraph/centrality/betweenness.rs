@@ -163,35 +163,25 @@ impl Betweenness {
 mod tests {
     use maplit::hashmap;
 
-    use crate::webgraph::WebgraphBuilder;
+    use crate::webgraph::WebgraphWriter;
 
     use super::*;
 
     fn create_path_graph(n: usize) -> Webgraph {
-        //     ┌────┐
-        //     │    │
-        // ┌───A◄─┐ │
-        // │      │ │
-        // ▼      │ │
-        // B─────►C◄┘
-        //        ▲
-        //        │
-        //        │
-        //        D
-
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+        );
 
         for i in 0..n - 1 {
-            graph.insert(
+            writer.insert(
                 Node::from(i.to_string()),
                 Node::from((i + 1).to_string()),
                 String::new(),
             );
         }
 
-        graph.commit();
-
-        graph
+        writer.finalize()
     }
 
     #[test]

@@ -240,7 +240,7 @@ mod tests {
         index::Index,
         ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphBuilder},
+        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
@@ -622,37 +622,38 @@ mod tests {
     fn liked_sites() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut graph = WebgraphBuilder::new_memory().open();
+        let mut writer =
+            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
 
-        graph.insert(
+        writer.insert(
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.a.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("https://www.a.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
         );
 
-        graph.insert(
+        writer.insert(
             Node::from("https://www.c.com").into_host(),
             Node::from("https://www.c.com").into_host(),
             String::new(),
         );
 
-        graph.insert(
+        writer.insert(
             Node::from("https://www.b.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
         );
-        graph.insert(
+        writer.insert(
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.b.com").into_host(),
             String::new(),
         );
 
-        graph.commit();
+        let graph = writer.finalize();
 
         let centrality_store = CentralityStore::build(&graph, gen_temp_path());
 

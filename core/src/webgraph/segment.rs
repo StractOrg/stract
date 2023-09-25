@@ -16,38 +16,34 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{store::EdgeStore, Deduplication, Edge, NodeID};
+use super::{
+    store::{EdgeStore, EdgeStoreWriter},
+    Edge, NodeID,
+};
 
 const ADJACENCY_STORE: &str = "adjacency";
 const REVERSED_ADJACENCY_STORE: &str = "reversed_adjacency";
 
-pub struct StoredSegment {
-    full_adjacency: EdgeStore,
-    full_reversed_adjacency: EdgeStore,
+pub struct SegmentWriter {
+    full_adjacency: EdgeStoreWriter,
+    full_reversed_adjacency: EdgeStoreWriter,
     id: String,
     folder_path: String,
 }
 
-impl StoredSegment {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, dedup: Deduplication) -> Self {
-        let dedup_insert = match dedup {
-            Deduplication::OnlyQuery => false,
-            Deduplication::QueryAndInserts => true,
-        };
-
-        StoredSegment {
-            full_adjacency: EdgeStore::open(
+impl SegmentWriter {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+        SegmentWriter {
+            full_adjacency: EdgeStoreWriter::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 false,
-                dedup_insert,
             ),
-            full_reversed_adjacency: EdgeStore::open(
+            full_reversed_adjacency: EdgeStoreWriter::open(
                 folder_path
                     .as_ref()
                     .join(&id)
                     .join(REVERSED_ADJACENCY_STORE),
                 true,
-                dedup_insert,
             ),
             folder_path: folder_path
                 .as_ref()
@@ -59,35 +55,73 @@ impl StoredSegment {
         }
     }
 
-    pub fn estimate_num_nodes(&self) -> usize {
-        self.full_adjacency.estimate_len()
-    }
+    pub fn finalize(mut self) -> Segment {
+        self.flush();
 
-    pub fn outgoing_edges_with_label(
-        &self,
-        node: &NodeID,
-    ) -> impl Iterator<Item = Edge<String>> + '_ {
-        self.full_adjacency.get(*node)
-    }
-
-    pub fn outgoing_edges(&self, node: &NodeID) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.full_adjacency.get(*node)
-    }
-
-    pub fn ingoing_edges_with_label(
-        &self,
-        node: &NodeID,
-    ) -> impl Iterator<Item = Edge<String>> + '_ {
-        self.full_reversed_adjacency.get(*node)
-    }
-
-    pub fn ingoing_edges(&self, node: &NodeID) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.full_reversed_adjacency.get(*node)
+        Segment {
+            full_adjacency: self.full_adjacency.finalize(),
+            full_reversed_adjacency: self.full_reversed_adjacency.finalize(),
+            folder_path: self.folder_path,
+            id: self.id,
+        }
     }
 
     pub fn flush(&mut self) {
         self.full_adjacency.flush();
         self.full_reversed_adjacency.flush();
+    }
+
+    pub fn insert(&mut self, edges: &[Edge<String>]) {
+        self.full_adjacency.put(edges.iter());
+        self.full_reversed_adjacency.put(edges.iter());
+    }
+}
+
+pub struct Segment {
+    full_adjacency: EdgeStore,
+    full_reversed_adjacency: EdgeStore,
+    id: String,
+    folder_path: String,
+}
+
+impl Segment {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+        Segment {
+            full_adjacency: EdgeStore::open(
+                folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
+                false,
+            ),
+            full_reversed_adjacency: EdgeStore::open(
+                folder_path
+                    .as_ref()
+                    .join(&id)
+                    .join(REVERSED_ADJACENCY_STORE),
+                true,
+            ),
+            folder_path: folder_path
+                .as_ref()
+                .as_os_str()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            id,
+        }
+    }
+
+    pub fn outgoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
+        self.full_adjacency.get_with_label(node)
+    }
+
+    pub fn outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+        self.full_adjacency.get_without_label(node)
+    }
+
+    pub fn ingoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
+        self.full_reversed_adjacency.get_with_label(node)
+    }
+
+    pub fn ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+        self.full_reversed_adjacency.get_without_label(node)
     }
 
     pub fn id(&self) -> String {
@@ -99,35 +133,7 @@ impl StoredSegment {
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
-        self.full_adjacency.iter()
-    }
-
-    fn merge_with(&self, other: &StoredSegment) {
-        self.full_adjacency.merge_with(&other.full_adjacency);
-        self.full_reversed_adjacency
-            .merge_with(&other.full_reversed_adjacency);
-    }
-
-    pub fn merge(mut segments: Vec<StoredSegment>) -> Self {
-        debug_assert!(!segments.is_empty());
-
-        if segments.len() == 1 {
-            let mut segments = segments;
-            return segments.pop().unwrap();
-        }
-
-        let segment = segments.remove(0);
-
-        for other in segments {
-            segment.merge_with(&other);
-        }
-
-        segment
-    }
-
-    pub fn insert(&mut self, edges: &[Edge<String>]) {
-        self.full_adjacency.put(edges.iter());
-        self.full_reversed_adjacency.put(edges.iter());
+        self.full_adjacency.iter_without_label()
     }
 }
 
@@ -144,11 +150,7 @@ mod test {
         // ▼      │ │
         // 1─────►2◄┘
 
-        let mut store = StoredSegment::open(
-            crate::gen_temp_path(),
-            "test".to_string(),
-            Deduplication::OnlyQuery,
-        );
+        let mut writer = SegmentWriter::open(crate::gen_temp_path(), "test".to_string());
 
         let mut edges = Vec::new();
 
@@ -177,10 +179,10 @@ mod test {
             label: String::new(),
         });
 
-        store.insert(&edges);
-        store.flush();
+        writer.insert(&edges);
+        let segment = writer.finalize();
 
-        let mut out: Vec<_> = store.outgoing_edges(&a).collect();
+        let mut out: Vec<_> = segment.outgoing_edges(&a);
 
         out.sort_by(|a, b| a.to.cmp(&b.to));
 
@@ -200,7 +202,7 @@ mod test {
             ]
         );
 
-        let mut out: Vec<_> = store.outgoing_edges(&b).collect();
+        let mut out: Vec<_> = segment.outgoing_edges(&b);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
@@ -211,7 +213,7 @@ mod test {
             },]
         );
 
-        let mut out: Vec<_> = store.outgoing_edges(&c).collect();
+        let mut out: Vec<_> = segment.outgoing_edges(&c);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
@@ -222,7 +224,7 @@ mod test {
             },]
         );
 
-        let out: Vec<_> = store.ingoing_edges(&a).collect();
+        let out: Vec<_> = segment.ingoing_edges(&a);
         assert_eq!(
             out,
             vec![Edge {
@@ -232,7 +234,7 @@ mod test {
             },]
         );
 
-        let out: Vec<_> = store.ingoing_edges(&b).collect();
+        let out: Vec<_> = segment.ingoing_edges(&b);
         assert_eq!(
             out,
             vec![Edge {
@@ -242,7 +244,7 @@ mod test {
             },]
         );
 
-        let mut out: Vec<_> = store.ingoing_edges(&c).collect();
+        let mut out: Vec<_> = segment.ingoing_edges(&c);
         out.sort_by(|a, b| a.from.cmp(&b.from));
         assert_eq!(
             out,

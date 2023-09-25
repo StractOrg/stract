@@ -146,7 +146,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
             let node = Node::from(html.url());
             let host_node_id = node.clone().into_host().id();
 
-            let host_centrality = worker
+            let mut host_centrality = worker
                 .host_centrality_store
                 .harmonic
                 .get(&host_node_id)
@@ -184,6 +184,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                         .raw_ingoing_edges_with_labels(&Node::from(html.url()).id())
                         .into_iter()
                         .map(|edge| edge.label)
+                        .filter(|label| !label.is_empty())
                         .collect()
                 })
                 .unwrap_or_default();
@@ -206,6 +207,14 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
             if !backlink_labels.is_empty() {
                 has_backlinks = true;
+            }
+
+            if !page_centrality.is_normal() {
+                page_centrality = 0.0;
+            }
+
+            if !host_centrality.is_normal() {
+                host_centrality = 0.0;
             }
 
             let fetch_time_ms = record.metadata.fetch_time_ms as u64;
