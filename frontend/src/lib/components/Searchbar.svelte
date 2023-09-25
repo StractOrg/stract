@@ -81,7 +81,12 @@
   let hasFocus = autofocus;
 </script>
 
-<form action="/search" class="flex w-full justify-center" id="searchbar-form" method={$postSearchStore ? "POST" : "GET"}>
+<form
+  action="/search"
+  class="flex w-full justify-center"
+  id="searchbar-form"
+  method={$postSearchStore ? 'POST' : 'GET'}
+>
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
   <input type="hidden" value={$compressedRanked} name="sr" id="siteRankingsUuid" />
 

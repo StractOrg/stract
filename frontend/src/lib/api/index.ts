@@ -16,10 +16,7 @@ export const api = {
     return { data: data.then((res) => res[200]), cancel };
   },
 
-  similarSites: (
-    props: Props<'/beta/api/webgraph/host/similar', 'post'>,
-    options?: ApiOptions,
-  ) => {
+  similarSites: (props: Props<'/beta/api/webgraph/host/similar', 'post'>, options?: ApiOptions) => {
     const { data, cancel } = send(
       '/beta/api/webgraph/host/similar',
       'post',

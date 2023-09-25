@@ -3,14 +3,12 @@
 @tailwind utilities;
 
 @layer base {
-
   :root,
   html {
     @apply theme-light bg-base-100 text-base-content transition-colors duration-300;
   }
 
   @media (prefers-color-scheme: dark) {
-
     :root,
     html {
       @apply theme-dark;

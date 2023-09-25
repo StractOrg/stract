@@ -9,5 +9,5 @@
 </script>
 
 <div class="noscript:hidden">
-    <Select bind:value={$postSearchStore} class="text-neutral-focus" {options} />
+  <Select bind:value={$postSearchStore} class="text-neutral-focus" {options} />
 </div>
