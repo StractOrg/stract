@@ -142,7 +142,7 @@
               class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
-          <label class="hover:cursor-pointer">
+          <label class="flex w-6 items-start hover:cursor-pointer">
             <input
               type="checkbox"
               bind:checked={$opticsShowStore[opticKey(optic)]}
