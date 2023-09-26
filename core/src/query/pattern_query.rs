@@ -106,11 +106,8 @@ impl PatternQuery {
         for pattern in &patterns {
             match pattern {
                 PatternPart::Raw(text) => {
-                    let mut stream = field
-                        .as_text()
-                        .unwrap()
-                        .indexing_tokenizer()
-                        .token_stream(text);
+                    let mut tokenizer = field.as_text().unwrap().indexing_tokenizer();
+                    let mut stream = tokenizer.token_stream(text);
 
                     while let Some(token) = stream.next() {
                         new_patterns.push(PatternPart::Raw(token.text.clone()));
@@ -141,14 +138,17 @@ impl tantivy::query::Query for PatternQuery {
         scoring: tantivy::query::EnableScoring<'_>,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
         let bm25_weight = match scoring {
-            tantivy::query::EnableScoring::Enabled(searcher) => {
+            tantivy::query::EnableScoring::Enabled {
+                searcher,
+                statistics_provider: _,
+            } => {
                 if self.raw_terms.is_empty() {
                     None
                 } else {
                     Some(Bm25Weight::for_terms(searcher, &self.raw_terms)?)
                 }
             }
-            tantivy::query::EnableScoring::Disabled(_) => None,
+            tantivy::query::EnableScoring::Disabled { .. } => None,
         };
 
         if self.can_optimize_site_domain {

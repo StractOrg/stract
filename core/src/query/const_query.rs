@@ -46,13 +46,22 @@ impl Query for ConstQuery {
         enable_scoring: tantivy::query::EnableScoring,
     ) -> tantivy::Result<Box<dyn Weight>> {
         let schema = match enable_scoring {
-            tantivy::query::EnableScoring::Enabled(searcher) => searcher.schema(),
-            tantivy::query::EnableScoring::Disabled(s) => s,
+            tantivy::query::EnableScoring::Enabled {
+                searcher,
+                statistics_provider: _,
+            } => searcher.schema(),
+            tantivy::query::EnableScoring::Disabled {
+                schema,
+                searcher_opt: _,
+            } => schema,
         };
         Ok(Box::new(ConstWeight {
             subweight: self
                 .subquery
-                .weight(tantivy::query::EnableScoring::Disabled(schema))?,
+                .weight(tantivy::query::EnableScoring::Disabled {
+                    schema,
+                    searcher_opt: None,
+                })?,
             score: self.score,
         }))
     }

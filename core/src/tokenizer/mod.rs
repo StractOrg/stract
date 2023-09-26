@@ -55,7 +55,7 @@ impl From<Lang> for MyStemmer {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Tokenizer {
     Normal(Normal),
     Identity(Identity),
@@ -90,9 +90,10 @@ impl Default for Tokenizer {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 pub struct Normal {
     stopwords: Option<Vec<String>>,
+    analyzer: Option<TextAnalyzer>,
 }
 
 impl Normal {
@@ -103,12 +104,15 @@ impl Normal {
     pub fn with_stopwords(stopwords: Vec<String>) -> Self {
         Self {
             stopwords: Some(stopwords),
+            analyzer: None,
         }
     }
 }
 
-#[derive(Clone, Default, Debug)]
-pub struct BigramTokenizer {}
+#[derive(Clone, Default)]
+pub struct BigramTokenizer {
+    inner_tokenizer: Normal,
+}
 
 impl BigramTokenizer {
     pub fn as_str() -> &'static str {
@@ -116,8 +120,10 @@ impl BigramTokenizer {
     }
 }
 
-#[derive(Clone, Default, Debug)]
-pub struct TrigramTokenizer {}
+#[derive(Clone, Default)]
+pub struct TrigramTokenizer {
+    inner_tokenizer: Normal,
+}
 
 impl TrigramTokenizer {
     pub fn as_str() -> &'static str {
@@ -125,9 +131,10 @@ impl TrigramTokenizer {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 pub struct Stemmed {
     force_language: Option<Lang>,
+    analyzer: Option<TextAnalyzer>,
 }
 
 impl Stemmed {
@@ -137,6 +144,7 @@ impl Stemmed {
     pub fn with_forced_language(lang: Lang) -> Self {
         Self {
             force_language: Some(lang),
+            analyzer: None,
         }
     }
 }
@@ -151,7 +159,9 @@ impl Identity {
 }
 
 impl tantivy::tokenizer::Tokenizer for Tokenizer {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
         match self {
             Tokenizer::Normal(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Stemmed(tokenizer) => tokenizer.token_stream(text),
@@ -165,52 +175,70 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
 }
 
 impl tantivy::tokenizer::Tokenizer for Normal {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let mut analyzer = TextAnalyzer::from(Simple).filter(LowerCaser);
+    type TokenStream<'a> = BoxTokenStream<'a>;
 
-        if let Some(stopwords) = &self.stopwords {
-            analyzer = analyzer.filter(StopWordFilter::remove(stopwords.clone()));
-        }
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        let builder = TextAnalyzer::builder(Simple).filter(LowerCaser);
 
-        analyzer.token_stream(text)
+        self.analyzer = if let Some(stopwords) = &self.stopwords {
+            Some(
+                builder
+                    .filter(StopWordFilter::remove(stopwords.clone()))
+                    .build(),
+            )
+        } else {
+            Some(builder.build())
+        };
+
+        self.analyzer.as_mut().unwrap().token_stream(text)
     }
 }
 
 impl tantivy::tokenizer::Tokenizer for Stemmed {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let analyzer = TextAnalyzer::from(Simple).filter(LowerCaser);
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        let builder = TextAnalyzer::builder(Simple).filter(LowerCaser);
 
         let lang = match self.force_language {
             Some(lang) => Some(lang),
             None => whatlang::detect_lang(text),
         };
 
-        match lang {
-            Some(lang) => analyzer.filter(MyStemmer::from(lang).0).token_stream(text),
-            None => analyzer.token_stream(text),
-        }
+        self.analyzer = match lang {
+            Some(lang) => Some(builder.filter(MyStemmer::from(lang).0).build()),
+            None => Some(builder.build()),
+        };
+
+        self.analyzer.as_mut().unwrap().token_stream(text)
     }
 }
 
 impl tantivy::tokenizer::Tokenizer for Identity {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        BoxTokenStream::from(IdentityTokenStream::from(text.to_string()))
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
+        BoxTokenStream::new(IdentityTokenStream::from(text.to_string()))
     }
 }
 
 impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let inner = Normal::default().token_stream(text);
-        let stream: NGramTokenStream<2> = NGramTokenStream::new(inner);
-        BoxTokenStream::from(stream)
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        let inner_stream = self.inner_tokenizer.token_stream(text);
+        let stream: NGramTokenStream<2> = NGramTokenStream::new(inner_stream);
+        BoxTokenStream::new(stream)
     }
 }
 
 impl tantivy::tokenizer::Tokenizer for TrigramTokenizer {
-    fn token_stream<'a>(&self, text: &'a str) -> tantivy::tokenizer::BoxTokenStream<'a> {
-        let inner = Normal::default().token_stream(text);
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        let inner = self.inner_tokenizer.token_stream(text);
         let stream: NGramTokenStream<3> = NGramTokenStream::new(inner);
-        BoxTokenStream::from(stream)
+        BoxTokenStream::new(stream)
     }
 }
 
@@ -275,9 +303,11 @@ pub struct SimpleTokenStream<'a> {
 }
 
 impl tantivy::tokenizer::Tokenizer for Simple {
-    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
         let lexer = Token::lexer(text);
-        BoxTokenStream::from(SimpleTokenStream {
+        BoxTokenStream::new(SimpleTokenStream {
             lexer,
             token: None,
             next_position: 0,
@@ -389,6 +419,7 @@ impl<'a, const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'a
 
 pub struct FlattenedJson {
     flattened_json: String,
+    inner_tokenizer: JsonField,
 }
 
 struct IntermediateFlatValue {
@@ -459,11 +490,14 @@ impl FlattenedJson {
 
         let flattened_json = itertools::intersperse(flatten(val), "\n".to_string()).collect();
 
-        Ok(Self { flattened_json })
+        Ok(Self {
+            flattened_json,
+            inner_tokenizer: JsonField,
+        })
     }
 
-    pub fn token_stream(&self) -> BoxTokenStream {
-        tantivy::tokenizer::Tokenizer::token_stream(&JsonField, &self.flattened_json)
+    pub fn token_stream(&mut self) -> BoxTokenStream {
+        tantivy::tokenizer::Tokenizer::token_stream(&mut self.inner_tokenizer, &self.flattened_json)
     }
 
     pub fn text(&self) -> &str {
@@ -481,8 +515,10 @@ impl JsonField {
 }
 
 impl tantivy::tokenizer::Tokenizer for JsonField {
-    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
-        BoxTokenStream::from(JsonFieldTokenStream {
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
+        BoxTokenStream::new(JsonFieldTokenStream {
             text,
             chars: text.char_indices(),
             token: tantivy::tokenizer::Token::default(),
@@ -578,7 +614,9 @@ impl SiteOperatorUrlTokenizer {
 }
 
 impl tantivy::tokenizer::Tokenizer for SiteOperatorUrlTokenizer {
-    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
         let parsed_url = url::Url::parse(text)
             .or_else(|_| url::Url::parse(&format!("http://{}", text)))
             .map(|url| {
@@ -617,7 +655,7 @@ impl tantivy::tokenizer::Tokenizer for SiteOperatorUrlTokenizer {
             })
             .unwrap_or_default();
 
-        BoxTokenStream::from(SiteOperatorUrlTokenStream {
+        BoxTokenStream::new(SiteOperatorUrlTokenStream {
             url: parsed_url,
             token: tantivy::tokenizer::Token::default(),
         })
@@ -694,7 +732,8 @@ mod tests {
 
     fn tokenize_simple(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = Normal::default().token_stream(s);
+        let mut tokenizer = Normal::default();
+        let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -705,7 +744,8 @@ mod tests {
 
     fn tokenize_json(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = JsonField.token_stream(s);
+        let mut tokenizer = JsonField;
+        let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -716,7 +756,8 @@ mod tests {
 
     fn tokenize_bigram(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = Tokenizer::Bigram(BigramTokenizer::default()).token_stream(s);
+        let mut tokenizer = Tokenizer::Bigram(BigramTokenizer::default());
+        let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -727,7 +768,9 @@ mod tests {
 
     fn tokenize_trigram(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = Tokenizer::Trigram(TrigramTokenizer::default()).token_stream(s);
+
+        let mut tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
+        let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());
@@ -738,7 +781,8 @@ mod tests {
 
     fn tokenize_url(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut stream = SiteOperatorUrlTokenizer.token_stream(s);
+        let mut tokenizer = SiteOperatorUrlTokenizer;
+        let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
             res.push(token.text.clone());

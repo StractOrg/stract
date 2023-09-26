@@ -316,7 +316,8 @@ impl EntityIndex {
         let entity_abstract = self.schema.get_field("abstract").unwrap();
 
         let mut term_queries = Vec::new();
-        let mut stream = Normal::default().token_stream(query);
+        let mut tokenizer = Normal::default();
+        let mut stream = tokenizer.token_stream(query);
         while let Some(token) = stream.next() {
             if self.stopwords.contains(&token.text) {
                 continue;

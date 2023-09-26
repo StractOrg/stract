@@ -327,7 +327,8 @@ impl Term {
             Field::Fast(_) => vec![tantivy::Term::from_field_text(tantivy_field, term)],
             Field::Text(text_field) => {
                 let mut terms: Vec<tantivy::Term> = Vec::new();
-                let mut token_stream = text_field.query_tokenizer().token_stream(term);
+                let mut tokenizer = text_field.query_tokenizer();
+                let mut token_stream = tokenizer.token_stream(term);
                 token_stream.process(&mut |token| {
                     let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
                     terms.push(term);

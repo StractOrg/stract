@@ -14,9 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::schema::{
-    Cardinality, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
-};
+use tantivy::schema::{IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions};
 
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
@@ -442,146 +440,120 @@ impl Field {
             Field::Text(TextField::SafetyClassification) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Fast(FastField::IsHomepage) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::HostCentrality) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::PageCentrality) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::FetchTimeMs) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::TrackerScore) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
+            Field::Fast(FastField::IsHomepage) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::HostCentrality) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::PageCentrality) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::FetchTimeMs) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::TrackerScore) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
             Field::Fast(FastField::LastUpdated) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_stored()
                     .set_indexed(),
             ),
             Field::Fast(FastField::Region) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::Fast(FastField::NumCleanBodyTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumDescriptionTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumTitleTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumMicroformatTagsTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumUrlTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumDomainTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumUrlForSiteOperatorTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::NumFlattenedSchemaTokens) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
-                    .set_indexed(),
-            ),
-            Field::Fast(FastField::SiteHash1) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::SiteHash2) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::UrlWithoutQueryHash1) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::UrlWithoutQueryHash2) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::UrlHash1) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::UrlHash2) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::DomainHash1) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::DomainHash2) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::TitleHash1) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
-            Field::Fast(FastField::TitleHash2) => IndexingOption::Integer(
-                NumericOptions::default().set_fast(Cardinality::SingleValue),
-            ),
+            Field::Fast(FastField::NumCleanBodyTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumDescriptionTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumTitleTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumMicroformatTagsTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumUrlTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumDomainTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumUrlForSiteOperatorTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::NumFlattenedSchemaTokens) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::SiteHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::SiteHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::UrlWithoutQueryHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::UrlWithoutQueryHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::UrlHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::UrlHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::DomainHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::DomainHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::TitleHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::TitleHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
             Field::Fast(FastField::PreComputedScore) => IndexingOption::Float(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
             Field::Fast(FastField::HostNodeID1) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
             Field::Fast(FastField::HostNodeID2) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
             Field::Fast(FastField::SimHash) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
             Field::Fast(FastField::NumPathAndQuerySlashes) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
             Field::Fast(FastField::NumPathAndQueryDigits) => IndexingOption::Integer(
                 NumericOptions::default()
-                    .set_fast(Cardinality::SingleValue)
+                    .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),

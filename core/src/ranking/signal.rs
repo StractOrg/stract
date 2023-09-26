@@ -864,8 +864,8 @@ impl SignalAggregator {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut stream =
-                            text_field.indexing_tokenizer().token_stream(&simple_query);
+                        let mut tokenizer = text_field.indexing_tokenizer();
+                        let mut stream = tokenizer.token_stream(&simple_query);
 
                         while let Some(token) = stream.next() {
                             let term = tantivy::Term::from_field_text(tv_field, &token.text);
@@ -922,7 +922,10 @@ impl SignalAggregator {
                 .map(|(_, rule)| RuleBoost {
                     docset: rule
                         .query
-                        .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                        .weight(tantivy::query::EnableScoring::Enabled {
+                            searcher: tv_searcher,
+                            statistics_provider: tv_searcher,
+                        })
                         .unwrap()
                         .scorer(segment_reader, 0.0)
                         .unwrap(),
@@ -957,7 +960,7 @@ impl SignalAggregator {
                     let mut queries = Vec::new();
                     for field in proximity_fields {
                         let tv_field = schema.get_field(field.name()).unwrap();
-                        let tokenizer = field.indexing_tokenizer();
+                        let mut tokenizer = field.indexing_tokenizer();
                         let mut terms = Vec::with_capacity(query.simple_terms.len());
 
                         for term in &query.simple_terms {
@@ -979,7 +982,10 @@ impl SignalAggregator {
 
                     let query = tantivy::query::BooleanQuery::new(queries);
                     let docset = query
-                        .weight(tantivy::query::EnableScoring::Enabled(tv_searcher))
+                        .weight(tantivy::query::EnableScoring::Enabled {
+                            searcher: tv_searcher,
+                            statistics_provider: tv_searcher,
+                        })
                         .unwrap()
                         .scorer(segment_reader, 1.0)
                         .unwrap();

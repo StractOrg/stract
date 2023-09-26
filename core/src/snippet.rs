@@ -79,13 +79,13 @@ struct SnippetBuilder {
 
 impl SnippetBuilder {
     fn highlight(&mut self, terms: &HashSet<String>, lang: whatlang::Lang) {
-        for tokenizer in [
+        for mut tokenizer in [
             Tokenizer::Stemmed(Stemmed::with_forced_language(lang)),
-            Tokenizer::Bigram(BigramTokenizer {}),
-            Tokenizer::Trigram(TrigramTokenizer {}),
+            Tokenizer::Bigram(BigramTokenizer::default()),
+            Tokenizer::Trigram(TrigramTokenizer::default()),
         ] {
             let mut stream =
-                tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, &self.fragment);
+                tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &self.fragment);
             while let Some(tok) = stream.next() {
                 if terms.contains(&tok.text) {
                     self.highlights.push(tok.offset_from..tok.offset_to);
@@ -137,12 +137,12 @@ fn snippet_string_builder(
     lang: whatlang::Lang,
     config: SnippetConfig,
 ) -> SnippetBuilder {
-    let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
+    let mut tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
 
     let terms: HashSet<String> = terms
         .iter()
         .flat_map(|term| {
-            let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, term);
+            let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, term);
 
             let mut res = Vec::new();
             while let Some(tok) = stream.next() {
@@ -162,7 +162,8 @@ fn snippet_string_builder(
             let mut doc_terms = HashMap::new();
 
             {
-                let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, &sentence);
+                let mut stream =
+                    tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &sentence);
                 while let Some(tok) = stream.next() {
                     *doc_terms.entry(tok.text.clone()).or_insert(0) += 1;
                 }

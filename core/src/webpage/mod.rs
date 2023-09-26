@@ -916,6 +916,8 @@ impl Html {
         text: String,
         tokenizer: tokenizer::Tokenizer,
     ) -> PreTokenizedString {
+        let mut tokenizer = tokenizer;
+
         let mut tokens = Vec::new();
 
         {
@@ -960,13 +962,15 @@ impl Html {
         let schema_json = serde_json::to_string(&schemas).ok().unwrap_or_default();
 
         let pretokenized_schema_json = match schema_org::flattened_json(schemas) {
-            Ok(f) => {
+            Ok(mut f) => {
                 let mut tokens = Vec::new();
 
-                let mut stream = f.token_stream();
+                {
+                    let mut stream = f.token_stream();
 
-                while let Some(token) = stream.next() {
-                    tokens.push(token.clone());
+                    while let Some(token) = stream.next() {
+                        tokens.push(token.clone());
+                    }
                 }
 
                 PreTokenizedString {
@@ -994,7 +998,7 @@ impl Html {
         for field in &ALL_FIELDS {
             let tantivy_field = schema
                 .get_field(field.name())
-                .unwrap_or_else(|| panic!("Unknown field: {}", field.name()));
+                .unwrap_or_else(|_| panic!("Unknown field: {}", field.name()));
 
             match field {
                 Field::Text(TextField::Title) => {

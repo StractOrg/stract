@@ -30,9 +30,9 @@ fn hash_token(token: &tantivy::tokenizer::Token) -> HashType {
 }
 
 pub fn hash(text: &str) -> HashType {
-    let tokenizer = Tokenizer::default();
+    let mut tokenizer = Tokenizer::default();
 
-    let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&tokenizer, text);
+    let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, text);
 
     let mut v = [0i64; HashType::BITS as usize];
 

@@ -16,11 +16,11 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use tantivy::{fastfield::Column, DocId, SegmentId};
+use tantivy::{columnar::ColumnValues, DocId, SegmentId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{DataType, FastField, Field, ALL_FIELDS},
+    schema::{DataType, FastField, ALL_FIELDS},
 };
 
 #[derive(Default, Clone)]
@@ -43,24 +43,20 @@ impl FastFieldReader {
     pub fn new(tv_searcher: &tantivy::Searcher) -> Self {
         let mut segments = HashMap::new();
 
-        let schema = tv_searcher.schema();
-
         for reader in tv_searcher.segment_readers() {
             let fastfield_readers = reader.fast_fields();
 
             let mut field_readers = Vec::new();
 
             for field in ALL_FIELDS.iter().filter_map(|field| field.as_fast()) {
-                let tv_field = schema.get_field(Field::Fast(field).name()).unwrap();
-
                 let field_reader = match field.data_type() {
                     DataType::U64 => {
-                        let reader = fastfield_readers.u64(tv_field).unwrap();
-                        FieldReader::U64(reader)
+                        let reader = fastfield_readers.u64(field.name()).unwrap();
+                        FieldReader::U64(reader.values)
                     }
                     DataType::F64 => {
-                        let reader = fastfield_readers.f64(tv_field).unwrap();
-                        FieldReader::F64(reader)
+                        let reader = fastfield_readers.f64(field.name()).unwrap();
+                        FieldReader::F64(reader.values)
                     }
                 };
 
@@ -108,8 +104,8 @@ impl From<FieldValue> for Option<u64> {
 }
 
 pub enum FieldReader {
-    U64(Arc<dyn Column<u64>>),
-    F64(Arc<dyn Column<f64>>),
+    U64(Arc<dyn ColumnValues<u64>>),
+    F64(Arc<dyn ColumnValues<f64>>),
 }
 
 impl FieldReader {

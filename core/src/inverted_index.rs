@@ -45,7 +45,9 @@ use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
 use crate::snippet::TextSnippet;
-use crate::tokenizer::{BigramTokenizer, Identity, SiteOperatorUrlTokenizer, TrigramTokenizer};
+use crate::tokenizer::{
+    BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
+};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{schema_org, Webpage};
@@ -155,6 +157,11 @@ impl InvertedIndex {
             .register(tokenizer.as_str(), tokenizer);
 
         let tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
+        tantivy_index
+            .tokenizers()
+            .register(tokenizer.as_str(), tokenizer);
+
+        let tokenizer = Tokenizer::Json(JsonField);
         tantivy_index
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
