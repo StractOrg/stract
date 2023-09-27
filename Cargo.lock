@@ -1357,6 +1357,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fend-core"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64dc291a216d691abf67c05592e02f7cefa4befa6c8011bcebc2acb4a930092b"
+
+[[package]]
 name = "filetime"
 version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4238,6 +4244,7 @@ dependencies = [
  "dashmap",
  "encoding_rs",
  "eventsource-stream",
+ "fend-core",
  "flate2",
  "fst",
  "futures",

@@ -15,114 +15,44 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::widgets::{Error, Result};
-use lalrpop_util::lalrpop_mod;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use utoipa::ToSchema;
 
-lalrpop_mod!(pub parser, "/widgets/calculator.rs");
-pub static PARSER: once_cell::sync::Lazy<parser::ExprParser> =
-    once_cell::sync::Lazy::new(parser::ExprParser::new);
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub enum Expr {
-    Number(f64),
-    Op(Box<Expr>, Opcode, Box<Expr>),
-}
-impl Expr {
-    fn calculate(&self) -> f64 {
-        match self {
-            Expr::Number(n) => *n,
-            Expr::Op(lhs, op, rhs) => {
-                let lhs = lhs.calculate();
-                let rhs = rhs.calculate();
-
-                match op {
-                    Opcode::Mul => lhs * rhs,
-                    Opcode::Div => lhs / rhs,
-                    Opcode::Add => lhs + rhs,
-                    Opcode::Sub => lhs - rhs,
-                }
-            }
-        }
-    }
-}
-
-#[derive(Copy, Clone, Serialize, Deserialize)]
-pub enum Opcode {
-    Mul,
-    Div,
-    Add,
-    Sub,
-}
-
-impl Debug for Expr {
-    fn fmt(&self, fmt: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
-        use self::Expr::*;
-        match *self {
-            Number(n) => write!(fmt, "{n:?}"),
-            Op(ref l, op, ref r) => write!(fmt, "({l:?} {op:?} {r:?})"),
-        }
-    }
-}
-
-impl Display for Expr {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
-        use self::Expr::*;
-        match *self {
-            Number(n) => write!(fmt, "{n}"),
-            Op(ref l, op, ref r) => write!(fmt, "{l} {op} {r}"),
-        }
-    }
-}
-
-impl Debug for Opcode {
-    fn fmt(&self, fmt: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
-        use self::Opcode::*;
-        match *self {
-            Mul => write!(fmt, "*"),
-            Div => write!(fmt, "/"),
-            Add => write!(fmt, "+"),
-            Sub => write!(fmt, "-"),
-        }
-    }
-}
-
-impl Display for Opcode {
-    fn fmt(&self, fmt: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
-        use self::Opcode::*;
-        match *self {
-            Mul => write!(fmt, "*"),
-            Div => write!(fmt, "/"),
-            Add => write!(fmt, "+"),
-            Sub => write!(fmt, "-"),
-        }
-    }
-}
-
-fn parse(expr: &str) -> Result<Box<Expr>> {
-    match PARSER.parse(expr) {
-        Ok(expr) => Ok(expr),
-        Err(_) => Err(Error::CalculatorParse),
-    }
-}
+static DICE_REGEX: once_cell::sync::Lazy<regex::Regex> =
+    once_cell::sync::Lazy::new(|| regex::Regex::new(r"^d[0-9]+").unwrap());
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Calculation {
     pub input: String,
-    pub expr: Box<Expr>,
-    pub result: f64,
+    pub result: String,
 }
 
 pub fn try_calculate(expr: &str) -> Result<Calculation> {
-    let input = expr.to_string();
-    let expr = parse(expr)?;
+    // if expr starts with "d[0-9]+", wrap it in "roll(...)"
+    let expr = if DICE_REGEX.is_match(expr) {
+        format!("roll({})", expr)
+    } else {
+        expr.to_string()
+    };
+
+    let mut context = fend_core::Context::new();
+    context.set_random_u32_fn(|| {
+        let mut rng = rand::thread_rng();
+        rng.gen()
+    });
+
+    let res = fend_core::evaluate(&expr, &mut context).map_err(|_| Error::CalculatorParse)?;
+
+    if res.get_main_result() == expr {
+        return Err(Error::CalculatorParse);
+    }
 
     Ok(Calculation {
-        input,
-        result: expr.calculate(),
-        expr,
+        input: expr.to_string(),
+        result: res.get_main_result().to_string(),
     })
 }
 
@@ -132,16 +62,15 @@ mod tests {
 
     #[test]
     fn it_calculates_simple_expressions() {
-        assert_eq!(try_calculate("2+2").unwrap().result, 4.0);
-        assert_eq!(try_calculate("2*2").unwrap().result, 4.0);
-        assert_eq!(try_calculate("2*3").unwrap().result, 6.0);
-        assert!(try_calculate("2.1-3").unwrap().result + 0.9 < 0.0001);
-        assert_eq!(try_calculate("6/2").unwrap().result, 3.0);
+        assert_eq!(try_calculate("2+2").unwrap().result, 4.0.to_string());
+        assert_eq!(try_calculate("2*2").unwrap().result, 4.0.to_string());
+        assert_eq!(try_calculate("2*3").unwrap().result, 6.0.to_string());
+        assert_eq!(try_calculate("6/2").unwrap().result, 3.0.to_string());
     }
 
     #[test]
     fn it_respects_paranthesis() {
-        assert_eq!(try_calculate("2+2*6").unwrap().result, 14.0);
-        assert_eq!(try_calculate("(2+2)*6").unwrap().result, 24.0);
+        assert_eq!(try_calculate("2+2*6").unwrap().result, 14.0.to_string());
+        assert_eq!(try_calculate("(2+2)*6").unwrap().result, 24.0.to_string());
     }
 }

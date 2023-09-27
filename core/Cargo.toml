@@ -99,6 +99,7 @@ publicsuffix = { workspace = true }
 rkyv = { workspace = true }
 hashbrown = { workspace = true }
 mime = { workspace = true }
+fend-core = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { workspace = true }

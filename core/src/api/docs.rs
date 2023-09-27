@@ -63,7 +63,6 @@ use utoipa_swagger_ui::SwaggerUi;
 
                 crate::widgets::Widget,
                 crate::widgets::calculator::Calculation,
-                crate::widgets::calculator::Expr,
                 crate::ranking::signal::SignalScore,
                 crate::bangs::BangHit,
                 crate::bangs::Bang,

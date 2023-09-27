@@ -103,3 +103,4 @@ rkyv = { version = "0.7.42", default_features = false, features = [
     "size_64",
 ] }
 mime = "0.3.17"
+fend-core = "1.2.2"
