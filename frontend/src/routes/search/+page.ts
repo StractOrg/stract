@@ -1,4 +1,4 @@
-import { api, type Region } from '$lib/api';
+import { api } from '$lib/api';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 import { fetchRemoteOptic } from '$lib/optics';
@@ -8,7 +8,7 @@ import { globals } from '$lib/globals';
 
 export const load: PageLoad = async (req) => {
   const { fetch, url } = req;
-  var params = extractSearchParams(url.searchParams);
+  let params = extractSearchParams(url.searchParams);
 
   if (!params.query.trim()) {
     const form = req.data['form'];

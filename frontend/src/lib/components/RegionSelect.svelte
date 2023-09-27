@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type { Region } from '$lib/api';
-  import { ALL_REGIONS } from '$lib/regions';
+  import { type Region, REGIONS } from '$lib/api';
   import Select from './Select.svelte';
 
   export let searchOnChange: boolean;
-  export let selected: Region = ALL_REGIONS[0];
+  export let selected: Region = REGIONS[0];
 
-  $: options = ALL_REGIONS.map((region) => ({
+  $: options = REGIONS.map((region) => ({
     value: region,
     label: region == 'All' ? 'All Languages' : region,
   }));

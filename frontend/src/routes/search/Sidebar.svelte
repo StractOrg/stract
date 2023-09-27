@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Sidebar } from '$lib/api';
+  import type { DisplayedSidebar } from '$lib/api';
   import Entity from './Entity.svelte';
   import StackOverflow from './StackOverflow.svelte';
 
-  export let sidebar: Sidebar;
+  export let sidebar: DisplayedSidebar;
 </script>
 
 {#if sidebar.type == 'entity'}

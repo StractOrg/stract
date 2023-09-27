@@ -1,11 +1,11 @@
 <script lang="ts">
   import ChevronDown from '~icons/heroicons/chevron-down';
   import ChatBubbleLeftRight from '~icons/heroicons/chat-bubble-left-right-20-solid';
-  import type { Webpage } from '$lib/api';
+  import type { DisplayedWebpage } from '$lib/api';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import Button from '$lib/components/Button.svelte';
 
-  export let discussions: Webpage[];
+  export let discussions: DisplayedWebpage[];
 
   let showMore = false;
 

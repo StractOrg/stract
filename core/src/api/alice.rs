@@ -137,7 +137,7 @@ pub struct AliceParams {
     path = "/beta/api/alice",
     params(AliceParams),
     responses(
-        (status = 200, description = "Interact with Alice", body = ExecutionState),
+        (status = 200, description = "Interact with Alice", body = ExecutionState, content_type = "text/event-stream"),
     )
 )]
 pub async fn alice_route(

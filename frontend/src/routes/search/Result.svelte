@@ -1,6 +1,6 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
-  import type { Webpage } from '$lib/api';
+  import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import { clearSummary, summariesStore } from '$lib/stores';
   import Summary from './Summary.svelte';
@@ -8,7 +8,7 @@
   import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
 
-  export let webpage: Webpage;
+  export let webpage: DisplayedWebpage;
   export let resultIndex: number;
 
   const summary = derived(summariesStore, ($summaries) => $summaries[webpage.url]);
