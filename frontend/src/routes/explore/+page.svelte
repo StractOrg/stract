@@ -19,30 +19,46 @@
   let chosenSites: string[] = [];
   let similarSites: ScoredSite[] = [];
 
-  let errorMessage = false;
+  type ValidationState = 'idle' | 'validating url' | 'loading similar' | 'error';
+  let validation: ValidationState = 'idle';
 
   $: {
-    api
-      .webgraphHostSimilar({ sites: chosenSites, topN: limit })
-      .data.then((res) => (similarSites = res));
+    validation = 'loading similar';
+    api.webgraphHostSimilar({ sites: chosenSites, topN: limit }).data.then(async (res) => {
+      await wait(1000);
+      similarSites = res;
+      validation = 'idle';
+    });
   }
+
+  const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
   const removeWebsite = async (site: string) => {
     if (chosenSites.includes(site)) {
       chosenSites = chosenSites.filter((s) => s != site);
     }
   };
-  const addWebsite = async (site: string, clear = false) => {
-    errorMessage = false;
+  const addWebsite = async (
+    site: string,
+    { clear = false, validate = true }: { clear?: boolean; validate?: boolean } = {},
+  ) => {
+    validation = 'idle';
     site = site.trim();
     if (!site) return;
+    if (!validate) {
+      chosenSites = [...chosenSites, site];
+      return;
+    }
+    validation = 'validating url';
 
+    await wait(1000);
     const result = await api.webgraphHostKnows({ site }).data;
     match(result)
       .with({ type: 'unknown' }, () => {
-        errorMessage = true;
+        validation = 'error';
       })
       .with({ type: 'known' }, async ({ site }) => {
+        validation = 'idle';
         if (clear) inputWebsite = '';
         if (!chosenSites.includes(site)) chosenSites = [...chosenSites, site];
       })
@@ -74,12 +90,13 @@
           'mb-2 flex w-full max-w-lg rounded-full border border-base-400 bg-base-100 p-[2px] pl-3 transition focus-within:shadow',
         )}
         id="site-input-container"
-        on:submit|preventDefault={() => addWebsite(inputWebsite, true)}
+        novalidate
+        on:submit|preventDefault={() => addWebsite(inputWebsite, { clear: true })}
       >
         <!-- svelte-ignore a11y-autofocus -->
         <input
           class="grow border-none bg-transparent outline-none placeholder:opacity-50 focus:ring-0"
-          type="text"
+          type="url"
           id="site-input"
           name="site"
           autofocus
@@ -88,15 +105,23 @@
         />
         <Button>Add</Button>
       </form>
-      {#if errorMessage}
+      {#if validation == 'error'}
         <div class="my-2" transition:slide>
           <Callout kind="warning" title="Unable to add page">
-            <button slot="top-right" on:click={() => (errorMessage = false)}>
+            <button slot="top-right" on:click={() => (validation = 'idle')}>
               <XMark />
             </button>
 
             Unfortunately, we don't know about that site yet.
           </Callout>
+        </div>
+      {:else if validation == 'validating url'}
+        <div class="my-2" transition:slide>
+          <Callout kind="neutral" title="Validating URL..." />
+        </div>
+      {:else if validation == 'loading similar'}
+        <div class="my-2" transition:slide>
+          <Callout kind="neutral" title="Fetching similar sites..." />
         </div>
       {/if}
       <div class="flex flex-wrap justify-center gap-x-5 gap-y-3" id="sites-list">
@@ -115,9 +140,11 @@
 
     {#if chosenSites.length > 0 && similarSites.length > 0}
       <div class="flex flex-col space-y-4">
-        <div class="grid grid-cols-[auto_auto_1fr_auto] items-center gap-5">
-          <h2 class="text-2xl font-bold">Similar sites</h2>
-          <div class="flex space-x-1">
+        <div
+          class="grid grid-cols-[auto_auto_1fr] items-center sm:grid-cols-[auto_auto_1fr] sm:gap-x-5 md:grid-rows-none"
+        >
+          <h2 class="text-lg font-bold sm:text-2xl">Similar sites</h2>
+          <div class="flex space-x-1 justify-self-center">
             <Select
               id="limit"
               class="cursor-pointer rounded border-none dark:bg-transparent"
@@ -125,8 +152,9 @@
               options={LIMIT_OPTIONS.map((value) => ({ value, label: value.toString() }))}
             />
           </div>
-          <div />
-          <Button on:click={exportAsOptic}>Export as optic</Button>
+          <div class="justify-self-end md:col-auto md:row-auto md:place-self-end">
+            <Button on:click={exportAsOptic}>Export as optic</Button>
+          </div>
         </div>
         <div class="grid items-center gap-y-2">
           {#each similarSites as site (site.site)}
@@ -141,7 +169,7 @@
                   on:click={() =>
                     chosenSites.includes(site.site)
                       ? removeWebsite(site.site)
-                      : addWebsite(site.site)}
+                      : addWebsite(site.site, { validate: false })}
                 >
                   <PlusCircleOutline
                     class={twJoin(
