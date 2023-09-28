@@ -32,7 +32,7 @@ use crate::search_prettifier::{
     create_stackoverflow_sidebar, DisplayedAnswer, DisplayedEntity, DisplayedSidebar,
     DisplayedWebpage, HighlightedSpellCorrection,
 };
-use crate::widgets::Widget;
+use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
     collector::BucketCollector,
@@ -58,6 +58,7 @@ pub struct ApiSearcher {
     bangs: Bangs,
     collector_config: CollectorConfig,
     thresholds: ApiThresholds,
+    widgets: Widgets,
 }
 
 impl ApiSearcher {
@@ -78,6 +79,7 @@ impl ApiSearcher {
             bangs,
             collector_config,
             thresholds,
+            widgets: Widgets::new(),
         }
     }
 
@@ -401,7 +403,7 @@ impl ApiSearcher {
             return None;
         }
 
-        Widget::try_new(&query.query)
+        self.widgets.widget(query.query.as_str())
     }
 
     fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {

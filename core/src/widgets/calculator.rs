@@ -14,10 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::widgets::{Error, Result};
+use crate::widgets::Error;
+use anyhow::{anyhow, Result};
+use hashbrown::HashMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 use utoipa::ToSchema;
 
 static DICE_REGEX: once_cell::sync::Lazy<regex::Regex> =
@@ -30,30 +35,136 @@ pub struct Calculation {
     pub result: String,
 }
 
-pub fn try_calculate(expr: &str) -> Result<Calculation> {
-    // if expr starts with "d[0-9]+", wrap it in "roll(...)"
-    let expr = if DICE_REGEX.is_match(expr) {
-        format!("roll({})", expr)
-    } else {
-        expr.to_string()
-    };
+async fn get_rates() -> Result<CurrencyExchange> {
+    let client = reqwest::Client::new();
+    let xml = client
+        .get("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml")
+        .send()
+        .await?
+        .text()
+        .await?;
 
-    let mut context = fend_core::Context::new();
-    context.set_random_u32_fn(|| {
-        let mut rng = rand::thread_rng();
-        rng.gen()
-    });
+    let mut rates = HashMap::new();
+    let mut buf = Vec::new();
+    let mut reader = quick_xml::Reader::from_str(&xml);
 
-    let res = fend_core::evaluate(&expr, &mut context).map_err(|_| Error::CalculatorParse)?;
-
-    if res.get_main_result() == expr {
-        return Err(Error::CalculatorParse);
+    // read all `Cube` nodes that has the `currency` attribute
+    // and insert them into the `rates` map
+    while let Ok(event) = reader.read_event(&mut buf) {
+        match event {
+            quick_xml::events::Event::Empty(ref e) if e.name() == b"Cube" => {
+                if let Some(currency) = e
+                    .attributes()
+                    .find(|a| a.as_ref().unwrap().key == b"currency")
+                    .map(|a| a.unwrap().value.to_vec())
+                {
+                    let rate = e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == b"rate")
+                        .map(|a| a.unwrap().value.to_vec())
+                        .unwrap();
+                    rates.insert(
+                        String::from_utf8(currency)?,
+                        String::from_utf8(rate)?.parse::<f64>()?,
+                    );
+                }
+            }
+            quick_xml::events::Event::Eof => break,
+            _ => (),
+        }
     }
 
-    Ok(Calculation {
-        input: expr.to_string(),
-        result: res.get_main_result().to_string(),
-    })
+    rates.insert("EUR".to_string(), 1.0);
+
+    Ok(CurrencyExchange { rates })
+}
+
+#[derive(Debug, Default)]
+struct CurrencyExchange {
+    rates: HashMap<String, f64>,
+}
+
+impl CurrencyExchange {
+    fn get_rate(
+        &self,
+        currency: &str,
+    ) -> Result<
+        f64,
+        std::boxed::Box<(dyn std::error::Error + std::marker::Send + std::marker::Sync + 'static)>,
+    > {
+        match self.rates.get(currency) {
+            Some(rate) => Ok(*rate),
+            None => Err(anyhow!("No exchange rate for currency: {}", currency).into()),
+        }
+    }
+}
+
+pub enum ExchangeUpdate {
+    #[allow(dead_code)] // used in tests
+    None,
+    AsyncTokio,
+}
+
+pub struct Calculator {
+    exchange: Arc<Mutex<Arc<CurrencyExchange>>>,
+}
+
+impl Calculator {
+    pub fn new(exchange_update: ExchangeUpdate) -> Self {
+        let exchange = Arc::new(Mutex::new(Arc::new(Default::default())));
+
+        match exchange_update {
+            ExchangeUpdate::None => {}
+            ExchangeUpdate::AsyncTokio => {
+                let exchange_clone = exchange.clone();
+                tokio::spawn(async move {
+                    let mut interval =
+                        tokio::time::interval(std::time::Duration::from_secs(60 * 60 * 24));
+
+                    loop {
+                        if let Ok(rates) = get_rates().await {
+                            *exchange_clone.lock().unwrap() = Arc::new(rates);
+                        }
+
+                        interval.tick().await;
+                    }
+                });
+            }
+        }
+
+        Self { exchange }
+    }
+
+    pub fn try_calculate(&self, expr: &str) -> Result<Calculation, Error> {
+        // if expr starts with "d[0-9]+", wrap it in "roll(...)"
+        let expr = if DICE_REGEX.is_match(expr) {
+            format!("roll({})", expr)
+        } else {
+            expr.to_string()
+        };
+
+        let mut context = fend_core::Context::new();
+
+        let exchange: Arc<CurrencyExchange> = self.exchange.lock().unwrap().clone();
+
+        context.set_exchange_rate_handler_v1(move |currency: &str| exchange.get_rate(currency));
+
+        context.set_random_u32_fn(|| {
+            let mut rng = rand::thread_rng();
+            rng.gen()
+        });
+
+        let res = fend_core::evaluate(&expr, &mut context).map_err(|_| Error::CalculatorParse)?;
+
+        if res.get_main_result() == expr {
+            return Err(Error::CalculatorParse);
+        }
+
+        Ok(Calculation {
+            input: expr.to_string(),
+            result: res.get_main_result().to_string(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -62,15 +173,24 @@ mod tests {
 
     #[test]
     fn it_calculates_simple_expressions() {
-        assert_eq!(try_calculate("2+2").unwrap().result, 4.0.to_string());
-        assert_eq!(try_calculate("2*2").unwrap().result, 4.0.to_string());
-        assert_eq!(try_calculate("2*3").unwrap().result, 6.0.to_string());
-        assert_eq!(try_calculate("6/2").unwrap().result, 3.0.to_string());
+        let calc = Calculator::new(ExchangeUpdate::None);
+        assert_eq!(calc.try_calculate("2+2").unwrap().result, 4.0.to_string());
+        assert_eq!(calc.try_calculate("2*2").unwrap().result, 4.0.to_string());
+        assert_eq!(calc.try_calculate("2*3").unwrap().result, 6.0.to_string());
+        assert_eq!(calc.try_calculate("6/2").unwrap().result, 3.0.to_string());
     }
 
     #[test]
     fn it_respects_paranthesis() {
-        assert_eq!(try_calculate("2+2*6").unwrap().result, 14.0.to_string());
-        assert_eq!(try_calculate("(2+2)*6").unwrap().result, 24.0.to_string());
+        let calc = Calculator::new(ExchangeUpdate::None);
+
+        assert_eq!(
+            calc.try_calculate("2+2*6").unwrap().result,
+            14.0.to_string()
+        );
+        assert_eq!(
+            calc.try_calculate("(2+2)*6").unwrap().result,
+            24.0.to_string()
+        );
     }
 }

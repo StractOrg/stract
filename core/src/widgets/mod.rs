@@ -18,11 +18,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utoipa::ToSchema;
 
-use self::calculator::{try_calculate, Calculation};
+use self::calculator::{Calculation, Calculator};
 
 pub mod calculator;
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -30,18 +28,27 @@ pub enum Error {
     CalculatorParse,
 }
 
+pub struct Widgets {
+    calculator: Calculator,
+}
+
+impl Widgets {
+    pub fn new() -> Self {
+        Self {
+            calculator: Calculator::new(calculator::ExchangeUpdate::AsyncTokio),
+        }
+    }
+
+    pub fn widget(&self, query: &str) -> Option<Widget> {
+        self.calculator
+            .try_calculate(query)
+            .ok()
+            .map(Widget::Calculator)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum Widget {
     Calculator(Calculation),
-}
-
-impl Widget {
-    pub fn try_new(query: &str) -> Option<Widget> {
-        Self::calculator(query)
-    }
-
-    fn calculator(query: &str) -> Option<Widget> {
-        try_calculate(query).ok().map(Widget::Calculator)
-    }
 }
