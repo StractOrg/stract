@@ -218,10 +218,12 @@ impl EntityIndex {
 
         info.into_iter()
             .map(|(key, mut value)| {
-                value.text = value.text.replace('*', "•");
-
-                if let Some((_, rest)) = value.text.split_once('•') {
-                    value.text = rest.to_string();
+                if let Some(start) = value.text.find(|c: char| !(c.is_whitespace() || c == '*')) {
+                    value.text.replace_range(0..start, "");
+                    for link in &mut value.links {
+                        link.start = link.start.saturating_sub(start);
+                        link.end = link.end.saturating_sub(start);
+                    }
                 }
 
                 (key.replace('_', " "), value)
