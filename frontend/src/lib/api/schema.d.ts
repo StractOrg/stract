@@ -101,6 +101,7 @@ export interface components {
       type: "text";
       value: string;
     };
+    Definition: string;
     DisplayedAnswer: {
       answer: string;
       prettyUrl: string;
@@ -156,6 +157,7 @@ export interface components {
       kind: "link";
       text: string;
     };
+    Example: string;
     ExecutionState: {
       query: string;
       /** @enum {string} */
@@ -203,8 +205,15 @@ export interface components {
       /** @enum {string} */
       type: "unknown";
     };
+    Lemma: string;
     Node: {
       name: string;
+    };
+    /** @enum {string} */
+    PartOfSpeech: "noun" | "verb" | "adjective" | "adjectiveSatellite" | "adverb";
+    PartOfSpeechMeaning: {
+      meanings: components["schemas"]["WordMeaning"][];
+      pos: components["schemas"]["PartOfSpeech"];
     };
     /** @enum {string} */
     Region: "All" | "Denmark" | "France" | "Germany" | "Spain" | "US";
@@ -271,6 +280,10 @@ export interface components {
       kind: components["schemas"]["TextSnippetFragmentKind"];
       text: string;
     };
+    ThesaurusWidget: {
+      meanings: components["schemas"]["PartOfSpeechMeaning"][];
+      term: components["schemas"]["Lemma"];
+    };
     /**
      * Url
      * @description Wrapper around `Url` that implements `ToSchema` for `Url`.
@@ -291,6 +304,15 @@ export interface components {
       /** @enum {string} */
       type: "calculator";
       value: components["schemas"]["Calculation"];
+    } | {
+      /** @enum {string} */
+      type: "thesaurus";
+      value: components["schemas"]["ThesaurusWidget"];
+    };
+    WordMeaning: {
+      definition: components["schemas"]["Definition"];
+      examples: components["schemas"]["Example"][];
+      similar: components["schemas"]["Lemma"][];
     };
   };
   responses: never;

@@ -16,7 +16,7 @@
 
   let inputWebsite = '';
   let limit = LIMIT_OPTIONS[0];
-  let chosenSites: string[] = ['facebook.com'];
+  let chosenSites: string[] = [];
   let similarSites: ScoredSite[] = [];
 
   let errorMessage = false;

@@ -43,6 +43,8 @@ chrono = { version = "0.4.23", features = ["serde"] }
 uuid = "1.1.2"
 futures = "0.3.21"
 quick-xml = "0.23.0"
+rio_turtle = "0.8.4"
+rio_api = "0.8.4"
 bzip2 = "0.4.4"
 parse_wiki_text = "0.1.5"
 md5 = "0.7.0"

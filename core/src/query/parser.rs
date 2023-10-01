@@ -417,7 +417,9 @@ pub fn parse(query: &str) -> Vec<Box<Term>> {
     }
 
     if cur_term_begin < query.len() {
-        res.push(parse_term(&query[cur_term_begin..query.len()]));
+        res.push(parse_term(
+            &query[floor_char_boundary(&query, cur_term_begin)..query.len()],
+        ));
     }
 
     res
@@ -426,6 +428,7 @@ pub fn parse(query: &str) -> Vec<Box<Term>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn parse_not() {
@@ -550,5 +553,19 @@ mod tests {
                 Box::new(Term::Url("test".to_string()))
             ]
         );
+    }
+
+    #[test]
+    fn unicode() {
+        let query = "\u{a0}";
+        assert_eq!(parse(query).len(), 1);
+    }
+
+    proptest! {
+        #[test]
+        fn prop(query: String) {
+            let res = parse(&query);
+            prop_assert_eq!(query.is_empty() || query.chars().all(|c| c.is_whitespace()), res.is_empty());
+        }
     }
 }

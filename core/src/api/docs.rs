@@ -63,6 +63,14 @@ use utoipa_swagger_ui::SwaggerUi;
 
                 crate::widgets::Widget,
                 crate::widgets::calculator::Calculation,
+                crate::thesaurus::ThesaurusWidget,
+                crate::thesaurus::Lemma,
+                crate::thesaurus::WordMeaning,
+                crate::thesaurus::Definition,
+                crate::thesaurus::Example,
+                crate::thesaurus::PartOfSpeech,
+                crate::thesaurus::PartOfSpeechMeaning,
+
                 crate::ranking::signal::SignalScore,
                 crate::bangs::BangHit,
                 crate::bangs::Bang,

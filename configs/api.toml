@@ -1,16 +1,19 @@
 cluster_id = "dev_api"
-queries_csv_path = "data/queries_us.csv"
-host = "0.0.0.0:3000"
-prometheus_host = "0.0.0.0:3001"
-gossip_addr = "0.0.0.0:3005"
-gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 crossencoder_model_path = "data/cross_encoder"
 fact_check_model_path = "data/fact_model"
+gossip_addr = "0.0.0.0:3005"
+gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
+host = "0.0.0.0:3000"
+prometheus_host = "0.0.0.0:3001"
+queries_csv_path = "data/queries_us.csv"
 # lambda_model_path = "data/lambdamart.txt"
 # qa_model_path = "data/qa_model"
 bangs_path = "data/bangs.json"
 summarizer_path = "data/summarizer"
 
 [thresholds]
-stackoverflow = 0.0
 entity_sidebar = 0.0
+stackoverflow = 0.0
+
+[widgets]
+thesaurus_paths = ["data/english-wordnet-2022-subset.ttl"]

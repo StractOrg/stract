@@ -18,7 +18,13 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utoipa::ToSchema;
 
+use crate::{
+    config::WidgetsConfig,
+    thesaurus::{self, ThesaurusWidget},
+};
+
 use self::calculator::{Calculation, Calculator};
+use anyhow::{anyhow, Result};
 
 pub mod calculator;
 
@@ -30,13 +36,25 @@ pub enum Error {
 
 pub struct Widgets {
     calculator: Calculator,
+    thesaurus: Option<thesaurus::Dictionary>,
 }
 
 impl Widgets {
-    pub fn new() -> Self {
-        Self {
-            calculator: Calculator::new(calculator::ExchangeUpdate::AsyncTokio),
+    pub fn new(config: WidgetsConfig) -> Result<Self> {
+        if config.thesaurus_paths.len() > 1 {
+            return Err(anyhow!("Only one thesaurus path is supported for now"));
         }
+
+        let thesaurus = if let Some(path) = config.thesaurus_paths.get(0) {
+            Some(thesaurus::Dictionary::build(path)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            calculator: Calculator::new(calculator::ExchangeUpdate::AsyncTokio),
+            thesaurus,
+        })
     }
 
     pub fn widget(&self, query: &str) -> Option<Widget> {
@@ -44,6 +62,12 @@ impl Widgets {
             .try_calculate(query)
             .ok()
             .map(Widget::Calculator)
+            .or_else(|| {
+                self.thesaurus
+                    .as_ref()
+                    .and_then(|thesaurus| thesaurus.lookup(query))
+                    .map(Widget::Thesaurus)
+            })
     }
 }
 
@@ -51,4 +75,5 @@ impl Widgets {
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum Widget {
     Calculator(Calculation),
+    Thesaurus(ThesaurusWidget),
 }

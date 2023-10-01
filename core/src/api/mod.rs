@@ -133,8 +133,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         lambda_model,
         qa_model,
         bangs,
-        config.collector.clone(),
-        config.thresholds.clone(),
+        config.clone(),
     );
 
     let state = Arc::new(State {

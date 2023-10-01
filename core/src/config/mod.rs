@@ -206,6 +206,8 @@ pub struct ApiConfig {
 
     #[serde(default)]
     pub thresholds: ApiThresholds,
+
+    pub widgets: WidgetsConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -353,4 +355,9 @@ pub struct WebgraphServerConfig {
 
     #[serde(default = "defaults::WebgraphServer::max_similar_sites")]
     pub max_similar_sites: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetsConfig {
+    pub thesaurus_paths: Vec<String>,
 }

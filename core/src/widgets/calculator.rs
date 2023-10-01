@@ -21,7 +21,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicUsize, Arc, Mutex},
 };
 use utoipa::ToSchema;
 
@@ -63,6 +63,7 @@ async fn get_rates() -> Result<CurrencyExchange> {
                         .find(|a| a.as_ref().unwrap().key == b"rate")
                         .map(|a| a.unwrap().value.to_vec())
                         .unwrap();
+
                     rates.insert(
                         String::from_utf8(currency)?,
                         String::from_utf8(rate)?.parse::<f64>()?,
@@ -105,6 +106,27 @@ pub enum ExchangeUpdate {
     AsyncTokio,
 }
 
+struct MaxIterations {
+    max_iterations: usize,
+    iterations: AtomicUsize,
+}
+impl MaxIterations {
+    fn new(max_iterations: usize) -> Self {
+        Self {
+            max_iterations,
+            iterations: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl fend_core::Interrupt for MaxIterations {
+    fn should_interrupt(&self) -> bool {
+        self.iterations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            > self.max_iterations
+    }
+}
+
 pub struct Calculator {
     exchange: Arc<Mutex<Arc<CurrencyExchange>>>,
 }
@@ -136,8 +158,9 @@ impl Calculator {
     }
 
     pub fn try_calculate(&self, expr: &str) -> Result<Calculation, Error> {
+        let expr = expr.replace(['"', '\''], "");
         // if expr starts with "d[0-9]+", wrap it in "roll(...)"
-        let expr = if DICE_REGEX.is_match(expr) {
+        let expr = if DICE_REGEX.is_match(&expr) {
             format!("roll({})", expr)
         } else {
             expr.to_string()
@@ -154,7 +177,10 @@ impl Calculator {
             rng.gen()
         });
 
-        let res = fend_core::evaluate(&expr, &mut context).map_err(|_| Error::CalculatorParse)?;
+        let interrupt = MaxIterations::new(32);
+
+        let res = fend_core::evaluate_with_interrupt(&expr, &mut context, &interrupt)
+            .map_err(|_| Error::CalculatorParse)?;
 
         if res.get_main_result() == expr {
             return Err(Error::CalculatorParse);

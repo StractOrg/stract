@@ -73,6 +73,7 @@ mod snippet;
 pub mod spell;
 mod subdomain_count;
 pub mod summarizer;
+mod thesaurus;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;

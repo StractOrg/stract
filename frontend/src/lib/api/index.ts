@@ -146,6 +146,7 @@ export type Sidebar = components['schemas']['DisplayedSidebar'];
 export type Entity = components['schemas']['DisplayedEntity'];
 export type EntitySnippet = components['schemas']['EntitySnippet'];
 export type Widget = components['schemas']['Widget'];
+export type ThesaurusWidget = components['schemas']['ThesaurusWidget'];
 export type DisplayedAnswer = components['schemas']['DisplayedAnswer'];
 export type ScoredSite = components['schemas']['ScoredSite'];
 export type Suggestion = components['schemas']['Suggestion'];

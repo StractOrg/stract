@@ -590,7 +590,6 @@ impl Field {
                 | Field::Text(TextField::TitleIfHomepage)
                 | Field::Text(TextField::SiteWithout) // will match url
                 | Field::Text(TextField::Domain) // will match url
-                | Field::Text(TextField::CleanBody) // will match all_body
         ) && !self.is_fast()
     }
 

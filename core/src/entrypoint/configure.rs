@@ -41,6 +41,7 @@ fn download_files() {
                 "sample.warc.gz",
                 "bangs.json",
                 "content.rdf.u8.gz",
+                "english-wordnet-2022-subset.ttl",
             ] {
                 info!("Downloading {}", name);
                 let body = reqwest::get(format!("http://s3.trystract.com/{BUCKET_NAME}/{name}"))

@@ -25,7 +25,7 @@ use optics::Optic;
 use url::Url;
 
 use crate::bangs::{Bang, BangHit};
-use crate::config::{ApiThresholds, CollectorConfig};
+use crate::config::{ApiConfig, ApiThresholds, CollectorConfig};
 use crate::inverted_index::RetrievedWebpage;
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
@@ -68,8 +68,7 @@ impl ApiSearcher {
         lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,
         bangs: Bangs,
-        collector_config: CollectorConfig,
-        thresholds: ApiThresholds,
+        config: ApiConfig,
     ) -> Self {
         Self {
             distributed_searcher: DistributedSearcher::new(cluster),
@@ -77,9 +76,9 @@ impl ApiSearcher {
             lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
             bangs,
-            collector_config,
-            thresholds,
-            widgets: Widgets::new(),
+            collector_config: config.collector,
+            thresholds: config.thresholds,
+            widgets: Widgets::new(config.widgets).unwrap(),
         }
     }
 

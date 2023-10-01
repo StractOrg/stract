@@ -13,3 +13,4 @@ notes
 ltr_scores.json
 .venv
 libtorch
+proptest-regressions
