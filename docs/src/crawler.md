@@ -10,10 +10,10 @@ The coordinator starts with a list of seed urls, schedules these to the availabl
 
 You can imagine that the url frontier can grow very large, very quickly. This begs the question: How does the coordinator determine which urls to crawl next? We could just crawl the urls in the order they were discovered, but this might not lead to the most interesting results.
 
-Instead, the coordinator assigns a score to each url and performs a weighted random selection of the next url to crawl. The score is determined by the number of incoming links to the url from other urls on different domains. The more incoming links a url has from other domains, the higher its score and the more likely it is to be selected for crawling.
-This prioritizes urls that are more likely to be interesting to the user. After a url has been chosen, we again sample from the url frontier but this time only choosing urls from the same domain as the chosen url. This ensures that we get a fairly good coverage of the domain before moving on to the next one.
+Instead, the coordinator assigns a score to each url and performs a weighted random selection of the next url to crawl.
+Each domain starts with a score of 1.0 and is summed with the weight of all the ingoing links. Whenever a domain is sampled, it spreads its score to all urls that are linked to from the domain. Thus if a domain has many outgoing links, the weight for each of those links will be relatively low compared to if the domain only has a few outgoing links.
 
-The sampled urls are then scheduled to the available workers and the process repeats.
+This prioritizes urls and domains that has many high-valued incoming links and are therefore more likely to be interesting for the user. The sampled urls are then scheduled to the available workers and the process repeats.
 
 ### Respectfullness
 It is of utmost importance that we are respectful of the websites we crawl. We do not want to overload a website with requests and we do not want to crawl pages from the website that the website owner does not want us to crawl.

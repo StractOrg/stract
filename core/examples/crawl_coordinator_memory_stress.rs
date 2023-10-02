@@ -59,6 +59,7 @@ fn random_responses(num: usize) -> Vec<JobResponse> {
             domain: domain.clone(),
             url_responses,
             discovered_urls,
+            weight_budget: 1.0,
         });
     }
 

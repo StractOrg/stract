@@ -272,6 +272,7 @@ impl WorkerThread {
                 .into_iter()
                 .filter(|url| url.as_str().len() < MAX_URL_LENGTH)
                 .collect(),
+            weight_budget: job.weight_budget,
         };
 
         self.results.lock().await.push(job_response);

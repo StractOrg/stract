@@ -20,16 +20,16 @@ use rand::Rng;
 use rayon::prelude::*;
 use std::hash::Hash;
 use std::path::PathBuf;
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, VecDeque},
-    path::Path,
-};
+use std::{collections::BinaryHeap, path::Path};
 use url::Url;
 
 use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
-const MAX_URL_DB_SIZE_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10GB
+const MAX_URL_DB_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024; // 20GB
+
+/// TLDs that are known to be spammy and should be ignored.
+/// Whenever a TLD is free to register, it is likely to be abused by spammers.
+const BLOCKED_TLD: [&str; 1] = ["tk"];
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UrlStatus {
@@ -71,7 +71,7 @@ impl<T> Ord for SampledItem<T> {
     }
 }
 
-fn weighted_sample<T>(items: impl Iterator<Item = (T, f64)>, num_items: usize) -> Vec<T> {
+fn weighted_sample<T>(items: impl Iterator<Item = (T, f64)>, num_items: usize) -> Vec<(T, f64)> {
     let mut sampled_items: BinaryHeap<SampledItem<T>> = BinaryHeap::with_capacity(num_items);
 
     let mut rng = rand::thread_rng();
@@ -90,7 +90,10 @@ fn weighted_sample<T>(items: impl Iterator<Item = (T, f64)>, num_items: usize) -
         }
     }
 
-    sampled_items.into_iter().map(|s| s.item).collect()
+    sampled_items
+        .into_iter()
+        .map(|s| (s.item, s.priority))
+        .collect()
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -112,15 +115,13 @@ impl Default for UrlState {
 struct DomainState {
     weight: f64,
     status: DomainStatus,
-    total_urls: u64,
 }
 
 impl Default for DomainState {
     fn default() -> Self {
         Self {
-            weight: 0.0,
+            weight: 1.0,
             status: DomainStatus::Pending,
-            total_urls: 0,
         }
     }
 }
@@ -222,7 +223,7 @@ impl<T> From<T> for CachedValue<T> {
 
 struct UrlToInsert {
     url: Url,
-    different_domain: bool,
+    weight: f64,
 }
 
 struct UrlStateDbShard {
@@ -433,7 +434,7 @@ impl UrlStateDb {
 
     pub fn get(&self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
         // we iterate in reverse order so that we get the most recent state
-        // since we insert new states at the last shard.
+        // since new states are inserted into the last shard.
         for shard in self.shards.iter().rev() {
             if let Some(state) = shard.get(domain, url)? {
                 return Ok(Some(state));
@@ -581,21 +582,7 @@ impl CrawlDb {
         for url in urls {
             let domain = Domain::from(url);
 
-            match self.domain_state.get(&domain)? {
-                Some(mut state) => {
-                    state.total_urls += 1;
-                    self.domain_state.put(&domain, &state)?;
-                }
-                None => self.domain_state.put(
-                    &domain,
-                    &DomainState {
-                        weight: 0.0,
-                        status: DomainStatus::Pending,
-                        total_urls: 1,
-                    },
-                )?,
-            }
-
+            self.domain_state.put(&domain, &DomainState::default())?;
             self.urls
                 .put_batch(&domain, &[(UrlString::from(url), UrlState::default())])?;
         }
@@ -607,15 +594,61 @@ impl CrawlDb {
         let domains: DashMap<Domain, Vec<UrlToInsert>> = DashMap::new();
 
         responses.par_iter().for_each(|res| {
+            let urls: Vec<(Domain, Url)> = res
+                .discovered_urls
+                .iter()
+                .filter_map(|url| {
+                    let domain = Domain::from(url);
+
+                    for tld in BLOCKED_TLD.iter() {
+                        if domain.as_str().ends_with(tld) {
+                            return None;
+                        }
+                    }
+
+                    Some((domain, url.clone()))
+                })
+                .collect();
+
+            let diff_domains = urls
+                .iter()
+                .filter(|(domain, _)| res.domain != *domain)
+                .count() as f64;
+            let mut used_budget = 0.0;
+
             for url in &res.discovered_urls {
                 let domain = Domain::from(url);
+
+                for tld in BLOCKED_TLD.iter() {
+                    if domain.as_str().ends_with(tld) {
+                        continue;
+                    }
+                }
+
                 let different_domain = res.domain != domain;
+
+                let weight = if different_domain {
+                    (res.weight_budget / diff_domains).min(1.0)
+                } else {
+                    0.0
+                };
+
+                used_budget += weight;
 
                 domains.entry(domain).or_default().push(UrlToInsert {
                     url: url.clone(),
-                    different_domain,
+                    weight,
                 });
             }
+
+            let mut domain_state = self
+                .domain_state
+                .get(&res.domain)
+                .unwrap()
+                .unwrap_or_default();
+
+            domain_state.weight = (domain_state.weight - used_budget).max(0.0);
+            self.domain_state.put(&res.domain, &domain_state).unwrap();
 
             for url_res in &res.url_responses {
                 if let UrlResponse::Redirected { url, new_url } = url_res {
@@ -627,19 +660,7 @@ impl CrawlDb {
         let mut nonempty_domains = HashSet::new();
 
         for (domain, urls) in domains.into_iter() {
-            let mut domain_state = match self.domain_state.get(&domain)? {
-                Some(state) => state,
-                None => {
-                    let state = DomainState {
-                        weight: 0.0,
-                        status: DomainStatus::Pending,
-                        total_urls: 0,
-                    };
-                    self.domain_state.put(&domain, &state)?;
-
-                    state
-                }
-            };
+            let mut domain_state = self.domain_state.get(&domain)?.unwrap_or_default();
 
             if !urls.is_empty() {
                 nonempty_domains.insert(domain.clone());
@@ -650,19 +671,11 @@ impl CrawlDb {
             for url in urls {
                 let mut url_state = match self.urls.get(&domain, &UrlString::from(&url.url))? {
                     Some(state) => state,
-                    None => {
-                        domain_state.total_urls += 1;
-                        UrlState::default()
-                    }
+                    None => UrlState::default(),
                 };
 
-                if url.different_domain {
-                    url_state.weight += 1.0;
-                }
-
-                if url_state.weight > domain_state.weight {
-                    domain_state.weight = url_state.weight;
-                }
+                url_state.weight += url.weight;
+                domain_state.weight += url_state.weight;
 
                 url_states.push((UrlString::from(&url.url), url_state));
             }
@@ -697,13 +710,13 @@ impl CrawlDb {
             num_jobs,
         );
 
-        for domain in sampled.iter() {
+        for (domain, _) in sampled.iter() {
             let mut state = self.domain_state.get(domain)?.unwrap_or_default();
             state.status = DomainStatus::CrawlInProgress;
             self.domain_state.put(domain, &state)?;
         }
 
-        Ok(sampled)
+        Ok(sampled.into_iter().map(|(d, _)| d).collect())
     }
 
     pub fn prepare_jobs(&mut self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
@@ -729,7 +742,7 @@ impl CrawlDb {
 
             let mut new_url_states = Vec::new();
 
-            for url in &sampled {
+            for (url, _) in &sampled {
                 let mut state = self.urls.get(domain, url)?.unwrap_or_default();
                 state.status = UrlStatus::Crawling;
 
@@ -738,31 +751,14 @@ impl CrawlDb {
 
             self.urls.put_batch(domain, &new_url_states)?;
 
-            let mut domain_state = self.domain_state.get(domain)?.unwrap_or_default();
+            let domain_state = self.domain_state.get(domain)?.unwrap_or_default();
 
-            domain_state.weight = urls
-                .iter()
-                .filter_map(|(_, state)| {
-                    if state.status == UrlStatus::Pending {
-                        Some(state.weight)
-                    } else {
-                        None
-                    }
-                })
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap_or(0.0);
-
-            self.domain_state.put(domain, &domain_state)?;
-
-            let mut job = Job {
+            let job = Job {
                 domain: domain.clone(),
                 fetch_sitemap: false, // todo: fetch for new sites
-                urls: VecDeque::with_capacity(urls_per_job),
+                urls: sampled.iter().map(|(url, _)| (*url).into()).collect(),
+                weight_budget: domain_state.weight,
             };
-
-            for url in sampled {
-                job.urls.push_back(url.into());
-            }
 
             jobs.push(job);
         }
@@ -794,7 +790,7 @@ mod tests {
         let items: Vec<(usize, f64)> = vec![(0, 1000000000.0), (1, 2.0)];
         let sampled = weighted_sample(items.iter().map(|(i, w)| (i, *w)), 1);
         assert_eq!(sampled.len(), 1);
-        assert_eq!(*sampled[0], 0);
+        assert_eq!(*sampled[0].0, 0);
     }
 
     #[test]

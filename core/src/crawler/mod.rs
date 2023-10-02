@@ -111,6 +111,7 @@ pub struct Job {
     pub domain: Domain,
     pub fetch_sitemap: bool,
     pub urls: VecDeque<Url>,
+    pub weight_budget: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -125,6 +126,7 @@ pub struct JobResponse {
     pub domain: Domain,
     pub url_responses: Vec<UrlResponse>,
     pub discovered_urls: Vec<Url>,
+    pub weight_budget: f64,
 }
 
 struct RetrieableUrl {
@@ -142,6 +144,7 @@ struct WorkerJob {
     pub domain: Domain,
     pub fetch_sitemap: bool,
     pub urls: VecDeque<RetrieableUrl>,
+    pub weight_budget: f64,
 }
 
 impl From<Job> for WorkerJob {
@@ -150,6 +153,7 @@ impl From<Job> for WorkerJob {
             domain: value.domain,
             fetch_sitemap: value.fetch_sitemap,
             urls: value.urls.into_iter().map(RetrieableUrl::from).collect(),
+            weight_budget: value.weight_budget,
         }
     }
 }
