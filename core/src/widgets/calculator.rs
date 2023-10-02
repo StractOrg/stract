@@ -177,7 +177,7 @@ impl Calculator {
             rng.gen()
         });
 
-        let interrupt = MaxIterations::new(32);
+        let interrupt = MaxIterations::new(256);
 
         let res = fend_core::evaluate_with_interrupt(&expr, &mut context, &interrupt)
             .map_err(|_| Error::CalculatorParse)?;
