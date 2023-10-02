@@ -72,7 +72,7 @@ async fn summarize(
     path = "/beta/api/summarize",
     params(SummarizeParams),
     responses(
-        (status = 200, description = "Summarize a website", body = String),
+        (status = 200, description = "Summarize a website", body = String, content_type = "text/event-stream"),
     )
 )]
 pub async fn summarize_route(

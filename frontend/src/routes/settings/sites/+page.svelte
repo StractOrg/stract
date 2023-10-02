@@ -43,7 +43,7 @@
   const clearAndExport =
     ({ clear }: { clear: boolean }) =>
     async () => {
-      const { data } = api.sitesExportOptic({
+      const { data } = api.sitesExport({
         siteRankings: $ranked,
       });
       const { default: fileSaver } = await import('file-saver');

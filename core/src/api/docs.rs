@@ -55,6 +55,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
                 crate::snippet::TextSnippet,
                 crate::snippet::TextSnippetFragment,
+                crate::snippet::TextSnippetFragmentKind,
 
                 crate::entity_index::entity::EntitySnippet,
                 crate::entity_index::entity::EntitySnippetFragment,

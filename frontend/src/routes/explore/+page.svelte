@@ -22,7 +22,9 @@
   let errorMessage = false;
 
   $: {
-    api.similarSites({ sites: chosenSites, topN: limit }).data.then((res) => (similarSites = res));
+    api
+      .webgraphHostSimilar({ sites: chosenSites, topN: limit })
+      .data.then((res) => (similarSites = res));
   }
 
   const removeWebsite = async (site: string) => {
@@ -35,7 +37,7 @@
     site = site.trim();
     if (!site) return;
 
-    const result = await api.knowsSite({ site }).data;
+    const result = await api.webgraphHostKnows({ site }).data;
     match(result)
       .with({ type: 'unknown' }, () => {
         errorMessage = true;
@@ -48,7 +50,7 @@
   };
 
   const exportAsOptic = async () => {
-    const { data } = api.exploreExportOptic({
+    const { data } = api.exploreExport({
       chosenSites,
       similarSites: similarSites.map((site) => site.site),
     });

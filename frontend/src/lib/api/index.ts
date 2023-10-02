@@ -1,159 +1,449 @@
-// deno-lint-ignore-file ban-types
+type Method = 'DELETE' | 'GET' | 'PUT' | 'POST' | 'HEAD' | 'TRACE' | 'PATCH';
 
-import { match } from 'ts-pattern';
-import type { components } from './schema.d.ts';
-import { send, sse, type Props, API_BASE, type ApiOptions } from './com';
+let GLOBAL_API_BASE = '';
+export const getApiBase = (options?: ApiOptions) => options?.apiBase ?? GLOBAL_API_BASE;
+export const setGlobalApiBase = (apiBase: string) => (GLOBAL_API_BASE = apiBase);
 
-export const api = {
-  search: (props: Props<'/beta/api/search', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send('/beta/api/search', 'post', 'json', props, options);
-
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  autosuggest: (props: Props<'/beta/api/autosuggest', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send('/beta/api/autosuggest', 'post', 'parameters', props, options);
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  similarSites: (props: Props<'/beta/api/webgraph/host/similar', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send(
-      '/beta/api/webgraph/host/similar',
-      'post',
-      'json',
-      props,
-      options,
-    );
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  knowsSite: (props: Props<'/beta/api/webgraph/host/knows', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send(
-      '/beta/api/webgraph/host/knows',
-      'post',
-      'parameters',
-      props,
-      options,
-    );
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  factCheck: (props: Props<'/beta/api/fact_check', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send('/beta/api/fact_check', 'post', 'json', props, options);
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  alice: (
-    props: Props<'/beta/api/alice', 'get'>,
-    stream: (
-      msg:
-        | { type: 'begin' }
-        | { type: 'content'; data: ExecutionState }
-        | {
-            type: 'done';
-          },
-    ) => void,
-    options?: ApiOptions,
-  ) => {
-    const { cancel, listen } = sse('/beta/api/alice', 'parameters', props, options);
-    stream({ type: 'begin' });
-    listen((e) => {
-      match(e)
-        .with({ type: 'message' }, ({ data }) => stream({ type: 'content', data }))
-        .with({ type: 'error' }, () => {
-          stream({ type: 'done' });
-          cancel();
-        })
-        .exhaustive();
-    });
-  },
-
-  summarize: (
-    props: Props<'/beta/api/summarize', 'get'>,
-    stream: (
-      msg:
-        | { type: 'begin' }
-        | { type: 'content'; data: string }
-        | {
-            type: 'done';
-          },
-    ) => void,
-    options?: ApiOptions,
-  ) => {
-    const { cancel, listen } = sse('/beta/api/summarize', 'parameters', props, options);
-    stream({ type: 'begin' });
-    listen((e) => {
-      match(e)
-        .with({ type: 'message' }, ({ data }) => stream({ type: 'content', data }))
-        .with({ type: 'error' }, () => {
-          stream({ type: 'done' });
-          cancel();
-        })
-        .exhaustive();
-    });
-  },
-
-  sitesExportOptic: (props: Props<'/beta/api/sites/export', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send('/beta/api/sites/export', 'post', 'json', props, options);
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  exploreExportOptic: (props: Props<'/beta/api/explore/export', 'post'>, options?: ApiOptions) => {
-    const { data, cancel } = send('/beta/api/explore/export', 'post', 'json', props, options);
-    return { data: data.then((res) => res[200]), cancel };
-  },
-
-  queryId: ({ query, urls }: { query: string; urls: string[] }, options?: ApiOptions) => {
-    const { signal, abort } = new AbortController();
-    let finished = false;
-    const data = (options?.fetch ?? fetch)(`${API_BASE}/improvement/store`, {
-      method: 'POST',
-      signal,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: query,
-        urls: urls,
-      }),
-    })
-      .then((response) => response.text())
-      .then((data) => {
-        finished = true;
-        return data;
-      });
-
-    return {
-      data,
-      abort: () => {
-        if (!finished) {
-          abort();
-        }
-      },
-    };
-  },
-
-  sendImprovementClick: ({ queryId, clickIndex }: { queryId: string; clickIndex: number }) => {
-    window.navigator.sendBeacon(`${API_BASE}/improvement/click?qid=${queryId}&click=${clickIndex}`);
-  },
+export type ApiOptions = {
+  fetch?: typeof fetch;
+  apiBase?: string;
 };
 
-export type SearchResults = components['schemas']['ApiSearchResult'];
-export type WebsitesResult = components['schemas']['WebsitesResult'];
-export type Webpage = components['schemas']['DisplayedWebpage'];
-export type TextSnippet = components['schemas']['TextSnippet'];
-export type Sidebar = components['schemas']['DisplayedSidebar'];
-export type Entity = components['schemas']['DisplayedEntity'];
-export type EntitySnippet = components['schemas']['EntitySnippet'];
-export type Widget = components['schemas']['Widget'];
-export type ThesaurusWidget = components['schemas']['ThesaurusWidget'];
-export type DisplayedAnswer = components['schemas']['DisplayedAnswer'];
-export type ScoredSite = components['schemas']['ScoredSite'];
-export type Suggestion = components['schemas']['Suggestion'];
-export type Region = components['schemas']['Region'];
+export const requestPlain = (
+  method: Method,
+  url: string,
+  body?: unknown,
+  options?: ApiOptions & { headers?: Record<string, string> },
+): {
+  data: Promise<string>;
+  cancel: (reason?: string) => void;
+} => {
+  let inFlight = true;
+  const controller = new AbortController();
+  const data = (options?.fetch ?? fetch)(`${getApiBase(options)}${url}`, {
+    method: method.toUpperCase(),
+    body: typeof body != 'undefined' ? JSON.stringify(body) : void 0,
+    signal: controller.signal,
+    headers: {
+      ...options?.headers,
+      ...(typeof body != 'undefined' ? { 'Content-Type': 'application/json' } : {}),
+    },
+  }).then(async (res) => {
+    inFlight = false;
+    if (res.ok) {
+      const text = await res.text();
+      try {
+        return text;
+      } catch (_) {
+        throw text;
+      }
+    } else {
+      throw res.text();
+    }
+  });
 
-export type StackOverflowAnswer = components['schemas']['StackOverflowAnswer'];
-export type StackOverflowQuestion = components['schemas']['StackOverflowQuestion'];
+  return {
+    data,
+    cancel: (reason) => {
+      if (inFlight) controller.abort(reason);
+    },
+  };
+};
 
-export type FactCheckResponse = components['schemas']['FactCheckResponse'];
-export type ExecutionState = components['schemas']['ExecutionState'];
+export const requestJson = <T>(
+  method: Method,
+  url: string,
+  body?: unknown,
+  options: ApiOptions = {},
+): {
+  data: Promise<T>;
+  cancel: (reason?: string) => void;
+} => {
+  const { data, cancel } = requestPlain(method, url, body, options);
+  return { data: data.then((text) => JSON.parse(text) as T), cancel };
+};
+
+export type SSEStream<T> = (
+  event:
+    | { type: 'message'; data: T }
+    | {
+        type: 'error';
+        event: Event;
+      },
+) => void;
+
+const sse = <T>(
+  _method: Method,
+  url: string,
+  options?: ApiOptions,
+): {
+  cancel: () => void;
+  listen: (stream: SSEStream<T>) => void;
+} => {
+  const source = new EventSource(`${getApiBase(options)}${url}`);
+
+  let stream: SSEStream<T> | null = null;
+
+  source.onmessage = (event) => {
+    const data = event.data;
+    stream?.({ type: 'message', data });
+  };
+  source.onerror = (event) => {
+    stream?.({ type: 'error', event });
+  };
+  return {
+    cancel: () => source.close(),
+    listen: (newStream) => (stream = newStream),
+  };
+};
+
+export const api = {
+  alice: (
+    query: {
+      message: string;
+      optic: string;
+      prevState: EncodedSavedState;
+    },
+    options?: ApiOptions,
+  ) => sse<ExecutionState>('GET', `/beta/api/alice?${new URLSearchParams(query)}`, options),
+  autosuggest: (
+    params: {
+      q: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<Suggestion[]>(
+      'POST',
+      `/beta/api/autosuggest?${new URLSearchParams(params)}`,
+      options,
+    ),
+  exploreExport: (body: ExploreExportOpticParams, options?: ApiOptions) =>
+    requestPlain('POST', `/beta/api/explore/export`, body, options),
+  factCheck: (body: FactCheckParams, options?: ApiOptions) =>
+    requestJson<FactCheckResponse>('POST', `/beta/api/fact_check`, body, options),
+  search: (body: ApiSearchQuery, options?: ApiOptions) =>
+    requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
+  sitesExport: (body: SitesExportOpticParams, options?: ApiOptions) =>
+    requestPlain('POST', `/beta/api/sites/export`, body, options),
+  summarize: (
+    query: {
+      query: string;
+      url: string;
+    },
+    options?: ApiOptions,
+  ) => sse<string>('GET', `/beta/api/summarize?${new URLSearchParams(query)}`, options),
+  webgraphHostIngoing: (
+    query: {
+      site: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<FullEdge[]>(
+      'POST',
+      `/beta/api/webgraph/host/ingoing?${new URLSearchParams(query)}`,
+      options,
+    ),
+  webgraphHostKnows: (
+    query: {
+      site: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<KnowsSite>(
+      'POST',
+      `/beta/api/webgraph/host/knows?${new URLSearchParams(query)}`,
+      options,
+    ),
+  webgraphHostOutgoing: (
+    query: {
+      site: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<FullEdge[]>(
+      'POST',
+      `/beta/api/webgraph/host/outgoing?${new URLSearchParams(query)}`,
+      options,
+    ),
+  webgraphHostSimilar: (body: SimilarSitesParams, options?: ApiOptions) =>
+    requestJson<ScoredSite[]>('POST', `/beta/api/webgraph/host/similar`, body, options),
+  webgraphPageIngoing: (
+    query: {
+      page: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<FullEdge[]>(
+      'POST',
+      `/beta/api/webgraph/page/ingoing?${new URLSearchParams(query)}`,
+      options,
+    ),
+  webgraphPageOutgoing: (
+    query: {
+      page: string;
+    },
+    options?: ApiOptions,
+  ) =>
+    requestJson<FullEdge[]>(
+      'POST',
+      `/beta/api/webgraph/page/outgoing?${new URLSearchParams(query)}`,
+      options,
+    ),
+};
+
+export type ApiSearchQuery = {
+  fetchDiscussions?: boolean;
+  flattenResponse?: boolean;
+  numResults?: number;
+  optic?: string;
+  page?: number;
+  query: string;
+  returnRankingSignals?: boolean;
+  safeSearch?: boolean;
+  selectedRegion?: Region;
+  siteRankings?: SiteRankings;
+};
+export type ApiSearchResult =
+  | (WebsitesResult & {
+      type: 'websites';
+    })
+  | (BangHit & {
+      type: 'bang';
+    });
+export type Bang = {
+  c?: string;
+  d?: string;
+  r?: number;
+  s?: string;
+  sc?: string;
+  t: string;
+  u: string;
+};
+export type BangHit = {
+  bang: Bang;
+  redirectTo: UrlWrapper;
+};
+export type Calculation = {
+  input: string;
+  result: string;
+};
+export type CodeOrText =
+  | {
+      type: 'code';
+      value: string;
+    }
+  | {
+      type: 'text';
+      value: string;
+    };
+export type Definition = string;
+export type DisplayedAnswer = {
+  answer: string;
+  prettyUrl: string;
+  snippet: string;
+  title: string;
+  url: string;
+};
+export type DisplayedEntity = {
+  imageBase64?: string;
+  info: string & EntitySnippet[][];
+  matchScore: number;
+  relatedEntities: DisplayedEntity[];
+  smallAbstract: EntitySnippet;
+  title: string;
+};
+export type DisplayedSidebar =
+  | {
+      type: 'entity';
+      value: DisplayedEntity;
+    }
+  | {
+      type: 'stackOverflow';
+      value: {
+        answer: StackOverflowAnswer;
+        title: string;
+      };
+    };
+export type DisplayedWebpage = {
+  domain: string;
+  prettyUrl: string;
+  rankingSignals?: {};
+  site: string;
+  snippet: Snippet;
+  title: string;
+  url: string;
+};
+export type EncodedEncryptedState = string;
+export type EncodedSavedState = string;
+export type EntitySnippet = {
+  fragments: EntitySnippetFragment[];
+};
+export type EntitySnippetFragment =
+  | {
+      kind: 'normal';
+      text: string;
+    }
+  | {
+      href: string;
+      kind: 'link';
+      text: string;
+    };
+export type Example = string;
+export type ExecutionState =
+  | {
+      query: string;
+      type: 'beginSearch';
+    }
+  | {
+      query: string;
+      result: SimplifiedWebsite[];
+      type: 'searchResult';
+    }
+  | {
+      text: string;
+      type: 'speaking';
+    }
+  | {
+      state: EncodedEncryptedState;
+      type: 'done';
+    };
+export type ExploreExportOpticParams = {
+  chosenSites: string[];
+  similarSites: string[];
+};
+export type FactCheckParams = {
+  claim: string;
+  evidence: string;
+};
+export type FactCheckResponse = {
+  score: number;
+};
+export type FullEdge = {
+  from: Node;
+  label: string;
+  to: Node;
+};
+export type HighlightedSpellCorrection = {
+  highlighted: string;
+  raw: string;
+};
+export type KnowsSite =
+  | {
+      site: string;
+      type: 'known';
+    }
+  | {
+      type: 'unknown';
+    };
+export type Lemma = string;
+export type Node = {
+  name: string;
+};
+export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adjectiveSatellite' | 'adverb';
+export const PART_OF_SPEECHES = [
+  'noun',
+  'verb',
+  'adjective',
+  'adjectiveSatellite',
+  'adverb',
+] satisfies PartOfSpeech[];
+export type PartOfSpeechMeaning = {
+  meanings: WordMeaning[];
+  pos: PartOfSpeech;
+};
+export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
+export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];
+export type ScoredSite = {
+  description?: string;
+  score: number;
+  site: string;
+};
+export type SignalScore = {
+  coefficient: number;
+  value: number;
+};
+export type SimilarSitesParams = {
+  sites: string[];
+  topN: number;
+};
+export type SimplifiedWebsite = {
+  site: string;
+  text: string;
+  title: string;
+  url: string;
+};
+export type SiteRankings = {
+  blocked: string[];
+  disliked: string[];
+  liked: string[];
+};
+export type SitesExportOpticParams = {
+  siteRankings: SiteRankings;
+};
+export type Snippet =
+  | {
+      date?: string;
+      text: TextSnippet;
+      type: 'normal';
+    }
+  | {
+      answers: StackOverflowAnswer[];
+      question: StackOverflowQuestion;
+      type: 'stackOverflowQA';
+    };
+export type StackOverflowAnswer = {
+  accepted: boolean;
+  body: CodeOrText[];
+  date: string;
+  upvotes: number;
+  url: string;
+};
+export type StackOverflowQuestion = {
+  body: CodeOrText[];
+};
+export type Suggestion = {
+  highlighted: string;
+  raw: string;
+};
+export type TextSnippet = {
+  fragments: TextSnippetFragment[];
+};
+export type TextSnippetFragment = {
+  kind: TextSnippetFragmentKind;
+  text: string;
+};
+export type TextSnippetFragmentKind = 'normal' | 'highlighted';
+export const TEXT_SNIPPET_FRAGMENT_KINDS = [
+  'normal',
+  'highlighted',
+] satisfies TextSnippetFragmentKind[];
+export type ThesaurusWidget = {
+  meanings: PartOfSpeechMeaning[];
+  term: Lemma;
+};
+export type UrlWrapper = string;
+export type WebsitesResult = {
+  directAnswer?: DisplayedAnswer;
+  discussions?: DisplayedWebpage[];
+  hasMoreResults: boolean;
+  numHits: number;
+  searchDurationMs: number;
+  sidebar?: DisplayedSidebar;
+  spellCorrectedQuery?: HighlightedSpellCorrection;
+  webpages: DisplayedWebpage[];
+  widget?: Widget;
+};
+export type Widget =
+  | {
+      type: 'calculator';
+      value: Calculation;
+    }
+  | {
+      type: 'thesaurus';
+      value: ThesaurusWidget;
+    };
+export type WordMeaning = {
+  definition: Definition;
+  examples: Example[];
+  similar: Lemma[];
+};

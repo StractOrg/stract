@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import type { OpticOption } from './optics';
 import type { SiteRakings } from './rankings';
-import { api, type Webpage } from './api';
+import { api, type DisplayedWebpage } from './api';
 import { match } from 'ts-pattern';
 
 const parseJSONWithFallback = <T>(json: string, fallback: T, message = '') => {
@@ -70,38 +70,42 @@ if (browser)
     document.documentElement.className = `${c} ${theme}`.trim();
   });
 
-export const summariesStore = writable<
-  Record<string, { inProgress: boolean; data: string } | undefined>
->({});
+type SummaryState = { inProgress: boolean; data: string } | undefined;
+export const summariesStore = writable<Record<string, SummaryState>>({});
 
 // Actions
 
-export const summarize = (query: string, site: Webpage) => {
-  api.summarize({ query, url: site.url }, (e) => {
-    summariesStore.update(($summaries) =>
-      match(e)
-        .with({ type: 'begin' }, () => ({
-          ...$summaries,
-          [site.url]: { inProgress: true, data: '' },
-        }))
-        .with({ type: 'content' }, ({ data }) => ({
-          ...$summaries,
-          [site.url]: {
-            inProgress: true,
-            data: ($summaries[site.url]?.data ?? '') + data,
-          },
-        }))
-        .with({ type: 'done' }, () => ({
-          ...$summaries,
-          [site.url]: {
-            inProgress: false,
-            data: $summaries[site.url]?.data ?? '',
-          },
-        }))
-        .exhaustive(),
-    );
+export const summarize = (query: string, site: DisplayedWebpage) => {
+  const updateSummary = (update: (summary: SummaryState) => SummaryState) => {
+    summariesStore.update(($summaries) => ({
+      ...$summaries,
+      [site.url]: update($summaries[site.url]),
+    }));
+  };
+
+  updateSummary(() => ({ inProgress: true, data: '' }));
+
+  const { listen, cancel } = api.summarize({ query, url: site.url });
+
+  listen((e) => {
+    match(e)
+      .with({ type: 'message' }, ({ data }) =>
+        updateSummary((summary) => ({
+          inProgress: true,
+          data: (summary?.data ?? '') + data,
+        })),
+      )
+      .with({ type: 'error' }, () => {
+        cancel();
+        updateSummary((summary) => ({
+          inProgress: false,
+          data: summary?.data ?? '',
+        }));
+      })
+      .exhaustive();
   });
 };
-export const clearSummary = (site: Webpage) => {
+
+export const clearSummary = (site: DisplayedWebpage) => {
   summariesStore.update(($summaries) => ({ ...$summaries, [site.url]: void 0 }));
 };

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Entity } from '$lib/api';
+  import type { DisplayedEntity } from '$lib/api';
   import EntitySnippet from '$lib/components/EntitySnippet.svelte';
 
-  export let entity: Entity;
+  export let entity: DisplayedEntity;
 </script>
 
 <div class="flex w-full justify-center">

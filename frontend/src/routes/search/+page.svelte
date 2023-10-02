@@ -9,7 +9,7 @@
   import type { PageData } from './$types';
   import { scale } from 'svelte/transition';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
-  import type { Webpage } from '$lib/api';
+  import type { DisplayedWebpage } from '$lib/api';
   import { onMount } from 'svelte';
   import { twJoin } from 'tailwind-merge';
   import Button from '$lib/components/Button.svelte';
@@ -29,7 +29,7 @@
   $: results = data.results;
   $: query = data.query;
 
-  let modal: { top: number; left: number; site: Webpage } | undefined;
+  let modal: { top: number; left: number; site: DisplayedWebpage } | undefined;
 
   onMount(() => {
     const listener = () => {
@@ -40,7 +40,7 @@
   });
 
   const openSearchModal =
-    (site: Webpage) =>
+    (site: DisplayedWebpage) =>
     ({ detail: button }: CustomEvent<HTMLButtonElement>) => {
       const rect = button.getBoundingClientRect();
 
@@ -95,14 +95,14 @@
     },
   ] as const;
 
-  const rankSite = (site: Webpage, ranking: Ranking) => () => {
+  const rankSite = (site: DisplayedWebpage, ranking: Ranking) => () => {
     siteRankingsStore.update(($rankings) => ({
       ...$rankings,
       [site.domain]: $rankings[site.domain] == ranking ? void 0 : ranking,
     }));
   };
 
-  const summarizeSite = (site: Webpage) => () => summarize(query, site);
+  const summarizeSite = (site: DisplayedWebpage) => () => summarize(query, site);
 </script>
 
 {#if modal}
