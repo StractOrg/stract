@@ -48,6 +48,7 @@
     "typescript": "^5.0.0",
     "unplugin-icons": "^0.17.0",
     "vite": "^4.4.2",
+    "vite-plugin-wasm": "^3.2.2",
     "vitest": "^0.32.2"
   },
   "type": "module",
@@ -57,6 +58,7 @@
     "highlight.js": "^11.8.0",
     "lz-string": "^1.5.0",
     "tailwind-merge": "^1.14.0",
-    "ts-pattern": "^5.0.5"
+    "ts-pattern": "^5.0.5",
+    "wasm": "file:../wasm/pkg"
   }
 }

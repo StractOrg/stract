@@ -1,0 +1,27 @@
+[package]
+name = "wasm"
+version = "0.1.0"
+edition = "2021"
+# wasm-opt = ["-Oz", "--enable-mutable-globals"]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+fend-core = "1.2.2"
+image = { version = "0.24.7", features = ["avif"] }
+tracing = "0.1.37"
+tracing-wasm = "0.2.1"
+wasm-bindgen = "0.2.87"
+
+[workspace]
