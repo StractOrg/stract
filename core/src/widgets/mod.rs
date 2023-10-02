@@ -18,15 +18,14 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utoipa::ToSchema;
 
-use crate::{
-    config::WidgetsConfig,
-    thesaurus::{self, ThesaurusWidget},
-};
+use self::thesaurus::ThesaurusWidget;
+use crate::config::WidgetsConfig;
 
 use self::calculator::{Calculation, Calculator};
 use anyhow::{anyhow, Result};
 
 pub mod calculator;
+pub mod thesaurus;
 
 #[derive(Error, Debug)]
 pub enum Error {

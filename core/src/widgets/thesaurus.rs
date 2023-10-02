@@ -184,6 +184,8 @@ impl Dictionary {
                 Regex::new(r"^([\w| ]+) meaning$")?,
                 Regex::new(r"^([\w| ]+) synonym$")?,
                 Regex::new(r"^([\w| ]+) synonyms$")?,
+                //
+                Regex::new(r"^define ([\w| ]+)$")?,
             ],
         })
     }

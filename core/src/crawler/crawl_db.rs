@@ -594,7 +594,7 @@ impl CrawlDb {
         let domains: DashMap<Domain, Vec<UrlToInsert>> = DashMap::new();
 
         responses.par_iter().for_each(|res| {
-            let urls: Vec<(Domain, Url)> = res
+            let mut urls: Vec<(Domain, Url)> = res
                 .discovered_urls
                 .iter()
                 .filter_map(|url| {
@@ -614,11 +614,13 @@ impl CrawlDb {
                 .iter()
                 .filter(|(domain, _)| res.domain != *domain)
                 .count() as f64;
+
+            urls.sort_unstable_by(|(_, a), (_, b)| a.as_str().cmp(b.as_str()));
+            urls.dedup_by(|(_, a), (_, b)| a.as_str() == b.as_str());
+
             let mut used_budget = 0.0;
 
-            for url in &res.discovered_urls {
-                let domain = Domain::from(url);
-
+            for (domain, url) in urls {
                 for tld in BLOCKED_TLD.iter() {
                     if domain.as_str().ends_with(tld) {
                         continue;
@@ -635,10 +637,10 @@ impl CrawlDb {
 
                 used_budget += weight;
 
-                domains.entry(domain).or_default().push(UrlToInsert {
-                    url: url.clone(),
-                    weight,
-                });
+                domains
+                    .entry(domain)
+                    .or_default()
+                    .push(UrlToInsert { url, weight });
             }
 
             let mut domain_state = self
