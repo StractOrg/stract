@@ -27,10 +27,6 @@ use super::{Domain, Job, JobResponse, Result, UrlResponse};
 
 const MAX_URL_DB_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024; // 20GB
 
-/// TLDs that are known to be spammy and should be ignored.
-/// Whenever a TLD is free to register, it is likely to be abused by spammers.
-const BLOCKED_TLD: [&str; 1] = ["tk"];
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UrlStatus {
     Pending,
@@ -597,16 +593,9 @@ impl CrawlDb {
             let mut urls: Vec<(Domain, Url)> = res
                 .discovered_urls
                 .iter()
-                .filter_map(|url| {
+                .map(|url| {
                     let domain = Domain::from(url);
-
-                    for tld in BLOCKED_TLD.iter() {
-                        if domain.as_str().ends_with(tld) {
-                            return None;
-                        }
-                    }
-
-                    Some((domain, url.clone()))
+                    (domain, url.clone())
                 })
                 .collect();
 
@@ -621,12 +610,6 @@ impl CrawlDb {
             let mut used_budget = 0.0;
 
             for (domain, url) in urls {
-                for tld in BLOCKED_TLD.iter() {
-                    if domain.as_str().ends_with(tld) {
-                        continue;
-                    }
-                }
-
                 let different_domain = res.domain != domain;
 
                 let weight = if different_domain {
