@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use dashmap::DashMap;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use rand::Rng;
 use rayon::prelude::*;
 use std::hash::Hash;
@@ -38,7 +38,6 @@ pub enum UrlStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DomainStatus {
     Pending,
-    NoUncrawledUrls,
     CrawlInProgress,
 }
 
@@ -586,7 +585,7 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<HashSet<Domain>> {
+    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<()> {
         let domains: DashMap<Domain, Vec<UrlToInsert>> = DashMap::new();
 
         responses.par_iter().for_each(|res| {
@@ -642,14 +641,8 @@ impl CrawlDb {
             }
         });
 
-        let mut nonempty_domains = HashSet::new();
-
         for (domain, urls) in domains.into_iter() {
             let mut domain_state = self.domain_state.get(&domain)?.unwrap_or_default();
-
-            if !urls.is_empty() {
-                nonempty_domains.insert(domain.clone());
-            }
 
             let mut url_states = Vec::new();
 
@@ -670,7 +663,7 @@ impl CrawlDb {
             self.domain_state.put(&domain, &domain_state)?;
         }
 
-        Ok(nonempty_domains)
+        Ok(())
     }
 
     pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
