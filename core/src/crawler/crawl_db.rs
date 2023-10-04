@@ -286,23 +286,6 @@ impl UrlStateDbShard {
         })
     }
 
-    pub fn get(&self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
-        let url_bytes = bincode::serialize(url)?;
-        let domain_bytes = bincode::serialize(domain)?;
-
-        let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
-
-        let state_bytes = self.db.get(key_bytes)?;
-
-        match state_bytes {
-            Some(state_bytes) => {
-                let state = bincode::deserialize(&state_bytes).unwrap();
-                Ok(Some(state))
-            }
-            None => Ok(None),
-        }
-    }
-
     pub fn put_batch(&mut self, domain: &Domain, urls: &[(UrlString, UrlState)]) -> Result<()> {
         let domain_bytes = bincode::serialize(domain)?;
 
@@ -427,18 +410,6 @@ impl UrlStateDb {
         }
     }
 
-    pub fn get(&self, domain: &Domain, url: &UrlString) -> Result<Option<UrlState>> {
-        // we iterate in reverse order so that we get the most recent state
-        // since new states are inserted into the last shard.
-        for shard in self.shards.iter().rev() {
-            if let Some(state) = shard.get(domain, url)? {
-                return Ok(Some(state));
-            }
-        }
-
-        Ok(None)
-    }
-
     pub fn put_batch(&mut self, domain: &Domain, urls: &[(UrlString, UrlState)]) -> Result<()> {
         let last_shard = self.shards.last_mut().unwrap();
 
@@ -459,7 +430,7 @@ impl UrlStateDb {
         Ok(())
     }
 
-    pub fn get_all_urls(&self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
+    pub fn get_all_urls(&self, domain: &Domain) -> Result<HashMap<UrlString, UrlState>> {
         let mut res = HashMap::new();
 
         for shard in &self.shards {
@@ -468,7 +439,7 @@ impl UrlStateDb {
             }
         }
 
-        Ok(res.into_iter().collect())
+        Ok(res)
     }
 }
 
@@ -646,7 +617,7 @@ impl CrawlDb {
 
         for (domain, urls) in domains.into_iter() {
             let mut domain_state = self.domain_state.get(&domain)?.unwrap_or_default();
-            let all_urls: HashMap<_, _> = self.urls.get_all_urls(&domain)?.into_iter().collect();
+            let all_urls: HashMap<_, _> = self.urls.get_all_urls(&domain)?;
 
             let mut url_states = Vec::new();
 
@@ -725,7 +696,7 @@ impl CrawlDb {
             let mut new_url_states = Vec::new();
 
             for (url, _) in &sampled {
-                let mut state = self.urls.get(domain, url)?.unwrap_or_default();
+                let mut state = urls.get(*url).cloned().unwrap_or_default();
                 state.status = UrlStatus::Crawling;
 
                 new_url_states.push(((*url).clone(), state));
@@ -809,7 +780,7 @@ mod tests {
 
         let domain = Domain::from(&Url::parse("https://a.com").unwrap());
 
-        let urls = db.urls.get_all_urls(&domain).unwrap();
+        let urls: Vec<_> = db.urls.get_all_urls(&domain).unwrap().into_iter().collect();
 
         assert_eq!(urls.len(), 1);
         assert_eq!(
