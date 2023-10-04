@@ -57,14 +57,16 @@ impl Widgets {
     }
 
     pub fn widget(&self, query: &str) -> Option<Widget> {
+        let query = query.to_lowercase();
+
         self.calculator
-            .try_calculate(query)
+            .try_calculate(&query)
             .ok()
             .map(Widget::Calculator)
             .or_else(|| {
                 self.thesaurus
                     .as_ref()
-                    .and_then(|thesaurus| thesaurus.lookup(query))
+                    .and_then(|thesaurus| thesaurus.lookup(&query))
                     .map(Widget::Thesaurus)
             })
     }

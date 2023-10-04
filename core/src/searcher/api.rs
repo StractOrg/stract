@@ -402,7 +402,21 @@ impl ApiSearcher {
             return None;
         }
 
-        self.widgets.widget(query.query.as_str())
+        let parsed_terms = query::parser::parse(&query.query);
+
+        self.widgets.widget(
+            parsed_terms
+                .into_iter()
+                .filter_map(|term| {
+                    if let query::parser::Term::Simple(simple) = *term {
+                        Some(String::from(simple))
+                    } else {
+                        None
+                    }
+                })
+                .join(" ")
+                .as_str(),
+        )
     }
 
     fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
