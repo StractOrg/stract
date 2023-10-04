@@ -495,6 +495,9 @@ impl DomainStateDb {
         options.set_allow_mmap_writes(true);
         options.set_max_subcompactions(8);
 
+        options.set_level_zero_slowdown_writes_trigger(-1);
+        options.set_level_zero_stop_writes_trigger(-1);
+
         let db = rocksdb::DB::open(&options, path.as_ref())?;
 
         Ok(Self { db })
@@ -643,12 +646,13 @@ impl CrawlDb {
 
         for (domain, urls) in domains.into_iter() {
             let mut domain_state = self.domain_state.get(&domain)?.unwrap_or_default();
+            let all_urls: HashMap<_, _> = self.urls.get_all_urls(&domain)?.into_iter().collect();
 
             let mut url_states = Vec::new();
 
             for url in urls {
-                let mut url_state = match self.urls.get(&domain, &UrlString::from(&url.url))? {
-                    Some(state) => state,
+                let mut url_state = match all_urls.get(&UrlString::from(&url.url)) {
+                    Some(state) => state.clone(),
                     None => UrlState::default(),
                 };
 

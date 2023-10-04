@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use super::{
     store::{EdgeStore, EdgeStoreWriter},
-    Edge, NodeID,
+    Compression, Edge, NodeID,
 };
 
 const ADJACENCY_STORE: &str = "adjacency";
@@ -32,10 +32,11 @@ pub struct SegmentWriter {
 }
 
 impl SegmentWriter {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         SegmentWriter {
             full_adjacency: EdgeStoreWriter::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
+                compression,
                 false,
             ),
             full_reversed_adjacency: EdgeStoreWriter::open(
@@ -43,6 +44,7 @@ impl SegmentWriter {
                     .as_ref()
                     .join(&id)
                     .join(REVERSED_ADJACENCY_STORE),
+                compression,
                 true,
             ),
             folder_path: folder_path
@@ -85,11 +87,12 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         Segment {
             full_adjacency: EdgeStore::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 false,
+                compression,
             ),
             full_reversed_adjacency: EdgeStore::open(
                 folder_path
@@ -97,6 +100,7 @@ impl Segment {
                     .join(&id)
                     .join(REVERSED_ADJACENCY_STORE),
                 true,
+                compression,
             ),
             folder_path: folder_path
                 .as_ref()
@@ -150,7 +154,11 @@ mod test {
         // ▼      │ │
         // 1─────►2◄┘
 
-        let mut writer = SegmentWriter::open(crate::gen_temp_path(), "test".to_string());
+        let mut writer = SegmentWriter::open(
+            crate::gen_temp_path(),
+            "test".to_string(),
+            Compression::default(),
+        );
 
         let mut edges = Vec::new();
 

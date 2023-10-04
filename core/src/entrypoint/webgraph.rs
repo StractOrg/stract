@@ -68,11 +68,19 @@ pub struct Job {
 }
 
 pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
-    WebgraphWriter::new(path, crate::executor::Executor::single_thread())
+    WebgraphWriter::new(
+        path,
+        crate::executor::Executor::single_thread(),
+        webgraph::Compression::Lz4,
+    )
 }
 
 pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
-    WebgraphWriter::new(path, crate::executor::Executor::single_thread())
+    WebgraphWriter::new(
+        path,
+        crate::executor::Executor::single_thread(),
+        webgraph::Compression::Lz4,
+    )
 }
 
 pub struct WebgraphWorker {

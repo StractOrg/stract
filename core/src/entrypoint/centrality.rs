@@ -16,20 +16,27 @@
 
 use std::path::Path;
 
-use crate::{ranking::centrality_store::CentralityStore, webgraph::WebgraphBuilder};
+use crate::{
+    ranking::centrality_store::CentralityStore,
+    webgraph::{Compression, WebgraphBuilder},
+};
 
 pub struct Centrality {}
 
 impl Centrality {
     pub fn build_harmonic<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
         tracing::info!("Building harmonic centrality");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
+        let graph = WebgraphBuilder::new(webgraph_path)
+            .compression(Compression::Lz4)
+            .open();
         CentralityStore::build_harmonic(&graph, output_path);
     }
 
     pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, output_path: P) {
         tracing::info!("Building inbound similarity");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
+        let graph = WebgraphBuilder::new(webgraph_path)
+            .compression(Compression::Lz4)
+            .open();
         CentralityStore::build_similarity(&graph, output_path);
     }
 }

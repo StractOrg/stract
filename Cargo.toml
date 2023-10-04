@@ -11,98 +11,99 @@ debug = true
 
 [workspace.dependencies]
 aes-gcm = "0.10.2"
-bincode = "1.3.3"
-clap = { version = "3.1.18", features = ["derive"] }
-encoding_rs = "0.8.31"
-flate2 = "1.0.23"
-indicatif = { version = "0.16.2", features = ["rayon"] }
-itertools = "0.10.3"
-rayon = "1.5.3"
-half = { version = "2.2.1", features = ["serde"] }
-eventsource-stream = "0.2.3"
-reqwest-eventsource = "0.4.0"
-reqwest = { version = "0.11.16", features = ["blocking", "stream", "json"] }
-serde = { version = "1.0.137", features = ["rc", "derive"] }
-serde_json = "1.0.81"
-tantivy = "0.21.0"
-thiserror = "1.0.31"
-toml = "0.5.9"
-tracing = "0.1.34"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-whatlang = "0.16.0"
-tokio = { version = "1.23.1", features = ["full"] }
+anyhow = {version = "1.0.72", features = ["backtrace"]}
+async-channel = "1.8.0"
+async-stream = "0.3.3"
+async-trait = "0.1.57"
 axum = "0.6.9"
-axum-extra = { version = "0.6.0", features = ["spa"] }
+axum-extra = {version = "0.6.0", features = ["spa"]}
 axum-macros = "0.3.4"
-logos = "0.12.1"
-csv = "1.1.6"
-fst = { version = "0.4.7", features = ["levenshtein"] }
-rocksdb = { version = "0.21.0", features = ["default", "jemalloc", "io-uring"] }
-image = "0.24.3"
-chrono = { version = "0.4.23", features = ["serde"] }
-uuid = "1.1.2"
-futures = "0.3.21"
-quick-xml = "0.23.0"
-rio_turtle = "0.8.4"
-rio_api = "0.8.4"
+base64 = "0.13.0"
+bincode = "1.3.3"
+bitvec = "1.0.1"
+bytemuck = {version = "1.13.1", features = ["derive"]}
+byteorder = "1.4.3"
 bzip2 = "0.4.4"
-parse_wiki_text = "0.1.5"
+chitchat = "0.5.0"
+chrono = {version = "0.4.23", features = ["serde"]}
+clap = {version = "3.1.18", features = ["derive"]}
+criterion = "0.3.6"
+crossbeam-channel = "0.5.6"
+csv = "1.1.6"
+dashmap = {version = "5.4.0", features = ["rayon"]}
+encoding_rs = "0.8.31"
+eventsource-stream = "0.2.3"
+fend-core = "1.2.2"
+flate2 = "1.0.23"
+fst = {version = "0.4.7", features = ["levenshtein"]}
+futures = "0.3.21"
+half = {version = "2.2.1", features = ["serde"]}
+hashbrown = {version = "0.14.0", features = ["serde", "rkyv"]}
+http = "0.2.8"
+image = "0.24.3"
+indicatif = {version = "0.16.2", features = ["rayon"]}
+insta = "1.31"
+itertools = "0.10.3"
+lalrpop = {version = "0.19.8", features = ["lexer"]}
+lalrpop-util = {version = "0.19.8", features = ["lexer"]}
+libc = "0.2.142"
+logos = "0.12.1"
+lz-str = "0.2.1"
+lz4_flex = "0.11.1"
+maplit = "1.0.2"
 md5 = "0.7.0"
 memmap = "0.7.0"
-once_cell = "1.13.1"
-regex = "1.6.0"
-http = "0.2.8"
-tower-http = { version = "0.4.0", features = ["compression-gzip", "cors"] }
-lalrpop-util = { version = "0.19.8", features = ["lexer"] }
-lalrpop = { version = "0.19.8", features = ["lexer"] }
-serde_urlencoded = "0.7.1"
-rust-stemmers = "1.2.0"
-min-max-heap = "1.3.0"
-base64 = "0.13.0"
-async-trait = "0.1.57"
-urlencoding = "2.1.2"
-bitvec = "1.0.1"
-criterion = "0.3.6"
-maplit = "1.0.2"
-rand = "0.8.5"
-crossbeam-channel = "0.5.6"
-num_cpus = "1.15.0"
-tokenizers = "0.13.2"
-byteorder = "1.4.3"
-async-stream = "0.3.3"
-tokio-stream = "0.1.11"
-scylla = "0.7.0"
-chitchat = "0.5.0"
 memmap2 = "0.5.10"
-dashmap = { version = "5.4.0", features = ["rayon"] }
-tch = "0.13.0"
-torch-sys = "0.13.0"
-libc = "0.2.142"
-lz-str = "0.2.1"
-safetensors = "0.3.1"
-robotstxt-with-cache = "0.4.0"
-rust-s3 = { version = "0.33.0", features = ["blocking", "tokio"] }
-rusqlite = { version = "0.29.0", features = [
-    "bundled",
-    "modern-full",
-    "buildtime_bindgen",
-] }
-async-channel = "1.8.0"
-url = { version = "2.4.0", features = ["serde"] }
-anyhow = { version = "1.0.72", features = ["backtrace"] }
-bytemuck = { version = "1.13.1", features = ["derive"] }
+mime = "0.3.17"
+min-max-heap = "1.3.0"
+num_cpus = "1.15.0"
+once_cell = "1.13.1"
+parse_wiki_text = "0.1.5"
 proptest = "1.2.0"
 proptest-derive = "0.3.0"
-insta = "1.31"
-utoipa = { version = "3.4.4", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "3.1.4", features = ["axum"] }
-tikv-jemallocator = "0.5"
 publicsuffix = "2.2.3"
-hashbrown = { version = "0.14.0", features = ["serde", "rkyv"] }
-rkyv = { version = "0.7.42", default_features = false, features = [
-    "std",
-    "validation",
-    "size_64",
-] }
-mime = "0.3.17"
-fend-core = "1.2.2"
+quick-xml = "0.23.0"
+rand = "0.8.5"
+rayon = "1.5.3"
+regex = "1.6.0"
+reqwest = {version = "0.11.16", features = ["blocking", "stream", "json"]}
+reqwest-eventsource = "0.4.0"
+rio_api = "0.8.4"
+rio_turtle = "0.8.4"
+rkyv = {version = "0.7.42", default_features = false, features = [
+  "std",
+  "validation",
+  "size_64",
+]}
+robotstxt-with-cache = "0.4.0"
+rocksdb = {version = "0.21.0", features = ["default", "jemalloc", "io-uring"]}
+rusqlite = {version = "0.29.0", features = [
+  "bundled",
+  "modern-full",
+  "buildtime_bindgen",
+]}
+rust-s3 = {version = "0.33.0", features = ["blocking", "tokio"]}
+rust-stemmers = "1.2.0"
+safetensors = "0.3.1"
+scylla = "0.7.0"
+serde = {version = "1.0.137", features = ["rc", "derive"]}
+serde_json = "1.0.81"
+serde_urlencoded = "0.7.1"
+tantivy = "0.21.0"
+tch = "0.13.0"
+thiserror = "1.0.31"
+tikv-jemallocator = "0.5"
+tokenizers = "0.13.2"
+tokio = {version = "1.23.1", features = ["full"]}
+tokio-stream = "0.1.11"
+toml = "0.5.9"
+torch-sys = "0.13.0"
+tower-http = {version = "0.4.0", features = ["compression-gzip", "cors"]}
+tracing = "0.1.34"
+tracing-subscriber = {version = "0.3.11", features = ["env-filter"]}
+url = {version = "2.4.0", features = ["serde"]}
+urlencoding = "2.1.2"
+utoipa = {version = "3.4.4", features = ["axum_extras"]}
+utoipa-swagger-ui = {version = "3.1.4", features = ["axum"]}
+uuid = "1.1.2"
+whatlang = "0.16.0"

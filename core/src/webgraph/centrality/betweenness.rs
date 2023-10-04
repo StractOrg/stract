@@ -171,6 +171,7 @@ mod tests {
         let mut writer = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
         );
 
         for i in 0..n - 1 {

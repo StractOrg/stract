@@ -622,8 +622,11 @@ mod tests {
     fn liked_sites() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut writer =
-            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
+        let mut writer = WebgraphWriter::new(
+            gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
+        );
 
         writer.insert(
             Node::from("https://www.e.com").into_host(),

@@ -2329,6 +2329,9 @@ name = "lz4_flex"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ea9b256699eda7b0387ffbc776dd625e28bde3918446381781245b7a50349d8"
+dependencies = [
+ "twox-hash",
+]
 
 [[package]]
 name = "mac"
@@ -4290,6 +4293,7 @@ dependencies = [
  "libc",
  "logos",
  "lz-str",
+ "lz4_flex 0.11.1",
  "maplit",
  "md5",
  "memmap",

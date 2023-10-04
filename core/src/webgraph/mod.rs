@@ -229,9 +229,33 @@ pub fn normalize_url(url: &Url) -> String {
     normalized
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+pub enum Compression {
+    None,
+    #[default]
+    Lz4,
+}
+
+impl Compression {
+    pub fn compress(&self, bytes: &[u8]) -> Vec<u8> {
+        match self {
+            Compression::None => bytes.to_vec(),
+            Compression::Lz4 => lz4_flex::compress_prepend_size(bytes),
+        }
+    }
+
+    pub fn decompress(&self, bytes: &[u8]) -> Vec<u8> {
+        match self {
+            Compression::None => bytes.to_vec(),
+            Compression::Lz4 => lz4_flex::decompress_size_prepended(bytes).unwrap(),
+        }
+    }
+}
+
 pub struct WebgraphBuilder {
     path: Box<Path>,
     executor: Executor,
+    compression: Compression,
 }
 
 impl WebgraphBuilder {
@@ -239,6 +263,7 @@ impl WebgraphBuilder {
         Self {
             path: path.as_ref().into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
+            compression: Compression::default(),
         }
     }
 
@@ -247,8 +272,13 @@ impl WebgraphBuilder {
         self
     }
 
+    pub fn compression(mut self, compression: Compression) -> Self {
+        self.compression = compression;
+        self
+    }
+
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor)
+        Webgraph::open(self.path, self.executor, self.compression)
     }
 }
 
@@ -453,6 +483,7 @@ pub struct WebgraphWriter {
     id2node: Id2NodeDb,
     executor: Executor,
     meta: Meta,
+    compression: Compression,
 }
 
 impl WebgraphWriter {
@@ -466,7 +497,7 @@ impl WebgraphWriter {
         self.meta.save(path);
     }
 
-    pub fn new<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
+    pub fn new<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
         fs::create_dir_all(&path).unwrap();
         let mut meta = Self::meta(&path);
         meta.comitted_segments.clear();
@@ -474,7 +505,7 @@ impl WebgraphWriter {
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
 
         let id = uuid::Uuid::new_v4().to_string();
-        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone());
+        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone(), compression);
 
         meta.comitted_segments.push(id);
 
@@ -485,6 +516,7 @@ impl WebgraphWriter {
             insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
             executor,
             meta,
+            compression,
         }
     }
 
@@ -538,6 +570,7 @@ impl WebgraphWriter {
             executor: self.executor.into(),
             id2node: self.id2node,
             meta: self.meta,
+            compression: self.compression,
         }
     }
 }
@@ -548,6 +581,7 @@ pub struct Webgraph {
     executor: Arc<Executor>,
     id2node: Id2NodeDb,
     meta: Meta,
+    compression: Compression,
 }
 
 impl Webgraph {
@@ -561,7 +595,7 @@ impl Webgraph {
         self.meta.save(path);
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
+    fn open<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
@@ -572,6 +606,7 @@ impl Webgraph {
             segments.push(Segment::open(
                 path.as_ref().join("segments"),
                 segment.clone(),
+                compression,
             ));
         }
 
@@ -581,6 +616,7 @@ impl Webgraph {
             executor: Arc::new(executor),
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
             meta,
+            compression,
         }
     }
 
@@ -594,7 +630,8 @@ impl Webgraph {
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments.push(Segment::open(new_path, id));
+            self.segments
+                .push(Segment::open(new_path, id, self.compression));
         }
 
         self.save_metadata();
@@ -737,7 +774,11 @@ mod test {
         //        │
         //        D
 
-        let mut graph = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+        let mut graph = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+        );
 
         for (from, to, label) in test_edges() {
             graph.insert(from, to, label);
@@ -795,7 +836,11 @@ mod test {
             (Node::from("F"), Node::from("G"), String::new()),
             (Node::from("G"), Node::from("H"), String::new()),
         ] {
-            let mut wrt = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+            );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
         }
@@ -805,8 +850,6 @@ mod test {
         for other in graphs {
             graph.merge(other);
         }
-
-        dbg!(&graph.path);
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),
@@ -822,7 +865,11 @@ mod test {
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
         ] {
-            let mut wrt = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+            );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
         }
@@ -860,7 +907,11 @@ mod test {
 
     #[test]
     fn cap_label_length() {
-        let mut writer = WebgraphWriter::new(crate::gen_temp_path(), Executor::single_thread());
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+        );
 
         writer.insert(
             Node::from("A"),

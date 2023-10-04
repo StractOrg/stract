@@ -32,8 +32,11 @@ mod tests {
     fn site_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        let mut wrt =
-            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
+        let mut wrt = WebgraphWriter::new(
+            gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
+        );
 
         wrt.insert(
             Node::from("https://www.first.com").into_host(),

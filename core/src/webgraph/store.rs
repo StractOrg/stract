@@ -20,17 +20,18 @@ use itertools::Itertools;
 use memmap2::Mmap;
 use rocksdb::BlockBasedOptions;
 
-use super::{Edge, EdgeLabel, NodeID};
+use super::{Compression, Edge, EdgeLabel, NodeID};
 
 pub const MAX_BATCH_SIZE: usize = 100_000;
 
 pub struct EdgeStoreWriter {
     reversed: bool,
     db: rocksdb::DB,
+    compression: Compression,
 }
 
 impl EdgeStoreWriter {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -63,7 +64,11 @@ impl EdgeStoreWriter {
 
         let db = rocksdb::DB::open(&options, path.as_ref().join("writer")).unwrap();
 
-        Self { db, reversed }
+        Self {
+            db,
+            reversed,
+            compression,
+        }
     }
 
     pub fn put<'a, L: EdgeLabel + 'a>(&'a self, edges: impl Iterator<Item = &'a Edge<L>>) {
@@ -133,7 +138,12 @@ impl EdgeStoreWriter {
     }
 
     pub fn finalize(self) -> EdgeStore {
-        let s = EdgeStore::build(self.db.path().parent().unwrap(), self.reversed, self.iter());
+        let s = EdgeStore::build(
+            self.db.path().parent().unwrap(),
+            self.compression,
+            self.reversed,
+            self.iter(),
+        );
 
         // delete the writer db
         let p = self.db.path().to_owned();
@@ -148,16 +158,20 @@ pub struct EdgeStore {
     reversed: bool,
     ranges: rocksdb::DB, // column[nodes] = nodeid -> (start, end); column[labels] = nodeid -> (start, end)
     _cache: rocksdb::Cache,
+
     edge_labels_file: File,
     edge_labels_len: usize,
     edge_labels: Mmap,
+
     edge_nodes_file: File,
     edge_nodes_len: usize,
     edge_nodes: Mmap,
+
+    compression: Compression,
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, reversed: bool, compression: Compression) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -233,6 +247,7 @@ impl EdgeStore {
             edge_nodes,
             edge_nodes_file,
             edge_nodes_len,
+            compression,
         }
     }
 
@@ -269,6 +284,9 @@ impl EdgeStore {
         let edge_labels_bytes = bincode::serialize(&edge_labels).unwrap();
         let edge_nodes_bytes = bincode::serialize(&edge_nodes).unwrap();
 
+        let edge_labels_bytes = self.compression.compress(&edge_labels_bytes);
+        let edge_nodes_bytes = self.compression.compress(&edge_nodes_bytes);
+
         let label_range = self.edge_labels_len..(self.edge_labels_len + edge_labels_bytes.len());
         let node_range = self.edge_nodes_len..(self.edge_nodes_len + edge_nodes_bytes.len());
 
@@ -304,10 +322,11 @@ impl EdgeStore {
     /// either the from or to node, depending on the value of `reversed`.
     fn build<P: AsRef<Path>>(
         path: P,
+        compression: Compression,
         reversed: bool,
         edges: impl Iterator<Item = Edge<String>>,
     ) -> Self {
-        let mut s = Self::open(path, reversed);
+        let mut s = Self::open(path, reversed, compression);
 
         // create batches of consecutive edges with the same from/to node
         let mut batch = Vec::new();
@@ -367,10 +386,12 @@ impl EdgeStore {
                 let edge_range = bincode::deserialize::<Range<usize>>(&edge_range_bytes).unwrap();
 
                 let edge_labels = &self.edge_labels[edge_range];
-                let edge_labels: Vec<String> = bincode::deserialize(edge_labels).unwrap();
+                let edge_labels = self.compression.decompress(edge_labels);
+                let edge_labels: Vec<String> = bincode::deserialize(&edge_labels).unwrap();
 
                 let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(edge_nodes).unwrap();
+                let edge_nodes = self.compression.decompress(edge_nodes);
+                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_labels
                     .into_iter()
@@ -406,7 +427,8 @@ impl EdgeStore {
                 let node_range = bincode::deserialize::<Range<usize>>(&node_range_bytes).unwrap();
 
                 let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(edge_nodes).unwrap();
+                let edge_nodes = self.compression.decompress(edge_nodes);
+                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_nodes
                     .into_iter()
@@ -444,7 +466,8 @@ impl EdgeStore {
 
                 let node_range = bincode::deserialize::<Range<usize>>(&val).unwrap();
                 let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(edge_nodes).unwrap();
+                let edge_nodes = self.compression.decompress(edge_nodes);
+                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_nodes.into_iter().map(move |other| {
                     if self.reversed {
@@ -471,8 +494,11 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let kv: EdgeStoreWriter =
-            EdgeStoreWriter::open(crate::gen_temp_path().join("test-segment"), false);
+        let kv: EdgeStoreWriter = EdgeStoreWriter::open(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            false,
+        );
 
         let e = Edge {
             from: NodeID(0),
@@ -496,8 +522,11 @@ mod tests {
 
     #[test]
     fn test_reversed() {
-        let kv: EdgeStoreWriter =
-            EdgeStoreWriter::open(crate::gen_temp_path().join("test-segment"), true);
+        let kv: EdgeStoreWriter = EdgeStoreWriter::open(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            true,
+        );
 
         let e = Edge {
             from: NodeID(0),

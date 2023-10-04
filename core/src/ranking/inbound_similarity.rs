@@ -222,8 +222,11 @@ mod tests {
 
     #[test]
     fn it_favors_liked_sites() {
-        let mut wrt =
-            WebgraphWriter::new(gen_temp_path(), crate::executor::Executor::single_thread());
+        let mut wrt = WebgraphWriter::new(
+            gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
+        );
 
         wrt.insert(Node::from("a.com"), Node::from("b.com"), String::new());
         wrt.insert(Node::from("c.com"), Node::from("d.com"), String::new());
@@ -251,6 +254,7 @@ mod tests {
         let mut wrt = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
         );
 
         wrt.insert(Node::from("b.com"), Node::from("a.com"), String::new());

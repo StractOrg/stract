@@ -34,6 +34,7 @@ use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
 use crate::sonic_service;
+use crate::webgraph::Compression;
 use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
 use crate::webgraph::Webgraph;
@@ -189,8 +190,16 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     );
     let searcher = DistributedSearcher::new(cluster);
 
-    let host_graph = Arc::new(WebgraphBuilder::new(config.host_graph_path).open());
-    let page_graph = Arc::new(WebgraphBuilder::new(config.page_graph_path).open());
+    let host_graph = Arc::new(
+        WebgraphBuilder::new(config.host_graph_path)
+            .compression(Compression::Lz4)
+            .open(),
+    );
+    let page_graph = Arc::new(
+        WebgraphBuilder::new(config.page_graph_path)
+            .compression(Compression::Lz4)
+            .open(),
+    );
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
     let similar_sites_finder = SimilarSitesFinder::new(

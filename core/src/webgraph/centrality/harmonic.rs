@@ -263,6 +263,7 @@ mod tests {
         let mut writer = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
         );
 
         for (from, to, label) in test_edges() {
@@ -277,6 +278,7 @@ mod tests {
         let mut writer = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
         );
 
         writer.insert(
@@ -384,6 +386,7 @@ mod tests {
         let mut other = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
         );
 
         for (from, to, label) in test_edges() {
