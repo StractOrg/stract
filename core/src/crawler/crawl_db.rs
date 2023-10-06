@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use dashmap::DashMap;
 use hashbrown::HashMap;
 use rand::Rng;
-use rayon::prelude::*;
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::{collections::BinaryHeap, path::Path};
@@ -286,31 +284,33 @@ impl UrlStateDbShard {
         })
     }
 
-    pub fn put_batch(&mut self, domain: &Domain, urls: &[(UrlString, UrlState)]) -> Result<()> {
-        let domain_bytes = bincode::serialize(domain)?;
+    pub fn put_batch(&mut self, batch: &[(Domain, Vec<(UrlString, UrlState)>)]) -> Result<()> {
+        let mut rocksdb_batch = rocksdb::WriteBatch::default();
 
-        let mut batch = rocksdb::WriteBatch::default();
+        for (domain, urls) in batch {
+            let domain_bytes = bincode::serialize(domain)?;
 
-        for (url, state) in urls {
-            let url_bytes = bincode::serialize(url)?;
+            for (url, state) in urls {
+                let url_bytes = bincode::serialize(url)?;
 
-            if url_bytes.len() > self.longest_known_url.value {
-                self.longest_known_url = url_bytes.len().into();
-                self.meta
-                    .set_longest_url_len(self.longest_known_url.value)?;
+                if url_bytes.len() > self.longest_known_url.value {
+                    self.longest_known_url = url_bytes.len().into();
+                    self.meta
+                        .set_longest_url_len(self.longest_known_url.value)?;
+                }
+
+                let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+
+                let state_bytes = bincode::serialize(state)?;
+
+                rocksdb_batch.put(key_bytes, state_bytes);
             }
-
-            let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
-
-            let state_bytes = bincode::serialize(state)?;
-
-            batch.put(key_bytes, state_bytes);
         }
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
 
-        self.db.write_opt(batch, &write_options)?;
+        self.db.write_opt(rocksdb_batch, &write_options)?;
 
         Ok(())
     }
@@ -362,6 +362,35 @@ impl UrlStateDbShard {
 
         Ok(self.approx_size_bytes.value)
     }
+
+    fn multi_get(&self, urls: &[(Domain, UrlString)]) -> Result<HashMap<UrlString, UrlState>> {
+        let mut res = HashMap::new();
+
+        let mut keys = Vec::with_capacity(urls.len());
+
+        for (domain, url) in urls {
+            let domain_bytes = bincode::serialize(domain)?;
+            let url_bytes = bincode::serialize(url)?;
+
+            let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+
+            keys.push(key_bytes);
+        }
+
+        for (val, (_, url)) in self
+            .db
+            .multi_get(keys.into_iter())
+            .into_iter()
+            .zip(urls.iter())
+        {
+            if let Some(val) = val? {
+                let state: UrlState = bincode::deserialize(&val[..])?;
+                res.insert(url.clone(), state);
+            }
+        }
+
+        Ok(res)
+    }
 }
 
 struct UrlStateDb {
@@ -410,7 +439,7 @@ impl UrlStateDb {
         }
     }
 
-    pub fn put_batch(&mut self, domain: &Domain, urls: &[(UrlString, UrlState)]) -> Result<()> {
+    pub fn put_batch(&mut self, batch: &[(Domain, Vec<(UrlString, UrlState)>)]) -> Result<()> {
         let last_shard = self.shards.last_mut().unwrap();
 
         if last_shard.approximate_size_bytes()? > MAX_URL_DB_SIZE_BYTES {
@@ -425,7 +454,7 @@ impl UrlStateDb {
             self.shards.push(shard);
         }
 
-        self.shards.last_mut().unwrap().put_batch(domain, urls)?;
+        self.shards.last_mut().unwrap().put_batch(batch)?;
 
         Ok(())
     }
@@ -437,6 +466,16 @@ impl UrlStateDb {
             for (url, state) in shard.get_all_urls(domain)? {
                 res.insert(url, state);
             }
+        }
+
+        Ok(res)
+    }
+
+    fn multi_get(&self, urls: &[(Domain, UrlString)]) -> Result<HashMap<UrlString, UrlState>> {
+        let mut res = HashMap::new();
+
+        for shard in &self.shards {
+            res.extend(shard.multi_get(urls)?.into_iter());
         }
 
         Ok(res)
@@ -474,15 +513,44 @@ impl DomainStateDb {
         Ok(Self { db })
     }
 
-    fn get(&self, domain: &Domain) -> Result<Option<DomainState>> {
-        let domain_bytes = bincode::serialize(&domain)?;
-        let value_bytes = self.db.get(domain_bytes)?;
+    fn multi_get(&self, domains: &[Domain]) -> Result<HashMap<Domain, DomainState>> {
+        let mut res = HashMap::new();
+        let domain_bytes: Vec<_> = domains
+            .iter()
+            .map(|domain| bincode::serialize(domain).unwrap())
+            .collect();
 
-        if let Some(value_bytes) = &value_bytes {
-            return Ok(Some(bincode::deserialize(&value_bytes[..])?));
+        for (val, domain) in self
+            .db
+            .multi_get(domain_bytes.into_iter())
+            .into_iter()
+            .zip(domains.iter())
+        {
+            if let Some(val) = val? {
+                let domain_state: DomainState = bincode::deserialize(&val[..])?;
+                res.insert(domain.clone(), domain_state);
+            }
         }
 
-        Ok(None)
+        Ok(res)
+    }
+
+    fn put_batch(&self, batch: &[(Domain, DomainState)]) -> Result<()> {
+        let mut rocksdb_batch = rocksdb::WriteBatch::default();
+
+        for (domain, state) in batch {
+            let domain_bytes = bincode::serialize(domain)?;
+            let state_bytes = bincode::serialize(state)?;
+
+            rocksdb_batch.put(domain_bytes, state_bytes);
+        }
+
+        let mut write_options = rocksdb::WriteOptions::default();
+        write_options.disable_wal(true);
+
+        self.db.write_opt(rocksdb_batch, &write_options)?;
+
+        Ok(())
     }
 
     fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
@@ -553,16 +621,20 @@ impl CrawlDb {
 
             self.domain_state.put(&domain, &DomainState::default())?;
             self.urls
-                .put_batch(&domain, &[(UrlString::from(url), UrlState::default())])?;
+                .put_batch(&[(domain, vec![(UrlString::from(url), UrlState::default())])])?;
         }
 
         Ok(())
     }
 
     pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<()> {
-        let domains: DashMap<Domain, Vec<UrlToInsert>> = DashMap::new();
+        let mut domain_urls: HashMap<Domain, Vec<UrlToInsert>> = HashMap::new();
+        let mut domain_batches = Vec::new();
 
-        responses.par_iter().for_each(|res| {
+        let response_domains: Vec<_> = responses.iter().map(|res| res.domain.clone()).collect();
+        let response_domains = self.domain_state.multi_get(&response_domains)?;
+
+        for res in responses {
             let mut urls: Vec<(Domain, Url)> = res
                 .discovered_urls
                 .iter()
@@ -593,36 +665,52 @@ impl CrawlDb {
 
                 used_budget += weight;
 
-                domains
+                domain_urls
                     .entry(domain)
                     .or_default()
                     .push(UrlToInsert { url, weight });
             }
 
-            let mut domain_state = self
-                .domain_state
+            let mut domain_state = response_domains
                 .get(&res.domain)
-                .unwrap()
+                .cloned()
                 .unwrap_or_default();
 
             domain_state.weight = (domain_state.weight - used_budget).max(0.0);
-            self.domain_state.put(&res.domain, &domain_state).unwrap();
+            domain_batches.push((res.domain.clone(), domain_state));
 
             for url_res in &res.url_responses {
                 if let UrlResponse::Redirected { url, new_url } = url_res {
                     self.redirects.put(url, new_url).ok();
                 }
             }
-        });
+        }
 
-        for (domain, urls) in domains.into_iter() {
-            let mut domain_state = self.domain_state.get(&domain)?.unwrap_or_default();
-            let all_urls: HashMap<_, _> = self.urls.get_all_urls(&domain)?;
+        self.domain_state.put_batch(&domain_batches)?;
 
-            let mut url_states = Vec::new();
+        let mut url_batches = Vec::new();
+        let mut domain_batches = Vec::new();
+
+        let domains = domain_urls.keys().cloned().collect::<Vec<_>>();
+        let domain_states = self.domain_state.multi_get(&domains)?;
+        let url_states = self.urls.multi_get(
+            domain_urls
+                .iter()
+                .flat_map(|(domain, urls)| {
+                    urls.iter()
+                        .map(|url| (domain.clone(), UrlString::from(&url.url)))
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )?;
+
+        for (domain, urls) in domain_urls.into_iter() {
+            let mut domain_state = domain_states.get(&domain).cloned().unwrap_or_default();
+
+            let mut updated_url_states = Vec::new();
 
             for url in urls {
-                let mut url_state = match all_urls.get(&UrlString::from(&url.url)) {
+                let mut url_state = match url_states.get(&UrlString::from(&url.url)) {
                     Some(state) => state.clone(),
                     None => UrlState::default(),
                 };
@@ -630,23 +718,34 @@ impl CrawlDb {
                 url_state.weight += url.weight;
                 domain_state.weight += url_state.weight;
 
-                url_states.push((UrlString::from(&url.url), url_state));
+                if url.weight > 0.0 {
+                    updated_url_states.push((UrlString::from(&url.url), url_state));
+                }
             }
 
-            self.urls.put_batch(&domain, &url_states)?;
-
-            self.domain_state.put(&domain, &domain_state)?;
+            url_batches.push((domain.clone(), updated_url_states));
+            domain_batches.push((domain, domain_state));
         }
+
+        self.urls.put_batch(&url_batches)?;
+        self.domain_state.put_batch(&domain_batches)?;
 
         Ok(())
     }
 
-    pub fn set_domain_status(&mut self, domain: &Domain, status: DomainStatus) -> Result<()> {
-        let mut domain_state = self.domain_state.get(domain)?.unwrap_or_default();
+    pub fn set_domain_status(&mut self, domains: &[Domain], status: DomainStatus) -> Result<()> {
+        let domain_states = self.domain_state.multi_get(domains)?;
 
-        domain_state.status = status;
+        let mut batches = Vec::new();
 
-        self.domain_state.put(domain, &domain_state)?;
+        for domain in domains {
+            let mut domain_state = domain_states.get(domain).cloned().unwrap_or_default();
+            domain_state.status = status;
+
+            batches.push((domain.clone(), domain_state));
+        }
+
+        self.domain_state.put_batch(&batches)?;
 
         Ok(())
     }
@@ -663,17 +762,19 @@ impl CrawlDb {
             num_jobs,
         );
 
-        for (domain, _) in sampled.iter() {
-            let mut state = self.domain_state.get(domain)?.unwrap_or_default();
-            state.status = DomainStatus::CrawlInProgress;
-            self.domain_state.put(domain, &state)?;
-        }
+        let domains = sampled.into_iter().map(|(d, _)| d).collect::<Vec<_>>();
 
-        Ok(sampled.into_iter().map(|(d, _)| d).collect())
+        self.set_domain_status(&domains, DomainStatus::CrawlInProgress)?;
+
+        Ok(domains)
     }
 
     pub fn prepare_jobs(&mut self, domains: &[Domain], urls_per_job: usize) -> Result<Vec<Job>> {
         let mut jobs = Vec::with_capacity(domains.len());
+        let mut url_batches = Vec::new();
+
+        let domain_states = self.domain_state.multi_get(domains)?;
+
         for domain in domains {
             let urls = self.urls.get_all_urls(domain)?;
 
@@ -702,9 +803,9 @@ impl CrawlDb {
                 new_url_states.push(((*url).clone(), state));
             }
 
-            self.urls.put_batch(domain, &new_url_states)?;
+            url_batches.push((domain.clone(), new_url_states));
 
-            let domain_state = self.domain_state.get(domain)?.unwrap_or_default();
+            let domain_state = domain_states.get(domain).cloned().unwrap_or_default();
 
             let job = Job {
                 domain: domain.clone(),
@@ -715,6 +816,8 @@ impl CrawlDb {
 
             jobs.push(job);
         }
+
+        self.urls.put_batch(&url_batches)?;
 
         Ok(jobs)
     }
@@ -760,7 +863,7 @@ mod tests {
         assert_eq!(sample.len(), 1);
         assert_eq!(&sample[0], &domain);
         assert_eq!(
-            db.domain_state.get(&domain).unwrap().unwrap().status,
+            db.domain_state.multi_get(&[domain.clone()]).unwrap()[&domain].status,
             DomainStatus::CrawlInProgress
         );
 

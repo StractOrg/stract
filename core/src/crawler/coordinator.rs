@@ -86,9 +86,12 @@ impl CrawlCoordinator {
 
         db.insert_urls(responses)?;
 
-        for resp in responses {
-            db.set_domain_status(&resp.domain, DomainStatus::Pending)?;
-        }
+        let response_domains = responses
+            .iter()
+            .map(|resp| resp.domain.clone())
+            .collect::<Vec<_>>();
+
+        db.set_domain_status(&response_domains, DomainStatus::Pending)?;
 
         tracing::info!("inserted responses in {:?}", start.elapsed());
 
