@@ -44,7 +44,6 @@ pub struct WebgraphConstructConfig {
     pub host_graph_base_path: String,
     pub page_graph_base_path: String,
     pub warc_source: WarcSource,
-    pub redirect_db_path: Option<String>,
     pub limit_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
 }
@@ -264,7 +263,6 @@ pub struct SearchServerConfig {
 pub struct CrawlCoordinatorConfig {
     pub crawldb_folder: String,
     pub host: SocketAddr,
-    pub num_urls_to_crawl: u64,
     pub seed_urls: Vec<String>,
 }
 
@@ -303,7 +301,13 @@ pub struct CrawlerConfig {
 
     pub timeout_seconds: u64,
     pub s3: S3Config,
-    pub coordinator_host: String,
+    pub router_hosts: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CrawlRouterConfig {
+    pub host: SocketAddr,
+    pub coordinator_addrs: Vec<SocketAddr>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

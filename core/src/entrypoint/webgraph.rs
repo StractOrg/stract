@@ -16,7 +16,6 @@
 use crate::{
     config::WarcSource,
     config::{self, WebgraphConstructConfig},
-    crawler::crawl_db::RedirectDb,
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
     webgraph::{self, Node, WebgraphWriter},
@@ -25,7 +24,7 @@ use crate::{
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, path::Path};
 use tokio::pin;
 use tracing::{info, trace};
 
@@ -86,7 +85,6 @@ pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWrit
 pub struct WebgraphWorker {
     pub host_graph: webgraph::WebgraphWriter,
     pub page_graph: webgraph::WebgraphWriter,
-    pub redirect: Option<Arc<RedirectDb>>,
 }
 
 impl WebgraphWorker {
@@ -122,14 +120,7 @@ impl WebgraphWorker {
                     })
                 {
                     let source = link.source.clone();
-                    let mut destination = link.destination.clone();
-
-                    if let Some(redirect) = &self.redirect {
-                        if let Some(new_destination) = redirect.get(&destination).unwrap() {
-                            trace!("redirecting {:?} to {:?}", destination, new_destination);
-                            destination = new_destination;
-                        }
-                    }
+                    let destination = link.destination.clone();
 
                     if source.root_domain() == destination.root_domain() {
                         continue;
@@ -168,11 +159,6 @@ impl Webgraph {
 
         let job_config = JobConfig::from(config.warc_source.clone());
 
-        let redirect = match &config.redirect_db_path {
-            Some(path) => Some(Arc::new(RedirectDb::open(path)?)),
-            None => None,
-        };
-
         let jobs: Vec<_> = warc_paths
             .into_iter()
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
@@ -200,7 +186,6 @@ impl Webgraph {
             let page_path = page_path.join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
-                redirect: redirect.clone(),
                 host_graph: open_host_graph_writer(host_path),
                 page_graph: open_page_graph_writer(page_path),
             };

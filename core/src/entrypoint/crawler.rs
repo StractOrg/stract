@@ -16,11 +16,12 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     config,
-    crawler::{CrawlCoordinator, Crawler, JobResponse},
+    crawler::{self, CrawlCoordinator, Crawler, Domain, DomainCrawled, JobResponse, UrlToInsert},
     distributed::sonic::{self, service::Message},
     sonic_service, Result,
 };
@@ -28,53 +29,123 @@ use crate::{
 pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
     let crawler = Crawler::new(config).await?;
 
-    crawler.wait().await;
+    crawler.run().await;
 
     Ok(())
-}
-
-pub struct CoordinatorService {
-    coordinator: Arc<CrawlCoordinator>,
-}
-
-sonic_service!(CoordinatorService, [NewJobs]);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewJobs {
-    pub responses: Vec<JobResponse>,
-    pub num_jobs: usize,
-}
-#[async_trait::async_trait]
-impl Message<CoordinatorService> for NewJobs {
-    type Response = crate::crawler::Response;
-
-    async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-        server.coordinator.add_responses(&self.responses)?;
-
-        if server.coordinator.is_done() {
-            tracing::info!("Crawl is done. Waiting for workers to finish.");
-            Ok(crate::crawler::Response::Done)
-        } else {
-            let jobs = server.coordinator.sample_jobs(self.num_jobs)?;
-
-            Ok(crate::crawler::Response::NewJobs { jobs })
-        }
-    }
 }
 
 pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     let coordinator = Arc::new(CrawlCoordinator::new(
         config.crawldb_folder,
-        config.num_urls_to_crawl,
         config.seed_urls,
     )?);
 
     let addr: SocketAddr = config.host;
-    let server = CoordinatorService { coordinator }.bind(addr).await.unwrap();
+    let server = coordinator::CoordinatorService { coordinator }
+        .bind(addr)
+        .await
+        .unwrap();
 
     tracing::info!("Crawl coordinator listening on {}", addr);
 
     loop {
         let _ = server.accept().await;
+    }
+}
+
+pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
+    let router = crawler::Router::new(config.coordinator_addrs.clone());
+
+    let addr: SocketAddr = config.host;
+
+    let server = router::RouterService { router }.bind(addr).await.unwrap();
+
+    tracing::info!("Crawl router listening on {}", addr);
+
+    loop {
+        let _ = server.accept().await;
+    }
+}
+
+pub mod router {
+    use super::*;
+    pub struct RouterService {
+        pub router: crawler::Router,
+    }
+
+    sonic_service!(RouterService, [NewJobs]);
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct NewJobs {
+        pub responses: Vec<JobResponse>,
+        pub num_jobs: usize,
+    }
+
+    #[async_trait::async_trait]
+    impl Message<RouterService> for NewJobs {
+        type Response = crate::crawler::Response;
+
+        async fn handle(self, server: &RouterService) -> sonic::Result<Self::Response> {
+            server.router.add_responses(&self.responses).await?;
+            let jobs = server.router.sample_jobs(self.num_jobs).await?;
+            Ok(crate::crawler::Response::NewJobs { jobs })
+        }
+    }
+}
+
+pub mod coordinator {
+    use crate::crawler::Job;
+
+    use super::*;
+
+    pub struct CoordinatorService {
+        pub coordinator: Arc<CrawlCoordinator>,
+    }
+
+    sonic_service!(CoordinatorService, [InsertUrls, GetJobs, MarkJobsComplete]);
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct InsertUrls {
+        pub urls: HashMap<Domain, Vec<UrlToInsert>>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct GetJobs {
+        pub num_jobs: usize,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MarkJobsComplete {
+        pub domains: Vec<DomainCrawled>,
+    }
+
+    #[async_trait::async_trait]
+    impl Message<CoordinatorService> for InsertUrls {
+        type Response = ();
+
+        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
+            server.coordinator.insert_urls(self.urls)?;
+            Ok(())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Message<CoordinatorService> for GetJobs {
+        type Response = Vec<Job>;
+
+        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
+            let jobs = server.coordinator.sample_jobs(self.num_jobs)?;
+            Ok(jobs)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Message<CoordinatorService> for MarkJobsComplete {
+        type Response = ();
+
+        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
+            server.coordinator.mark_jobs_complete(&self.domains)?;
+            Ok(())
+        }
     }
 }

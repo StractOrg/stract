@@ -1,16 +1,16 @@
-num_worker_threads = 10
-num_jobs_per_fetch  = 10
+num_jobs_per_fetch = 10
+num_worker_threads = 1
 politeness_factor = 1.0
+router_hosts = ["0.0.0.0:8181"]
 timeout_seconds = 30
-coordinator_host = "0.0.0.0:8080"
 
 [user_agent]
-token = "StractBot"
 full = "Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://trystract.com/webmasters)"
+token = "StractBot"
 
 [s3]
-bucket = "crawl"
-folder = "test"
 access_key = "<access_key>"
-secret_key = "<secret_key>"
+bucket = "crawl"
 endpoint = "http://s3.trystract.com"
+folder = "test"
+secret_key = "<secret_key>"

@@ -17,6 +17,7 @@ use encoding_rs::{Encoding, UTF_8};
 use futures::{future::BoxFuture, FutureExt};
 use mime::Mime;
 use quick_xml::events::Event;
+use rand::seq::SliceRandom;
 use tokio_stream::StreamExt;
 
 use std::{
@@ -33,7 +34,7 @@ use crate::{
     config::CrawlerConfig,
     crawler::{JobResponse, Response},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
-    entrypoint::crawler::{CoordinatorService, NewJobs},
+    entrypoint::crawler::router::{NewJobs, RouterService},
     webpage::Html,
 };
 
@@ -54,7 +55,7 @@ pub struct WorkerThread {
     client: reqwest::Client,
     config: CrawlerConfig,
     politeness_factor: f32,
-    coordinator_host: SocketAddr,
+    router_hosts: Vec<SocketAddr>,
     num_jobs_per_fetch: usize,
     robotstxt: RobotsTxtManager,
 }
@@ -66,7 +67,7 @@ impl WorkerThread {
         results: Arc<Mutex<Vec<JobResponse>>>,
         config: CrawlerConfig,
         timeout: Duration,
-        coordinator_host: SocketAddr,
+        router_hosts: Vec<SocketAddr>,
     ) -> Result<Self> {
         if config.politeness_factor < config.min_politeness_factor {
             return Err(Error::InvalidPolitenessFactor.into());
@@ -104,19 +105,19 @@ impl WorkerThread {
             num_jobs_per_fetch: config.num_jobs_per_fetch,
             politeness_factor: config.politeness_factor,
             config,
-            coordinator_host,
+            router_hosts,
             robotstxt,
         })
     }
 
-    async fn coordinator_conn(
-        &self,
-    ) -> Result<sonic::service::ResilientConnection<CoordinatorService>> {
+    async fn router_conn(&self) -> Result<sonic::service::ResilientConnection<RouterService>> {
         let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
+        let router = *self.router_hosts.choose(&mut rand::thread_rng()).unwrap();
+
         Ok(sonic::service::ResilientConnection::create_with_timeout(
-            self.coordinator_host,
-            Duration::from_secs(30),
+            router,
+            Duration::from_secs(3600),
             retry,
         )
         .await?)
@@ -145,7 +146,7 @@ impl WorkerThread {
                     }
                 }
             } else {
-                let conn = self.coordinator_conn().await.unwrap();
+                let conn = self.router_conn().await.unwrap();
                 let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
 
                 let res = conn
@@ -154,7 +155,7 @@ impl WorkerThread {
                             responses: results,
                             num_jobs: self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(10 * 60),
+                        Duration::from_secs(60 * 60),
                     )
                     .await;
 

@@ -94,13 +94,11 @@ enum Commands {
         output_dir: String,
     },
 
-    /// Deploy the crawl coordinator. The crawl coordinator is responsible for
-    /// distributing crawl jobs to the crawles and deciding which urls to crawl next.
-    CrawlCoordinator { config_path: String },
-
-    /// Deploy the crawler. The crawler is responsible for downloading webpages, saving them to S3,
-    /// and sending newly discovered urls back to the crawl coordinator.
-    Crawler { config_path: String },
+    /// Deploy the crawler.
+    Crawler {
+        #[clap(subcommand)]
+        options: Crawler,
+    },
 
     /// Train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
     SafetyClassifier {
@@ -117,6 +115,21 @@ enum Commands {
         #[clap(long, takes_value = false)]
         alice: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum Crawler {
+    /// Deploy the crawl worker. The worker is responsible for downloading webpages, saving them to S3,
+    /// and sending newly discovered urls back to the crawl coordinator.
+    Worker { config_path: String },
+
+    /// Deploy the crawl coordinator. The crawl coordinator is responsible for
+    /// distributing crawl jobs to the crawles and deciding which urls to crawl next.
+    Coordinator { config_path: String },
+
+    /// Deploy the crawl router. The crawl router is responsible for routing job responses and requests
+    /// from the workers to the correct crawl coordinators.
+    Router { config_path: String },
 }
 
 /// Commands to deploy Alice.
@@ -311,22 +324,32 @@ fn main() -> Result<()> {
             }
             AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
         },
-        Commands::CrawlCoordinator { config_path } => {
-            let config: config::CrawlCoordinatorConfig = load_toml_config(config_path);
+        Commands::Crawler { options } => match options {
+            Crawler::Worker { config_path } => {
+                let config: config::CrawlerConfig = load_toml_config(config_path);
 
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()?
-                .block_on(entrypoint::crawler::coordinator(config))?
-        }
-        Commands::Crawler { config_path } => {
-            let config: config::CrawlerConfig = load_toml_config(config_path);
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::crawler::worker(config))?
+            }
+            Crawler::Coordinator { config_path } => {
+                let config: config::CrawlCoordinatorConfig = load_toml_config(config_path);
 
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()?
-                .block_on(entrypoint::crawler::worker(config))?
-        }
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::crawler::coordinator(config))?
+            }
+            Crawler::Router { config_path } => {
+                let config: config::CrawlRouterConfig = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::crawler::router(config))?
+            }
+        },
         Commands::SafetyClassifier { options } => match options {
             SafetyClassifierOptions::Train {
                 dataset_path,

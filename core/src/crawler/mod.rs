@@ -30,6 +30,8 @@ use self::{warc_writer::WarcWriter, worker::WorkerThread};
 pub mod coordinator;
 pub mod crawl_db;
 mod robots_txt;
+pub mod router;
+pub use router::Router;
 mod warc_writer;
 mod worker;
 
@@ -129,6 +131,23 @@ pub struct JobResponse {
     pub weight_budget: f64,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UrlToInsert {
+    pub url: Url,
+    pub weight: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DiscoveredUrls {
+    pub urls: HashMap<Domain, Vec<UrlToInsert>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DomainCrawled {
+    pub domain: Domain,
+    pub budget_used: f64,
+}
+
 struct RetrieableUrl {
     url: Url,
     retries: u8,
@@ -184,7 +203,11 @@ impl Crawler {
         let writer = Arc::new(WarcWriter::new(config.s3.clone()));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
-        let coordinator_host = config.coordinator_host.parse()?;
+        let mut router_hosts = Vec::new();
+
+        for host in &config.router_hosts {
+            router_hosts.push(host.parse()?);
+        }
 
         for _ in 0..config.num_worker_threads {
             let worker = WorkerThread::new(
@@ -193,7 +216,7 @@ impl Crawler {
                 Arc::clone(&results),
                 config.clone(),
                 timeout,
-                coordinator_host,
+                router_hosts.clone(),
             )?;
 
             handles.push(tokio::spawn(async move {
@@ -204,7 +227,7 @@ impl Crawler {
         Ok(Self { writer, handles })
     }
 
-    pub async fn wait(self) {
+    pub async fn run(self) {
         for handle in self.handles {
             handle.await.ok();
         }

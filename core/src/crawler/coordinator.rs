@@ -14,38 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use hashbrown::HashMap;
 use url::Url;
 
-use crate::call_counter::CallCounter;
-
-use super::{
-    crawl_db::{CrawlDb, DomainStatus},
-    Job, JobResponse, Result,
-};
-use std::{
-    path::Path,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Mutex,
-    },
-    time::{Duration, Instant},
-};
+use super::{crawl_db::CrawlDb, Domain, DomainCrawled, Job, Result, UrlToInsert};
+use std::{path::Path, sync::Mutex, time::Instant};
 
 const DEFAULT_JOB_URLS: usize = 200;
 
 pub struct CrawlCoordinator {
     db: Mutex<CrawlDb>,
-    num_crawled_urls: AtomicU64,
-    num_urls_to_crawl: u64,
-    call_counter: Mutex<CallCounter>,
 }
 
 impl CrawlCoordinator {
-    pub fn new<P: AsRef<Path>>(
-        crawldb_folder: P,
-        num_urls_to_crawl: u64,
-        seed_urls: Vec<String>,
-    ) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(crawldb_folder: P, seed_urls: Vec<String>) -> Result<Self> {
         let mut db = CrawlDb::open(crawldb_folder)?;
         let mut parsed_seed_urls = Vec::new();
 
@@ -55,51 +37,29 @@ impl CrawlCoordinator {
 
         db.insert_seed_urls(&parsed_seed_urls)?;
 
-        Ok(Self {
-            db: Mutex::new(db),
-            num_urls_to_crawl,
-            num_crawled_urls: AtomicU64::new(0),
-            call_counter: Mutex::new(CallCounter::new(Duration::from_secs(60))),
-        })
+        Ok(Self { db: Mutex::new(db) })
     }
 
-    fn log_crawls_per_second(&self, num_urls: usize) {
-        if self.is_done() {
-            return;
-        }
-
-        let mut call_counter = self.call_counter.lock().unwrap();
-
-        call_counter.count_with_weight(num_urls);
-        tracing::info!("avg crawls per second: {}", call_counter.avg_per_second());
-    }
-
-    pub fn add_responses(&self, responses: &[JobResponse]) -> Result<()> {
-        let num_crawled_urls = responses.iter().map(|res| res.url_responses.len()).sum();
-
-        self.log_crawls_per_second(num_crawled_urls);
-        self.num_crawled_urls
-            .fetch_add(num_crawled_urls as u64, Ordering::SeqCst);
-
+    pub fn insert_urls(&self, urls: HashMap<Domain, Vec<UrlToInsert>>) -> Result<()> {
         let mut db = self.db.lock().unwrap();
         let start = Instant::now();
 
-        db.insert_urls(responses)?;
-
-        let response_domains = responses
-            .iter()
-            .map(|resp| resp.domain.clone())
-            .collect::<Vec<_>>();
-
-        db.set_domain_status(&response_domains, DomainStatus::Pending)?;
+        db.insert_urls(urls)?;
 
         tracing::info!("inserted responses in {:?}", start.elapsed());
 
         Ok(())
     }
 
-    pub fn is_done(&self) -> bool {
-        self.num_crawled_urls.load(Ordering::SeqCst) >= self.num_urls_to_crawl
+    pub fn mark_jobs_complete(&self, domains: &[DomainCrawled]) -> Result<()> {
+        let mut db = self.db.lock().unwrap();
+        let start = Instant::now();
+
+        db.mark_jobs_complete(domains)?;
+
+        tracing::info!("marked jobs complete in {:?}", start.elapsed());
+
+        Ok(())
     }
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {

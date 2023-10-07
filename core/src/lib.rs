@@ -35,7 +35,6 @@ pub mod alice;
 mod api;
 mod autosuggest;
 mod bangs;
-mod call_counter;
 mod collector;
 pub mod config;
 pub mod crawler;

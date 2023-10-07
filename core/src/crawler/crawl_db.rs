@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::{collections::BinaryHeap, path::Path};
 use url::Url;
 
-use super::{Domain, Job, JobResponse, Result, UrlResponse};
+use super::{Domain, DomainCrawled, Job, Result, UrlToInsert};
 
 const MAX_URL_DB_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024; // 20GB
 
@@ -119,51 +119,6 @@ impl Default for DomainState {
     }
 }
 
-pub struct RedirectDb {
-    inner: rocksdb::DB,
-}
-
-impl RedirectDb {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut options = rocksdb::Options::default();
-
-        options.create_if_missing(true);
-
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_format_version(5);
-
-        options.set_block_based_table_factory(&block_options);
-
-        let inner = rocksdb::DB::open(&options, path.as_ref())?;
-
-        Ok(Self { inner })
-    }
-
-    pub fn put(&self, from: &Url, to: &Url) -> Result<()> {
-        let url_bytes = bincode::serialize(from)?;
-        let redirect_bytes = bincode::serialize(to)?;
-
-        let mut write_options = rocksdb::WriteOptions::default();
-        write_options.disable_wal(true);
-        self.inner
-            .put_opt(url_bytes, redirect_bytes, &write_options)?;
-
-        Ok(())
-    }
-
-    pub fn get(&self, from: &Url) -> Result<Option<Url>> {
-        let url_bytes = bincode::serialize(from)?;
-        let redirect_bytes = self.inner.get(url_bytes)?;
-
-        if let Some(redirect_bytes) = redirect_bytes {
-            let redirect: Url = bincode::deserialize(&redirect_bytes)?;
-            return Ok(Some(redirect));
-        }
-
-        Ok(None)
-    }
-}
-
 struct MetaDb {
     db: rocksdb::DB,
 }
@@ -212,11 +167,6 @@ impl<T> From<T> for CachedValue<T> {
             last_updated: std::time::Instant::now(),
         }
     }
-}
-
-struct UrlToInsert {
-    url: Url,
-    weight: f64,
 }
 
 struct UrlStateDbShard {
@@ -603,13 +553,11 @@ impl From<&UrlString> for Url {
 pub struct CrawlDb {
     domain_state: DomainStateDb,
     urls: UrlStateDb,
-    redirects: RedirectDb,
 }
 
 impl CrawlDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self {
-            redirects: RedirectDb::open(path.as_ref().join("redirects"))?,
             domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
             urls: UrlStateDb::open(path.as_ref().join("urls"))?,
         })
@@ -627,73 +575,13 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn insert_urls(&mut self, responses: &[JobResponse]) -> Result<()> {
-        let mut domain_urls: HashMap<Domain, Vec<UrlToInsert>> = HashMap::new();
-        let mut domain_batches = Vec::new();
-
-        let response_domains: Vec<_> = responses.iter().map(|res| res.domain.clone()).collect();
-        let response_domains = self.domain_state.multi_get(&response_domains)?;
-
-        for res in responses {
-            let mut urls: Vec<(Domain, Url)> = res
-                .discovered_urls
-                .iter()
-                .map(|url| {
-                    let domain = Domain::from(url);
-                    (domain, url.clone())
-                })
-                .collect();
-
-            let diff_domains = urls
-                .iter()
-                .filter(|(domain, _)| res.domain != *domain)
-                .count() as f64;
-
-            urls.sort_unstable_by(|(_, a), (_, b)| a.as_str().cmp(b.as_str()));
-            urls.dedup_by(|(_, a), (_, b)| a.as_str() == b.as_str());
-
-            let mut used_budget = 0.0;
-
-            for (domain, url) in urls {
-                let different_domain = res.domain != domain;
-
-                let weight = if different_domain {
-                    (res.weight_budget / diff_domains).min(1.0)
-                } else {
-                    0.0
-                };
-
-                used_budget += weight;
-
-                domain_urls
-                    .entry(domain)
-                    .or_default()
-                    .push(UrlToInsert { url, weight });
-            }
-
-            let mut domain_state = response_domains
-                .get(&res.domain)
-                .cloned()
-                .unwrap_or_default();
-
-            domain_state.weight = (domain_state.weight - used_budget).max(0.0);
-            domain_batches.push((res.domain.clone(), domain_state));
-
-            for url_res in &res.url_responses {
-                if let UrlResponse::Redirected { url, new_url } = url_res {
-                    self.redirects.put(url, new_url).ok();
-                }
-            }
-        }
-
-        self.domain_state.put_batch(&domain_batches)?;
-
+    pub fn insert_urls(&mut self, domain_urls: HashMap<Domain, Vec<UrlToInsert>>) -> Result<()> {
         let mut url_batches = Vec::new();
         let mut domain_batches = Vec::new();
 
         let domains = domain_urls.keys().cloned().collect::<Vec<_>>();
         let domain_states = self.domain_state.multi_get(&domains)?;
-        let url_states = self.urls.multi_get(
+        let mut url_states = self.urls.multi_get(
             domain_urls
                 .iter()
                 .flat_map(|(domain, urls)| {
@@ -710,17 +598,22 @@ impl CrawlDb {
             let mut updated_url_states = Vec::new();
 
             for url in urls {
-                let mut url_state = match url_states.get(&UrlString::from(&url.url)) {
-                    Some(state) => state.clone(),
-                    None => UrlState::default(),
+                match url_states.get_mut(&UrlString::from(&url.url)) {
+                    Some(state) => {
+                        state.weight += url.weight;
+                        domain_state.weight += url.weight;
+                        if url.weight > 0.0 {
+                            updated_url_states.push((UrlString::from(&url.url), state.clone()));
+                        }
+                    }
+                    None => {
+                        let mut state = UrlState::default();
+                        state.weight += url.weight;
+                        domain_state.weight += url.weight;
+
+                        updated_url_states.push((UrlString::from(&url.url), state));
+                    }
                 };
-
-                url_state.weight += url.weight;
-                domain_state.weight += url_state.weight;
-
-                if url.weight > 0.0 {
-                    updated_url_states.push((UrlString::from(&url.url), url_state));
-                }
             }
 
             url_batches.push((domain.clone(), updated_url_states));
@@ -733,7 +626,7 @@ impl CrawlDb {
         Ok(())
     }
 
-    pub fn set_domain_status(&mut self, domains: &[Domain], status: DomainStatus) -> Result<()> {
+    fn set_domain_status(&mut self, domains: &[Domain], status: DomainStatus) -> Result<()> {
         let domain_states = self.domain_state.multi_get(domains)?;
 
         let mut batches = Vec::new();
@@ -743,6 +636,33 @@ impl CrawlDb {
             domain_state.status = status;
 
             batches.push((domain.clone(), domain_state));
+        }
+
+        self.domain_state.put_batch(&batches)?;
+
+        Ok(())
+    }
+
+    pub fn mark_jobs_complete(&mut self, domains: &[DomainCrawled]) -> Result<()> {
+        let domain_states = self.domain_state.multi_get(
+            domains
+                .iter()
+                .map(|d| d.domain.clone())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )?;
+
+        let mut batches = Vec::new();
+
+        for domain in domains {
+            let mut domain_state = domain_states
+                .get(&domain.domain)
+                .cloned()
+                .unwrap_or_default();
+            domain_state.status = DomainStatus::Pending;
+            domain_state.weight -= domain.budget_used;
+
+            batches.push((domain.domain.clone(), domain_state));
         }
 
         self.domain_state.put_batch(&batches)?;

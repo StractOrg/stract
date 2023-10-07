@@ -143,10 +143,6 @@ name = "spell-correction"
 
 [[bench]]
 harness = false
-name = "crawl-coordinator"
-
-[[bench]]
-harness = false
 name = "similar-sites"
 
 [[bench]]
