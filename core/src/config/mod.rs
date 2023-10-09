@@ -263,7 +263,6 @@ pub struct SearchServerConfig {
 pub struct CrawlCoordinatorConfig {
     pub crawldb_folder: String,
     pub host: SocketAddr,
-    pub seed_urls: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -308,6 +307,7 @@ pub struct CrawlerConfig {
 pub struct CrawlRouterConfig {
     pub host: SocketAddr,
     pub coordinator_addrs: Vec<SocketAddr>,
+    pub seed_urls: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

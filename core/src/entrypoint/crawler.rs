@@ -35,10 +35,7 @@ pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
 }
 
 pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
-    let coordinator = Arc::new(CrawlCoordinator::new(
-        config.crawldb_folder,
-        config.seed_urls,
-    )?);
+    let coordinator = Arc::new(CrawlCoordinator::new(config.crawldb_folder)?);
 
     let addr: SocketAddr = config.host;
     let server = coordinator::CoordinatorService { coordinator }
@@ -54,7 +51,7 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
 }
 
 pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
-    let router = crawler::Router::new(config.coordinator_addrs.clone());
+    let router = crawler::Router::new(config.coordinator_addrs.clone(), config.seed_urls).await?;
 
     let addr: SocketAddr = config.host;
 

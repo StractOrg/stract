@@ -503,17 +503,6 @@ impl DomainStateDb {
         Ok(())
     }
 
-    fn put(&self, domain: &Domain, state: &DomainState) -> Result<()> {
-        let domain_bytes = bincode::serialize(domain)?;
-        let state_bytes = bincode::serialize(state)?;
-
-        let mut write_options = rocksdb::WriteOptions::default();
-        write_options.disable_wal(true);
-        self.db.put_opt(domain_bytes, state_bytes, &write_options)?;
-
-        Ok(())
-    }
-
     fn iter(&self) -> impl Iterator<Item = (Domain, DomainState)> + '_ {
         let iter = self.db.iterator(rocksdb::IteratorMode::Start);
 
@@ -561,18 +550,6 @@ impl CrawlDb {
             domain_state: DomainStateDb::open(path.as_ref().join("domains"))?,
             urls: UrlStateDb::open(path.as_ref().join("urls"))?,
         })
-    }
-
-    pub fn insert_seed_urls(&mut self, urls: &[Url]) -> Result<()> {
-        for url in urls {
-            let domain = Domain::from(url);
-
-            self.domain_state.put(&domain, &DomainState::default())?;
-            self.urls
-                .put_batch(&[(domain, vec![(UrlString::from(url), UrlState::default())])])?;
-        }
-
-        Ok(())
     }
 
     pub fn insert_urls(&mut self, domain_urls: HashMap<Domain, Vec<UrlToInsert>>) -> Result<()> {
@@ -749,6 +726,25 @@ mod tests {
 
     use super::*;
 
+    fn insert_seed_urls(urls: &[Url], db: &mut CrawlDb) {
+        let mut domain_urls = HashMap::new();
+
+        for url in urls {
+            let domain = Domain::from(url);
+            let url_to_insert = UrlToInsert {
+                url: url.clone(),
+                weight: 0.0,
+            };
+
+            domain_urls
+                .entry(domain)
+                .or_insert_with(Vec::new)
+                .push(url_to_insert);
+        }
+
+        db.insert_urls(domain_urls).unwrap();
+    }
+
     #[test]
     fn sampling() {
         let items: Vec<(usize, f64)> = vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0)];
@@ -773,8 +769,8 @@ mod tests {
     fn simple_politeness() {
         let mut db = CrawlDb::open(gen_temp_path()).unwrap();
 
-        db.insert_seed_urls(&[Url::parse("https://example.com").unwrap()])
-            .unwrap();
+        let urls = vec![Url::parse("https://example.com").unwrap()];
+        insert_seed_urls(&urls, &mut db);
 
         let domain = Domain::from(&Url::parse("https://example.com").unwrap());
 
@@ -795,11 +791,11 @@ mod tests {
     fn get_all_urls() {
         let mut db = CrawlDb::open(gen_temp_path()).unwrap();
 
-        db.insert_seed_urls(&[
+        let urls = vec![
             Url::parse("https://a.com").unwrap(),
             Url::parse("https://b.com").unwrap(),
-        ])
-        .unwrap();
+        ];
+        insert_seed_urls(&urls, &mut db);
 
         let domain = Domain::from(&Url::parse("https://a.com").unwrap());
 

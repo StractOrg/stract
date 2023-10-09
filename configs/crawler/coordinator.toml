@@ -1,3 +1,2 @@
 crawldb_folder = "data/crawldb"
 host = "0.0.0.0:8080"
-seed_urls = ["https://en.wikipedia.org"]

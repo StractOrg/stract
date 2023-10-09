@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use hashbrown::HashMap;
-use url::Url;
 
 use super::{crawl_db::CrawlDb, Domain, DomainCrawled, Job, Result, UrlToInsert};
 use std::{path::Path, sync::Mutex, time::Instant};
@@ -27,15 +26,8 @@ pub struct CrawlCoordinator {
 }
 
 impl CrawlCoordinator {
-    pub fn new<P: AsRef<Path>>(crawldb_folder: P, seed_urls: Vec<String>) -> Result<Self> {
-        let mut db = CrawlDb::open(crawldb_folder)?;
-        let mut parsed_seed_urls = Vec::new();
-
-        for url in seed_urls {
-            parsed_seed_urls.push(Url::parse(&url)?);
-        }
-
-        db.insert_seed_urls(&parsed_seed_urls)?;
+    pub fn new<P: AsRef<Path>>(crawldb_folder: P) -> Result<Self> {
+        let db = CrawlDb::open(crawldb_folder)?;
 
         Ok(Self { db: Mutex::new(db) })
     }

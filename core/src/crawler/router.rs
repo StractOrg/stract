@@ -62,13 +62,41 @@ pub struct Router {
 }
 
 impl Router {
-    pub fn new(coordinator_addrs: Vec<SocketAddr>) -> Self {
-        Self {
+    pub async fn new(coordinator_addrs: Vec<SocketAddr>, seed_urls: Vec<String>) -> Result<Self> {
+        let s = Self {
             coordinators: coordinator_addrs
                 .into_iter()
                 .map(|addr| RemoteCoordinator { addr })
                 .collect(),
+        };
+
+        let mut coordinator_urls: HashMap<usize, HashMap<Domain, Vec<UrlToInsert>>> =
+            HashMap::new();
+
+        for url in seed_urls {
+            let url = Url::parse(&url)?;
+            let domain = Domain::from(&url);
+
+            let coordinator_index = s.coordinator_index(&domain);
+
+            coordinator_urls
+                .entry(coordinator_index)
+                .or_default()
+                .entry(domain)
+                .or_default()
+                .push(UrlToInsert { url, weight: 0.0 });
         }
+
+        let mut futures = Vec::new();
+        for (coordinator_index, urls) in coordinator_urls {
+            let coordinator = &s.coordinators[coordinator_index];
+
+            futures.push(coordinator.insert_urls(urls));
+        }
+
+        futures::future::join_all(futures).await;
+
+        Ok(s)
     }
 
     fn coordinator_index(&self, domain: &Domain) -> usize {
