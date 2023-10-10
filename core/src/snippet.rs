@@ -393,7 +393,6 @@ Survey in 2016, 2017, and 2018."#;
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(highlight(result.webpages[0].snippet.clone()), format!("{HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is a systems programming {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX} sponsored by Mozilla which describes it as a \"safe, concurrent, practical {HIGHLIGHTEN_PREFIX}language{HIGHLIGHTEN_POSTFIX}\", supporting functional and imperative-procedural paradigms. {HIGHLIGHTEN_PREFIX}Rust{HIGHLIGHTEN_POSTFIX} is syntactically similar to C++[according to whom?"));
     }
@@ -433,7 +432,6 @@ Survey in 2016, 2017, and 2018."#;
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(highlight(result.webpages[0].snippet.clone()), format!("Rust is a systems programming language sponsored by Mozilla which {HIGHLIGHTEN_PREFIX}describes{HIGHLIGHTEN_POSTFIX} it as a \"safe, concurrent, practical language\", supporting functional and imperative-procedural paradigms. Rust is syntactically similar to C++[according to whom?"));
     }
@@ -473,7 +471,6 @@ Survey in 2016, 2017, and 2018."#;
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(
             highlight(result.webpages[0].snippet.clone()),

@@ -132,4 +132,8 @@ impl SearchQuery {
     pub fn fetch_discussions() -> bool {
         false
     }
+
+    pub fn count_results() -> bool {
+        false
+    }
 }

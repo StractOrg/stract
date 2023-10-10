@@ -27,7 +27,7 @@
 //! but the principle is the same.
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use tantivy::collector::{Collector, Count};
+use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::Schema;
@@ -35,9 +35,10 @@ use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
 use url::Url;
 
-use crate::collector::Hashes;
+use crate::collector::{Hashes, MainCollector};
 use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
+use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
@@ -61,7 +62,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
-    pub num_websites: usize,
+    pub num_websites: Option<usize>,
     pub top_websites: Vec<WebsitePointer>,
 }
 
@@ -214,20 +215,33 @@ impl InvertedIndex {
         Ok(())
     }
 
-    pub fn search_initial<C>(
+    pub fn search_initial(
         &self,
         query: &Query,
         ctx: &Ctx,
-        collector: C,
-    ) -> Result<InitialSearchResult>
-    where
-        C: Collector<Fruit = Vec<WebsitePointer>>,
-    {
+        collector: MainCollector,
+    ) -> Result<InitialSearchResult> {
+        if !query.count_results() {
+            let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
+
+            if let Some(limit) = collector.top_docs().max_docs() {
+                let docs_per_segment = limit.total_docs / limit.segments;
+                query = Box::new(ShortCircuitQuery::new(query, docs_per_segment as u64));
+            }
+
+            let pointers = ctx.tv_searcher.search(&query, &collector)?;
+
+            return Ok(InitialSearchResult {
+                num_websites: None,
+                top_websites: pointers,
+            });
+        }
+
         let collector = (Count, collector);
         let (count, pointers) = ctx.tv_searcher.search(query, &collector)?;
 
         Ok(InitialSearchResult {
-            num_websites: count,
+            num_websites: Some(count),
             top_websites: pointers,
         })
     }
@@ -523,7 +537,7 @@ impl InvertedIndex {
 
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
-    pub num_docs: usize,
+    pub num_docs: Option<usize>,
     pub documents: Vec<RetrievedWebpage>,
 }
 
@@ -645,15 +659,12 @@ mod tests {
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-    fn search<C>(
+    fn search(
         index: &InvertedIndex,
         query: &Query,
         ctx: &Ctx,
-        collector: C,
-    ) -> Result<SearchResult>
-    where
-        C: Collector<Fruit = Vec<WebsitePointer>>,
-    {
+        collector: MainCollector,
+    ) -> Result<SearchResult> {
         let initial_result = index.search_initial(query, ctx, collector)?;
 
         let pointers: Vec<_> = initial_result.top_websites;
@@ -689,7 +700,6 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
 
         index
             .insert(
@@ -722,7 +732,6 @@ mod tests {
 
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-        assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
@@ -773,7 +782,6 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
     }
 
     #[test]
@@ -1124,7 +1132,6 @@ mod tests {
 
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-        assert_eq!(result.num_docs, 2);
         assert_eq!(result.documents.len(), 2);
         assert_eq!(result.documents[0].url, "https://www.example.com/");
         assert_eq!(result.documents[1].url, "https://www.example.com/");
@@ -1153,7 +1160,6 @@ mod tests {
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
-        assert_eq!(result.num_docs, 0);
 
         index
             .insert(
@@ -1185,7 +1191,6 @@ mod tests {
         );
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-        assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com/");
     }
@@ -1234,7 +1239,6 @@ mod tests {
 
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
-        assert_eq!(result.num_docs, 1);
         assert_eq!(result.documents.len(), 1);
         assert_eq!(result.documents[0].url, "https://www.example.com/");
     }

@@ -192,6 +192,7 @@ export const api = {
 };
 
 export type ApiSearchQuery = {
+  countResults?: boolean;
   fetchDiscussions?: boolean;
   flattenResponse?: boolean;
   numResults?: number;
@@ -426,7 +427,7 @@ export type WebsitesResult = {
   directAnswer?: DisplayedAnswer;
   discussions?: DisplayedWebpage[];
   hasMoreResults: boolean;
-  numHits: number;
+  numHits?: number;
   searchDurationMs: number;
   sidebar?: DisplayedSidebar;
   spellCorrectedQuery?: HighlightedSpellCorrection;

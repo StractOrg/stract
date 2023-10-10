@@ -256,7 +256,7 @@ impl ApiSearcher {
 
         let num_results: usize = initial_results
             .iter()
-            .map(|res| res.local_result.num_websites)
+            .map(|res| res.local_result.websites.len())
             .sum();
 
         if num_results < NUM_RESULTS / 2 {

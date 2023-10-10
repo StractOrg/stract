@@ -22,7 +22,7 @@ use tantivy::{DocId, SegmentReader};
 
 use super::SignalAggregator;
 
-pub(crate) struct InitialScoreTweaker {
+pub struct InitialScoreTweaker {
     tv_searcher: tantivy::Searcher,
     fastfield_reader: FastFieldReader,
     aggregator: SignalAggregator,
@@ -65,7 +65,7 @@ impl ScoreTweaker<Score> for InitialScoreTweaker {
     }
 }
 
-pub(crate) struct InitialSegmentScoreTweaker {
+pub struct InitialSegmentScoreTweaker {
     aggregator: SignalAggregator,
 }
 

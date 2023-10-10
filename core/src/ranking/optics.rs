@@ -188,7 +188,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
         assert_eq!(result.webpages[1].url, "https://www.second.com/");
@@ -206,7 +205,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
         assert_eq!(result.webpages[1].url, "https://www.second.com/");
@@ -225,7 +223,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 2);
         assert_eq!(result.webpages.len(), 2);
         assert_eq!(result.webpages[0].url, "https://www.third.com/");
         assert_eq!(result.webpages[1].url, "https://www.second.com/");

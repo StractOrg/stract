@@ -26,13 +26,11 @@ pub mod query_centrality;
 pub mod signal;
 
 use initial::InitialScoreTweaker;
-use tantivy::collector::Collector;
 
 use crate::{
-    collector::{MaxDocsConsidered, TopDocs},
+    collector::{MaxDocsConsidered, TopDocs, MainCollector},
     config::CollectorConfig,
     fastfield_reader::FastFieldReader,
-    inverted_index,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::Region,
@@ -102,7 +100,7 @@ impl Ranker {
     pub fn collector(
         &self,
         ctx: Ctx,
-    ) -> impl Collector<Fruit = Vec<inverted_index::WebsitePointer>> {
+    ) -> MainCollector {
         let aggregator = self.aggregator();
 
         let score_tweaker =
@@ -127,7 +125,7 @@ impl Ranker {
 
         collector = collector.and_collector_config(self.collector_config.clone());
 
-        collector.tweak_score(score_tweaker)
+        collector.main_collector(score_tweaker)
     }
 
     pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
@@ -648,7 +646,7 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(res.num_hits, 3);
+        assert_eq!(res.webpages.len(), 3);
         assert_eq!(&res.webpages[0].url, "https://www.title.com/");
 
         let res = searcher
@@ -666,7 +664,7 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(res.num_hits, 3);
+        assert_eq!(res.webpages.len(), 3);
         assert_eq!(&res.webpages[0].url, "https://www.centrality.com/");
     }
 
@@ -786,7 +784,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
         assert_eq!(result.webpages[1].url, "https://www.second.com/");
@@ -867,7 +864,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 2);
         assert_eq!(result.webpages.len(), 2);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
         assert_eq!(result.webpages[1].url, "https://www.second.com/");
@@ -977,7 +973,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 3);
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/one");
         assert_eq!(result.webpages[1].url, "https://www.second.com/one/two");

@@ -58,7 +58,7 @@ impl From<Index> for LocalSearcher {
 
 struct InvertedIndexResult {
     webpages: Vec<RankingWebsite>,
-    num_hits: usize,
+    num_hits: Option<usize>,
     has_more: bool,
 }
 

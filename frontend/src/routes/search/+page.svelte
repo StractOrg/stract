@@ -153,10 +153,14 @@
       <div class="mx-auto flex w-full justify-between">
         <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
           <p class="h-fit">
-            Found {results.numHits.toLocaleString()} results in {(
-              (results.searchDurationMs ?? 0) / 1000
-            ).toFixed(2)}
-            seconds
+            {#if results.numHits }
+              Found {results.numHits.toLocaleString()} results in {(
+                (results.searchDurationMs ?? 0) / 1000
+              ).toFixed(2)}
+              seconds
+            {:else}
+              Search took {((results.searchDurationMs ?? 0) / 1000).toFixed(2)} seconds
+            {/if}
           </p>
         </div>
         <div class="flex space-x-2">

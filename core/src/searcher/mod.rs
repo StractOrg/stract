@@ -50,7 +50,7 @@ pub enum SearchResult {
 pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
-    pub num_hits: usize,
+    pub num_hits: Option<usize>,
     pub sidebar: Option<DisplayedSidebar>,
     pub widget: Option<Widget>,
     pub direct_answer: Option<DisplayedAnswer>,
@@ -70,12 +70,13 @@ pub struct SearchQuery {
     pub return_ranking_signals: bool,
     pub safe_search: bool,
     pub fetch_discussions: bool,
+    pub count_results: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub spell_corrected_query: Option<Correction>,
-    pub num_websites: usize,
+    pub num_websites: Option<usize>,
     pub websites: Vec<RankingWebsite>,
     pub has_more: bool,
     pub entity_sidebar: Option<EntityMatch>,
@@ -96,6 +97,7 @@ impl Default for SearchQuery {
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
             fetch_discussions: defaults::SearchQuery::fetch_discussions(),
+            count_results: defaults::SearchQuery::count_results(),
         }
     }
 }

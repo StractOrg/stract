@@ -33,6 +33,7 @@ pub mod intersection;
 pub mod optic;
 pub mod parser;
 mod pattern_query;
+pub mod shortcircuit;
 pub mod union;
 
 use parser::Term;
@@ -52,6 +53,7 @@ pub struct Query {
     region: Option<Region>,
     optics: Vec<Optic>,
     top_n: usize,
+    count_results: bool,
 }
 
 impl Query {
@@ -165,7 +167,12 @@ impl Query {
             offset: query.num_results * query.page,
             region: query.selected_region,
             top_n: query.num_results,
+            count_results: query.count_results,
         })
+    }
+
+    pub fn count_results(&self) -> bool {
+        self.count_results
     }
 
     pub fn simple_terms(&self) -> &[String] {
@@ -426,7 +433,6 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.second.com/");
     }
@@ -479,7 +485,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -488,7 +493,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -497,7 +501,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.second.com/");
     }
@@ -550,7 +553,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
@@ -603,7 +605,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/forum");
     }
@@ -698,7 +699,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 0);
         assert_eq!(result.webpages.len(), 0);
 
         let query = SearchQuery {
@@ -706,7 +706,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
 
@@ -715,7 +714,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
     }
@@ -774,7 +772,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -783,7 +780,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 0);
         assert_eq!(result.webpages.len(), 0);
     }
 
@@ -844,7 +840,7 @@ mod tests {
         };
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
             query: "test website".to_string(),
@@ -852,7 +848,7 @@ mod tests {
         };
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
     }
 
     #[test]
@@ -914,7 +910,7 @@ mod tests {
         };
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 2);
+        assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
             query: "test".to_string(),
@@ -923,7 +919,7 @@ mod tests {
         };
 
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
+        assert_eq!(result.webpages.len(), 1);
 
         assert_eq!(result.webpages[0].url, "https://www.sfw.com/");
     }
@@ -1003,7 +999,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 2);
         assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
@@ -1011,7 +1006,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
@@ -1019,7 +1013,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
@@ -1027,7 +1020,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
@@ -1035,7 +1027,6 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
     }
 }

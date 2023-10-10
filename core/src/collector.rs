@@ -29,10 +29,12 @@ use crate::{
     fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::Prehashed,
-    ranking::initial::Score,
+    ranking::initial::{InitialScoreTweaker, Score},
     schema::FastField,
     simhash,
 };
+
+pub type MainCollector = TweakedScoreTopCollector<InitialScoreTweaker>;
 
 #[derive(Clone)]
 pub struct MaxDocsConsidered {
@@ -75,6 +77,10 @@ impl TopDocs {
         }
     }
 
+    pub fn max_docs(&self) -> Option<&MaxDocsConsidered> {
+        self.max_docs.as_ref()
+    }
+
     pub fn and_offset(mut self, offset: usize) -> Self {
         self.offset = offset;
         self
@@ -95,14 +101,7 @@ impl TopDocs {
         self
     }
 
-    pub fn tweak_score<TScoreSegmentTweaker, TScoreTweaker>(
-        self,
-        score_tweaker: TScoreTweaker,
-    ) -> impl Collector<Fruit = Vec<WebsitePointer>>
-    where
-        TScoreSegmentTweaker: ScoreSegmentTweaker<Score> + 'static,
-        TScoreTweaker: ScoreTweaker<Score, Child = TScoreSegmentTweaker> + Send + Sync,
-    {
+    pub fn main_collector(self, score_tweaker: InitialScoreTweaker) -> MainCollector {
         TweakedScoreTopCollector::new(score_tweaker, self)
     }
 }
@@ -361,7 +360,7 @@ impl Doc for SegmentDoc {
     }
 }
 
-pub(crate) struct TweakedScoreTopCollector<TScoreTweaker> {
+pub struct TweakedScoreTopCollector<TScoreTweaker> {
     score_tweaker: TScoreTweaker,
     top_docs: TopDocs,
 }
@@ -375,6 +374,10 @@ impl<TScoreTweaker> TweakedScoreTopCollector<TScoreTweaker> {
             score_tweaker,
             top_docs,
         }
+    }
+
+    pub fn top_docs(&self) -> &TopDocs {
+        &self.top_docs
     }
 }
 

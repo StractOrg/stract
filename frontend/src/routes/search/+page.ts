@@ -32,6 +32,7 @@ export const load: PageLoad = async (req) => {
       selectedRegion: params.selectedRegion,
       siteRankings: params.siteRankings,
       fetchDiscussions: true,
+      countResults: true,
     },
     { fetch },
   );

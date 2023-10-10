@@ -20,11 +20,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tantivy::collector::Collector;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use url::Url;
 
+use crate::collector::MainCollector;
 use crate::directory::{self, DirEntry};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
@@ -100,10 +100,12 @@ impl Index {
         Ok(())
     }
 
-    pub fn top_nodes<C>(&self, query: &Query, ctx: &Ctx, collector: C) -> Result<Vec<NodeID>>
-    where
-        C: Collector<Fruit = Vec<inverted_index::WebsitePointer>>,
-    {
+    pub fn top_nodes(
+        &self,
+        query: &Query,
+        ctx: &Ctx,
+        collector: MainCollector,
+    ) -> Result<Vec<NodeID>> {
         let websites = self
             .inverted_index
             .search_initial(query, ctx, collector)?
@@ -243,7 +245,6 @@ mod tests {
             })
             .expect("Search failed");
 
-        assert_eq!(result.num_hits, 1);
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.example.com/");
     }
