@@ -343,19 +343,28 @@ impl UrlStateDb {
         }
     }
 
+    fn new_shard(&mut self) -> Result<()> {
+        let shard_id =
+            chrono::Utc::now().to_rfc3339() + "_" + uuid::Uuid::new_v4().to_string().as_str();
+        let shard_path = self.path.as_path().join(shard_id);
+
+        std::fs::create_dir_all(&shard_path)?;
+
+        let shard = UrlStateDbShard::open(&shard_path)?;
+
+        self.shards.push(shard);
+
+        Ok(())
+    }
+
     pub fn put_batch(&mut self, batch: &[(Domain, Vec<(UrlString, UrlState)>)]) -> Result<()> {
+        if self.shards.is_empty() {
+            self.new_shard()?;
+        }
         let last_shard = self.shards.last_mut().unwrap();
 
         if last_shard.approximate_size_bytes()? > MAX_URL_DB_SIZE_BYTES {
-            let shard_id =
-                chrono::Utc::now().to_rfc3339() + "_" + uuid::Uuid::new_v4().to_string().as_str();
-            let shard_path = self.path.as_path().join(shard_id);
-
-            std::fs::create_dir_all(&shard_path)?;
-
-            let shard = UrlStateDbShard::open(&shard_path)?;
-
-            self.shards.push(shard);
+            self.new_shard()?;
         }
 
         self.shards.last_mut().unwrap().put_batch(batch)?;
@@ -419,10 +428,11 @@ impl DomainStateDb {
 
     fn multi_get(&self, domains: &[Domain]) -> Result<HashMap<Domain, DomainState>> {
         let mut res = HashMap::new();
-        let domain_bytes: Vec<_> = domains
-            .iter()
-            .map(|domain| bincode::serialize(domain).unwrap())
-            .collect();
+        let mut domain_bytes = Vec::with_capacity(domains.len());
+
+        for domain in domains {
+            domain_bytes.push(bincode::serialize(domain)?);
+        }
 
         for (val, domain) in self
             .db
@@ -487,9 +497,10 @@ impl From<Url> for UrlString {
     }
 }
 
-impl From<&UrlString> for Url {
-    fn from(url: &UrlString) -> Self {
-        Url::parse(&url.0).unwrap()
+impl TryFrom<&UrlString> for Url {
+    type Error = anyhow::Error;
+    fn try_from(url: &UrlString) -> Result<Self, Self::Error> {
+        Ok(Url::parse(&url.0)?)
     }
 }
 
@@ -665,7 +676,10 @@ impl CrawlDb {
             let job = Job {
                 domain: domain.clone(),
                 fetch_sitemap: false, // todo: fetch for new sites
-                urls: sampled.iter().map(|(url, _)| (*url).into()).collect(),
+                urls: sampled
+                    .iter()
+                    .filter_map(|(url, _)| Url::try_from(*url).ok())
+                    .collect(),
                 weight_budget: domain_state.weight,
             };
 
