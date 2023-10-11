@@ -32,7 +32,7 @@ use url::Url;
 
 use crate::{
     config::CrawlerConfig,
-    crawler::{JobResponse, Response},
+    crawler::{JobResponse, Response, MAX_OUTGOING_URLS_PER_PAGE, MAX_URL_LEN_BYTES},
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     entrypoint::crawler::router::{NewJobs, RouterService},
     webpage::Html,
@@ -44,8 +44,6 @@ use super::{
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
-
-const MAX_URL_LENGTH: usize = 8192;
 
 pub struct WorkerThread {
     current_job: Option<WorkerJob>,
@@ -226,7 +224,7 @@ impl WorkerThread {
                     discovered_urls.extend(
                         sitemap_urls
                             .into_iter()
-                            .filter(|url| url.as_str().len() < MAX_URL_LENGTH),
+                            .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES),
                     );
                 }
             }
@@ -261,7 +259,8 @@ impl WorkerThread {
             discovered_urls.extend(
                 res.new_urls
                     .into_iter()
-                    .filter(|url| url.as_str().len() < MAX_URL_LENGTH),
+                    .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES)
+                    .take(MAX_OUTGOING_URLS_PER_PAGE),
             );
             url_responses.push(res.response);
         }
@@ -271,7 +270,7 @@ impl WorkerThread {
             url_responses,
             discovered_urls: discovered_urls
                 .into_iter()
-                .filter(|url| url.as_str().len() < MAX_URL_LENGTH)
+                .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES)
                 .collect(),
             weight_budget: job.weight_budget,
         };

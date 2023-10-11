@@ -15,9 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use hashbrown::HashMap;
+use parking_lot::Mutex;
 
 use super::{crawl_db::CrawlDb, Domain, DomainCrawled, Job, Result, UrlToInsert};
-use std::{path::Path, sync::Mutex, time::Instant};
+use std::{path::Path, time::Instant};
 
 const DEFAULT_JOB_URLS: usize = 200;
 
@@ -33,7 +34,7 @@ impl CrawlCoordinator {
     }
 
     pub fn insert_urls(&self, urls: HashMap<Domain, Vec<UrlToInsert>>) -> Result<()> {
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.lock();
         let start = Instant::now();
 
         db.insert_urls(urls)?;
@@ -44,7 +45,7 @@ impl CrawlCoordinator {
     }
 
     pub fn mark_jobs_complete(&self, domains: &[DomainCrawled]) -> Result<()> {
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.lock();
         let start = Instant::now();
 
         db.mark_jobs_complete(domains)?;
@@ -55,7 +56,7 @@ impl CrawlCoordinator {
     }
 
     pub fn sample_jobs(&self, num_jobs: usize) -> Result<Vec<Job>> {
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.lock();
         let start = Instant::now();
 
         let domains = db.sample_domains(num_jobs)?;

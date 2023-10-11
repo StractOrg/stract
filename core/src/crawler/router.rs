@@ -10,7 +10,7 @@ use crate::{
     entrypoint::crawler::coordinator::{CoordinatorService, GetJobs, InsertUrls, MarkJobsComplete},
 };
 
-use super::{Domain, Job, JobResponse};
+use super::{Domain, Job, JobResponse, MAX_URLS_FOR_DOMAIN_PER_INSERT, MAX_URL_LEN_BYTES};
 
 struct RemoteCoordinator {
     addr: SocketAddr,
@@ -136,6 +136,10 @@ impl Router {
             let mut used_budget = 0.0;
 
             for (domain, url) in urls {
+                if url.as_str().len() > MAX_URL_LEN_BYTES {
+                    continue;
+                }
+
                 let different_domain = res.domain != domain;
 
                 let weight = if different_domain {
@@ -146,10 +150,13 @@ impl Router {
 
                 used_budget += weight;
 
-                domain_urls
-                    .entry(domain)
-                    .or_default()
-                    .push(UrlToInsert { url, weight });
+                let urls = domain_urls.entry(domain).or_default();
+
+                if urls.len() >= MAX_URLS_FOR_DOMAIN_PER_INSERT {
+                    continue;
+                }
+
+                urls.push(UrlToInsert { url, weight });
             }
 
             domain_budgets.push(DomainCrawled {

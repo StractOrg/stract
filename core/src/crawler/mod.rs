@@ -37,6 +37,10 @@ mod worker;
 
 pub use coordinator::CrawlCoordinator;
 
+pub const MAX_URL_LEN_BYTES: usize = 8192;
+pub const MAX_URLS_FOR_DOMAIN_PER_INSERT: usize = 200;
+pub const MAX_OUTGOING_URLS_PER_PAGE: usize = 100;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("invalid content type: {0}")]

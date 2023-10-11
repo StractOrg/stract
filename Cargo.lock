@@ -4303,6 +4303,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "optics",
+ "parking_lot",
  "parse_wiki_text",
  "proptest",
  "proptest-derive",

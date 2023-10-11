@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::{collections::BinaryHeap, path::Path};
 use url::Url;
 
-use super::{Domain, DomainCrawled, Job, Result, UrlToInsert};
+use super::{Domain, DomainCrawled, Job, Result, UrlToInsert, MAX_URL_LEN_BYTES};
 
 const MAX_URL_DB_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024; // 20GB
 
@@ -118,43 +118,6 @@ impl Default for DomainState {
         }
     }
 }
-
-struct MetaDb {
-    db: rocksdb::DB,
-}
-
-impl MetaDb {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut options = rocksdb::Options::default();
-        options.create_if_missing(true);
-
-        let db = rocksdb::DB::open(&options, path.as_ref())?;
-
-        Ok(Self { db })
-    }
-
-    fn set_longest_url_len(&self, len: usize) -> Result<()> {
-        let mut write_options = rocksdb::WriteOptions::default();
-        write_options.disable_wal(true);
-
-        self.db
-            .put_opt(b"longest_url_len", len.to_be_bytes(), &write_options)?;
-
-        Ok(())
-    }
-
-    fn get_longest_url_len(&self) -> Result<usize> {
-        let len_bytes = self.db.get(b"longest_url_len")?;
-
-        if let Some(len_bytes) = len_bytes {
-            let len: usize = usize::from_be_bytes(len_bytes.try_into().unwrap());
-            return Ok(len);
-        }
-
-        Ok(0)
-    }
-}
-
 struct CachedValue<T> {
     value: T,
     last_updated: std::time::Instant,
@@ -171,11 +134,9 @@ impl<T> From<T> for CachedValue<T> {
 
 struct UrlStateDbShard {
     db: rocksdb::DB,
-    meta: MetaDb,
     /// from rocksdb docs: "Cache must outlive DB instance which uses it."
     _cache: rocksdb::Cache,
     approx_size_bytes: CachedValue<u64>,
-    longest_known_url: CachedValue<usize>,
 }
 
 impl UrlStateDbShard {
@@ -218,19 +179,13 @@ impl UrlStateDbShard {
         let db = rocksdb::DB::open(&options, path.as_ref().join("urls"))?;
         let approx_size_bytes = db
             .property_int_value(rocksdb::properties::TOTAL_SST_FILES_SIZE)?
-            .unwrap()
+            .unwrap_or_default()
             .into();
-
-        let meta = MetaDb::open(path.as_ref().join("meta"))?;
-
-        let longest_known_url = meta.get_longest_url_len()?.into();
 
         Ok(Self {
             db,
             approx_size_bytes,
             _cache: cache,
-            longest_known_url,
-            meta,
         })
     }
 
@@ -242,14 +197,11 @@ impl UrlStateDbShard {
 
             for (url, state) in urls {
                 let url_bytes = bincode::serialize(url)?;
-
-                if url_bytes.len() > self.longest_known_url.value {
-                    self.longest_known_url = url_bytes.len().into();
-                    self.meta
-                        .set_longest_url_len(self.longest_known_url.value)?;
+                if url_bytes.len() > MAX_URL_LEN_BYTES {
+                    continue;
                 }
 
-                let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+                let key_bytes = [domain_bytes.as_slice(), url_bytes.as_slice()].concat();
 
                 let state_bytes = bincode::serialize(state)?;
 
@@ -268,12 +220,7 @@ impl UrlStateDbShard {
     pub fn get_all_urls(&self, domain: &Domain) -> Result<Vec<(UrlString, UrlState)>> {
         let domain_bytes = bincode::serialize(domain)?;
 
-        let start = [
-            domain_bytes.as_slice(),
-            &[b'/'],
-            &[0].repeat(self.longest_known_url.value),
-        ]
-        .concat();
+        let start = [domain_bytes.as_slice(), &[0].repeat(MAX_URL_LEN_BYTES)].concat();
 
         let iter = self.db.iterator(rocksdb::IteratorMode::From(
             &start,
@@ -283,7 +230,11 @@ impl UrlStateDbShard {
         Ok(iter
             .take_while(|r| {
                 if let Ok((key, _)) = r.as_ref() {
-                    key[..domain_bytes.len()] == domain_bytes[..]
+                    if domain_bytes.len() >= key.len() {
+                        return false;
+                    }
+
+                    key[..domain_bytes.len()] == domain_bytes
                 } else {
                     false
                 }
@@ -291,10 +242,13 @@ impl UrlStateDbShard {
             .filter_map(|r| {
                 let (key, value) = r.ok()?;
 
-                let url = bincode::deserialize(&key[domain_bytes.len() + 1..]) // +1 for '/'
-                    .ok()?;
+                if domain_bytes.len() >= key.len() {
+                    return None;
+                }
 
-                let state = bincode::deserialize(&value[..]).ok()?;
+                let url = bincode::deserialize(&key[domain_bytes.len()..]).ok()?;
+
+                let state = bincode::deserialize(&value).ok()?;
 
                 Some((url, state))
             })
@@ -322,7 +276,7 @@ impl UrlStateDbShard {
             let domain_bytes = bincode::serialize(domain)?;
             let url_bytes = bincode::serialize(url)?;
 
-            let key_bytes = [domain_bytes.as_slice(), &[b'/'], url_bytes.as_slice()].concat();
+            let key_bytes = [domain_bytes.as_slice(), url_bytes.as_slice()].concat();
 
             keys.push(key_bytes);
         }
@@ -334,7 +288,7 @@ impl UrlStateDbShard {
             .zip(urls.iter())
         {
             if let Some(val) = val? {
-                let state: UrlState = bincode::deserialize(&val[..])?;
+                let state: UrlState = bincode::deserialize(&val)?;
                 res.insert(url.clone(), state);
             }
         }
@@ -477,7 +431,7 @@ impl DomainStateDb {
             .zip(domains.iter())
         {
             if let Some(val) = val? {
-                let domain_state: DomainState = bincode::deserialize(&val[..])?;
+                let domain_state: DomainState = bincode::deserialize(&val)?;
                 res.insert(domain.clone(), domain_state);
             }
         }
@@ -508,8 +462,8 @@ impl DomainStateDb {
 
         iter.filter_map(|r| {
             let (key, value) = r.ok()?;
-            let domain = bincode::deserialize(&key[..]).ok()?;
-            let state = bincode::deserialize(&value[..]).ok()?;
+            let domain = bincode::deserialize(&key).ok()?;
+            let state = bincode::deserialize(&value).ok()?;
 
             Some((domain, state))
         })
@@ -575,6 +529,10 @@ impl CrawlDb {
             let mut updated_url_states = Vec::new();
 
             for url in urls {
+                if url.url.as_str().len() > MAX_URL_LEN_BYTES {
+                    continue;
+                }
+
                 match url_states.get_mut(&UrlString::from(&url.url)) {
                     Some(state) => {
                         state.weight += url.weight;
