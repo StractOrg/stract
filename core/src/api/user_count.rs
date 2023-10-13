@@ -18,9 +18,9 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::{NaiveDateTime, Utc};
-use parking_lot::Mutex;
 use ring::rand::SecureRandom;
 use ring::{digest, pbkdf2, rand};
+use std::sync::Mutex;
 
 use crate::hyperloglog::HyperLogLog;
 use crate::metrics::Counter;
@@ -131,10 +131,16 @@ impl<F: Frequency> UserCount<F> {
     }
 
     pub fn inc<T: serde::Serialize>(&self, user_id: &T) -> Result<()> {
-        self.inner.lock().inc(user_id)
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .inc(user_id)
     }
 
     pub fn metric(&self) -> Counter {
-        self.inner.lock().metric()
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .metric()
     }
 }

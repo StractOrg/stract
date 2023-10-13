@@ -115,7 +115,7 @@ impl WorkerThread {
 
         Ok(sonic::service::ResilientConnection::create_with_timeout(
             router,
-            Duration::from_secs(3600),
+            Duration::from_secs(90),
             retry,
         )
         .await?)
@@ -153,7 +153,7 @@ impl WorkerThread {
                             responses: results,
                             num_jobs: self.num_jobs_per_fetch,
                         },
-                        Duration::from_secs(60 * 60),
+                        Duration::from_secs(90),
                     )
                     .await;
 

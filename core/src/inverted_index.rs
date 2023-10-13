@@ -30,9 +30,9 @@ use serde::{Deserialize, Serialize};
 use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
-use tantivy::schema::Schema;
+use tantivy::schema::{Schema, Value};
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{Document, IndexReader, IndexWriter, SegmentMeta};
+use tantivy::{IndexReader, IndexWriter, SegmentMeta, TantivyDocument};
 use url::Url;
 
 use crate::collector::{Hashes, MainCollector};
@@ -303,7 +303,7 @@ impl InvertedIndex {
 
     pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
         let searcher = self.reader.searcher();
-        let doc = searcher.doc(website.address.into())?;
+        let doc: TantivyDocument = searcher.doc(website.address.into())?;
 
         let field1 = self
             .schema()
@@ -414,7 +414,7 @@ impl InvertedIndex {
         doc_address: DocAddress,
         searcher: &tantivy::Searcher,
     ) -> Result<RetrievedWebpage> {
-        let doc = searcher.doc(doc_address.into())?;
+        let doc: TantivyDocument = searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
     }
 
@@ -560,30 +560,33 @@ impl RetrievedWebpage {
     }
 }
 
-impl From<Document> for RetrievedWebpage {
-    fn from(doc: Document) -> Self {
+impl From<TantivyDocument> for RetrievedWebpage {
+    fn from(doc: TantivyDocument) -> Self {
         let mut webpage = RetrievedWebpage::default();
 
         for value in doc.field_values() {
             match ALL_FIELDS[value.field.field_id() as usize] {
                 Field::Text(TextField::Title) => {
                     webpage.title = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Title field should be text")
                         .to_string();
                 }
                 Field::Text(TextField::StemmedCleanBody) => {
                     webpage.body = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Body field should be text")
                         .to_string();
                 }
                 Field::Text(TextField::Description) => {
                     let desc = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Description field should be text")
                         .to_string();
 
@@ -591,14 +594,15 @@ impl From<Document> for RetrievedWebpage {
                 }
                 Field::Text(TextField::Url) => {
                     webpage.url = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Url field should be text")
                         .to_string();
                 }
                 Field::Fast(FastField::LastUpdated) => {
                     webpage.updated_time = {
-                        let timestamp = value.value.as_u64().unwrap() as i64;
+                        let timestamp = value.value().as_value().as_u64().unwrap() as i64;
                         if timestamp == 0 {
                             None
                         } else {
@@ -608,21 +612,23 @@ impl From<Document> for RetrievedWebpage {
                 }
                 Field::Text(TextField::AllBody) => {
                     webpage.dirty_body = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("All body field should be text")
                         .to_string();
                 }
                 Field::Fast(FastField::Region) => {
                     webpage.region = {
-                        let id = value.value.as_u64().unwrap();
+                        let id = value.value().as_value().as_u64().unwrap();
                         Region::from_id(id)
                     }
                 }
                 Field::Text(TextField::DmozDescription) => {
                     let desc = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Dmoz description field should be text")
                         .to_string();
 
@@ -630,8 +636,9 @@ impl From<Document> for RetrievedWebpage {
                 }
                 Field::Text(TextField::SchemaOrgJson) => {
                     let json = value
-                        .value
-                        .as_text()
+                        .value()
+                        .as_value()
+                        .as_str()
                         .expect("Schema.org json field should be stored as text")
                         .to_string();
 

@@ -521,7 +521,7 @@ impl Field {
             Field::Fast(FastField::TitleHash2) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::PreComputedScore) => IndexingOption::Float(
+            Field::Fast(FastField::PreComputedScore) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
@@ -619,7 +619,6 @@ pub fn create_schema() -> tantivy::schema::Schema {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
-            IndexingOption::Float(options) => builder.add_f64_field(field.name(), options),
         };
     }
 
@@ -629,12 +628,10 @@ pub fn create_schema() -> tantivy::schema::Schema {
 pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Integer(tantivy::schema::NumericOptions),
-    Float(tantivy::schema::NumericOptions),
 }
 
 pub enum DataType {
     U64,
-    F64,
 }
 
 impl FastField {
@@ -665,7 +662,7 @@ impl FastField {
             FastField::UrlHash2 => DataType::U64,
             FastField::DomainHash1 => DataType::U64,
             FastField::DomainHash2 => DataType::U64,
-            FastField::PreComputedScore => DataType::F64,
+            FastField::PreComputedScore => DataType::U64,
             FastField::HostNodeID1 => DataType::U64,
             FastField::HostNodeID2 => DataType::U64,
             FastField::SimHash => DataType::U64,

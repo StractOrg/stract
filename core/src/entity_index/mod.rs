@@ -28,7 +28,7 @@ use tantivy::{
     query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
     schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
     tokenizer::Tokenizer,
-    DocAddress, IndexReader, IndexWriter, Searcher, Term,
+    DocAddress, IndexReader, IndexWriter, Searcher, TantivyDocument, Term,
 };
 use tracing::info;
 use url::Url;
@@ -92,8 +92,8 @@ fn schema() -> Schema {
     builder.build()
 }
 
-fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> tantivy::Document {
-    let mut doc = tantivy::Document::new();
+fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> TantivyDocument {
+    let mut doc = TantivyDocument::new();
 
     doc.add_text(schema.get_field("title").unwrap(), entity.title);
     doc.add_text(
@@ -373,11 +373,11 @@ impl EntityIndex {
         let info = self.schema.get_field("info").unwrap();
         let links = self.schema.get_field("links").unwrap();
 
-        let doc = searcher.doc(doc_address).unwrap();
+        let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
         let title = doc
             .get_first(title)
             .and_then(|val| match val {
-                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
                 _ => None,
             })
             .unwrap();
@@ -385,7 +385,7 @@ impl EntityIndex {
         let entity_abstract = doc
             .get_first(entity_abstract)
             .and_then(|val| match val {
-                tantivy::schema::Value::Str(string) => Some(string.clone()),
+                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
                 _ => None,
             })
             .unwrap();
@@ -394,7 +394,7 @@ impl EntityIndex {
             bincode::deserialize(
                 doc.get_first(info)
                     .and_then(|val| match val {
-                        tantivy::schema::Value::Bytes(bytes) => Some(bytes),
+                        tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
                         _ => None,
                     })
                     .unwrap(),
@@ -420,7 +420,7 @@ impl EntityIndex {
             bincode::deserialize(
                 doc.get_first(links)
                     .and_then(|val| match val {
-                        tantivy::schema::Value::Bytes(bytes) => Some(bytes),
+                        tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
                         _ => None,
                     })
                     .unwrap(),

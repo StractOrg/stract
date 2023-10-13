@@ -1,11 +1,17 @@
-centrality_store_path = "./data/centrality"
+host_centrality_store_path = "./data/centrality"
 limit_warc_files = 10
-minimum_clean_words = 40
+# minimum_clean_words = 40
 
 [warc_source]
 # type = "Local"
 # folder = "./data"
 # names = ["sample.warc.gz"]
-type = "HTTP"
-base_url = "https://data.commoncrawl.org/"
-warc_paths_file = "data/warc.paths"
+# type = "HTTP"
+# base_url = "https://data.commoncrawl.org/"
+# warc_paths_file = "data/warc.paths"
+access_key = "crawl_nOf7tywztpjg2"
+bucket = "crawl"
+endpoint = "http://s3.trystract.com"
+folder = "400m_try11"
+secret_key = "4Kzo0CPdQYnlFHRgwKpUA7mACzSLsA6OpG6qDFl4"
+type = "S3"

@@ -224,6 +224,14 @@ pub fn parse(root: NodeRef) -> Vec<Item> {
     res.into_iter().map(Item::from).collect()
 }
 
+pub(crate) fn flattened_json(schemas: Vec<Item>) -> Result<FlattenedJson> {
+    let single_maps: Vec<_> = schemas
+        .into_iter()
+        .map(|item| item.into_single_map())
+        .collect();
+    FlattenedJson::new(&single_maps)
+}
+
 #[cfg(test)]
 mod tests {
     use kuchiki::traits::TendrilSink;
@@ -518,12 +526,4 @@ mod tests {
 
         assert_eq!(&instructions, "Helt enkelt som navnet antyder, så kom alle ingredienserne i en stor gryde på én gang. Kog retten op, rør godt rundt i gryden og skru ned for varmen. Lad det simrekoge under låg i 10-12 minutter, til spaghettien er perfekt kogt – al dente med lidt bid i. Server med revet parmesan og basilikum.");
     }
-}
-
-pub(crate) fn flattened_json(schemas: Vec<Item>) -> Result<FlattenedJson> {
-    let single_maps: Vec<_> = schemas
-        .into_iter()
-        .map(|item| item.into_single_map())
-        .collect();
-    FlattenedJson::new(&single_maps)
 }

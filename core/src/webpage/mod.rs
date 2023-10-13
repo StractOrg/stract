@@ -27,7 +27,10 @@ use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use std::{collections::HashMap, panic, str::FromStr};
-use tantivy::tokenizer::{PreTokenizedString, Tokenizer};
+use tantivy::{
+    tokenizer::{PreTokenizedString, Tokenizer},
+    TantivyDocument,
+};
 use url::Url;
 use whatlang::Lang;
 
@@ -160,7 +163,7 @@ impl Webpage {
         })
     }
 
-    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
+    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
         let region = Region::guess_from(&self);
 
         let dmoz_description = self.dmoz_description();
@@ -226,11 +229,11 @@ impl Webpage {
             self.fetch_time_ms,
         );
 
-        doc.add_f64(
+        doc.add_u64(
             schema
                 .get_field(Field::Fast(FastField::PreComputedScore).name())
                 .expect("failed to get pre_computed_score field"),
-            self.pre_computed_score,
+            (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
         );
 
         match &self.node_id {
@@ -930,8 +933,8 @@ impl Html {
         PreTokenizedString { text, tokens }
     }
 
-    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<tantivy::Document> {
-        let mut doc = tantivy::Document::new();
+    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+        let mut doc = TantivyDocument::new();
 
         let title = self.pretokenize_title()?;
         let all_text = self.pretokenize_all_text()?;

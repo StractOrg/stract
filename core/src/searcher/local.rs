@@ -17,6 +17,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use tantivy::schema::Value;
+use tantivy::TantivyDocument;
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
@@ -239,10 +241,10 @@ impl LocalSearcher {
 
         let schema = self.index.schema();
         for website in &mut ranking_websites {
-            let doc = ctx.tv_searcher.doc(website.pointer.address.into())?;
+            let doc: TantivyDocument = ctx.tv_searcher.doc(website.pointer.address.into())?;
             website.title = Some(
                 doc.get_first(schema.get_field(TextField::Title.name()).unwrap())
-                    .map(|text| text.as_text().unwrap().to_string())
+                    .map(|text| text.as_value().as_str().unwrap().to_string())
                     .unwrap_or_default(),
             );
             website.clean_body = Some(
@@ -251,7 +253,7 @@ impl LocalSearcher {
                         .get_field(TextField::StemmedCleanBody.name())
                         .unwrap(),
                 )
-                .map(|text| text.as_text().unwrap().to_string())
+                .map(|text| text.as_value().as_str().unwrap().to_string())
                 .unwrap_or_default(),
             );
         }

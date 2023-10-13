@@ -22,7 +22,7 @@ impl RemoteCoordinator {
 
         Ok(sonic::service::ResilientConnection::create_with_timeout(
             self.addr,
-            Duration::from_secs(3600),
+            Duration::from_secs(60),
             retry,
         )
         .await?)
@@ -32,7 +32,7 @@ impl RemoteCoordinator {
         let conn = self.conn().await?;
 
         let response = conn
-            .send_with_timeout(&GetJobs { num_jobs }, Duration::from_secs(60 * 60))
+            .send_with_timeout(&GetJobs { num_jobs }, Duration::from_secs(90))
             .await?;
 
         Ok(response)
@@ -41,7 +41,7 @@ impl RemoteCoordinator {
     async fn insert_urls(&self, urls: HashMap<Domain, Vec<UrlToInsert>>) -> Result<()> {
         let conn = self.conn().await?;
 
-        conn.send_with_timeout(&InsertUrls { urls }, Duration::from_secs(60 * 60))
+        conn.send_with_timeout(&InsertUrls { urls }, Duration::from_secs(90))
             .await?;
 
         Ok(())
@@ -50,7 +50,7 @@ impl RemoteCoordinator {
     async fn mark_jobs_complete(&self, domains: Vec<DomainCrawled>) -> Result<()> {
         let conn = self.conn().await?;
 
-        conn.send_with_timeout(&MarkJobsComplete { domains }, Duration::from_secs(60 * 60))
+        conn.send_with_timeout(&MarkJobsComplete { domains }, Duration::from_secs(90))
             .await?;
 
         Ok(())
