@@ -4345,6 +4345,10 @@ impl<const N: usize> HyperLogLog<N> {
         self.registers[j] = self.registers[j].max(p as u8);
     }
 
+    pub fn clear(&mut self) {
+        self.registers.iter_mut().for_each(|r| *r = 0);
+    }
+
     pub fn estimate_bias(&self, e: f64, b: usize) -> f64 {
         // binary search first nearest neighbor
         let lookup_array = RAW_ESTIMATE_DATA_VEC[b - 1 - RAW_ESTIMATE_DATA_OFFSET];
@@ -4524,5 +4528,18 @@ mod tests {
         a.merge(&b);
 
         assert_eq!(a.registers, without_merge.registers);
+    }
+
+    #[test]
+    fn accurate_counts() {
+        let mut set: HyperLogLog<65_536> = HyperLogLog::default();
+        let mut counter = 0;
+
+        for item in 0..1_000 {
+            set.add(item);
+            counter += 1;
+
+            assert!((set.size() as f64 - counter as f64).abs() <= 10.0);
+        }
     }
 }

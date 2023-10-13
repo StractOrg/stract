@@ -38,7 +38,7 @@ use crate::{
     summarizer::Summarizer,
 };
 use anyhow::Result;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     http::StatusCode,
@@ -59,12 +59,14 @@ mod metrics;
 pub mod search;
 mod sites;
 mod summarize;
+pub mod user_count;
 mod webgraph;
 
 pub struct Counters {
     pub search_counter_success: crate::metrics::Counter,
     pub search_counter_fail: crate::metrics::Counter,
     pub explore_counter: crate::metrics::Counter,
+    pub daily_active_users: user_count::UserCount<user_count::Daily>,
 }
 
 pub struct State {
@@ -215,9 +217,25 @@ pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Router {
 
 async fn search_metric<B>(
     extract::State(state): extract::State<Arc<State>>,
+    extract::ConnectInfo(addr): extract::ConnectInfo<SocketAddr>,
     request: axum::http::Request<B>,
     next: middleware::Next<B>,
 ) -> Response {
+    // It is very important that the ip address is not stored. It is only used
+    // for a probabilistic estimate of the number of unique users using a hyperloglog datastructure.
+    let mut ip = None;
+    if let Some(forwarded_for) = request.headers().get("x-forwarded-for") {
+        let forwarded_for = forwarded_for.to_str().unwrap_or_default();
+        if let Some(client_ip) = forwarded_for.split(',').next() {
+            if let Ok(client_ip) = client_ip.trim().parse::<SocketAddr>() {
+                ip = Some(client_ip.ip());
+            }
+        }
+    }
+
+    let ip = ip.unwrap_or_else(|| addr.ip());
+    state.counters.daily_active_users.inc(&ip).ok();
+
     let response = next.run(request).await;
 
     if response.status().is_success() {

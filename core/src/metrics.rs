@@ -39,6 +39,10 @@ impl Counter {
     pub fn inc(&self) {
         self.0.fetch_add(1, Ordering::SeqCst);
     }
+
+    pub fn store(&self, val: u64) {
+        self.0.store(val, Ordering::SeqCst);
+    }
 }
 
 pub enum PrometheusMetric {

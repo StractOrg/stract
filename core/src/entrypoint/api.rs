@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::net::SocketAddr;
+
 use anyhow::Result;
 
 use crate::{
-    api::{metrics_router, router, Counters},
+    api::{metrics_router, router, user_count, Counters},
     config,
     metrics::Label,
 };
@@ -26,6 +28,7 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
     let search_counter_success = crate::metrics::Counter::default();
     let search_counter_fail = crate::metrics::Counter::default();
     let explore_counter = crate::metrics::Counter::default();
+    let daily_active_users = user_count::UserCount::new()?;
 
     let mut registry = crate::metrics::PrometheusRegistry::default();
 
@@ -59,10 +62,19 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
         .unwrap();
     group.register(explore_counter.clone(), vec![]);
 
+    let group = registry
+        .new_group(
+            "daily_active_users".to_string(),
+            Some("Approximate number of unique daily active users.".to_string()),
+        )
+        .unwrap();
+    group.register(daily_active_users.metric(), vec![]);
+
     let counters = Counters {
         search_counter_success,
         search_counter_fail,
         explore_counter,
+        daily_active_users,
     };
 
     let app = router(&config, counters).await?;
@@ -70,7 +82,8 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
 
     let addr = config.host;
     tracing::info!("api server listening on {}", addr);
-    let server = axum::Server::bind(&addr).serve(app.into_make_service());
+    let server =
+        axum::Server::bind(&addr).serve(app.into_make_service_with_connect_info::<SocketAddr>());
 
     let addr = config.prometheus_host;
     tracing::info!("prometheus exporter listening on {}", addr);

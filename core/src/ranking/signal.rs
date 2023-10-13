@@ -251,6 +251,10 @@ fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
 }
 
 fn bm25(field: &mut TextFieldData, doc: DocId) -> f64 {
+    if field.postings.is_empty() {
+        return 0.0;
+    }
+
     let mut term_freq = 0;
     for posting in &mut field.postings {
         if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
@@ -294,12 +298,12 @@ impl Signal {
             Signal::Bm25DomainIfHomepageNoTokenizer => 0.007,
             Signal::Bm25TitleIfHomepage => 0.00002,
             Signal::Bm25BacklinkText => 0.003,
-            Signal::Bm25Description => 0.00001,
-            Signal::ProximitySlop0 => 0.01,
-            Signal::ProximitySlop1 => 0.01,
-            Signal::ProximitySlop2 => 0.01,
-            Signal::ProximitySlop4 => 0.01,
-            Signal::ProximitySlop8 => 0.01,
+            Signal::Bm25Description => 0.0,
+            Signal::ProximitySlop0 => 0.00,
+            Signal::ProximitySlop1 => 0.00,
+            Signal::ProximitySlop2 => 0.00,
+            Signal::ProximitySlop4 => 0.00,
+            Signal::ProximitySlop8 => 0.00,
             Signal::CrossEncoder => 0.17,
             Signal::HostCentrality => 1.0,
             Signal::PageCentrality => 4.0,
