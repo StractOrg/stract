@@ -46,12 +46,6 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Commands to deploy the Alice server.
-    Alice {
-        #[clap(subcommand)]
-        options: AliceOptions,
-    },
-
     /// Build an index.
     Indexer {
         #[clap(subcommand)]
@@ -130,15 +124,6 @@ enum Crawler {
     /// Deploy the crawl router. The crawl router is responsible for routing job responses and requests
     /// from the workers to the correct crawl coordinators.
     Router { config_path: String },
-}
-
-/// Commands to deploy Alice.
-#[derive(Subcommand)]
-enum AliceOptions {
-    /// Deploy Alice server.
-    Serve { config_path: String },
-    /// Generate a new keypair for Alice to sign states.
-    GenerateKey,
 }
 
 /// Commands to train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
@@ -313,17 +298,6 @@ fn main() -> Result<()> {
             dmoz_file,
             output_path,
         } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
-        Commands::Alice { options } => match options {
-            AliceOptions::Serve { config_path } => {
-                let config: config::AliceLocalConfig = load_toml_config(config_path);
-
-                tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()?
-                    .block_on(entrypoint::alice::run(config))?
-            }
-            AliceOptions::GenerateKey => entrypoint::alice::generate_key(),
-        },
         Commands::Crawler { options } => match options {
             Crawler::Worker { config_path } => {
                 let config: config::CrawlerConfig = load_toml_config(config_path);

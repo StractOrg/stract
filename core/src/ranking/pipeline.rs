@@ -28,12 +28,11 @@ use crate::{
 };
 
 use super::{
-    models::{
-        cross_encoder::CrossEncoder,
-        lambdamart::{self, LambdaMART},
-    },
+    models::lambdamart::{self, LambdaMART},
     Signal, SignalAggregator, SignalCoefficient, SignalScore,
 };
+
+use super::models::cross_encoder::CrossEncoder;
 
 pub trait AsRankingWebsite: Clone {
     fn as_ranking(&self) -> &RankingWebsite;

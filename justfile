@@ -21,8 +21,11 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cd frontend && npm run openapi
 
 @setup *ARGS:
-    just setup_python_env
+    python3 -m venv .venv || true
     just download_libtorch {{ARGS}}
+
+@prepare_models:
+    just setup_python_env
     ./scripts/export_crossencoder
     ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
@@ -31,6 +34,7 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @configure *ARGS:
     just setup {{ARGS}}
+    just prepare_models
     RUST_LOG="none,stract=info" just cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:

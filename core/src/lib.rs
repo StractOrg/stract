@@ -31,6 +31,7 @@ mod inverted_index;
 
 pub mod mapreduce;
 
+#[cfg(feature = "with_alice")]
 pub mod alice;
 mod api;
 mod autosuggest;
@@ -43,7 +44,6 @@ mod distributed;
 mod entity_index;
 mod enum_map;
 mod executor;
-mod fact_check_model;
 mod fastfield_reader;
 mod human_website_annotations;
 pub mod hyperloglog;
@@ -55,10 +55,12 @@ mod intmap;
 mod kahan_sum;
 mod kv;
 mod leaky_queue;
+#[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;
 pub mod naive_bayes;
 pub mod prehashed;
+#[cfg(feature = "libtorch")]
 mod qa_model;
 mod query;
 pub mod ranking;
@@ -71,6 +73,7 @@ pub mod similar_sites;
 mod snippet;
 pub mod spell;
 mod subdomain_count;
+#[cfg(feature = "libtorch")]
 pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]

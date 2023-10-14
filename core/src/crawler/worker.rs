@@ -67,10 +67,6 @@ impl WorkerThread {
         timeout: Duration,
         router_hosts: Vec<SocketAddr>,
     ) -> Result<Self> {
-        if config.politeness_factor < config.min_politeness_factor {
-            return Err(Error::InvalidPolitenessFactor.into());
-        }
-
         let mut headers = reqwest::header::HeaderMap::default();
         headers.insert(
             reqwest::header::ACCEPT,
@@ -86,6 +82,7 @@ impl WorkerThread {
             .connect_timeout(timeout)
             .http2_keep_alive_interval(None)
             .default_headers(headers)
+            .redirect(reqwest::redirect::Policy::limited(config.max_redirects))
             .user_agent(&config.user_agent.full)
             .build()?;
 

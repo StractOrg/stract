@@ -27,6 +27,8 @@ use url::Url;
 use crate::bangs::{Bang, BangHit};
 use crate::config::{ApiConfig, ApiThresholds, CollectorConfig};
 use crate::inverted_index::RetrievedWebpage;
+#[cfg(not(feature = "libtorch"))]
+use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
     create_stackoverflow_sidebar, DisplayedAnswer, DisplayedEntity, DisplayedSidebar,
@@ -37,19 +39,18 @@ use crate::{
     bangs::Bangs,
     collector::BucketCollector,
     distributed::cluster::Cluster,
-    qa_model::QaModel,
-    ranking::{
-        models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
-        pipeline::RankingPipeline,
-    },
+    ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
 };
 use crate::{ceil_char_boundary, floor_char_boundary, query, Result};
+#[cfg(feature = "libtorch")]
+use crate::{qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel};
 
 use super::{
     distributed, DistributedSearcher, InitialSearchResultShard, ScoredWebsitePointer, SearchQuery,
     SearchResult, WebsitesResult,
 };
 
+#[cfg(feature = "libtorch")]
 pub struct ApiSearcher {
     distributed_searcher: DistributedSearcher,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
@@ -61,7 +62,18 @@ pub struct ApiSearcher {
     widgets: Widgets,
 }
 
+#[cfg(not(feature = "libtorch"))]
+pub struct ApiSearcher {
+    distributed_searcher: DistributedSearcher,
+    lambda_model: Option<Arc<LambdaMART>>,
+    bangs: Bangs,
+    collector_config: CollectorConfig,
+    thresholds: ApiThresholds,
+    widgets: Widgets,
+}
+
 impl ApiSearcher {
+    #[cfg(feature = "libtorch")]
     pub fn new(
         cluster: Arc<Cluster>,
         cross_encoder: Option<CrossEncoderModel>,
@@ -75,6 +87,23 @@ impl ApiSearcher {
             cross_encoder: cross_encoder.map(Arc::new),
             lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
+            bangs,
+            collector_config: config.collector,
+            thresholds: config.thresholds,
+            widgets: Widgets::new(config.widgets).unwrap(),
+        }
+    }
+
+    #[cfg(not(feature = "libtorch"))]
+    pub fn new(
+        cluster: Arc<Cluster>,
+        lambda_model: Option<LambdaMART>,
+        bangs: Bangs,
+        config: ApiConfig,
+    ) -> Self {
+        Self {
+            distributed_searcher: DistributedSearcher::new(cluster),
+            lambda_model: lambda_model.map(Arc::new),
             bangs,
             collector_config: config.collector,
             thresholds: config.thresholds,
@@ -241,12 +270,22 @@ impl ApiSearcher {
             ..Default::default()
         };
 
+        #[cfg(feature = "libtorch")]
         let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
             &mut query,
             self.cross_encoder.as_ref().map(Arc::clone),
             self.lambda_model.clone(),
             self.collector_config.clone(),
         )?;
+
+        #[cfg(not(feature = "libtorch"))]
+        let pipeline: RankingPipeline<ScoredWebsitePointer> =
+            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
+                &mut query,
+                None,
+                self.lambda_model.clone(),
+                self.collector_config.clone(),
+            )?;
 
         let initial_results = self.distributed_searcher.search_initial(&query).await;
 
@@ -321,12 +360,22 @@ impl ApiSearcher {
         }
 
         let mut search_query = query.clone();
+        #[cfg(feature = "libtorch")]
         let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::reranking_for_query(
             &mut search_query,
             self.cross_encoder.as_ref().map(Arc::clone),
             self.lambda_model.clone(),
             self.collector_config.clone(),
         )?;
+
+        #[cfg(not(feature = "libtorch"))]
+        let pipeline: RankingPipeline<ScoredWebsitePointer> =
+            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
+                &mut search_query,
+                None,
+                self.lambda_model.clone(),
+                self.collector_config.clone(),
+            )?;
 
         let initial_results = self
             .distributed_searcher
@@ -419,6 +468,7 @@ impl ApiSearcher {
         )
     }
 
+    #[cfg(feature = "libtorch")]
     fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
         self.qa_model.as_ref().and_then(|qa_model| {
             let contexts: Vec<_> = webpages
@@ -450,6 +500,11 @@ impl ApiSearcher {
                 None => None,
             }
         })
+    }
+
+    #[cfg(not(feature = "libtorch"))]
+    fn answer(&self, query: &str, webpages: &mut Vec<DisplayedWebpage>) -> Option<DisplayedAnswer> {
+        None
     }
 
     pub async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {

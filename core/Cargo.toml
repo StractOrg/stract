@@ -10,10 +10,11 @@ version = "0.1.0"
 
 [features]
 cors = []
-default = ["cors", "with_alice"]
+default = ["cors", "with_alice", "libtorch"]
 dev = ["cors"]
-prod = ["cors"]
-with_alice = []
+libtorch = ["dep:tch", "dep:torch-sys"]
+prod = ["cors", "libtorch"]
+with_alice = ["libtorch"]
 
 [[bin]]
 name = "stract"
@@ -88,13 +89,13 @@ serde = {workspace = true}
 serde_json = {workspace = true}
 serde_urlencoded = {workspace = true}
 tantivy = {workspace = true}
-tch = {workspace = true}
+tch = {workspace = true, optional = true}
 thiserror = {workspace = true}
 tokenizers = {workspace = true}
 tokio = {workspace = true}
 tokio-stream = {workspace = true}
 toml = {workspace = true}
-torch-sys = {workspace = true}
+torch-sys = {workspace = true, optional = true}
 tower-http = {workspace = true}
 tracing = {workspace = true}
 tracing-subscriber = {workspace = true}
@@ -117,6 +118,10 @@ insta = {workspace = true}
 maplit = {workspace = true}
 proptest = {workspace = true}
 proptest-derive = {workspace = true}
+
+[[example]]
+name = "alice"
+required-features = ["with_alice"]
 
 [[bench]]
 harness = false

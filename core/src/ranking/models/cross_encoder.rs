@@ -14,50 +14,129 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use anyhow::anyhow;
+use anyhow::Result;
 use std::path::Path;
 
-use itertools::Itertools;
-use tch::Tensor;
-use tokenizers::PaddingParams;
-use tokenizers::TruncationParams;
+#[cfg(feature = "libtorch")]
+pub use model::*;
 
-const TRUNCATE_INPUT: usize = 128;
+#[cfg(feature = "libtorch")]
+mod model {
+    use super::*;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Tokenizer error")]
-    Tokenizer(#[from] tokenizers::Error),
-    #[error("Torch error")]
-    Torch(#[from] tch::TchError),
-}
+    use itertools::Itertools;
+    use tch::Tensor;
+    use tokenizers::PaddingParams;
+    use tokenizers::TruncationParams;
 
-type Result<T> = std::result::Result<T, Error>;
+    const TRUNCATE_INPUT: usize = 128;
 
-pub struct CrossEncoderModel {
-    tokenizer: tokenizers::Tokenizer,
-    model: tch::CModule,
-}
+    pub struct CrossEncoderModel {
+        tokenizer: tokenizers::Tokenizer,
+        model: tch::CModule,
+    }
 
-impl CrossEncoderModel {
-    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
-        let truncation = TruncationParams {
-            max_length: TRUNCATE_INPUT,
-            ..Default::default()
-        };
+    impl CrossEncoderModel {
+        pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+            let truncation = TruncationParams {
+                max_length: TRUNCATE_INPUT,
+                ..Default::default()
+            };
 
-        let padding = PaddingParams {
-            ..Default::default()
-        };
+            let padding = PaddingParams {
+                ..Default::default()
+            };
 
-        let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+            let mut tokenizer =
+                tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))
+                    .map_err(|_| anyhow!("couldn't open tokenizer"))?;
 
-        tokenizer.with_truncation(Some(truncation))?;
-        tokenizer.with_padding(Some(padding));
+            tokenizer
+                .with_truncation(Some(truncation))
+                .map_err(|_| anyhow!("tokenizer truncation settings"))?;
+            tokenizer.with_padding(Some(padding));
 
-        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
+            let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
 
-        Ok(Self { tokenizer, model })
+            Ok(Self { tokenizer, model })
+        }
+    }
+
+    impl CrossEncoder for CrossEncoderModel {
+        fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
+            if bodies.is_empty() {
+                return Vec::new();
+            }
+
+            let bs = bodies.len();
+
+            let input: Vec<_> = bodies
+                .iter()
+                .map(|body| {
+                    (
+                        query.to_string(),
+                        body.split_whitespace()
+                            .take(TRUNCATE_INPUT)
+                            .collect::<String>(),
+                    )
+                })
+                .collect();
+
+            let encoded = self.tokenizer.encode_batch(input, true).unwrap();
+
+            let num_tokens = encoded
+                .iter()
+                .map(|enc| enc.get_ids().len())
+                .max()
+                .unwrap_or(0);
+
+            let ids = encoded
+                .iter()
+                .flat_map(|enc| enc.get_ids().iter().map(|i| *i as i64).take(TRUNCATE_INPUT))
+                .collect_vec();
+
+            let attention_mask = encoded
+                .iter()
+                .flat_map(|enc| {
+                    enc.get_attention_mask()
+                        .iter()
+                        .map(|i| *i as i64)
+                        .take(TRUNCATE_INPUT)
+                })
+                .collect_vec();
+
+            let type_ids = encoded
+                .iter()
+                .flat_map(|enc| {
+                    enc.get_type_ids()
+                        .iter()
+                        .map(|i| *i as i64)
+                        .take(TRUNCATE_INPUT)
+                })
+                .collect_vec();
+
+            let ids = Tensor::from_slice(&ids).reshape([bs as i64, num_tokens as i64]);
+            let attention_mask =
+                Tensor::from_slice(&attention_mask).reshape([bs as i64, num_tokens as i64]);
+            let type_ids = Tensor::from_slice(&type_ids).reshape([bs as i64, num_tokens as i64]);
+
+            let output = self
+                .model
+                .forward_ts(&[ids, attention_mask, type_ids])
+                .unwrap();
+
+            let mut res = Vec::with_capacity(bs);
+
+            for i in 0..bs {
+                let s = output.double_value(&[i as i64, 0]);
+                let s = s.exp();
+                let s = s / (s + 1.0);
+                res.push(s);
+            }
+
+            res
+        }
     }
 }
 
@@ -65,7 +144,7 @@ pub trait CrossEncoder: Send + Sync {
     fn run(&self, query: &str, bodies: &[String]) -> Vec<f64>;
 }
 
-pub struct DummyCrossEncoder {}
+pub struct DummyCrossEncoder;
 
 impl CrossEncoder for DummyCrossEncoder {
     fn run(&self, _query: &str, bodies: &[String]) -> Vec<f64> {
@@ -73,83 +152,8 @@ impl CrossEncoder for DummyCrossEncoder {
     }
 }
 
-impl CrossEncoder for CrossEncoderModel {
-    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
-        if bodies.is_empty() {
-            return Vec::new();
-        }
-
-        let bs = bodies.len();
-
-        let input: Vec<_> = bodies
-            .iter()
-            .map(|body| {
-                (
-                    query.to_string(),
-                    body.split_whitespace()
-                        .take(TRUNCATE_INPUT)
-                        .collect::<String>(),
-                )
-            })
-            .collect();
-
-        let encoded = self.tokenizer.encode_batch(input, true).unwrap();
-
-        let num_tokens = encoded
-            .iter()
-            .map(|enc| enc.get_ids().len())
-            .max()
-            .unwrap_or(0);
-
-        let ids = encoded
-            .iter()
-            .flat_map(|enc| enc.get_ids().iter().map(|i| *i as i64).take(TRUNCATE_INPUT))
-            .collect_vec();
-
-        let attention_mask = encoded
-            .iter()
-            .flat_map(|enc| {
-                enc.get_attention_mask()
-                    .iter()
-                    .map(|i| *i as i64)
-                    .take(TRUNCATE_INPUT)
-            })
-            .collect_vec();
-
-        let type_ids = encoded
-            .iter()
-            .flat_map(|enc| {
-                enc.get_type_ids()
-                    .iter()
-                    .map(|i| *i as i64)
-                    .take(TRUNCATE_INPUT)
-            })
-            .collect_vec();
-
-        let ids = Tensor::from_slice(&ids).reshape([bs as i64, num_tokens as i64]);
-        let attention_mask =
-            Tensor::from_slice(&attention_mask).reshape([bs as i64, num_tokens as i64]);
-        let type_ids = Tensor::from_slice(&type_ids).reshape([bs as i64, num_tokens as i64]);
-
-        let output = self
-            .model
-            .forward_ts(&[ids, attention_mask, type_ids])
-            .unwrap();
-
-        let mut res = Vec::with_capacity(bs);
-
-        for i in 0..bs {
-            let s = output.double_value(&[i as i64, 0]);
-            let s = s.exp();
-            let s = s / (s + 1.0);
-            res.push(s);
-        }
-
-        res
-    }
-}
-
 #[cfg(test)]
+#[cfg(feature = "libtorch")]
 mod tests {
     use super::*;
 

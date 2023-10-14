@@ -194,7 +194,6 @@ pub struct ApiConfig {
     pub qa_model_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
-    pub fact_check_model_path: String,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -292,11 +291,11 @@ pub struct CrawlerConfig {
     #[serde(default = "defaults::Crawler::max_politeness_factor")]
     pub max_politeness_factor: f32,
 
-    #[serde(default = "defaults::Crawler::min_politeness_factor")]
-    pub min_politeness_factor: f32,
-
     #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
     pub max_url_slowdown_retry: u8,
+
+    #[serde(default = "defaults::Crawler::max_redirects")]
+    pub max_redirects: usize,
 
     pub timeout_seconds: u64,
     pub s3: S3Config,

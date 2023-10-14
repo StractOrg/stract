@@ -42,11 +42,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
 
     for _ in 0..1000 {
-        // bench!("the", searcher, c);
-        // bench!("dtu", searcher, c);
-        // bench!("the best", searcher, c);
-        // bench!("the circle of life", searcher, c);
-        bench!("runescape is old the", searcher, c);
+        bench!("the", searcher, c);
+        bench!("dtu", searcher, c);
+        bench!("the best", searcher, c);
+        bench!("the circle of life", searcher, c);
+        bench!("what", searcher, c);
+        bench!("a", searcher, c);
+        bench!("sun", searcher, c);
+        bench!("what a sun", searcher, c);
     }
 }
 

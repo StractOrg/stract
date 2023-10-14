@@ -78,7 +78,7 @@ impl Crawler {
     }
 
     pub fn min_crawl_delay_ms() -> u64 {
-        1_000
+        5_000
     }
 
     pub fn max_crawl_delay_ms() -> u64 {
@@ -89,12 +89,12 @@ impl Crawler {
         2048.0
     }
 
-    pub fn min_politeness_factor() -> f32 {
-        1.0
-    }
-
     pub fn max_url_slowdown_retry() -> u8 {
         3
+    }
+
+    pub fn max_redirects() -> usize {
+        5
     }
 }
 

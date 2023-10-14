@@ -1,5 +1,5 @@
 host_centrality_store_path = "./data/centrality"
-limit_warc_files = 10
+limit_warc_files = 20
 # minimum_clean_words = 40
 
 [warc_source]

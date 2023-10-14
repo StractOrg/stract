@@ -29,14 +29,17 @@ use crate::{
         cluster::Cluster,
         member::{Member, Service},
     },
-    fact_check_model::FactCheckModel,
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
-    qa_model::QaModel,
-    ranking::models::{cross_encoder::CrossEncoderModel, lambdamart::LambdaMART},
+    ranking::models::lambdamart::LambdaMART,
     searcher::api::ApiSearcher,
-    summarizer::Summarizer,
 };
+
+#[cfg(feature = "libtorch")]
+use crate::{
+    qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer,
+};
+
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
 
@@ -49,11 +52,9 @@ use axum::{
 
 use self::webgraph::RemoteWebgraph;
 
-mod alice;
 mod autosuggest;
 mod docs;
 mod explore;
-mod fact_check;
 pub mod improvement;
 mod metrics;
 pub mod search;
@@ -69,6 +70,7 @@ pub struct Counters {
     pub daily_active_users: user_count::UserCount<user_count::Daily>,
 }
 
+#[cfg(feature = "libtorch")]
 pub struct State {
     pub config: ApiConfig,
     pub searcher: ApiSearcher,
@@ -76,7 +78,17 @@ pub struct State {
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
-    pub fact_checker: Arc<FactCheckModel>,
+    pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
+    pub cluster: Arc<Cluster>,
+}
+
+#[cfg(not(feature = "libtorch"))]
+pub struct State {
+    pub config: ApiConfig,
+    pub searcher: ApiSearcher,
+    pub remote_webgraph: RemoteWebgraph,
+    pub autosuggest: Autosuggest,
+    pub counters: Counters,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub cluster: Arc<Cluster>,
 }
@@ -93,19 +105,9 @@ pub async fn favicon() -> impl IntoResponse {
 
 pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
-    let mut cross_encoder = None;
-
-    if let Some(path) = config.crossencoder_model_path.as_ref() {
-        cross_encoder = Some(CrossEncoderModel::open(path)?);
-    }
 
     let lambda_model = match &config.lambda_model_path {
         Some(path) => Some(LambdaMART::open(path)?),
-        None => None,
-    };
-
-    let qa_model = match &config.qa_model_path {
-        Some(path) => Some(QaModel::open(path)?),
         None => None,
     };
 
@@ -129,26 +131,55 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         .await?,
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-    let searcher = ApiSearcher::new(
-        cluster.clone(),
-        cross_encoder,
-        lambda_model,
-        qa_model,
-        bangs,
-        config.clone(),
-    );
 
-    let state = Arc::new(State {
-        config: config.clone(),
-        searcher,
-        autosuggest,
-        counters,
-        remote_webgraph,
-        summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
-        fact_checker: Arc::new(FactCheckModel::open(&config.fact_check_model_path)?),
-        improvement_queue: query_store_queue,
-        cluster,
-    });
+    #[cfg(feature = "libtorch")]
+    let state = {
+        let mut cross_encoder = None;
+
+        if let Some(path) = config.crossencoder_model_path.as_ref() {
+            cross_encoder = Some(CrossEncoderModel::open(path)?);
+        }
+
+        let qa_model = match &config.qa_model_path {
+            Some(path) => Some(QaModel::open(path)?),
+            None => None,
+        };
+
+        let searcher = ApiSearcher::new(
+            cluster.clone(),
+            cross_encoder,
+            lambda_model,
+            qa_model,
+            bangs,
+            config.clone(),
+        );
+
+        Arc::new(State {
+            config: config.clone(),
+            searcher,
+            autosuggest,
+            counters,
+            remote_webgraph,
+            summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
+            improvement_queue: query_store_queue,
+            cluster,
+        })
+    };
+
+    #[cfg(not(feature = "libtorch"))]
+    let state = {
+        let searcher = ApiSearcher::new(cluster.clone(), lambda_model, bangs, config.clone());
+
+        Arc::new(State {
+            config: config.clone(),
+            searcher,
+            autosuggest,
+            counters,
+            remote_webgraph,
+            improvement_queue: query_store_queue,
+            cluster,
+        })
+    };
 
     Ok(Router::new()
         .merge(
@@ -190,9 +221,6 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                     "/api/webgraph/page/outgoing",
                     post(webgraph::page::outgoing_pages),
                 )
-                .route("/api/alice", get(alice::alice_route))
-                .route("/api/alice/save_state", post(alice::save_state))
-                .route("/api/fact_check", post(fact_check::fact_check_route))
                 .route("/api/sites/export", post(sites::sites_export_optic))
                 .route("/api/explore/export", post(explore::explore_export_optic))
                 .layer(cors_layer()),

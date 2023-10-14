@@ -27,6 +27,8 @@ use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
 use crate::ranking::centrality_store::SearchCentralityStore;
+#[cfg(not(feature = "libtorch"))]
+use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
@@ -67,7 +69,7 @@ struct InvertedIndexResult {
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         let mut index = index;
-        index.optimize_for_search().unwrap();
+        // index.optimize_for_search().unwrap();
 
         LocalSearcher {
             index,
@@ -315,26 +317,39 @@ impl LocalSearcher {
     pub fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         use std::time::Instant;
 
-        use crate::{
-            ranking::models::cross_encoder::CrossEncoderModel, search_prettifier::DisplayedSidebar,
-        };
+        use crate::search_prettifier::DisplayedSidebar;
 
         let start = Instant::now();
         let mut search_query = query.clone();
 
-        let pipeline = match CrossEncoderModel::open("data/cross_encoder") {
-            Ok(model) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
+        #[cfg(feature = "libtorch")]
+        let pipeline = {
+            use crate::ranking::models::cross_encoder::CrossEncoderModel;
+            match CrossEncoderModel::open("data/cross_encoder") {
+                Ok(model) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
+                    &mut search_query,
+                    Some(Arc::new(model)),
+                    None,
+                    self.collector_config.clone(),
+                )?,
+                Err(_) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
+                    &mut search_query,
+                    None,
+                    None,
+                    self.collector_config.clone(),
+                )?,
+            }
+        };
+
+        #[cfg(not(feature = "libtorch"))]
+        let pipeline = {
+            use crate::ranking::models::cross_encoder::DummyCrossEncoder;
+            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
                 &mut search_query,
-                Some(Arc::new(model)),
+                None,
                 None,
                 self.collector_config.clone(),
-            )?,
-            Err(_) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
-                &mut search_query,
-                None,
-                None,
-                self.collector_config.clone(),
-            )?,
+            )?
         };
 
         let search_result = self.search_initial(&search_query, true)?;

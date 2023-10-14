@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{alice, autosuggest, explore, fact_check, search, sites, summarize, webgraph};
+use super::{autosuggest, explore, search, sites, summarize, webgraph};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -31,8 +31,6 @@ use utoipa_swagger_ui::SwaggerUi;
             webgraph::page::outgoing_pages,
             autosuggest::route,
             summarize::summarize_route,
-            fact_check::fact_check_route,
-            alice::alice_route,
             sites::sites_export_optic,
             explore::explore_export_optic,
         ),
@@ -81,13 +79,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::entrypoint::webgraph_server::ScoredSite,
 
                 autosuggest::Suggestion,
-                fact_check::FactCheckParams,
-                fact_check::FactCheckResponse,
 
-                crate::alice::SimplifiedWebsite,
-                crate::alice::ExecutionState,
-                crate::alice::EncodedEncryptedState,
-                alice::EncodedSavedState,
                 sites::SitesExportOpticParams,
                 explore::ExploreExportOpticParams,
 
@@ -112,22 +104,6 @@ The API might also change quite a bit during the beta period, but we will try to
 
 Remember to always give proper attributions to the sources you use from the search results."#.to_string(),
         );
-
-        #[cfg(not(feature = "with_alice"))]
-        {
-            openapi.paths.paths.remove("/beta/api/alice");
-            openapi.paths.paths.remove("/beta/api/alice/save_state");
-            openapi.paths.paths.remove("/beta/api/fact_check");
-
-            if let Some(components) = openapi.components.as_mut() {
-                components.schemas.remove("SimplifiedWebsite");
-                components.schemas.remove("ExecutionState");
-                components.schemas.remove("EncodedEncryptedState");
-                components.schemas.remove("EncodedSavedState");
-                components.schemas.remove("FactCheckParams");
-                components.schemas.remove("FactCheckResponse");
-            }
-        }
     }
 }
 

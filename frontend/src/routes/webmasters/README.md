@@ -7,7 +7,7 @@ The crawler uses the user agent `Mozilla/5.0 (compatible; StractBot/0.1; open so
 ## Politeness
 
 StractBot is a polite crawler. It respects the [robots.txt](https://en.wikipedia.org/wiki/Robots.txt) file of the website it is crawling and tries to not overload the server.
-It does this by waiting a certain amount of time between requests to the same domain. The waiting time is calculated by *min(max(fetchtime \* politeness, 1 sec), 60 sec)* where *fetchtime* is the time it took to fetch the page. The crawler will wait at least 1 sec between requests and at most 60 seconds.
+It does this by waiting a certain amount of time between requests to the same domain. The waiting time is calculated by *min(max(fetchtime \* politeness, 5 sec), 60 sec)* where *fetchtime* is the time it took to fetch the page. The crawler will wait at least 5 sec between requests and at most 60 seconds.
 This dynamic waiting time tries to prevent us from disrupting servers that cannot handle the load, while not giving unnecessary politeness to servers that can. The politeness factor starts at 1 and is doubled every time the crawler gets a 429 response from the server (to at most 2048).
 
 The crawler looks for the token `StractBot` in the robots.txt file to determine which pages (if any) the crawler is allowed to crawl.
