@@ -23,6 +23,7 @@ use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, EntityMatch};
+use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
@@ -69,7 +70,7 @@ struct InvertedIndexResult {
 impl LocalSearcher {
     pub fn new(index: Index) -> Self {
         let mut index = index;
-        // index.optimize_for_search().unwrap();
+        index.optimize_for_search().unwrap();
 
         LocalSearcher {
             index,
@@ -408,6 +409,12 @@ impl LocalSearcher {
 
     pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         self.index.get_homepage(url)
+    }
+
+    pub fn get_entity_image(&self, image_id: &str) -> Option<Image> {
+        self.entity_index
+            .as_ref()
+            .and_then(|index| index.retrieve_image(image_id))
     }
 }
 

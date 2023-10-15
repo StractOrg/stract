@@ -149,7 +149,7 @@ fn wikipedify_url(url: &str) -> Vec<Url> {
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
-    pub image_base64: Option<String>,
+    pub image_id: Option<String>,
     pub related_entities: Vec<EntityMatch>,
     pub best_info: Vec<(String, Span)>,
     pub links: Vec<Link>,
@@ -304,7 +304,7 @@ impl EntityIndex {
 
                     EntityMatch { entity, score }
                 })
-                .filter(|m| m.entity.image_base64.is_some())
+                .filter(|m| m.entity.image_id.is_some())
                 .take(4)
                 .collect(),
             Err(_) => Vec::new(),
@@ -412,9 +412,12 @@ impl EntityIndex {
             Vec::new()
         };
 
-        let image_base64 = self
-            .retrieve_image(&title)
-            .map(|image| base64::encode(image.as_raw_bytes()));
+        let image_id = base64::encode(&title);
+        let image_id = if self.retrieve_image(&image_id).is_some() {
+            Some(image_id)
+        } else {
+            None
+        };
 
         let links: Vec<Link> = if get_links {
             bincode::deserialize(
@@ -433,15 +436,18 @@ impl EntityIndex {
         StoredEntity {
             title,
             entity_abstract,
-            image_base64,
+            image_id,
             related_entities,
             best_info,
             links,
         }
     }
 
-    pub fn retrieve_image(&self, key: &String) -> Option<Image> {
-        self.image_store.get(key)
+    pub fn retrieve_image(&self, key: &str) -> Option<Image> {
+        let key = base64::decode(key).ok()?;
+        let key = String::from_utf8(key).ok()?;
+
+        self.image_store.get(&key)
     }
 
     pub fn get_attribute_occurrence(&self, attribute: &String) -> Option<u32> {

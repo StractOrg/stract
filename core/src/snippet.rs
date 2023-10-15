@@ -19,7 +19,7 @@ use std::ops::Range;
 use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::spell::sentence_ranges;
-use crate::tokenizer::{BigramTokenizer, Stemmed, Tokenizer, TrigramTokenizer};
+use crate::tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;
@@ -81,6 +81,7 @@ impl SnippetBuilder {
     fn highlight(&mut self, terms: &HashSet<String>, lang: whatlang::Lang) {
         for mut tokenizer in [
             Tokenizer::Stemmed(Stemmed::with_forced_language(lang)),
+            Tokenizer::Normal(Normal::default()),
             Tokenizer::Bigram(BigramTokenizer::default()),
             Tokenizer::Trigram(TrigramTokenizer::default()),
         ] {
@@ -94,9 +95,10 @@ impl SnippetBuilder {
         }
 
         // remove overlapping ranges
-        self.highlights.sort_by(|a, b| a.start.cmp(&b.start));
         self.highlights
-            .dedup_by(|a, b| a.start == b.start && a.end > b.end);
+            .sort_by(|a, b| a.start.cmp(&b.start).then(a.end.cmp(&b.end)));
+        self.highlights
+            .dedup_by(|a, b| a.start == b.start && a.end >= b.end);
     }
 
     fn build(self) -> TextSnippet {
@@ -136,9 +138,8 @@ fn snippet_string_builder(
     terms: &[String],
     lang: whatlang::Lang,
     config: SnippetConfig,
+    mut tokenizer: Tokenizer,
 ) -> SnippetBuilder {
-    let mut tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
-
     let terms: HashSet<String> = terms
         .iter()
         .flat_map(|term| {
@@ -276,7 +277,20 @@ fn snippet_string(
     lang: whatlang::Lang,
     config: SnippetConfig,
 ) -> TextSnippet {
-    snippet_string_builder(text, terms, lang, config).build()
+    let tokenizer = Tokenizer::Normal(Normal::default());
+    let snip = snippet_string_builder(text, terms, lang, config.clone(), tokenizer).build();
+
+    if !snip.fragments.is_empty()
+        && snip
+            .fragments
+            .iter()
+            .any(|f| f.kind == TextSnippetFragmentKind::Highlighted)
+    {
+        return snip;
+    }
+
+    let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
+    snippet_string_builder(text, terms, lang, config, tokenizer).build()
 }
 
 pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> TextSnippet {
@@ -523,17 +537,16 @@ Survey in 2016, 2017, and 2018."#;
 
     #[test]
     fn compounded_terms() {
-        let mut snip = snippet_string_builder(
+        let snip = snippet_string_builder(
             "this is a test",
             &["thisis".to_string()],
             whatlang::Lang::Eng,
             SnippetConfig::default(),
+            Tokenizer::Normal(Normal::default()),
         );
 
         let mut terms = HashSet::new();
         terms.insert("thisis".to_string());
-
-        snip.highlight(&terms, whatlang::Lang::Eng);
 
         assert_eq!(
             highlight(Snippet::Normal {

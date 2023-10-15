@@ -17,6 +17,7 @@
 use crate::{
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
     entrypoint::search_server::{self, SearchService},
+    image_store::Image,
     inverted_index::{self, RetrievedWebpage},
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
     Result,
@@ -143,6 +144,19 @@ impl RemoteSearcher {
         .await
         .unwrap()
     }
+
+    async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
+        let conn = self.conn().await;
+
+        conn.send_with_timeout(
+            &search_server::GetEntityImage {
+                image_id: image_id.to_string(),
+            },
+            Duration::from_secs(60),
+        )
+        .await
+        .map_err(|e| e.into())
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
@@ -216,6 +230,10 @@ impl Shard {
 
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         self.replica().get_homepage_descriptions(urls).await
+    }
+
+    async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
+        self.replica().get_entity_image(image_id).await
     }
 }
 
@@ -343,5 +361,12 @@ impl DistributedSearcher {
             .into_iter()
             .flatten()
             .collect()
+    }
+
+    pub async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
+        match self.shards().await.first() {
+            Some(s) => s.get_entity_image(image_id).await,
+            None => Ok(None),
+        }
     }
 }

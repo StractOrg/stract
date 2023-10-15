@@ -223,6 +223,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                 )
                 .route("/api/sites/export", post(sites::sites_export_optic))
                 .route("/api/explore/export", post(explore::explore_export_optic))
+                .route("/api/entity_image", get(search::entity_image))
                 .layer(cors_layer()),
         )
         .with_state(state))

@@ -126,6 +126,27 @@ fn schema_item_to_stackoverflow_answer(
     }
 }
 
+fn limit_chars(passages: &[CodeOrText], limit: usize) -> Vec<CodeOrText> {
+    let mut res = Vec::new();
+    let mut taken_chars = 0;
+
+    for p in passages {
+        res.push(p.clone());
+        let s = match p {
+            CodeOrText::Code(s) => s,
+            CodeOrText::Text(s) => s,
+        };
+
+        if taken_chars + s.len() > limit {
+            break;
+        }
+
+        taken_chars += s.len();
+    }
+
+    res
+}
+
 pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
     match webpage
         .schema_org
@@ -192,10 +213,20 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 answers.push(answer);
             }
 
-            Ok(Snippet::StackOverflowQA {
-                question: StackOverflowQuestion { body: question },
-                answers: answers.into_iter().take(3).collect(),
-            })
+            let question = StackOverflowQuestion {
+                body: limit_chars(&question, 512),
+            };
+
+            let answers: Vec<_> = answers
+                .into_iter()
+                .map(|answer| StackOverflowAnswer {
+                    body: limit_chars(&answer.body, 512),
+                    ..answer
+                })
+                .take(3)
+                .collect();
+
+            Ok(Snippet::StackOverflowQA { question, answers })
         }
         None => Err(Error::InvalidStackoverflowSchema.into()),
     }

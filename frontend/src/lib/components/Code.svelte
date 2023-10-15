@@ -1,20 +1,13 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import {HighlightAuto} from "svelte-highlight";
 
   export let code: string;
-
-  const component =
-    $page.data.globals?.highlightjs?.HighlightAuto ||
-    import('svelte-highlight').then(({ HighlightAuto }) => HighlightAuto);
+  export let transparentBackground = false;
 </script>
 
-<div class="code rounded-lg bg-base-200 text-sm text-neutral-focus">
+<div class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus">
   <div class="overflow-auto px-3 py-2">
-    {#await component}
-      <pre><code>{code}</code></pre>
-    {:then comp}
-      <svelte:component this={comp} {code} />
-    {/await}
+    <HighlightAuto code={code}/>
   </div>
 </div>
 

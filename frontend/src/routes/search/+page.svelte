@@ -153,7 +153,7 @@
       <div class="mx-auto flex w-full justify-between">
         <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
           <p class="h-fit">
-            {#if results.numHits }
+            {#if results.numHits != null }
               Found {results.numHits.toLocaleString()} results in {(
                 (results.searchDurationMs ?? 0) / 1000
               ).toFixed(2)}

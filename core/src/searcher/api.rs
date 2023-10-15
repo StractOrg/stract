@@ -26,6 +26,7 @@ use url::Url;
 
 use crate::bangs::{Bang, BangHit};
 use crate::config::{ApiConfig, ApiThresholds, CollectorConfig};
+use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
@@ -509,6 +510,10 @@ impl ApiSearcher {
 
     pub async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {
         self.distributed_searcher.get_webpage(url).await
+    }
+
+    pub async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
+        self.distributed_searcher.get_entity_image(image_id).await
     }
 }
 

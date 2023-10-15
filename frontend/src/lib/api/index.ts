@@ -98,14 +98,6 @@ const sse = <T>(
 };
 
 export const api = {
-  alice: (
-    query: {
-      message: string;
-      optic: string;
-      prevState: EncodedSavedState;
-    },
-    options?: ApiOptions,
-  ) => sse<ExecutionState>('GET', `/beta/api/alice?${new URLSearchParams(query)}`, options),
   autosuggest: (
     params: {
       q: string;
@@ -119,8 +111,6 @@ export const api = {
     ),
   exploreExport: (body: ExploreExportOpticParams, options?: ApiOptions) =>
     requestPlain('POST', `/beta/api/explore/export`, body, options),
-  factCheck: (body: FactCheckParams, options?: ApiOptions) =>
-    requestJson<FactCheckResponse>('POST', `/beta/api/fact_check`, body, options),
   search: (body: ApiSearchQuery, options?: ApiOptions) =>
     requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
   sitesExport: (body: SitesExportOpticParams, options?: ApiOptions) =>
@@ -246,7 +236,7 @@ export type DisplayedAnswer = {
   url: string;
 };
 export type DisplayedEntity = {
-  imageBase64?: string;
+  imageId?: string;
   info: string & EntitySnippet[][];
   matchScore: number;
   relatedEntities: DisplayedEntity[];
@@ -274,8 +264,6 @@ export type DisplayedWebpage = {
   title: string;
   url: string;
 };
-export type EncodedEncryptedState = string;
-export type EncodedSavedState = string;
 export type EntitySnippet = {
   fragments: EntitySnippetFragment[];
 };
@@ -290,34 +278,9 @@ export type EntitySnippetFragment =
       text: string;
     };
 export type Example = string;
-export type ExecutionState =
-  | {
-      query: string;
-      type: 'beginSearch';
-    }
-  | {
-      query: string;
-      result: SimplifiedWebsite[];
-      type: 'searchResult';
-    }
-  | {
-      text: string;
-      type: 'speaking';
-    }
-  | {
-      state: EncodedEncryptedState;
-      type: 'done';
-    };
 export type ExploreExportOpticParams = {
   chosenSites: string[];
   similarSites: string[];
-};
-export type FactCheckParams = {
-  claim: string;
-  evidence: string;
-};
-export type FactCheckResponse = {
-  score: number;
 };
 export type FullEdge = {
   from: Node;
@@ -366,12 +329,6 @@ export type SignalScore = {
 export type SimilarSitesParams = {
   sites: string[];
   topN: number;
-};
-export type SimplifiedWebsite = {
-  site: string;
-  text: string;
-  title: string;
-  url: string;
 };
 export type SiteRankings = {
   blocked: string[];

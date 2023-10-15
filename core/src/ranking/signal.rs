@@ -32,7 +32,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
-use tantivy::query::{PhraseQuery, Query as _, Scorer};
+use tantivy::query::{Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 use utoipa::ToSchema;
@@ -49,8 +49,6 @@ use super::bm25::Bm25Weight;
 use super::models::linear::LinearRegression;
 use super::{inbound_similarity, query_centrality};
 
-const PROXIMITY_ENABLED: bool = false;
-
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("unknown signal: {0}")]
@@ -59,8 +57,6 @@ pub enum Error {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
-    #[serde(rename = "bm25")]
-    Bm25,
     #[serde(rename = "bm25_title")]
     Bm25Title,
     #[serde(rename = "bm25_title_bigrams")]
@@ -101,34 +97,6 @@ pub enum Signal {
     Bm25TitleIfHomepage,
     #[serde(rename = "bm25_backlink_text")]
     Bm25BacklinkText,
-    #[serde(rename = "bm25_description")]
-    Bm25Description,
-
-    /// All proximity signals are disabled for now.
-    /// We need to figure out how to make them faster.
-    #[serde(rename = "proximity_slop_0")]
-    ProximitySlop0,
-
-    /// All proximity signals are disabled for now.
-    /// We need to figure out how to make them faster.
-    #[serde(rename = "proximity_slop_1")]
-    ProximitySlop1,
-
-    /// All proximity signals are disabled for now.
-    /// We need to figure out how to make them faster.
-    #[serde(rename = "proximity_slop_2")]
-    ProximitySlop2,
-
-    /// All proximity signals are disabled for now.
-    /// We need to figure out how to make them faster.
-    #[serde(rename = "proximity_slop_4")]
-    ProximitySlop4,
-
-    /// All proximity signals are disabled for now.
-    /// We need to figure out how to make them faster.
-    #[serde(rename = "proximity_slop_8")]
-    ProximitySlop8,
-
     #[serde(rename = "cross_encoder")]
     CrossEncoder,
     #[serde(rename = "host_centrality")]
@@ -163,8 +131,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 40] = [
-    Signal::Bm25,
+pub const ALL_SIGNALS: [Signal; 33] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -185,12 +152,6 @@ pub const ALL_SIGNALS: [Signal; 40] = [
     Signal::Bm25DomainIfHomepageNoTokenizer,
     Signal::Bm25TitleIfHomepage,
     Signal::Bm25BacklinkText,
-    Signal::Bm25Description,
-    Signal::ProximitySlop0,
-    Signal::ProximitySlop1,
-    Signal::ProximitySlop2,
-    Signal::ProximitySlop4,
-    Signal::ProximitySlop8,
     Signal::CrossEncoder,
     Signal::HostCentrality,
     Signal::PageCentrality,
@@ -277,33 +238,26 @@ impl Signal {
 
     pub fn default_coefficient(&self) -> f64 {
         match self {
-            Signal::Bm25 => 0.0002,
-            Signal::Bm25Title => 0.004,
-            Signal::Bm25TitleBigrams => 0.0025,
-            Signal::Bm25TitleTrigrams => 0.0025,
-            Signal::Bm25CleanBody => 0.004,
-            Signal::Bm25CleanBodyBigrams => 0.0015,
-            Signal::Bm25CleanBodyTrigrams => 0.0015,
-            Signal::Bm25StemmedTitle => 0.0005,
-            Signal::Bm25StemmedCleanBody => 0.0005,
+            Signal::Bm25Title => 0.0042,
+            Signal::Bm25TitleBigrams => 0.0027,
+            Signal::Bm25TitleTrigrams => 0.0027,
+            Signal::Bm25CleanBody => 0.0042,
+            Signal::Bm25CleanBodyBigrams => 0.0017,
+            Signal::Bm25CleanBodyTrigrams => 0.0017,
+            Signal::Bm25StemmedTitle => 0.0007,
+            Signal::Bm25StemmedCleanBody => 0.0007,
             Signal::Bm25AllBody => 0.0,
-            Signal::Bm25Url => 0.00005,
-            Signal::Bm25Site => 0.00005,
-            Signal::Bm25Domain => 0.00005,
-            Signal::Bm25SiteNoTokenizer => 0.00005,
-            Signal::Bm25DomainNoTokenizer => 0.00005,
-            Signal::Bm25DomainNameNoTokenizer => 0.00005,
-            Signal::Bm25DomainIfHomepage => 0.0002,
-            Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.007,
-            Signal::Bm25DomainIfHomepageNoTokenizer => 0.007,
-            Signal::Bm25TitleIfHomepage => 0.00002,
-            Signal::Bm25BacklinkText => 0.003,
-            Signal::Bm25Description => 0.0,
-            Signal::ProximitySlop0 => 0.00,
-            Signal::ProximitySlop1 => 0.00,
-            Signal::ProximitySlop2 => 0.00,
-            Signal::ProximitySlop4 => 0.00,
-            Signal::ProximitySlop8 => 0.00,
+            Signal::Bm25Url => 0.00015,
+            Signal::Bm25Site => 0.00015,
+            Signal::Bm25Domain => 0.00015,
+            Signal::Bm25SiteNoTokenizer => 0.00015,
+            Signal::Bm25DomainNoTokenizer => 0.00015,
+            Signal::Bm25DomainNameNoTokenizer => 0.00015,
+            Signal::Bm25DomainIfHomepage => 0.0004,
+            Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0072,
+            Signal::Bm25DomainIfHomepageNoTokenizer => 0.0072,
+            Signal::Bm25TitleIfHomepage => 0.00022,
+            Signal::Bm25BacklinkText => 0.0032,
             Signal::CrossEncoder => 0.17,
             Signal::HostCentrality => 1.0,
             Signal::PageCentrality => 4.0,
@@ -442,13 +396,6 @@ impl Signal {
                 let host_id = self.host_id(signal_aggregator, doc);
                 host_id.map(|host_id| signal_aggregator.inbound_similarity(host_id))
             }
-            Signal::Bm25 => signal_aggregator.segment_reader.as_mut().map(|reader| {
-                reader
-                    .text_fields
-                    .values_mut()
-                    .map(|field| bm25(field, doc))
-                    .sum()
-            }),
             Signal::Bm25Title
             | Signal::Bm25TitleBigrams
             | Signal::Bm25TitleTrigrams
@@ -468,8 +415,7 @@ impl Signal {
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
             | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
-            | Signal::Bm25BacklinkText
-            | Signal::Bm25Description => signal_aggregator.segment_reader.as_mut().map(|reader| {
+            | Signal::Bm25BacklinkText => signal_aggregator.segment_reader.as_mut().map(|reader| {
                 reader
                     .text_fields
                     .get_mut(self.as_textfield().unwrap())
@@ -477,25 +423,6 @@ impl Signal {
                     .unwrap_or(0.0)
             }),
 
-            Signal::ProximitySlop0
-            | Signal::ProximitySlop1
-            | Signal::ProximitySlop2
-            | Signal::ProximitySlop4
-            | Signal::ProximitySlop8 => {
-                let reader = signal_aggregator
-                    .segment_reader
-                    .as_mut()
-                    .expect("set segment reader before computing signals");
-
-                reader.proximity_scorers.get_mut(self).map(|scorer| {
-                    let docset = &mut scorer.docset;
-                    if docset.doc() == doc || (docset.doc() < doc && docset.seek(doc) == doc) {
-                        docset.score() as f64
-                    } else {
-                        0.0
-                    }
-                })
-            }
             Signal::CrossEncoder => None, // this is calculated in a later step
             Signal::LambdaMART => None,
         };
@@ -572,8 +499,7 @@ impl Signal {
                     .count() as f64;
                 Some(score_slashes(num_slashes))
             }
-            Signal::Bm25
-            | Signal::Bm25Title
+            Signal::Bm25Title
             | Signal::Bm25TitleBigrams
             | Signal::Bm25TitleTrigrams
             | Signal::Bm25CleanBody
@@ -593,12 +519,6 @@ impl Signal {
             | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
             | Signal::Bm25BacklinkText
-            | Signal::Bm25Description
-            | Signal::ProximitySlop0
-            | Signal::ProximitySlop1
-            | Signal::ProximitySlop2
-            | Signal::ProximitySlop4
-            | Signal::ProximitySlop8
             | Signal::CrossEncoder
             | Signal::InboundSimilarity
             | Signal::LambdaMART
@@ -615,17 +535,6 @@ impl Signal {
                 value,
             },
         })
-    }
-
-    fn proximity_slop(&self) -> Option<u32> {
-        match self {
-            Signal::ProximitySlop0 => Some(0),
-            Signal::ProximitySlop1 => Some(1),
-            Signal::ProximitySlop2 => Some(2),
-            Signal::ProximitySlop4 => Some(4),
-            Signal::ProximitySlop8 => Some(8),
-            _ => None,
-        }
     }
 
     fn as_fastfield(&self) -> Option<FastField> {
@@ -666,7 +575,6 @@ impl Signal {
             }
             Signal::Bm25TitleIfHomepage => Some(TextField::TitleIfHomepage),
             Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
-            Signal::Bm25Description => Some(TextField::Description),
             Signal::Bm25DomainIfHomepageNoTokenizer => Some(TextField::DomainIfHomepageNoTokenizer),
             _ => None,
         }
@@ -743,13 +651,8 @@ struct OpticBoosts {
     rules: Vec<RuleBoost>,
 }
 
-struct ProximityScorer {
-    docset: Box<dyn Scorer>,
-}
-
 struct SegmentReader {
     text_fields: EnumMap<TextField, TextFieldData>,
-    proximity_scorers: EnumMap<Signal, ProximityScorer>,
     optic_boosts: OpticBoosts,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
@@ -941,67 +844,6 @@ impl SignalAggregator {
         optic_rule_boosts
     }
 
-    fn prepare_proximity_scorers(
-        &self,
-        tv_searcher: &tantivy::Searcher,
-        segment_reader: &tantivy::SegmentReader,
-    ) -> EnumMap<Signal, ProximityScorer> {
-        if !PROXIMITY_ENABLED {
-            return EnumMap::new();
-        }
-
-        let mut proximity_scorers = EnumMap::new();
-        let proximity_fields = [TextField::Title, TextField::CleanBody];
-        let schema = tv_searcher.schema();
-
-        if let Some(query) = &self.query {
-            if query.simple_terms.len() < 2 {
-                return proximity_scorers;
-            }
-
-            for signal in ALL_SIGNALS {
-                if let Some(slop) = signal.proximity_slop() {
-                    let mut queries = Vec::new();
-                    for field in proximity_fields {
-                        let tv_field = schema.get_field(field.name()).unwrap();
-                        let mut tokenizer = field.indexing_tokenizer();
-                        let mut terms = Vec::with_capacity(query.simple_terms.len());
-
-                        for term in &query.simple_terms {
-                            let mut stream = tokenizer.token_stream(term);
-                            while let Some(term) = stream.next() {
-                                let term = tantivy::Term::from_field_text(tv_field, &term.text);
-                                terms.push(term);
-                            }
-                        }
-
-                        let mut phrase_query = PhraseQuery::new(terms);
-                        phrase_query.set_slop(slop);
-
-                        queries.push((
-                            tantivy::query::Occur::Should,
-                            Box::new(phrase_query) as Box<dyn tantivy::query::Query>,
-                        ));
-                    }
-
-                    let query = tantivy::query::BooleanQuery::new(queries);
-                    let docset = query
-                        .weight(tantivy::query::EnableScoring::Enabled {
-                            searcher: tv_searcher,
-                            statistics_provider: tv_searcher,
-                        })
-                        .unwrap()
-                        .scorer(segment_reader, 1.0)
-                        .unwrap();
-
-                    proximity_scorers.insert(signal, ProximityScorer { docset });
-                }
-            }
-        }
-
-        proximity_scorers
-    }
-
     pub fn register_segment(
         &mut self,
         tv_searcher: &tantivy::Searcher,
@@ -1011,7 +853,6 @@ impl SignalAggregator {
         let fastfield_segment_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
         let text_fields = self.prepare_textfields(tv_searcher, segment_reader)?;
         let optic_rule_boosts = self.prepare_optic(tv_searcher, segment_reader, fastfield_reader);
-        let proximity_scorers = self.prepare_proximity_scorers(tv_searcher, segment_reader);
 
         self.segment_reader = Some(SegmentReader {
             text_fields,
@@ -1019,7 +860,6 @@ impl SignalAggregator {
             optic_boosts: OpticBoosts {
                 rules: optic_rule_boosts,
             },
-            proximity_scorers,
         });
 
         Ok(())
@@ -1138,102 +978,4 @@ pub struct ComputedSignal {
 pub struct SignalScore {
     pub coefficient: f64,
     pub value: f64,
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use crate::{
-        index::Index,
-        searcher::{LocalSearcher, SearchQuery},
-    };
-
-    use super::*;
-
-    fn signals_for_query(searcher: &LocalSearcher, q: &str) -> HashMap<Signal, SignalScore> {
-        let res = searcher
-            .search(&SearchQuery {
-                query: q.to_string(),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-        res[0].ranking_signals.clone().unwrap()
-    }
-    #[test]
-    #[ignore = "proximity signals are currently disabled"]
-    fn test_proximity() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        let mut webpage = Webpage::new(
-            &format!(
-                r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    {}
-                </body>
-            </html>
-            "#,
-                crate::rand_words(1_000)
-            ),
-            "https://www.example.com",
-        )
-        .unwrap();
-
-        webpage
-            .html
-            .set_clean_text("a b c d e f g h i j k l m n o p q r s t u v w x y z".to_string());
-
-        index.insert(webpage).expect("failed to insert webpage");
-
-        index.commit().unwrap();
-
-        let searcher = LocalSearcher::new(index);
-
-        let signals = signals_for_query(&searcher, "a b");
-        assert!(signals[&Signal::ProximitySlop8].value > 0.0);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop4].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop2].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop1].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop0].value);
-
-        let signals = signals_for_query(&searcher, "a c");
-        assert!(signals[&Signal::ProximitySlop8].value > 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop0].value, 0.0);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop4].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop2].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop1].value);
-
-        let signals = signals_for_query(&searcher, "a d");
-        assert!(signals[&Signal::ProximitySlop8].value > 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop0].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop1].value, 0.0);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop4].value);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop2].value);
-
-        let signals = signals_for_query(&searcher, "a e");
-        assert!(signals[&Signal::ProximitySlop8].value > 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop0].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop1].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop2].value, 0.0);
-        assert!(signals[&Signal::ProximitySlop8].value == signals[&Signal::ProximitySlop4].value);
-
-        let signals = signals_for_query(&searcher, "a g");
-        assert!(signals[&Signal::ProximitySlop8].value > 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop0].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop1].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop2].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop4].value, 0.0);
-
-        let signals = signals_for_query(&searcher, "a k");
-        assert_eq!(signals[&Signal::ProximitySlop0].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop1].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop2].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop4].value, 0.0);
-        assert_eq!(signals[&Signal::ProximitySlop8].value, 0.0);
-    }
 }

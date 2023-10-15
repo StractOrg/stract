@@ -203,6 +203,10 @@ impl Image {
 
         bytes
     }
+
+    pub fn resize(self, width: u32, height: u32) -> Self {
+        ResizeFilter { width, height }.transform(self)
+    }
 }
 
 #[cfg(test)]

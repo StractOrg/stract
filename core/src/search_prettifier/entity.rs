@@ -29,7 +29,7 @@ use crate::entity_index::{
 pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: EntitySnippet,
-    pub image_base64: Option<String>,
+    pub image_id: Option<String>,
     pub related_entities: Vec<DisplayedEntity>,
     pub info: Vec<(String, EntitySnippet)>,
     pub match_score: f32,
@@ -47,7 +47,7 @@ impl From<EntityMatch> for DisplayedEntity {
         Self {
             title: m.entity.title,
             small_abstract,
-            image_base64: m.entity.image_base64,
+            image_id: m.entity.image_id,
             related_entities: m
                 .entity
                 .related_entities

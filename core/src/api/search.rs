@@ -164,3 +164,39 @@ pub async fn api(
         },
     }
 }
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityImageParams {
+    pub image_id: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/beta/api/search",
+    request_body(content = ApiSearchQuery),
+    responses(
+        (status = 200, description = "Search results", body = ApiSearchResult),
+    )
+)]
+pub async fn entity_image(
+    extract::Query(query): extract::Query<EntityImageParams>,
+    extract::State(state): extract::State<Arc<State>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    match state.searcher.get_entity_image(&query.image_id).await {
+        Ok(Some(result)) => {
+            let bytes = result.as_raw_bytes();
+
+            Ok((
+                ([(axum::http::header::CONTENT_TYPE, "image/png")]),
+                axum::response::AppendHeaders([(axum::http::header::CONTENT_TYPE, "image/png")]),
+                bytes,
+            ))
+        }
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(err) => {
+            tracing::error!("{:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}

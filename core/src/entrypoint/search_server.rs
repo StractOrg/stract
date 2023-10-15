@@ -28,6 +28,7 @@ use crate::{
         sonic,
     },
     entity_index::EntityIndex,
+    image_store::Image,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{
@@ -45,6 +46,7 @@ sonic_service!(
         Search,
         GetWebpage,
         GetHomepageDescriptions,
+        GetEntityImage,
     ]
 );
 
@@ -175,6 +177,18 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
         }
 
         Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetEntityImage {
+    pub image_id: String,
+}
+#[async_trait::async_trait]
+impl sonic::service::Message<SearchService> for GetEntityImage {
+    type Response = Option<Image>;
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
+        Ok(server.local_searcher.get_entity_image(&self.image_id))
     }
 }
 

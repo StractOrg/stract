@@ -7,6 +7,7 @@
   import { derived } from 'svelte/store';
   import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
+  import StackOverflowSnippet from './StackOverflowSnippet.svelte';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;
@@ -54,12 +55,22 @@
       <div class="snippet">
         <div class="line-clamp-3">
           <div class="inline">
-            <span id="snippet-text" class="snippet-text [&:nth-child(2)]:before:content-['—']">
-              {webpage.snippet.date || ''}
-              <TextSnippet snippet={webpage.snippet.text} />
+            <span id="snippet-text" class="snippet-text">
+              {#if webpage.snippet.date}
+              <span class="text-neutral">
+                {webpage.snippet.date} -
+              </span>
+              {/if}
+              <span>
+                <TextSnippet snippet={webpage.snippet.text} />
+              </span>
             </span>
           </div>
         </div>
+      </div>
+    {:else if webpage.snippet.type == 'stackOverflowQA'}
+      <div class="snippet">
+        <StackOverflowSnippet question={webpage.snippet.question} answers={webpage.snippet.answers} />
       </div>
     {/if}
   </div>

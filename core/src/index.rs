@@ -335,7 +335,7 @@ mod tests {
                 .ranking_signals
                 .as_ref()
                 .unwrap()
-                .get(&crate::ranking::Signal::Bm25)
+                .get(&crate::ranking::Signal::Bm25Title)
                 .unwrap())
             .all(|&v| v.value > 0.0));
     }

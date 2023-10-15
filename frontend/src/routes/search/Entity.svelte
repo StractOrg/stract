@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DisplayedEntity } from '$lib/api';
+  import { getApiBase, type DisplayedEntity } from '$lib/api';
   import EntitySnippet from '$lib/components/EntitySnippet.svelte';
 
   export let entity: DisplayedEntity;
@@ -7,13 +7,13 @@
 
 <div class="flex w-full justify-center">
   <div class="flex w-full flex-col items-center">
-    {#if entity.imageBase64}
+    {#if entity.imageId}
       <div class="w-lg mb-5">
         <a href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
           <img
             alt="Image of {entity.title}"
             class="h-full w-full rounded-full"
-            src="data:image/png;base64, {entity.imageBase64}"
+            src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
           />
         </a>
       </div>
@@ -53,13 +53,13 @@
         <div class="flex overflow-scroll">
           {#each entity.relatedEntities as related (related.title)}
             <div class="flex flex-col items-center p-4">
-              {#if related.imageBase64}
+              {#if related.imageId != null}
                 <div class="mb-3 h-20 w-20">
                   <a href="/search?q={encodeURIComponent(related.title)}">
                     <img
                       alt="Image of {related.title}"
                       class="h-full w-full rounded-full object-cover"
-                      src="data:image/png;base64, {related.imageBase64}"
+                      src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}"
                     />
                   </a>
                 </div>

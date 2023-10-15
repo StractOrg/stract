@@ -408,7 +408,7 @@ mod tests {
             .map(|i| -> RankingWebsite {
                 let mut signals = EnumMap::new();
                 signals.insert(
-                    Signal::Bm25,
+                    Signal::HostCentrality,
                     SignalScore {
                         coefficient: 1.0,
                         value: 1.0 / i as f64,
