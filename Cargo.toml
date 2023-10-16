@@ -97,7 +97,7 @@ tikv-jemallocator = "0.5"
 tokenizers = "0.13.2"
 tokio = {version = "1.23.1", features = ["full"]}
 tokio-stream = "0.1.11"
-toml = "0.5.9"
+toml = "0.8.2"
 torch-sys = "0.13.0"
 tower-http = {version = "0.4.0", features = ["compression-gzip", "cors"]}
 tracing = "0.1.34"
