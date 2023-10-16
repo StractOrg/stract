@@ -121,7 +121,10 @@ pub mod coordinator {
         type Response = ();
 
         async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            server.coordinator.insert_urls(self.urls)?;
+            if let Err(e) = server.coordinator.insert_urls(self.urls) {
+                tracing::error!("failed to insert urls: {}", e);
+            }
+
             Ok(())
         }
     }
@@ -141,7 +144,10 @@ pub mod coordinator {
         type Response = ();
 
         async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            server.coordinator.mark_jobs_complete(&self.domains)?;
+            if let Err(e) = server.coordinator.mark_jobs_complete(&self.domains) {
+                tracing::error!("failed to mark jobs complete: {}", e);
+            }
+
             Ok(())
         }
     }

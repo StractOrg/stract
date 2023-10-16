@@ -38,7 +38,10 @@ mod worker;
 pub use coordinator::CrawlCoordinator;
 
 pub const MAX_URL_LEN_BYTES: usize = 8192;
-pub const MAX_URLS_FOR_DOMAIN_PER_INSERT: usize = 500;
+pub const MAX_URLS_FOR_DOMAIN_PER_INSERT: usize = 256;
+/// Number of new domains that can be discovered for each domain crawled.
+pub const MAX_DOMAIN_DISCOVERY_FACTOR: usize = 4;
+
 pub const MAX_OUTGOING_URLS_PER_PAGE: usize = 200;
 
 #[derive(thiserror::Error, Debug)]
@@ -135,9 +138,38 @@ pub struct JobResponse {
     pub weight_budget: f64,
 }
 
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+pub struct UrlString(pub String);
+impl UrlString {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&Url> for UrlString {
+    fn from(url: &Url) -> Self {
+        Self(url.as_str().to_string())
+    }
+}
+
+impl From<Url> for UrlString {
+    fn from(url: Url) -> Self {
+        Self(url.as_str().to_string())
+    }
+}
+
+impl TryFrom<&UrlString> for Url {
+    type Error = anyhow::Error;
+    fn try_from(url: &UrlString) -> Result<Self, Self::Error> {
+        Ok(Url::parse(&url.0)?)
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UrlToInsert {
-    pub url: Url,
+    pub url: UrlString,
     pub weight: f64,
 }
 

@@ -16,12 +16,11 @@
 
 use hashbrown::HashMap;
 use rand::Rng;
-use std::hash::Hash;
 use std::path::PathBuf;
 use std::{collections::BinaryHeap, path::Path};
 use url::Url;
 
-use super::{Domain, DomainCrawled, Job, Result, UrlToInsert, MAX_URL_LEN_BYTES};
+use super::{Domain, DomainCrawled, Job, Result, UrlString, UrlToInsert, MAX_URL_LEN_BYTES};
 
 const MAX_URL_DB_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024; // 20GB
 
@@ -154,8 +153,6 @@ impl UrlStateDbShard {
         options.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
         options.set_target_file_size_multiplier(10);
 
-        options.set_max_write_buffer_number(4);
-        options.set_min_write_buffer_number_to_merge(2);
         options.set_level_zero_slowdown_writes_trigger(-1);
         options.set_level_zero_stop_writes_trigger(-1);
 
@@ -172,7 +169,6 @@ impl UrlStateDbShard {
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_optimize_filters_for_hits(true);
 
         options.set_compression_type(rocksdb::DBCompressionType::None);
 
@@ -211,6 +207,7 @@ impl UrlStateDbShard {
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
+        write_options.set_no_slowdown(true);
 
         self.db.write_opt(rocksdb_batch, &write_options)?;
 
@@ -461,6 +458,7 @@ impl DomainStateDb {
 
         let mut write_options = rocksdb::WriteOptions::default();
         write_options.disable_wal(true);
+        write_options.set_no_slowdown(true);
 
         self.db.write_opt(rocksdb_batch, &write_options)?;
 
@@ -477,30 +475,6 @@ impl DomainStateDb {
 
             Some((domain, state))
         })
-    }
-}
-
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
-)]
-struct UrlString(String);
-
-impl From<&Url> for UrlString {
-    fn from(url: &Url) -> Self {
-        Self(url.as_str().to_string())
-    }
-}
-
-impl From<Url> for UrlString {
-    fn from(url: Url) -> Self {
-        Self(url.as_str().to_string())
-    }
-}
-
-impl TryFrom<&UrlString> for Url {
-    type Error = anyhow::Error;
-    fn try_from(url: &UrlString) -> Result<Self, Self::Error> {
-        Ok(Url::parse(&url.0)?)
     }
 }
 
@@ -526,10 +500,7 @@ impl CrawlDb {
         let mut url_states = self.urls.multi_get(
             domain_urls
                 .iter()
-                .flat_map(|(domain, urls)| {
-                    urls.iter()
-                        .map(|url| (domain.clone(), UrlString::from(&url.url)))
-                })
+                .flat_map(|(domain, urls)| urls.iter().map(|url| (domain.clone(), url.url.clone())))
                 .collect::<Vec<_>>()
                 .as_slice(),
         )?;
@@ -544,12 +515,12 @@ impl CrawlDb {
                     continue;
                 }
 
-                match url_states.get_mut(&UrlString::from(&url.url)) {
+                match url_states.get_mut(&url.url) {
                     Some(state) => {
                         state.weight += url.weight;
                         domain_state.weight += url.weight;
                         if url.weight > 0.0 {
-                            updated_url_states.push((UrlString::from(&url.url), state.clone()));
+                            updated_url_states.push((url.url.clone(), state.clone()));
                         }
                     }
                     None => {
@@ -557,7 +528,7 @@ impl CrawlDb {
                         state.weight += url.weight;
                         domain_state.weight += url.weight;
 
-                        updated_url_states.push((UrlString::from(&url.url), state));
+                        updated_url_states.push((url.url.clone(), state));
                     }
                 };
             }
@@ -704,7 +675,7 @@ mod tests {
         for url in urls {
             let domain = Domain::from(url);
             let url_to_insert = UrlToInsert {
-                url: url.clone(),
+                url: UrlString::from(url),
                 weight: 0.0,
             };
 

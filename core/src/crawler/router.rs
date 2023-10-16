@@ -10,7 +10,10 @@ use crate::{
     entrypoint::crawler::coordinator::{CoordinatorService, GetJobs, InsertUrls, MarkJobsComplete},
 };
 
-use super::{Domain, Job, JobResponse, MAX_URLS_FOR_DOMAIN_PER_INSERT, MAX_URL_LEN_BYTES};
+use super::{
+    Domain, Job, JobResponse, UrlString, MAX_DOMAIN_DISCOVERY_FACTOR,
+    MAX_URLS_FOR_DOMAIN_PER_INSERT, MAX_URL_LEN_BYTES,
+};
 
 struct RemoteCoordinator {
     addr: SocketAddr,
@@ -84,7 +87,10 @@ impl Router {
                 .or_default()
                 .entry(domain)
                 .or_default()
-                .push(UrlToInsert { url, weight: 0.0 });
+                .push(UrlToInsert {
+                    url: UrlString::from(url),
+                    weight: 0.0,
+                });
         }
 
         let mut futures = Vec::new();
@@ -112,11 +118,11 @@ impl Router {
     }
 
     pub async fn add_responses(&self, responses: &[JobResponse]) -> Result<()> {
-        let mut domain_urls: HashMap<Domain, Vec<UrlToInsert>> = HashMap::new();
+        let mut domain_urls: HashMap<Domain, HashMap<UrlString, f64>> = HashMap::new();
         let mut domain_budgets: Vec<DomainCrawled> = Vec::new();
 
         for res in responses {
-            let mut urls: Vec<(Domain, Url)> = res
+            let urls: Vec<(Domain, Url)> = res
                 .discovered_urls
                 .iter()
                 .map(|url| {
@@ -129,9 +135,6 @@ impl Router {
                 .iter()
                 .filter(|(domain, _)| res.domain != *domain)
                 .count() as f64;
-
-            urls.sort_unstable_by(|(_, a), (_, b)| a.as_str().cmp(b.as_str()));
-            urls.dedup_by(|(_, a), (_, b)| a.as_str() == b.as_str());
 
             let mut used_budget = 0.0;
 
@@ -156,7 +159,9 @@ impl Router {
                     continue;
                 }
 
-                urls.push(UrlToInsert { url, weight });
+                urls.entry(UrlString::from(url.clone()))
+                    .and_modify(|w| *w = (*w + weight).min(1.0))
+                    .or_insert(weight);
             }
 
             domain_budgets.push(DomainCrawled {
@@ -169,12 +174,17 @@ impl Router {
             HashMap::new();
 
         for (domain, urls) in domain_urls {
+            let urls = urls
+                .into_iter()
+                .map(|(url, weight)| UrlToInsert { url, weight })
+                .collect();
             let coordinator_index = self.coordinator_index(&domain);
 
-            coordinator_urls
-                .entry(coordinator_index)
-                .or_default()
-                .insert(domain, urls);
+            let domains = coordinator_urls.entry(coordinator_index).or_default();
+
+            if domains.len() < MAX_DOMAIN_DISCOVERY_FACTOR * responses.len() {
+                domains.insert(domain, urls);
+            }
         }
 
         let mut futures = Vec::new();
