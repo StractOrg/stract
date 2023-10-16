@@ -113,18 +113,9 @@ impl WebgraphWorker {
                     .anchor_links()
                     .into_iter()
                     .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
-                    .filter(|link| link.source.root_domain() != link.destination.root_domain())
-                    .filter(|link| {
-                        link.source.root_domain().is_some()
-                            && link.destination.root_domain().is_some()
-                    })
                 {
                     let source = link.source.clone();
                     let destination = link.destination.clone();
-
-                    if source.root_domain() == destination.root_domain() {
-                        continue;
-                    }
 
                     trace!("inserting link {:?}", link);
                     let mut source = Node::from(source);
