@@ -22,6 +22,7 @@ use std::{
     time::Duration,
 };
 
+use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::TopDocs,
@@ -412,7 +413,7 @@ impl EntityIndex {
             Vec::new()
         };
 
-        let image_id = base64::encode(&title);
+        let image_id = BASE64_ENGINE.encode(&title);
         let image_id = if self.retrieve_image(&image_id).is_some() {
             Some(image_id)
         } else {
@@ -444,7 +445,7 @@ impl EntityIndex {
     }
 
     pub fn retrieve_image(&self, key: &str) -> Option<Image> {
-        let key = base64::decode(key).ok()?;
+        let key = BASE64_ENGINE.decode(key).ok()?;
         let key = String::from_utf8(key).ok()?;
 
         self.image_store.get(&key)
