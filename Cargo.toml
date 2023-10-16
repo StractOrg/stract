@@ -44,8 +44,8 @@ image = "0.24.3"
 indicatif = {version = "0.17.7", features = ["rayon"]}
 insta = "1.31"
 itertools = "0.11.0"
-lalrpop = {version = "0.19.8", features = ["lexer"]}
-lalrpop-util = {version = "0.19.8", features = ["lexer"]}
+lalrpop = {version = "0.20.0", features = ["lexer"]}
+lalrpop-util = {version = "0.20.0", features = ["lexer"]}
 libc = "0.2.142"
 logos = "0.12.1"
 lz-str = "0.2.1"

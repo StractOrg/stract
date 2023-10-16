@@ -264,7 +264,7 @@ impl<'source> Iterator for LexerBridge<'source> {
             for tok in inner.by_ref() {
                 match tok {
                     QuotedString::Error => {
-                        return Some(Err(Error::UnexpectedEOF {
+                        return Some(Err(Error::UnexpectedEof {
                             expected: vec!["\"".to_string()],
                         }))
                     }
@@ -276,7 +276,7 @@ impl<'source> Iterator for LexerBridge<'source> {
             let end = inner.span().end - 1;
 
             if start > end {
-                return Some(Err(Error::UnexpectedEOF {
+                return Some(Err(Error::UnexpectedEof {
                     expected: vec!["\"".to_string()],
                 }));
             }

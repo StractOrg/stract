@@ -18,9 +18,8 @@ use std::collections::HashMap;
 
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
-    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-     Hover, HoverContents, HoverParams, MarkedString, Position,
-    PublishDiagnosticsParams, Range, Url,
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover,
+    HoverContents, HoverParams, MarkedString, Position, PublishDiagnosticsParams, Range, Url,
 };
 use optics::Optic;
 use thiserror::Error;
@@ -155,13 +154,13 @@ impl OpticsBackend {
                                 will have the `Action` applied to it. The action can either `Boost`, `Downrank` or `Discard` a result. An empty `Action` is \
                                 equivalent to a `Boost` of 0.".to_string()),
 
-                                optics::Token::RankingPipeline => Some("The final ranking consists of multiple stages in a pipeline. Each stage receives the 
-                                best scoring webpages from the stage before it, and uses more accurate yet computationally expensive algorithms to rank 
+                                optics::Token::RankingPipeline => Some("The final ranking consists of multiple stages in a pipeline. Each stage receives the
+                                best scoring webpages from the stage before it, and uses more accurate yet computationally expensive algorithms to rank
                                 the pages for the next stage.".to_string()),
 
-                                optics::Token::Stage => Some("The final ranking consists of multiple stages in a pipeline. Each stage has different fields and 
+                                optics::Token::Stage => Some("The final ranking consists of multiple stages in a pipeline. Each stage has different fields and
                                 signals available to it.".to_string()),
-                                
+
                                 optics::Token::Matches => Some("`Matches` dictates the set of criteria a search result should match in order to have the action applied to it. \
                                 A search result must match all the parts of the `Matches` block in order to match the specific rule.".to_string()),
 
@@ -288,7 +287,7 @@ impl OpticsBackend {
 
 fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
     match err {
-        optics::Error::UnexpectedEOF { expected } => {
+        optics::Error::UnexpectedEof { expected } => {
             let mut message = String::new();
 
             message.push_str("Unexpected EOF.\n");
@@ -393,8 +392,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
                 message,
                 ..Default::default()
             }
-        },
-        optics::Error::RankingStagesMismatch => unreachable!("this error cannot occur at compile time"),
+        }
+        optics::Error::RankingStagesMismatch => {
+            unreachable!("this error cannot occur at compile time")
+        }
     }
 }
 

@@ -33,7 +33,7 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug, Clone)]
 pub enum Error {
     #[error("Unexpected EOF")]
-    UnexpectedEOF {
+    UnexpectedEof {
         /// expected one of these tokens but got EOF
         expected: Vec<String>,
     },

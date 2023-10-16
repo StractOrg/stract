@@ -27,7 +27,7 @@ pub mod signal;
 use initial::InitialScoreTweaker;
 
 use crate::{
-    collector::{MaxDocsConsidered, TopDocs, MainCollector},
+    collector::{MainCollector, MaxDocsConsidered, TopDocs},
     config::CollectorConfig,
     fastfield_reader::FastFieldReader,
     search_ctx::Ctx,
@@ -96,10 +96,7 @@ impl Ranker {
         self.aggregator.clone()
     }
 
-    pub fn collector(
-        &self,
-        ctx: Ctx,
-    ) -> MainCollector {
+    pub fn collector(&self, ctx: Ctx) -> MainCollector {
         let aggregator = self.aggregator();
 
         let score_tweaker =
