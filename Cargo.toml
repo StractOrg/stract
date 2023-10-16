@@ -47,7 +47,7 @@ itertools = "0.11.0"
 lalrpop = {version = "0.20.0", features = ["lexer"]}
 lalrpop-util = {version = "0.20.0", features = ["lexer"]}
 libc = "0.2.142"
-logos = "0.12.1"
+logos = "0.13.0"
 lz-str = "0.2.1"
 lz4_flex = "0.11.1"
 maplit = "1.0.2"

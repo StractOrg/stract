@@ -284,13 +284,10 @@ impl tantivy::tokenizer::TokenStream for IdentityTokenStream {
 }
 
 #[derive(Logos, Debug, PartialEq)]
+#[logos(skip r"[ \t\n\f]+")]
 enum Token {
     #[regex("[\\w|\\p{Han}|\\p{Hiragana}|\\p{Katakana}|\\p{Cyrillic}|\\p{Arabic}]+")]
     Text,
-
-    #[error]
-    #[regex(r"[ \t\n\f]+", logos::skip)]
-    Error,
 }
 
 #[derive(Clone)]
@@ -890,12 +887,7 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
             ]
         );
         assert_eq!(
-            tokenize_json(
-                r#"
-                Test.field="this*@# is\" the\" 
-value"
-            "#
-            ),
+            tokenize_json("\n        Test.field=\"this*@# is\\\" the\\\" \nvalue\"\n    "),
             vec![
                 "Test".to_string(),
                 "field".to_string(),
