@@ -173,7 +173,7 @@ pub struct EntityImageParams {
 
 #[utoipa::path(
     post,
-    path = "/beta/api/search",
+    path = "/beta/api/entity_image",
     request_body(content = ApiSearchQuery),
     responses(
         (status = 200, description = "Search results", body = ApiSearchResult),
