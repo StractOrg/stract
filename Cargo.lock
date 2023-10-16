@@ -1976,8 +1976,21 @@ dependencies = [
  "console",
  "lazy_static",
  "number_prefix 0.4.0",
- "rayon",
  "regex",
+]
+
+[[package]]
+name = "indicatif"
+version = "0.17.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+dependencies = [
+ "console",
+ "instant",
+ "number_prefix 0.4.0",
+ "portable-atomic",
+ "rayon",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3149,6 +3162,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "portable-atomic"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31114a898e107c51bb1609ffaf55a0e011cf6a4d7f1170d0015a165082c0338b"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4297,7 +4316,7 @@ dependencies = [
  "hashbrown 0.14.0",
  "http",
  "image",
- "indicatif 0.16.2",
+ "indicatif 0.17.7",
  "insta",
  "itertools 0.10.5",
  "kuchiki",
