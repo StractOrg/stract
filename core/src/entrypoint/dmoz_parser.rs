@@ -53,45 +53,47 @@ impl<R: BufRead> Iterator for PageIterator<R> {
         let mut inside_topic = false;
         let mut inside_desc = false;
 
-        while let Ok(event) = self.reader.read_event(&mut self.buf) {
+        while let Ok(event) = self.reader.read_event_into(&mut self.buf) {
             match event {
-                Event::Start(ref e) if e.name() == b"ExternalPage" => {
+                Event::Start(ref e) if e.name().as_ref() == b"ExternalPage" => {
                     let url_attr = e
                         .attributes()
                         .filter(std::result::Result::is_ok)
-                        .find(|attr| attr.as_ref().unwrap().key == b"about")
+                        .find(|attr| attr.as_ref().unwrap().key.as_ref() == b"about")
                         .unwrap()
                         .unwrap();
-                    let url = self.reader.decode(&url_attr.value).unwrap().to_string();
-                    current_page = Some(Page::new(url));
+                    let url = url_attr.decode_and_unescape_value(&self.reader).unwrap();
+                    current_page = Some(Page::new(url.into_owned()));
                     inside_desc = false;
                     inside_topic = false;
                 }
-                Event::End(ref e) if e.name() == b"ExternalPage" => break,
-                Event::Start(ref e) if e.name() == b"topic" && current_page.is_some() => {
+                Event::End(ref e) if e.name().as_ref() == b"ExternalPage" => break,
+                Event::Start(ref e) if e.name().as_ref() == b"topic" && current_page.is_some() => {
                     inside_topic = true;
                 }
-                Event::End(ref e) if e.name() == b"topic" && current_page.is_some() => {
+                Event::End(ref e) if e.name().as_ref() == b"topic" && current_page.is_some() => {
                     inside_topic = false;
                 }
-                Event::Start(ref e) if e.name() == b"d:Description" && current_page.is_some() => {
+                Event::Start(ref e)
+                    if e.name().as_ref() == b"d:Description" && current_page.is_some() =>
+                {
                     inside_desc = true;
                 }
-                Event::End(ref e) if e.name() == b"d:Description" && current_page.is_some() => {
+                Event::End(ref e)
+                    if e.name().as_ref() == b"d:Description" && current_page.is_some() =>
+                {
                     inside_desc = false;
                 }
                 Event::Text(ref e) => {
                     if inside_topic {
                         if let Some(page) = &mut current_page {
-                            let bytes = e.unescaped().unwrap();
-                            let topic = self.reader.decode(&bytes).unwrap();
-                            page.topic.push_str(topic);
+                            let topic = e.unescape().unwrap();
+                            page.topic.push_str(topic.as_ref());
                         }
                     } else if inside_desc {
                         if let Some(page) = &mut current_page {
-                            let bytes = e.unescaped().unwrap();
-                            let desc = self.reader.decode(&bytes).unwrap();
-                            page.description.push_str(desc);
+                            let desc = e.unescape().unwrap();
+                            page.description.push_str(desc.as_ref());
                         }
                     }
                 }
