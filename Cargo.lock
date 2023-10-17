@@ -2416,15 +2416,6 @@ dependencies = [
 
 [[package]]
 name = "memmap2"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "memmap2"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deaba38d7abf1d4cca21cc89e932e542ba2b9258664d2a9ef0e61512039c9375"
@@ -4292,7 +4283,7 @@ dependencies = [
  "maplit",
  "md5",
  "memmap",
- "memmap2 0.5.10",
+ "memmap2",
  "mime",
  "min-max-heap",
  "num_cpus",
@@ -4472,7 +4463,7 @@ dependencies = [
  "lru",
  "lz4_flex",
  "measure_time",
- "memmap2 0.9.0",
+ "memmap2",
  "murmurhash32",
  "num_cpus",
  "once_cell",
