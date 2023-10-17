@@ -16,9 +16,12 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Mutex},
 };
 
+use anyhow::Result;
 use std::sync::atomic::Ordering;
 
 use bitvec::vec::BitVec;
@@ -82,17 +85,114 @@ impl JankyBloomFilter {
     }
 }
 
-fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
+struct Db<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned,
+    V: serde::Serialize + serde::de::DeserializeOwned,
+{
+    db: rocksdb::DB,
+    path: PathBuf,
+    _cache: rocksdb::Cache,
+    _phantom: std::marker::PhantomData<(K, V)>,
+}
+
+impl<K, V> Db<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned,
+    V: serde::Serialize + serde::de::DeserializeOwned,
+{
+    fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref())?;
+        }
+
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+
+        options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
+        options.set_max_subcompactions(8);
+
+        let cache = rocksdb::Cache::new_lru_cache(20 * 1024 * 1024 * 1024); // 20 gb
+
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        options.set_level_compaction_dynamic_level_bytes(true);
+        options.set_bytes_per_sync(1048576);
+        let mut block_options = rocksdb::BlockBasedOptions::default();
+        block_options.set_block_size(16 * 1024);
+        block_options.set_format_version(5);
+        block_options.set_cache_index_and_filter_blocks(true);
+        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
+        block_options.set_ribbon_filter(10.0);
+        block_options.set_block_cache(&cache);
+
+        options.set_block_based_table_factory(&block_options);
+        options.set_compression_type(rocksdb::DBCompressionType::None);
+
+        options.optimize_for_point_lookup(512); // 512 MB
+
+        let db = rocksdb::DB::open(&options, &path)?;
+
+        Ok(Self {
+            db,
+            path: path.as_ref().to_path_buf(),
+            _cache: cache,
+            _phantom: std::marker::PhantomData,
+        })
+    }
+
+    fn get(&self, key: &K) -> Option<V> {
+        let key_bytes = bincode::serialize(key).expect("failed to serialize key");
+
+        self.db
+            .get(key_bytes)
+            .expect("failed to retrieve key")
+            .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize stored value"))
+    }
+
+    fn insert(&self, key: &K, value: &V) {
+        let key = bincode::serialize(key).expect("failed to serialize key");
+        let value = bincode::serialize(value).expect("failed to serialize value");
+
+        self.db.put(key, value).expect("failed to insert key");
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+        self.db.iterator(rocksdb::IteratorMode::Start).map(|s| {
+            let (key, value) = s.expect("failed to iterate over db");
+            (
+                bincode::deserialize(&key).expect("failed to deserialize key"),
+                bincode::deserialize(&value).expect("failed to deserialize value"),
+            )
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+fn calculate_centrality<P: AsRef<Path>>(
+    graph: &Webgraph,
+    calculation_path: P,
+) -> BTreeMap<NodeID, f64> {
     let mut num_nodes = 0;
 
-    let mut counters: BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = BTreeMap::new();
+    let mut counters: Db<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = Db::open(
+        calculation_path
+            .as_ref()
+            .join(uuid::Uuid::new_v4().to_string()),
+    )
+    .unwrap();
+
     let mut centralities: BTreeMap<NodeID, KahanSum> = BTreeMap::new();
 
     for node in graph.nodes() {
         let mut counter = HyperLogLog::default();
         counter.add(node.bit_64());
 
-        counters.insert(node, counter);
+        counters.insert(&node, &counter);
         centralities.insert(node, KahanSum::default());
 
         num_nodes += 1;
@@ -119,7 +219,16 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             break;
         }
 
-        let mut new_counters: BTreeMap<_, _> = counters.clone();
+        let new_counters: Db<_, _> = Db::open(
+            calculation_path
+                .as_ref()
+                .join(uuid::Uuid::new_v4().to_string()),
+        )
+        .unwrap();
+
+        for (node, counter) in counters.iter() {
+            new_counters.insert(&node, &counter);
+        }
 
         has_changes.store(false, Ordering::Relaxed);
         let new_changed_nodes = Mutex::new(JankyBloomFilter::new(num_nodes as u64, 0.05));
@@ -131,8 +240,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 
             exact_changed_nodes.iter().for_each(|changed_node| {
                 for edge in graph.raw_outgoing_edges(changed_node) {
-                    if let (Some(counter_to), Some(counter_from)) =
-                        (new_counters.get_mut(&edge.to), counters.get(&edge.from))
+                    if let (Some(mut counter_to), Some(counter_from)) =
+                        (new_counters.get(&edge.to), counters.get(&edge.from))
                     {
                         if counter_to
                             .registers()
@@ -140,7 +249,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .zip(counter_from.registers().iter())
                             .any(|(to, from)| *from > *to)
                         {
-                            counter_to.merge(counter_from);
+                            counter_to.merge(&counter_from);
+                            new_counters.insert(&edge.to, &counter_to);
                             new_changed_nodes.lock().unwrap().insert(edge.to.bit_64());
 
                             new_exact_changed_nodes.insert(edge.to);
@@ -156,8 +266,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             exact_changed_nodes = BTreeSet::default();
             graph.edges().for_each(|edge| {
                 if changed_nodes.contains(&edge.from.bit_64()) {
-                    if let (Some(counter_to), Some(counter_from)) =
-                        (new_counters.get_mut(&edge.to), counters.get(&edge.from))
+                    if let (Some(mut counter_to), Some(counter_from)) =
+                        (new_counters.get(&edge.to), counters.get(&edge.from))
                     {
                         if counter_to
                             .registers()
@@ -165,7 +275,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .zip(counter_from.registers().iter())
                             .any(|(to, from)| *from > *to)
                         {
-                            counter_to.merge(counter_from);
+                            counter_to.merge(&counter_from);
+                            new_counters.insert(&edge.to, &counter_to);
                             new_changed_nodes.lock().unwrap().insert(edge.to.bit_64());
 
                             if exact_counting {
@@ -195,7 +306,9 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         });
 
         counters = new_counters;
+        let old_path = counters.path().to_path_buf();
         changed_nodes = new_changed_nodes.into_inner().unwrap();
+        std::fs::remove_dir_all(old_path).unwrap();
         t += 1;
 
         if changed_nodes.estimate_card() <= exact_counting_threshold {
@@ -218,8 +331,8 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 pub struct HarmonicCentrality(BTreeMap<NodeID, f64>);
 
 impl HarmonicCentrality {
-    pub fn calculate(graph: &Webgraph) -> Self {
-        Self(calculate_centrality(graph))
+    pub fn calculate<P: AsRef<Path>>(graph: &Webgraph, path: P) -> Self {
+        Self(calculate_centrality(graph, path))
     }
 
     pub fn get(&self, node: &NodeID) -> Option<f64> {
@@ -351,7 +464,7 @@ mod tests {
 
         let graph = writer.finalize();
 
-        let centrality = HarmonicCentrality::calculate(&graph);
+        let centrality = HarmonicCentrality::calculate(&graph, crate::gen_temp_path());
 
         assert!(
             centrality.get(&Node::from("B.com").id()).unwrap()
@@ -362,7 +475,7 @@ mod tests {
     #[test]
     fn harmonic_centrality() {
         let graph = test_graph();
-        let centrality = HarmonicCentrality::calculate(&graph);
+        let centrality = HarmonicCentrality::calculate(&graph, crate::gen_temp_path());
 
         assert!(
             centrality.get(&Node::from("C").id()).unwrap()
@@ -378,7 +491,7 @@ mod tests {
     #[test]
     fn additional_edges_ignored() {
         let graph = test_graph();
-        let centrality = HarmonicCentrality::calculate(&graph);
+        let centrality = HarmonicCentrality::calculate(&graph, crate::gen_temp_path());
 
         let mut other = WebgraphWriter::new(
             crate::gen_temp_path(),
@@ -407,7 +520,7 @@ mod tests {
 
         let graph = other.finalize();
 
-        let centrality_extra = HarmonicCentrality::calculate(&graph);
+        let centrality_extra = HarmonicCentrality::calculate(&graph, crate::gen_temp_path());
 
         assert_eq!(centrality.0, centrality_extra.0);
     }

@@ -18,6 +18,8 @@
 // It seemed a bit excessive to add another dependency just for hyperloglog
 // but huge credits to the authors of that crate.
 
+use serde::{Deserialize, Serialize};
+
 pub(crate) const THRESHOLD_DATA_OFFSET: usize = 4;
 pub(crate) const THRESHOLD_DATA_VEC: &[usize] = &[
     10,     // b = 4
@@ -4293,7 +4295,7 @@ const ONE_OVER_POWER_OF_TWO: [f64; 256] = [
     1.727233711018889e-77,
 ];
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HyperLogLog<const N: usize> {
     registers: Vec<u8>,
 }

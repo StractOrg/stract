@@ -129,7 +129,8 @@ impl CentralityStore {
     pub fn build_harmonic<P: AsRef<Path>>(graph: &Webgraph, output_path: P) -> Self {
         let store = CentralityStore::open(output_path.as_ref());
 
-        let harmonic_centrality = HarmonicCentrality::calculate(graph);
+        let harmonic_centrality =
+            HarmonicCentrality::calculate(graph, output_path.as_ref().join("calculations"));
         Self::store_harmonic(&output_path, &store, harmonic_centrality, graph);
 
         store.flush();
