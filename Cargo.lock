@@ -4289,7 +4289,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
- "torch-sys",
  "tower-http",
  "tracing",
  "tracing-subscriber",
