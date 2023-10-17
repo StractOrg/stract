@@ -74,7 +74,6 @@ rand = {workspace = true}
 rayon = {workspace = true}
 regex = {workspace = true}
 reqwest = {workspace = true}
-reqwest-eventsource = {workspace = true}
 ring = {workspace = true}
 rio_api = {workspace = true}
 rio_turtle = {workspace = true}
