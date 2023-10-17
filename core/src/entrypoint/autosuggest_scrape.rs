@@ -60,6 +60,7 @@ fn suggestions(query: &str, gl: &str) -> Result<Vec<String>> {
     Ok(suggestions)
 }
 
+#[derive(Clone)]
 pub enum Gl {
     Us,
 }

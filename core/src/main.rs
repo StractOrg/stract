@@ -101,10 +101,10 @@ enum Commands {
     /// Setup dev environment.
     #[cfg(feature = "dev")]
     Configure {
-        #[clap(long, takes_value = false)]
+        #[clap(long)]
         skip_download: bool,
 
-        #[clap(long, takes_value = false)]
+        #[clap(long)]
         alice: bool,
     },
 }
