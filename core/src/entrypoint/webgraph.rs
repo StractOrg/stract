@@ -19,7 +19,7 @@ use crate::{
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
     webgraph::{self, Node, WebgraphWriter},
-    webpage::{url_ext::UrlExt, Html},
+    webpage::Html,
     Result,
 };
 use itertools::Itertools;

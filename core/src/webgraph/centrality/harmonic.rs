@@ -15,15 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{atomic::AtomicBool, Mutex},
 };
 
 use std::sync::atomic::Ordering;
 
 use bitvec::vec::BitVec;
-use dashmap::{DashMap, DashSet};
-use rayon::prelude::*;
 use tracing::info;
 
 use crate::{
@@ -87,8 +85,8 @@ impl JankyBloomFilter {
 fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let mut num_nodes = 0;
 
-    let mut counters: DashMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = DashMap::new();
-    let centralities: DashMap<NodeID, KahanSum> = DashMap::new();
+    let mut counters: BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = BTreeMap::new();
+    let mut centralities: BTreeMap<NodeID, KahanSum> = BTreeMap::new();
 
     for node in graph.nodes() {
         let mut counter = HyperLogLog::default();
@@ -114,14 +112,14 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let has_changes = AtomicBool::new(true);
     let mut t = 0;
 
-    let mut exact_changed_nodes: DashSet<NodeID> = DashSet::default();
+    let mut exact_changed_nodes: BTreeSet<NodeID> = BTreeSet::default();
 
     loop {
         if !has_changes.load(Ordering::Relaxed) {
             break;
         }
 
-        let new_counters: DashMap<_, _> = counters.clone();
+        let mut new_counters: BTreeMap<_, _> = counters.clone();
 
         has_changes.store(false, Ordering::Relaxed);
         let new_changed_nodes = Mutex::new(JankyBloomFilter::new(num_nodes as u64, 0.05));
@@ -129,11 +127,11 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         if !exact_changed_nodes.is_empty()
             && exact_changed_nodes.len() as u64 <= exact_counting_threshold
         {
-            let new_exact_changed_nodes = DashSet::default();
+            let mut new_exact_changed_nodes = BTreeSet::default();
 
-            exact_changed_nodes.par_iter().for_each(|changed_node| {
-                for edge in graph.raw_outgoing_edges(&changed_node) {
-                    if let (Some(mut counter_to), Some(counter_from)) =
+            exact_changed_nodes.iter().for_each(|changed_node| {
+                for edge in graph.raw_outgoing_edges(changed_node) {
+                    if let (Some(counter_to), Some(counter_from)) =
                         (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {
                         if counter_to
@@ -142,7 +140,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .zip(counter_from.registers().iter())
                             .any(|(to, from)| *from > *to)
                         {
-                            counter_to.merge(&counter_from);
+                            counter_to.merge(counter_from);
                             new_changed_nodes.lock().unwrap().insert(edge.to.bit_64());
 
                             new_exact_changed_nodes.insert(edge.to);
@@ -155,10 +153,10 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 
             exact_changed_nodes = new_exact_changed_nodes;
         } else {
-            exact_changed_nodes = DashSet::default();
-            graph.par_edges().for_each(|edge| {
+            exact_changed_nodes = BTreeSet::default();
+            graph.edges().for_each(|edge| {
                 if changed_nodes.contains(&edge.from.bit_64()) {
-                    if let (Some(mut counter_to), Some(counter_from)) =
+                    if let (Some(counter_to), Some(counter_from)) =
                         (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {
                         if counter_to
@@ -167,7 +165,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .zip(counter_from.registers().iter())
                             .any(|(to, from)| *from > *to)
                         {
-                            counter_to.merge(&counter_from);
+                            counter_to.merge(counter_from);
                             new_changed_nodes.lock().unwrap().insert(edge.to.bit_64());
 
                             if exact_counting {
@@ -181,8 +179,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             })
         }
 
-        centralities.par_iter_mut().for_each(|mut r| {
-            let (node, score) = r.pair_mut();
+        centralities.iter_mut().for_each(|(node, score)| {
             *score += new_counters
                 .get(node)
                 .map(|counter| counter.size())
