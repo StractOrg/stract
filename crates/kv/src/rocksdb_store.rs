@@ -22,7 +22,7 @@ use rocksdb::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::kv::Kv;
+use crate::Kv;
 
 pub struct RocksDbStore<K, V>
 where

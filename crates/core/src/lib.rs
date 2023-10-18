@@ -53,7 +53,6 @@ mod image_store;
 mod improvement;
 pub mod index;
 mod kahan_sum;
-mod kv;
 #[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;

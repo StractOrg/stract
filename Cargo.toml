@@ -47,6 +47,7 @@ insta = "1.31"
 intmap = { path = "lib/intmap" }
 itertools = "0.11.0"
 kuchiki = { path = "./lib/kuchiki" }
+kv = { path = "./crates/kv" }
 lalrpop = {version = "0.20.0", features = ["lexer"]}
 lalrpop-util = {version = "0.20.0", features = ["lexer"]}
 leaky_queue = { path = "./lib/leaky_queue" }

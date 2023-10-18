@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    kv::{rocksdb_store::RocksDbStore, Kv},
     prehashed::{hash, Prehashed},
     webpage::url_ext::UrlExt,
 };
+use kv::{rocksdb_store::RocksDbStore, Kv};
 use std::{collections::HashSet, path::Path};
 use url::Url;
 

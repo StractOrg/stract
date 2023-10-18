@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::{anyhow, Result};
+use kv::{rocksdb_store::RocksDbStore, Kv};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::{
@@ -27,7 +28,6 @@ use crate::webgraph::centrality::{top_hosts, TopHosts};
 use crate::{
     config::CrawlPlannerConfig,
     crawler::{file_queue::FileQueueWriter, Job},
-    kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{NodeID, Webgraph},
 };
 

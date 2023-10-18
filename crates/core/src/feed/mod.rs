@@ -16,13 +16,13 @@
 
 use std::path::Path;
 
-use crate::tokenizer::{SiteOperatorUrlTokenizer, Tokenizer};
 use anyhow::Result;
 use tantivy::{
     query::{PhraseQuery, TermQuery},
     schema::{IndexRecordOption, TextFieldIndexing, TextOptions, Value},
     tokenizer::Tokenizer as TantivyTokenizer,
 };
+use tokenizer::{SiteOperatorUrlTokenizer, Tokenizer};
 use url::Url;
 
 pub mod scheduler;

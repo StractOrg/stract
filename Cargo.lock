@@ -2101,6 +2101,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kv"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "rocksdb",
+ "serde",
+]
+
+[[package]]
 name = "lalrpop"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4291,6 +4300,7 @@ dependencies = [
  "intmap",
  "itertools 0.11.0",
  "kuchiki",
+ "kv",
  "lalrpop",
  "lalrpop-util",
  "leaky_queue",

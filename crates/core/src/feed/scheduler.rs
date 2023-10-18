@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use hashbrown::{HashMap, HashSet};
+use kv::rocksdb_store::RocksDbStore;
 use url::Url;
 
 use crate::{
-    kv::rocksdb_store::RocksDbStore,
     webgraph::{
         centrality::{top_hosts, TopHosts},
         NodeID, Webgraph,

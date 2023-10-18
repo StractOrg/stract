@@ -23,6 +23,7 @@ use std::{
 };
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
+use kv::{rocksdb_store::RocksDbStore, Kv};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::TopDocs,
@@ -38,7 +39,6 @@ use url::Url;
 use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
-    kv::{rocksdb_store::RocksDbStore, Kv},
     Result,
 };
 

@@ -19,12 +19,12 @@
 //! derive a centrality measure for the page graph.
 
 use anyhow::Result;
+use kv::{rocksdb_store::RocksDbStore, Kv};
 use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
 use crate::{
     bloom::BloomFilter,
-    kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{NodeID, Webgraph},
 };
 

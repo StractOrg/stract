@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
+use kv::{rocksdb_store::RocksDbStore, Kv};
 use std::{cmp::Reverse, collections::BinaryHeap, fs::File, path::Path};
 
 use crate::{
-    kv::{rocksdb_store::RocksDbStore, Kv},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{
         centrality::{derived_harmonic::DerivedCentrality, harmonic::HarmonicCentrality},
