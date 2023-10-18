@@ -481,12 +481,12 @@ impl<R: Read> Iterator for RecordIterator<R> {
 
 pub struct WarcWriter {
     num_writes: usize,
-    buf: Vec<u8>,
+    writer: GzEncoder<Vec<u8>>,
 }
 
 impl WarcWriter {
     pub fn new() -> Self {
-        let mut writer = GzEncoder::new(Vec::new(), Compression::best());
+        let mut writer = GzEncoder::new(Default::default(), Compression::best());
 
         writer.write_all("WARC/1.0\r\n".as_bytes()).unwrap();
         writer
@@ -505,57 +505,59 @@ impl WarcWriter {
         writer.write_all("\r\n\r\n".as_bytes()).unwrap();
 
         writer.flush().unwrap();
-        let buf = writer.finish().unwrap();
 
-        Self { num_writes: 0, buf }
+        Self {
+            num_writes: 0,
+            writer,
+        }
     }
 
     pub fn write(&mut self, record: &WarcRecord) -> Result<()> {
-        let mut writer = GzEncoder::new(Vec::new(), Compression::best());
+        self.writer.write_all("WARC/1.0\r\n".as_bytes())?;
 
-        writer.write_all("WARC/1.0\r\n".as_bytes())?;
+        self.writer.write_all("WARC-Type: request\r\n".as_bytes())?;
+        self.writer
+            .write_all(format!("WARC-Target-URI: {}\r\n", record.request.url).as_bytes())?;
+        self.writer.write_all("Content-Length: 0\r\n".as_bytes())?;
+        self.writer.write_all("\r\n".as_bytes())?;
+        self.writer.write_all("\r\n\r\n".as_bytes())?;
 
-        writer.write_all("WARC-Type: request\r\n".as_bytes())?;
-        writer.write_all(format!("WARC-Target-URI: {}\r\n", record.request.url).as_bytes())?;
-        writer.write_all("Content-Length: 0\r\n".as_bytes())?;
-        writer.write_all("\r\n".as_bytes())?;
-        writer.write_all("\r\n\r\n".as_bytes())?;
-
-        writer.write_all("WARC/1.0\r\n".as_bytes())?;
-        writer.write_all("WARC-Type: response\r\n".as_bytes())?;
+        self.writer.write_all("WARC/1.0\r\n".as_bytes())?;
+        self.writer
+            .write_all("WARC-Type: response\r\n".as_bytes())?;
 
         if let Some(payload_type) = &record.response.payload_type {
-            writer.write_all(
+            self.writer.write_all(
                 format!("WARC-Identified-Payload-Type: {}\r\n", payload_type).as_bytes(),
             )?;
         }
 
         let body = record.response.body.as_bytes();
         let content_len = body.len() + 4; // +4 is for the \r\n\r\n between http header and body
-        writer.write_all(format!("Content-Length: {content_len}\r\n").as_bytes())?;
+        self.writer
+            .write_all(format!("Content-Length: {content_len}\r\n").as_bytes())?;
 
-        writer.write_all("\r\n".as_bytes())?;
+        self.writer.write_all("\r\n".as_bytes())?;
         // write the http-header here if we want to in the future
-        writer.write_all("\r\n\r\n".as_bytes())?;
+        self.writer.write_all("\r\n\r\n".as_bytes())?;
 
-        writer.write_all(body)?;
-        writer.write_all("\r\n\r\n".as_bytes())?;
+        self.writer.write_all(body)?;
+        self.writer.write_all("\r\n\r\n".as_bytes())?;
 
-        writer.write_all("WARC/1.0\r\n".as_bytes())?;
-        writer.write_all("WARC-Type: metadata\r\n".as_bytes())?;
+        self.writer.write_all("WARC/1.0\r\n".as_bytes())?;
+        self.writer
+            .write_all("WARC-Type: metadata\r\n".as_bytes())?;
 
         let body = format!("fetchTimeMs: {}", record.metadata.fetch_time_ms);
         let content_len = body.len();
 
-        writer.write_all(format!("Content-Length: {content_len}\r\n").as_bytes())?;
-        writer.write_all("\r\n".as_bytes())?;
-        writer.write_all(body.as_bytes())?;
-        writer.write_all("\r\n\r\n".as_bytes())?;
+        self.writer
+            .write_all(format!("Content-Length: {content_len}\r\n").as_bytes())?;
+        self.writer.write_all("\r\n".as_bytes())?;
+        self.writer.write_all(body.as_bytes())?;
+        self.writer.write_all("\r\n\r\n".as_bytes())?;
 
-        writer.flush().unwrap();
-        let bytes = writer.finish()?;
-
-        self.buf.extend_from_slice(&bytes);
+        self.writer.flush().unwrap();
 
         self.num_writes += 1;
 
@@ -563,11 +565,11 @@ impl WarcWriter {
     }
 
     pub fn finish(self) -> Result<Vec<u8>> {
-        Ok(self.buf)
+        Ok(self.writer.finish()?)
     }
 
     pub fn num_bytes(&self) -> usize {
-        self.buf.len()
+        self.writer.get_ref().len()
     }
 
     pub fn num_writes(&self) -> usize {
