@@ -34,7 +34,7 @@ dashmap = {version = "5.4.0", features = ["rayon"]}
 encoding_rs = "0.8.31"
 eventsource-stream = "0.2.3"
 fend-core = "1.2.2"
-flate2 = "1.0.23"
+flate2 = "1.0.28"
 fst = {version = "0.4.7", features = ["levenshtein"]}
 futures = "0.3.21"
 half = {version = "2.2.1", features = ["serde"]}
@@ -106,3 +106,6 @@ utoipa = {version = "4.0.0", features = ["axum_extras"]}
 utoipa-swagger-ui = {version = "4.0.0", features = ["axum"]}
 uuid = "1.1.2"
 whatlang = "0.16.0"
+
+[profile.test.package]
+flate2.opt-level = 3
