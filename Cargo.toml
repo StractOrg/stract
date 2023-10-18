@@ -42,6 +42,7 @@ futures = "0.3.21"
 half = {version = "2.2.1", features = ["serde"]}
 hashbrown = {version = "0.14.0", features = ["serde", "rkyv"]}
 http = "0.2.8"
+hyperloglog = { path = "./crates/hyperloglog" }
 image = "0.24.3"
 imager = { path = "./crates/imager" }
 indicatif = {version = "0.17.7", features = ["rayon"]}

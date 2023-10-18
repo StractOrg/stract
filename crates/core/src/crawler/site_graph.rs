@@ -17,9 +17,10 @@
 //! In-memory graph that the worker constructs for the site during crawl.
 
 use hashbrown::{HashMap, HashSet};
+use hyperloglog::HyperLogLog;
 use url::Url;
 
-use crate::{hyperloglog::HyperLogLog, kahan_sum::KahanSum};
+use crate::kahan_sum::KahanSum;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Node {

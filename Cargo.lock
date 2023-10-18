@@ -1794,6 +1794,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperloglog"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4259,6 +4266,7 @@ dependencies = [
  "half 2.3.1",
  "hashbrown 0.14.1",
  "http",
+ "hyperloglog",
  "image",
  "imager",
  "indicatif 0.17.7",

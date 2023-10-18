@@ -22,10 +22,10 @@ use std::{
 use std::sync::atomic::Ordering;
 
 use crate::bloom::BloomFilter;
+use hyperloglog::HyperLogLog;
 use tracing::info;
 
 use crate::{
-    hyperloglog::HyperLogLog,
     kahan_sum::KahanSum,
     webgraph::{NodeID, Webgraph},
 };

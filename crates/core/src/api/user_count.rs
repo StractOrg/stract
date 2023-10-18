@@ -18,11 +18,11 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::{NaiveDateTime, Utc};
+use hyperloglog::HyperLogLog;
 use ring::rand::SecureRandom;
 use ring::{digest, pbkdf2, rand};
 use std::sync::Mutex;
 
-use crate::hyperloglog::HyperLogLog;
 use crate::metrics::Counter;
 
 pub trait Frequency: Clone + Copy + Default {

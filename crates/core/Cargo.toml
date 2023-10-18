@@ -49,6 +49,7 @@ futures = {workspace = true}
 half = {workspace = true}
 hashbrown = {workspace = true}
 http = {workspace = true}
+hyperloglog.workspace = true
 image = {workspace = true}
 imager.workspace = true
 indicatif = {workspace = true}
