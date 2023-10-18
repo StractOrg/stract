@@ -238,7 +238,7 @@ mod tests {
     use crate::{
         gen_temp_path,
         index::Index,
-        ranking::centrality_store::CentralityStore,
+        ranking::inbound_similarity::InboundSimilarity,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
@@ -658,8 +658,6 @@ mod tests {
 
         let graph = writer.finalize();
 
-        let centrality_store = CentralityStore::build(&graph, gen_temp_path());
-
         index
             .insert(Webpage {
                 html: Html::parse(
@@ -755,7 +753,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let mut searcher = LocalSearcher::from(index);
 
-        searcher.set_centrality_store(centrality_store.into());
+        searcher.set_inbound_similarity(InboundSimilarity::build(&graph));
 
         let res = searcher
             .search(&SearchQuery {

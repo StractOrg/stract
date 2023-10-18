@@ -15,4 +15,5 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod betweenness;
+pub mod derived_harmonic;
 pub mod harmonic;

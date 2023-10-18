@@ -26,10 +26,11 @@ use tracing::{debug, info, trace, warn};
 use crate::config;
 use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
+use crate::kv::rocksdb_store::RocksDbStore;
+use crate::kv::Kv;
 use crate::mapreduce::{Map, Reduce, Worker};
-use crate::ranking::centrality_store::IndexerCentralityStore;
 use crate::ranking::SignalAggregator;
-use crate::webgraph::{Node, Webgraph, WebgraphBuilder};
+use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use crate::webpage::{safety_classifier, Html, Webpage};
 use crate::{human_website_annotations, Result};
 
@@ -72,8 +73,8 @@ pub struct Job {
 }
 
 pub struct IndexingWorker {
-    host_centrality_store: IndexerCentralityStore,
-    page_centrality_store: Option<IndexerCentralityStore>,
+    host_centrality_store: RocksDbStore<NodeID, f64>,
+    page_centrality_store: Option<RocksDbStore<NodeID, f64>>,
     webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
     safety_classifier: Option<safety_classifier::Model>,
@@ -88,8 +89,11 @@ impl IndexingWorker {
         safety_classifier_path: Option<String>,
     ) -> Self {
         Self {
-            host_centrality_store: IndexerCentralityStore::open(host_centrality_store_path),
-            page_centrality_store: page_centrality_store_path.map(IndexerCentralityStore::open),
+            host_centrality_store: RocksDbStore::open(
+                Path::new(&host_centrality_store_path).join("harmonic"),
+            ),
+            page_centrality_store: page_centrality_store_path
+                .map(|p| RocksDbStore::open(Path::new(&p).join("derived_harmonic"))),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
             safety_classifier: safety_classifier_path
@@ -148,7 +152,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
             let mut host_centrality = worker
                 .host_centrality_store
-                .harmonic
                 .get(&host_node_id)
                 .unwrap_or_default();
 
@@ -194,7 +197,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
             if let Some(store) = worker.page_centrality_store.as_ref() {
                 let node_id = node.id();
 
-                page_centrality = store.harmonic.get(&node_id).unwrap_or_default();
+                page_centrality = store.get(&node_id).unwrap_or_default();
             }
 
             if host_centrality > 0.0 {

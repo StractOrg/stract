@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use stract::{
-    ranking::centrality_store::CentralityStore,
+    ranking::inbound_similarity::InboundSimilarity,
     similar_sites::{ScoredNode, SimilarSitesFinder},
     webgraph::WebgraphBuilder,
 };
@@ -40,11 +40,11 @@ fn print_top_nodes(liked_sites: &[&str], top_n: usize, similarity_finder: &Simil
 pub fn main() {
     const TOP_N: usize = 50;
     let graph = WebgraphBuilder::new("data/webgraph").open();
-    let store = CentralityStore::open("data/centrality");
+    let inbound_similarity = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
 
     let similarity_finder = SimilarSitesFinder::new(
         graph.into(),
-        store.inbound_similarity,
+        inbound_similarity,
         stract::config::defaults::WebgraphServer::max_similar_sites(),
     );
 

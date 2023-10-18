@@ -27,7 +27,7 @@ use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
-use crate::ranking::centrality_store::SearchCentralityStore;
+use crate::ranking::inbound_similarity::InboundSimilarity;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::models::lambdamart::LambdaMART;
@@ -49,7 +49,7 @@ pub struct LocalSearcher {
     index: Index,
     spell: Option<Spell>,
     entity_index: Option<EntityIndex>,
-    centrality_store: Option<SearchCentralityStore>,
+    inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
     collector_config: CollectorConfig,
@@ -76,7 +76,7 @@ impl LocalSearcher {
             index,
             spell: None,
             entity_index: None,
-            centrality_store: None,
+            inbound_similarity: None,
             linear_regression: None,
             lambda_model: None,
             collector_config: CollectorConfig::default(),
@@ -91,8 +91,8 @@ impl LocalSearcher {
         self.entity_index = Some(entity_index);
     }
 
-    pub fn set_centrality_store(&mut self, centrality_store: SearchCentralityStore) {
-        self.centrality_store = Some(centrality_store);
+    pub fn set_inbound_similarity(&mut self, inbound: InboundSimilarity) {
+        self.inbound_similarity = Some(inbound);
     }
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
@@ -145,7 +145,7 @@ impl LocalSearcher {
         ranker.de_rank_similar(de_rank_similar);
 
         if query_centrality_coeff > 0.0 {
-            if let Some(centrality_store) = self.centrality_store.as_ref() {
+            if let Some(inbound_sim) = self.inbound_similarity.as_ref() {
                 ranker = ranker
                     .with_max_docs(1_000, self.index.num_segments())
                     .with_num_results(100);
@@ -155,10 +155,7 @@ impl LocalSearcher {
                         .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
 
                 if !top_host_nodes.is_empty() {
-                    let inbound =
-                        centrality_store
-                            .inbound_similarity
-                            .scorer(&top_host_nodes, &[], false);
+                    let inbound = inbound_sim.scorer(&top_host_nodes, &[], false);
 
                     let query_centrality = query_centrality::Scorer::new(inbound);
 
@@ -192,7 +189,7 @@ impl LocalSearcher {
 
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
 
-        if let Some(store) = &self.centrality_store {
+        if let Some(inbound_sim) = &self.inbound_similarity {
             let liked_sites: Vec<_> = parsed_query
                 .site_rankings()
                 .liked
@@ -209,9 +206,7 @@ impl LocalSearcher {
                 .map(|node| node.id())
                 .collect();
 
-            let scorer = store
-                .inbound_similarity
-                .scorer(&liked_sites, &disliked_sites, false);
+            let scorer = inbound_sim.scorer(&liked_sites, &disliked_sites, false);
 
             aggregator.set_inbound_similarity(scorer);
         }

@@ -1,8 +1,10 @@
+use std::path::Path;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use optics::SiteRankings;
 use stract::{
     index::Index,
-    ranking::centrality_store::CentralityStore,
+    ranking::inbound_similarity::InboundSimilarity,
     searcher::{LocalSearcher, SearchQuery},
 };
 
@@ -39,7 +41,9 @@ macro_rules! bench {
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
     let mut searcher = LocalSearcher::new(index);
-    searcher.set_centrality_store(CentralityStore::open(CENTRALITY_PATH).into());
+    searcher.set_inbound_similarity(
+        InboundSimilarity::open(Path::new(CENTRALITY_PATH).join("inbound_similarity")).unwrap(),
+    );
 
     for _ in 0..1000 {
         bench!("the", searcher, c);

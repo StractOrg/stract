@@ -212,7 +212,6 @@ mod tests {
         gen_temp_path,
         index::Index,
         rand_words,
-        ranking::centrality_store::CentralityStore,
         searcher::{LocalSearcher, SearchQuery},
         webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
@@ -265,9 +264,6 @@ mod tests {
         let graph = wrt.finalize();
 
         let inbound = InboundSimilarity::build(&graph);
-
-        let mut centrality_store = CentralityStore::build(&graph, gen_temp_path());
-        centrality_store.inbound_similarity = inbound;
 
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -335,7 +331,7 @@ mod tests {
         index.commit().unwrap();
 
         let mut searcher = LocalSearcher::new(index);
-        searcher.set_centrality_store(centrality_store.into());
+        searcher.set_inbound_similarity(inbound);
 
         let res = searcher
             .search(&SearchQuery {

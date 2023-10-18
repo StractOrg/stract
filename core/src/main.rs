@@ -55,9 +55,7 @@ enum Commands {
     /// Calculate centrality metrics that estimates a websites importance. These metrics are used to rank search results.
     Centrality {
         #[clap(subcommand)]
-        mode: CentralityType,
-        webgraph_path: String,
-        output_path: String,
+        mode: CentralityMode,
     },
 
     /// Parse the DMOZ dataset. DMOZ contains a list of websites and their categories.
@@ -140,15 +138,18 @@ enum SafetyClassifierOptions {
 }
 
 #[derive(Subcommand)]
-enum CentralityType {
-    /// Calculate all the supported centrality metrics.
-    All,
-    /// Calculate harmonic centrality. Harmonic centrality is the sum of the inverse distance from all
-    /// other nodes to a given node. It is a measure of how central a node (webpage) is in a graph.
-    Harmonic,
-    /// Create an index that can be used to quickly calculate the inbound link similarity between two nodes.
-    /// This is used to calculate the similarity between two webpages.
-    Similarity,
+enum CentralityMode {
+    /// Calculate metrics for the host webgraph.
+    Host {
+        webgraph_path: String,
+        output_path: String,
+    },
+    /// Calculate metrics for the page webgraph.
+    Page {
+        webgraph_path: String,
+        host_centrality_path: String,
+        output_path: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -217,22 +218,24 @@ fn main() -> Result<()> {
                 entrypoint::Indexer::merge(indexes.into_iter().map(IndexPointer::from).collect())?
             }
         },
-        Commands::Centrality {
-            mode,
-            webgraph_path,
-            output_path,
-        } => {
+        Commands::Centrality { mode } => {
             match mode {
-                CentralityType::Harmonic => {
-                    entrypoint::Centrality::build_harmonic(webgraph_path, output_path)
-                }
-                CentralityType::Similarity => {
-                    entrypoint::Centrality::build_similarity(webgraph_path, output_path)
-                }
-                CentralityType::All => {
+                CentralityMode::Host {
+                    webgraph_path,
+                    output_path,
+                } => {
                     entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
                     entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
                 }
+                CentralityMode::Page {
+                    webgraph_path,
+                    host_centrality_path,
+                    output_path,
+                } => entrypoint::Centrality::build_derived_harmonic(
+                    webgraph_path,
+                    host_centrality_path,
+                    output_path,
+                )?,
             }
             tracing::info!("Done");
         }

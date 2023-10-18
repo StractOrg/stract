@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -32,7 +32,7 @@ use crate::{
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{
-        centrality_store::SearchCentralityStore,
+        inbound_similarity::InboundSimilarity,
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
@@ -63,8 +63,8 @@ impl SearchService {
             .entity_index_path
             .map(|path| EntityIndex::open(path).unwrap());
         let centrality_store = config
-            .host_centrality_store_path
-            .map(SearchCentralityStore::open);
+            .centrality_store_path
+            .map(|p| InboundSimilarity::open(Path::new(&p).join("inbound_similarity")).unwrap());
         let search_index = Index::open(config.index_path)?;
 
         let mut local_searcher = LocalSearcher::new(search_index);
@@ -74,7 +74,7 @@ impl SearchService {
         }
 
         if let Some(centrality_store) = centrality_store {
-            local_searcher.set_centrality_store(centrality_store);
+            local_searcher.set_inbound_similarity(centrality_store);
         }
 
         if let Some(model_path) = config.linear_model_path {

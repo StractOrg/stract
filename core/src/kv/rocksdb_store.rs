@@ -24,12 +24,21 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::kv::Kv;
 
-pub struct RocksDbStore {
+pub struct RocksDbStore<K, V>
+where
+    K: Serialize + DeserializeOwned,
+    V: Serialize + DeserializeOwned,
+{
     db: DB,
     _cache: rocksdb::Cache,
+    _phantom: PhantomData<(K, V)>,
 }
 
-impl RocksDbStore {
+impl<K, V> RocksDbStore<K, V>
+where
+    K: Serialize + DeserializeOwned,
+    V: Serialize + DeserializeOwned,
+{
     pub fn open<P>(path: P) -> Self
     where
         P: AsRef<std::path::Path>,
@@ -66,21 +75,30 @@ impl RocksDbStore {
 
         let db = DB::open(&options, path).expect("unable to open rocks db");
 
-        Self { db, _cache: cache }
+        Self {
+            db,
+            _cache: cache,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<K, V> Kv<K, V> for RocksDbStore
+impl<K, V> Kv<K, V> for RocksDbStore<K, V>
 where
-    K: Serialize + DeserializeOwned + 'static,
-    V: Serialize + DeserializeOwned + 'static,
+    K: Serialize + DeserializeOwned + 'static + Send + Sync,
+    V: Serialize + DeserializeOwned + 'static + Send + Sync,
 {
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.db.get(key).expect("failed to retrieve key")
     }
 
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>) {
-        self.db.put(key, value).expect("failed to insert value");
+        let mut opt = rocksdb::WriteOptions::default();
+        opt.disable_wal(true);
+
+        self.db
+            .put_opt(key, value, &opt)
+            .expect("failed to insert value");
     }
 
     fn flush(&self) {

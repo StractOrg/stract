@@ -101,8 +101,17 @@ fn calculate_centrality() {
     let webgraph_path = Path::new(DATA_PATH).join("webgraph_host");
     let out_path = Path::new(DATA_PATH).join("centrality");
 
-    Centrality::build_harmonic(&webgraph_path, &out_path);
-    Centrality::build_similarity(&webgraph_path, &out_path);
+    if !out_path.exists() {
+        Centrality::build_harmonic(&webgraph_path, &out_path);
+        Centrality::build_similarity(&webgraph_path, &out_path);
+    }
+
+    let webgraph_page = Path::new(DATA_PATH).join("webgraph_page");
+    let out_path_page = Path::new(DATA_PATH).join("centrality_page");
+
+    if !out_path_page.exists() {
+        Centrality::build_derived_harmonic(webgraph_page, out_path, out_path_page).unwrap();
+    }
 }
 
 fn create_inverted_index() -> Result<()> {
@@ -132,10 +141,11 @@ fn create_inverted_index() -> Result<()> {
 
     let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");
     let centrality_path = Path::new(DATA_PATH).join("centrality");
+    let page_centrality_path = Path::new(DATA_PATH).join("centrality_page");
 
     let worker = indexer::IndexingWorker::new(
         centrality_path.to_str().unwrap().to_string(),
-        None,
+        Some(page_centrality_path.to_str().unwrap().to_string()),
         Some(webgraph_path.to_str().unwrap().to_string()),
         Some(
             Path::new(DATA_PATH)
