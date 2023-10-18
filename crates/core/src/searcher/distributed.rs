@@ -16,7 +16,6 @@
 
 use crate::{
     entrypoint::search_server::{self, SearchService},
-    image_store::Image,
     inverted_index::{self, RetrievedWebpage},
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
     Result,
@@ -31,6 +30,7 @@ use distributed::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use imager::image_store::Image;
 use rand::seq::SliceRandom;
 use thiserror::Error;
 use url::Url;

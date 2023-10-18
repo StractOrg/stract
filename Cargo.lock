@@ -1896,6 +1896,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "imager"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "distributed",
+ "futures",
+ "image",
+ "kv",
+ "reqwest",
+ "serde",
+ "stdx",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4295,6 +4313,7 @@ dependencies = [
  "hashbrown 0.14.1",
  "http",
  "image",
+ "imager",
  "indicatif 0.17.7",
  "insta",
  "intmap",

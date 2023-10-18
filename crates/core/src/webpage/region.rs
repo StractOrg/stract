@@ -215,7 +215,7 @@ impl RegionCount {
 
 #[cfg(test)]
 mod tests {
-    use crate::gen_temp_path;
+    use stdx::gen_temp_path;
 
     use super::*;
 

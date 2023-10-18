@@ -14,13 +14,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Result;
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageOutputFormat};
+use image::{DynamicImage, ImageError, ImageOutputFormat};
 use kv::{rocksdb_store::RocksDbStore, Kv};
 use serde::{de, ser::SerializeStruct, Serialize};
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("image was not of format: {format:?}")]
+    InvalidImageFormat {
+        source: ImageError,
+        format: image::ImageFormat,
+    },
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Image(DynamicImage);
@@ -184,14 +194,18 @@ impl Image {
         {
             Ok(Self(img))
         } else {
-            Ok(Self(image::load_from_memory_with_format(
-                &bytes,
-                image::ImageFormat::Png,
-            )?))
+            Ok(Self(
+                image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).map_err(
+                    |source| Error::InvalidImageFormat {
+                        source,
+                        format: image::ImageFormat::Png,
+                    },
+                )?,
+            ))
         }
     }
 
-    pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {
+    pub fn as_raw_bytes(&self) -> Vec<u8> {
         let mut cursor = Cursor::new(Vec::new());
         self.0
             .write_to(&mut cursor, ImageOutputFormat::Png)
@@ -233,7 +247,7 @@ mod tests {
             ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
         );
         let key = "test".to_string();
-        let mut store = BaseImageStore::open(crate::gen_temp_path());
+        let mut store = BaseImageStore::open(stdx::gen_temp_path());
 
         assert_eq!(store.get(&key), None);
         store.insert(key.clone(), image.clone());

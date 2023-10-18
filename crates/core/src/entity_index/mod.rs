@@ -23,6 +23,10 @@ use std::{
 };
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
+use imager::{
+    image_downloader::{ImageDownloadJob, ImageDownloader},
+    image_store::{EntityImageStore, Image, ImageStore},
+};
 use kv::{rocksdb_store::RocksDbStore, Kv};
 use serde::{Deserialize, Serialize};
 use tantivy::{
@@ -36,11 +40,7 @@ use tokenizer::Normal;
 use tracing::info;
 use url::Url;
 
-use crate::{
-    image_downloader::{ImageDownloadJob, ImageDownloader},
-    image_store::{EntityImageStore, Image, ImageStore},
-    Result,
-};
+use crate::Result;
 
 use self::entity::{Entity, Link, Span};
 pub(crate) mod entity;
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn stopwords_title_ignored() {
-        let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+        let mut index = EntityIndex::open(stdx::gen_temp_path()).unwrap();
 
         index.insert(Entity {
             title: "the ashes".to_string(),

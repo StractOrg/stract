@@ -836,7 +836,7 @@ mod test {
         //        D
 
         let mut graph = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            stdx::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );
@@ -898,7 +898,7 @@ mod test {
             (Node::from("G"), Node::from("H"), String::new()),
         ] {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                stdx::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
             );
@@ -927,7 +927,7 @@ mod test {
             (Node::from("C"), Node::from("A"), String::new()),
         ] {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                stdx::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
             );
@@ -969,7 +969,7 @@ mod test {
     #[test]
     fn cap_label_length() {
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            stdx::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );

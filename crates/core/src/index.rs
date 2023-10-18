@@ -79,7 +79,7 @@ impl Index {
 
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
-        let path = crate::gen_temp_path();
+        let path = stdx::gen_temp_path();
         Self::open(path)
     }
 

@@ -52,6 +52,7 @@ half = {workspace = true}
 hashbrown = {workspace = true}
 http = {workspace = true}
 image = {workspace = true}
+imager.workspace = true
 indicatif = {workspace = true}
 intmap.workspace = true
 itertools = {workspace = true}

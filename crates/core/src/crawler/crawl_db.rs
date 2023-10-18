@@ -660,8 +660,6 @@ impl CrawlDb {
 
 #[cfg(test)]
 mod tests {
-    use crate::gen_temp_path;
-
     use super::*;
 
     fn insert_seed_urls(urls: &[Url], db: &mut CrawlDb) {
@@ -705,7 +703,7 @@ mod tests {
 
     #[test]
     fn simple_politeness() {
-        let mut db = CrawlDb::open(gen_temp_path()).unwrap();
+        let mut db = CrawlDb::open(stdx::gen_temp_path()).unwrap();
 
         let urls = vec![Url::parse("https://example.com").unwrap()];
         insert_seed_urls(&urls, &mut db);
@@ -727,7 +725,7 @@ mod tests {
 
     #[test]
     fn get_all_urls() {
-        let mut db = CrawlDb::open(gen_temp_path()).unwrap();
+        let mut db = CrawlDb::open(stdx::gen_temp_path()).unwrap();
 
         let urls = vec![
             Url::parse("https://a.com").unwrap(),

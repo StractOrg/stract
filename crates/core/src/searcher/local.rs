@@ -17,13 +17,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use imager::image_store::Image;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, EntityMatch};
-use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;

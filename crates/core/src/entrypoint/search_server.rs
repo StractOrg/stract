@@ -20,6 +20,7 @@ use distributed::{
     cluster::Cluster,
     member::{Member, Service},
 };
+use imager::image_store::Image;
 use serde::{Deserialize, Serialize};
 use sonic::sonic_service;
 use tracing::info;
@@ -28,7 +29,6 @@ use url::Url;
 use crate::{
     config,
     entity_index::EntityIndex,
-    image_store::Image,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{

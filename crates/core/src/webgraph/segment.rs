@@ -165,7 +165,7 @@ mod test {
         // 1─────►2◄┘
 
         let mut writer = SegmentWriter::open(
-            crate::gen_temp_path(),
+            stdx::gen_temp_path(),
             "test".to_string(),
             Compression::default(),
         );

@@ -23,9 +23,6 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
-use std::path::PathBuf;
-use thiserror::Error;
-
 pub mod entrypoint;
 mod inverted_index;
 
@@ -48,8 +45,6 @@ mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;
 pub mod hyperloglog;
-mod image_downloader;
-mod image_store;
 mod improvement;
 pub mod index;
 mod kahan_sum;
@@ -80,7 +75,7 @@ pub mod webgraph;
 pub mod webpage;
 mod widgets;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Failed to parse WARC file")]
     WarcParse(&'static str),
@@ -114,33 +109,6 @@ pub enum Error {
 }
 
 pub(crate) type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
-
-// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-pub fn gen_temp_path() -> PathBuf {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::SystemTime;
-
-    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
-
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        << 48;
-
-    let pid = u128::from(std::process::id());
-
-    let salt = (pid << 16) + now + seed;
-
-    if cfg!(target_os = "linux") {
-        // use shared memory for temporary linux files
-        format!("/dev/shm/pagecache.tmp.{salt}").into()
-    } else {
-        std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
-    }
-}
 
 #[cfg(test)]
 fn rand_words(num_words: usize) -> String {

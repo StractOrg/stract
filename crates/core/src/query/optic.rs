@@ -236,7 +236,6 @@ mod tests {
     use optics::{Optic, SiteRankings};
 
     use crate::{
-        gen_temp_path,
         index::Index,
         ranking::inbound_similarity::InboundSimilarity,
         searcher::{LocalSearcher, SearchQuery},
@@ -623,7 +622,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         let mut writer = WebgraphWriter::new(
-            gen_temp_path(),
+            stdx::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
         );

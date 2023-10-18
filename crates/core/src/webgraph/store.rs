@@ -601,7 +601,7 @@ mod tests {
     #[test]
     fn test_insert() {
         let kv: EdgeStoreWriter = EdgeStoreWriter::open(
-            crate::gen_temp_path().join("test-segment"),
+            stdx::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
         );
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_reversed() {
         let kv: EdgeStoreWriter = EdgeStoreWriter::open(
-            crate::gen_temp_path().join("test-segment"),
+            stdx::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
         );
