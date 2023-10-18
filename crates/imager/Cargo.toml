@@ -12,7 +12,7 @@ futures.workspace = true
 image.workspace = true
 kv.workspace = true
 reqwest.workspace = true
-serde = { workspace = true, features = ["derive"] }
+serde.workspace = true
 stdx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

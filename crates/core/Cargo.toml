@@ -23,11 +23,9 @@ path = "src/main.rs"
 [dependencies]
 aes-gcm = {workspace = true}
 anyhow = {workspace = true}
-async-channel = {workspace = true}
 async-stream = {workspace = true}
 async-trait = {workspace = true}
 axum = {workspace = true}
-axum-extra = {workspace = true}
 axum-macros = {workspace = true}
 base64 = {workspace = true}
 bincode = {workspace = true}
@@ -44,7 +42,6 @@ dashmap = {workspace = true}
 distributed.workspace = true
 encoding_rs = {workspace = true}
 entity_index.workspace = true
-eventsource-stream = {workspace = true}
 fend-core = {workspace = true}
 flate2 = {workspace = true}
 fst = {workspace = true}
@@ -63,10 +60,8 @@ lalrpop-util = {workspace = true}
 leaky_queue.workspace = true
 libc = {workspace = true}
 logos = {workspace = true}
-lz-str = {workspace = true}
 lz4_flex = {workspace = true}
 md5 = {workspace = true}
-memmap = {workspace = true}
 memmap2 = {workspace = true}
 mime = {workspace = true}
 min-max-heap = {workspace = true}
@@ -121,7 +116,6 @@ lalrpop = {workspace = true}
 
 [dev-dependencies]
 criterion = {workspace = true}
-insta = {workspace = true}
 maplit = {workspace = true}
 proptest = {workspace = true}
 proptest-derive = {workspace = true}

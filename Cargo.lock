@@ -192,17 +192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-channel"
-version = "1.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81953c529336010edd6d8e358f886d9581267795c61b19475b71314bffa46d35"
-dependencies = [
- "concurrent-queue",
- "event-listener",
- "futures-core",
-]
-
-[[package]]
 name = "async-compression"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -339,27 +328,6 @@ dependencies = [
  "http-body",
  "mime",
  "rustversion",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "axum-extra"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ab90e7b70bea63a153137162affb6a0bce26b584c24a4c7885509783e2cf30b"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "mime",
- "pin-project-lite",
- "serde",
- "tokio",
- "tower",
  "tower-layer",
  "tower-service",
 ]
@@ -799,15 +767,6 @@ name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
-
-[[package]]
-name = "concurrent-queue"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f057a694a54f12365049b0958a1685bb52d567f5593b355fbf685838e873d400"
-dependencies = [
- "crossbeam-utils",
-]
 
 [[package]]
 name = "console"
@@ -1300,23 +1259,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d817e038c30374a4bcb22f94d0a8a0e216958d4c3dcde369b1439fec4bdda6e6"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "event-listener"
-version = "2.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
-
-[[package]]
-name = "eventsource-stream"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74fef4569247a5f429d9156b9d0a2599914385dd189c539334c625d8099d90ab"
-dependencies = [
- "futures-core",
- "nom",
- "pin-project-lite",
 ]
 
 [[package]]
@@ -2346,12 +2288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lz-str"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f3d72d77227090eed75ea331285a53726e78374a1f357ff5757702c23c70cc"
-
-[[package]]
 name = "lz4-sys"
 version = "1.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2475,16 +2411,6 @@ name = "memchr"
 version = "2.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
-
-[[package]]
-name = "memmap"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
-dependencies = [
- "libc",
- "winapi",
-]
 
 [[package]]
 name = "memmap2"
@@ -2861,7 +2787,6 @@ dependencies = [
 name = "optics"
 version = "0.1.0"
 dependencies = [
- "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
  "logos",
@@ -4307,11 +4232,9 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
- "async-channel",
  "async-stream",
  "async-trait",
  "axum",
- "axum-extra",
  "axum-macros",
  "base64 0.21.4",
  "bincode",
@@ -4329,7 +4252,6 @@ dependencies = [
  "distributed",
  "encoding_rs",
  "entity_index",
- "eventsource-stream",
  "fend-core",
  "flate2",
  "fst",
@@ -4340,7 +4262,6 @@ dependencies = [
  "image",
  "imager",
  "indicatif 0.17.7",
- "insta",
  "intmap",
  "itertools 0.11.0",
  "kuchiki",
@@ -4350,11 +4271,9 @@ dependencies = [
  "leaky_queue",
  "libc",
  "logos",
- "lz-str",
  "lz4_flex",
  "maplit",
  "md5",
- "memmap",
  "memmap2",
  "mime",
  "min-max-heap",

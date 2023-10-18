@@ -7,7 +7,6 @@ edition = "2021"
 thiserror = { workspace = true }
 lalrpop-util = { workspace = true }
 once_cell = { workspace = true }
-itertools = { workspace = true }
 logos = { workspace = true }
 serde = { workspace = true }
 utoipa = { workspace = true }
