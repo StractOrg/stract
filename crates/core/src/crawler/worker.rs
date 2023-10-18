@@ -35,7 +35,6 @@ use crate::{
     config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
     entrypoint::crawler::router::{NewJob, RouterService},
-    warc,
     webpage::Html,
 };
 

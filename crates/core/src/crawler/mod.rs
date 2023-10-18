@@ -20,7 +20,7 @@ use hashbrown::HashMap;
 
 use url::Url;
 
-use crate::{config::CrawlerConfig, warc, webpage::url_ext::UrlExt};
+use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
 
 use self::{warc_writer::WarcWriter, worker::WorkerThread};
 

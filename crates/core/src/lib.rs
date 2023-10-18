@@ -69,15 +69,14 @@ mod subdomain_count;
 pub mod summarizer;
 #[allow(unused)]
 mod ttl_cache;
-pub mod warc;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Failed to parse WARC file")]
-    WarcParse(&'static str),
+    #[error("WARC error")]
+    Warc(#[from] warc::Error),
 
     #[error("Encountered an empty required field ({0}) when converting to tantivy")]
     EmptyField(&'static str),

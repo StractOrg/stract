@@ -34,9 +34,10 @@ pub use centrality::Centrality;
 pub use entity_index::builder::EntityIndexer;
 pub use indexer::Indexer;
 use tracing::{debug, log::error};
+use warc::WarcFile;
 pub use webgraph::Webgraph;
 
-use crate::{config, warc::WarcFile};
+use crate::config;
 
 fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
@@ -73,10 +74,10 @@ mod warc_download {
 
     use distributed::retry_strategy::ExponentialBackoff;
     use tracing::{debug, trace};
+    use warc::WarcFile;
 
     use crate::{
         config::{S3Config, WarcSource},
-        warc::WarcFile,
         Error, Result,
     };
 

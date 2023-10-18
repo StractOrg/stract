@@ -16,10 +16,7 @@
 
 use std::time::Duration;
 
-use crate::{
-    config::{self, S3Config},
-    warc,
-};
+use crate::config::{self, S3Config};
 
 use super::{CrawlDatum, Result};
 

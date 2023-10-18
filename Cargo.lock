@@ -4321,6 +4321,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
+ "warc",
  "whatlang",
 ]
 
@@ -5284,6 +5285,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa7760aed19e106de2c7c0b581b509f2f25d3dacaf737cb82ac61bc6d760b0e"
 dependencies = [
  "try-lock",
+]
+
+[[package]]
+name = "warc"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "encoding_rs",
+ "flate2",
+ "proptest",
+ "proptest-derive",
+ "thiserror",
 ]
 
 [[package]]

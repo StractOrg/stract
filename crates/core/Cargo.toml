@@ -106,6 +106,7 @@ urlencoding = {workspace = true}
 utoipa = {workspace = true}
 utoipa-swagger-ui = {workspace = true}
 uuid = {workspace = true}
+warc.workspace = true
 whatlang = {workspace = true}
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

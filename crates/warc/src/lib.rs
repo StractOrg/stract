@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{config::S3Config, config::WarcSource, Error, Result};
-use distributed::retry_strategy::ExponentialBackoff;
+// use crate::{Error, Result};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
@@ -30,7 +29,15 @@ use flate2::Compression;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
-use tracing::{debug, trace};
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+    #[error("Failed to parse WARC file")]
+    Parse(&'static str),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct WarcFile {
     bytes: Vec<u8>,
@@ -84,122 +91,6 @@ impl WarcFile {
             num_reads: 0,
         }
     }
-
-    pub(crate) fn download(source: &WarcSource, warc_path: &str) -> Result<Self> {
-        let mut cursor = Cursor::new(Vec::new());
-        Self::download_into_buf(source, warc_path, &mut cursor)?;
-        cursor.rewind()?;
-
-        let mut buf = Vec::new();
-        cursor.read_to_end(&mut buf)?;
-
-        Ok(Self::new(buf))
-    }
-
-    pub(crate) fn download_into_buf<W: Write + Seek>(
-        source: &WarcSource,
-        warc_path: &str,
-        buf: &mut W,
-    ) -> Result<()> {
-        for dur in ExponentialBackoff::from_millis(10)
-            .with_limit(Duration::from_secs(30))
-            .take(35)
-        {
-            let res = match source.clone() {
-                WarcSource::HTTP(config) => {
-                    WarcFile::download_from_http(warc_path, config.base_url, buf)
-                }
-                WarcSource::Local(config) => {
-                    WarcFile::load_from_folder(warc_path, &config.folder, buf)
-                }
-                WarcSource::S3(config) => WarcFile::download_from_s3(warc_path, &config, buf),
-            };
-
-            if res.is_ok() {
-                return Ok(());
-            } else {
-                trace!("Error {:?}", res);
-            }
-
-            debug!("warc download failed: {:?}", res.err().unwrap());
-            debug!("retrying in {} ms", dur.as_millis());
-
-            sleep(dur);
-        }
-
-        Err(Error::DownloadFailed.into())
-    }
-
-    fn load_from_folder<W: Write + Seek>(name: &str, folder: &str, buf: &mut W) -> Result<()> {
-        let f = File::open(Path::new(folder).join(name))?;
-        let mut reader = BufReader::new(f);
-
-        buf.rewind()?;
-
-        std::io::copy(&mut reader, buf)?;
-
-        Ok(())
-    }
-
-    fn download_from_http<W: Write + Seek>(
-        warc_path: &str,
-        base_url: String,
-        buf: &mut W,
-    ) -> Result<()> {
-        let mut url = base_url;
-        if !url.ends_with('/') {
-            url += "/";
-        }
-        url += warc_path;
-
-        let client = reqwest::blocking::ClientBuilder::new()
-            .tcp_keepalive(None)
-            .pool_idle_timeout(Duration::from_secs(30 * 60))
-            .timeout(Duration::from_secs(30 * 60))
-            .connect_timeout(Duration::from_secs(30 * 60))
-            .build()?;
-        let res = client.get(url).send()?;
-
-        if res.status().as_u16() != 200 {
-            return Err(Error::DownloadFailed.into());
-        }
-
-        let bytes = res.bytes()?;
-
-        buf.rewind()?;
-        std::io::copy(&mut &bytes[..], buf)?;
-
-        Ok(())
-    }
-
-    fn download_from_s3<W: Write + Seek>(
-        warc_path: &str,
-        config: &S3Config,
-        buf: &mut W,
-    ) -> Result<()> {
-        let bucket = s3::Bucket::new(
-            &config.bucket,
-            s3::Region::Custom {
-                region: "".to_string(),
-                endpoint: config.endpoint.clone(),
-            },
-            s3::creds::Credentials {
-                access_key: Some(config.access_key.clone()),
-                secret_key: Some(config.secret_key.clone()),
-                security_token: None,
-                session_token: None,
-                expiration: None,
-            },
-        )?
-        .with_path_style()
-        .with_request_timeout(Duration::from_secs(30 * 60));
-
-        let res = bucket.get_object_blocking(warc_path)?;
-
-        buf.write_all(res.bytes())?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -229,7 +120,7 @@ impl Request {
             url: record
                 .header
                 .get("WARC-TARGET-URI")
-                .ok_or(Error::WarcParse("No target url"))?
+                .ok_or(Error::Parse("No target url"))?
                 .to_owned(),
         })
     }
@@ -254,7 +145,7 @@ impl FromStr for PayloadType {
             "application/pdf" => Ok(Self::Pdf),
             "application/rss" => Ok(Self::Rss),
             "application/atom" => Ok(Self::Atom),
-            _ => Err(Error::WarcParse("Unknown payload type")),
+            _ => Err(Error::Parse("Unknown payload type")),
         }
     }
 }
@@ -283,7 +174,7 @@ impl Response {
 
         let (_header, content) = content
             .split_once("\r\n\r\n")
-            .ok_or(Error::WarcParse("Invalid http body"))?;
+            .ok_or(Error::Parse("Invalid http body"))?;
 
         Ok(Self {
             body: content.to_string(),
@@ -313,13 +204,15 @@ impl Metadata {
                 line.pop(); // remove colon
                 let key = line;
                 if key == "fetchTimeMs" {
-                    let fetch_time_ms = value.parse::<usize>()?;
+                    let fetch_time_ms = value
+                        .parse::<usize>()
+                        .map_err(|_| Error::Parse("failed to parse 'fetchTimeMs'"))?;
                     return Ok(Self { fetch_time_ms });
                 }
             }
         }
 
-        Err(Error::WarcParse("Failed to parse metadata").into())
+        Err(Error::Parse("Failed to parse metadata"))
     }
 }
 
@@ -343,7 +236,7 @@ impl<R: Read> RecordIterator<R> {
         rtrim(&mut version);
 
         if !version.to_uppercase().starts_with("WARC/1.") {
-            return Some(Err(Error::WarcParse("Unknown WARC version").into()));
+            return Some(Err(Error::Parse("Unknown WARC version")));
         }
 
         let mut header = BTreeMap::<String, String>::new();
@@ -376,23 +269,18 @@ impl<R: Read> RecordIterator<R> {
 
                 header.insert(key.to_ascii_uppercase(), value);
             } else {
-                return Some(Err(Error::WarcParse(
-                    "All header lines must contain a colon",
-                )
-                .into()));
+                return Some(Err(Error::Parse("All header lines must contain a colon")));
             }
         }
 
         let content_len = header.get("CONTENT-LENGTH");
         if content_len.is_none() {
-            return Some(Err(Error::WarcParse("Record has no content-length").into()));
+            return Some(Err(Error::Parse("Record has no content-length")));
         }
 
         let content_len = content_len.unwrap().parse::<usize>();
         if content_len.is_err() {
-            return Some(Err(
-                Error::WarcParse("Could not parse content length").into()
-            ));
+            return Some(Err(Error::Parse("Could not parse content length")));
         }
 
         let content_len = content_len.unwrap();
@@ -407,7 +295,7 @@ impl<R: Read> RecordIterator<R> {
         }
 
         if linefeed != [13, 10, 13, 10] {
-            return Some(Err(Error::WarcParse("Invalid record ending").into()));
+            return Some(Err(Error::Parse("Invalid record ending")));
         }
 
         let record = RawWarcRecord { header, content };
@@ -456,17 +344,11 @@ impl<R: Read> Iterator for RecordIterator<R> {
         match response.header.get("WARC-TYPE") {
             Some(warc_type) => {
                 if warc_type.as_str() != "response" {
-                    return Some(Err(Error::WarcParse(
-                        "Expected response, got something else",
-                    )
-                    .into()));
+                    return Some(Err(Error::Parse("Expected response, got something else")));
                 }
             }
             None => {
-                return Some(Err(Error::WarcParse(
-                    "Expected response, got something else",
-                )
-                .into()));
+                return Some(Err(Error::Parse("Expected response, got something else")));
             }
         }
 
@@ -483,27 +365,18 @@ impl<R: Read> Iterator for RecordIterator<R> {
         match metadata.header.get("WARC-TYPE") {
             Some(warc_type) => {
                 if warc_type.as_str() != "metadata" {
-                    return Some(Err(Error::WarcParse(
-                        "Expected metadata, got something else",
-                    )
-                    .into()));
+                    return Some(Err(Error::Parse("Expected metadata, got something else")));
                 }
             }
             None => {
-                return Some(Err(Error::WarcParse(
-                    "Expected metadata, got something else",
-                )
-                .into()));
+                return Some(Err(Error::Parse("Expected metadata, got something else")));
             }
         }
 
         let metadata = Metadata::from_raw(metadata);
 
         if request.is_err() || response.is_err() || metadata.is_err() {
-            return Some(Err(Error::WarcParse(
-                "Request, response or metadata is error",
-            )
-            .into()));
+            return Some(Err(Error::Parse("Request, response or metadata is error")));
         }
 
         let request = request.unwrap();

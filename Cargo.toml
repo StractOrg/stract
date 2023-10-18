@@ -116,6 +116,7 @@ urlencoding = "2.1.2"
 utoipa = {version = "4.0.0", features = ["axum_extras"]}
 utoipa-swagger-ui = {version = "4.0.0", features = ["axum"]}
 uuid = "1.1.2"
+warc = { path = "./crates/warc" }
 whatlang = "0.16.0"
 
 [profile.test.package]
