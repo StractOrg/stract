@@ -850,7 +850,7 @@ mod tests {
     fn abstractive_summary() {
         let summarizer = AbstractiveSummarizer {
             model: Arc::new(
-                AbstractiveModel::open("../data/summarizer/abstractive")
+                AbstractiveModel::open("../../data/summarizer/abstractive")
                     .expect("abstractive summary model not found"),
             ),
         };

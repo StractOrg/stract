@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "optics", "kuchiki"]
+members = ["crates/*", "lib/*"]
 resolver = "2"
 
 [profile.release]
@@ -44,6 +44,7 @@ image = "0.24.3"
 indicatif = {version = "0.17.7", features = ["rayon"]}
 insta = "1.31"
 itertools = "0.11.0"
+kuchiki = { path = "./lib/kuchiki" }
 lalrpop = {version = "0.20.0", features = ["lexer"]}
 lalrpop-util = {version = "0.20.0", features = ["lexer"]}
 libc = "0.2.142"
@@ -58,6 +59,7 @@ mime = "0.3.17"
 min-max-heap = "1.3.0"
 num_cpus = "1.15.0"
 once_cell = "1.13.1"
+optics = { path = "./crates/optics" }
 parse_wiki_text = "0.1.5"
 proptest = "1.2.0"
 proptest-derive = "0.4.0"

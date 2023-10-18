@@ -199,7 +199,7 @@ mod tests {
 
     fn open_qa_model() -> QaModel {
         QaModel::open(
-            std::path::Path::new("../data/qa_model")
+            std::path::Path::new("../../data/qa_model")
                 .canonicalize()
                 .expect("QA model not found in data/qa_model"),
         )

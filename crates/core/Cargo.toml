@@ -53,7 +53,7 @@ http = {workspace = true}
 image = {workspace = true}
 indicatif = {workspace = true}
 itertools = {workspace = true}
-kuchiki = {path = "../kuchiki"}
+kuchiki = {workspace = true}
 lalrpop-util = {workspace = true}
 libc = {workspace = true}
 logos = {workspace = true}
@@ -66,7 +66,7 @@ mime = {workspace = true}
 min-max-heap = {workspace = true}
 num_cpus = {workspace = true}
 once_cell = {workspace = true}
-optics = {path = "../optics"}
+optics = {workspace = true}
 parse_wiki_text = {workspace = true}
 publicsuffix = {workspace = true}
 quick-xml = {workspace = true}

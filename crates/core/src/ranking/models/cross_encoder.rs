@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn sanity_check() {
-        let model = CrossEncoderModel::open("../data/cross_encoder")
+        let model = CrossEncoderModel::open("../../data/cross_encoder")
             .expect("Failed to find cross-encoder model");
 
         let s = model.run(

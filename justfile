@@ -33,8 +33,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     ./scripts/export_fact_model
 
 @configure *ARGS:
-    just setup {{ARGS}}
-    just prepare_models
+    # just setup {{ARGS}}
+    # just prepare_models
     RUST_LOG="none,stract=info" just cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:
@@ -46,3 +46,17 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @cargo *ARGS:
     LIBTORCH="{{justfile_directory()}}/libtorch" LD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" DYLD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" cargo {{ARGS}}
+
+@bench-compile:
+    #!/bin/bash
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    hyperfine --show-output -w 2 -p 'touch core/src/lib.rs' \
+        "git switch main      && cargo build -p stract --bin stract" \
+        "git switch ${BRANCH} && cargo build -p stract --bin stract"
+
+@bench-compile-release:
+    #!/bin/bash
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    hyperfine --show-output -w 2 -p 'touch core/src/lib.rs' \
+        "git switch main      && cargo build -p stract --bin stract --release" \
+        "git switch ${BRANCH} && cargo build -p stract --bin stract --release"

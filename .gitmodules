@@ -1,3 +1,0 @@
-[submodule "optics/testcases"]
-	path = optics/testcases/samples
-	url = https://github.com/StractOrg/sample-optics
