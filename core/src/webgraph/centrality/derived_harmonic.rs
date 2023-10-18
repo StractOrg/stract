@@ -23,7 +23,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
-    webgraph::{Node, NodeID, Webgraph},
+    webgraph::{NodeID, Webgraph},
 };
 pub struct DerivedCentrality {
     inner: RocksDbStore<NodeID, f64>,
@@ -46,16 +46,17 @@ impl DerivedCentrality {
 
         let non_normalized = RocksDbStore::open(output.as_ref().join("non_normalized"));
 
-        let mut norms: BTreeMap<Node, usize> = BTreeMap::new();
+        let mut norms: BTreeMap<NodeID, usize> = BTreeMap::new();
 
         for (node, id) in page_graph.node_ids() {
-            let host_node = node.clone().into_host();
+            let host_node = node.clone().into_host().id();
 
-            if let Some(harmonic) = host_harmonic.get(&host_node.id()) {
+            if let Some(harmonic) = host_harmonic.get(&host_node) {
                 let mut ingoing: Vec<_> = page_graph
-                    .ingoing_edges(node.clone())
+                    .raw_ingoing_edges(&id)
                     .into_iter()
-                    .map(|e| e.from.into_host())
+                    .filter_map(|e| page_graph.id2node(&e.from))
+                    .map(|n| n.into_host())
                     .collect();
                 ingoing.sort();
                 ingoing.dedup();
@@ -65,16 +66,15 @@ impl DerivedCentrality {
 
                 non_normalized.insert(id, page_score);
 
-                let norm = norms.entry(host_node.clone()).or_insert(0);
+                let norm = norms.entry(host_node).or_insert(0);
                 *norm = (*norm).max(count);
             }
         }
 
         let db = RocksDbStore::open(output.as_ref());
         for (id, score) in non_normalized.iter() {
-            let node = page_graph.id2node(&id).unwrap();
-            let host_node = node.clone().into_host();
-            let norm = norms.get(&host_node).unwrap();
+            let node = page_graph.id2node(&id).unwrap().into_host().id();
+            let norm = norms.get(&node).unwrap();
             let normalized = score / (*norm as f64);
             db.insert(id, normalized);
         }
