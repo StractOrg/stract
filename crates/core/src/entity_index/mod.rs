@@ -31,6 +31,7 @@ use tantivy::{
     tokenizer::Tokenizer,
     DocAddress, IndexReader, IndexWriter, Searcher, TantivyDocument, Term,
 };
+use tokenizer::Normal;
 use tracing::info;
 use url::Url;
 
@@ -38,7 +39,6 @@ use crate::{
     image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
     kv::{rocksdb_store::RocksDbStore, Kv},
-    tokenizer::Normal,
     Result,
 };
 

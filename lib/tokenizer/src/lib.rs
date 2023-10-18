@@ -23,8 +23,6 @@ use tantivy::tokenizer::{
 
 use whatlang::Lang;
 
-use crate::{ceil_char_boundary, floor_char_boundary};
-
 use self::{add_space_last::AddSpaceLast, split_preserve::StrSplitPreserve};
 
 mod add_space_last;
@@ -478,7 +476,7 @@ fn flatten(val: serde_json::Value) -> Vec<String> {
 }
 
 impl FlattenedJson {
-    pub fn new<T>(value: &T) -> crate::Result<Self>
+    pub fn new<T>(value: &T) -> serde_json::Result<Self>
     where
         T: serde::Serialize,
     {
@@ -569,9 +567,11 @@ impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
                     self.token.offset_from -= 1;
                     self.token.offset_to += 1;
 
-                    self.token.offset_from = floor_char_boundary(self.text, self.token.offset_from);
+                    self.token.offset_from =
+                        stdx::floor_char_boundary(self.text, self.token.offset_from);
                     self.token.offset_to =
-                        ceil_char_boundary(self.text, self.token.offset_to).min(self.text.len());
+                        stdx::ceil_char_boundary(self.text, self.token.offset_to)
+                            .min(self.text.len());
                 }
 
                 self.token

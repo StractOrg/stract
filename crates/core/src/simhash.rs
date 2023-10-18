@@ -18,8 +18,7 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
 };
-
-use crate::tokenizer::Tokenizer;
+use tokenizer::Tokenizer;
 
 pub type HashType = u64;
 

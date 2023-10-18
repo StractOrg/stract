@@ -17,7 +17,7 @@
 use crate::fastfield_reader::FieldValue;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
-use crate::{combine_u64s, Result};
+use crate::Result;
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
@@ -294,7 +294,7 @@ impl Signal {
             if node_id1 == u64::MAX && node_id2 == u64::MAX {
                 None
             } else {
-                let id = combine_u64s([node_id1, node_id2]);
+                let id = stdx::combine_u64s([node_id1, node_id2]);
 
                 Some(NodeID::from(id))
             }

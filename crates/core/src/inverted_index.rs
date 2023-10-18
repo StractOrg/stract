@@ -33,6 +33,9 @@ use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::{Schema, Value};
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter, SegmentMeta, TantivyDocument};
+use tokenizer::{
+    BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
+};
 use url::Url;
 
 use crate::collector::{Hashes, MainCollector};
@@ -43,18 +46,15 @@ use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
+use crate::schema::create_schema;
 use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
+use crate::snippet;
 use crate::snippet::TextSnippet;
-use crate::tokenizer::{
-    BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
-};
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{schema_org, Webpage};
 use crate::Result;
-use crate::{combine_u64s, snippet};
-use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -320,7 +320,7 @@ impl InvertedIndex {
         if id1 == u64::MAX && id2 == u64::MAX {
             Ok(None)
         } else {
-            let id = combine_u64s([id1, id2]);
+            let id = stdx::combine_u64s([id1, id2]);
             Ok(Some(id.into()))
         }
     }

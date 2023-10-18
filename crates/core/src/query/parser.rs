@@ -21,7 +21,6 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIX,
-    floor_char_boundary,
     schema::{Field, TextField, ALL_FIELDS},
 };
 
@@ -392,7 +391,7 @@ pub fn parse(query: &str) -> Vec<Box<Term>> {
             continue;
         }
 
-        cur_term_begin = floor_char_boundary(&query, cur_term_begin);
+        cur_term_begin = stdx::floor_char_boundary(&query, cur_term_begin);
 
         if query[cur_term_begin..].starts_with('"') {
             if let Some(offset) = query[cur_term_begin + 1..].find('"') {
@@ -418,7 +417,7 @@ pub fn parse(query: &str) -> Vec<Box<Term>> {
 
     if cur_term_begin < query.len() {
         res.push(parse_term(
-            &query[floor_char_boundary(&query, cur_term_begin)..query.len()],
+            &query[stdx::floor_char_boundary(&query, cur_term_begin)..query.len()],
         ));
     }
 

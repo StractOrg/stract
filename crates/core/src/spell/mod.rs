@@ -26,10 +26,10 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::index::Index;
+use crate::query;
 use crate::query::parser::Term;
 use crate::schema::TextField;
 use crate::searcher::SearchQuery;
-use crate::{floor_char_boundary, query};
 
 use self::dictionary::DictionaryBuilder;
 pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit};
@@ -91,7 +91,7 @@ pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
         .filter(|(_, c)| matches!(c, '.' | '\n' | '?' | '!'))
     {
         res.push(last_start..end + 1);
-        last_start = floor_char_boundary(text, end + 2);
+        last_start = stdx::floor_char_boundary(text, end + 2);
     }
 
     res

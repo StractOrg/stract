@@ -4233,6 +4233,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "stdx"
+version = "0.1.0"
+
+[[package]]
 name = "stract"
 version = "0.1.0"
 dependencies = [
@@ -4311,10 +4315,12 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sonic",
+ "stdx",
  "tantivy",
  "tch",
  "thiserror",
  "tikv-jemallocator",
+ "tokenizer",
  "tokenizers",
  "tokio",
  "tokio-stream",
@@ -4767,6 +4773,20 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "tokenizer"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.11.0",
+ "logos",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tantivy",
+ "url",
+ "whatlang",
+]
 
 [[package]]
 name = "tokenizers"

@@ -90,9 +90,11 @@ serde = {workspace = true}
 serde_json = {workspace = true}
 serde_urlencoded = {workspace = true}
 sonic = { version = "0.1.0", path = "../../lib/sonic" }
+stdx.workspace = true
 tantivy = {workspace = true}
 tch = {workspace = true, optional = true}
 thiserror = {workspace = true}
+tokenizer.workspace = true
 tokenizers = {workspace = true}
 tokio = {workspace = true}
 tokio-stream = {workspace = true}

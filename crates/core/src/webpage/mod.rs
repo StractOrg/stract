@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    ceil_char_boundary,
     enum_map::EnumSet,
     prehashed::hash,
     schema::{FastField, TextField},
-    simhash, split_u128, tokenizer,
+    simhash,
     webgraph::NodeID,
     Error, Result,
 };
@@ -238,7 +237,7 @@ impl Webpage {
 
         match &self.node_id {
             Some(node_id) => {
-                let [node_id1, node_id2] = split_u128(node_id.bit_128());
+                let [node_id1, node_id2] = stdx::split_u128(node_id.bit_128());
                 doc.add_u64(
                     schema
                         .get_field(Field::Fast(FastField::HostNodeID1).name())
@@ -955,7 +954,7 @@ impl Html {
             .unwrap_or_default()
             .find('.')
             .map(|index| {
-                &domain.text[..ceil_char_boundary(&domain.text, index).min(domain.text.len())]
+                &domain.text[..stdx::ceil_char_boundary(&domain.text, index).min(domain.text.len())]
             })
             .unwrap_or_default()
             .to_string();
@@ -987,16 +986,16 @@ impl Html {
             },
         };
 
-        let site_hash = split_u128(hash(self.url().host_str().unwrap_or_default()).0);
+        let site_hash = stdx::split_u128(hash(self.url().host_str().unwrap_or_default()).0);
 
         let mut url_without_query = self.url().clone();
         url_without_query.set_query(None);
 
-        let url_without_query_hash = split_u128(hash(url_without_query.as_str()).0);
-        let url_hash = split_u128(hash(self.url().as_str()).0);
+        let url_without_query_hash = stdx::split_u128(hash(url_without_query.as_str()).0);
+        let url_hash = stdx::split_u128(hash(self.url().as_str()).0);
 
-        let domain_hash = split_u128(hash(self.url().root_domain().unwrap_or_default()).0);
-        let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
+        let domain_hash = stdx::split_u128(hash(self.url().root_domain().unwrap_or_default()).0);
+        let title_hash = stdx::split_u128(hash(self.title().unwrap_or_default()).0);
 
         for field in &ALL_FIELDS {
             let tantivy_field = schema

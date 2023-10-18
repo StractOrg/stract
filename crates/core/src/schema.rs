@@ -15,8 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::schema::{IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions};
-
-use crate::tokenizer::{
+use tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
 };
 

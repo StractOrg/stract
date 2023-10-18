@@ -27,7 +27,6 @@ use tch::{IValue, Kind, Tensor};
 use tokenizers::{PaddingParams, TruncationParams};
 
 use crate::{
-    ceil_char_boundary,
     llm_utils::{self, ClonableTensor},
     spell::word2vec::{Word2Vec, WordVec},
 };
@@ -154,7 +153,7 @@ impl<'a> Iterator for OverlappingSents<'a> {
                 self.text = "";
                 self.prev_end += end;
             } else {
-                let next_start = ceil_char_boundary(self.text, next_start + 1);
+                let next_start = stdx::ceil_char_boundary(self.text, next_start + 1);
 
                 self.text = &self.text[next_start..];
                 self.prev_end += next_start;
@@ -288,7 +287,7 @@ impl ExtractiveSummarizer {
 
         for (a, mut b) in best_passages.into_iter().tuple_windows() {
             if a.range.end > b.range.start {
-                b.range.start = ceil_char_boundary(text, a.range.end);
+                b.range.start = stdx::ceil_char_boundary(text, a.range.end);
                 b.passage = &text[b.range.clone()];
             }
 

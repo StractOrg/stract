@@ -24,7 +24,6 @@ use tantivy::{
 };
 
 use crate::{
-    combine_u64s,
     config::CollectorConfig,
     fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
@@ -155,7 +154,7 @@ impl TopSegmentCollector {
         let hash2 = hash.unwrap();
 
         let hash = [hash1, hash2];
-        combine_u64s(hash).into()
+        stdx::combine_u64s(hash).into()
     }
 }
 

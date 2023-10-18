@@ -15,11 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::ops::Range;
+use tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 
 use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::spell::sentence_ranges;
-use crate::tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;

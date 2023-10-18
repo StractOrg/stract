@@ -18,8 +18,8 @@ use std::collections::HashMap;
 
 use kuchiki::NodeRef;
 use serde::{Deserialize, Serialize};
+use tokenizer::FlattenedJson;
 
-use crate::tokenizer::FlattenedJson;
 use crate::Result;
 
 mod json_ld;
@@ -229,7 +229,7 @@ pub(crate) fn flattened_json(schemas: Vec<Item>) -> Result<FlattenedJson> {
         .into_iter()
         .map(|item| item.into_single_map())
         .collect();
-    FlattenedJson::new(&single_maps)
+    Ok(FlattenedJson::new(&single_maps)?)
 }
 
 #[cfg(test)]

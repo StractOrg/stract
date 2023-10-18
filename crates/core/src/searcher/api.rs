@@ -40,9 +40,10 @@ use crate::{
     bangs::Bangs,
     collector::BucketCollector,
     distributed::cluster::Cluster,
+    query,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
+    Result,
 };
-use crate::{ceil_char_boundary, floor_char_boundary, query, Result};
 #[cfg(feature = "libtorch")]
 use crate::{qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel};
 
@@ -542,24 +543,24 @@ fn generate_answer_snippet(body: &str, answer_offset: Range<usize>) -> String {
 
     if (answer_offset.end - best_start > SNIPPET_LENGTH) || (best_start >= best_end) {
         if answer_offset.end - answer_offset.start >= SNIPPET_LENGTH {
-            let end = floor_char_boundary(body, answer_offset.start + SNIPPET_LENGTH);
+            let end = stdx::floor_char_boundary(body, answer_offset.start + SNIPPET_LENGTH);
 
             return "<b>".to_string() + &body[answer_offset.start..end] + "</b>";
         }
 
         let chars_either_side = (SNIPPET_LENGTH - (answer_offset.end - answer_offset.start)) / 2;
 
-        let start = ceil_char_boundary(
+        let start = stdx::ceil_char_boundary(
             body,
             answer_offset
                 .start
                 .checked_sub(chars_either_side)
                 .unwrap_or_default(),
         );
-        let mut end = ceil_char_boundary(body, answer_offset.end + chars_either_side);
+        let mut end = stdx::ceil_char_boundary(body, answer_offset.end + chars_either_side);
 
         if end >= body.len() {
-            end = floor_char_boundary(body, body.len());
+            end = stdx::floor_char_boundary(body, body.len());
         }
 
         body[start..answer_offset.start].to_string()
@@ -574,7 +575,8 @@ fn generate_answer_snippet(body: &str, answer_offset: Range<usize>) -> String {
             + "</b>";
 
         let remaining_chars = SNIPPET_LENGTH - (res.len() - 7);
-        let end = ceil_char_boundary(body, (remaining_chars + answer_offset.end).min(best_end));
+        let end =
+            stdx::ceil_char_boundary(body, (remaining_chars + answer_offset.end).min(best_end));
 
         res += &body[answer_offset.end..end];
 
