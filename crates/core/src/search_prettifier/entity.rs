@@ -100,47 +100,7 @@ fn maybe_prettify_entity_date(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use entity_index::entity::Link;
-
     use super::*;
-
-    #[test]
-    fn simple_link_to_html() {
-        assert_eq!(
-            EntitySnippet::from_span(
-                &Span {
-                    text: "some text with a link".to_string(),
-                    links: vec![Link {
-                        start: 5,
-                        end: 9,
-                        target: "text article".to_string()
-                    }]
-                },
-                10000
-            )
-            .to_md(None),
-            "some [text](https://en.wikipedia.org/wiki/text_article) with a link".to_string()
-        );
-    }
-
-    #[test]
-    fn truncated_link_to_html() {
-        assert_eq!(
-            EntitySnippet::from_span(
-                &Span {
-                    text: "some text".to_string(),
-                    links: vec![Link {
-                        start: 5,
-                        end: 9,
-                        target: "text article".to_string()
-                    }]
-                },
-                7
-            )
-            .to_md(None),
-            "some [te](https://en.wikipedia.org/wiki/text_article)...".to_string()
-        );
-    }
 
     #[test]
     fn einstein_date() {

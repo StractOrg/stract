@@ -24,7 +24,6 @@ mod centrality;
 pub mod configure;
 pub mod crawler;
 pub mod dmoz_parser;
-mod entity;
 pub mod indexer;
 pub mod safety_classifier;
 pub mod search_server;
@@ -32,7 +31,7 @@ mod webgraph;
 pub mod webgraph_server;
 
 pub use centrality::Centrality;
-pub use entity::EntityIndexer;
+pub use entity_index::builder::EntityIndexer;
 pub use indexer::Indexer;
 use tracing::{debug, log::error};
 pub use webgraph::Webgraph;

@@ -214,8 +214,7 @@ impl EntitySnippet {
         EntitySnippet { fragments }
     }
 
-    // TODO: re-add this when we have moved the rest of entity here
-    // #[cfg(test)]
+    #[cfg(test)]
     pub fn to_md(&self, strip_href_prefix: Option<&str>) -> String {
         self.fragments
             .iter()
@@ -244,5 +243,48 @@ impl<'a> From<&[Node<'a>]> for Span {
             span.add_node(node);
         }
         span
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_link_to_html() {
+        assert_eq!(
+            EntitySnippet::from_span(
+                &Span {
+                    text: "some text with a link".to_string(),
+                    links: vec![Link {
+                        start: 5,
+                        end: 9,
+                        target: "text article".to_string()
+                    }]
+                },
+                10000
+            )
+            .to_md(None),
+            "some [text](https://en.wikipedia.org/wiki/text_article) with a link".to_string()
+        );
+    }
+
+    #[test]
+    fn truncated_link_to_html() {
+        assert_eq!(
+            EntitySnippet::from_span(
+                &Span {
+                    text: "some text".to_string(),
+                    links: vec![Link {
+                        start: 5,
+                        end: 9,
+                        target: "text article".to_string()
+                    }]
+                },
+                7
+            )
+            .to_md(None),
+            "some [te](https://en.wikipedia.org/wiki/text_article)...".to_string()
+        );
     }
 }

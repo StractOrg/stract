@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use entity_index::{
+use crate::{
     entity::{Entity, Paragraph, Span, WikiNodeExt},
     EntityIndex,
 };
@@ -289,7 +289,7 @@ impl EntityBuilder {
 
 #[cfg(test)]
 mod tests {
-    use entity_index::entity::EntitySnippet;
+    use crate::entity::EntitySnippet;
 
     use super::*;
 
@@ -367,7 +367,7 @@ mod tests {
     fn aristotle() {
         check_abstract(
             "Aristotle",
-            include_str!("../../testcases/entity/aristotle.txt"),
+            include_str!("../../core/testcases/entity/aristotle.txt"),
             expect!(@r###"
             Title: Aristotle
             Image: Some("Aristotle Altemps Inv8575.jpg")
@@ -435,7 +435,7 @@ mod tests {
     fn barack_obama() {
         check_abstract(
             "Barack Obama",
-            include_str!("../../testcases/entity/obama.txt"),
+            include_str!("../../core/testcases/entity/obama.txt"),
             expect!(@r###"
             Title: Barack Obama
             Image: Some("President Barack Obama.jpg")
@@ -498,7 +498,7 @@ mod tests {
     fn algorithm() {
         check_abstract(
             "Algorithm",
-            include_str!("../../testcases/entity/algorithm.txt"),
+            include_str!("../../core/testcases/entity/algorithm.txt"),
             expect!(@r###"
             Title: Algorithm
             Image: None
@@ -519,7 +519,7 @@ mod tests {
     fn andre() {
         check_abstract(
             "Andre",
-            include_str!("../../testcases/entity/andre.txt"),
+            include_str!("../../core/testcases/entity/andre.txt"),
             expect!(@r###"
             Title: Andre
             Image: Some("Andre Agassi (2011).jpg")
@@ -579,7 +579,7 @@ mod tests {
     fn skip_disambiguation_pages() {
         assert!(EntityBuilder {
             title: "Test".to_string(),
-            text: include_str!("../../testcases/entity/disambiguation.txt").to_string(),
+            text: include_str!("../../core/testcases/entity/disambiguation.txt").to_string(),
         }
         .build()
         .is_none());

@@ -41,6 +41,7 @@ use tracing::info;
 use url::Url;
 
 use self::entity::{Entity, Link, Span};
+pub mod builder;
 pub mod entity;
 
 #[derive(thiserror::Error, Debug)]

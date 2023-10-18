@@ -8,11 +8,13 @@ edition = "2021"
 [dependencies]
 base64.workspace = true
 bincode.workspace = true
+bzip2.workspace = true
 imager.workspace = true
 itertools.workspace = true
 kv.workspace = true
 md5.workspace = true
 parse_wiki_text.workspace = true
+quick-xml = "0.30.0"
 serde.workspace = true
 stdx.workspace = true
 tantivy.workspace = true
@@ -21,3 +23,6 @@ tokenizer.workspace = true
 tracing.workspace = true
 url.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
