@@ -55,7 +55,6 @@ mod improvement;
 pub mod index;
 mod kahan_sum;
 mod kv;
-mod leaky_queue;
 #[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;

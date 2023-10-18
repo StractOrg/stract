@@ -18,6 +18,7 @@
 //! All http requests are handled using axum.
 
 use axum::{body::Body, extract, middleware, Router};
+use leaky_queue::LeakyQueue;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 
@@ -30,7 +31,6 @@ use crate::{
         member::{Member, Service},
     },
     improvement::{store_improvements_loop, ImprovementEvent},
-    leaky_queue::LeakyQueue,
     ranking::models::lambdamart::LambdaMART,
     searcher::api::ApiSearcher,
 };

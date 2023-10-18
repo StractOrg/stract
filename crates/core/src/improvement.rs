@@ -17,13 +17,12 @@
 use std::{sync::Arc, time::Duration};
 
 use chrono::{DateTime, Timelike, Utc};
+use leaky_queue::LeakyQueue;
 use scylla::{prepared_statement::PreparedStatement, SessionBuilder};
 use thiserror::Error;
 use tokio::{sync::Mutex, time};
 use url::Url;
 use uuid::Uuid;
-
-use crate::leaky_queue::LeakyQueue;
 
 #[derive(Debug, Error)]
 enum Error {

@@ -60,3 +60,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     hyperfine --show-output -w 2 -p 'touch core/src/lib.rs' \
         "git switch main      && cargo build -p stract --bin stract --release" \
         "git switch ${BRANCH} && cargo build -p stract --bin stract --release"
+
+@librarify path:
+    cargo new lib/{{file_stem(path)}} --lib
+    mv {{path}} lib/{{file_stem(path)}}/src/lib.rs
+    echo "cargo add -p stract {{file_stem(path)}}"

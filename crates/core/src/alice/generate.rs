@@ -17,11 +17,11 @@
 use std::{rc::Rc, sync::Arc};
 
 use aes_gcm::{Aes256Gcm, Key};
+use leaky_queue::LeakyQueue;
 use tch::{IndexOp, Kind, Tensor};
 
 use crate::{
     alice::ExecutionState,
-    leaky_queue::LeakyQueue,
     llm_utils::{self, ClonableTensor},
 };
 
