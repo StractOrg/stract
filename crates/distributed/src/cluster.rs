@@ -22,7 +22,7 @@ use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 use tracing::error;
 
-use crate::distributed::member::{Member, Service};
+use crate::member::{Member, Service};
 
 const CLUSTER_ID: &str = "stract-cluster";
 const GOSSIP_INTERVAL: Duration = Duration::from_secs(1);

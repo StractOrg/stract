@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
     entrypoint::search_server::{self, SearchService},
     image_store::Image,
     inverted_index::{self, RetrievedWebpage},
@@ -25,10 +24,14 @@ use crate::{
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
+use distributed::{
+    cluster::Cluster,
+    member::{Service, ShardId},
+    retry_strategy::ExponentialBackoff,
+};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
@@ -157,9 +160,6 @@ impl RemoteSearcher {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
-pub struct ShardId(u64);
-
 pub struct Shard {
     id: ShardId,
     replicas: Vec<RemoteSearcher>,
@@ -176,7 +176,7 @@ impl Shard {
         }
 
         Self {
-            id: ShardId(id),
+            id: ShardId::new(id),
             replicas: parsed_replicas,
         }
     }

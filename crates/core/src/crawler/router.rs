@@ -1,12 +1,10 @@
 use anyhow::Result;
+use distributed::retry_strategy::ExponentialBackoff;
 use rand::Rng;
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::Mutex;
 
-use crate::{
-    distributed::retry_strategy::ExponentialBackoff,
-    entrypoint::crawler::coordinator::{CoordinatorService, GetJob},
-};
+use crate::entrypoint::crawler::coordinator::{CoordinatorService, GetJob};
 
 use super::Job;
 

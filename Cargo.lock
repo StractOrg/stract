@@ -1183,6 +1183,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "distributed"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chitchat",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "dlv-list"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4261,6 +4275,7 @@ dependencies = [
  "crossbeam-channel",
  "csv",
  "dashmap",
+ "distributed",
  "encoding_rs",
  "eventsource-stream",
  "fend-core",

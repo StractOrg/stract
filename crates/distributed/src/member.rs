@@ -18,7 +18,14 @@ use std::net::SocketAddr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::searcher::ShardId;
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
+pub struct ShardId(u64);
+
+impl ShardId {
+    pub fn new(id: u64) -> ShardId {
+        ShardId(id)
+    }
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {

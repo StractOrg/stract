@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::distributed::retry_strategy::ExponentialBackoff;
 use crate::{config::S3Config, config::WarcSource, Error, Result};
+use distributed::retry_strategy::ExponentialBackoff;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};

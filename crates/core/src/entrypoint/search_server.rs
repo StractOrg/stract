@@ -16,6 +16,10 @@
 
 use std::{collections::HashMap, path::Path};
 
+use distributed::{
+    cluster::Cluster,
+    member::{Member, Service},
+};
 use serde::{Deserialize, Serialize};
 use sonic::sonic_service;
 use tracing::info;
@@ -23,10 +27,6 @@ use url::Url;
 
 use crate::{
     config,
-    distributed::{
-        cluster::Cluster,
-        member::{Member, Service},
-    },
     entity_index::EntityIndex,
     image_store::Image,
     index::Index,

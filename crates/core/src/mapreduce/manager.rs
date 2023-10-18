@@ -1,7 +1,7 @@
 use super::{Error, MapReduceConnection, Result, Worker};
 use super::{Map, Reduce};
-use crate::distributed::retry_strategy::ExponentialBackoff;
 use crate::mapreduce::Task;
+use distributed::retry_strategy::ExponentialBackoff;
 use futures::StreamExt;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;

@@ -17,6 +17,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use distributed::{
+    cluster::Cluster,
+    member::{Member, Service},
+};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -26,9 +30,6 @@ use url::Url;
 use utoipa::ToSchema;
 
 use crate::config;
-use crate::distributed::cluster::Cluster;
-use crate::distributed::member::Member;
-use crate::distributed::member::Service;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;

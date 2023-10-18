@@ -16,13 +16,11 @@
 use futures::StreamExt;
 use std::{collections::HashSet, hash::Hash, time::Duration};
 
+use distributed::retry_strategy::ExponentialBackoff;
 use serde::Serialize;
 use url::Url;
 
-use crate::{
-    distributed::retry_strategy::ExponentialBackoff,
-    image_store::{Image, ImageStore},
-};
+use crate::image_store::{Image, ImageStore};
 
 #[derive(Clone, Debug)]
 pub struct ImageDownloadJob<K>

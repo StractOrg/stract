@@ -20,6 +20,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::Instant;
 
+use ::distributed::cluster::Cluster;
 use itertools::{intersperse, Itertools};
 use optics::Optic;
 use url::Url;
@@ -39,7 +40,6 @@ use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
     collector::BucketCollector,
-    distributed::cluster::Cluster,
     query,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
     Result,

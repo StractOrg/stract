@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use distributed::retry_strategy::ExponentialBackoff;
 use encoding_rs::{Encoding, UTF_8};
 use futures::{future::BoxFuture, FutureExt};
 use hashbrown::{HashMap, HashSet};
@@ -33,7 +34,6 @@ use url::Url;
 use crate::{
     config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
-    distributed::retry_strategy::ExponentialBackoff,
     entrypoint::crawler::router::{NewJob, RouterService},
     warc,
     webpage::Html,

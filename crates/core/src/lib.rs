@@ -41,7 +41,6 @@ mod collector;
 pub mod config;
 pub mod crawler;
 mod directory;
-mod distributed;
 mod entity_index;
 mod enum_map;
 mod executor;

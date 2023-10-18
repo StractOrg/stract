@@ -31,6 +31,7 @@ criterion = "0.5.1"
 crossbeam-channel = "0.5.6"
 csv = "1.1.6"
 dashmap = {version = "5.4.0", features = ["rayon"]}
+distributed = { path = "crates/distributed" }
 encoding_rs = "0.8.31"
 eventsource-stream = "0.2.3"
 fend-core = "1.2.2"
