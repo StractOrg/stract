@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use intmap::{IntMap, IntSet};
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
 
 use hashbrown::HashSet;
 use url::Url;
 
 use crate::{
-    intmap::{IntMap, IntSet},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{Node, NodeID, Webgraph},
     webpage::url_ext::UrlExt,

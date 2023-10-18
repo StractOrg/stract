@@ -53,7 +53,6 @@ mod image_downloader;
 mod image_store;
 mod improvement;
 pub mod index;
-mod intmap;
 mod kahan_sum;
 mod kv;
 mod leaky_queue;

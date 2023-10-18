@@ -27,7 +27,6 @@ use url::Url;
 use utoipa::ToSchema;
 
 use crate::executor::Executor;
-use crate::intmap;
 
 pub mod centrality;
 mod store;

@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::intmap::IntMap;
 use hashbrown::{HashMap, HashSet};
+use intmap::IntMap;
 use itertools::Itertools;
 use std::hash::Hash;
 

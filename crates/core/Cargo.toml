@@ -52,6 +52,7 @@ hashbrown = {workspace = true}
 http = {workspace = true}
 image = {workspace = true}
 indicatif = {workspace = true}
+intmap.workspace = true
 itertools = {workspace = true}
 kuchiki = {workspace = true}
 lalrpop-util = {workspace = true}

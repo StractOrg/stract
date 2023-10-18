@@ -22,11 +22,11 @@ use std::{
 };
 
 use dashmap::DashMap;
+use intmap::{IntMap, IntSet};
 use rayon::prelude::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    intmap::{IntMap, IntSet},
     webgraph::{NodeID, Webgraph},
     Result,
 };

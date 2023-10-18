@@ -20,12 +20,10 @@
 use std::collections::{HashMap, VecDeque};
 
 use indicatif::{ProgressBar, ProgressStyle};
+use intmap::IntMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    intmap::IntMap,
-    webgraph::{Node, NodeID, Webgraph},
-};
+use crate::webgraph::{Node, NodeID, Webgraph};
 
 fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
