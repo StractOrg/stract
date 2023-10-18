@@ -21,7 +21,7 @@ use http::StatusCode;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
-    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
+    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff},
     entrypoint::webgraph_server::GraphLevel,
     webgraph::{FullEdge, Node},
 };

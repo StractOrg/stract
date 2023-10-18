@@ -17,6 +17,7 @@
 use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
+use sonic::sonic_service;
 use tracing::info;
 use url::Url;
 
@@ -25,7 +26,6 @@ use crate::{
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
-        sonic,
     },
     entity_index::EntityIndex,
     image_store::Image,
@@ -36,7 +36,7 @@ use crate::{
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
-    sonic_service, Result,
+    Result,
 };
 
 sonic_service!(

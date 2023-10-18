@@ -278,12 +278,7 @@ impl UrlStateDbShard {
             keys.push(key_bytes);
         }
 
-        for (val, (_, url)) in self
-            .db
-            .multi_get(keys.into_iter())
-            .into_iter()
-            .zip(urls.iter())
-        {
+        for (val, (_, url)) in self.db.multi_get(keys).into_iter().zip(urls.iter()) {
             if let Some(val) = val? {
                 let state: UrlState = bincode::deserialize(&val)?;
                 res.insert(url.clone(), state);
@@ -385,7 +380,7 @@ impl UrlStateDb {
         let mut res = HashMap::new();
 
         for shard in &self.shards {
-            res.extend(shard.multi_get(urls)?.into_iter());
+            res.extend(shard.multi_get(urls)?);
         }
 
         Ok(res)
@@ -433,7 +428,7 @@ impl DomainStateDb {
 
         for (val, domain) in self
             .db
-            .multi_get(domain_bytes.into_iter())
+            .multi_get(domain_bytes)
             .into_iter()
             .zip(domains.iter())
         {

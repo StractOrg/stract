@@ -17,13 +17,12 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use sonic::{service::Message, sonic_service};
 
 use crate::{
     config,
     crawler::{self, planner::make_crawl_plan, CrawlCoordinator, Crawler},
-    distributed::sonic::{self, service::Message},
     kv::rocksdb_store::RocksDbStore,
-    sonic_service,
     webgraph::WebgraphBuilder,
     Result,
 };

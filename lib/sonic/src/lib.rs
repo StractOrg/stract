@@ -24,7 +24,7 @@ use tokio::{
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
-pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -126,7 +126,7 @@ struct Header {
 }
 
 pub struct Server<Req, Res> {
-    pub(super) listener: TcpListener,
+    listener: TcpListener,
     marker: PhantomData<(Req, Res)>,
 }
 

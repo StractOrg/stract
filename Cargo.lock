@@ -4184,6 +4184,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sonic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "bytemuck",
+ "proptest",
+ "proptest-derive",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4294,6 +4310,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "sonic",
  "tantivy",
  "tch",
  "thiserror",

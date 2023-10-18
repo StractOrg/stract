@@ -33,7 +33,7 @@ use url::Url;
 use crate::{
     config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
-    distributed::{retry_strategy::ExponentialBackoff, sonic},
+    distributed::retry_strategy::ExponentialBackoff,
     entrypoint::crawler::router::{NewJob, RouterService},
     warc,
     webpage::Html,

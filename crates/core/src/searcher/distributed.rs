@@ -32,8 +32,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::distributed::sonic;
-
 use super::{InitialWebsiteResult, SearchQuery};
 
 const NUM_REPLICA_RETRIES: usize = 3;

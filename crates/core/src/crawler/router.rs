@@ -4,7 +4,7 @@ use std::{net::SocketAddr, time::Duration};
 use tokio::sync::Mutex;
 
 use crate::{
-    distributed::{retry_strategy::ExponentialBackoff, sonic},
+    distributed::retry_strategy::ExponentialBackoff,
     entrypoint::crawler::coordinator::{CoordinatorService, GetJob},
 };
 

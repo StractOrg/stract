@@ -137,8 +137,6 @@ macro_rules! sonic_service {
 
             use super::{$service, $($req),*};
 
-            use $crate::distributed::sonic;
-
             #[derive(Debug, Clone, ::serde::Deserialize)]
             pub enum Request {
                 $($req($req),)*
@@ -149,14 +147,14 @@ macro_rules! sonic_service {
             }
             #[derive(::serde::Serialize, ::serde::Deserialize)]
             pub enum Response {
-                $($req(<$req as sonic::service::Message<$service>>::Response),)*
+                $($req(<$req as $crate::service::Message<$service>>::Response),)*
             }
             $(
-                impl sonic::service::Wrapper<$service> for $req {
+                impl $crate::service::Wrapper<$service> for $req {
                     fn wrap_request_ref(req: &Self) -> RequestRef {
                         RequestRef::$req(req)
                     }
-                    fn unwrap_response(res: <$service as sonic::service::Service>::Response) -> Option<Self::Response> {
+                    fn unwrap_response(res: <$service as $crate::service::Service>::Response) -> Option<Self::Response> {
                         #[allow(irrefutable_let_patterns)]
                         if let Response::$req(value) = res {
                             Some(value)
@@ -167,22 +165,22 @@ macro_rules! sonic_service {
                 }
             )*
             #[async_trait::async_trait]
-            impl sonic::service::Service for $service {
+            impl $crate::service::Service for $service {
                 type Request = Request;
                 type RequestRef<'a> = RequestRef<'a>;
                 type Response = Response;
 
-                async fn handle(req: Request, server: &Self) -> sonic::Result<Response> {
+                async fn handle(req: Request, server: &Self) -> $crate::Result<Response> {
                     match req {
                         $(
-                            Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
+                            Request::$req(value) => Ok(Response::$req($crate::service::Message::handle(value, server).await?)),
                         )*
                     }
                 }
             }
             impl $service {
-                pub async fn bind(self, addr: impl ::tokio::net::ToSocketAddrs) -> sonic::Result<sonic::service::Server<Self>> {
-                    sonic::service::Server::bind(self, addr).await
+                pub async fn bind(self, addr: impl ::tokio::net::ToSocketAddrs) -> $crate::Result<$crate::service::Server<Self>> {
+                    $crate::service::Server::bind(self, addr).await
                 }
             }
         }
@@ -193,10 +191,9 @@ macro_rules! sonic_service {
 mod tests {
     use proptest::prelude::*;
 
-    use std::{marker::PhantomData, net::SocketAddr, sync::atomic::AtomicI32};
+    use std::{future::Future, marker::PhantomData, net::SocketAddr, sync::atomic::AtomicI32};
 
     use super::{Server, Service, Wrapper};
-    use futures::Future;
 
     struct ConnectionBuilder<S> {
         addr: SocketAddr,
@@ -258,8 +255,6 @@ mod tests {
         use proptest_derive::Arbitrary;
         use serde::{Deserialize, Serialize};
 
-        use crate::distributed::sonic;
-
         use super::super::Message;
 
         pub struct CounterService {
@@ -279,7 +274,7 @@ mod tests {
         impl Message<CounterService> for Change {
             type Response = i32;
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> crate::Result<Self::Response> {
                 let prev = server
                     .counter
                     .fetch_add(self.amount, std::sync::atomic::Ordering::SeqCst);
@@ -291,7 +286,7 @@ mod tests {
         impl Message<CounterService> for Reset {
             type Response = ();
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> crate::Result<Self::Response> {
                 server.counter.store(0, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
