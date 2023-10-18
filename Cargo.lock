@@ -1254,6 +1254,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "entity_index"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.4",
+ "bincode",
+ "imager",
+ "itertools 0.11.0",
+ "kv",
+ "md5",
+ "parse_wiki_text",
+ "serde",
+ "stdx",
+ "tantivy",
+ "thiserror",
+ "tokenizer",
+ "tracing",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4304,6 +4325,7 @@ dependencies = [
  "dashmap",
  "distributed",
  "encoding_rs",
+ "entity_index",
  "eventsource-stream",
  "fend-core",
  "flate2",

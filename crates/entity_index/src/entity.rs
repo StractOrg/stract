@@ -214,7 +214,8 @@ impl EntitySnippet {
         EntitySnippet { fragments }
     }
 
-    #[cfg(test)]
+    // TODO: re-add this when we have moved the rest of entity here
+    // #[cfg(test)]
     pub fn to_md(&self, strip_href_prefix: Option<&str>) -> String {
         self.fragments
             .iter()

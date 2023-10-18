@@ -19,7 +19,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::entity_index::{
+use entity_index::{
     entity::{EntitySnippet, Span},
     EntityMatch,
 };
@@ -100,7 +100,7 @@ fn maybe_prettify_entity_date(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::entity_index::entity::Link;
+    use entity_index::entity::Link;
 
     use super::*;
 

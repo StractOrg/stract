@@ -19,6 +19,7 @@ pub mod distributed;
 pub mod local;
 
 pub use distributed::*;
+use entity_index::EntityMatch;
 pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,6 @@ use utoipa::ToSchema;
 use crate::{
     bangs::BangHit,
     config::defaults,
-    entity_index::EntityMatch,
     ranking::pipeline::RankingWebsite,
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,

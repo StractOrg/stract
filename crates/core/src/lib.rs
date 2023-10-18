@@ -38,7 +38,6 @@ mod collector;
 pub mod config;
 pub mod crawler;
 mod directory;
-mod entity_index;
 mod enum_map;
 mod executor;
 mod fastfield_reader;

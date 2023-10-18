@@ -33,6 +33,7 @@ csv = "1.1.6"
 dashmap = {version = "5.4.0", features = ["rayon"]}
 distributed = { path = "crates/distributed" }
 encoding_rs = "0.8.31"
+entity_index = { path = "./crates/entity_index" }
 eventsource-stream = "0.2.3"
 fend-core = "1.2.2"
 flate2 = "1.0.28"

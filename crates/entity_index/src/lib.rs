@@ -40,10 +40,18 @@ use tokenizer::Normal;
 use tracing::info;
 use url::Url;
 
-use crate::Result;
-
 use self::entity::{Entity, Link, Span};
-pub(crate) mod entity;
+pub mod entity;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+    #[error("tantivy error")]
+    Tantivy(#[from] tantivy::error::TantivyError),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct EntityIndex {
     image_store: EntityImageStore,
@@ -181,7 +189,7 @@ impl EntityIndex {
             path.as_ref().join("attribute_occurrences"),
         ));
 
-        let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
+        let stopwords: HashSet<String> = include_str!("../../core/stopwords/English.txt")
             .lines()
             .take(50)
             .map(str::to_ascii_lowercase)

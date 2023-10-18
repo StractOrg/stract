@@ -15,22 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageError, ImageOutputFormat};
+use image::{DynamicImage, ImageOutputFormat};
 use kv::{rocksdb_store::RocksDbStore, Kv};
 use serde::{de, ser::SerializeStruct, Serialize};
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("image was not of format: {format:?}")]
-    InvalidImageFormat {
-        source: ImageError,
-        format: image::ImageFormat,
-    },
-}
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+use crate::{Error, Result};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Image(DynamicImage);

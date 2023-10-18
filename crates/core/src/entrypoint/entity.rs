@@ -14,19 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use entity_index::{
+    entity::{Entity, Paragraph, Span, WikiNodeExt},
+    EntityIndex,
+};
 use std::{
     collections::{BTreeMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
 };
 
-use crate::{
-    entity_index::{
-        entity::{Entity, Paragraph, Span, WikiNodeExt},
-        EntityIndex,
-    },
-    Result,
-};
+use crate::Result;
 
 use bzip2::bufread::MultiBzDecoder;
 use itertools::Itertools;
@@ -291,7 +289,7 @@ impl EntityBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::entity_index::entity::EntitySnippet;
+    use entity_index::entity::EntitySnippet;
 
     use super::*;
 

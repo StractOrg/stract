@@ -43,6 +43,7 @@ csv = {workspace = true}
 dashmap = {workspace = true}
 distributed.workspace = true
 encoding_rs = {workspace = true}
+entity_index.workspace = true
 eventsource-stream = {workspace = true}
 fend-core = {workspace = true}
 flate2 = {workspace = true}

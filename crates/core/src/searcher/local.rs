@@ -23,7 +23,6 @@ use tantivy::TantivyDocument;
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
-use crate::entity_index::{EntityIndex, EntityMatch};
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;
@@ -41,6 +40,7 @@ use crate::spell::Spell;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
 use crate::{inverted_index, Error, Result};
+use entity_index::{EntityIndex, EntityMatch};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
