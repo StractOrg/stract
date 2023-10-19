@@ -45,7 +45,6 @@ pub mod index;
 mod llm_utils;
 mod metrics;
 pub mod naive_bayes;
-pub mod prehashed;
 #[cfg(feature = "libtorch")]
 mod qa_model;
 mod query;

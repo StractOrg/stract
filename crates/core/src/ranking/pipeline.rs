@@ -394,12 +394,10 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
+    use stdx::prehashed::Prehashed;
 
     use crate::ranking::models::cross_encoder::DummyCrossEncoder;
-    use crate::{
-        collector::Hashes, inverted_index::DocAddress, prehashed::Prehashed,
-        ranking::initial::Score,
-    };
+    use crate::{collector::Hashes, inverted_index::DocAddress, ranking::initial::Score};
 
     use super::*;
 

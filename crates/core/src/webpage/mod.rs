@@ -13,14 +13,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{prehashed::hash, simhash, Error, Result};
+use crate::{simhash, Error, Result};
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use schema::{FastField, Field, TextField, ALL_FIELDS, FLOAT_SCALING};
 use std::{collections::HashMap, panic, str::FromStr};
-use stdx::enum_map::EnumSet;
+use stdx::{enum_map::EnumSet, prehashed::hash};
 use tantivy::{
     tokenizer::{PreTokenizedString, Tokenizer},
     TantivyDocument,
