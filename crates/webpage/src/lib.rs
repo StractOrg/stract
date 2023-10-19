@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{Error, Result};
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
@@ -40,6 +39,54 @@ use self::{
     region::Region,
     url_ext::UrlExt,
 };
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Encountered an empty required field ({0}) when converting to tantivy")]
+    EmptyField(&'static str),
+
+    // #[error("Parsing error")]
+    // ParsingError(String),
+
+    // #[error("Failed to download warc files after all retries")]
+    // DownloadFailed,
+
+    // #[error("Query cannot be completely empty")]
+    // EmptyQuery,
+    #[error("Unknown region")]
+    UnknownRegion,
+
+    // #[error("Unknown CLI option")]
+    // UnknownCLIOption,
+
+    // #[error("The stackoverflow schema was not structured as expected")]
+    // InvalidStackoverflowSchema,
+
+    // #[error("Internal error")]
+    // InternalError(String),
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error")]
+    Json(#[from] serde_json::Error),
+
+    #[error("URL parse error")]
+    Url(#[from] url::ParseError),
+
+    #[error("CSV error")]
+    Csv(#[from] csv::Error),
+
+    #[error("Bincode error")]
+    Bincode(#[from] bincode::Error),
+
+    #[error("Unknown webpage robots meta tag")]
+    UnknownRobotsMetaTag,
+
+    #[error("Unknown microformat")]
+    UnknownMicroformat,
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
     Regex::new(r"(((http|ftp|https):/{2})+(([0-9a-z_-]+\.)+(aero|asia|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|cz|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mn|mn|mo|mp|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|nom|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ra|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|arpa)(:[0-9]+)?((/([~0-9a-zA-Z\#\+%@\./_-]+))?(\?[0-9a-zA-Z\+%@/&\[\];=_-]+)?)?))\b").unwrap()
@@ -123,7 +170,8 @@ pub struct Webpage {
 }
 
 impl Webpage {
-    #[cfg(test)]
+    // TODO: I needed to make this for all targets due to #[cfg(test)] not being exported
+    // #[cfg(test)]
     pub fn new(html: &str, url: &str) -> Result<Self> {
         let html = Html::parse(html, url)?;
 
@@ -284,13 +332,13 @@ enum RobotsMeta {
 }
 
 impl FromStr for RobotsMeta {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "noindex" => Ok(RobotsMeta::NoIndex),
             "nofollow" => Ok(RobotsMeta::NoFollow),
-            _ => Err(Error::UnknownRobotsMetaTag.into()),
+            _ => Err(Error::UnknownRobotsMetaTag),
         }
     }
 }
@@ -341,7 +389,7 @@ impl From<Microformat> for usize {
 }
 
 impl TryFrom<usize> for Microformat {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(value: usize) -> Result<Self> {
         match value {
@@ -351,7 +399,7 @@ impl TryFrom<usize> for Microformat {
             3 => Ok(Microformat::HRecipe),
             4 => Ok(Microformat::HReview),
             5 => Ok(Microformat::HProduct),
-            _ => Err(anyhow::anyhow!("Unknown microformat")),
+            _ => Err(Error::UnknownMicroformat),
         }
     }
 }
@@ -384,7 +432,8 @@ impl Html {
         Ok(html)
     }
 
-    #[cfg(test)]
+    // TODO: I needed to make this for all targets due to #[cfg(test)] not being exported
+    // #[cfg(test)]
     pub fn set_clean_text(&mut self, text: String) {
         self.clean_text = Some(text);
     }
@@ -842,7 +891,7 @@ impl Html {
         let title = self.title();
 
         if title.is_none() {
-            return Err(Error::EmptyField("title").into());
+            return Err(Error::EmptyField("title"));
         }
         let title = title.unwrap();
 
@@ -853,7 +902,7 @@ impl Html {
         let all_text = self.all_text();
 
         if all_text.is_none() {
-            return Err(Error::EmptyField("all body").into());
+            return Err(Error::EmptyField("all body"));
         }
         let all_text = all_text.unwrap();
 
@@ -1570,7 +1619,7 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::webpage::url_ext::UrlExt;
+    use crate::url_ext::UrlExt;
     use schema::create_schema;
 
     use super::*;
@@ -1752,7 +1801,7 @@ mod tests {
     #[test]
     fn hard_parsing() {
         let webpage = Html::parse(
-            include_str!("../../testcases/parsing/yasudaya.html"),
+            include_str!("../../core/testcases/parsing/yasudaya.html"),
             "https://example.com",
         )
         .unwrap();
@@ -1764,7 +1813,7 @@ mod tests {
         assert!(!webpage.all_text().unwrap().is_empty());
 
         let webpage = Html::parse(
-            include_str!("../../testcases/parsing/5390001.html"),
+            include_str!("../../core/testcases/parsing/5390001.html"),
             "https://example.com",
         )
         .unwrap();
@@ -1776,7 +1825,7 @@ mod tests {
         assert!(!webpage.all_text().unwrap().is_empty());
 
         let webpage = Html::parse(
-            include_str!("../../testcases/parsing/77p2p-7.live-105.html"),
+            include_str!("../../core/testcases/parsing/77p2p-7.live-105.html"),
             "https://example.com",
         )
         .unwrap();
@@ -1791,7 +1840,7 @@ mod tests {
     #[test]
     fn reddit_comments() {
         let webpage = Html::parse(
-            include_str!("../../testcases/parsing/reddit.html"),
+            include_str!("../../core/testcases/parsing/reddit.html"),
             "https://reddit.com/",
         )
         .unwrap();
@@ -1807,7 +1856,7 @@ mod tests {
     #[test]
     fn out_of_bounds_str() {
         let webpage = Html::parse(
-            include_str!("../../testcases/parsing/byte_index_out_of_bounds.html"),
+            include_str!("../../core/testcases/parsing/byte_index_out_of_bounds.html"),
             "https://example.com",
         )
         .unwrap();
@@ -2269,7 +2318,8 @@ mod tests {
 
     #[test]
     fn stackoverflow_question_has_clean_text() {
-        let stackoverflow = include_str!("../../testcases/schema_org/stackoverflow_with_code.html");
+        let stackoverflow =
+            include_str!("../../core/testcases/schema_org/stackoverflow_with_code.html");
         let html = Html::parse(stackoverflow, "https://www.example.com").unwrap();
 
         assert!(html.clean_text().is_some());

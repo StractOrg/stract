@@ -19,6 +19,7 @@ use http::StatusCode;
 use optics::{Optic, SiteRankings};
 use std::sync::Arc;
 use utoipa::ToSchema;
+use webpage::region::Region;
 
 use axum::Json;
 use axum_macros::debug_handler;
@@ -26,7 +27,6 @@ use axum_macros::debug_handler;
 use crate::{
     bangs::BangHit,
     searcher::{self, SearchQuery, SearchResult, WebsitesResult},
-    webpage::region::Region,
 };
 
 use super::State;

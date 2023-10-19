@@ -17,12 +17,12 @@
 use publicsuffix::Psl;
 
 static FULL_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
-    include_str!("../../public_suffix_list.dat")
+    include_str!("../../core/public_suffix_list.dat")
         .parse()
         .expect("Failed to parse public suffix list")
 });
 static ICANN_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
-    include_str!("../../public_icann_suffix.dat")
+    include_str!("../../core/public_icann_suffix.dat")
         .parse()
         .expect("Failed to parse public icann suffix list")
 });

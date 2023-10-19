@@ -17,7 +17,7 @@
 use rand::seq::SliceRandom;
 use tracing::info;
 
-use crate::{webpage, Result};
+use crate::Result;
 use std::path::Path;
 
 const TEST_SIZE: f64 = 0.2;

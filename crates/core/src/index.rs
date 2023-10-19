@@ -24,6 +24,10 @@ use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use url::Url;
 use webgraph::NodeID;
+use webpage::{
+    region::{Region, RegionCount},
+    Webpage,
+};
 
 use crate::collector::MainCollector;
 use crate::directory::{self, DirEntry};
@@ -31,8 +35,6 @@ use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
 use crate::subdomain_count::SubdomainCounter;
-use crate::webpage::region::{Region, RegionCount};
-use crate::webpage::Webpage;
 use crate::Result;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";

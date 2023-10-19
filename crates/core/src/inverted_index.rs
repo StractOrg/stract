@@ -41,6 +41,7 @@ use tokenizer::{
 };
 use url::Url;
 use webgraph::NodeID;
+use webpage::{region::Region, schema_org, Webpage};
 
 use crate::collector::{Hashes, MainCollector};
 use crate::config::SnippetConfig;
@@ -52,8 +53,6 @@ use crate::ranking::SignalAggregator;
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
-use crate::webpage::region::Region;
-use crate::webpage::{schema_org, Webpage};
 use crate::Result;
 use std::collections::HashSet;
 use std::fs;
@@ -655,11 +654,11 @@ impl From<TantivyDocument> for RetrievedWebpage {
 #[cfg(test)]
 mod tests {
     use maplit::hashmap;
+    use webpage::Html;
 
     use crate::{
         ranking::{Ranker, SignalAggregator},
         searcher::SearchQuery,
-        webpage::Html,
     };
 
     use super::*;

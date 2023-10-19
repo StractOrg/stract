@@ -24,6 +24,7 @@ pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use webpage::region::Region;
 
 use crate::{
     bangs::BangHit,
@@ -33,7 +34,6 @@ use crate::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
     },
     spell::Correction,
-    webpage::region::Region,
     widgets::Widget,
 };
 

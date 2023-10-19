@@ -18,7 +18,6 @@ use crate::{
     config::{self, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
-    webpage::Html,
     Result,
 };
 use itertools::Itertools;
@@ -27,6 +26,7 @@ use std::{fs, path::Path};
 use tokio::pin;
 use tracing::{info, trace};
 use webgraph::{Node, WebgraphWriter};
+use webpage::Html;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct GraphPointer {

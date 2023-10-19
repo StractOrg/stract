@@ -89,7 +89,7 @@ impl Region {
             "ger" => Ok(Region::Germany),
             "spa" => Ok(Region::Spain),
             "us" => Ok(Region::US),
-            _ => Err(Error::UnknownRegion.into()),
+            _ => Err(Error::UnknownRegion),
         }
     }
 
@@ -101,9 +101,9 @@ impl Region {
                 whatlang::Lang::Fra => Ok(Region::France),
                 whatlang::Lang::Deu => Ok(Region::Germany),
                 whatlang::Lang::Dan => Ok(Region::Denmark),
-                _ => Err(Error::UnknownRegion.into()),
+                _ => Err(Error::UnknownRegion),
             },
-            None => Err(Error::UnknownRegion.into()),
+            None => Err(Error::UnknownRegion),
         }
     }
 

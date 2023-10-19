@@ -26,13 +26,13 @@ pub mod signal;
 
 use initial::InitialScoreTweaker;
 use schema::fastfield_reader::FastFieldReader;
+use webpage::region::Region;
 
 use crate::{
     collector::{MainCollector, MaxDocsConsidered, TopDocs},
     config::CollectorConfig,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
-    webpage::region::Region,
 };
 
 pub use self::signal::*;
@@ -133,11 +133,11 @@ impl Ranker {
 mod tests {
 
     use optics::Optic;
+    use webpage::{Html, Webpage};
 
     use crate::{
         index::Index,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::{Html, Webpage},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";

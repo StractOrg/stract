@@ -21,8 +21,7 @@ use webgraph::{
     centrality::{top_hosts, TopHosts},
     NodeID, Webgraph,
 };
-
-use crate::webpage::url_ext::UrlExt;
+use webpage::url_ext::UrlExt;
 
 use super::{Feed, FeedIndex};
 

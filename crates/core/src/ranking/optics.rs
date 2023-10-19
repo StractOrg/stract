@@ -18,12 +18,12 @@
 mod tests {
     use optics::SiteRankings;
     use webgraph::{Node, WebgraphWriter};
+    use webpage::{Html, Webpage};
 
     use crate::{
         index::Index,
         ranking::inbound_similarity::InboundSimilarity,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::{Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 

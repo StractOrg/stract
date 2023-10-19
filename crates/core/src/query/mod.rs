@@ -15,18 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    inverted_index::InvertedIndex,
-    query::parser::TermCompound,
-    ranking::SignalCoefficient,
-    search_ctx::Ctx,
-    searcher::SearchQuery,
-    webpage::{region::Region, safety_classifier},
-    Result,
+    inverted_index::InvertedIndex, query::parser::TermCompound, ranking::SignalCoefficient,
+    search_ctx::Ctx, searcher::SearchQuery, Result,
 };
 use optics::{Optic, SiteRankings};
 use schema::{Field, TextField};
 use std::collections::HashMap;
 use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
+use webpage::{region::Region, safety_classifier};
 
 mod const_query;
 pub mod intersection;
@@ -243,8 +239,8 @@ mod tests {
         index::Index,
         rand_words,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::Webpage,
     };
+    use webpage::Webpage;
 
     use super::*;
 

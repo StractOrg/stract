@@ -31,14 +31,14 @@ pub enum Property {
     Item(Item),
 }
 impl Property {
-    pub(crate) fn try_into_string(&self) -> Option<String> {
+    pub fn try_into_string(&self) -> Option<String> {
         match self {
             Property::String(s) => Some(s.clone()),
             Property::Item(_) => None,
         }
     }
 
-    pub(crate) fn try_into_item(&self) -> Option<Item> {
+    pub fn try_into_item(&self) -> Option<Item> {
         match self {
             Property::String(_) => None,
             Property::Item(it) => Some(it.clone()),
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn stackoverflow_question() {
-        let html = include_str!("../../../testcases/schema_org/stackoverflow.html");
+        let html = include_str!("../../../core/testcases/schema_org/stackoverflow.html");
         let root = kuchiki::parse_html().one(html);
         let res = microdata::parse_schema(root);
 
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn stackoverflow_question_with_code() {
-        let html = include_str!("../../../testcases/schema_org/stackoverflow_with_code.html");
+        let html = include_str!("../../../core/testcases/schema_org/stackoverflow_with_code.html");
         let root = kuchiki::parse_html().one(html);
         let res = microdata::parse_schema(root);
 
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn recipe() {
-        let html = include_str!("../../../testcases/schema_org/recipe.html");
+        let html = include_str!("../../../core/testcases/schema_org/recipe.html");
         let root = kuchiki::parse_html().one(html);
         let res = microdata::parse_schema(root);
 

@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webpage::url_ext::UrlExt;
 use kv::{rocksdb_store::RocksDbStore, Kv};
 use std::{collections::HashSet, path::Path};
 use stdx::prehashed::{hash, Prehashed};
 use url::Url;
+use webpage::url_ext::UrlExt;
 
 pub struct SubdomainCounter {
     inner: Box<dyn Kv<Prehashed, HashSet<String>>>,

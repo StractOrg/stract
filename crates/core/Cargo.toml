@@ -112,6 +112,7 @@ utoipa-swagger-ui = {workspace = true}
 uuid = {workspace = true}
 warc.workspace = true
 webgraph.workspace = true
+webpage.workspace = true
 whatlang = {workspace = true}
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

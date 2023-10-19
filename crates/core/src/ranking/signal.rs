@@ -16,7 +16,6 @@
 
 use crate::{
     query::{optic::AsSearchableRule, Query},
-    webpage::Webpage,
     Result,
 };
 use optics::ast::RankingTarget;
@@ -37,11 +36,13 @@ use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 use utoipa::ToSchema;
 use webgraph::NodeID;
+use webpage::{
+    region::{Region, RegionCount},
+    Webpage,
+};
 
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};
-
-use crate::webpage::region::{Region, RegionCount};
 
 use super::bm25::Bm25Weight;
 use super::models::linear::LinearRegression;

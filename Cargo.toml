@@ -122,6 +122,7 @@ utoipa-swagger-ui = {version = "4.0.0", features = ["axum"]}
 uuid = "1.1.2"
 warc = { path = "./crates/warc" }
 webgraph = { path = "./crates/webgraph" }
+webpage = { path = "./crates/webpage" }
 whatlang = "0.16.0"
 
 

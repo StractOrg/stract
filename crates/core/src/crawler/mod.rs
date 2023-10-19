@@ -19,8 +19,9 @@ use std::{collections::VecDeque, sync::Arc, time::Duration};
 use hashbrown::HashMap;
 
 use url::Url;
+use webpage::url_ext::UrlExt;
 
-use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
+use crate::config::CrawlerConfig;
 
 use self::{warc_writer::WarcWriter, worker::WorkerThread};
 

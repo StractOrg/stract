@@ -24,6 +24,7 @@ use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 use webgraph::Node;
+use webpage::region::Region;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
@@ -39,7 +40,6 @@ use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIG
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Spell;
-use crate::webpage::region::Region;
 use crate::{inverted_index, Error, Result};
 
 use super::WebsitesResult;
@@ -415,10 +415,8 @@ impl LocalSearcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        searcher::NUM_RESULTS_PER_PAGE,
-        webpage::{Html, Webpage},
-    };
+    use crate::searcher::NUM_RESULTS_PER_PAGE;
+    use webpage::{Html, Webpage};
 
     use super::*;
 

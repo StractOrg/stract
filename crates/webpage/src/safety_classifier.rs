@@ -77,7 +77,7 @@ fn normalize(text: &str) -> String {
         .to_lowercase()
 }
 
-pub fn page_text(page: &crate::webpage::Webpage) -> String {
+pub fn page_text(page: &crate::Webpage) -> String {
     page.html.title().unwrap_or_default()
         + " "
         + page.html.clean_text().cloned().unwrap_or_default().as_str()
@@ -120,7 +120,7 @@ impl Model {
         self.pipeline.predict(&text)
     }
 
-    pub fn predict(&self, page: &crate::webpage::Webpage) -> naive_bayes::Prediction<Label> {
+    pub fn predict(&self, page: &crate::Webpage) -> naive_bayes::Prediction<Label> {
         let text = normalize(&page_text(page));
         self.predict_text(&text)
     }

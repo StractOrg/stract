@@ -17,12 +17,9 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
+use webpage::schema_org::{self, Item, OneOrMany, Property};
 
-use crate::{
-    inverted_index::RetrievedWebpage,
-    webpage::schema_org::{self, Item, OneOrMany, Property},
-    Error,
-};
+use crate::{inverted_index::RetrievedWebpage, Error};
 
 use super::{DisplayedSidebar, Snippet};
 use crate::Result;

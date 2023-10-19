@@ -36,7 +36,7 @@ use utoipa_swagger_ui::SwaggerUi;
         ),
         components(
             schemas(
-                crate::webpage::region::Region,
+                webpage::region::Region,
                 optics::SiteRankings,
                 search::ApiSearchQuery,
                 search::ApiSearchResult,

@@ -65,7 +65,7 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::{RawOneOrMany, RawProperty};
+    use crate::schema_org::{RawOneOrMany, RawProperty};
 
     use super::*;
 

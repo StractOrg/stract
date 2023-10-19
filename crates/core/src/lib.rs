@@ -59,7 +59,6 @@ mod subdomain_count;
 pub mod summarizer;
 #[allow(unused)]
 mod ttl_cache;
-pub mod webpage;
 mod widgets;
 
 #[derive(thiserror::Error, Debug)]

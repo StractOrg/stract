@@ -214,12 +214,12 @@ impl InboundSimilarity {
 mod tests {
     use optics::SiteRankings;
     use webgraph::{Node, WebgraphWriter};
+    use webpage::{Html, Webpage};
 
     use crate::{
         index::Index,
         rand_words,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::{Html, Webpage},
     };
 
     use super::*;

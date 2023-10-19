@@ -16,11 +16,11 @@
 
 use std::ops::Range;
 use tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
+use webpage::region::Region;
 
 use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::spell::sentence_ranges;
-use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;
 
@@ -333,8 +333,8 @@ mod tests {
         index::Index,
         search_prettifier::Snippet,
         searcher::{LocalSearcher, SearchQuery},
-        webpage::Webpage,
     };
+    use webpage::Webpage;
 
     const TEST_TEXT: &str = r#"Rust is a systems programming language sponsored by
 Mozilla which describes it as a "safe, concurrent, practical language", supporting functional and

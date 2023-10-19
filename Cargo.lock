@@ -4369,6 +4369,7 @@ dependencies = [
  "uuid",
  "warc",
  "webgraph",
+ "webpage",
  "whatlang",
 ]
 
@@ -5472,6 +5473,37 @@ dependencies = [
  "url",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "webpage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "chrono",
+ "csv",
+ "itertools 0.11.0",
+ "kuchiki",
+ "maplit",
+ "naive_bayes",
+ "once_cell",
+ "publicsuffix",
+ "regex",
+ "rust-stemmers",
+ "schema",
+ "serde",
+ "serde_json",
+ "simhash",
+ "stdx",
+ "tantivy",
+ "thiserror",
+ "tokenizer",
+ "tracing",
+ "url",
+ "utoipa",
+ "webgraph",
+ "whatlang",
 ]
 
 [[package]]

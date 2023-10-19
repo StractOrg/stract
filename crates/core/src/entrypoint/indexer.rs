@@ -25,13 +25,13 @@ use tokio::pin;
 use tracing::{debug, info, trace, warn};
 use warc::PayloadType;
 use webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
+use webpage::{safety_classifier, Html, Webpage};
 
 use crate::config;
 use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::SignalAggregator;
-use crate::webpage::{safety_classifier, Html, Webpage};
 use crate::{human_website_annotations, Result};
 
 pub struct Indexer {}

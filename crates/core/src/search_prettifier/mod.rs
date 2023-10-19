@@ -23,13 +23,13 @@ use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
+use webpage::url_ext::UrlExt;
 
 use crate::{
     inverted_index::RetrievedWebpage,
     ranking::{Signal, SignalScore},
     snippet::TextSnippet,
     spell::{self, CorrectionTerm},
-    webpage::url_ext::UrlExt,
 };
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
