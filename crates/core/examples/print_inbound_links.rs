@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use stract::{
-    ranking::inbound_similarity::InboundSimilarity,
-    webgraph::{Node, WebgraphBuilder},
-};
+use stract::ranking::inbound_similarity::InboundSimilarity;
+use webgraph::{Node, WebgraphBuilder};
 
 pub fn main() {
     let graph = WebgraphBuilder::new("data/webgraph").open();

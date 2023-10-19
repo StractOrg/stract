@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::hyperloglog::HyperLogLog;
+use hyperloglog::HyperLogLog;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Hyperloglog", |b| {

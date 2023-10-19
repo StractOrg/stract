@@ -17,14 +17,12 @@
 use hashbrown::{HashMap, HashSet};
 use kv::rocksdb_store::RocksDbStore;
 use url::Url;
-
-use crate::{
-    webgraph::{
-        centrality::{top_hosts, TopHosts},
-        NodeID, Webgraph,
-    },
-    webpage::url_ext::UrlExt,
+use webgraph::{
+    centrality::{top_hosts, TopHosts},
+    NodeID, Webgraph,
 };
+
+use crate::webpage::url_ext::UrlExt;
 
 use super::{Feed, FeedIndex};
 

@@ -20,11 +20,9 @@ use axum::{extract, response::IntoResponse, Json};
 use distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff};
 use http::StatusCode;
 use utoipa::{IntoParams, ToSchema};
+use webgraph::{FullEdge, Node};
 
-use crate::{
-    entrypoint::webgraph_server::GraphLevel,
-    webgraph::{FullEdge, Node},
-};
+use crate::entrypoint::webgraph_server::GraphLevel;
 
 use super::State;
 

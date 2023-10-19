@@ -17,14 +17,12 @@
 use anyhow::Result;
 use kv::{rocksdb_store::RocksDbStore, Kv};
 use std::{cmp::Reverse, collections::BinaryHeap, fs::File, path::Path};
-
-use crate::{
-    ranking::inbound_similarity::InboundSimilarity,
-    webgraph::{
-        centrality::{derived_harmonic::DerivedCentrality, harmonic::HarmonicCentrality},
-        Node, WebgraphBuilder,
-    },
+use webgraph::{
+    centrality::{derived_harmonic::DerivedCentrality, harmonic::HarmonicCentrality},
+    Node, WebgraphBuilder,
 };
+
+use crate::ranking::inbound_similarity::InboundSimilarity;
 
 fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
     let csv_file = File::options()

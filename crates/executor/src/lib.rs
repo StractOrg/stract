@@ -14,10 +14,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Error, Result};
-
 use crossbeam_channel::unbounded;
 use rayon::{ThreadPool, ThreadPoolBuilder};
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("At least one of the scheduled jobs failed")]
+    AtLeastOneOfTheScheduledJobsFailed,
+    #[error("Rayon thread pool error")]
+    Rayon(#[from] rayon::ThreadPoolBuildError),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub enum Executor {
     #[allow(unused)]
@@ -88,10 +96,7 @@ impl Executor {
                 let results: Vec<R> = result_placeholders.into_iter().flatten().collect();
 
                 if results.len() != num_jobs {
-                    return Err(Error::InternalError(
-                        "At least one of the scheduled jobs failed.".to_string(),
-                    )
-                    .into());
+                    return Err(Error::AtLeastOneOfTheScheduledJobsFailed);
                 }
 
                 Ok(results)

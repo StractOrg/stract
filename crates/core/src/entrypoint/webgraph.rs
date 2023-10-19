@@ -18,7 +18,6 @@ use crate::{
     config::{self, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
-    webgraph::{self, Node, WebgraphWriter},
     webpage::Html,
     Result,
 };
@@ -27,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 use tokio::pin;
 use tracing::{info, trace};
+use webgraph::{Node, WebgraphWriter};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct GraphPointer {
@@ -69,7 +69,7 @@ pub struct Job {
 pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
-        crate::executor::Executor::single_thread(),
+        executor::Executor::single_thread(),
         webgraph::Compression::Lz4,
     )
 }
@@ -77,7 +77,7 @@ pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWrit
 pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
-        crate::executor::Executor::single_thread(),
+        executor::Executor::single_thread(),
         webgraph::Compression::Lz4,
     )
 }

@@ -20,13 +20,13 @@ use std::fs;
 use std::path::Path;
 use stract::config;
 use stract::entrypoint::autosuggest_scrape::{self, Gl};
+use webgraph::WebgraphBuilder;
 
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
 
 use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
-use stract::webgraph::WebgraphBuilder;
 use tracing_subscriber::prelude::*;
 
 #[cfg(not(target_env = "msvc"))]

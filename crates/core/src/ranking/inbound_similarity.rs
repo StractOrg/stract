@@ -25,11 +25,9 @@ use dashmap::DashMap;
 use intmap::{IntMap, IntSet};
 use rayon::prelude::ParallelIterator;
 use serde::{Deserialize, Serialize};
+use webgraph::{NodeID, Webgraph};
 
-use crate::{
-    webgraph::{NodeID, Webgraph},
-    Result,
-};
+use crate::Result;
 
 use super::bitvec_similarity;
 
@@ -215,12 +213,12 @@ impl InboundSimilarity {
 #[cfg(test)]
 mod tests {
     use optics::SiteRankings;
+    use webgraph::{Node, WebgraphWriter};
 
     use crate::{
         index::Index,
         rand_words,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
@@ -230,8 +228,8 @@ mod tests {
     fn it_favors_liked_sites() {
         let mut wrt = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            webgraph::Compression::default(),
         );
 
         wrt.insert(Node::from("a.com"), Node::from("b.com"), String::new());
@@ -259,8 +257,8 @@ mod tests {
     fn it_ranks_search_results() {
         let mut wrt = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            webgraph::Compression::default(),
         );
 
         wrt.insert(Node::from("b.com"), Node::from("a.com"), String::new());

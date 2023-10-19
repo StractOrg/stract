@@ -23,12 +23,14 @@ use std::{
     sync::{atomic::AtomicUsize, Mutex},
 };
 use url::Url;
+use webgraph::{
+    centrality::{top_hosts, TopHosts},
+    NodeID, Webgraph,
+};
 
-use crate::webgraph::centrality::{top_hosts, TopHosts};
 use crate::{
     config::CrawlPlannerConfig,
     crawler::{file_queue::FileQueueWriter, Job},
-    webgraph::{NodeID, Webgraph},
 };
 
 use super::Domain;

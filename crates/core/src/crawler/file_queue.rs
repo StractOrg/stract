@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut writer = FileQueueWriter::new(crate::gen_temp_path()).unwrap();
+        let mut writer = FileQueueWriter::new(stdx::gen_temp_path()).unwrap();
 
         writer.push("Hello".to_string()).unwrap();
         writer.push("World".to_string()).unwrap();
@@ -201,7 +201,7 @@ mod tests {
         fn prop(data: Vec<String>) {
             let expected = data.clone();
 
-            let mut writer = FileQueueWriter::new(crate::gen_temp_path()).unwrap();
+            let mut writer = FileQueueWriter::new(stdx::gen_temp_path()).unwrap();
 
             for item in data {
                 writer.push(item).unwrap();

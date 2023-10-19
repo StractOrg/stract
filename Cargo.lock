@@ -1262,6 +1262,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "executor"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "num_cpus",
+ "rayon",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "exr"
 version = "1.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4259,6 +4270,7 @@ dependencies = [
  "distributed",
  "encoding_rs",
  "entity_index",
+ "executor",
  "fend-core",
  "flate2",
  "fst",
@@ -4330,6 +4342,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "warc",
+ "webgraph",
  "whatlang",
 ]
 
@@ -5406,6 +5419,34 @@ checksum = "9b85cbef8c220a6abc02aefd892dfc0fc23afb1c6a426316ec33253a3877249b"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webgraph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bitvec",
+ "executor",
+ "hyperloglog",
+ "indicatif 0.17.7",
+ "intmap",
+ "itertools 0.11.0",
+ "kv",
+ "lz4_flex",
+ "maplit",
+ "md5",
+ "memmap2",
+ "rayon",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tracing",
+ "url",
+ "utoipa",
+ "uuid",
 ]
 
 [[package]]

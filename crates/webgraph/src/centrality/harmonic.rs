@@ -25,10 +25,7 @@ use crate::bloom::BloomFilter;
 use hyperloglog::HyperLogLog;
 use tracing::info;
 
-use crate::{
-    kahan_sum::KahanSum,
-    webgraph::{NodeID, Webgraph},
-};
+use crate::{kahan_sum::KahanSum, NodeID, Webgraph};
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
 
@@ -192,7 +189,7 @@ impl HarmonicCentrality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webgraph::{Node, WebgraphWriter};
+    use crate::{Node, WebgraphWriter};
 
     fn test_edges() -> Vec<(Node, Node, String)> {
         //     ┌────┐
@@ -217,8 +214,8 @@ mod tests {
     fn test_graph() -> Webgraph {
         let mut writer = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            crate::Compression::default(),
         );
 
         for (from, to, label) in test_edges() {
@@ -232,8 +229,8 @@ mod tests {
     fn host_harmonic_centrality() {
         let mut writer = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            crate::Compression::default(),
         );
 
         writer.insert(
@@ -340,8 +337,8 @@ mod tests {
 
         let mut other = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            crate::Compression::default(),
         );
 
         for (from, to, label) in test_edges() {

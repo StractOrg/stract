@@ -28,16 +28,12 @@ use sonic::{service::Message, sonic_service};
 use tracing::info;
 use url::Url;
 use utoipa::ToSchema;
+use webgraph::{Compression, FullEdge, Node, Webgraph, WebgraphBuilder};
 
 use crate::config;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
-use crate::webgraph::Compression;
-use crate::webgraph::FullEdge;
-use crate::webgraph::Node;
-use crate::webgraph::Webgraph;
-use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 
 #[derive(serde::Serialize, serde::Deserialize, ToSchema)]

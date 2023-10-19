@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::{ranking::inbound_similarity::InboundSimilarity, webgraph::WebgraphBuilder};
+use stract::ranking::inbound_similarity::InboundSimilarity;
+use webgraph::WebgraphBuilder;
 
 const WEBGRAPH_PATH: &str = "data/webgraph";
 

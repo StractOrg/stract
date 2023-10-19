@@ -33,19 +33,16 @@ pub mod alice;
 mod api;
 mod autosuggest;
 mod bangs;
-mod bloom;
 mod collector;
 pub mod config;
 pub mod crawler;
 mod directory;
 mod enum_map;
-mod executor;
 mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;
 mod improvement;
 pub mod index;
-mod kahan_sum;
 #[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;
@@ -68,7 +65,6 @@ mod subdomain_count;
 pub mod summarizer;
 #[allow(unused)]
 mod ttl_cache;
-pub mod webgraph;
 pub mod webpage;
 mod widgets;
 

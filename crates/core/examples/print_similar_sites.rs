@@ -17,8 +17,8 @@
 use stract::{
     ranking::inbound_similarity::InboundSimilarity,
     similar_sites::{ScoredNode, SimilarSitesFinder},
-    webgraph::WebgraphBuilder,
 };
+use webgraph::WebgraphBuilder;
 
 fn print_nodes(nodes: &[ScoredNode]) {
     for (i, node) in nodes.iter().enumerate() {

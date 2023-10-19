@@ -151,7 +151,7 @@ impl Segment {
 
 #[cfg(test)]
 mod test {
-    use crate::webgraph::FullNodeID;
+    use crate::FullNodeID;
 
     use super::*;
 

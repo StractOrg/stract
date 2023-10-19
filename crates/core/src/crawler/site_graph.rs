@@ -19,8 +19,7 @@
 use hashbrown::{HashMap, HashSet};
 use hyperloglog::HyperLogLog;
 use url::Url;
-
-use crate::kahan_sum::KahanSum;
+use webgraph::kahan_sum::KahanSum;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Node {

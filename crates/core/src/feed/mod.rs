@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn feed_index() {
-        let mut index = FeedIndex::open(crate::gen_temp_path()).unwrap();
+        let mut index = FeedIndex::open(stdx::gen_temp_path()).unwrap();
 
         let a = Feed {
             url: Url::parse("https://a.com/feed.xml").unwrap(),

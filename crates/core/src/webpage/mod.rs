@@ -17,9 +17,7 @@ use crate::{
     enum_map::EnumSet,
     prehashed::hash,
     schema::{FastField, TextField},
-    simhash,
-    webgraph::NodeID,
-    Error, Result,
+    simhash, Error, Result,
 };
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
@@ -31,6 +29,7 @@ use tantivy::{
     TantivyDocument,
 };
 use url::Url;
+use webgraph::NodeID;
 use whatlang::Lang;
 
 mod just_text;

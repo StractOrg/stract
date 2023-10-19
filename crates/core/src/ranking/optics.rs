@@ -17,12 +17,12 @@
 #[cfg(test)]
 mod tests {
     use optics::SiteRankings;
+    use webgraph::{Node, WebgraphWriter};
 
     use crate::{
         index::Index,
         ranking::inbound_similarity::InboundSimilarity,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
@@ -33,8 +33,8 @@ mod tests {
 
         let mut wrt = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            webgraph::Compression::default(),
         );
 
         wrt.insert(

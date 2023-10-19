@@ -234,12 +234,12 @@ impl AsTantivyQuery for Matching {
 #[cfg(test)]
 mod tests {
     use optics::{Optic, SiteRankings};
+    use webgraph::{Node, WebgraphWriter};
 
     use crate::{
         index::Index,
         ranking::inbound_similarity::InboundSimilarity,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
@@ -623,8 +623,8 @@ mod tests {
 
         let mut writer = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            webgraph::Compression::default(),
         );
 
         writer.insert(

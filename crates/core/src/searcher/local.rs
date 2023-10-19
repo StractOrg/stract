@@ -17,10 +17,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use entity_index::{EntityIndex, EntityMatch};
 use imager::image_store::Image;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
+use webgraph::Node;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
@@ -37,10 +39,8 @@ use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Spell;
-use crate::webgraph::Node;
 use crate::webpage::region::Region;
 use crate::{inverted_index, Error, Result};
-use entity_index::{EntityIndex, EntityMatch};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};

@@ -23,7 +23,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use intmap::IntMap;
 use serde::{Deserialize, Serialize};
 
-use crate::webgraph::{Node, NodeID, Webgraph};
+use crate::{Node, NodeID, Webgraph};
 
 fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32) {
     let mut centrality: HashMap<NodeID, f64> = HashMap::new();
@@ -162,15 +162,15 @@ impl Betweenness {
 mod tests {
     use maplit::hashmap;
 
-    use crate::webgraph::WebgraphWriter;
+    use crate::WebgraphWriter;
 
     use super::*;
 
     fn create_path_graph(n: usize) -> Webgraph {
         let mut writer = WebgraphWriter::new(
             stdx::gen_temp_path(),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
+            executor::Executor::single_thread(),
+            crate::Compression::default(),
         );
 
         for i in 0..n - 1 {

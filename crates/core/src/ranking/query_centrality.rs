@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::NodeID;
+use webgraph::NodeID;
 
 use super::inbound_similarity;
 

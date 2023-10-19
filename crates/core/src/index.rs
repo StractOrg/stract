@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use url::Url;
+use webgraph::NodeID;
 
 use crate::collector::MainCollector;
 use crate::directory::{self, DirEntry};
@@ -30,7 +31,6 @@ use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
 use crate::subdomain_count::SubdomainCounter;
-use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::Webpage;
 use crate::Result;

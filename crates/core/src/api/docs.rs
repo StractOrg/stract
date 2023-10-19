@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{autosuggest, explore, search, sites, summarize, webgraph};
+use super::{autosuggest, explore, search, sites, summarize};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -23,12 +23,12 @@ use utoipa_swagger_ui::SwaggerUi;
 #[openapi(
         paths(
             search::api,
-            webgraph::host::similar,
-            webgraph::host::knows,
-            webgraph::host::ingoing_hosts,
-            webgraph::host::outgoing_hosts,
-            webgraph::page::ingoing_pages,
-            webgraph::page::outgoing_pages,
+            super::webgraph::host::similar,
+            super::webgraph::host::knows,
+            super::webgraph::host::ingoing_hosts,
+            super::webgraph::host::outgoing_hosts,
+            super::webgraph::page::ingoing_pages,
+            super::webgraph::page::outgoing_pages,
             autosuggest::route,
             summarize::summarize_route,
             sites::sites_export_optic,
@@ -74,8 +74,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::bangs::BangHit,
                 crate::bangs::Bang,
 
-                webgraph::host::SimilarSitesParams,
-                webgraph::KnowsSite,
+                super::webgraph::host::SimilarSitesParams,
+                super::webgraph::KnowsSite,
                 crate::entrypoint::webgraph_server::ScoredSite,
 
                 autosuggest::Suggestion,
@@ -83,8 +83,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 sites::SitesExportOpticParams,
                 explore::ExploreExportOpticParams,
 
-                crate::webgraph::Node,
-                crate::webgraph::FullEdge,
+                webgraph::Node,
+                webgraph::FullEdge,
             ),
         ),
         modifiers(&ApiModifier),

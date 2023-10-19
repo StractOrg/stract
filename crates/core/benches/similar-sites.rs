@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::{
-    ranking::inbound_similarity::InboundSimilarity, similar_sites::SimilarSitesFinder,
-    webgraph::WebgraphBuilder,
-};
+use stract::{ranking::inbound_similarity::InboundSimilarity, similar_sites::SimilarSitesFinder};
+use webgraph::WebgraphBuilder;
 
 const WEBGRAPH_PATH: &str = "data/webgraph";
 const INBOUND_SIMILARITY_PATH: &str = "data/centrality/inbound_similarity";

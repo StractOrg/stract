@@ -23,10 +23,7 @@ use kv::{rocksdb_store::RocksDbStore, Kv};
 use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
-use crate::{
-    bloom::BloomFilter,
-    webgraph::{NodeID, Webgraph},
-};
+use crate::{bloom::BloomFilter, NodeID, Webgraph};
 
 struct BloomMap {
     map: Vec<Mutex<BloomFilter>>,

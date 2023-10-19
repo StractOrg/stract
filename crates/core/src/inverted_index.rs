@@ -37,6 +37,7 @@ use tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
 };
 use url::Url;
+use webgraph::NodeID;
 
 use crate::collector::{Hashes, MainCollector};
 use crate::config::SnippetConfig;
@@ -51,7 +52,6 @@ use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
-use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
 use crate::webpage::{schema_org, Webpage};
 use crate::Result;

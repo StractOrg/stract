@@ -22,7 +22,6 @@ use crate::{
     enum_map::EnumMap,
     fastfield_reader,
     schema::{FastField, TextField},
-    webgraph::NodeID,
     webpage::Webpage,
 };
 use optics::ast::RankingTarget;
@@ -37,6 +36,7 @@ use tantivy::query::{Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer;
 use thiserror::Error;
 use utoipa::ToSchema;
+use webgraph::NodeID;
 
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};

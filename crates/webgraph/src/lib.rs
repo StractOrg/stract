@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+mod bloom;
 mod segment;
 
 use std::collections::{BTreeMap, BinaryHeap};
@@ -22,13 +23,13 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
 
+use executor::Executor;
 use rayon::prelude::*;
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::executor::Executor;
-
 pub mod centrality;
+pub mod kahan_sum;
 mod store;
 use self::segment::{Segment, SegmentWriter};
 
@@ -992,7 +993,7 @@ mod test {
     #[test]
     fn edges_by_host() {
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            stdx::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );

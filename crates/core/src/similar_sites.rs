@@ -16,15 +16,12 @@
 
 use intmap::{IntMap, IntSet};
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
+use webgraph::{Node, NodeID, Webgraph};
 
 use hashbrown::HashSet;
 use url::Url;
 
-use crate::{
-    ranking::inbound_similarity::InboundSimilarity,
-    webgraph::{Node, NodeID, Webgraph},
-    webpage::url_ext::UrlExt,
-};
+use crate::{ranking::inbound_similarity::InboundSimilarity, webpage::url_ext::UrlExt};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ScoredNode {
