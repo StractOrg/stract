@@ -1,6 +1,5 @@
 [package]
 authors = ['Stract ApS. <hello@trystract.com>']
-default-run = "stract"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 name = "stract-core"
@@ -15,10 +14,6 @@ dev = ["cors"]
 libtorch = ["dep:tch"]
 prod = ["cors", "libtorch"]
 with_alice = ["libtorch"]
-
-[[bin]]
-name = "stract"
-path = "src/main.rs"
 
 [dependencies]
 aes-gcm = {workspace = true}

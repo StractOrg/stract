@@ -4284,6 +4284,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "stract-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "stract-core",
+ "tikv-jemallocator",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "webgraph",
+]
+
+[[package]]
 name = "stract-core"
 version = "0.1.0"
 dependencies = [
