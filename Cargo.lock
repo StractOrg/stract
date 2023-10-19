@@ -2527,6 +2527,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9380db4c04d219ac5c51d14996bbf2c2e9a15229771b53f8671eb6c83cf44df"
 
 [[package]]
+name = "naive_bayes"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.14.1",
+ "itertools 0.11.0",
+ "serde",
+ "stdx",
+]
+
+[[package]]
 name = "nanorand"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4310,6 +4320,7 @@ dependencies = [
  "memmap2",
  "mime",
  "min-max-heap",
+ "naive_bayes",
  "num_cpus",
  "once_cell",
  "optics",

@@ -66,6 +66,7 @@ md5 = {workspace = true}
 memmap2 = {workspace = true}
 mime = {workspace = true}
 min-max-heap = {workspace = true}
+naive_bayes.workspace = true
 num_cpus = {workspace = true}
 once_cell = {workspace = true}
 optics = {workspace = true}

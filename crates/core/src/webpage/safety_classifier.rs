@@ -19,7 +19,6 @@ use std::path::Path;
 
 use itertools::Itertools;
 
-use crate::naive_bayes;
 use crate::Result;
 
 const MAX_NUM_WORDS: usize = 100;

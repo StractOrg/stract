@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::seq::SliceRandom;
-use stract::naive_bayes;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Label {
