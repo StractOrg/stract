@@ -4284,7 +4284,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "stract"
+name = "stract-core"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",

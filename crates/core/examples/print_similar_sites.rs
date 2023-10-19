@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use stract::{
+use stract_core::{
     ranking::inbound_similarity::InboundSimilarity,
     similar_sites::{ScoredNode, SimilarSitesFinder},
 };
@@ -45,7 +45,7 @@ pub fn main() {
     let similarity_finder = SimilarSitesFinder::new(
         graph.into(),
         inbound_similarity,
-        stract::config::defaults::WebgraphServer::max_similar_sites(),
+        stract_core::config::defaults::WebgraphServer::max_similar_sites(),
     );
 
     print_top_nodes(

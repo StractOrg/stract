@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use base64::Engine;
-use stract::alice::{
+use stract_core::alice::{
     ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
 };
 

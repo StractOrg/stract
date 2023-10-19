@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use optics::Optic;
-use stract::{
+use stract_core::{
     index::Index,
     searcher::{LocalSearcher, SearchQuery},
 };

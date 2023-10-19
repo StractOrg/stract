@@ -18,15 +18,15 @@ use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
-use stract::config;
-use stract::entrypoint::autosuggest_scrape::{self, Gl};
+use stract_core::config;
+use stract_core::entrypoint::autosuggest_scrape::{self, Gl};
 use webgraph::WebgraphBuilder;
 
 #[cfg(feature = "dev")]
-use stract::entrypoint::configure;
+use stract_core::entrypoint::configure;
 
-use stract::entrypoint::indexer::IndexPointer;
-use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
+use stract_core::entrypoint::indexer::IndexPointer;
+use stract_core::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
 use tracing_subscriber::prelude::*;
 
 #[cfg(not(target_env = "msvc"))]

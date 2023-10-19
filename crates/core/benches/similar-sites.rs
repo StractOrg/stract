@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::{ranking::inbound_similarity::InboundSimilarity, similar_sites::SimilarSitesFinder};
+use stract_core::{
+    ranking::inbound_similarity::InboundSimilarity, similar_sites::SimilarSitesFinder,
+};
 use webgraph::WebgraphBuilder;
 
 const WEBGRAPH_PATH: &str = "data/webgraph";
@@ -14,7 +16,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let finder = SimilarSitesFinder::new(
         webgraph,
         inbound,
-        stract::config::defaults::WebgraphServer::max_similar_sites(),
+        stract_core::config::defaults::WebgraphServer::max_similar_sites(),
     );
 
     for _ in 0..10 {

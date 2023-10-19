@@ -2,7 +2,7 @@ use std::path::Path;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use optics::SiteRankings;
-use stract::{
+use stract_core::{
     index::Index,
     ranking::inbound_similarity::InboundSimilarity,
     searcher::{LocalSearcher, SearchQuery},

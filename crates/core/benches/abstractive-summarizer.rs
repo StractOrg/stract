@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract::summarizer::{AbstractiveModel, AbstractiveSummarizer};
+use stract_core::summarizer::{AbstractiveModel, AbstractiveSummarizer};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let model =
