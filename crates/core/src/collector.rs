@@ -20,13 +20,13 @@ use min_max_heap::MinMaxHeap;
 use schema::{fastfield_reader, FastField};
 use serde::{Deserialize, Serialize};
 use stdx::prehashed::Prehashed;
+use stract_config::CollectorConfig;
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
     DocId, SegmentOrdinal, SegmentReader,
 };
 
 use crate::{
-    config::CollectorConfig,
     inverted_index::{DocAddress, WebsitePointer},
     ranking::initial::{InitialScoreTweaker, Score},
 };

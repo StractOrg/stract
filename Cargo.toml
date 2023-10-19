@@ -105,6 +105,7 @@ sonic = { path = "./lib/sonic" }
 stdx = { path = "./crates/stdx" }
 stract-cli = { path = "./crates/cli" }
 stract-core = { path = "./crates/core" }
+stract-config = { path = "./crates/config" }
 tantivy = {git = "https://github.com/quickwit-oss/tantivy", rev = "182f58cea"}
 tch = "0.13.0"
 thiserror = "1.0.31"

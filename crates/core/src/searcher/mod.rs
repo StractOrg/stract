@@ -23,12 +23,12 @@ use entity_index::EntityMatch;
 pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
+use stract_config::defaults;
 use utoipa::ToSchema;
 use webpage::region::Region;
 
 use crate::{
     bangs::BangHit,
-    config::defaults,
     ranking::pipeline::RankingWebsite,
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,

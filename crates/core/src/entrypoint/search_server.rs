@@ -28,7 +28,6 @@ use tracing::info;
 use url::Url;
 
 use crate::{
-    config,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{
@@ -58,7 +57,7 @@ pub struct SearchService {
 }
 
 impl SearchService {
-    async fn new(config: config::SearchServerConfig) -> Result<Self> {
+    async fn new(config: stract_config::SearchServerConfig) -> Result<Self> {
         let entity_index = config
             .entity_index_path
             .map(|path| EntityIndex::open(path).unwrap());
@@ -192,7 +191,7 @@ impl sonic::service::Message<SearchService> for GetEntityImage {
     }
 }
 
-pub async fn run(config: config::SearchServerConfig) -> Result<()> {
+pub async fn run(config: stract_config::SearchServerConfig) -> Result<()> {
     let addr = config.host;
     let server = SearchService::new(config).await?.bind(addr).await.unwrap();
 

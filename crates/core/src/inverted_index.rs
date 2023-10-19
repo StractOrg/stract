@@ -30,6 +30,7 @@ use schema::{
     create_schema, fastfield_reader::FastFieldReader, FastField, Field, TextField, ALL_FIELDS,
 };
 use serde::{Deserialize, Serialize};
+use stract_config::SnippetConfig;
 use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
@@ -44,7 +45,6 @@ use webgraph::NodeID;
 use webpage::{region::Region, schema_org, Webpage};
 
 use crate::collector::{Hashes, MainCollector};
-use crate::config::SnippetConfig;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;

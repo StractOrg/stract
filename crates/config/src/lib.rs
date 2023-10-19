@@ -16,7 +16,6 @@
 
 pub mod defaults;
 
-use super::Result;
 use distributed::member::ShardId;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -57,7 +56,7 @@ pub enum WarcSource {
 }
 
 impl WarcSource {
-    pub fn paths(&self) -> Result<Vec<String>> {
+    pub fn paths(&self) -> Result<Vec<String>, s3::error::S3Error> {
         let mut warc_paths = Vec::new();
         match &self {
             WarcSource::HTTP(config) => {

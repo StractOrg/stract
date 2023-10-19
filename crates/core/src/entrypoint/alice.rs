@@ -31,6 +31,7 @@ use distributed::{
     cluster::Cluster,
     member::{Member, Service},
 };
+use stract_config::AliceLocalConfig;
 use tokio::sync::Mutex;
 use tokio_stream::Stream;
 use tokio_stream::StreamExt as _;
@@ -38,7 +39,6 @@ use tracing::info;
 
 use crate::{
     alice::{Alice, EncodedEncryptedState, EncryptedState, BASE64_ENGINE},
-    config::AliceLocalConfig,
     ttl_cache::TTLCache,
 };
 

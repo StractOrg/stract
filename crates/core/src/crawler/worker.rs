@@ -29,11 +29,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use distributed::retry_strategy::ExponentialBackoff;
+use stract_config::CrawlerConfig;
+use tokio::sync::Mutex;
 use url::Url;
 use webpage::Html;
 
 use crate::{
-    config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
     entrypoint::crawler::router::{NewJob, RouterService},
 };

@@ -37,11 +37,9 @@ use tracing::{debug, log::error};
 use warc::WarcFile;
 pub use webgraph::Webgraph;
 
-use crate::config;
-
 fn download_all_warc_files<'a>(
     warc_paths: &'a [String],
-    source: &'a config::WarcSource,
+    source: &'a stract_config::WarcSource,
 ) -> impl Iterator<Item = WarcFile> + 'a {
     let warc_paths: Vec<_> = warc_paths
         .iter()
@@ -73,13 +71,11 @@ mod warc_download {
     };
 
     use distributed::retry_strategy::ExponentialBackoff;
+    use stract_config::{S3Config, WarcSource};
     use tracing::{debug, trace};
     use warc::WarcFile;
 
-    use crate::{
-        config::{S3Config, WarcSource},
-        Error, Result,
-    };
+    use crate::{Error, Result};
 
     pub(super) fn download(source: &WarcSource, warc_path: &str) -> Result<WarcFile> {
         let mut cursor = Cursor::new(Vec::new());

@@ -18,7 +18,6 @@ use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
-use stract_core::config;
 use stract_core::entrypoint::autosuggest_scrape::{self, Gl};
 use webgraph::WebgraphBuilder;
 
@@ -257,7 +256,7 @@ fn main() -> Result<()> {
                 }
             }
             WebgraphOptions::Server { config_path } => {
-                let config: config::WebgraphServerConfig = load_toml_config(config_path);
+                let config: stract_config::WebgraphServerConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -266,7 +265,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Api { config_path } => {
-            let config: config::ApiConfig = load_toml_config(config_path);
+            let config: stract_config::ApiConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -274,7 +273,7 @@ fn main() -> Result<()> {
                 .block_on(api::run(config))?
         }
         Commands::SearchServer { config_path } => {
-            let config: config::SearchServerConfig = load_toml_config(config_path);
+            let config: stract_config::SearchServerConfig = load_toml_config(config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -306,7 +305,7 @@ fn main() -> Result<()> {
         } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
         Commands::Crawler { options } => match options {
             Crawler::Worker { config_path } => {
-                let config: config::CrawlerConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlerConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -314,7 +313,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::worker(config))?
             }
             Crawler::Coordinator { config_path } => {
-                let config: config::CrawlCoordinatorConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlCoordinatorConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -322,7 +321,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::coordinator(config))?
             }
             Crawler::Router { config_path } => {
-                let config: config::CrawlRouterConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlRouterConfig = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()

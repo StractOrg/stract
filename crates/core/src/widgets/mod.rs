@@ -15,11 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use stract_config::WidgetsConfig;
 use thiserror::Error;
 use utoipa::ToSchema;
 
 use self::thesaurus::ThesaurusWidget;
-use crate::config::WidgetsConfig;
 
 use self::calculator::{Calculation, Calculator};
 use anyhow::{anyhow, Result};

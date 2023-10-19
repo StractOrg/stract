@@ -24,10 +24,10 @@ use ::distributed::cluster::Cluster;
 use imager::image_store::Image;
 use itertools::{intersperse, Itertools};
 use optics::Optic;
+use stract_config::{ApiConfig, ApiThresholds, CollectorConfig};
 use url::Url;
 
 use crate::bangs::{Bang, BangHit};
-use crate::config::{ApiConfig, ApiThresholds, CollectorConfig};
 use crate::inverted_index::RetrievedWebpage;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;

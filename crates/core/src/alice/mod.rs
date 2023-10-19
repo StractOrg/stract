@@ -41,15 +41,13 @@ use base64::Engine;
 use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
 use itertools::Itertools;
+use stract_config::{AcceleratorDevice, AcceleratorDtype, AliceAcceleratorConfig};
 use tch::Tensor;
 use url::Url;
 use utoipa::ToSchema;
 
 use crate::{
     api::search::ApiSearchQuery,
-    config::AcceleratorDevice,
-    config::AcceleratorDtype,
-    config::AliceAcceleratorConfig,
     llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
@@ -228,32 +226,23 @@ pub struct AcceleratorConfig {
     pub kind: tch::Kind,
 }
 
-impl From<AcceleratorDevice> for tch::Device {
-    fn from(value: AcceleratorDevice) -> Self {
-        match value {
+impl From<AliceAcceleratorConfig> for AcceleratorConfig {
+    fn from(value: AliceAcceleratorConfig) -> Self {
+        let device = match value.device {
             AcceleratorDevice::Cpu => tch::Device::Cpu,
             AcceleratorDevice::Cuda(d) => tch::Device::Cuda(d),
             AcceleratorDevice::Mps => tch::Device::Mps,
-        }
-    }
-}
-
-impl From<AcceleratorDtype> for tch::Kind {
-    fn from(value: AcceleratorDtype) -> Self {
-        match value {
+        };
+        let kind = match value.dtype {
             AcceleratorDtype::Float => tch::Kind::Float,
             AcceleratorDtype::Bf16 => tch::Kind::BFloat16,
-        }
-    }
-}
+        };
 
-impl From<AliceAcceleratorConfig> for AcceleratorConfig {
-    fn from(value: AliceAcceleratorConfig) -> Self {
         Self {
             layer_fraction: value.layer_fraction,
             quantize_fraction: value.quantize_fraction,
-            device: value.device.into(),
-            kind: value.dtype.into(),
+            device,
+            kind,
         }
     }
 }

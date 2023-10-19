@@ -16,7 +16,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let finder = SimilarSitesFinder::new(
         webgraph,
         inbound,
-        stract_core::config::defaults::WebgraphServer::max_similar_sites(),
+        stract_config::defaults::WebgraphServer::max_similar_sites(),
     );
 
     for _ in 0..10 {

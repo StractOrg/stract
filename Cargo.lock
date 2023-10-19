@@ -4286,6 +4286,7 @@ dependencies = [
  "anyhow",
  "clap",
  "serde",
+ "stract-config",
  "stract-core",
  "tikv-jemallocator",
  "tokio",
@@ -4293,6 +4294,15 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "webgraph",
+]
+
+[[package]]
+name = "stract-config"
+version = "0.1.0"
+dependencies = [
+ "distributed",
+ "rust-s3",
+ "serde",
 ]
 
 [[package]]
@@ -4376,6 +4386,7 @@ dependencies = [
  "simhash",
  "sonic",
  "stdx",
+ "stract-config",
  "tantivy",
  "tch",
  "thiserror",

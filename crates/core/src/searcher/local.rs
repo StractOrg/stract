@@ -20,13 +20,13 @@ use std::sync::Arc;
 use entity_index::{EntityIndex, EntityMatch};
 use imager::image_store::Image;
 use schema::TextField;
+use stract_config::{CollectorConfig, SnippetConfig};
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 use webgraph::Node;
 use webpage::region::Region;
 
-use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
 use crate::inverted_index::RetrievedWebpage;
 use crate::query::Query;

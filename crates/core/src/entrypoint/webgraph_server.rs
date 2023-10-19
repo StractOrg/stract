@@ -30,7 +30,6 @@ use url::Url;
 use utoipa::ToSchema;
 use webgraph::{Compression, FullEdge, Node, Webgraph, WebgraphBuilder};
 
-use crate::config;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::similar_sites::SimilarSitesFinder;
@@ -168,7 +167,7 @@ impl Message<WebGraphService> for OutgoingLinks {
     }
 }
 
-pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
+pub async fn run(config: stract_config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
     // dropping the handle leaves the cluster

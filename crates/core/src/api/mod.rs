@@ -23,13 +23,13 @@ use distributed::{
     member::{Member, Service},
 };
 use stdx::leaky_queue::LeakyQueue;
+use stract_config::ApiConfig;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 
 use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
-    config::ApiConfig,
     improvement::{store_improvements_loop, ImprovementEvent},
     ranking::models::lambdamart::LambdaMART,
     searcher::api::ApiSearcher,

@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::ops::Range;
+use stract_config::SnippetConfig;
 use tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use webpage::region::Region;
 
-use crate::config::SnippetConfig;
 use crate::query::Query;
 use crate::spell::sentence_ranges;
 use hashbrown::{HashMap, HashSet};

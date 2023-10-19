@@ -22,12 +22,11 @@ use sonic::{service::Message, sonic_service};
 use webgraph::WebgraphBuilder;
 
 use crate::{
-    config,
     crawler::{self, planner::make_crawl_plan, CrawlCoordinator, Crawler},
     Result,
 };
 
-pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
+pub async fn worker(config: stract_config::CrawlerConfig) -> Result<()> {
     let crawler = Crawler::new(config).await?;
 
     crawler.run().await;
@@ -35,7 +34,7 @@ pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
+pub async fn coordinator(config: stract_config::CrawlCoordinatorConfig) -> Result<()> {
     let coordinator = Arc::new(CrawlCoordinator::new(config.job_queue)?);
 
     let addr: SocketAddr = config.host;
@@ -51,7 +50,7 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
     }
 }
 
-pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
+pub async fn router(config: stract_config::CrawlRouterConfig) -> Result<()> {
     let router = crawler::Router::new(config.coordinator_addrs.clone()).await?;
 
     let addr: SocketAddr = config.host;
@@ -65,7 +64,7 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
     }
 }
 
-pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
+pub fn planner(config: stract_config::CrawlPlannerConfig) -> Result<()> {
     let page_centrality = RocksDbStore::open(&config.page_harmonic_path);
     let host_centrality = RocksDbStore::open(&config.host_harmonic_path);
     let page_graph = WebgraphBuilder::new(&config.page_graph_path).open();

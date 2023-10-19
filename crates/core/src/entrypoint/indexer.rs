@@ -28,7 +28,6 @@ use warc::PayloadType;
 use webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use webpage::{safety_classifier, Html, Webpage};
 
-use crate::config;
 use crate::entrypoint::download_all_warc_files;
 use crate::index::{FrozenIndex, Index};
 use crate::ranking::SignalAggregator;
@@ -38,27 +37,27 @@ pub struct Indexer {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobConfig {
-    Http(config::HttpConfig),
-    Local(config::LocalConfig),
-    S3(config::S3Config),
+    Http(stract_config::HttpConfig),
+    Local(stract_config::LocalConfig),
+    S3(stract_config::S3Config),
 }
 
-impl From<config::WarcSource> for JobConfig {
-    fn from(value: config::WarcSource) -> Self {
+impl From<stract_config::WarcSource> for JobConfig {
+    fn from(value: stract_config::WarcSource) -> Self {
         match value {
-            config::WarcSource::HTTP(config) => JobConfig::Http(config),
-            config::WarcSource::Local(config) => JobConfig::Local(config),
-            config::WarcSource::S3(config) => JobConfig::S3(config),
+            stract_config::WarcSource::HTTP(config) => JobConfig::Http(config),
+            stract_config::WarcSource::Local(config) => JobConfig::Local(config),
+            stract_config::WarcSource::S3(config) => JobConfig::S3(config),
         }
     }
 }
 
-impl From<JobConfig> for config::WarcSource {
+impl From<JobConfig> for stract_config::WarcSource {
     fn from(value: JobConfig) -> Self {
         match value {
-            JobConfig::Http(config) => config::WarcSource::HTTP(config),
-            JobConfig::Local(config) => config::WarcSource::Local(config),
-            JobConfig::S3(config) => config::WarcSource::S3(config),
+            JobConfig::Http(config) => stract_config::WarcSource::HTTP(config),
+            JobConfig::Local(config) => stract_config::WarcSource::Local(config),
+            JobConfig::S3(config) => stract_config::WarcSource::S3(config),
         }
     }
 }
@@ -113,7 +112,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
 
-    let source: config::WarcSource = job.source_config.clone().into();
+    let source: stract_config::WarcSource = job.source_config.clone().into();
 
     let warc_files = download_all_warc_files(&job.warc_paths, &source);
     pin!(warc_files);
@@ -339,7 +338,7 @@ impl Reduce<Index> for Index {
 }
 
 impl Indexer {
-    pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
+    pub fn run(config: &stract_config::IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
         let job_config: JobConfig = config.warc_source.clone().into();

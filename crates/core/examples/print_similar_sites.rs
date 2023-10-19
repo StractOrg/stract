@@ -45,7 +45,7 @@ pub fn main() {
     let similarity_finder = SimilarSitesFinder::new(
         graph.into(),
         inbound_similarity,
-        stract_core::config::defaults::WebgraphServer::max_similar_sites(),
+        stract_config::defaults::WebgraphServer::max_similar_sites(),
     );
 
     print_top_nodes(

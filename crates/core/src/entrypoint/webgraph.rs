@@ -13,16 +13,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{
-    config::WarcSource,
-    config::{self, WebgraphConstructConfig},
-    entrypoint::download_all_warc_files,
-    Result,
-};
+use crate::{entrypoint::download_all_warc_files, Result};
 use itertools::Itertools;
 use mapreduce::Worker;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
+use stract_config::{WarcSource, WebgraphConstructConfig};
 use tokio::pin;
 use tracing::{info, trace};
 use webgraph::{Node, WebgraphWriter};
@@ -35,26 +31,26 @@ struct GraphPointer {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobConfig {
-    Http(config::HttpConfig),
-    Local(config::LocalConfig),
-    S3(config::S3Config),
+    Http(stract_config::HttpConfig),
+    Local(stract_config::LocalConfig),
+    S3(stract_config::S3Config),
 }
 
-impl From<config::WarcSource> for JobConfig {
-    fn from(value: config::WarcSource) -> Self {
+impl From<stract_config::WarcSource> for JobConfig {
+    fn from(value: stract_config::WarcSource) -> Self {
         match value {
-            config::WarcSource::HTTP(config) => JobConfig::Http(config),
-            config::WarcSource::Local(config) => JobConfig::Local(config),
-            config::WarcSource::S3(config) => JobConfig::S3(config),
+            stract_config::WarcSource::HTTP(config) => JobConfig::Http(config),
+            stract_config::WarcSource::Local(config) => JobConfig::Local(config),
+            stract_config::WarcSource::S3(config) => JobConfig::S3(config),
         }
     }
 }
 
-impl From<JobConfig> for config::WarcSource {
+impl From<JobConfig> for stract_config::WarcSource {
     fn from(value: JobConfig) -> Self {
         match value {
-            JobConfig::Http(config) => config::WarcSource::HTTP(config),
-            JobConfig::Local(config) => config::WarcSource::Local(config),
+            JobConfig::Http(config) => stract_config::WarcSource::HTTP(config),
+            JobConfig::Local(config) => stract_config::WarcSource::Local(config),
             JobConfig::S3(config) => WarcSource::S3(config),
         }
     }

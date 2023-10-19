@@ -18,10 +18,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use stdx::enum_map::EnumMap;
+use stract_config::CollectorConfig;
 
 use crate::{
     collector::{self, BucketCollector},
-    config::CollectorConfig,
     inverted_index::WebsitePointer,
     searcher::SearchQuery,
     Result,

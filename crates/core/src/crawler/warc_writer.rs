@@ -15,8 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::time::Duration;
-
-use crate::config::{self, S3Config};
+use stract_config::S3Config;
 
 use super::{CrawlDatum, Result};
 
@@ -32,7 +31,7 @@ pub enum WarcWriterMessage {
     Finish,
 }
 
-async fn commit(writer: warc::WarcWriter, s3: config::S3Config) {
+async fn commit(writer: warc::WarcWriter, s3: stract_config::S3Config) {
     let filename = format!(
         "{}_{}.warc.gz",
         chrono::Utc::now().to_rfc3339(),

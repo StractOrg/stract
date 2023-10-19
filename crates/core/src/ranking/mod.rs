@@ -26,11 +26,11 @@ pub mod signal;
 
 use initial::InitialScoreTweaker;
 use schema::fastfield_reader::FastFieldReader;
+use stract_config::CollectorConfig;
 use webpage::region::Region;
 
 use crate::{
     collector::{MainCollector, MaxDocsConsidered, TopDocs},
-    config::CollectorConfig,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
 };

@@ -32,7 +32,6 @@ mod api;
 mod autosuggest;
 mod bangs;
 mod collector;
-pub mod config;
 pub mod crawler;
 pub mod feed;
 mod human_website_annotations;
