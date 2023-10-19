@@ -29,7 +29,6 @@ use crate::{
     config::CollectorConfig,
     inverted_index::{DocAddress, WebsitePointer},
     ranking::initial::{InitialScoreTweaker, Score},
-    simhash,
 };
 
 pub type MainCollector = TweakedScoreTopCollector<InitialScoreTweaker>;

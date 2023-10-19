@@ -52,7 +52,6 @@ pub mod ranking;
 mod search_ctx;
 mod search_prettifier;
 pub mod searcher;
-mod simhash;
 pub mod similar_sites;
 mod snippet;
 pub mod spell;

@@ -4121,6 +4121,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27f6278552951f1f2b8cf9da965d10969b2efdea95a6ec47987ab46edfe263a"
 
 [[package]]
+name = "simhash"
+version = "0.1.0"
+dependencies = [
+ "tantivy",
+ "tokenizer",
+]
+
+[[package]]
 name = "similar"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4328,6 +4336,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "simhash",
  "sonic",
  "stdx",
  "tantivy",

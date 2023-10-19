@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{simhash, Error, Result};
+use crate::{Error, Result};
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
