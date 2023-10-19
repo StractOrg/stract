@@ -52,7 +52,6 @@ itertools = {workspace = true}
 kuchiki = {workspace = true}
 kv.workspace = true
 lalrpop-util = {workspace = true}
-leaky_queue.workspace = true
 libc = {workspace = true}
 logos = {workspace = true}
 lz4_flex = {workspace = true}

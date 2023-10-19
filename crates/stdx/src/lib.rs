@@ -1,5 +1,6 @@
 pub mod enum_map;
 pub mod intmap;
+pub mod leaky_queue;
 pub mod prehashed;
 
 use std::path::PathBuf;

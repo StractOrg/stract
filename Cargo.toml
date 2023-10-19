@@ -53,7 +53,6 @@ kuchiki = { path = "./lib/kuchiki" }
 kv = { path = "./crates/kv" }
 lalrpop = {version = "0.20.0", features = ["lexer"]}
 lalrpop-util = {version = "0.20.0", features = ["lexer"]}
-leaky_queue = { path = "./lib/leaky_queue" }
 libc = "0.2.142"
 logos = "0.13.0"
 lz-str = "0.2.1"

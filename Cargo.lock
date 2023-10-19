@@ -2149,10 +2149,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
-name = "leaky_queue"
-version = "0.1.0"
-
-[[package]]
 name = "lebe"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4341,7 +4337,6 @@ dependencies = [
  "kv",
  "lalrpop",
  "lalrpop-util",
- "leaky_queue",
  "libc",
  "logos",
  "lz4_flex",

@@ -22,7 +22,7 @@ use distributed::{
     cluster::Cluster,
     member::{Member, Service},
 };
-use leaky_queue::LeakyQueue;
+use stdx::leaky_queue::LeakyQueue;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 
