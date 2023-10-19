@@ -47,12 +47,12 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 @cargo *ARGS:
     LIBTORCH="{{justfile_directory()}}/libtorch" LD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" DYLD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" cargo {{ARGS}}
 
-@bench-compile:
+@bench-compile A B:
     #!/bin/bash
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     hyperfine --show-output -w 2 \
-        "git switch main      && touch core/src/lib.rs        && cargo build -p stract --bin stract" \
-        "git switch ${BRANCH} && touch crates/core/src/lib.rs && cargo build -p stract --bin stract"
+        "git switch {{A}} && touch core/src/lib.rs        && cargo build -p stract --bin stract" \
+        "git switch {{B}} && touch crates/core/src/lib.rs && cargo build -p stract --bin stract"
 
 @bench-compile-release:
     #!/bin/bash
