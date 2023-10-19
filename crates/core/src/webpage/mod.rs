@@ -13,15 +13,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{
-    prehashed::hash,
-    schema::{FastField, TextField},
-    simhash, Error, Result,
-};
+use crate::{prehashed::hash, simhash, Error, Result};
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
+use schema::{FastField, Field, TextField, ALL_FIELDS, FLOAT_SCALING};
 use std::{collections::HashMap, panic, str::FromStr};
 use stdx::enum_map::EnumSet;
 use tantivy::{
@@ -37,8 +34,6 @@ pub mod region;
 pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
-
-use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
 
 use self::{
     just_text::{JustText, Paragraph},
@@ -1575,7 +1570,8 @@ pub type Meta = HashMap<String, String>;
 mod tests {
     // TODO: make test macro to test both dom parsers
 
-    use crate::{schema::create_schema, webpage::url_ext::UrlExt};
+    use crate::webpage::url_ext::UrlExt;
+    use schema::create_schema;
 
     use super::*;
 

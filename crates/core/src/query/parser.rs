@@ -14,15 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use schema::{Field, TextField, ALL_FIELDS};
 use tantivy::{
     query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
     tokenizer::Tokenizer,
 };
 
-use crate::{
-    bangs::BANG_PREFIX,
-    schema::{Field, TextField, ALL_FIELDS},
-};
+use crate::bangs::BANG_PREFIX;
 
 #[derive(Debug, Clone)]
 pub struct TermCompound {

@@ -16,12 +16,11 @@
 
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
+use schema::{fastfield_reader::FastFieldReader, TextField};
 use tantivy::{
     query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
 };
-
-use crate::{fastfield_reader::FastFieldReader, schema::TextField};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 

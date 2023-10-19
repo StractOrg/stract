@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod fastfield_reader;
+
 use tantivy::schema::{IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions};
 use tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,

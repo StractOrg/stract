@@ -19,7 +19,7 @@ use std::{collections::HashMap, sync::Arc};
 use stdx::enum_map::EnumMap;
 use tantivy::{columnar::ColumnValues, DocId, SegmentId};
 
-use crate::schema::{DataType, FastField, ALL_FIELDS};
+use crate::{DataType, FastField, ALL_FIELDS};
 
 #[derive(Default, Clone)]
 struct InnerFastFieldReader {

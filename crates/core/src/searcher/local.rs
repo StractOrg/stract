@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use entity_index::{EntityIndex, EntityMatch};
 use imager::image_store::Image;
+use schema::TextField;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
@@ -35,7 +36,6 @@ use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
-use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::spell::Spell;

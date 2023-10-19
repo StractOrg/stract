@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::fastfield_reader::FieldValue;
-use crate::query::optic::AsSearchableRule;
-use crate::query::Query;
-use crate::Result;
 use crate::{
-    fastfield_reader,
-    schema::{FastField, TextField},
+    query::{optic::AsSearchableRule, Query},
     webpage::Webpage,
+    Result,
 };
 use optics::ast::RankingTarget;
 use optics::Optic;
+use schema::{
+    fastfield_reader::{self, FieldValue},
+    FastField, TextField, FLOAT_SCALING,
+};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::str::FromStr;
@@ -41,10 +41,7 @@ use webgraph::NodeID;
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};
 
-use crate::{
-    schema::FLOAT_SCALING,
-    webpage::region::{Region, RegionCount},
-};
+use crate::webpage::region::{Region, RegionCount};
 
 use super::bm25::Bm25Weight;
 use super::models::linear::LinearRegression;

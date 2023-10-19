@@ -17,6 +17,10 @@
 use std::sync::Arc;
 
 use optics::PatternPart;
+use schema::{
+    fastfield_reader::{self, FastFieldReader},
+    FastField, Field, TextField, ALL_FIELDS,
+};
 use tantivy::{
     fieldnorm::FieldNormReader,
     postings::SegmentPostings,
@@ -26,12 +30,7 @@ use tantivy::{
     DocId, DocSet, Postings, Score, SegmentReader, TantivyError, TERMINATED,
 };
 
-use crate::{
-    fastfield_reader::{self, FastFieldReader},
-    query::intersection::Intersection,
-    ranking::bm25::Bm25Weight,
-    schema::{FastField, Field, TextField, ALL_FIELDS},
-};
+use crate::{query::intersection::Intersection, ranking::bm25::Bm25Weight};
 
 #[derive(Clone)]
 pub struct PatternQuery {

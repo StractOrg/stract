@@ -3843,6 +3843,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "schema"
+version = "0.1.0"
+dependencies = [
+ "stdx",
+ "tantivy",
+ "tokenizer",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4313,6 +4322,7 @@ dependencies = [
  "rust-s3",
  "rust-stemmers",
  "safetensors",
+ "schema",
  "scylla",
  "serde",
  "serde_json",

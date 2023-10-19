@@ -26,6 +26,9 @@
 //! This allows us to perform more advanced queries than just term lookups,
 //! but the principle is the same.
 use chrono::NaiveDateTime;
+use schema::{
+    create_schema, fastfield_reader::FastFieldReader, FastField, Field, TextField, ALL_FIELDS,
+};
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
@@ -41,14 +44,11 @@ use webgraph::NodeID;
 
 use crate::collector::{Hashes, MainCollector};
 use crate::config::SnippetConfig;
-use crate::fastfield_reader::FastFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
-use crate::schema::create_schema;
-use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;

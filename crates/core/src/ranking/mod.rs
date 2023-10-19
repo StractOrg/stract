@@ -25,11 +25,11 @@ pub mod query_centrality;
 pub mod signal;
 
 use initial::InitialScoreTweaker;
+use schema::fastfield_reader::FastFieldReader;
 
 use crate::{
     collector::{MainCollector, MaxDocsConsidered, TopDocs},
     config::CollectorConfig,
-    fastfield_reader::FastFieldReader,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
     webpage::region::Region,
@@ -441,7 +441,7 @@ mod tests {
                 fetch_time_ms: 500,
                 page_centrality: 0.0,
                 pre_computed_score: 0.0,
-                
+
                 node_id: None,
                 dmoz_description: None,
                 safety_classification: None,

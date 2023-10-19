@@ -17,6 +17,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use min_max_heap::MinMaxHeap;
+use schema::{fastfield_reader, FastField};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
@@ -25,11 +26,9 @@ use tantivy::{
 
 use crate::{
     config::CollectorConfig,
-    fastfield_reader,
     inverted_index::{DocAddress, WebsitePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
-    schema::FastField,
     simhash,
 };
 

@@ -18,13 +18,13 @@ use crate::{
     inverted_index::InvertedIndex,
     query::parser::TermCompound,
     ranking::SignalCoefficient,
-    schema::{Field, TextField},
     search_ctx::Ctx,
     searcher::SearchQuery,
     webpage::{region::Region, safety_classifier},
     Result,
 };
 use optics::{Optic, SiteRankings};
+use schema::{Field, TextField};
 use std::collections::HashMap;
 use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
 

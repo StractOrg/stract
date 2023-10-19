@@ -22,13 +22,13 @@ pub mod word2vec;
 use std::ops::Range;
 
 use itertools::intersperse;
+use schema::TextField;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::index::Index;
 use crate::query;
 use crate::query::parser::Term;
-use crate::schema::TextField;
 use crate::searcher::SearchQuery;
 
 use self::dictionary::DictionaryBuilder;
