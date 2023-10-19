@@ -30,7 +30,6 @@ byteorder = {workspace = true}
 bzip2 = {workspace = true}
 chitchat = {workspace = true}
 chrono = {workspace = true}
-clap = {workspace = true}
 crossbeam-channel = {workspace = true}
 csv = {workspace = true}
 dashmap = {workspace = true}
@@ -97,7 +96,6 @@ tokenizer.workspace = true
 tokenizers = {workspace = true}
 tokio = {workspace = true}
 tokio-stream = {workspace = true}
-toml = {workspace = true}
 tower-http = {workspace = true}
 tracing = {workspace = true}
 tracing-subscriber = {workspace = true}
@@ -110,9 +108,6 @@ warc.workspace = true
 webgraph.workspace = true
 webpage.workspace = true
 whatlang = {workspace = true}
-
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = {workspace = true}
 
 [build-dependencies]
 lalrpop = {workspace = true}
