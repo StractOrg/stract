@@ -50,9 +50,9 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 @bench-compile A B:
     #!/bin/bash
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    hyperfine --show-output -w 2 \
-        "git switch {{A}} && touch core/src/lib.rs        && cargo build -p stract --bin stract" \
-        "git switch {{B}} && touch crates/core/src/lib.rs && cargo build -p stract --bin stract"
+    hyperfine --show-output -w 2 --export-markdown bench-compile-{{A}}-vs-{{B}}.md \
+        -p "git switch {{A}} && touch core/src/lib.rs        && sleep 1" -n "{{A}}" "cargo build" \
+        -p "git switch {{B}} && touch crates/core/src/lib.rs && sleep 1" -n "{{B}}" "cargo build"
 
 @bench-compile-release:
     #!/bin/bash
