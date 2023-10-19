@@ -4387,6 +4387,7 @@ dependencies = [
  "sonic",
  "stdx",
  "stract-config",
+ "stract-llm",
  "tantivy",
  "tch",
  "thiserror",
@@ -4406,6 +4407,22 @@ dependencies = [
  "webgraph",
  "webpage",
  "whatlang",
+]
+
+[[package]]
+name = "stract-llm"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "byteorder",
+ "flate2",
+ "itertools 0.11.0",
+ "serde",
+ "stdx",
+ "tch",
+ "thiserror",
+ "tokenizers",
+ "tracing",
 ]
 
 [[package]]

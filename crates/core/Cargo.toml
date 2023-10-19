@@ -11,7 +11,7 @@ version = "0.1.0"
 cors = []
 default = ["cors", "with_alice", "libtorch"]
 dev = ["cors"]
-libtorch = ["dep:tch"]
+libtorch = ["dep:tch", "dep:stract-llm"]
 prod = ["cors", "libtorch"]
 with_alice = ["libtorch"]
 
@@ -89,6 +89,7 @@ simhash.workspace = true
 sonic.workspace = true
 stdx.workspace = true
 stract-config.workspace = true
+stract-llm = { workspace = true, optional = true }
 tantivy = {workspace = true}
 tch = {workspace = true, optional = true}
 thiserror = {workspace = true}

@@ -37,11 +37,7 @@ pub mod feed;
 mod human_website_annotations;
 mod improvement;
 pub mod index;
-#[cfg(feature = "libtorch")]
-mod llm_utils;
 mod metrics;
-#[cfg(feature = "libtorch")]
-mod qa_model;
 mod query;
 pub mod ranking;
 mod search_ctx;
@@ -51,8 +47,6 @@ pub mod similar_sites;
 mod snippet;
 pub mod spell;
 mod subdomain_count;
-#[cfg(feature = "libtorch")]
-pub mod summarizer;
 #[allow(unused)]
 mod ttl_cache;
 mod widgets;

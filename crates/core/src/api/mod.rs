@@ -36,9 +36,9 @@ use crate::{
 };
 
 #[cfg(feature = "libtorch")]
-use crate::{
-    qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer,
-};
+use crate::ranking::models::cross_encoder::CrossEncoderModel;
+#[cfg(feature = "libtorch")]
+use stract_llm::{qa_model::QaModel, summarizer::Summarizer};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};

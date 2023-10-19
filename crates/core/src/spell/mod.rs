@@ -17,7 +17,6 @@ pub mod dictionary;
 pub mod distance;
 pub mod spell_checker;
 pub mod splitter;
-pub mod word2vec;
 
 use std::ops::Range;
 

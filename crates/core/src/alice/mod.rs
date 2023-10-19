@@ -42,13 +42,13 @@ use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
 use itertools::Itertools;
 use stract_config::{AcceleratorDevice, AcceleratorDtype, AliceAcceleratorConfig};
+use stract_llm::llm_utils::ClonableTensor;
 use tch::Tensor;
 use url::Url;
 use utoipa::ToSchema;
 
 use crate::{
     api::search::ApiSearchQuery,
-    llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
 };

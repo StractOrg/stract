@@ -18,12 +18,10 @@ use std::{rc::Rc, sync::Arc};
 
 use aes_gcm::{Aes256Gcm, Key};
 use stdx::leaky_queue::LeakyQueue;
+use stract_llm::llm_utils::{self, ClonableTensor};
 use tch::{IndexOp, Kind, Tensor};
 
-use crate::{
-    alice::ExecutionState,
-    llm_utils::{self, ClonableTensor},
-};
+use crate::alice::ExecutionState;
 
 use super::{
     raw_model::RawModel, AnyTransitionValidator, EncodedEncryptedState, EncryptedState, Error,

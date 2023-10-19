@@ -28,7 +28,7 @@ use tokenizers::{PaddingParams, TruncationParams};
 
 use crate::{
     llm_utils::{self, ClonableTensor},
-    spell::word2vec::{Word2Vec, WordVec},
+    word2vec::{Word2Vec, WordVec},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -43,7 +43,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
 
     #[error("Word2vec")]
-    Word2Vec(#[from] crate::spell::word2vec::Error),
+    Word2Vec(#[from] crate::word2vec::Error),
 
     #[error("Unexpected output type")]
     UnexpectedOutputType,

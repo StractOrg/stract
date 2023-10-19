@@ -29,6 +29,8 @@ use url::Url;
 
 use crate::bangs::{Bang, BangHit};
 use crate::inverted_index::RetrievedWebpage;
+#[cfg(feature = "libtorch")]
+use crate::ranking::models::cross_encoder::CrossEncoderModel;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::ALL_SIGNALS;
@@ -45,7 +47,7 @@ use crate::{
     Result,
 };
 #[cfg(feature = "libtorch")]
-use crate::{qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel};
+use stract_llm::qa_model::QaModel;
 
 use super::{
     distributed, DistributedSearcher, InitialSearchResultShard, ScoredWebsitePointer, SearchQuery,
