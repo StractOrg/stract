@@ -1,6 +1,4 @@
-use super::{Error, MapReduceConnection, Result, Worker};
-use super::{Map, Reduce};
-use crate::mapreduce::Task;
+use crate::{Error, Map, MapReduceConnection, Reduce, Result, Task, Worker};
 use distributed::retry_strategy::ExponentialBackoff;
 use futures::StreamExt;
 use itertools::Itertools;

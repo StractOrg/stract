@@ -62,6 +62,7 @@ leaky_queue.workspace = true
 libc = {workspace = true}
 logos = {workspace = true}
 lz4_flex = {workspace = true}
+mapreduce.workspace = true
 md5 = {workspace = true}
 memmap2 = {workspace = true}
 mime = {workspace = true}

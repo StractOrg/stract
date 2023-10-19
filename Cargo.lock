@@ -2346,6 +2346,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
+name = "mapreduce"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "distributed",
+ "futures",
+ "itertools 0.11.0",
+ "serde",
+ "sonic",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "markup5ever"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4316,6 +4331,7 @@ dependencies = [
  "logos",
  "lz4_flex",
  "maplit",
+ "mapreduce",
  "md5",
  "memmap2",
  "mime",

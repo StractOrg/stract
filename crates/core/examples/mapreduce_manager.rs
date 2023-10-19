@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
+use mapreduce::{Manager, Map, Reduce, StatelessWorker};
 use serde::{Deserialize, Serialize};
-use stract::mapreduce::{Manager, Map, Reduce, StatelessWorker};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 

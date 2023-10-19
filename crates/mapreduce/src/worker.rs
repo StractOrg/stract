@@ -16,9 +16,8 @@
 
 use std::net::SocketAddr;
 
-use crate::mapreduce::MapReduceServer;
+use crate::{Map, MapReduceServer, Result, Task};
 
-use super::{Map, Result, Task};
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, info};

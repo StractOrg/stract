@@ -26,8 +26,6 @@
 pub mod entrypoint;
 mod inverted_index;
 
-pub mod mapreduce;
-
 #[cfg(feature = "with_alice")]
 pub mod alice;
 mod api;

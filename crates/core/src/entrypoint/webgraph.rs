@@ -17,10 +17,10 @@ use crate::{
     config::WarcSource,
     config::{self, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
-    mapreduce::Worker,
     Result,
 };
 use itertools::Itertools;
+use mapreduce::Worker;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 use tokio::pin;

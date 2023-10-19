@@ -1,0 +1,17 @@
+[package]
+name = "mapreduce"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.74"
+distributed.workspace = true
+futures.workspace = true
+itertools.workspace = true
+serde.workspace = true
+sonic.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
