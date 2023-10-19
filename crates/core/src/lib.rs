@@ -34,7 +34,6 @@ mod bangs;
 mod collector;
 pub mod config;
 pub mod crawler;
-mod directory;
 pub mod feed;
 mod human_website_annotations;
 mod improvement;

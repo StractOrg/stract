@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -30,7 +29,7 @@ pub enum DirEntry {
     },
 }
 
-fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
+fn iterate_children(path: &str) -> Result<Vec<DirEntry>, std::io::Error> {
     let mut res = Vec::new();
 
     for f in fs::read_dir(path)? {
@@ -53,7 +52,7 @@ fn iterate_children(path: &str) -> Result<Vec<DirEntry>> {
     Ok(res)
 }
 
-pub fn recreate_folder(entry: &DirEntry) -> Result<()> {
+pub fn recreate_folder(entry: &DirEntry) -> Result<(), std::io::Error> {
     match entry {
         DirEntry::Folder { name, entries } => {
             fs::create_dir(name)?;
@@ -68,7 +67,7 @@ pub fn recreate_folder(entry: &DirEntry) -> Result<()> {
     }
 }
 
-pub fn scan_folder(path: String) -> Result<DirEntry> {
+pub fn scan_folder(path: String) -> Result<DirEntry, std::io::Error> {
     Ok(DirEntry::Folder {
         entries: iterate_children(&path)?,
         name: path,

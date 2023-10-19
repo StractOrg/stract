@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use stdx::directory::{self, DirEntry};
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use url::Url;
@@ -30,7 +31,6 @@ use webpage::{
 };
 
 use crate::collector::MainCollector;
-use crate::directory::{self, DirEntry};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
