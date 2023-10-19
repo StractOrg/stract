@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use intmap::{IntMap, IntSet};
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
+use stdx::intmap::{IntMap, IntSet};
 use webgraph::{Node, NodeID, Webgraph};
 
 use hashbrown::HashSet;

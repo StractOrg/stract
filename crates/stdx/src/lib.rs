@@ -1,3 +1,6 @@
+pub mod enum_map;
+pub mod intmap;
+
 use std::path::PathBuf;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445

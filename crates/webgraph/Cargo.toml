@@ -12,7 +12,6 @@ bitvec.workspace = true
 executor = { version = "0.1.0", path = "../executor" }
 hyperloglog.workspace = true
 indicatif.workspace = true
-intmap.workspace = true
 itertools.workspace = true
 kv.workspace = true
 lz4_flex.workspace = true

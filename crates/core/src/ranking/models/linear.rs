@@ -17,8 +17,8 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::{collections::HashMap, path::Path};
+use stdx::enum_map::EnumMap;
 
-use crate::enum_map::EnumMap;
 use crate::ranking::Signal;
 use crate::Result;
 

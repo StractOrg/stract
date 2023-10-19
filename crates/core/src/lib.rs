@@ -37,7 +37,6 @@ mod collector;
 pub mod config;
 pub mod crawler;
 mod directory;
-mod enum_map;
 mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;

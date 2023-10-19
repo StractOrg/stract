@@ -19,7 +19,6 @@ use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::Result;
 use crate::{
-    enum_map::EnumMap,
     fastfield_reader,
     schema::{FastField, TextField},
     webpage::Webpage,
@@ -30,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
+use stdx::enum_map::EnumMap;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};

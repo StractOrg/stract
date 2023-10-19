@@ -20,8 +20,8 @@
 use std::collections::{HashMap, VecDeque};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use intmap::IntMap;
 use serde::{Deserialize, Serialize};
+use stdx::intmap::IntMap;
 
 use crate::{Node, NodeID, Webgraph};
 

@@ -54,7 +54,6 @@ hyperloglog.workspace = true
 image = {workspace = true}
 imager.workspace = true
 indicatif = {workspace = true}
-intmap.workspace = true
 itertools = {workspace = true}
 kuchiki = {workspace = true}
 kv.workspace = true

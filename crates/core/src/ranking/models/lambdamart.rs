@@ -15,11 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{path::Path, str::FromStr};
+use stdx::enum_map::EnumMap;
 
-use crate::{
-    enum_map::EnumMap,
-    ranking::{signal, Signal},
-};
+use crate::ranking::{signal, Signal};
 
 type Result<T> = std::result::Result<T, Error>;
 

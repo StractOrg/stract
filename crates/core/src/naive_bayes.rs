@@ -15,9 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use hashbrown::{HashMap, HashSet};
-use intmap::IntMap;
 use itertools::Itertools;
 use std::hash::Hash;
+use stdx::intmap::IntMap;
 
 /// Laplace smoothing factor
 const ALPHA: f32 = 1.0;

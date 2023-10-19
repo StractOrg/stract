@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    enum_map::EnumSet,
     prehashed::hash,
     schema::{FastField, TextField},
     simhash, Error, Result,
@@ -24,6 +23,7 @@ use itertools::Itertools;
 use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use std::{collections::HashMap, panic, str::FromStr};
+use stdx::enum_map::EnumSet;
 use tantivy::{
     tokenizer::{PreTokenizedString, Tokenizer},
     TantivyDocument,
