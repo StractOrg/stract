@@ -117,7 +117,7 @@ impl Centrality {
         base_output: P,
     ) -> Result<()> {
         tracing::info!("Building derived harmonic centrality");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
+        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
         let host_centrality = RocksDbStore::open(host_centrality_path.as_ref().join("harmonic"));
 
         let derived = DerivedCentrality::build(

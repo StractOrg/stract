@@ -21,7 +21,7 @@ use std::{
 
 use std::sync::atomic::Ordering;
 
-use bitvec::vec::BitVec;
+use crate::bloom::BloomFilter;
 use tracing::info;
 
 use crate::{
@@ -31,56 +31,6 @@ use crate::{
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
-
-#[derive(Clone)]
-struct JankyBloomFilter {
-    bit_vec: BitVec,
-    num_bits: u64,
-}
-
-impl JankyBloomFilter {
-    pub fn new(estimated_items: u64, fp: f64) -> Self {
-        let num_bits = Self::num_bits(estimated_items, fp);
-        Self {
-            bit_vec: BitVec::repeat(false, num_bits as usize),
-            num_bits,
-        }
-    }
-
-    fn num_bits(estimated_items: u64, fp: f64) -> u64 {
-        ((estimated_items as f64) * fp.ln() / (-8.0 * 2.0_f64.ln().powi(2))).ceil() as u64
-    }
-
-    fn hash(item: &u64) -> usize {
-        item.wrapping_mul(11400714819323198549) as usize
-    }
-
-    pub fn insert(&mut self, item: u64) {
-        let h = Self::hash(&item);
-        self.bit_vec.set(h % self.num_bits as usize, true);
-    }
-
-    pub fn contains(&self, item: &u64) -> bool {
-        let h = Self::hash(item);
-        self.bit_vec[h % self.num_bits as usize]
-    }
-
-    pub fn estimate_card(&self) -> u64 {
-        let num_ones = self.bit_vec.count_ones() as u64;
-
-        if num_ones == 0 || self.num_bits == 0 {
-            return 0;
-        }
-
-        if num_ones == self.num_bits {
-            return u64::MAX;
-        }
-
-        (-(self.num_bits as i64) * (1.0 - (num_ones as f64) / (self.num_bits as f64)).ln() as i64)
-            .try_into()
-            .unwrap_or_default()
-    }
-}
 
 fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let mut num_nodes = 0;
@@ -99,7 +49,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         num_nodes += 1;
     }
 
-    let mut changed_nodes = JankyBloomFilter::new(num_nodes as u64, 0.05);
+    let mut changed_nodes = BloomFilter::new(num_nodes as u64, 0.05);
 
     for node in graph.nodes() {
         changed_nodes.insert(node.bit_64());
@@ -123,7 +73,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         let mut new_counters = counters.clone();
 
         has_changes.store(false, Ordering::Relaxed);
-        let mut new_changed_nodes = JankyBloomFilter::new(num_nodes as u64, 0.05);
+        let mut new_changed_nodes = BloomFilter::new(num_nodes as u64, 0.05);
 
         if !exact_changed_nodes.is_empty()
             && exact_changed_nodes.len() as u64 <= exact_counting_threshold

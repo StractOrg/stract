@@ -36,6 +36,7 @@ pub mod alice;
 mod api;
 mod autosuggest;
 mod bangs;
+mod bloom;
 mod collector;
 pub mod config;
 pub mod crawler;
