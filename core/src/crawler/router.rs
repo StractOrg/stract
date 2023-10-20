@@ -107,7 +107,7 @@ impl Router {
 
     fn coordinator_index(&self, domain: &Domain) -> usize {
         let hash = md5::compute(domain.0.as_bytes());
-        let hash = u128::from_le_bytes(hash.0) as usize;
+        let hash = u128::from_be_bytes(hash.0) as usize;
         hash % self.coordinators.len()
     }
 

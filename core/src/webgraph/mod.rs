@@ -23,7 +23,6 @@ use std::sync::Arc;
 use std::{cmp, fs};
 
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
 
@@ -36,7 +35,9 @@ use self::segment::{Segment, SegmentWriter};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub struct NodeID(u128);
 
 impl NodeID {
@@ -52,6 +53,21 @@ impl NodeID {
 impl From<u128> for NodeID {
     fn from(val: u128) -> Self {
         NodeID(val)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct FullNodeID {
+    pub prefix: NodeID,
+    pub id: NodeID,
+}
+
+impl From<Node> for FullNodeID {
+    fn from(value: Node) -> Self {
+        let id = value.id();
+        let prefix = value.into_host().id();
+
+        FullNodeID { prefix, id }
     }
 }
 
@@ -113,6 +129,29 @@ where
     pub label: L,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InnerEdge<L>
+where
+    L: EdgeLabel,
+{
+    pub from: FullNodeID,
+    pub to: FullNodeID,
+    pub label: L,
+}
+
+impl<L> From<InnerEdge<L>> for Edge<L>
+where
+    L: EdgeLabel,
+{
+    fn from(edge: InnerEdge<L>) -> Self {
+        Edge {
+            from: edge.from.id,
+            to: edge.to.id,
+            label: edge.label,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FullEdge {
@@ -121,7 +160,18 @@ pub struct FullEdge {
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     pub name: String,
@@ -360,7 +410,7 @@ impl ShortestPaths for Webgraph {
 
 type SegmentID = String;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Meta {
     comitted_segments: Vec<SegmentID>,
 }
@@ -479,7 +529,7 @@ impl Id2NodeDb {
 pub struct WebgraphWriter {
     pub path: String,
     segment: SegmentWriter,
-    insert_batch: Vec<Edge<String>>,
+    insert_batch: Vec<InnerEdge<String>>,
     id2node: Id2NodeDb,
     executor: Executor,
     meta: Meta,
@@ -524,20 +574,23 @@ impl WebgraphWriter {
         self.id2node.get(id)
     }
 
-    fn id_or_assign(&mut self, node: &Node) -> NodeID {
-        let id = node.id();
+    fn id_or_assign(&mut self, node: Node) -> FullNodeID {
+        let id = FullNodeID::from(node.clone());
 
-        if self.id2node(&id).is_none() {
-            self.id2node.put(&id, node);
+        if self.id2node(&id.id).is_none() {
+            self.id2node.put(&id.id, &node);
         }
 
         id
     }
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
-        let (from_id, to_id) = (self.id_or_assign(&from), self.id_or_assign(&to));
+        let (from_id, to_id) = (
+            self.id_or_assign(from.clone()),
+            self.id_or_assign(to.clone()),
+        );
 
-        let edge = Edge {
+        let edge = InnerEdge {
             from: from_id,
             to: to_id,
             label: label.chars().take(MAX_LABEL_LENGTH).collect(),
@@ -655,6 +708,15 @@ impl Webgraph {
             label: e.label,
         })
         .collect()
+    }
+
+    pub fn raw_ingoing_edges_by_host(&self, host_node: &NodeID) -> Vec<Edge<()>> {
+        let dedup = |edges: &mut Vec<Edge<()>>| {
+            edges.sort_by_key(|e| e.from);
+            edges.dedup_by_key(|e| e.from);
+        };
+
+        self.inner_edges(|segment| segment.ingoing_edges_by_host(host_node), dedup)
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
@@ -925,6 +987,44 @@ mod test {
         assert_eq!(
             graph.outgoing_edges(Node::from("A"))[0].label,
             "a".repeat(MAX_LABEL_LENGTH)
+        );
+    }
+
+    #[test]
+    fn edges_by_host() {
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+        );
+
+        writer.insert(
+            Node::from("http://a.com/first"),
+            Node::from("http://b.com/first"),
+            String::new(),
+        );
+        writer.insert(
+            Node::from("http://c.com/first"),
+            Node::from("http://b.com/second"),
+            String::new(),
+        );
+
+        let graph = writer.finalize();
+
+        let mut res = graph
+            .raw_ingoing_edges_by_host(&Node::from("b.com").id())
+            .into_iter()
+            .map(|e| e.to)
+            .map(|id| graph.id2node(&id).unwrap())
+            .collect::<Vec<_>>();
+        res.sort();
+
+        assert_eq!(
+            res,
+            vec![
+                Node::from("http://b.com/first"),
+                Node::from("http://b.com/second")
+            ]
         );
     }
 }

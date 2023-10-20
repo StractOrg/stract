@@ -97,7 +97,7 @@ impl<F: Frequency> InnerUserCount<F> {
         let mut user_id = [0u8; 8];
         user_id.copy_from_slice(&hash[..8]);
 
-        self.counter.add(u64::from_le_bytes(user_id));
+        self.counter.add(u64::from_be_bytes(user_id));
         self.metric.store(self.counter.size() as u64);
 
         Ok(())

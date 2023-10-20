@@ -20,7 +20,14 @@ use itertools::Itertools;
 use memmap2::Mmap;
 use rocksdb::BlockBasedOptions;
 
-use super::{Compression, Edge, EdgeLabel, NodeID};
+use super::{Compression, Edge, EdgeLabel, FullNodeID, InnerEdge, NodeID};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SerializedEdge {
+    from: FullNodeID,
+    to: FullNodeID,
+    label: Vec<u8>,
+}
 
 pub const MAX_BATCH_SIZE: usize = 100_000;
 
@@ -71,24 +78,35 @@ impl EdgeStoreWriter {
         }
     }
 
-    pub fn put<'a, L: EdgeLabel + 'a>(&'a self, edges: impl Iterator<Item = &'a Edge<L>>) {
+    pub fn put<'a, L: EdgeLabel + 'a>(&'a self, edges: impl Iterator<Item = &'a InnerEdge<L>>) {
         let mut batch = rocksdb::WriteBatch::default();
 
         let mut opts = rocksdb::WriteOptions::default();
         opts.disable_wal(true);
 
         for edge in edges {
-            let (prefix, suffix) = if self.reversed {
-                (edge.to, edge.from)
+            let value_bytes = L::to_bytes(&edge.label).unwrap();
+
+            let value_bytes = bincode::serialize(&SerializedEdge {
+                from: edge.from.clone(),
+                to: edge.to.clone(),
+                label: value_bytes.clone(),
+            })
+            .unwrap();
+
+            let key_bytes = if self.reversed {
+                [
+                    edge.to.id.bit_128().to_be_bytes(),
+                    edge.from.id.bit_128().to_be_bytes(),
+                ]
+                .concat()
             } else {
-                (edge.from, edge.to)
+                [
+                    edge.from.id.bit_128().to_be_bytes(),
+                    edge.to.id.bit_128().to_be_bytes(),
+                ]
+                .concat()
             };
-
-            let prefix_bytes = prefix.bit_128().to_be_bytes();
-            let suffix_bytes = suffix.bit_128().to_be_bytes();
-
-            let key_bytes = [prefix_bytes, suffix_bytes].concat();
-            let value_bytes = edge.label.to_bytes().unwrap();
 
             batch.put(key_bytes, value_bytes);
 
@@ -101,35 +119,21 @@ impl EdgeStoreWriter {
         self.db.write_opt(batch, &opts).unwrap();
     }
 
-    pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = Edge<L>> + '_ + Send + Sync {
+    pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = InnerEdge<L>> + '_ + Send + Sync {
         let read_opts = rocksdb::ReadOptions::default();
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
             .map(|res| {
-                let (key, val) = res.unwrap();
+                let (_, val) = res.unwrap();
 
-                let (from, to) = if self.reversed {
-                    let from = u128::from_be_bytes(key[16..32].try_into().unwrap());
-                    let from = NodeID(from);
+                let val: SerializedEdge = bincode::deserialize(&val).unwrap();
 
-                    let to = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                    let to = NodeID(to);
-
-                    (from, to)
-                } else {
-                    let from = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                    let from = NodeID(from);
-
-                    let to = u128::from_be_bytes(key[16..32].try_into().unwrap());
-                    let to = NodeID(to);
-
-                    (from, to)
-                };
-
-                let label = L::from_bytes(&val).unwrap();
-
-                Edge { from, to, label }
+                InnerEdge {
+                    from: val.from,
+                    to: val.to,
+                    label: L::from_bytes(&val.label).unwrap(),
+                }
             })
     }
 
@@ -154,9 +158,95 @@ impl EdgeStoreWriter {
     }
 }
 
+struct PrefixDb {
+    db: rocksdb::DB,
+}
+
+impl PrefixDb {
+    fn open<P: AsRef<Path>>(path: P) -> Self {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+
+        options.set_max_background_jobs(8);
+        options.increase_parallelism(8);
+        options.set_max_subcompactions(8);
+
+        options.set_allow_mmap_reads(true);
+        options.set_allow_mmap_writes(true);
+
+        options.set_level_zero_slowdown_writes_trigger(-1);
+        options.set_level_zero_stop_writes_trigger(-1);
+
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        options.set_level_compaction_dynamic_level_bytes(true);
+        options.set_bytes_per_sync(1048576);
+        let mut block_options = BlockBasedOptions::default();
+        block_options.set_block_size(16 * 1024);
+        block_options.set_format_version(5);
+        block_options.set_cache_index_and_filter_blocks(true);
+        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
+        options.set_block_based_table_factory(&block_options);
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+        let db = rocksdb::DB::open(&options, path).unwrap();
+
+        Self { db }
+    }
+
+    fn insert(&self, node: &FullNodeID) {
+        let mut opts = rocksdb::WriteOptions::default();
+        opts.disable_wal(true);
+
+        let key = [
+            node.prefix.bit_128().to_be_bytes(),
+            node.id.bit_128().to_be_bytes(),
+        ]
+        .concat();
+        let value = [];
+
+        self.db.put_opt(key, value, &opts).unwrap();
+    }
+
+    fn get(&self, prefix: &NodeID) -> Vec<NodeID> {
+        let start = [
+            prefix.bit_128().to_be_bytes().to_vec(),
+            [0].repeat(u128::BITS as usize / 8).to_vec(),
+        ]
+        .concat();
+
+        let mut res = Vec::new();
+
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            &start,
+            rocksdb::Direction::Forward,
+        ));
+
+        for item in iter {
+            let (key, _) = item.unwrap();
+
+            let p = u128::from_be_bytes(key[..(u128::BITS as usize / 8)].try_into().unwrap());
+            let node = u128::from_be_bytes(key[(u128::BITS as usize / 8)..].try_into().unwrap());
+
+            if p != prefix.bit_128() {
+                break;
+            }
+
+            res.push(NodeID::from(node));
+        }
+
+        res
+    }
+
+    fn flush(&self) {
+        self.db.flush().unwrap();
+    }
+}
+
 pub struct EdgeStore {
     reversed: bool,
-    ranges: rocksdb::DB, // column[nodes] = nodeid -> (start, end); column[labels] = nodeid -> (start, end)
+    ranges: rocksdb::DB, // column[nodes] = full_nodeid -> (start, end); column[labels] = nodeid -> (start, end)
+    prefixes: PrefixDb,
     _cache: rocksdb::Cache,
 
     edge_labels_file: File,
@@ -240,6 +330,7 @@ impl EdgeStore {
         Self {
             reversed,
             ranges,
+            prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
             _cache: cache,
             edge_labels,
             edge_labels_len,
@@ -255,17 +346,19 @@ impl EdgeStore {
     /// The edges *must* have been de-duplicated by their from/to node.
     /// I.e. if the store is not reversed, there should only ever be a single
     /// put for each from node, and vice versa.
-    fn put(&mut self, edges: &[Edge<String>]) {
+    fn put(&mut self, edges: &[InnerEdge<String>]) {
         if edges.is_empty() {
             return;
         }
 
         let node = if self.reversed {
-            edges[0].to
+            edges[0].to.clone()
         } else {
-            edges[0].from
+            edges[0].from.clone()
         };
-        let node_bytes = node.bit_128().to_be_bytes();
+
+        self.prefixes.insert(&node);
+        let node_bytes = node.id.bit_128().to_be_bytes();
 
         let node_cf = self.ranges.cf_handle("nodes").unwrap();
         let label_cf = self.ranges.cf_handle("labels").unwrap();
@@ -278,7 +371,11 @@ impl EdgeStore {
 
         for edge in edges {
             edge_labels.push(edge.label.clone());
-            edge_nodes.push(if self.reversed { edge.from } else { edge.to });
+            edge_nodes.push(if self.reversed {
+                edge.from.id
+            } else {
+                edge.to.id
+            });
         }
 
         let edge_labels_bytes = bincode::serialize(&edge_labels).unwrap();
@@ -324,7 +421,7 @@ impl EdgeStore {
         path: P,
         compression: Compression,
         reversed: bool,
-        edges: impl Iterator<Item = Edge<String>>,
+        edges: impl Iterator<Item = InnerEdge<String>>,
     ) -> Self {
         let mut s = Self::open(path, reversed, compression);
 
@@ -333,13 +430,14 @@ impl EdgeStore {
         let mut last_node = None;
         for edge in edges {
             if let Some(last_node) = last_node {
-                if (reversed && edge.to != last_node) || (!reversed && edge.from != last_node) {
+                if (reversed && edge.to.id != last_node) || (!reversed && edge.from.id != last_node)
+                {
                     s.put(&batch);
                     batch.clear();
                 }
             }
 
-            last_node = Some(if reversed { edge.to } else { edge.from });
+            last_node = Some(if reversed { edge.to.id } else { edge.from.id });
             batch.push(edge);
         }
 
@@ -353,6 +451,8 @@ impl EdgeStore {
     }
 
     fn flush(&mut self) {
+        self.prefixes.flush();
+
         self.ranges.flush().unwrap();
         self.ranges
             .flush_cf(self.ranges.cf_handle("nodes").unwrap())
@@ -453,6 +553,10 @@ impl EdgeStore {
         }
     }
 
+    pub fn nodes_by_prefix(&self, prefix: &NodeID) -> Vec<NodeID> {
+        self.prefixes.get(prefix)
+    }
+
     pub fn iter_without_label(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
         let node_cf = self.ranges.cf_handle("nodes").unwrap();
 
@@ -490,6 +594,8 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
+    use crate::webgraph::FullNodeID;
+
     use super::*;
 
     #[test]
@@ -500,9 +606,15 @@ mod tests {
             false,
         );
 
-        let e = Edge {
-            from: NodeID(0),
-            to: NodeID(1),
+        let e = InnerEdge {
+            from: FullNodeID {
+                id: NodeID(0),
+                prefix: NodeID(0),
+            },
+            to: FullNodeID {
+                id: NodeID(1),
+                prefix: NodeID(0),
+            },
             label: "test".to_string(),
         };
 
@@ -513,7 +625,7 @@ mod tests {
         let edges: Vec<_> = store.get_with_label(&NodeID(0));
 
         assert_eq!(edges.len(), 1);
-        assert_eq!(&edges[0], &e);
+        assert_eq!(&edges[0], &Edge::from(e.clone()));
 
         let edges: Vec<_> = store.get_with_label(&NodeID(1));
 
@@ -528,9 +640,15 @@ mod tests {
             true,
         );
 
-        let e = Edge {
-            from: NodeID(0),
-            to: NodeID(1),
+        let e = InnerEdge {
+            from: FullNodeID {
+                id: NodeID(0),
+                prefix: NodeID(0),
+            },
+            to: FullNodeID {
+                id: NodeID(1),
+                prefix: NodeID(0),
+            },
             label: "test".to_string(),
         };
 
@@ -543,6 +661,6 @@ mod tests {
 
         let edges: Vec<_> = store.get_with_label(&NodeID(1));
         assert_eq!(edges.len(), 1);
-        assert_eq!(&edges[0], &e);
+        assert_eq!(&edges[0], &Edge::from(e.clone()));
     }
 }

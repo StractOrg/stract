@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use super::{
     store::{EdgeStore, EdgeStoreWriter},
-    Compression, Edge, NodeID,
+    Compression, Edge, InnerEdge, NodeID,
 };
 
 const ADJACENCY_STORE: &str = "adjacency";
@@ -73,7 +73,7 @@ impl SegmentWriter {
         self.full_reversed_adjacency.flush();
     }
 
-    pub fn insert(&mut self, edges: &[Edge<String>]) {
+    pub fn insert(&mut self, edges: &[InnerEdge<String>]) {
         self.full_adjacency.put(edges.iter());
         self.full_reversed_adjacency.put(edges.iter());
     }
@@ -128,6 +128,14 @@ impl Segment {
         self.full_reversed_adjacency.get_without_label(node)
     }
 
+    pub fn ingoing_edges_by_host(&self, host_node: &NodeID) -> Vec<Edge<()>> {
+        self.full_reversed_adjacency
+            .nodes_by_prefix(host_node)
+            .into_iter()
+            .flat_map(|node| self.ingoing_edges(&node))
+            .collect()
+    }
+
     pub fn id(&self) -> String {
         self.id.clone()
     }
@@ -143,6 +151,8 @@ impl Segment {
 
 #[cfg(test)]
 mod test {
+    use crate::webgraph::FullNodeID;
+
     use super::*;
 
     #[test]
@@ -162,35 +172,44 @@ mod test {
 
         let mut edges = Vec::new();
 
-        let a = NodeID(0);
-        let b = NodeID(1);
-        let c = NodeID(2);
+        let a = FullNodeID {
+            id: NodeID(0),
+            prefix: NodeID(0),
+        };
+        let b = FullNodeID {
+            id: NodeID(1),
+            prefix: NodeID(0),
+        };
+        let c = FullNodeID {
+            id: NodeID(2),
+            prefix: NodeID(0),
+        };
 
-        edges.push(Edge {
-            from: a,
-            to: b,
+        edges.push(InnerEdge {
+            from: a.clone(),
+            to: b.clone(),
             label: String::new(),
         });
-        edges.push(Edge {
-            from: b,
-            to: c,
+        edges.push(InnerEdge {
+            from: b.clone(),
+            to: c.clone(),
             label: String::new(),
         });
-        edges.push(Edge {
-            from: c,
-            to: a,
+        edges.push(InnerEdge {
+            from: c.clone(),
+            to: a.clone(),
             label: String::new(),
         });
-        edges.push(Edge {
-            from: a,
-            to: c,
+        edges.push(InnerEdge {
+            from: a.clone(),
+            to: c.clone(),
             label: String::new(),
         });
 
         writer.insert(&edges);
         let segment = writer.finalize();
 
-        let mut out: Vec<_> = segment.outgoing_edges(&a);
+        let mut out: Vec<_> = segment.outgoing_edges(&a.id);
 
         out.sort_by(|a, b| a.to.cmp(&b.to));
 
@@ -198,73 +217,73 @@ mod test {
             out,
             vec![
                 Edge {
-                    from: a,
-                    to: b,
+                    from: a.id,
+                    to: b.id,
                     label: ()
                 },
                 Edge {
-                    from: a,
-                    to: c,
+                    from: a.id,
+                    to: c.id,
                     label: ()
                 },
             ]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&b);
+        let mut out: Vec<_> = segment.outgoing_edges(&b.id);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
             vec![Edge {
-                from: b,
-                to: c,
+                from: b.id,
+                to: c.id,
                 label: ()
             },]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&c);
+        let mut out: Vec<_> = segment.outgoing_edges(&c.id);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
             vec![Edge {
-                from: c,
-                to: a,
+                from: c.id,
+                to: a.id,
                 label: ()
             },]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&a);
+        let out: Vec<_> = segment.ingoing_edges(&a.id);
         assert_eq!(
             out,
             vec![Edge {
-                from: c,
-                to: a,
+                from: c.id,
+                to: a.id,
                 label: ()
             },]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&b);
+        let out: Vec<_> = segment.ingoing_edges(&b.id);
         assert_eq!(
             out,
             vec![Edge {
-                from: a,
-                to: b,
+                from: a.id,
+                to: b.id,
                 label: ()
             },]
         );
 
-        let mut out: Vec<_> = segment.ingoing_edges(&c);
+        let mut out: Vec<_> = segment.ingoing_edges(&c.id);
         out.sort_by(|a, b| a.from.cmp(&b.from));
         assert_eq!(
             out,
             vec![
                 Edge {
-                    from: a,
-                    to: c,
+                    from: a.id,
+                    to: c.id,
                     label: ()
                 },
                 Edge {
-                    from: b,
-                    to: c,
+                    from: b.id,
+                    to: c.id,
                     label: ()
                 },
             ]
