@@ -60,6 +60,7 @@ fn suggestions(query: &str, gl: &str) -> Result<Vec<String>> {
     Ok(suggestions)
 }
 
+#[derive(Clone)]
 pub enum Gl {
     Us,
 }
@@ -111,6 +112,7 @@ pub fn run<P: AsRef<Path>>(
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})")
+            .unwrap()
             .progress_chars("#>-"),
     );
 

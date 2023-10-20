@@ -50,17 +50,17 @@ async fn get_rates() -> Result<CurrencyExchange> {
 
     // read all `Cube` nodes that has the `currency` attribute
     // and insert them into the `rates` map
-    while let Ok(event) = reader.read_event(&mut buf) {
+    while let Ok(event) = reader.read_event_into(&mut buf) {
         match event {
-            quick_xml::events::Event::Empty(ref e) if e.name() == b"Cube" => {
+            quick_xml::events::Event::Empty(ref e) if e.name().as_ref() == b"Cube" => {
                 if let Some(currency) = e
                     .attributes()
-                    .find(|a| a.as_ref().unwrap().key == b"currency")
+                    .find(|a| a.as_ref().unwrap().key.as_ref() == b"currency")
                     .map(|a| a.unwrap().value.to_vec())
                 {
                     let rate = e
                         .attributes()
-                        .find(|a| a.as_ref().unwrap().key == b"rate")
+                        .find(|a| a.as_ref().unwrap().key.as_ref() == b"rate")
                         .map(|a| a.unwrap().value.to_vec())
                         .unwrap();
 

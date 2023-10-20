@@ -547,7 +547,6 @@ impl WorkerThread {
 
             // parse xml
             let mut reader = quick_xml::Reader::from_str(&body);
-            let mut buf = Vec::new();
 
             let mut urls = vec![];
 
@@ -556,28 +555,28 @@ impl WorkerThread {
             let mut in_loc = false;
 
             loop {
-                match reader.read_event(&mut buf) {
+                match reader.read_event() {
                     Ok(Event::Start(ref e)) => {
-                        if e.name() == b"sitemap" {
+                        if e.name().as_ref() == b"sitemap" {
                             in_sitemap = true;
-                        } else if e.name() == b"url" {
+                        } else if e.name().as_ref() == b"url" {
                             in_url = true;
-                        } else if e.name() == b"loc" {
+                        } else if e.name().as_ref() == b"loc" {
                             in_loc = true;
                         }
                     }
                     Ok(Event::End(ref e)) => {
-                        if e.name() == b"sitemap" {
+                        if e.name().as_ref() == b"sitemap" {
                             in_sitemap = false;
-                        } else if e.name() == b"url" {
+                        } else if e.name().as_ref() == b"url" {
                             in_url = false;
-                        } else if e.name() == b"loc" {
+                        } else if e.name().as_ref() == b"loc" {
                             in_loc = false;
                         }
                     }
                     Ok(Event::Text(e)) => {
                         if in_sitemap && in_loc {
-                            if let Ok(url) = Url::parse(&e.unescape_and_decode(&reader).unwrap()) {
+                            if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
                                 urls.append(
                                     &mut self.urls_from_sitemap(url, depth + 1, max_depth).await,
                                 );
@@ -587,7 +586,7 @@ impl WorkerThread {
                                 .await;
                             }
                         } else if in_url && in_loc {
-                            if let Ok(url) = Url::parse(&e.unescape_and_decode(&reader).unwrap()) {
+                            if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
                                 urls.push(url);
                             }
                         }
@@ -599,8 +598,6 @@ impl WorkerThread {
                     }
                     _ => (),
                 }
-
-                buf.clear();
             }
 
             urls

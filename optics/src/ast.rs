@@ -140,10 +140,10 @@ pub fn parse(optic: &str) -> ModResult<RawOptic> {
             lalrpop_util::ParseError::InvalidToken { location: _ } => unreachable!(
                 "this is a lexing error, which should be caught earlier since we use logos"
             ),
-            lalrpop_util::ParseError::UnrecognizedEOF {
+            lalrpop_util::ParseError::UnrecognizedEof {
                 location: _,
                 expected,
-            } => Err(Error::UnexpectedEOF { expected }),
+            } => Err(Error::UnexpectedEof { expected }),
             lalrpop_util::ParseError::UnrecognizedToken {
                 token: (start, tok, end),
                 expected,

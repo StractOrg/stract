@@ -1,7 +1,8 @@
 use std::io::Write;
 
+use base64::Engine;
 use stract::alice::{
-    ExecutionState, {AcceleratorConfig, Alice},
+    ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
 };
 
 #[tokio::main]
@@ -12,7 +13,9 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // dont use this key in production
-    let key = base64::decode("URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc=").unwrap();
+    let key = BASE64_ENGINE
+        .decode("URyJQTjwUjTq6FSRoZGdbUdTIvqs/QxkPacQio8Lhxc=")
+        .unwrap();
 
     let model = Alice::open(
         "data/alice",

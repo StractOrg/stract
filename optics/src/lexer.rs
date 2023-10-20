@@ -92,9 +92,8 @@ impl<'a> ToString for Token<'a> {
 }
 
 #[derive(Logos, Debug, PartialEq, Clone)]
+#[logos(skip r"[ \t\r\n\f]+")]
 enum Outer<'a> {
-    #[error]
-    #[regex(r"[ \t\r\n\f]+", logos::skip)]
     Error,
 
     #[token("\"")]
@@ -168,9 +167,6 @@ enum Outer<'a> {
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 enum BlockComment {
-    #[error]
-    Error,
-
     #[regex(r"[^/*]*")]
     Text,
 
@@ -180,9 +176,6 @@ enum BlockComment {
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 enum LineComment {
-    #[error]
-    Error,
-
     #[regex(r"[^\n]*")]
     Text,
 
@@ -192,9 +185,6 @@ enum LineComment {
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 enum QuotedString<'a> {
-    #[error]
-    Error,
-
     #[regex(r#"[^\\"]+"#)]
     Text(&'a str),
 
@@ -219,12 +209,18 @@ impl<'source> LexerBridge<'source> {
     }
 }
 
+impl<'source> LexerBridge<'source> {
+    fn lex_next(&mut self) -> Option<Outer<'source>> {
+        Some(self.lexer.next()?.unwrap_or(Outer::Error))
+    }
+}
+
 // Clones as we switch between modes
 impl<'source> Iterator for LexerBridge<'source> {
     type Item = Result<(usize, Token<'source>, usize)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut tok = self.lexer.next();
+        let mut tok = self.lex_next();
 
         while let Some(innertok) = &tok {
             // ignore comments
@@ -232,24 +228,24 @@ impl<'source> Iterator for LexerBridge<'source> {
                 Outer::StartBlockComment => {
                     let mut inner: Lexer<BlockComment> = self.lexer.clone().morph();
                     for tok in inner.by_ref() {
-                        if matches!(tok, BlockComment::End) {
+                        if matches!(tok, Ok(BlockComment::End)) {
                             break;
                         }
                     }
 
                     self.lexer = inner.morph();
-                    tok = self.lexer.next()
+                    tok = self.lex_next()
                 }
                 Outer::StartLineComment => {
                     let mut inner: Lexer<LineComment> = self.lexer.clone().morph();
                     for tok in inner.by_ref() {
-                        if matches!(tok, LineComment::End) {
+                        if matches!(tok, Ok(LineComment::End)) {
                             break;
                         }
                     }
 
                     self.lexer = inner.morph();
-                    tok = self.lexer.next()
+                    tok = self.lex_next()
                 }
                 _ => break,
             }
@@ -263,20 +259,20 @@ impl<'source> Iterator for LexerBridge<'source> {
             let mut res = String::new();
             for tok in inner.by_ref() {
                 match tok {
-                    QuotedString::Error => {
-                        return Some(Err(Error::UnexpectedEOF {
+                    Err(()) => {
+                        return Some(Err(Error::UnexpectedEof {
                             expected: vec!["\"".to_string()],
                         }))
                     }
-                    QuotedString::Text(t) => res.push_str(t),
-                    QuotedString::EscapedQuote => res.push('"'),
-                    QuotedString::EndString => break,
+                    Ok(QuotedString::Text(t)) => res.push_str(t),
+                    Ok(QuotedString::EscapedQuote) => res.push('"'),
+                    Ok(QuotedString::EndString) => break,
                 }
             }
             let end = inner.span().end - 1;
 
             if start > end {
-                return Some(Err(Error::UnexpectedEOF {
+                return Some(Err(Error::UnexpectedEof {
                     expected: vec!["\"".to_string()],
                 }));
             }

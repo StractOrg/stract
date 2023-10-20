@@ -31,7 +31,7 @@ use crate::{
 use bzip2::bufread::MultiBzDecoder;
 use itertools::Itertools;
 use parse_wiki_text::{Node, Parameter};
-use quick_xml::events::Event;
+use quick_xml::{events::Event, name::QName};
 
 struct EntityIterator<R: BufRead> {
     inside_title: bool,
@@ -60,13 +60,13 @@ impl<R: BufRead> Iterator for EntityIterator<R> {
         use Event::*;
 
         loop {
-            let event = self.reader.read_event(&mut self.buf).ok()?;
+            let event = self.reader.read_event_into(&mut self.buf).ok()?;
             let name = match &event {
                 Start(b) | Empty(b) => b.name(),
                 End(b) => b.name(),
-                _ => &[],
+                _ => QName(&[]),
             };
-            match (&event, name) {
+            match (&event, name.as_ref()) {
                 (Start(_), b"page") => self.current_entity = Some(EntityBuilder::new()),
                 (End(_), b"page") => {
                     if let Some(entity) = self.current_entity.take().and_then(|e| e.build()) {
@@ -81,11 +81,9 @@ impl<R: BufRead> Iterator for EntityIterator<R> {
                 (Text(e), _) => {
                     if let Some(entity) = &mut self.current_entity {
                         if self.inside_title {
-                            let bytes = e.unescaped().unwrap();
-                            entity.append_title(self.reader.decode(&bytes).unwrap());
+                            entity.append_title(e.unescape().unwrap().as_ref());
                         } else if self.inside_text {
-                            let bytes = e.unescaped().unwrap();
-                            entity.append_text(self.reader.decode(&bytes).unwrap());
+                            entity.append_text(e.unescape().unwrap().as_ref());
                         }
                     }
                 }

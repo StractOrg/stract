@@ -26,13 +26,14 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::Engine;
 use tokio::sync::Mutex;
 use tokio_stream::Stream;
 use tokio_stream::StreamExt as _;
 use tracing::info;
 
 use crate::{
-    alice::{Alice, EncodedEncryptedState, EncryptedState},
+    alice::{Alice, EncodedEncryptedState, EncryptedState, BASE64_ENGINE},
     config::AliceLocalConfig,
     distributed::{
         cluster::Cluster,
@@ -169,7 +170,7 @@ pub async fn route(
 
 pub async fn run(config: AliceLocalConfig) -> Result<(), anyhow::Error> {
     let addr: SocketAddr = config.host;
-    let key = base64::decode(config.encryption_key)?;
+    let key = BASE64_ENGINE.decode(config.encryption_key)?;
 
     info!("starting alice");
     let alice = Alice::open(
@@ -201,5 +202,5 @@ pub async fn run(config: AliceLocalConfig) -> Result<(), anyhow::Error> {
 
 pub fn generate_key() {
     let key = Aes256Gcm::generate_key(OsRng);
-    println!("{}", base64::encode(key.as_slice()));
+    println!("{}", BASE64_ENGINE.encode(key.as_slice()));
 }

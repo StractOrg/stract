@@ -36,6 +36,8 @@ use aes_gcm::{
     AeadCore, Aes256Gcm, Key, KeyInit, Nonce,
 };
 use anyhow::anyhow;
+pub use base64::prelude::BASE64_STANDARD as BASE64_ENGINE;
+use base64::Engine;
 use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
 use itertools::Itertools;
@@ -407,13 +409,13 @@ pub struct EncodedEncryptedState(String);
 impl EncodedEncryptedState {
     pub fn encode(state: EncryptedState) -> Self {
         let bytes = bincode::serialize(&state).unwrap();
-        let encoded = base64::encode(bytes);
+        let encoded = BASE64_ENGINE.encode(bytes);
 
         Self(encoded)
     }
 
     pub fn decode(self) -> Result<EncryptedState> {
-        let bytes = base64::decode(self.0)?;
+        let bytes = BASE64_ENGINE.decode(self.0)?;
         let state = bincode::deserialize(&bytes)?;
 
         Ok(state)
@@ -477,11 +479,11 @@ pub fn compress_state(state: Vec<Vec<f32>>) -> CompressedState {
     let compressed = encoder.finish().unwrap();
 
     // base64 encode the compressed state
-    CompressedState(base64::encode(compressed))
+    CompressedState(BASE64_ENGINE.encode(compressed))
 }
 
 pub fn decompress_state(state: CompressedState) -> Result<Vec<Vec<f32>>> {
-    let state = base64::decode(state.0)?;
+    let state = BASE64_ENGINE.decode(state.0)?;
 
     let mut decoder = GzDecoder::new(&state[..]);
 

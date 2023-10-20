@@ -40,6 +40,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
             pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar}] {pos:>7}/{len:7} ({eta})")
+            .unwrap()
             .progress_chars("#>-"),
     );
             Some(pb)
