@@ -41,7 +41,7 @@ We recommend everyone to use the hosted version at [trystract.com](https://tryst
 Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) file.
 
 # 📬 Contact
-You can contact us at [hello@trystract.com](mailto:hello@trystract.com) or in our [Discord server](https://discord.gg/BmzKHffWJM).
+You can contact us at [hello@trystract.com](mailto:hello@trystract.com) or come hang out in our [Discord](https://discord.gg/BmzKHffWJM) or [Matrix](https://matrix.to/#/#stract:matrix.org) server.
 
 # 🏆 Thank you!
 We truly stand on the shoulders of giants and this project would not have been even remotely feasible without them. An especially huge thank you to
