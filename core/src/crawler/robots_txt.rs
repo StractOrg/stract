@@ -46,11 +46,6 @@ impl RobotsTxtManager {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.cache.clear();
-        self.last_prune = std::time::Instant::now();
-    }
-
     pub async fn is_allowed(&mut self, url: &Url, user_agent: &str) -> bool {
         match self.get_mut(url).await {
             Lookup::Found(robots_txt) => robots_txt

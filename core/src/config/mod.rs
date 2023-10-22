@@ -260,7 +260,7 @@ pub struct SearchServerConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlCoordinatorConfig {
-    pub crawldb_folder: String,
+    pub job_queue: String,
     pub host: SocketAddr,
 }
 
@@ -274,7 +274,6 @@ pub struct UserAgent {
 pub struct CrawlerConfig {
     pub num_worker_threads: usize,
     pub user_agent: UserAgent,
-    pub num_jobs_per_fetch: usize,
 
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
     pub robots_txt_cache_sec: u64,
@@ -297,6 +296,9 @@ pub struct CrawlerConfig {
     #[serde(default = "defaults::Crawler::max_redirects")]
     pub max_redirects: usize,
 
+    #[serde(default = "defaults::Crawler::dry_run")]
+    pub dry_run: bool,
+
     pub timeout_seconds: u64,
     pub s3: S3Config,
     pub router_hosts: Vec<String>,
@@ -306,7 +308,6 @@ pub struct CrawlerConfig {
 pub struct CrawlRouterConfig {
     pub host: SocketAddr,
     pub coordinator_addrs: Vec<SocketAddr>,
-    pub seed_urls: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -363,4 +364,19 @@ pub struct WebgraphServerConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WidgetsConfig {
     pub thesaurus_paths: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CrawlPlannerConfig {
+    pub page_harmonic_path: String,
+    pub host_harmonic_path: String,
+    pub page_graph_path: String,
+    pub host_graph_path: String,
+    pub output_path: String,
+
+    pub num_job_queues: usize,
+
+    pub crawl_budget: usize,
+    pub top_host_fraction: f64,
+    pub wander_fraction: f64,
 }

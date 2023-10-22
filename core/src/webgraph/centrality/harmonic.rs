@@ -159,6 +159,13 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
         .map(|(node_id, centrality)| (node_id, centrality / norm_factor))
+        .map(|(node_id, centrality)| {
+            if !centrality.is_finite() {
+                (node_id, 0.0)
+            } else {
+                (node_id, centrality)
+            }
+        })
         .collect();
 
     info!("Harmonic centrality calculated");

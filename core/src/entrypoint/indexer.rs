@@ -212,11 +212,11 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 has_backlinks = true;
             }
 
-            if !page_centrality.is_normal() {
+            if !page_centrality.is_finite() {
                 page_centrality = 0.0;
             }
 
-            if !host_centrality.is_normal() {
+            if !host_centrality.is_finite() {
                 host_centrality = 0.0;
             }
 

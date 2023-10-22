@@ -122,6 +122,9 @@ enum Crawler {
     /// Deploy the crawl router. The crawl router is responsible for routing job responses and requests
     /// from the workers to the correct crawl coordinators.
     Router { config_path: String },
+
+    /// Create a crawl plan.
+    Plan { config_path: String },
 }
 
 /// Commands to train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
@@ -325,6 +328,11 @@ fn main() -> Result<()> {
                     .enable_all()
                     .build()?
                     .block_on(entrypoint::crawler::router(config))?
+            }
+            Crawler::Plan { config_path } => {
+                let config: config::CrawlPlannerConfig = load_toml_config(config_path);
+
+                entrypoint::crawler::planner(config)?;
             }
         },
         Commands::SafetyClassifier { options } => match options {

@@ -14,13 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
-use tokio::sync::Mutex;
+use hashbrown::HashMap;
+
 use url::Url;
 
 use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
@@ -28,10 +25,12 @@ use crate::{config::CrawlerConfig, webpage::url_ext::UrlExt};
 use self::{warc_writer::WarcWriter, worker::WorkerThread};
 
 pub mod coordinator;
-pub mod crawl_db;
 mod robots_txt;
 pub mod router;
 pub use router::Router;
+mod file_queue;
+pub mod planner;
+mod site_graph;
 mod warc_writer;
 mod worker;
 
@@ -101,6 +100,12 @@ impl From<&Url> for Domain {
     }
 }
 
+impl From<Url> for Domain {
+    fn from(url: Url) -> Self {
+        Self::from(&url)
+    }
+}
+
 impl From<String> for Domain {
     fn from(s: String) -> Self {
         Self(s)
@@ -118,9 +123,8 @@ impl Domain {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Job {
     pub domain: Domain,
-    pub fetch_sitemap: bool,
     pub urls: VecDeque<Url>,
-    pub weight_budget: f64,
+    pub wandering_urls: u64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -130,23 +134,10 @@ pub enum UrlResponse {
     Redirected { url: Url, new_url: Url },
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct JobResponse {
-    pub domain: Domain,
-    pub url_responses: Vec<UrlResponse>,
-    pub discovered_urls: Vec<Url>,
-    pub weight_budget: f64,
-}
-
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
-pub struct UrlString(pub String);
-impl UrlString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+pub struct UrlString(String);
 
 impl From<&Url> for UrlString {
     fn from(url: &Url) -> Self {
@@ -197,25 +188,18 @@ impl From<Url> for RetrieableUrl {
 
 struct WorkerJob {
     pub domain: Domain,
-    pub fetch_sitemap: bool,
     pub urls: VecDeque<RetrieableUrl>,
-    pub weight_budget: f64,
+    pub wanrdering_urls: u64,
 }
 
 impl From<Job> for WorkerJob {
     fn from(value: Job) -> Self {
         Self {
             domain: value.domain,
-            fetch_sitemap: value.fetch_sitemap,
             urls: value.urls.into_iter().map(RetrieableUrl::from).collect(),
-            weight_budget: value.weight_budget,
+            wanrdering_urls: value.wandering_urls,
         }
     }
-}
-
-pub enum Command {
-    Job(Job),
-    Shutdown,
 }
 
 #[derive(Debug, Clone)]
@@ -234,8 +218,6 @@ pub struct Crawler {
 
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
-        let pending_commands = Arc::new(Mutex::new(VecDeque::new()));
-        let results = Arc::new(Mutex::new(Vec::new()));
         let writer = Arc::new(WarcWriter::new(config.s3.clone()));
         let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
@@ -247,9 +229,7 @@ impl Crawler {
 
         for _ in 0..config.num_worker_threads {
             let worker = WorkerThread::new(
-                Arc::clone(&pending_commands),
                 Arc::clone(&writer),
-                Arc::clone(&results),
                 config.clone(),
                 timeout,
                 router_hosts.clone(),
@@ -270,10 +250,4 @@ impl Crawler {
 
         self.writer.finish().await.unwrap();
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Response {
-    NewJobs { jobs: Vec<Job> },
-    Done,
 }

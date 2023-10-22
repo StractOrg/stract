@@ -96,6 +96,10 @@ impl Crawler {
     pub fn max_redirects() -> usize {
         5
     }
+
+    pub fn dry_run() -> bool {
+        false
+    }
 }
 
 pub struct WebgraphServer;

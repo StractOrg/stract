@@ -1,4 +1,3 @@
-use encoding_rs::{Encoding, UTF_8};
 // Stract is an open source web search engine.
 // Copyright (C) 2023 Stract ApS
 //
@@ -14,55 +13,54 @@ use encoding_rs::{Encoding, UTF_8};
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use encoding_rs::{Encoding, UTF_8};
 use futures::{future::BoxFuture, FutureExt};
+use hashbrown::{HashMap, HashSet};
 use mime::Mime;
 use quick_xml::events::Event;
 use rand::seq::SliceRandom;
 use tokio_stream::StreamExt;
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::VecDeque,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use tokio::sync::Mutex;
 use url::Url;
 
 use crate::{
     config::CrawlerConfig,
-    crawler::{JobResponse, Response, MAX_OUTGOING_URLS_PER_PAGE, MAX_URL_LEN_BYTES},
+    crawler::MAX_URL_LEN_BYTES,
     distributed::{retry_strategy::ExponentialBackoff, sonic},
-    entrypoint::crawler::router::{NewJobs, RouterService},
+    entrypoint::crawler::router::{NewJob, RouterService},
     webpage::Html,
 };
 
 use super::{
-    robots_txt::RobotsTxtManager, Command, CrawlDatum, Error, Result, Site, UrlResponse,
-    WarcWriter, WorkerJob,
+    robots_txt::RobotsTxtManager, site_graph::SiteGraph, CrawlDatum, Domain, Error, Result,
+    RetrieableUrl, Site, UrlResponse, WarcWriter, WorkerJob,
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 
+struct ProcessedUrl {
+    new_urls: Vec<Url>,
+    response: UrlResponse,
+    fetch_time: Duration,
+}
+
 pub struct WorkerThread {
-    current_job: Option<WorkerJob>,
-    pending_commands: Arc<Mutex<VecDeque<Command>>>,
     writer: Arc<WarcWriter>,
-    results: Arc<Mutex<Vec<JobResponse>>>,
     client: reqwest::Client,
-    config: CrawlerConfig,
-    politeness_factor: f32,
+    config: Arc<CrawlerConfig>,
     router_hosts: Vec<SocketAddr>,
-    num_jobs_per_fetch: usize,
-    robotstxt: RobotsTxtManager,
 }
 
 impl WorkerThread {
     pub fn new(
-        pending_commands: Arc<Mutex<VecDeque<Command>>>,
         writer: Arc<WarcWriter>,
-        results: Arc<Mutex<Vec<JobResponse>>>,
         config: CrawlerConfig,
         timeout: Duration,
         router_hosts: Vec<SocketAddr>,
@@ -86,22 +84,11 @@ impl WorkerThread {
             .user_agent(&config.user_agent.full)
             .build()?;
 
-        let robotstxt = RobotsTxtManager::new(
-            client.clone(),
-            Duration::from_secs(config.robots_txt_cache_sec),
-        );
-
         Ok(Self {
             writer,
             client,
-            results,
-            current_job: None,
-            pending_commands,
-            num_jobs_per_fetch: config.num_jobs_per_fetch,
-            politeness_factor: config.politeness_factor,
-            config,
+            config: Arc::new(config),
             router_hosts,
-            robotstxt,
         })
     }
 
@@ -118,82 +105,121 @@ impl WorkerThread {
         .await?)
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(self) {
         loop {
-            let mut guard = self.pending_commands.lock().await;
-            let command = guard.pop_front();
+            let conn = self.router_conn().await.unwrap();
+            let res = conn
+                .send_with_timeout(&NewJob {}, Duration::from_secs(90))
+                .await;
 
-            if let Some(command) = command {
-                drop(guard); // let other workers get jobs
-
-                match command {
-                    Command::Job(job) => {
-                        self.current_job = Some(job.into());
-                        self.process_job().await;
-                    }
-                    Command::Shutdown => {
-                        self.pending_commands
-                            .lock()
-                            .await
-                            .push_back(Command::Shutdown);
-
-                        break;
-                    }
+            match res {
+                Ok(Some(job)) => {
+                    let executor = JobExecutor::new(
+                        job.into(),
+                        self.client.clone(),
+                        self.config.clone(),
+                        self.writer.clone(),
+                    );
+                    executor.run().await;
                 }
-            } else {
-                let conn = self.router_conn().await.unwrap();
-                let results = self.results.lock().await.drain(..).collect::<Vec<_>>();
-
-                let res = conn
-                    .send_with_timeout(
-                        &NewJobs {
-                            responses: results,
-                            num_jobs: self.num_jobs_per_fetch,
-                        },
-                        Duration::from_secs(90),
-                    )
-                    .await;
-
-                match res {
-                    Ok(Response::NewJobs { jobs }) => {
-                        if jobs.is_empty() {
-                            drop(guard);
-                            tokio::time::sleep(Duration::from_secs(30)).await;
-                            continue;
-                        }
-
-                        guard.extend(jobs.into_iter().map(Command::Job));
-                    }
-                    Ok(Response::Done) => {
-                        guard.push_back(Command::Shutdown);
-
-                        break;
-                    }
-                    _ => {
-                        drop(guard);
-                        tokio::time::sleep(Duration::from_secs(30)).await;
-                        continue;
-                    }
+                Ok(None) => {
+                    return;
                 }
-                drop(guard)
+                _ => {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    continue;
+                }
             }
         }
     }
+}
 
-    async fn process_job(&mut self) {
-        self.politeness_factor = self.config.politeness_factor;
+struct JobExecutor {
+    writer: Arc<WarcWriter>,
+    client: reqwest::Client,
+    politeness_factor: f32,
+    robotstxt: RobotsTxtManager,
+    crawled_urls: HashSet<Url>,
+    crawled_sitemaps: HashSet<Site>,
+    sitemap_urls: HashSet<Url>,
+    config: Arc<CrawlerConfig>,
+    site_graph: SiteGraph,
+    job: WorkerJob,
+}
 
-        let mut job = self.current_job.take().unwrap();
-        tracing::info!("Processing job: {:?}", job.domain);
+impl JobExecutor {
+    fn new(
+        job: WorkerJob,
+        client: reqwest::Client,
+        config: Arc<CrawlerConfig>,
+        writer: Arc<WarcWriter>,
+    ) -> Self {
+        Self {
+            writer,
+            politeness_factor: config.politeness_factor,
+            robotstxt: RobotsTxtManager::new(
+                client.clone(),
+                Duration::from_secs(config.robots_txt_cache_sec),
+            ),
+            client,
+            crawled_urls: HashSet::new(),
+            crawled_sitemaps: HashSet::new(),
+            sitemap_urls: HashSet::new(),
+            config,
+            site_graph: SiteGraph::new(),
+            job,
+        }
+    }
+    async fn run(mut self) {
+        tracing::info!("Processing job: {:?}", self.job.domain);
 
-        self.robotstxt.clear();
+        self.scheduled_urls().await;
+        self.wander().await;
+    }
 
-        let mut url_responses: Vec<UrlResponse> = Vec::new();
-        let mut discovered_urls: HashSet<Url> = HashSet::new();
+    async fn scheduled_urls(&mut self) {
+        let urls = self.job.urls.drain(..).collect();
+        self.process_urls(urls, true).await;
+    }
 
-        let mut crawled_sitemaps: HashSet<Site> = HashSet::new();
+    async fn wander(&mut self) {
+        let mut urls: Vec<(Url, f64)> = self
+            .site_graph
+            .compute_centralities()
+            .into_iter()
+            .map(|(node_ref, score)| {
+                (
+                    Url::from(self.site_graph.get_node(node_ref).unwrap().clone()),
+                    score,
+                )
+            })
+            .chain(self.sitemap_urls.drain().map(|url| (url.clone(), 0.0)))
+            .filter(|(url, _)| !self.crawled_urls.contains(url))
+            .filter(|(url, _)| self.job.domain == Domain::from(url))
+            .filter(|(_, score)| score.is_finite())
+            .collect();
 
-        while let Some(retryable_url) = job.urls.pop_front() {
+        urls.sort_by(|(a, _), (b, _)| a.cmp(b));
+        urls.dedup();
+
+        urls.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+
+        let urls = urls
+            .into_iter()
+            .take(self.job.wanrdering_urls as usize)
+            .map(|(url, _)| url)
+            .map(RetrieableUrl::from)
+            .collect();
+
+        self.process_urls(urls, false).await;
+    }
+
+    async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>, fetch_sitemap: bool) {
+        while let Some(retryable_url) = urls.pop_front() {
+            if self.crawled_urls.contains(&retryable_url.url) {
+                continue;
+            }
+
             if retryable_url.retries > self.config.max_url_slowdown_retry {
                 continue;
             }
@@ -204,25 +230,22 @@ impl WorkerThread {
                 continue;
             }
 
-            if !self
-                .robotstxt
-                .is_allowed(&retryable_url.url, &self.config.user_agent.token)
-                .await
+            if !self.config.dry_run
+                && !self
+                    .robotstxt
+                    .is_allowed(&retryable_url.url, &self.config.user_agent.token)
+                    .await
             {
                 continue;
             }
 
             let site = Site(retryable_url.url.host_str().unwrap_or_default().to_string());
-            if job.fetch_sitemap && !crawled_sitemaps.contains(&site) {
-                crawled_sitemaps.insert(site.clone());
+            if !self.config.dry_run && fetch_sitemap && !self.crawled_sitemaps.contains(&site) {
+                self.crawled_sitemaps.insert(site.clone());
 
                 if let Some(sitemap) = self.robotstxt.sitemap(&retryable_url.url).await {
-                    let sitemap_urls = self.urls_from_sitemap(sitemap, 0, 5).await;
-                    discovered_urls.extend(
-                        sitemap_urls
-                            .into_iter()
-                            .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES),
-                    );
+                    self.sitemap_urls
+                        .extend(self.urls_from_sitemap(sitemap, 0, 5).await);
                 }
             }
 
@@ -240,39 +263,39 @@ impl WorkerThread {
 
             tokio::time::sleep(delay).await;
 
-            if let UrlResponse::Failed {
-                url: _,
-                status_code,
-            } = res.response
-            {
-                if matches!(status_code, Some(429)) {
-                    let mut retryable_url = retryable_url;
-                    retryable_url.retries += 1;
-                    job.urls.push_back(retryable_url);
-                    continue;
+            match res.response {
+                UrlResponse::Success { url } => {
+                    self.crawled_urls.insert(url.clone());
+
+                    let from_node = self.site_graph.add_node(url.clone().into());
+
+                    for new_url in res.new_urls {
+                        if new_url.host_str().is_none() {
+                            continue;
+                        }
+
+                        if new_url.host_str() != retryable_url.url.host_str() {
+                            continue;
+                        }
+
+                        let to_node = self.site_graph.add_node(new_url.clone().into());
+                        self.site_graph.add_edge(from_node, to_node);
+                    }
                 }
+                UrlResponse::Failed {
+                    url: _,
+                    status_code,
+                } => {
+                    if matches!(status_code, Some(429)) {
+                        let mut retryable_url = retryable_url;
+                        retryable_url.retries += 1;
+                        urls.push_back(retryable_url);
+                        continue;
+                    }
+                }
+                UrlResponse::Redirected { url: _, new_url: _ } => {}
             }
-
-            discovered_urls.extend(
-                res.new_urls
-                    .into_iter()
-                    .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES)
-                    .take(MAX_OUTGOING_URLS_PER_PAGE),
-            );
-            url_responses.push(res.response);
         }
-
-        let job_response = JobResponse {
-            domain: job.domain,
-            url_responses,
-            discovered_urls: discovered_urls
-                .into_iter()
-                .filter(|url| url.as_str().len() < MAX_URL_LEN_BYTES)
-                .collect(),
-            weight_budget: job.weight_budget,
-        };
-
-        self.results.lock().await.push(job_response);
     }
 
     async fn process_url(&mut self, url: Url) -> ProcessedUrl {
@@ -290,6 +313,7 @@ impl WorkerThread {
                                     .all_links()
                                     .into_iter()
                                     .map(|link| link.destination)
+                                    .filter(|url| url.as_str().len() <= MAX_URL_LEN_BYTES)
                                     .filter(|url| {
                                         !url.path().ends_with(".pdf")
                                             && !url.path().ends_with(".jpg")
@@ -400,8 +424,13 @@ impl WorkerThread {
     }
 
     async fn fetch(&self, url: Url) -> Result<reqwest::Response> {
-        let backoff = ExponentialBackoff::from_millis(1000)
-            .with_limit(Duration::from_secs(20))
+        if self.config.dry_run {
+            tracing::debug!("dry run: {}", url);
+            return Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
+        }
+
+        let backoff = ExponentialBackoff::from_millis(self.config.min_crawl_delay_ms)
+            .with_limit(Duration::from_millis(self.config.max_crawl_delay_ms))
             .take(3);
 
         let mut res = Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
@@ -546,57 +575,20 @@ impl WorkerThread {
             let body = body.unwrap();
 
             // parse xml
-            let mut reader = quick_xml::Reader::from_str(&body);
+            let entries = parse_sitemap(&body);
 
             let mut urls = vec![];
 
-            let mut in_sitemap = false;
-            let mut in_url = false;
-            let mut in_loc = false;
-
-            loop {
-                match reader.read_event() {
-                    Ok(Event::Start(ref e)) => {
-                        if e.name().as_ref() == b"sitemap" {
-                            in_sitemap = true;
-                        } else if e.name().as_ref() == b"url" {
-                            in_url = true;
-                        } else if e.name().as_ref() == b"loc" {
-                            in_loc = true;
-                        }
+            for entry in entries {
+                match entry {
+                    SitemapEntry::Url(url) => {
+                        urls.push(url);
                     }
-                    Ok(Event::End(ref e)) => {
-                        if e.name().as_ref() == b"sitemap" {
-                            in_sitemap = false;
-                        } else if e.name().as_ref() == b"url" {
-                            in_url = false;
-                        } else if e.name().as_ref() == b"loc" {
-                            in_loc = false;
-                        }
+                    SitemapEntry::Sitemap(url) => {
+                        tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms))
+                            .await;
+                        urls.append(&mut self.urls_from_sitemap(url, depth + 1, max_depth).await);
                     }
-                    Ok(Event::Text(e)) => {
-                        if in_sitemap && in_loc {
-                            if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                                urls.append(
-                                    &mut self.urls_from_sitemap(url, depth + 1, max_depth).await,
-                                );
-                                tokio::time::sleep(Duration::from_millis(
-                                    self.config.min_crawl_delay_ms,
-                                ))
-                                .await;
-                            }
-                        } else if in_url && in_loc {
-                            if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                                urls.push(url);
-                            }
-                        }
-                    }
-                    Ok(Event::Eof) => break,
-                    Err(e) => {
-                        tracing::debug!("failed to parse sitemap: {}", e);
-                        break;
-                    }
-                    _ => (),
                 }
             }
 
@@ -606,8 +598,154 @@ impl WorkerThread {
     }
 }
 
-struct ProcessedUrl {
-    new_urls: Vec<Url>,
-    response: UrlResponse,
-    fetch_time: Duration,
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SitemapEntry {
+    Url(Url),
+    Sitemap(Url),
+}
+
+fn parse_sitemap(s: &str) -> Vec<SitemapEntry> {
+    let mut reader = quick_xml::Reader::from_str(s);
+
+    let mut res = vec![];
+
+    let mut in_sitemap = false;
+    let mut in_url = false;
+    let mut in_loc = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                if e.name().as_ref() == b"sitemap" {
+                    in_sitemap = true;
+                } else if e.name().as_ref() == b"url" {
+                    in_url = true;
+                } else if e.name().as_ref() == b"loc" {
+                    in_loc = true;
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                if e.name().as_ref() == b"sitemap" {
+                    in_sitemap = false;
+                } else if e.name().as_ref() == b"url" {
+                    in_url = false;
+                } else if e.name().as_ref() == b"loc" {
+                    in_loc = false;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if in_sitemap && in_loc {
+                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
+                        res.push(SitemapEntry::Sitemap(url));
+                    }
+                } else if in_url && in_loc {
+                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
+                        res.push(SitemapEntry::Url(url));
+                    }
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                tracing::debug!("failed to parse sitemap: {}", e);
+                break;
+            }
+            _ => (),
+        }
+    }
+
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_sitemap() {
+        let dr = r#"<sitemapindex>
+        <sitemap>
+        <loc>https://www.dr.dk/drtv/sitemap.xml</loc>
+        </sitemap>
+        <sitemap>
+        <loc>https://www.dr.dk/sitemap.tvguide.xml</loc>
+        </sitemap>
+        <sitemap>
+        <loc>
+        https://www.dr.dk/sitemap.kommunalvalg.resultater.xml
+        </loc>
+        </sitemap>
+        <sitemap>
+        <loc>https://www.dr.dk/sitemap.folketingsvalg2022.xml</loc>
+        </sitemap>
+        </sitemapindex>"#;
+
+        let entries = super::parse_sitemap(dr);
+        assert_eq!(
+            entries,
+            vec![
+                super::SitemapEntry::Sitemap("https://www.dr.dk/drtv/sitemap.xml".parse().unwrap()),
+                super::SitemapEntry::Sitemap(
+                    "https://www.dr.dk/sitemap.tvguide.xml".parse().unwrap()
+                ),
+                super::SitemapEntry::Sitemap(
+                    "https://www.dr.dk/sitemap.kommunalvalg.resultater.xml"
+                        .parse()
+                        .unwrap()
+                ),
+                super::SitemapEntry::Sitemap(
+                    "https://www.dr.dk/sitemap.folketingsvalg2022.xml"
+                        .parse()
+                        .unwrap()
+                ),
+            ]
+        );
+
+        let dr = r#"<urlset>
+        <url>
+        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
+        <loc>https://www.dr.dk/drtv/serie/sleepover_6382</loc>
+        </url>
+        <url>
+        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
+        <loc>https://www.dr.dk/drtv/saeson/sleepover_9673</loc>
+        </url>
+        <url>
+        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
+        <loc>
+        https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239
+        </loc>
+        </url>
+        <url>
+        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
+        <loc>
+        https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252
+        </loc>
+        </url>
+        </urlset>"#;
+
+        let entries = super::parse_sitemap(dr);
+        assert_eq!(
+            entries,
+            vec![
+                super::SitemapEntry::Url(
+                    "https://www.dr.dk/drtv/serie/sleepover_6382"
+                        .parse()
+                        .unwrap()
+                ),
+                super::SitemapEntry::Url(
+                    "https://www.dr.dk/drtv/saeson/sleepover_9673"
+                        .parse()
+                        .unwrap()
+                ),
+                super::SitemapEntry::Url(
+                    "https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239"
+                        .parse()
+                        .unwrap()
+                ),
+                super::SitemapEntry::Url(
+                    "https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252"
+                        .parse()
+                        .unwrap()
+                ),
+            ]
+        );
+    }
 }

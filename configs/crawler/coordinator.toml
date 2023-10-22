@@ -1,2 +1,2 @@
-crawldb_folder = "data/crawldb"
 host = "0.0.0.0:8080"
+job_queue = "data/crawlplan/job_queue/0.queue"

@@ -16,14 +16,16 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     config,
-    crawler::{self, CrawlCoordinator, Crawler, Domain, DomainCrawled, JobResponse, UrlToInsert},
+    crawler::{self, planner::make_crawl_plan, CrawlCoordinator, Crawler},
     distributed::sonic::{self, service::Message},
-    sonic_service, Result,
+    kv::rocksdb_store::RocksDbStore,
+    sonic_service,
+    webgraph::WebgraphBuilder,
+    Result,
 };
 
 pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
@@ -35,7 +37,7 @@ pub async fn worker(config: config::CrawlerConfig) -> Result<()> {
 }
 
 pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
-    let coordinator = Arc::new(CrawlCoordinator::new(config.crawldb_folder)?);
+    let coordinator = Arc::new(CrawlCoordinator::new(config.job_queue)?);
 
     let addr: SocketAddr = config.host;
     let server = coordinator::CoordinatorService { coordinator }
@@ -51,7 +53,7 @@ pub async fn coordinator(config: config::CrawlCoordinatorConfig) -> Result<()> {
 }
 
 pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
-    let router = crawler::Router::new(config.coordinator_addrs.clone(), config.seed_urls).await?;
+    let router = crawler::Router::new(config.coordinator_addrs.clone()).await?;
 
     let addr: SocketAddr = config.host;
 
@@ -64,28 +66,44 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
     }
 }
 
+pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
+    let page_centrality = RocksDbStore::open(&config.page_harmonic_path);
+    let host_centrality = RocksDbStore::open(&config.host_harmonic_path);
+    let page_graph = WebgraphBuilder::new(&config.page_graph_path).open();
+    let host_graph = WebgraphBuilder::new(&config.host_graph_path).open();
+    let output_path = config.output_path.clone();
+
+    make_crawl_plan(
+        host_centrality,
+        page_centrality,
+        host_graph,
+        page_graph,
+        config,
+        output_path,
+    )?;
+
+    Ok(())
+}
+
 pub mod router {
+    use crate::crawler::Job;
+
     use super::*;
     pub struct RouterService {
         pub router: crawler::Router,
     }
 
-    sonic_service!(RouterService, [NewJobs]);
+    sonic_service!(RouterService, [NewJob]);
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct NewJobs {
-        pub responses: Vec<JobResponse>,
-        pub num_jobs: usize,
-    }
+    pub struct NewJob {}
 
     #[async_trait::async_trait]
-    impl Message<RouterService> for NewJobs {
-        type Response = crate::crawler::Response;
+    impl Message<RouterService> for NewJob {
+        type Response = Option<Job>;
 
         async fn handle(self, server: &RouterService) -> sonic::Result<Self::Response> {
-            server.router.add_responses(&self.responses).await?;
-            let jobs = server.router.sample_jobs(self.num_jobs).await?;
-            Ok(crate::crawler::Response::NewJobs { jobs })
+            Ok(server.router.sample_job().await?)
         }
     }
 }
@@ -99,56 +117,18 @@ pub mod coordinator {
         pub coordinator: Arc<CrawlCoordinator>,
     }
 
-    sonic_service!(CoordinatorService, [InsertUrls, GetJobs, MarkJobsComplete]);
+    sonic_service!(CoordinatorService, [GetJob]);
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct InsertUrls {
-        pub urls: HashMap<Domain, Vec<UrlToInsert>>,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct GetJobs {
-        pub num_jobs: usize,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct MarkJobsComplete {
-        pub domains: Vec<DomainCrawled>,
-    }
+    pub struct GetJob {}
 
     #[async_trait::async_trait]
-    impl Message<CoordinatorService> for InsertUrls {
-        type Response = ();
+    impl Message<CoordinatorService> for GetJob {
+        type Response = Option<Job>;
 
         async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            if let Err(e) = server.coordinator.insert_urls(self.urls) {
-                tracing::error!("failed to insert urls: {}", e);
-            }
-
-            Ok(())
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Message<CoordinatorService> for GetJobs {
-        type Response = Vec<Job>;
-
-        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            let jobs = server.coordinator.sample_jobs(self.num_jobs)?;
-            Ok(jobs)
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Message<CoordinatorService> for MarkJobsComplete {
-        type Response = ();
-
-        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            if let Err(e) = server.coordinator.mark_jobs_complete(&self.domains) {
-                tracing::error!("failed to mark jobs complete: {}", e);
-            }
-
-            Ok(())
+            let job = server.coordinator.sample_job()?;
+            Ok(job)
         }
     }
 }

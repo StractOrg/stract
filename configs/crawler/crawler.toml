@@ -1,3 +1,4 @@
+dry_run = true
 num_jobs_per_fetch = 10
 num_worker_threads = 1
 politeness_factor = 1.0
