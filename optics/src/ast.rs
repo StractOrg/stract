@@ -346,6 +346,11 @@ mod tests {
     }
 
     #[test]
+    fn tilde() {
+        assert!(parse(include_str!("../testcases/samples/tilde.optic")).is_ok());
+    }
+
+    #[test]
     fn crlf_linebreaks() {
         assert!(parse(include_str!("../testcases/crlf.optic")).is_ok());
     }
