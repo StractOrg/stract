@@ -1,0 +1,11 @@
+host_graph_path = "data/webgraph_host"
+host_harmonic_path = "data/centrality/harmonic"
+output_path = "data/crawlplan"
+page_graph_path = "data/webgraph_page"
+page_harmonic_path = "data/centrality_page/derived_harmonic"
+
+num_job_queues = 5
+
+crawl_budget = 1_000
+top_host_fraction = 0.01
+wander_fraction = 0.2
