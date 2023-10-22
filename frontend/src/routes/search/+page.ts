@@ -1,13 +1,11 @@
-import { api } from '$lib/api';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { fetchRemoteOptic } from '$lib/optics';
 import { match } from 'ts-pattern';
 import { extractSearchParams } from '$lib/search';
 import { globals } from '$lib/globals';
 
 export const load: PageLoad = async (req) => {
-  const { fetch, url } = req;
+  const { url } = req;
   let params = extractSearchParams(url.searchParams);
 
   if (!params.query.trim()) {
@@ -23,20 +21,7 @@ export const load: PageLoad = async (req) => {
     throw redirect(300, '/');
   }
 
-  const { data } = api.search(
-    {
-      query: params.query,
-      page: params.currentPage - 1,
-      safeSearch: params.safeSearch,
-      optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
-      selectedRegion: params.selectedRegion,
-      siteRankings: params.siteRankings,
-      fetchDiscussions: true,
-      countResults: true,
-    },
-    { fetch },
-  );
-  const results = await data;
+  const results = req.data['results'];
 
   if (results.type == 'bang') {
     throw redirect(300, results.redirectTo);
