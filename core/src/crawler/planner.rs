@@ -23,6 +23,7 @@ use std::{
 };
 use url::Url;
 
+use crate::webgraph::centrality::{top_hosts, TopHosts};
 use crate::{
     config::CrawlPlannerConfig,
     crawler::{file_queue::FileQueueWriter, Job},
@@ -31,30 +32,6 @@ use crate::{
 };
 
 use super::Domain;
-
-fn top_hosts(host_centrality: &RocksDbStore<NodeID, f64>, fraction: f64) -> Vec<NodeID> {
-    let mut hosts = host_centrality
-        .iter()
-        .map(|(id, centrality)| (id, centrality))
-        .map(|(id, centrality)| {
-            if !centrality.is_finite() {
-                (id, 0.0)
-            } else {
-                (id, centrality)
-            }
-        })
-        .collect::<Vec<_>>();
-
-    hosts.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-
-    let num_hosts = (hosts.len() as f64 * fraction) as usize;
-
-    hosts
-        .into_iter()
-        .take(num_hosts)
-        .map(|(id, _)| id)
-        .collect()
-}
 
 fn all_pages(
     page_centrality: &RocksDbStore<NodeID, f64>,
@@ -116,7 +93,10 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
     let queue_path = output.as_ref().join("job_queue");
     std::fs::create_dir_all(&queue_path)?;
 
-    let hosts = top_hosts(&host_centrality, config.top_host_fraction);
+    let hosts = top_hosts(
+        &host_centrality,
+        TopHosts::Fraction(config.top_host_fraction),
+    );
     tracing::debug!("generating for {} hosts", hosts.len());
     let grouped = group_domain(hosts, &host_graph);
 

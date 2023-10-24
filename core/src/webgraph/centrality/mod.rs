@@ -14,6 +14,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+
+use super::NodeID;
+
 pub mod betweenness;
 pub mod derived_harmonic;
 pub mod harmonic;
+
+#[derive(Debug, Clone, Copy)]
+pub enum TopHosts {
+    Top(usize),
+    Fraction(f64),
+}
+
+pub fn top_hosts(host_centrality: &RocksDbStore<NodeID, f64>, top: TopHosts) -> Vec<NodeID> {
+    let mut hosts = host_centrality
+        .iter()
+        .map(|(id, centrality)| (id, centrality))
+        .map(|(id, centrality)| {
+            if !centrality.is_finite() {
+                (id, 0.0)
+            } else {
+                (id, centrality)
+            }
+        })
+        .collect::<Vec<_>>();
+
+    hosts.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+
+    let num_hosts = match top {
+        TopHosts::Top(abs) => abs,
+        TopHosts::Fraction(frac) => (hosts.len() as f64 * frac) as usize,
+    };
+
+    hosts
+        .into_iter()
+        .take(num_hosts)
+        .map(|(id, _)| id)
+        .collect()
+}

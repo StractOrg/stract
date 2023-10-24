@@ -25,26 +25,27 @@ use tantivy::{
 };
 use url::Url;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub mod scheduler;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum FeedKind {
     Atom,
     Rss,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct Feed {
     url: Url,
     kind: FeedKind,
 }
 
-struct Index {
-    tantivy_index: tantivy::Index,
+pub struct FeedIndex {
     writer: tantivy::IndexWriter,
     reader: tantivy::IndexReader,
     schema: tantivy::schema::Schema,
 }
 
-impl Index {
+impl FeedIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
             std::fs::create_dir_all(path.as_ref())?;
@@ -92,7 +93,6 @@ impl Index {
         let reader = tv_index.reader()?;
 
         Ok(Self {
-            tantivy_index: tv_index,
             writer,
             reader,
             schema,
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn feed_index() {
-        let mut index = Index::open(crate::gen_temp_path()).unwrap();
+        let mut index = FeedIndex::open(crate::gen_temp_path()).unwrap();
 
         let a = Feed {
             url: Url::parse("https://a.com/feed.xml").unwrap(),
