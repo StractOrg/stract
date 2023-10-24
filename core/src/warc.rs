@@ -250,6 +250,7 @@ impl FromStr for PayloadType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "application/html" => Ok(Self::Html),
+            "text/html" => Ok(Self::Html),
             "application/pdf" => Ok(Self::Pdf),
             "application/rss" => Ok(Self::Rss),
             "application/atom" => Ok(Self::Atom),
@@ -261,7 +262,7 @@ impl FromStr for PayloadType {
 impl ToString for PayloadType {
     fn to_string(&self) -> String {
         match self {
-            Self::Html => "application/html".to_string(),
+            Self::Html => "text/html".to_string(),
             Self::Pdf => "application/pdf".to_string(),
             Self::Rss => "application/rss".to_string(),
             Self::Atom => "application/atom".to_string(),

@@ -63,7 +63,7 @@ impl SearchService {
             .entity_index_path
             .map(|path| EntityIndex::open(path).unwrap());
         let centrality_store = config
-            .centrality_store_path
+            .host_centrality_store_path
             .map(|p| InboundSimilarity::open(Path::new(&p).join("inbound_similarity")).unwrap());
         let search_index = Index::open(config.index_path)?;
 

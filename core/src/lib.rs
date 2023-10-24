@@ -46,6 +46,7 @@ mod entity_index;
 mod enum_map;
 mod executor;
 mod fastfield_reader;
+pub mod feed;
 mod human_website_annotations;
 pub mod hyperloglog;
 mod image_downloader;

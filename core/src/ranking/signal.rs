@@ -667,7 +667,7 @@ pub struct SignalAggregator {
     query: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
-    inbound_similariy: Option<Arc<inbound_similarity::Scorer>>,
+    inbound_similarity: Option<Arc<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
     query_centrality: Option<Arc<query_centrality::Scorer>>,
@@ -683,7 +683,7 @@ impl Clone for SignalAggregator {
             query: self.query.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
-            inbound_similariy: self.inbound_similariy.clone(),
+            inbound_similarity: self.inbound_similarity.clone(),
             fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
             update_time_cache: self.update_time_cache.clone(),
             query_centrality: self.query_centrality.clone(),
@@ -738,7 +738,7 @@ impl SignalAggregator {
 
         Self {
             segment_reader: None,
-            inbound_similariy: None,
+            inbound_similarity: None,
             query_signal_coefficients,
             fetch_time_ms_cache,
             update_time_cache,
@@ -870,7 +870,7 @@ impl SignalAggregator {
     }
 
     pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
-        self.inbound_similariy = Some(Arc::new(scorer));
+        self.inbound_similarity = Some(Arc::new(scorer));
     }
 
     pub fn set_region_count(&mut self, region_count: RegionCount) {
@@ -896,7 +896,7 @@ impl SignalAggregator {
     }
 
     pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {
-        self.inbound_similariy
+        self.inbound_similarity
             .as_ref()
             .map(|scorer| scorer.score(&host_id))
             .unwrap_or_default()
