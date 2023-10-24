@@ -238,7 +238,7 @@ impl Signal {
 
     pub fn default_coefficient(&self) -> f64 {
         match self {
-            Signal::Bm25Title => 0.0084,
+            Signal::Bm25Title => 0.0063,
             Signal::Bm25TitleBigrams => 0.0054,
             Signal::Bm25TitleTrigrams => 0.0054,
             Signal::Bm25CleanBody => 0.0063,
@@ -257,10 +257,10 @@ impl Signal {
             Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0018,
             Signal::Bm25DomainIfHomepageNoTokenizer => 0.0018,
             Signal::Bm25TitleIfHomepage => 0.00022,
-            Signal::Bm25BacklinkText => 0.002,
+            Signal::Bm25BacklinkText => 0.004,
             Signal::CrossEncoder => 0.17,
-            Signal::HostCentrality => 1.0,
-            Signal::PageCentrality => 0.5,
+            Signal::HostCentrality => 2.5,
+            Signal::PageCentrality => 1.0,
             Signal::QueryCentrality => 0.0,
             Signal::IsHomepage => 0.0005,
             Signal::FetchTimeMs => 0.001,
