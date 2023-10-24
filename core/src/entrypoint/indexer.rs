@@ -30,6 +30,7 @@ use crate::kv::rocksdb_store::RocksDbStore;
 use crate::kv::Kv;
 use crate::mapreduce::{Map, Reduce, Worker};
 use crate::ranking::SignalAggregator;
+use crate::warc::PayloadType;
 use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use crate::webpage::{safety_classifier, Html, Webpage};
 use crate::{human_website_annotations, Result};
@@ -125,8 +126,8 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
             file.records()
                 .flatten()
                 .filter(|record| match &record.response.payload_type {
-                    Some(payload_type) => !matches!(payload_type.as_str(), "application/pdf"),
-                    None => true,
+                    Some(payload_type) => matches!(payload_type, PayloadType::Html),
+                    None => false,
                 })
         {
             let mut html =

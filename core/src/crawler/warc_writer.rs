@@ -88,25 +88,13 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
 
                 rayon::scope(move |s| {
                     s.spawn(move |_| {
-                        let is_pdf = datum
-                            .headers
-                            .get("content-type")
-                            .map(|ct| ct.contains("application/pdf"))
-                            .unwrap_or(false);
-
-                        let payload = if is_pdf {
-                            Some("application/pdf".to_string())
-                        } else {
-                            None
-                        };
-
                         let warc_record = warc::WarcRecord {
                             request: warc::Request {
                                 url: datum.url.to_string(),
                             },
                             response: warc::Response {
                                 body: datum.body,
-                                payload_type: payload,
+                                payload_type: Some(datum.payload_type),
                             },
                             metadata: warc::Metadata {
                                 fetch_time_ms: datum.fetch_time_ms as usize,

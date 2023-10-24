@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
 use std::path::Path;
+use std::str::FromStr;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -234,11 +235,45 @@ impl Request {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(Arbitrary))]
+pub enum PayloadType {
+    Html,
+    Pdf,
+    Rss,
+    Atom,
+}
+
+impl FromStr for PayloadType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "application/html" => Ok(Self::Html),
+            "application/pdf" => Ok(Self::Pdf),
+            "application/rss" => Ok(Self::Rss),
+            "application/atom" => Ok(Self::Atom),
+            _ => Err(Error::WarcParse("Unknown payload type")),
+        }
+    }
+}
+
+impl ToString for PayloadType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Html => "application/html".to_string(),
+            Self::Pdf => "application/pdf".to_string(),
+            Self::Rss => "application/rss".to_string(),
+            Self::Atom => "application/atom".to_string(),
+        }
+    }
+}
+
 #[derive(Debug)]
 #[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct Response {
     pub body: String,
-    pub payload_type: Option<String>,
+    pub payload_type: Option<PayloadType>,
 }
 
 impl Response {
@@ -251,7 +286,10 @@ impl Response {
 
         Ok(Self {
             body: content.to_string(),
-            payload_type: record.header.get("WARC-IDENTIFIED-PAYLOAD-TYPE").cloned(),
+            payload_type: record
+                .header
+                .get("WARC-IDENTIFIED-PAYLOAD-TYPE")
+                .and_then(|p| PayloadType::from_str(p).ok()),
         })
     }
 }
@@ -528,7 +566,11 @@ impl WarcWriter {
 
         if let Some(payload_type) = &record.response.payload_type {
             self.writer.write_all(
-                format!("WARC-Identified-Payload-Type: {}\r\n", payload_type).as_bytes(),
+                format!(
+                    "WARC-Identified-Payload-Type: {}\r\n",
+                    payload_type.to_string()
+                )
+                .as_bytes(),
             )?;
         }
 
@@ -645,7 +687,7 @@ mod tests {
             },
             response: Response {
                 body: "body of a".to_string(),
-                payload_type: Some("text/html".to_string()),
+                payload_type: Some(PayloadType::Html),
             },
             metadata: Metadata {
                 fetch_time_ms: 1337,
@@ -695,7 +737,7 @@ mod tests {
             },
             response: Response {
                 body: utf8.to_string(),
-                payload_type: Some("text/html".to_string()),
+                payload_type: Some(PayloadType::Html),
             },
             metadata: Metadata { fetch_time_ms: 0 },
         };
@@ -727,7 +769,7 @@ mod tests {
             },
             response: Response {
                 body: body.to_string(),
-                payload_type: Some("text/html".to_string()),
+                payload_type: Some(PayloadType::Html),
             },
             metadata: Metadata { fetch_time_ms: 0 },
         };

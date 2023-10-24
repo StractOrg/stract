@@ -35,6 +35,7 @@ use crate::{
     crawler::MAX_URL_LEN_BYTES,
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     entrypoint::crawler::router::{NewJob, RouterService},
+    warc,
     webpage::Html,
 };
 
@@ -472,11 +473,12 @@ impl JobExecutor {
         }
 
         // check if content type is html
-        if let Some(content_type) = headers.get("content-type") {
-            if !content_type.contains("text/html") {
-                return Err(Error::InvalidContentType(content_type.to_string()).into());
-            }
-        }
+        let payload_type = match headers.get("content-type") {
+            Some(ct) if ct.contains("text/html") => warc::PayloadType::Html,
+            Some(ct) if ct.contains("application/rss") => warc::PayloadType::Rss,
+            Some(ct) if ct.contains("application/atom") => warc::PayloadType::Atom,
+            ct => return Err(Error::InvalidContentType(format!("{ct:?}")).into()),
+        };
 
         let status_code = res.status().as_u16();
 
@@ -495,7 +497,7 @@ impl JobExecutor {
             return Ok(CrawlDatum {
                 url,
                 status_code,
-                headers,
+                payload_type,
                 body: String::new(),
                 fetch_time_ms: fetch_time.as_millis() as u64,
             });
@@ -537,8 +539,8 @@ impl JobExecutor {
         Ok(CrawlDatum {
             url: res_url,
             status_code,
-            headers,
             body,
+            payload_type,
             fetch_time_ms: fetch_time.as_millis() as u64,
         })
     }
