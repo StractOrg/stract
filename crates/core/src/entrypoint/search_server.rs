@@ -28,6 +28,7 @@ use tracing::info;
 use url::Url;
 
 use crate::{
+    collector,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{
@@ -113,7 +114,7 @@ impl SearchService {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrieveWebsites {
-    pub websites: Vec<inverted_index::WebsitePointer>,
+    pub websites: Vec<collector::WebsitePointer>,
     pub query: String,
 }
 #[async_trait::async_trait]

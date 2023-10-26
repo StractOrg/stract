@@ -26,12 +26,41 @@ use tantivy::{
     DocId, SegmentOrdinal, SegmentReader,
 };
 
-use crate::{
-    inverted_index::{DocAddress, WebsitePointer},
-    ranking::initial::{InitialScoreTweaker, Score},
-};
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Score {
+    pub total: f64,
+}
 
-pub type MainCollector = TweakedScoreTopCollector<InitialScoreTweaker>;
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct WebsitePointer {
+    pub score: Score,
+    pub hashes: Hashes,
+    pub address: DocAddress,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct DocAddress {
+    pub segment: u32,
+    pub doc_id: u32,
+}
+
+impl From<tantivy::DocAddress> for DocAddress {
+    fn from(address: tantivy::DocAddress) -> Self {
+        Self {
+            segment: address.segment_ord,
+            doc_id: address.doc_id,
+        }
+    }
+}
+
+impl From<DocAddress> for tantivy::DocAddress {
+    fn from(address: DocAddress) -> Self {
+        Self {
+            segment_ord: address.segment,
+            doc_id: address.doc_id,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct MaxDocsConsidered {
@@ -98,7 +127,7 @@ impl TopDocs {
         self
     }
 
-    pub fn main_collector(self, score_tweaker: InitialScoreTweaker) -> MainCollector {
+    pub fn main_collector<T>(self, score_tweaker: T) -> TweakedScoreTopCollector<T> {
         TweakedScoreTopCollector::new(score_tweaker, self)
     }
 }

@@ -21,8 +21,7 @@ use stdx::enum_map::EnumMap;
 use stract_config::CollectorConfig;
 
 use crate::{
-    collector::{self, BucketCollector},
-    inverted_index::WebsitePointer,
+    collector::{self, BucketCollector, WebsitePointer},
     searcher::SearchQuery,
     Result,
 };
@@ -396,8 +395,8 @@ mod tests {
     use itertools::Itertools;
     use stdx::prehashed::Prehashed;
 
+    use crate::collector::{DocAddress, Hashes, Score};
     use crate::ranking::models::cross_encoder::DummyCrossEncoder;
-    use crate::{collector::Hashes, inverted_index::DocAddress, ranking::initial::Score};
 
     use super::*;
 

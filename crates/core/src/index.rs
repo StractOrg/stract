@@ -30,11 +30,12 @@ use webpage::{
     Webpage,
 };
 
-use crate::collector::MainCollector;
+use crate::collector;
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
 use crate::subdomain_count::SubdomainCounter;
+use crate::MainCollector;
 use crate::Result;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
@@ -124,7 +125,7 @@ impl Index {
 
     pub fn retrieve_websites(
         &self,
-        websites: &[inverted_index::WebsitePointer],
+        websites: &[collector::WebsitePointer],
         query: &Query,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         self.inverted_index.retrieve_websites(websites, query)

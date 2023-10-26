@@ -29,9 +29,10 @@ use stract_config::CollectorConfig;
 use webpage::region::Region;
 
 use crate::{
-    collector::{MainCollector, MaxDocsConsidered, TopDocs},
+    collector::{MaxDocsConsidered, TopDocs},
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
+    MainCollector,
 };
 
 pub use self::signal::*;

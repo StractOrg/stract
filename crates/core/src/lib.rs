@@ -84,6 +84,8 @@ pub enum Error {
 
 pub(crate) type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
+pub type MainCollector = collector::TweakedScoreTopCollector<ranking::initial::InitialScoreTweaker>;
+
 #[cfg(test)]
 fn rand_words(num_words: usize) -> String {
     use rand::{distributions::Alphanumeric, Rng};

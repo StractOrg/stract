@@ -16,9 +16,10 @@
 
 use chrono::Utc;
 use schema::fastfield_reader::FastFieldReader;
-use serde::{Deserialize, Serialize};
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, SegmentReader};
+
+use crate::collector::Score;
 
 use super::SignalAggregator;
 
@@ -67,11 +68,6 @@ impl ScoreTweaker<Score> for InitialScoreTweaker {
 
 pub struct InitialSegmentScoreTweaker {
     aggregator: SignalAggregator,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Score {
-    pub total: f64,
 }
 
 impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {

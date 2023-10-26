@@ -15,8 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    collector,
     entrypoint::search_server::{self, SearchService},
-    inverted_index::{self, RetrievedWebpage},
+    inverted_index::RetrievedWebpage,
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
     Result,
 };
@@ -76,7 +77,7 @@ impl RemoteSearcher {
 
     async fn retrieve_websites(
         &self,
-        pointers: &[inverted_index::WebsitePointer],
+        pointers: &[collector::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
         let conn = self.conn().await;
@@ -200,7 +201,7 @@ impl Shard {
 
     async fn retrieve_websites(
         &self,
-        pointers: &[inverted_index::WebsitePointer],
+        pointers: &[collector::WebsitePointer],
         original_query: &str,
     ) -> Result<Vec<RetrievedWebpage>> {
         for _ in 0..NUM_REPLICA_RETRIES {

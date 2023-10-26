@@ -45,14 +45,14 @@ use url::Url;
 use webgraph::NodeID;
 use webpage::{region::Region, schema_org, Webpage};
 
-use crate::collector::{Hashes, MainCollector};
+use crate::collector::{DocAddress, WebsitePointer};
 use crate::query::Query;
-use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
+use crate::MainCollector;
 use crate::Result;
 use std::collections::HashSet;
 use std::fs;
@@ -63,37 +63,6 @@ use std::sync::Arc;
 pub struct InitialSearchResult {
     pub num_websites: Option<usize>,
     pub top_websites: Vec<WebsitePointer>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct WebsitePointer {
-    pub score: Score,
-    pub hashes: Hashes,
-    pub address: DocAddress,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-pub struct DocAddress {
-    pub segment: u32,
-    pub doc_id: u32,
-}
-
-impl From<tantivy::DocAddress> for DocAddress {
-    fn from(address: tantivy::DocAddress) -> Self {
-        Self {
-            segment: address.segment_ord,
-            doc_id: address.doc_id,
-        }
-    }
-}
-
-impl From<DocAddress> for tantivy::DocAddress {
-    fn from(address: DocAddress) -> Self {
-        Self {
-            segment_ord: address.segment,
-            doc_id: address.doc_id,
-        }
-    }
 }
 
 struct SegmentMergeCandidate {
