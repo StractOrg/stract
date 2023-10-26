@@ -101,7 +101,7 @@ impl<K: Key, V> IntMap<K, V> {
     fn grow(&mut self) {
         let mut bins = Vec::new();
 
-        for _ in 0..self.bins.len() * 2 {
+        for _ in 0..(self.bins.len() as f64 * 1.5) as usize {
             bins.push(Vec::new());
         }
 

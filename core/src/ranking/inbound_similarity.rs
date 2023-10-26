@@ -33,15 +33,17 @@ use crate::{
 
 use super::bitvec_similarity;
 
+#[derive(Clone)]
 pub struct Scorer {
+    similarity: bitvec_similarity::BitVecSimilarity,
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
     vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
-    cache: DashMap<NodeID, f64>,
+    cache: IntMap<NodeID, f64>,
     normalized: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct NodeScorer {
     node: NodeID,
     inbound: bitvec_similarity::BitVec,
@@ -61,29 +63,34 @@ impl NodeScorer {
         self.self_score = self_score;
     }
 
-    fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
+    fn sim(
+        &self,
+        other: &NodeID,
+        other_inbound: &bitvec_similarity::BitVec,
+        similarity: &mut bitvec_similarity::BitVecSimilarity,
+    ) -> f64 {
         if self.node == *other {
             self.self_score
         } else {
-            self.inbound.sim(other_inbound)
+            similarity.sim(&self.inbound, other_inbound)
         }
     }
 }
 
 impl Scorer {
-    fn calculate_score(&self, node: &NodeID) -> f64 {
+    fn calculate_score(&mut self, node: &NodeID) -> f64 {
         let s = match self.vectors.get(node) {
             Some(vec) => {
                 (self.disliked.len() as f64)
                     + (self
                         .liked
                         .iter()
-                        .map(|liked| liked.sim(node, vec))
+                        .map(|liked| liked.sim(node, vec, &mut self.similarity))
                         .sum::<f64>()
                         - self
                             .disliked
                             .iter()
-                            .map(|disliked| disliked.sim(node, vec))
+                            .map(|disliked| disliked.sim(node, vec, &mut self.similarity))
                             .sum::<f64>())
             }
             None => 0.0,
@@ -96,7 +103,7 @@ impl Scorer {
         }
         .max(0.0)
     }
-    pub fn score(&self, node: &NodeID) -> f64 {
+    pub fn score(&mut self, node: &NodeID) -> f64 {
         if let Some(cached) = self.cache.get(node) {
             return *cached;
         }
@@ -135,7 +142,7 @@ impl InboundSimilarity {
         for (node_id, inbound) in adjacency {
             vectors.insert(
                 node_id,
-                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.bit_128()).collect()),
+                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.bit_64()).collect()),
             );
         }
 
@@ -163,10 +170,11 @@ impl InboundSimilarity {
             .collect();
 
         Scorer {
+            similarity: bitvec_similarity::BitVecSimilarity::default(),
             liked,
             disliked,
             vectors: self.vectors.clone(),
-            cache: DashMap::new(),
+            cache: IntMap::new(),
             normalized,
         }
     }
@@ -241,7 +249,7 @@ mod tests {
 
         let inbound = InboundSimilarity::build(&graph);
 
-        let scorer = inbound.scorer(&[Node::from("b.com").id()], &[], false);
+        let mut scorer = inbound.scorer(&[Node::from("b.com").id()], &[], false);
         let e = Node::from("e.com").id();
         let d = Node::from("d.com").id();
 

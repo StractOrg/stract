@@ -44,7 +44,7 @@ impl Widgets {
             return Err(anyhow!("Only one thesaurus path is supported for now"));
         }
 
-        let thesaurus = if let Some(path) = config.thesaurus_paths.get(0) {
+        let thesaurus = if let Some(path) = config.thesaurus_paths.first() {
             Some(thesaurus::Dictionary::build(path)?)
         } else {
             None

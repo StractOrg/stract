@@ -4295,7 +4295,7 @@ const ONE_OVER_POWER_OF_TWO: [f64; 256] = [
     1.727233711018889e-77,
 ];
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HyperLogLog<const N: usize> {
     registers: Vec<u8>,
 }
@@ -4319,7 +4319,7 @@ impl<const N: usize> HyperLogLog<N> {
         let m = self.registers.len();
 
         if m >= 128 {
-            0.7213 / (1. + 1.079 / (m as f64))
+            0.7213 / (1. + (1.079 / (m as f64)))
         } else if m >= 64 {
             0.709
         } else if m >= 32 {
@@ -4338,11 +4338,11 @@ impl<const N: usize> HyperLogLog<N> {
         let b = self.b();
         let hash = Self::hash(item) as usize;
 
-        let w = hash >> b;
-        let j = hash - (w << b);
+        let j = hash >> (64 - b);
+        let w = hash << b;
 
         // p = leftmost bit (1-based count)
-        let p = w.leading_zeros() + 1 - (b as u32);
+        let p = w.leading_zeros() + 1;
 
         self.registers[j] = self.registers[j].max(p as u8);
     }
@@ -4460,14 +4460,26 @@ impl<const N: usize> HyperLogLog<N> {
         }
     }
 
-    #[cfg(test)]
     pub fn relative_error(&self) -> f64 {
-        (3f64 * 2f64.ln() - 1f64).sqrt() / (self.registers.len() as f64).sqrt()
+        1.04 / (self.registers.len() as f64).sqrt()
+    }
+
+    pub fn size_bounds(&self) -> (usize, usize) {
+        let size = self.size();
+        let delta = (self.relative_error() * 2.0 * (size as f64)) as usize;
+
+        (size - delta, size + delta)
     }
 
     pub fn merge(&mut self, other: &Self) {
         for i in 0..N {
             self.registers[i] = self.registers[i].max(other.registers[i]);
+        }
+    }
+
+    pub fn merge_into(&self, other: &Self, out: &mut Self) {
+        for i in 0..N {
+            out.registers[i] = self.registers[i].max(other.registers[i]);
         }
     }
 
@@ -4488,9 +4500,7 @@ mod tests {
             set.add(item);
         }
 
-        let delta = (set.relative_error() * (set.size() as f64)) as usize;
-        let lower_bound = set.size() - delta;
-        let upper_bound = set.size() + delta;
+        let (lower_bound, upper_bound) = set.size_bounds();
 
         assert!(set.size() > lower_bound && set.size() < upper_bound);
     }
@@ -4500,12 +4510,9 @@ mod tests {
 
         for item in 0..10_000 {
             set.add(item);
-            set.size();
         }
 
-        let delta = (set.relative_error() * (set.size() as f64)) as usize;
-        let lower_bound = set.size() - delta;
-        let upper_bound = set.size() + delta;
+        let (lower_bound, upper_bound) = set.size_bounds();
 
         assert!(set.size() > lower_bound && set.size() < upper_bound);
     }

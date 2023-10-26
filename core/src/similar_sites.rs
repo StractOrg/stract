@@ -97,7 +97,7 @@ impl SimilarSitesFinder {
 
         let nodes = nodes.into_iter().map(|node| node.id()).collect::<Vec<_>>();
 
-        let scorer = self.inbound_similarity.scorer(&nodes, &[], true);
+        let mut scorer = self.inbound_similarity.scorer(&nodes, &[], true);
 
         let mut backlinks: IntMap<NodeID, f64> = IntMap::new();
 

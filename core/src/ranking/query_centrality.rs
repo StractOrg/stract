@@ -18,6 +18,7 @@ use crate::webgraph::NodeID;
 
 use super::inbound_similarity;
 
+#[derive(Clone)]
 pub struct Scorer {
     inbound_centrality: inbound_similarity::Scorer,
 }
@@ -30,7 +31,7 @@ impl Scorer {
         Self { inbound_centrality }
     }
 
-    pub fn score(&self, node: NodeID) -> f64 {
+    pub fn score(&mut self, node: NodeID) -> f64 {
         self.inbound_centrality.score(&node)
     }
 }

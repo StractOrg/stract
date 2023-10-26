@@ -28,6 +28,7 @@ use crate::{
 use optics::ast::RankingTarget;
 use optics::Optic;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::fieldnorm::FieldNormReader;
@@ -267,7 +268,7 @@ impl Signal {
             Signal::UpdateTimestamp => 0.001,
             Signal::TrackerScore => 0.02,
             Signal::Region => 0.01,
-            Signal::InboundSimilarity => 1.0,
+            Signal::InboundSimilarity => 0.25,
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
             Signal::UrlDigits => 0.01,
@@ -667,10 +668,10 @@ pub struct SignalAggregator {
     query: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
-    inbound_similarity: Option<Arc<inbound_similarity::Scorer>>,
+    inbound_similarity: Option<RefCell<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
-    query_centrality: Option<Arc<query_centrality::Scorer>>,
+    query_centrality: Option<RefCell<query_centrality::Scorer>>,
     region_count: Option<Arc<RegionCount>>,
     selected_region: Option<Region>,
     current_timestamp: Option<usize>,
@@ -679,14 +680,24 @@ pub struct SignalAggregator {
 
 impl Clone for SignalAggregator {
     fn clone(&self) -> Self {
+        let inbound_similarity = self
+            .inbound_similarity
+            .as_ref()
+            .map(|scorer| RefCell::new(scorer.borrow().clone()));
+
+        let query_centrality = self
+            .query_centrality
+            .as_ref()
+            .map(|scorer| RefCell::new(scorer.borrow().clone()));
+
         Self {
             query: self.query.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
-            inbound_similarity: self.inbound_similarity.clone(),
+            inbound_similarity,
             fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
             update_time_cache: self.update_time_cache.clone(),
-            query_centrality: self.query_centrality.clone(),
+            query_centrality,
             region_count: self.region_count.clone(),
             selected_region: self.selected_region,
             current_timestamp: self.current_timestamp,
@@ -866,11 +877,11 @@ impl SignalAggregator {
     }
 
     pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
-        self.query_centrality = Some(Arc::new(query_centrality));
+        self.query_centrality = Some(RefCell::new(query_centrality));
     }
 
     pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
-        self.inbound_similarity = Some(Arc::new(scorer));
+        self.inbound_similarity = Some(RefCell::new(scorer));
     }
 
     pub fn set_region_count(&mut self, region_count: RegionCount) {
@@ -892,13 +903,13 @@ impl SignalAggregator {
     pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
         self.query_centrality
             .as_ref()
-            .map(|scorer| scorer.score(host_id))
+            .map(|scorer| scorer.borrow_mut().score(host_id))
     }
 
     pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {
         self.inbound_similarity
             .as_ref()
-            .map(|scorer| scorer.score(&host_id))
+            .map(|scorer| scorer.borrow_mut().score(&host_id))
             .unwrap_or_default()
     }
 

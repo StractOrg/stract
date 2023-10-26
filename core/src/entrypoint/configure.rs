@@ -43,12 +43,19 @@ fn download_files() {
                 "content.rdf.u8.gz",
                 "english-wordnet-2022-subset.ttl",
             ] {
+                let path = Path::new(DATA_PATH).join(name);
+
+                if path.exists() {
+                    info!("Skipping {}", name);
+                    continue;
+                }
+
                 info!("Downloading {}", name);
                 let body = reqwest::get(format!("http://s3.trystract.com/{BUCKET_NAME}/{name}"))
                     .await
                     .unwrap();
 
-                let mut file = File::create(Path::new(DATA_PATH).join(name)).await.unwrap();
+                let mut file = File::create(path).await.unwrap();
                 let mut bytes = body.bytes_stream();
 
                 while let Some(item) = bytes.next().await {

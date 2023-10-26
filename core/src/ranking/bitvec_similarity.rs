@@ -17,9 +17,15 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::hyperloglog::HyperLogLog;
+
+const THRESHOLD_SIM_ESTIMATE: f64 = 0.1;
+
+const HYPERLOGLOG_REGISTERS: usize = 128;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
-    data: Vec<u128>,
+    data: Vec<u64>,
 }
 
 impl VeryJankyBloomFilter {
@@ -29,15 +35,14 @@ impl VeryJankyBloomFilter {
         }
     }
 
-    fn hash(&self, item: &u128) -> (usize, u128) {
+    fn hash(&self, item: &u64) -> (usize, u64) {
         (
-            (item.wrapping_mul(180811355057196146399512320062616506473) % self.data.len() as u128)
-                as usize,
-            item.wrapping_mul(258349730118558892798889897730042154643) % 128,
+            (item.wrapping_mul(11400714819323198549) % self.data.len() as u64) as usize,
+            item.wrapping_mul(11400714819323198549) % 64,
         )
     }
 
-    fn insert(&mut self, item: u128) {
+    fn insert(&mut self, item: u64) {
         let (a, b) = self.hash(&item);
         self.data[a] |= 1 << b;
     }
@@ -51,15 +56,20 @@ impl VeryJankyBloomFilter {
     }
 }
 
+#[derive(Clone)]
+struct ScratchSpace {
+    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Posting {
-    ranks: Vec<u128>,
-    skip_pointers: Vec<u128>,
+    ranks: Vec<u64>,
+    skip_pointers: Vec<u64>,
     skip_size: usize,
 }
 
 impl Posting {
-    fn new(ranks: Vec<u128>) -> Self {
+    fn new(ranks: Vec<u64>) -> Self {
         let skip_size = (ranks.len() as f64).sqrt() as usize;
 
         let skip_pointers = ranks
@@ -130,33 +140,37 @@ impl Posting {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
     bloom: VeryJankyBloomFilter,
+    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS>,
     posting: Posting,
     sqrt_len: f64,
 }
 
 impl BitVec {
-    pub fn new(mut ranks: Vec<u128>) -> Self {
+    pub fn new(mut ranks: Vec<u64>) -> Self {
         ranks.sort();
         ranks.dedup();
         ranks.shrink_to_fit();
 
         let len = ranks.len();
         let mut bloom = VeryJankyBloomFilter::new(2);
+        let mut hyperloglog = HyperLogLog::default();
 
         for rank in &ranks {
             bloom.insert(*rank);
+            hyperloglog.add(*rank);
         }
 
         let posting = Posting::new(ranks);
 
         Self {
             bloom,
+            hyperloglog,
             posting,
             sqrt_len: (len as f64).sqrt(),
         }
     }
 
-    pub fn sim(&self, other: &Self) -> f64 {
+    fn sim(&self, other: &Self, scratchspace: &mut ScratchSpace) -> f64 {
         if self.sqrt_len == 0.0 || other.sqrt_len == 0.0 {
             return 0.0;
         }
@@ -165,13 +179,48 @@ impl BitVec {
             return 0.0;
         }
 
-        let intersect = self.posting.intersection_size(&other.posting);
+        self.hyperloglog
+            .merge_into(&other.hyperloglog, &mut scratchspace.hyperloglog);
 
-        if intersect == 0 {
-            0.0
-        } else {
-            intersect as f64 / (self.sqrt_len * other.sqrt_len)
+        let union_est = scratchspace.hyperloglog.size();
+
+        let intersect_est = (self.posting.ranks.len() + other.posting.ranks.len())
+            .checked_sub(union_est)
+            .unwrap_or_default();
+
+        let sim_est = (intersect_est as f64) / (self.sqrt_len * other.sqrt_len);
+
+        if sim_est < THRESHOLD_SIM_ESTIMATE {
+            return 0.0;
         }
+
+        let intersect = self.posting.intersection_size(&other.posting) as f64;
+        intersect / (self.sqrt_len * other.sqrt_len)
+    }
+}
+
+#[derive(Clone)]
+pub struct BitVecSimilarity {
+    scratchspace: ScratchSpace,
+}
+
+impl Default for BitVecSimilarity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BitVecSimilarity {
+    pub fn new() -> Self {
+        Self {
+            scratchspace: ScratchSpace {
+                hyperloglog: HyperLogLog::default(),
+            },
+        }
+    }
+
+    pub fn sim(&mut self, a: &BitVec, b: &BitVec) -> f64 {
+        a.sim(b, &mut self.scratchspace)
     }
 }
 
@@ -181,11 +230,11 @@ mod tests {
     use itertools::Itertools;
     use std::iter::repeat;
 
-    fn into_ranks(a: &[bool]) -> Vec<u128> {
+    fn into_ranks(a: &[bool]) -> Vec<u64> {
         a.iter()
             .enumerate()
             .filter(|(_, b)| **b)
-            .map(|(i, _)| i as u128)
+            .map(|(i, _)| i as u64)
             .collect()
     }
 
@@ -220,7 +269,9 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert!((expected - a.sim(&b)).abs() < 0.001);
+        let sim = BitVecSimilarity::default().sim(&a, &b);
+
+        assert!((expected - sim).abs() < 0.1);
     }
 
     #[test]
@@ -232,7 +283,9 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert_eq!(a.sim(&b), 0.0);
+        let sim = BitVecSimilarity::default().sim(&a, &b);
+
+        assert_eq!(sim, 0.0);
     }
 
     #[test]
@@ -243,7 +296,9 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert_eq!(a.sim(&b), 0.0);
+        let sim = BitVecSimilarity::default().sim(&a, &b);
+
+        assert_eq!(sim, 0.0);
     }
 
     #[test]
@@ -266,6 +321,8 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        assert!((expected - a.sim(&b)).abs() < 0.01);
+        let sim = BitVecSimilarity::default().sim(&a, &b);
+
+        assert!((expected - sim).abs() < 0.1);
     }
 }

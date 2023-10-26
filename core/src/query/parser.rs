@@ -268,7 +268,7 @@ impl Term {
                 let processed_terms = Term::process_tantivy_term(term, *field);
 
                 if processed_terms.len() == 1 {
-                    let term = processed_terms.get(0).unwrap().clone();
+                    let term = processed_terms.first().unwrap().clone();
                     (
                         Occur::Should,
                         Box::new(TermQuery::new(
