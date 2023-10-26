@@ -27,6 +27,7 @@ bzip2 = "0.4.4"
 chitchat = "0.5.0"
 chrono = {version = "0.4.23", features = ["serde"]}
 clap = {version = "4.4.6", features = ["derive"]}
+collector = { path = "./crates/collector" }
 criterion = "0.5.1"
 crossbeam-channel = "0.5.6"
 csv = "1.1.6"

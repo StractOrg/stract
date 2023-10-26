@@ -27,9 +27,9 @@ use initial::InitialScoreTweaker;
 use schema::fastfield_reader::FastFieldReader;
 use stract_config::CollectorConfig;
 use webpage::region::Region;
+use collector::{MaxDocsConsidered, TopDocs};
 
 use crate::{
-    collector::{MaxDocsConsidered, TopDocs},
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
     MainCollector,

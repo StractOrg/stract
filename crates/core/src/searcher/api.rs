@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use collector::BucketCollector;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Range;
@@ -32,7 +33,6 @@ use crate::search_prettifier::{
 };
 use crate::widgets::{Widget, Widgets};
 use crate::{
-    collector::BucketCollector,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
     Result,
 };

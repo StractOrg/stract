@@ -16,15 +16,12 @@
 
 use std::sync::Arc;
 
+use collector::{BucketCollector, WebsitePointer};
 use serde::{Deserialize, Serialize};
 use stdx::enum_map::EnumMap;
 use stract_config::CollectorConfig;
 
-use crate::{
-    collector::{self, BucketCollector, WebsitePointer},
-    searcher::SearchQuery,
-    Result,
-};
+use crate::{searcher::SearchQuery, Result};
 
 use super::{
     models::lambdamart::{self, LambdaMART},
@@ -33,25 +30,22 @@ use super::{
 
 use super::models::cross_encoder::CrossEncoder;
 
-pub trait AsRankingWebsite: Clone {
+pub trait AsRankingWebsite: Clone + collector::Doc {
     fn as_ranking(&self) -> &RankingWebsite;
     fn as_mut_ranking(&mut self) -> &mut RankingWebsite;
 }
 
-impl<T> collector::Doc for T
-where
-    T: AsRankingWebsite,
-{
+impl collector::Doc for RankingWebsite {
     fn score(&self) -> f64 {
-        self.as_ranking().score
+        self.score
     }
 
     fn id(&self) -> &tantivy::DocId {
-        &self.as_ranking().pointer.address.doc_id
+        &self.pointer.address.doc_id
     }
 
     fn hashes(&self) -> collector::Hashes {
-        self.as_ranking().pointer.hashes
+        self.pointer.hashes
     }
 }
 
@@ -392,10 +386,10 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 
 #[cfg(test)]
 mod tests {
+    use collector::{DocAddress, Hashes, Score};
     use itertools::Itertools;
     use stdx::prehashed::Prehashed;
 
-    use crate::collector::{DocAddress, Hashes, Score};
     use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 
     use super::*;

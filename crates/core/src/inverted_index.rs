@@ -26,6 +26,7 @@
 //! This allows us to perform more advanced queries than just term lookups,
 //! but the principle is the same.
 use chrono::NaiveDateTime;
+use collector::{DocAddress, WebsitePointer};
 use schema::{
     create_schema, fastfield_reader::FastFieldReader, FastField, Field, TextField, ALL_FIELDS,
 };
@@ -45,7 +46,6 @@ use url::Url;
 use webgraph::NodeID;
 use webpage::{region::Region, schema_org, Webpage};
 
-use crate::collector::{DocAddress, WebsitePointer};
 use crate::query::Query;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;

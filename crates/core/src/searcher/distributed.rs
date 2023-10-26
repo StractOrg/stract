@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    collector,
     entrypoint::search_server::{self, SearchService},
     inverted_index::RetrievedWebpage,
     ranking::pipeline::{AsRankingWebsite, RankingWebsite},
@@ -246,6 +245,20 @@ pub struct InitialSearchResultShard {
 pub struct ScoredWebsitePointer {
     pub website: RankingWebsite,
     pub shard: ShardId,
+}
+
+impl collector::Doc for ScoredWebsitePointer {
+    fn score(&self) -> f64 {
+        self.as_ranking().score()
+    }
+
+    fn id(&self) -> &tantivy::DocId {
+        self.as_ranking().id()
+    }
+
+    fn hashes(&self) -> collector::Hashes {
+        self.as_ranking().hashes()
+    }
 }
 
 impl AsRankingWebsite for ScoredWebsitePointer {

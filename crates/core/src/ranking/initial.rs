@@ -15,11 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::Utc;
+use collector::Score;
 use schema::fastfield_reader::FastFieldReader;
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, SegmentReader};
-
-use crate::collector::Score;
 
 use super::SignalAggregator;
 

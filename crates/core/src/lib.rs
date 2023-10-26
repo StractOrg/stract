@@ -30,7 +30,6 @@ mod inverted_index;
 pub mod alice;
 mod api;
 mod autosuggest;
-mod collector;
 pub mod crawler;
 pub mod feed;
 mod human_website_annotations;

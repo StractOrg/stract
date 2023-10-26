@@ -30,7 +30,6 @@ use webpage::{
     Webpage,
 };
 
-use crate::collector;
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;

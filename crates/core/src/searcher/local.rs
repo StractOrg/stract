@@ -40,7 +40,7 @@ use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
-use crate::{collector, inverted_index, Error, Result};
+use crate::{inverted_index, Error, Result};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};

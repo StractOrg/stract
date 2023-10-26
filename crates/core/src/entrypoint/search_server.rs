@@ -28,7 +28,6 @@ use tracing::info;
 use url::Url;
 
 use crate::{
-    collector,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{

@@ -757,6 +757,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
 
 [[package]]
+name = "collector"
+version = "0.1.0"
+dependencies = [
+ "min-max-heap",
+ "schema",
+ "serde",
+ "simhash",
+ "stdx",
+ "stract-config",
+ "tantivy",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4338,6 +4351,7 @@ dependencies = [
  "bzip2",
  "chitchat",
  "chrono",
+ "collector",
  "criterion",
  "crossbeam-channel",
  "csv",
