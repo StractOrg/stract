@@ -16,13 +16,11 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use crawler::{coordinator, planner::make_crawl_plan, router, CrawlCoordinator, Crawler};
 use kv::rocksdb_store::RocksDbStore;
 use webgraph::WebgraphBuilder;
 
-use crate::{
-    crawler::{coordinator, planner::make_crawl_plan, router, CrawlCoordinator, Crawler},
-    Result,
-};
+use crate::Result;
 
 pub async fn worker(config: stract_config::CrawlerConfig) -> Result<()> {
     let crawler = Crawler::new(config).await?;

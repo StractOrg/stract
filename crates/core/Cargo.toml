@@ -31,6 +31,7 @@ bzip2 = {workspace = true}
 chitchat = {workspace = true}
 chrono = {workspace = true}
 collector.workspace = true
+crawler.workspace = true
 crossbeam-channel = {workspace = true}
 csv = {workspace = true}
 dashmap = {workspace = true}
