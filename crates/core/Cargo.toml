@@ -87,6 +87,7 @@ serde_json = {workspace = true}
 serde_urlencoded = {workspace = true}
 simhash.workspace = true
 sonic.workspace = true
+spell.workspace = true
 stdx.workspace = true
 stract-config.workspace = true
 stract-llm = { workspace = true, optional = true }

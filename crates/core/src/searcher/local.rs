@@ -20,6 +20,7 @@ use std::sync::Arc;
 use entity_index::{EntityIndex, EntityMatch};
 use imager::image_store::Image;
 use schema::TextField;
+use spell::Spell;
 use stract_config::{CollectorConfig, SnippetConfig};
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
@@ -39,7 +40,6 @@ use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
-use crate::spell::Spell;
 use crate::{inverted_index, Error, Result};
 
 use super::WebsitesResult;

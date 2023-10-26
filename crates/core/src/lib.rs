@@ -44,7 +44,6 @@ mod search_prettifier;
 pub mod searcher;
 pub mod similar_sites;
 mod snippet;
-pub mod spell;
 mod subdomain_count;
 #[allow(unused)]
 mod ttl_cache;

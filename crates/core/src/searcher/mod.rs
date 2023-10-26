@@ -23,6 +23,7 @@ use entity_index::EntityMatch;
 pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
+use spell::Correction;
 use stract_config::defaults;
 use stract_query::bangs::BangHit;
 use utoipa::ToSchema;
@@ -33,7 +34,6 @@ use crate::{
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
     },
-    spell::Correction,
     widgets::Widget,
 };
 

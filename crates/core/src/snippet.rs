@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use spell::sentence_ranges;
 use std::ops::Range;
 use stract_config::SnippetConfig;
 use tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use webpage::region::Region;
 
 use crate::query::Query;
-use crate::spell::sentence_ranges;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;
 

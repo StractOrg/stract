@@ -21,6 +21,7 @@ use std::collections::HashMap;
 
 use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use spell::CorrectionTerm;
 use url::Url;
 use utoipa::ToSchema;
 use webpage::url_ext::UrlExt;
@@ -29,7 +30,6 @@ use crate::{
     inverted_index::RetrievedWebpage,
     ranking::{Signal, SignalScore},
     snippet::TextSnippet,
-    spell::{self, CorrectionTerm},
 };
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};

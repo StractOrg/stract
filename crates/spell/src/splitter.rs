@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::spell::Dictionary;
+use crate::Dictionary;
 
 pub struct TermSplitter<'a> {
     dict: &'a Dictionary,
@@ -68,7 +68,7 @@ impl<'a> TermSplitter<'a> {
 #[cfg(test)]
 mod tests {
 
-    use crate::spell::dictionary;
+    use crate::dictionary;
 
     use super::*;
 

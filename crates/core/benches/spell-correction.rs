@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract_core::{index::Index, spell::Spell};
+use spell::Spell;
+use stract_core::index::Index;
 
 const INDEX_PATH: &str = "data/index";
 

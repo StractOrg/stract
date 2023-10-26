@@ -102,6 +102,7 @@ serde_json = "1.0.81"
 serde_urlencoded = "0.7.1"
 simhash = { path = "./crates/simhash" }
 sonic = { path = "./lib/sonic" }
+spell = { path = "./crates/spell" }
 stdx = { path = "./crates/stdx" }
 stract-cli = { path = "./crates/cli" }
 stract-core = { path = "./crates/core" }

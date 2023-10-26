@@ -4239,6 +4239,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "spell"
+version = "0.1.0"
+dependencies = [
+ "fst",
+ "itertools 0.11.0",
+ "schema",
+ "serde",
+ "stdx",
+ "stract-query",
+ "tantivy",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4385,6 +4400,7 @@ dependencies = [
  "serde_urlencoded",
  "simhash",
  "sonic",
+ "spell",
  "stdx",
  "stract-config",
  "stract-llm",

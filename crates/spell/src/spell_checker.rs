@@ -13,13 +13,13 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::spell::dictionary::EditStrategy;
-use crate::spell::Dictionary;
+use crate::{
+    dictionary::{EditStrategy, TermId},
+    distance::LevenshteinDistance,
+    Dictionary,
+};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet, VecDeque};
-
-use super::dictionary::TermId;
-use super::distance::LevenshteinDistance;
 
 pub struct SpellChecker<T: EditStrategy> {
     dict: Dictionary,
@@ -170,7 +170,7 @@ impl<T: EditStrategy> SpellChecker<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spell::{
+    use crate::{
         dictionary::{self, MaxEdit},
         LogarithmicEdit,
     };
