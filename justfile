@@ -65,10 +65,10 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cargo new crates/{{file_stem(path)}} --lib
     mv {{path}} crates/{{file_stem(path)}}/src/lib.rs
     echo {{file_stem(path)}} = { path = '"./crates/{{file_stem(path)}}"' }
-    echo "cargo add -p stract {{file_stem(path)}}"
+    echo "cargo add -p stract-core {{file_stem(path)}}"
 
 @librarify path:
     cargo new lib/{{file_stem(path)}} --lib
     mv {{path}} lib/{{file_stem(path)}}/src/lib.rs
     echo {{file_stem(path)}} = { path = '"./lib/{{file_stem(path)}}"' }
-    echo "cargo add -p stract {{file_stem(path)}}"
+    echo "cargo add -p stract-core {{file_stem(path)}}"
