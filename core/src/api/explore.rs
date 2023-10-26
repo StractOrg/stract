@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{extract, Json};
+use axum::extract;
 use http::StatusCode;
 use optics::{Optic, SiteRankings};
 use utoipa::ToSchema;
@@ -39,9 +39,10 @@ pub async fn explore_export_optic(
         chosen_sites,
         similar_sites,
     }): extract::Json<ExploreExportOpticParams>,
-) -> Result<Json<String>, StatusCode> {
+) -> Result<String, StatusCode> {
     let rules = similar_sites
         .into_iter()
+        .chain(chosen_sites.clone().into_iter())
         .map(|site| optics::Rule {
             matches: vec![optics::Matching {
                 pattern: vec![
@@ -65,5 +66,5 @@ pub async fn explore_export_optic(
         ..Default::default()
     };
 
-    Ok(Json(optic.to_string()))
+    Ok(optic.to_string())
 }

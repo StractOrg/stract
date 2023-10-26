@@ -6,8 +6,8 @@ router_hosts = ["0.0.0.0:8181"]
 timeout_seconds = 30
 
 [user_agent]
-full = "Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://trystract.com/webmasters)"
-token = "StractBot"
+full = "<user_agent>" 
+token = "<user_agent_token>" # e.g. 'StractBot'
 
 [s3]
 access_key = "<access_key>"
