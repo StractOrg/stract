@@ -26,9 +26,6 @@ use serde::{Deserialize, Serialize};
 use stract_query::parser::Term;
 use tracing::info;
 
-use crate::inverted_index::InvertedIndex;
-use crate::searcher::SearchQuery;
-
 use self::dictionary::DictionaryBuilder;
 pub use self::dictionary::{Dictionary, DictionaryResult, EditStrategy, LogarithmicEdit};
 pub use self::spell_checker::SpellChecker;
@@ -101,8 +98,8 @@ pub struct Spell {
 }
 
 impl Spell {
-    pub fn for_index(inverted_index: &InvertedIndex) -> Self {
-        let dict = Self::build_dict(inverted_index);
+    pub fn for_searcher(searcher: tantivy::Searcher) -> Self {
+        let dict = Self::build_dict(searcher);
         let spell_checker = SpellChecker::new(dict.clone(), LogarithmicEdit::new(3));
 
         Self {
@@ -110,9 +107,8 @@ impl Spell {
             spell_checker,
         }
     }
-    fn build_dict(inverted_index: &InvertedIndex) -> Dictionary {
+    fn build_dict(searcher: tantivy::Searcher) -> Dictionary {
         info!("Building spell correction dictionary");
-        let searcher = inverted_index.tv_searcher();
         let schema = searcher.schema();
         let mut dict = DictionaryBuilder::new(20_000);
 
@@ -221,8 +217,8 @@ impl Spell {
         }
     }
 
-    pub fn correction(&self, query: &SearchQuery) -> Option<Correction> {
-        let terms: Vec<_> = stract_query::parser::parse(&query.query)
+    pub fn correction(&self, query: &str) -> Option<Correction> {
+        let terms: Vec<_> = stract_query::parser::parse(query)
             .into_iter()
             .filter_map(|term| match *term {
                 Term::Simple(s) => Some(String::from(s)),

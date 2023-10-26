@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use stract_core::{index::Index, searcher::SearchQuery, spell::Spell};
+use stract_core::{index::Index, spell::Spell};
 
 const INDEX_PATH: &str = "data/index";
 
@@ -9,21 +9,14 @@ macro_rules! bench {
         desc.push_str($query);
         desc.push('\'');
         $c.bench_function(desc.as_str(), |b| {
-            b.iter(|| {
-                $spell
-                    .correction(&SearchQuery {
-                        query: $query.to_string(),
-                        ..Default::default()
-                    })
-                    .unwrap()
-            })
+            b.iter(|| $spell.correction($query).unwrap())
         });
     };
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
-    let spell = Spell::for_index(&index.inverted_index);
+    let spell = Spell::for_searcher(index.inverted_index.tv_searcher());
 
     for _ in 0..100 {
         bench!("asdf", spell, c);

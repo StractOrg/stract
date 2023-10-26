@@ -84,7 +84,7 @@ impl LocalSearcher {
     }
 
     pub fn build_spell_dict(&mut self) {
-        self.spell = Some(Spell::for_index(&self.index.inverted_index));
+        self.spell = Some(Spell::for_searcher(self.index.inverted_index.tv_searcher()));
     }
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
@@ -278,7 +278,7 @@ impl LocalSearcher {
     ) -> Result<InitialWebsiteResult> {
         let ctx = self.index.inverted_index.local_search_ctx();
         let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
-        let correction = self.spell.as_ref().and_then(|s| s.correction(query));
+        let correction = self.spell.as_ref().and_then(|s| s.correction(&query.query));
         let sidebar = self.entity_sidebar(query);
 
         Ok(InitialWebsiteResult {
@@ -516,19 +516,13 @@ mod tests {
                     .spell
                     .as_ref()
                     .unwrap()
-                    .correction(&SearchQuery {
-                        query: "th best".to_string(),
-                        ..Default::default()
-                    })
+                    .correction("th best")
                     .unwrap()
             ),
             "the best".to_string()
         );
         assert_eq!(
-            searcher.spell.as_ref().unwrap().correction(&SearchQuery {
-                query: "the best".to_string(),
-                ..Default::default()
-            }),
+            searcher.spell.as_ref().unwrap().correction("the best"),
             None
         );
     }
