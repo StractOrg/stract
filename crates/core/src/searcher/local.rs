@@ -84,7 +84,7 @@ impl LocalSearcher {
     }
 
     pub fn build_spell_dict(&mut self) {
-        self.spell = Some(Spell::for_index(&self.index));
+        self.spell = Some(Spell::for_index(&self.index.inverted_index));
     }
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {

@@ -23,7 +23,7 @@ macro_rules! bench {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open(INDEX_PATH).unwrap();
-    let spell = Spell::for_index(&index);
+    let spell = Spell::for_index(&index.inverted_index);
 
     for _ in 0..100 {
         bench!("asdf", spell, c);

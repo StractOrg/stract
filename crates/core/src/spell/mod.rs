@@ -25,7 +25,7 @@ use schema::TextField;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::index::Index;
+use crate::inverted_index::InvertedIndex;
 use crate::query;
 use crate::query::parser::Term;
 use crate::searcher::SearchQuery;
@@ -102,8 +102,8 @@ pub struct Spell {
 }
 
 impl Spell {
-    pub fn for_index(index: &Index) -> Self {
-        let dict = Self::build_dict(index);
+    pub fn for_index(inverted_index: &InvertedIndex) -> Self {
+        let dict = Self::build_dict(inverted_index);
         let spell_checker = SpellChecker::new(dict.clone(), LogarithmicEdit::new(3));
 
         Self {
@@ -111,9 +111,9 @@ impl Spell {
             spell_checker,
         }
     }
-    fn build_dict(index: &Index) -> Dictionary {
+    fn build_dict(inverted_index: &InvertedIndex) -> Dictionary {
         info!("Building spell correction dictionary");
-        let searcher = index.inverted_index.tv_searcher();
+        let searcher = inverted_index.tv_searcher();
         let schema = searcher.schema();
         let mut dict = DictionaryBuilder::new(20_000);
 
