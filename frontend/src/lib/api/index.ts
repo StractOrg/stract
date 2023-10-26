@@ -257,6 +257,7 @@ export type DisplayedSidebar =
     };
 export type DisplayedWebpage = {
   domain: string;
+  host: string;
   prettyUrl: string;
   rankingSignals?: {};
   site: string;
