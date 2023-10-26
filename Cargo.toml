@@ -107,6 +107,7 @@ stract-cli = { path = "./crates/cli" }
 stract-core = { path = "./crates/core" }
 stract-config = { path = "./crates/config" }
 stract-llm = { path = "./crates/llm" }
+stract-query = { path = "./crates/query" }
 tantivy = {git = "https://github.com/quickwit-oss/tantivy", rev = "182f58cea"}
 tch = "0.13.0"
 thiserror = "1.0.31"

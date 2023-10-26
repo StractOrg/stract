@@ -58,7 +58,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 entity_index::entity::EntitySnippet,
                 entity_index::entity::EntitySnippetFragment,
 
-                crate::bangs::UrlWrapper,
+                stract_query::bangs::UrlWrapper,
 
                 crate::widgets::Widget,
                 crate::widgets::calculator::Calculation,
@@ -71,8 +71,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::widgets::thesaurus::PartOfSpeechMeaning,
 
                 crate::ranking::signal::SignalScore,
-                crate::bangs::BangHit,
-                crate::bangs::Bang,
+                stract_query::bangs::BangHit,
+                stract_query::bangs::Bang,
 
                 super::webgraph::host::SimilarSitesParams,
                 super::webgraph::KnowsSite,

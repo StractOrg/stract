@@ -31,6 +31,7 @@ use schema::{
 };
 use serde::{Deserialize, Serialize};
 use stract_config::SnippetConfig;
+use stract_query::shortcircuit::ShortCircuitQuery;
 use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
 use tantivy::merge_policy::NoMergePolicy;
@@ -45,7 +46,6 @@ use webgraph::NodeID;
 use webpage::{region::Region, schema_org, Webpage};
 
 use crate::collector::{Hashes, MainCollector};
-use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;

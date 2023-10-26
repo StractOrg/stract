@@ -20,14 +20,6 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::Instant;
 
-use ::distributed::cluster::Cluster;
-use imager::image_store::Image;
-use itertools::{intersperse, Itertools};
-use optics::Optic;
-use stract_config::{ApiConfig, ApiThresholds, CollectorConfig};
-use url::Url;
-
-use crate::bangs::{Bang, BangHit};
 use crate::inverted_index::RetrievedWebpage;
 #[cfg(feature = "libtorch")]
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
@@ -40,14 +32,19 @@ use crate::search_prettifier::{
 };
 use crate::widgets::{Widget, Widgets};
 use crate::{
-    bangs::Bangs,
     collector::BucketCollector,
-    query,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
     Result,
 };
+use ::distributed::cluster::Cluster;
+use imager::image_store::Image;
+use itertools::{intersperse, Itertools};
+use optics::Optic;
+use stract_config::{ApiConfig, ApiThresholds, CollectorConfig};
 #[cfg(feature = "libtorch")]
 use stract_llm::qa_model::QaModel;
+use stract_query::bangs::{Bang, BangHit, Bangs};
+use url::Url;
 
 use super::{
     distributed, DistributedSearcher, InitialSearchResultShard, ScoredWebsitePointer, SearchQuery,
@@ -218,16 +215,18 @@ impl ApiSearcher {
     }
 
     async fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
-        let parsed_terms = query::parser::parse(&query.query);
+        let parsed_terms = stract_query::parser::parse(&query.query);
 
         if parsed_terms.iter().any(|term| match term.as_ref() {
-            query::parser::Term::PossibleBang(t) => t.is_empty(),
+            stract_query::parser::Term::PossibleBang(t) => t.is_empty(),
             _ => false,
         }) {
             let q: String = intersperse(
                 parsed_terms
                     .iter()
-                    .filter(|term| !matches!(term.as_ref(), query::parser::Term::PossibleBang(_)))
+                    .filter(|term| {
+                        !matches!(term.as_ref(), stract_query::parser::Term::PossibleBang(_))
+                    })
                     .map(|term| term.to_string()),
                 " ".to_string(),
             )
@@ -284,7 +283,7 @@ impl ApiSearcher {
 
         #[cfg(not(feature = "libtorch"))]
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
+            RankingPipeline::reranking_for_stract_query::<DummyCrossEncoder>(
                 &mut query,
                 None,
                 self.lambda_model.clone(),
@@ -374,7 +373,7 @@ impl ApiSearcher {
 
         #[cfg(not(feature = "libtorch"))]
         let pipeline: RankingPipeline<ScoredWebsitePointer> =
-            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
+            RankingPipeline::reranking_for_stract_query::<DummyCrossEncoder>(
                 &mut search_query,
                 None,
                 self.lambda_model.clone(),
@@ -455,13 +454,13 @@ impl ApiSearcher {
             return None;
         }
 
-        let parsed_terms = query::parser::parse(&query.query);
+        let parsed_terms = stract_query::parser::parse(&query.query);
 
         self.widgets.widget(
             parsed_terms
                 .into_iter()
                 .filter_map(|term| {
-                    if let query::parser::Term::Simple(simple) = *term {
+                    if let stract_query::parser::Term::Simple(simple) = *term {
                         Some(String::from(simple))
                     } else {
                         None

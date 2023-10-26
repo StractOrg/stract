@@ -23,11 +23,10 @@ use std::ops::Range;
 use itertools::intersperse;
 use schema::TextField;
 use serde::{Deserialize, Serialize};
+use stract_query::parser::Term;
 use tracing::info;
 
 use crate::inverted_index::InvertedIndex;
-use crate::query;
-use crate::query::parser::Term;
 use crate::searcher::SearchQuery;
 
 use self::dictionary::DictionaryBuilder;
@@ -223,7 +222,7 @@ impl Spell {
     }
 
     pub fn correction(&self, query: &SearchQuery) -> Option<Correction> {
-        let terms: Vec<_> = query::parser::parse(&query.query)
+        let terms: Vec<_> = stract_query::parser::parse(&query.query)
             .into_iter()
             .filter_map(|term| match *term {
                 Term::Simple(s) => Some(String::from(s)),

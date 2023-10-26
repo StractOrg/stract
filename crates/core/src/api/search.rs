@@ -18,16 +18,14 @@ use http::StatusCode;
 use optics::{Optic, SiteRankings};
 use std::sync::Arc;
 use stract_config::defaults;
+use stract_query::bangs::BangHit;
 use utoipa::ToSchema;
 use webpage::region::Region;
 
 use axum::Json;
 use axum_macros::debug_handler;
 
-use crate::{
-    bangs::BangHit,
-    searcher::{self, SearchQuery, SearchResult, WebsitesResult},
-};
+use crate::searcher::{self, SearchQuery, SearchResult, WebsitesResult};
 
 use super::State;
 

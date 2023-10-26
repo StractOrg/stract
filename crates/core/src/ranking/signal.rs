@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    query::{optic::AsSearchableRule, Query},
-    Result,
-};
+use crate::{query::Query, Result};
 use optics::ast::RankingTarget;
 use optics::Optic;
 use schema::{
@@ -29,6 +26,7 @@ use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
 use stdx::enum_map::EnumMap;
+use stract_query::{bm25::Bm25Weight, optic::AsSearchableRule};
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
@@ -44,7 +42,6 @@ use webpage::{
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};
 
-use super::bm25::Bm25Weight;
 use super::models::linear::LinearRegression;
 use super::{inbound_similarity, query_centrality};
 

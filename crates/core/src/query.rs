@@ -15,26 +15,18 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    inverted_index::InvertedIndex, query::parser::TermCompound, ranking::SignalCoefficient,
-    search_ctx::Ctx, searcher::SearchQuery, Result,
+    inverted_index::InvertedIndex, ranking::SignalCoefficient, search_ctx::Ctx,
+    searcher::SearchQuery, Result,
 };
 use optics::{Optic, SiteRankings};
 use schema::{Field, TextField};
 use std::collections::HashMap;
+use stract_query::{
+    optic::AsMultipleTantivyQuery,
+    parser::{CompoundAwareTerm, Term, TermCompound},
+};
 use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
 use webpage::{region::Region, safety_classifier};
-
-mod const_query;
-pub mod intersection;
-pub mod optic;
-pub mod parser;
-mod pattern_query;
-pub mod shortcircuit;
-pub mod union;
-
-use parser::Term;
-
-use self::{optic::AsMultipleTantivyQuery, parser::CompoundAwareTerm};
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -54,7 +46,7 @@ pub struct Query {
 
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
-        let parsed_terms = parser::parse(&query.query);
+        let parsed_terms = stract_query::parser::parse(&query.query);
         let mut term_count = HashMap::new();
         let mut terms = Vec::new();
 

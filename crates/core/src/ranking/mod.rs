@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod bitvec_similarity;
-pub mod bm25;
 pub mod inbound_similarity;
 pub mod initial;
 pub mod models;

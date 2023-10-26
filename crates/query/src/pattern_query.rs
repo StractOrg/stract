@@ -30,7 +30,7 @@ use tantivy::{
     DocId, DocSet, Postings, Score, SegmentReader, TantivyError, TERMINATED,
 };
 
-use crate::{query::intersection::Intersection, ranking::bm25::Bm25Weight};
+use crate::{bm25::Bm25Weight, intersection::Intersection};
 
 #[derive(Clone)]
 pub struct PatternQuery {

@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::query::parser::Term;
+use crate::parser::Term;
 
 pub const BANG_PREFIX: char = '!';
 
@@ -34,25 +34,25 @@ pub const BANG_PREFIX: char = '!';
 #[serde(rename_all = "camelCase")]
 pub struct Bang {
     #[serde(rename = "c")]
-    pub(crate) category: Option<String>,
+    pub category: Option<String>,
 
     #[serde(rename = "sc")]
-    pub(crate) sub_category: Option<String>,
+    pub sub_category: Option<String>,
 
     #[serde(rename = "d")]
-    pub(crate) domain: Option<String>,
+    pub domain: Option<String>,
 
     #[serde(rename = "r")]
-    pub(crate) ranking: Option<usize>,
+    pub ranking: Option<usize>,
 
     #[serde(rename = "s")]
-    pub(crate) site: Option<String>,
+    pub site: Option<String>,
 
     #[serde(rename = "t")]
-    pub(crate) tag: String,
+    pub tag: String,
 
     #[serde(rename = "u")]
-    pub(crate) url: String,
+    pub url: String,
 }
 
 /// Wrapper around `Url` that implements `ToSchema` for `Url`.
@@ -154,7 +154,7 @@ impl Bangs {
 #[cfg(test)]
 mod tests {
 
-    use crate::query::parser::parse;
+    use crate::parser::parse;
 
     use super::*;
 

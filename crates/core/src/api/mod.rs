@@ -24,12 +24,12 @@ use distributed::{
 };
 use stdx::leaky_queue::LeakyQueue;
 use stract_config::ApiConfig;
+use stract_query::bangs::Bangs;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 
 use crate::{
     autosuggest::Autosuggest,
-    bangs::Bangs,
     improvement::{store_improvements_loop, ImprovementEvent},
     ranking::models::lambdamart::LambdaMART,
     searcher::api::ApiSearcher,

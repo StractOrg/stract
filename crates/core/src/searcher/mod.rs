@@ -24,11 +24,11 @@ pub use local::*;
 use optics::{Optic, SiteRankings};
 use serde::{Deserialize, Serialize};
 use stract_config::defaults;
+use stract_query::bangs::BangHit;
 use utoipa::ToSchema;
 use webpage::region::Region;
 
 use crate::{
-    bangs::BangHit,
     ranking::pipeline::RankingWebsite,
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,

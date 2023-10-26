@@ -90,6 +90,7 @@ sonic.workspace = true
 stdx.workspace = true
 stract-config.workspace = true
 stract-llm = { workspace = true, optional = true }
+stract-query.workspace = true
 tantivy = {workspace = true}
 tch = {workspace = true, optional = true}
 thiserror = {workspace = true}
