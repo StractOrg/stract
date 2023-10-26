@@ -307,11 +307,15 @@ impl InvertedIndex {
 
         for page in &mut webpages {
             if !page.body.is_empty() {
-                page.snippet =
-                    snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
+                page.snippet = snippet::generate(
+                    query.simple_terms().iter().map(|s| s.as_str()),
+                    &page.body,
+                    &page.region,
+                    self.snippet_config.clone(),
+                );
             } else {
                 page.snippet = snippet::generate(
-                    query,
+                    query.simple_terms().iter().map(|s| s.as_str()),
                     page.description.as_deref().unwrap_or_default(),
                     &page.region,
                     self.snippet_config.clone(),

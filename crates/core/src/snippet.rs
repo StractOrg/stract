@@ -20,7 +20,6 @@ use stract_config::SnippetConfig;
 use tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use webpage::region::Region;
 
-use crate::query::Query;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;
 
@@ -133,15 +132,15 @@ impl SnippetBuilder {
     }
 }
 
-fn snippet_string_builder(
+fn snippet_string_builder<'a>(
     text: &str,
-    terms: &[String],
+    terms: impl IntoIterator<Item = &'a str>,
     lang: whatlang::Lang,
     config: SnippetConfig,
     mut tokenizer: Tokenizer,
 ) -> SnippetBuilder {
     let terms: HashSet<String> = terms
-        .iter()
+        .into_iter()
         .flat_map(|term| {
             let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, term);
 
@@ -271,14 +270,14 @@ fn snippet_string_builder(
     snippet
 }
 
-fn snippet_string(
+fn snippet_string<'a>(
     text: &str,
-    terms: &[String],
+    terms: impl IntoIterator<Item = &'a str> + Clone,
     lang: whatlang::Lang,
     config: SnippetConfig,
 ) -> TextSnippet {
     let tokenizer = Tokenizer::Normal(Normal::default());
-    let snip = snippet_string_builder(text, terms, lang, config.clone(), tokenizer).build();
+    let snip = snippet_string_builder(text, terms.clone(), lang, config.clone(), tokenizer).build();
 
     if !snip.fragments.is_empty()
         && snip
@@ -293,7 +292,12 @@ fn snippet_string(
     snippet_string_builder(text, terms, lang, config, tokenizer).build()
 }
 
-pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfig) -> TextSnippet {
+pub fn generate<'a>(
+    terms: impl IntoIterator<Item = &'a str> + Clone,
+    text: &str,
+    region: &Region,
+    config: SnippetConfig,
+) -> TextSnippet {
     let lang = match region.lang() {
         Some(lang) => lang,
         None => match config.num_words_for_lang_detection {
@@ -320,9 +324,9 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
     match config.max_considered_words {
         Some(num_words) => {
             let text = text.split_whitespace().take(num_words).join(" ");
-            snippet_string(&text, query.simple_terms(), lang, config)
+            snippet_string(&text, terms, lang, config)
         }
-        None => snippet_string(text, query.simple_terms(), lang, config),
+        None => snippet_string(text, terms, lang, config),
     }
 }
 
@@ -499,7 +503,7 @@ Survey in 2016, 2017, and 2018."#;
                 date: None,
                 text: snippet_string(
                     "this is a test",
-                    &[],
+                    [],
                     whatlang::Lang::Eng,
                     SnippetConfig::default()
                 )
@@ -514,12 +518,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(
             highlight(Snippet::Normal {
                 date: None,
-                text: snippet_string(
-                    "",
-                    &["test".to_string()],
-                    whatlang::Lang::Eng,
-                    SnippetConfig::default()
-                )
+                text: snippet_string("", ["test"], whatlang::Lang::Eng, SnippetConfig::default())
             })
             .as_str(),
             ""
@@ -528,7 +527,7 @@ Survey in 2016, 2017, and 2018."#;
         assert_eq!(
             highlight(Snippet::Normal {
                 date: None,
-                text: snippet_string("", &[], whatlang::Lang::Eng, SnippetConfig::default())
+                text: snippet_string("", [], whatlang::Lang::Eng, SnippetConfig::default())
             })
             .as_str(),
             ""
@@ -539,7 +538,7 @@ Survey in 2016, 2017, and 2018."#;
     fn compounded_terms() {
         let snip = snippet_string_builder(
             "this is a test",
-            &["thisis".to_string()],
+            ["thisis"],
             whatlang::Lang::Eng,
             SnippetConfig::default(),
             Tokenizer::Normal(Normal::default()),
