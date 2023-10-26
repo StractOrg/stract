@@ -19,7 +19,6 @@ use std::{collections::VecDeque, sync::Arc, time::Duration};
 use hashbrown::HashMap;
 
 use stract_config::CrawlerConfig;
-use tokio::sync::Mutex;
 use url::Url;
 use webpage::url_ext::UrlExt;
 

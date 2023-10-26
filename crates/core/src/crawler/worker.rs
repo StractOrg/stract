@@ -29,9 +29,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use distributed::retry_strategy::ExponentialBackoff;
 use stract_config::CrawlerConfig;
-use tokio::sync::Mutex;
 use url::Url;
 use webpage::Html;
 

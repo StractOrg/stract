@@ -17,11 +17,9 @@
 // use crate::{Error, Result};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::str::FromStr;
-use std::thread::sleep;
-use std::time::Duration;
 
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;

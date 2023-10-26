@@ -17,11 +17,12 @@
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
 use stdx::intmap::{IntMap, IntSet};
 use webgraph::{Node, NodeID, Webgraph};
+use webpage::url_ext::UrlExt;
 
 use hashbrown::HashSet;
 use url::Url;
 
-use crate::{ranking::inbound_similarity::InboundSimilarity, webpage::url_ext::UrlExt};
+use crate::ranking::inbound_similarity::InboundSimilarity;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ScoredNode {

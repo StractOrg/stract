@@ -22,16 +22,14 @@ use std::{
     path::Path,
     sync::{atomic::AtomicUsize, Mutex},
 };
+use stract_config::CrawlPlannerConfig;
 use url::Url;
 use webgraph::{
     centrality::{top_hosts, TopHosts},
     NodeID, Webgraph,
 };
 
-use crate::{
-    config::CrawlPlannerConfig,
-    crawler::{file_queue::FileQueueWriter, Job},
-};
+use crate::crawler::{file_queue::FileQueueWriter, Job};
 
 use super::Domain;
 

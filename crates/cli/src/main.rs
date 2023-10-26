@@ -329,7 +329,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::router(config))?
             }
             Crawler::Plan { config_path } => {
-                let config: config::CrawlPlannerConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlPlannerConfig = load_toml_config(config_path);
 
                 entrypoint::crawler::planner(config)?;
             }

@@ -65,7 +65,7 @@ pub fn schedule(
         all_feeds
             .entry(domain)
             .or_insert(HashSet::new())
-            .extend(index.search(&host.name).unwrap().into_iter());
+            .extend(index.search(&host.name).unwrap());
     }
 
     let mut splits = Vec::new();
