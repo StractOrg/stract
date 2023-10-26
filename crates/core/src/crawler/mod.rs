@@ -25,11 +25,10 @@ use webpage::url_ext::UrlExt;
 use self::{warc_writer::WarcWriter, worker::WorkerThread};
 
 pub mod coordinator;
-mod robots_txt;
-pub mod router;
-pub use router::Router;
 mod file_queue;
 pub mod planner;
+mod robots_txt;
+pub mod router;
 mod site_graph;
 mod warc_writer;
 mod worker;

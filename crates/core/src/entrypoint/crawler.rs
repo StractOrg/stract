@@ -17,12 +17,10 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use kv::rocksdb_store::RocksDbStore;
-use serde::{Deserialize, Serialize};
-use sonic::{service::Message, sonic_service};
 use webgraph::WebgraphBuilder;
 
 use crate::{
-    crawler::{self, planner::make_crawl_plan, CrawlCoordinator, Crawler},
+    crawler::{coordinator, planner::make_crawl_plan, router, CrawlCoordinator, Crawler},
     Result,
 };
 
@@ -51,7 +49,7 @@ pub async fn coordinator(config: stract_config::CrawlCoordinatorConfig) -> Resul
 }
 
 pub async fn router(config: stract_config::CrawlRouterConfig) -> Result<()> {
-    let router = crawler::Router::new(config.coordinator_addrs.clone()).await?;
+    let router = router::Router::new(config.coordinator_addrs.clone()).await?;
 
     let addr: SocketAddr = config.host;
 
@@ -81,52 +79,4 @@ pub fn planner(config: stract_config::CrawlPlannerConfig) -> Result<()> {
     )?;
 
     Ok(())
-}
-
-pub mod router {
-    use crate::crawler::Job;
-
-    use super::*;
-    pub struct RouterService {
-        pub router: crawler::Router,
-    }
-
-    sonic_service!(RouterService, [NewJob]);
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct NewJob {}
-
-    #[async_trait::async_trait]
-    impl Message<RouterService> for NewJob {
-        type Response = Option<Job>;
-
-        async fn handle(self, server: &RouterService) -> sonic::Result<Self::Response> {
-            Ok(server.router.sample_job().await?)
-        }
-    }
-}
-
-pub mod coordinator {
-    use crate::crawler::Job;
-
-    use super::*;
-
-    pub struct CoordinatorService {
-        pub coordinator: Arc<CrawlCoordinator>,
-    }
-
-    sonic_service!(CoordinatorService, [GetJob]);
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct GetJob {}
-
-    #[async_trait::async_trait]
-    impl Message<CoordinatorService> for GetJob {
-        type Response = Option<Job>;
-
-        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            let job = server.coordinator.sample_job()?;
-            Ok(job)
-        }
-    }
 }

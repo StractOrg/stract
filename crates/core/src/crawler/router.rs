@@ -1,13 +1,33 @@
 use anyhow::Result;
 use distributed::retry_strategy::ExponentialBackoff;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use sonic::{service::Message, sonic_service};
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::Mutex;
 
-use crate::entrypoint::crawler::coordinator::{CoordinatorService, GetJob};
+use super::{
+    coordinator::{CoordinatorService, GetJob},
+    Job,
+};
 
-use super::Job;
+pub struct RouterService {
+    pub router: Router,
+}
 
+sonic_service!(RouterService, [NewJob]);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewJob {}
+
+#[async_trait::async_trait]
+impl Message<RouterService> for NewJob {
+    type Response = Option<Job>;
+
+    async fn handle(self, server: &RouterService) -> sonic::Result<Self::Response> {
+        Ok(server.router.sample_job().await?)
+    }
+}
 struct RemoteCoordinator {
     addr: SocketAddr,
 }

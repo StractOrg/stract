@@ -33,9 +33,9 @@ use stract_config::CrawlerConfig;
 use url::Url;
 use webpage::Html;
 
-use crate::{
-    crawler::MAX_URL_LEN_BYTES,
-    entrypoint::crawler::router::{NewJob, RouterService},
+use super::{
+    router::{NewJob, RouterService},
+    MAX_URL_LEN_BYTES,
 };
 
 use super::{

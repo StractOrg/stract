@@ -29,9 +29,7 @@ use webgraph::{
     NodeID, Webgraph,
 };
 
-use crate::crawler::{file_queue::FileQueueWriter, Job};
-
-use super::Domain;
+use super::{file_queue::FileQueueWriter, Domain, Job};
 
 fn all_pages(
     page_centrality: &RocksDbStore<NodeID, f64>,
