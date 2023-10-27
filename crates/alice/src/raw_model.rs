@@ -15,7 +15,7 @@ use std::{fs::OpenOptions, path::Path};
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::alice::Result;
+use crate::Result;
 use safetensors::SafeTensors;
 use tch::{
     nn::{embedding, layer_norm, Embedding, LayerNorm, LayerNormConfig, ModuleT, VarStore},

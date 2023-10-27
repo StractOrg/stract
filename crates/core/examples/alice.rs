@@ -1,12 +1,10 @@
 use std::io::Write;
 
-use base64::Engine;
-use stract_core::{
-    alice::{
-        ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
-    },
-    entrypoint::alice::StractSearcher,
+use alice::{
+    ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
 };
+use base64::Engine;
+use stract_core::entrypoint::alice::StractSearcher;
 
 #[tokio::main]
 async fn main() {

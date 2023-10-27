@@ -1,0 +1,26 @@
+[package]
+name = "alice"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes-gcm = "0.10.3"
+anyhow.workspace = true
+base64.workspace = true
+bincode.workspace = true
+flate2.workspace = true
+half.workspace = true
+memmap2.workspace = true
+safetensors.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stdx.workspace = true
+stract-config.workspace = true
+stract-llm.workspace = true
+tch.workspace = true
+thiserror.workspace = true
+tokenizers.workspace = true
+tracing.workspace = true
+utoipa.workspace = true

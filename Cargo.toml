@@ -11,6 +11,7 @@ debug = true
 
 [workspace.dependencies]
 aes-gcm = "0.10.2"
+alice = { path = "./crates/alice" }
 anyhow = {version = "1.0.72", features = ["backtrace"]}
 async-channel = "1.8.0"
 async-stream = "0.3.3"

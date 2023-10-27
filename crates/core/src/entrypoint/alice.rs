@@ -20,6 +20,9 @@ use itertools::Itertools;
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use url::Url;
 
+use alice::{
+    Alice, EncodedEncryptedState, EncryptedState, Searcher, SimplifiedWebsite, BASE64_ENGINE,
+};
 use axum::{
     extract,
     response::{
@@ -40,14 +43,7 @@ use tokio_stream::Stream;
 use tokio_stream::StreamExt as _;
 use tracing::info;
 
-use crate::{
-    alice::{
-        Alice, EncodedEncryptedState, EncryptedState, Searcher, SimplifiedWebsite, BASE64_ENGINE,
-    },
-    api::search::ApiSearchQuery,
-    searcher::SearchResult,
-    ttl_cache::TTLCache,
-};
+use crate::{api::search::ApiSearchQuery, searcher::SearchResult, ttl_cache::TTLCache};
 
 pub struct State {
     pub alice: Alice,

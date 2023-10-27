@@ -13,10 +13,11 @@ default = ["cors", "with_alice", "libtorch"]
 dev = ["cors"]
 libtorch = ["dep:tch", "dep:stract-llm"]
 prod = ["cors", "libtorch"]
-with_alice = ["libtorch"]
+with_alice = ["libtorch", "dep:alice"]
 
 [dependencies]
 aes-gcm = {workspace = true}
+alice = { workspace = true, optional = true }
 anyhow = {workspace = true}
 async-stream = {workspace = true}
 async-trait = {workspace = true}

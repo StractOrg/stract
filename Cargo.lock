@@ -93,6 +93,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "alice"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "base64 0.21.4",
+ "bincode",
+ "flate2",
+ "half 2.3.1",
+ "memmap2",
+ "safetensors",
+ "serde",
+ "serde_json",
+ "stdx",
+ "stract-config",
+ "stract-llm",
+ "tch",
+ "thiserror",
+ "tokenizers",
+ "tracing",
+ "utoipa",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4378,6 +4402,7 @@ name = "stract-core"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "alice",
  "anyhow",
  "async-stream",
  "async-trait",

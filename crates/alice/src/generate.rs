@@ -21,13 +21,11 @@ use stdx::leaky_queue::LeakyQueue;
 use stract_llm::llm_utils::{self, ClonableTensor};
 use tch::{IndexOp, Kind, Tensor};
 
-use crate::alice::ExecutionState;
-
-use super::{
+use crate::{
     raw_model::RawModel, AnyTransitionValidator, EncodedEncryptedState, EncryptedState, Error,
-    ModelState, Result, Searcher, Tokenizer, TransitionValidator,
+    ExecutionState, ModelState, ModelWebsite, Result, Searcher, SimplifiedWebsite, Tokenizer,
+    TransitionValidator,
 };
-use crate::alice::{ModelWebsite, SimplifiedWebsite};
 
 // const TAU: f64 = 0.3;
 const TEMP: f64 = 0.4; // 0.4

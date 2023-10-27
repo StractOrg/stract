@@ -24,6 +24,9 @@
 //! To make sure the state has not been tampered with, it is encrypted
 //! using an AES-GCM key.
 
+pub mod generate;
+mod raw_model;
+
 use std::{
     io::{Read, Write},
     path::Path,
@@ -45,10 +48,8 @@ use stract_llm::llm_utils::ClonableTensor;
 use tch::Tensor;
 use utoipa::ToSchema;
 
-use self::{
-    generate::{ActionExecutor, ActionGenerator, AliceTokenGenerator, RawActionGenerator},
-    raw_model::RawModel,
-};
+use generate::{ActionExecutor, ActionGenerator, AliceTokenGenerator, RawActionGenerator};
+use raw_model::RawModel;
 
 const PROMPT_PREFIX: &str = r#"System: Your name is Alice, and you are an AI assistant trained by Stract. Below is a conversation between you and a user. Help the user as best you can.
 You can lookup information on the web in the following format:
@@ -59,9 +60,6 @@ Result: <search result>
 This Thought/Search/Result can repeat N times.
 When you are ready to answer the user, use the following format:
 Alice: <answer><|endoftext|>"#;
-
-pub mod generate;
-mod raw_model;
 
 type Result<T> = std::result::Result<T, anyhow::Error>;
 

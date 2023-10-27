@@ -26,8 +26,6 @@
 pub mod entrypoint;
 mod inverted_index;
 
-#[cfg(feature = "with_alice")]
-pub mod alice;
 mod api;
 mod autosuggest;
 pub mod feed;
