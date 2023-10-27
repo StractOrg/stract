@@ -1,13 +1,13 @@
 use stract_core::index::Index;
 
-pub(crate) type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
+pub type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
-pub(crate) fn temporary_index() -> Result<Index> {
+pub fn temporary_index() -> Result<Index> {
     let path = stdx::gen_temp_path();
     Index::open(path)
 }
 
-pub(crate) fn rand_words(num_words: usize) -> String {
+pub fn rand_words(num_words: usize) -> String {
     use rand::{distributions::Alphanumeric, Rng};
     let mut res = String::new();
 
