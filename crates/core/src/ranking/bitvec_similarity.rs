@@ -17,7 +17,7 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::hyperloglog::HyperLogLog;
+use hyperloglog::HyperLogLog;
 
 const THRESHOLD_SIM_ESTIMATE: f64 = 0.1;
 
