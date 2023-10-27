@@ -588,7 +588,7 @@ impl Iterator for ActionGenerator {
 
 pub struct ActionExecutor {
     generator: ActionGenerator,
-    searcher: Searcher,
+    searcher: Box<dyn Searcher>,
     query_to_search: Option<String>,
     queries_performed: Vec<String>,
     has_finished: bool,
@@ -598,9 +598,9 @@ pub struct ActionExecutor {
 unsafe impl Send for ActionExecutor {}
 
 impl ActionExecutor {
-    pub fn new(
+    pub(super) fn new(
         action_gen: ActionGenerator,
-        searcher: Searcher,
+        searcher: Box<dyn Searcher>,
         encryption_key: Key<Aes256Gcm>,
     ) -> Self {
         ActionExecutor {
@@ -612,7 +612,7 @@ impl ActionExecutor {
             encryption_key,
         }
     }
-    pub fn state(&self) -> Tensor {
+    pub(super) fn state(&self) -> Tensor {
         self.generator
             .raw
             .token_generator

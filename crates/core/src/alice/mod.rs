@@ -40,18 +40,10 @@ pub use base64::prelude::BASE64_STANDARD as BASE64_ENGINE;
 use base64::Engine;
 use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
 use half::bf16;
-use itertools::Itertools;
 use stract_config::{AcceleratorDevice, AcceleratorDtype, AliceAcceleratorConfig};
 use stract_llm::llm_utils::ClonableTensor;
 use tch::Tensor;
-use url::Url;
 use utoipa::ToSchema;
-
-use crate::{
-    api::search::ApiSearchQuery,
-    search_prettifier::DisplayedWebpage,
-    searcher::{SearchResult, WebsitesResult},
-};
 
 use self::{
     generate::{ActionExecutor, ActionGenerator, AliceTokenGenerator, RawActionGenerator},
@@ -78,9 +70,6 @@ pub enum Error {
     #[error("Empty input")]
     EmptyInput,
 
-    #[error("Unexpected search result")]
-    UnexpectedSearchResult,
-
     #[error("Failed to decrypt")]
     DecryptionFailed,
 
@@ -89,33 +78,6 @@ pub enum Error {
 
     #[error("Last message should be from user")]
     LastMessageNotUser,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
-pub struct SimplifiedWebsite {
-    pub title: String,
-    pub text: String,
-    pub url: String,
-    pub site: String,
-}
-
-impl SimplifiedWebsite {
-    fn new(webpage: DisplayedWebpage) -> Self {
-        let text = webpage
-            .snippet
-            .text()
-            .map(|t| t.fragments.iter().map(|f| f.text()).join(""))
-            .unwrap_or_default();
-
-        let url = Url::parse(&webpage.url).unwrap();
-
-        Self {
-            title: webpage.title,
-            text,
-            site: url.host_str().unwrap_or_default().to_string(),
-            url: url.to_string(),
-        }
-    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
@@ -136,6 +98,18 @@ pub enum ExecutionState {
     },
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct SimplifiedWebsite {
+    pub title: String,
+    pub text: String,
+    pub url: String,
+    pub site: String,
+}
+
+pub trait Searcher {
+    fn search(&self, query: &str) -> Result<Vec<SimplifiedWebsite>>;
+}
+
 /// A simplified website that the model sees in the prompt.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ModelWebsite {
@@ -151,57 +125,6 @@ impl From<SimplifiedWebsite> for ModelWebsite {
             text: value.text,
             site: value.site,
         }
-    }
-}
-
-pub struct Searcher {
-    url: String,
-    optic_url: Option<String>,
-}
-
-impl Searcher {
-    fn raw_search(&self, query: &str) -> Result<WebsitesResult> {
-        let optic = self
-            .optic_url
-            .as_ref()
-            .and_then(|url| reqwest::blocking::get(url).ok().and_then(|r| r.text().ok()));
-
-        let client = reqwest::blocking::Client::new();
-        let query = ApiSearchQuery {
-            query: query.trim().to_string(),
-            num_results: Some(3),
-            optic,
-            page: None,
-            selected_region: None,
-            site_rankings: None,
-            return_ranking_signals: false,
-            flatten_response: false,
-            safe_search: Some(false),
-            fetch_discussions: false,
-            count_results: false,
-        };
-        tracing::debug!("searching at {:?}: {:#?}", self.url, query);
-
-        let res: SearchResult = client.post(&self.url).json(&query).send()?.json()?;
-
-        match res {
-            SearchResult::Websites(res) => Ok(res),
-            SearchResult::Bang(_) => Err(Error::UnexpectedSearchResult.into()),
-        }
-    }
-
-    fn search(&self, query: &str) -> Result<Vec<SimplifiedWebsite>> {
-        let res = self.raw_search(query)?;
-
-        let mut websites = Vec::new();
-
-        for website in res.webpages {
-            websites.push(SimplifiedWebsite::new(website));
-        }
-
-        tracing::debug!("search result: {:#?}", websites);
-
-        Ok(websites)
     }
 }
 
@@ -294,12 +217,19 @@ impl Alice {
         Ok(ClonableTensor(state))
     }
 
-    pub fn new_executor(
+    pub fn new_executor<S: Searcher + 'static>(
         &self,
         user_question: &str,
         last_state: Option<EncryptedState>,
-        search_url: String,
-        optic_url: Option<String>,
+        searcher: S,
+    ) -> Result<ActionExecutor> {
+        self.new_executor_inner(user_question, last_state, Box::new(searcher))
+    }
+    fn new_executor_inner(
+        &self,
+        user_question: &str,
+        last_state: Option<EncryptedState>,
+        searcher: Box<dyn Searcher>,
     ) -> Result<ActionExecutor> {
         let mut state = None;
 
@@ -333,11 +263,6 @@ impl Alice {
 
         let raw_action_gen = RawActionGenerator::new(token_generator, self.tokenizer.clone());
         let action_gen = ActionGenerator::new(raw_action_gen);
-
-        let searcher = Searcher {
-            url: search_url,
-            optic_url,
-        };
 
         Ok(ActionExecutor::new(
             action_gen,

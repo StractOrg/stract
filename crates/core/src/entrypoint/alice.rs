@@ -15,7 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use aes_gcm::{aead::OsRng, Aes256Gcm, KeyInit};
+use anyhow::bail;
+use itertools::Itertools;
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
+use url::Url;
 
 use axum::{
     extract,
@@ -38,7 +41,11 @@ use tokio_stream::StreamExt as _;
 use tracing::info;
 
 use crate::{
-    alice::{Alice, EncodedEncryptedState, EncryptedState, BASE64_ENGINE},
+    alice::{
+        Alice, EncodedEncryptedState, EncryptedState, Searcher, SimplifiedWebsite, BASE64_ENGINE,
+    },
+    api::search::ApiSearchQuery,
+    searcher::SearchResult,
     ttl_cache::TTLCache,
 };
 
@@ -90,6 +97,68 @@ pub struct AliceParams {
     pub prev_state: Option<uuid::Uuid>,
 }
 
+pub struct StractSearcher {
+    pub url: String,
+    pub optic_url: Option<String>,
+}
+
+impl Searcher for StractSearcher {
+    fn search(&self, query: &str) -> crate::Result<Vec<SimplifiedWebsite>> {
+        let res = {
+            let optic = self
+                .optic_url
+                .as_ref()
+                .and_then(|url| reqwest::blocking::get(url).ok().and_then(|r| r.text().ok()));
+
+            let client = reqwest::blocking::Client::new();
+            let query = ApiSearchQuery {
+                query: query.trim().to_string(),
+                num_results: Some(3),
+                optic,
+                page: None,
+                selected_region: None,
+                site_rankings: None,
+                return_ranking_signals: false,
+                flatten_response: false,
+                safe_search: Some(false),
+                fetch_discussions: false,
+                count_results: false,
+            };
+            tracing::debug!("searching at {:?}: {:#?}", self.url, query);
+
+            let res: SearchResult = client.post(&self.url).json(&query).send()?.json()?;
+
+            match res {
+                SearchResult::Websites(res) => res,
+                SearchResult::Bang(_) => bail!("Unexpected search result"),
+            }
+        };
+
+        let mut websites = Vec::new();
+
+        for website in res.webpages {
+            let webpage = website;
+            let text = webpage
+                .snippet
+                .text()
+                .map(|t| t.fragments.iter().map(|f| f.text()).join(""))
+                .unwrap_or_default();
+
+            let url = Url::parse(&webpage.url).unwrap();
+            websites.push(SimplifiedWebsite {
+                title: webpage.title,
+                text,
+                site: url.host_str().unwrap_or_default().to_string(),
+                url: url.to_string(),
+            });
+        }
+
+        tracing::debug!("search result: {:#?}", websites);
+
+        Ok(websites)
+    }
+}
+
 pub async fn route(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<AliceParams>,
@@ -128,14 +197,13 @@ pub async fn route(
             http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    let searcher = StractSearcher {
+        url: format!("http://{}/beta/api/search", search_addr),
+        optic_url: params.optic,
+    };
     let executor = state
         .alice
-        .new_executor(
-            &params.message,
-            prev_state,
-            format!("http://{}/beta/api/search", search_addr),
-            params.optic,
-        )
+        .new_executor(&params.message, prev_state, searcher)
         .map_err(|e| {
             info!("error creating executor: {}", e);
             http::StatusCode::INTERNAL_SERVER_ERROR

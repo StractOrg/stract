@@ -1,8 +1,11 @@
 use std::io::Write;
 
 use base64::Engine;
-use stract_core::alice::{
-    ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
+use stract_core::{
+    alice::{
+        ExecutionState, BASE64_ENGINE, {AcceleratorConfig, Alice},
+    },
+    entrypoint::alice::StractSearcher,
 };
 
 #[tokio::main]
@@ -41,13 +44,12 @@ async fn main() {
         std::io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
 
+        let searcher = StractSearcher {
+            url: "http://localhost:3000/beta/api/search".to_string(),
+            optic_url: None,
+        };
         let gen = model
-            .new_executor(
-                input,
-                last_state.clone(),
-                "http://localhost:3000/beta/api/search".to_string(),
-                None,
-            )
+            .new_executor(input, last_state.clone(), searcher)
             .unwrap();
 
         for n in gen {
