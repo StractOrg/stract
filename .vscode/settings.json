@@ -23,6 +23,5 @@
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "optics-lsp/Cargo.toml",
-    "./core/Cargo.toml"
   ]
 }

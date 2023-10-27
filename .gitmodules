@@ -1,3 +1,3 @@
-[submodule "optics/testcases"]
-	path = optics/testcases/samples
+[submodule "crates/optics/testcases/samples"]
+	path = crates/optics/testcases/samples
 	url = https://github.com/StractOrg/sample-optics

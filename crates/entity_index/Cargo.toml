@@ -1,0 +1,28 @@
+[package]
+name = "entity_index"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64.workspace = true
+bincode.workspace = true
+bzip2.workspace = true
+imager.workspace = true
+itertools.workspace = true
+kv.workspace = true
+md5.workspace = true
+parse_wiki_text.workspace = true
+quick-xml = "0.30.0"
+serde.workspace = true
+stdx.workspace = true
+tantivy.workspace = true
+thiserror.workspace = true
+tokenizer.workspace = true
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

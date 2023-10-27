@@ -1,0 +1,15 @@
+[package]
+name = "collector"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+min-max-heap.workspace = true
+schema.workspace = true
+serde.workspace = true
+simhash.workspace = true
+stdx.workspace = true
+stract-config.workspace = true
+tantivy.workspace = true

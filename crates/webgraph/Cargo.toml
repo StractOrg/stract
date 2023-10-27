@@ -1,0 +1,31 @@
+[package]
+name = "webgraph"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+bitvec.workspace = true
+executor = { version = "0.1.0", path = "../executor" }
+hyperloglog.workspace = true
+indicatif.workspace = true
+itertools.workspace = true
+kv.workspace = true
+lz4_flex.workspace = true
+md5.workspace = true
+memmap2.workspace = true
+rayon.workspace = true
+rocksdb.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+stdx.workspace = true
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+maplit.workspace = true

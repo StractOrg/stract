@@ -33,8 +33,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     ./scripts/export_fact_model
 
 @configure *ARGS:
-    just setup {{ARGS}}
-    just prepare_models
+    # just setup {{ARGS}}
+    # just prepare_models
     RUST_LOG="none,stract=info" just cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:
@@ -46,3 +46,29 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @cargo *ARGS:
     LIBTORCH="{{justfile_directory()}}/libtorch" LD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" DYLD_LIBRARY_PATH="{{justfile_directory()}}/libtorch/lib" cargo {{ARGS}}
+
+@bench-compile A B:
+    #!/bin/bash
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    hyperfine --show-output -w 2 --export-markdown bench-compile-{{A}}-vs-{{B}}.md \
+        -p "git switch {{A}} && touch core/src/lib.rs        && sleep 1" -n "{{A}}" "cargo build" \
+        -p "git switch {{B}} && touch crates/core/src/lib.rs && sleep 1" -n "{{B}}" "cargo build"
+
+@bench-compile-release:
+    #!/bin/bash
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    hyperfine --show-output -w 2 -p 'touch core/src/lib.rs' \
+        "git switch main      && cargo build -p stract --bin stract --release" \
+        "git switch ${BRANCH} && cargo build -p stract --bin stract --release"
+
+@crateify path:
+    cargo new crates/{{file_stem(path)}} --lib
+    mv {{path}} crates/{{file_stem(path)}}/src/lib.rs
+    echo {{file_stem(path)}} = { path = '"./crates/{{file_stem(path)}}"' }
+    echo "cargo add -p stract-core {{file_stem(path)}}"
+
+@librarify path:
+    cargo new lib/{{file_stem(path)}} --lib
+    mv {{path}} lib/{{file_stem(path)}}/src/lib.rs
+    echo {{file_stem(path)}} = { path = '"./lib/{{file_stem(path)}}"' }
+    echo "cargo add -p stract-core {{file_stem(path)}}"

@@ -1,0 +1,20 @@
+[package]
+name = "imager"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bincode.workspace = true
+distributed.workspace = true
+futures.workspace = true
+image.workspace = true
+kv.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+stdx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
