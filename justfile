@@ -54,18 +54,18 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
         -p "git switch {{A}} && touch core/src/lib.rs        && sleep 1" -n "{{A}}" "cargo build" \
         -p "git switch {{B}} && touch crates/core/src/lib.rs && sleep 1" -n "{{B}}" "cargo build"
 
-@bench-compile-release:
+@bench-compile-release A B:
     #!/bin/bash
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    hyperfine --show-output -w 2 -p 'touch core/src/lib.rs' \
-        "git switch main      && cargo build -p stract --bin stract --release" \
-        "git switch ${BRANCH} && cargo build -p stract --bin stract --release"
+    hyperfine --show-output -w 2 --export-markdown bench-compile-release-{{A}}-vs-{{B}}.md \
+        -p "git switch {{A}} && touch core/src/lib.rs        && sleep 1" -n "{{A}}" "cargo build --release" \
+        -p "git switch {{B}} && touch crates/core/src/lib.rs && sleep 1" -n "{{B}}" "cargo build --release"
 
-@crateify path:
-    cargo new crates/{{file_stem(path)}} --lib
-    mv {{path}} crates/{{file_stem(path)}}/src/lib.rs
-    echo {{file_stem(path)}} = { path = '"./crates/{{file_stem(path)}}"' }
-    echo "cargo add -p stract-core {{file_stem(path)}}"
+@crateify path name:
+    cargo new crates/{{name}} --lib
+    mv {{path}} crates/{{name}}/src/lib.rs
+    echo {{name}} = { path = '"./crates/{{name}}"' }
+    echo "cargo add -p stract-core {{name}}"
 
 @librarify path:
     cargo new lib/{{file_stem(path)}} --lib
