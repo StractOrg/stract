@@ -34,7 +34,7 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
 
     let group = registry
         .new_group(
-            "search_requests".to_string(),
+            "stract_search_requests".to_string(),
             Some("Total number of incoming search requests.".to_string()),
         )
         .unwrap();
@@ -56,7 +56,7 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
 
     let group = registry
         .new_group(
-            "explore_requests".to_string(),
+            "stract_explore_requests".to_string(),
             Some("Total number of incoming requests to explore api.".to_string()),
         )
         .unwrap();
@@ -64,7 +64,7 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
 
     let group = registry
         .new_group(
-            "daily_active_users".to_string(),
+            "stract_daily_active_users".to_string(),
             Some("Approximate number of unique daily active users.".to_string()),
         )
         .unwrap();

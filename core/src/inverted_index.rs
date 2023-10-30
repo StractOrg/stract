@@ -202,7 +202,7 @@ impl InvertedIndex {
         Self::open(path)
     }
 
-    pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
+    pub fn insert(&self, webpage: Webpage) -> Result<()> {
         self.writer
             .add_document(webpage.into_tantivy(&self.schema)?)?;
         Ok(())
@@ -1070,7 +1070,7 @@ mod tests {
 
     #[test]
     fn merge() {
-        let mut index1 = InvertedIndex::temporary().expect("Unable to open index");
+        let index1 = InvertedIndex::temporary().expect("Unable to open index");
 
         index1
             .insert(
@@ -1094,7 +1094,7 @@ mod tests {
             )
             .expect("failed to insert webpage");
 
-        let mut index2 = InvertedIndex::temporary().expect("Unable to open index");
+        let index2 = InvertedIndex::temporary().expect("Unable to open index");
 
         index2
             .insert(

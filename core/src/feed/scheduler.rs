@@ -26,7 +26,7 @@ use crate::{
     webpage::url_ext::UrlExt,
 };
 
-use super::{Feed, FeedIndex};
+use super::{index::FeedIndex, Feed};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Domain(String);
