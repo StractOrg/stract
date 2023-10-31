@@ -521,7 +521,7 @@ pub struct RawModel {
 }
 
 impl RawModel {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<RawModel> {
+    pub fn open(path: &Path) -> Result<RawModel> {
         // SAFETY
         // broadcasting: please don't modify the file while we're reading it.
         let mmap = unsafe {

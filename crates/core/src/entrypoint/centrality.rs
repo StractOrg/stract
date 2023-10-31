@@ -24,7 +24,7 @@ use webgraph::{
 
 use crate::ranking::inbound_similarity::InboundSimilarity;
 
-fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
+fn store_csv(data: Vec<(Node, f64)>, output: &Path) {
     let csv_file = File::options()
         .write(true)
         .create(true)
@@ -67,11 +67,11 @@ impl Ord for SortableFloat {
 pub struct Centrality;
 
 impl Centrality {
-    pub fn build_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
+    pub fn build_harmonic(webgraph_path: &Path, base_output: &Path) {
         tracing::info!("Building harmonic centrality");
         let graph = WebgraphBuilder::new(webgraph_path).open();
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
-        let store = RocksDbStore::open(base_output.as_ref().join("harmonic"));
+        let store = RocksDbStore::open(&base_output.join("harmonic"));
 
         for (node_id, centrality) in harmonic_centrality.iter() {
             store.insert(*node_id, centrality);
@@ -96,32 +96,31 @@ impl Centrality {
             .map(|(score, id)| (graph.id2node(&id).unwrap(), score.0 .0))
             .collect();
 
-        store_csv(harmonics, base_output.as_ref().join("harmonic.csv"));
+        store_csv(harmonics, &base_output.join("harmonic.csv"));
     }
 
-    pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
+    pub fn build_similarity(webgraph_path: &Path, base_output: &Path) {
         tracing::info!("Building inbound similarity");
         let graph = WebgraphBuilder::new(webgraph_path).open();
 
         let sim = InboundSimilarity::build(&graph);
 
-        sim.save(base_output.as_ref().join("inbound_similarity"))
-            .unwrap();
+        sim.save(&base_output.join("inbound_similarity")).unwrap();
     }
 
-    pub fn build_derived_harmonic<P: AsRef<Path>>(
-        webgraph_path: P,
-        host_centrality_path: P,
-        base_output: P,
+    pub fn build_derived_harmonic(
+        webgraph_path: &Path,
+        host_centrality_path: &Path,
+        base_output: &Path,
     ) -> Result<()> {
         tracing::info!("Building derived harmonic centrality");
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
-        let host_centrality = RocksDbStore::open(host_centrality_path.as_ref().join("harmonic"));
+        let host_centrality = RocksDbStore::open(&host_centrality_path.join("harmonic"));
 
         let derived = DerivedCentrality::build(
             &host_centrality,
             &graph,
-            base_output.as_ref().join("derived_harmonic"),
+            &base_output.join("derived_harmonic"),
         )?;
 
         let mut top_nodes = BinaryHeap::new();
@@ -142,7 +141,7 @@ impl Centrality {
             .map(|(score, id)| (graph.id2node(&id).unwrap(), score.0 .0))
             .collect();
 
-        store_csv(derived, base_output.as_ref().join("derived_centrality.csv"));
+        store_csv(derived, &base_output.join("derived_centrality.csv"));
 
         Ok(())
     }

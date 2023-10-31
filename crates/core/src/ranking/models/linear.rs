@@ -45,7 +45,7 @@ pub struct LinearRegression {
 }
 
 impl LinearRegression {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         let model: SerialziedLinearRegression = serde_json::from_reader(reader)?;

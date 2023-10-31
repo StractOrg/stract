@@ -31,7 +31,7 @@ pub async fn worker(config: stract_config::CrawlerConfig) -> Result<()> {
 }
 
 pub async fn coordinator(config: stract_config::CrawlCoordinatorConfig) -> Result<()> {
-    let coordinator = Arc::new(CrawlCoordinator::new(config.job_queue)?);
+    let coordinator = Arc::new(CrawlCoordinator::new(config.job_queue.as_ref())?);
 
     let addr: SocketAddr = config.host;
     let server = coordinator::CoordinatorService { coordinator }
@@ -61,10 +61,10 @@ pub async fn router(config: stract_config::CrawlRouterConfig) -> Result<()> {
 }
 
 pub fn planner(config: stract_config::CrawlPlannerConfig) -> Result<()> {
-    let page_centrality = RocksDbStore::open(&config.page_harmonic_path);
-    let host_centrality = RocksDbStore::open(&config.host_harmonic_path);
-    let page_graph = WebgraphBuilder::new(&config.page_graph_path).open();
-    let host_graph = WebgraphBuilder::new(&config.host_graph_path).open();
+    let page_centrality = RocksDbStore::open(config.page_harmonic_path.as_ref());
+    let host_centrality = RocksDbStore::open(config.host_harmonic_path.as_ref());
+    let page_graph = WebgraphBuilder::new(config.page_graph_path.as_ref()).open();
+    let host_graph = WebgraphBuilder::new(config.host_graph_path.as_ref()).open();
     let output_path = config.output_path.clone();
 
     make_crawl_plan(
@@ -73,7 +73,7 @@ pub fn planner(config: stract_config::CrawlPlannerConfig) -> Result<()> {
         host_graph,
         page_graph,
         config,
-        output_path,
+        output_path.as_ref(),
     )?;
 
     Ok(())

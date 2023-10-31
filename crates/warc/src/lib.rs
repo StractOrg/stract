@@ -73,7 +73,7 @@ impl WarcFile {
         Self { bytes }
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 

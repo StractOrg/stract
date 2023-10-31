@@ -60,11 +60,11 @@ impl SearchService {
     async fn new(config: stract_config::SearchServerConfig) -> Result<Self> {
         let entity_index = config
             .entity_index_path
-            .map(|path| EntityIndex::open(path).unwrap());
+            .map(|path| EntityIndex::open(&path).unwrap());
         let centrality_store = config
             .host_centrality_store_path
-            .map(|p| InboundSimilarity::open(Path::new(&p).join("inbound_similarity")).unwrap());
-        let search_index = Index::open(config.index_path)?;
+            .map(|p| InboundSimilarity::open(&Path::new(&p).join("inbound_similarity")).unwrap());
+        let search_index = Index::open(&config.index_path)?;
 
         let mut local_searcher = LocalSearcher::new(search_index);
 
@@ -77,11 +77,11 @@ impl SearchService {
         }
 
         if let Some(model_path) = config.linear_model_path {
-            local_searcher.set_linear_model(LinearRegression::open(model_path)?);
+            local_searcher.set_linear_model(LinearRegression::open(&model_path)?);
         }
 
         if let Some(model_path) = config.lambda_model_path {
-            local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
+            local_searcher.set_lambda_model(LambdaMART::open(&model_path)?);
         }
 
         if config.build_spell_dictionary {

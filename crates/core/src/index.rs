@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use std::{collections::HashSet, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use stdx::directory::{self, DirEntry};
@@ -45,27 +45,24 @@ pub struct Index {
     pub inverted_index: InvertedIndex,
     pub region_count: RegionCount,
     pub subdomain_counter: SubdomainCounter,
-    pub path: String,
+    pub path: PathBuf,
 }
 
 impl Index {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            fs::create_dir_all(path.as_ref())?;
+    pub fn open(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            fs::create_dir_all(path)?;
         }
 
-        let inverted_index =
-            InvertedIndex::open(path.as_ref().join(INVERTED_INDEX_SUBFOLDER_NAME))?;
+        let inverted_index = InvertedIndex::open(&path.join(INVERTED_INDEX_SUBFOLDER_NAME))?;
 
-        let region_count = RegionCount::open(path.as_ref().join(REGION_COUNT_FILE_NAME));
+        let region_count = RegionCount::open(&path.join(REGION_COUNT_FILE_NAME));
 
         Ok(Self {
             inverted_index,
             region_count,
-            subdomain_counter: SubdomainCounter::open(
-                path.as_ref().join(SUBDOMAIN_COUNT_SUBFOLDER_NAME),
-            ),
-            path: path.as_ref().to_str().unwrap().to_string(),
+            subdomain_counter: SubdomainCounter::open(&path.join(SUBDOMAIN_COUNT_SUBFOLDER_NAME)),
+            path: path.to_owned(),
         })
     }
 
@@ -82,7 +79,7 @@ impl Index {
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = stdx::gen_temp_path();
-        Self::open(path)
+        Self::open(&path)
     }
 
     pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
@@ -138,7 +135,7 @@ impl Index {
         self.subdomain_counter.merge(other.subdomain_counter);
         drop(self.subdomain_counter);
 
-        Self::open(&self.path).expect("failed to open index")
+        Self::open(self.path.as_ref()).expect("failed to open index")
     }
 
     pub fn schema(&self) -> Arc<Schema> {
@@ -180,7 +177,7 @@ impl From<FrozenIndex> for Index {
         }
 
         directory::recreate_folder(&frozen.root).unwrap();
-        Index::open(path).expect("failed to open index")
+        Index::open(path.as_ref()).expect("failed to open index")
     }
 }
 
@@ -189,7 +186,7 @@ impl From<Index> for FrozenIndex {
         index.commit().expect("failed to commit index");
         let path = index.path.clone();
         index.inverted_index.stop();
-        let root = directory::scan_folder(path).unwrap();
+        let root = directory::scan_folder(path.to_str().unwrap().to_string()).unwrap();
 
         Self { root }
     }

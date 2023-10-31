@@ -28,7 +28,7 @@ macro_rules! bench {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let index = Index::open(INDEX_PATH).unwrap();
+    let index = Index::open(INDEX_PATH.as_ref()).unwrap();
     let searcher = LocalSearcher::new(index);
     let optic = include_str!("../../optics/testcases/samples/discussions.optic");
 

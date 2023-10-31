@@ -4,7 +4,7 @@ pub type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 pub fn temporary_index() -> Result<Index> {
     let path = stdx::gen_temp_path();
-    Index::open(path)
+    Index::open(&path)
 }
 
 pub fn rand_words(num_words: usize) -> String {

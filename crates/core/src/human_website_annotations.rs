@@ -73,7 +73,7 @@ impl From<HashMap<String, Info>> for Mapper {
 }
 
 impl Mapper {
-    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
+    pub fn save(self, path: &Path) -> Result<()> {
         let mut file = File::options()
             .create(true)
             .truncate(true)
@@ -86,7 +86,7 @@ impl Mapper {
         Ok(())
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let mut reader = BufReader::new(File::open(path)?);
 
         let mut bytes = Vec::new();

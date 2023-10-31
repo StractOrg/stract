@@ -38,7 +38,7 @@ mod model {
     }
 
     impl CrossEncoderModel {
-        pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        pub fn open(folder: &Path) -> Result<Self> {
             let truncation = TruncationParams {
                 max_length: TRUNCATE_INPUT,
                 ..Default::default()
@@ -48,16 +48,15 @@ mod model {
                 ..Default::default()
             };
 
-            let mut tokenizer =
-                tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))
-                    .map_err(|_| anyhow!("couldn't open tokenizer"))?;
+            let mut tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json"))
+                .map_err(|_| anyhow!("couldn't open tokenizer"))?;
 
             tokenizer
                 .with_truncation(Some(truncation))
                 .map_err(|_| anyhow!("tokenizer truncation settings"))?;
             tokenizer.with_padding(Some(padding));
 
-            let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
+            let model = tch::CModule::load(folder.join("model.pt"))?;
 
             Ok(Self { tokenizer, model })
         }
@@ -159,7 +158,7 @@ mod tests {
 
     #[test]
     fn sanity_check() {
-        let model = CrossEncoderModel::open("../../data/cross_encoder")
+        let model = CrossEncoderModel::open("../../data/cross_encoder".as_ref())
             .expect("Failed to find cross-encoder model");
 
         let s = model.run(

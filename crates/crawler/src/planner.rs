@@ -74,21 +74,21 @@ fn check_config(config: &CrawlPlannerConfig) -> Result<()> {
     Ok(())
 }
 
-pub fn make_crawl_plan<P: AsRef<Path>>(
+pub fn make_crawl_plan(
     host_centrality: RocksDbStore<NodeID, f64>,
     page_centrality: RocksDbStore<NodeID, f64>,
     host_graph: Webgraph,
     page_graph: Webgraph,
     config: CrawlPlannerConfig,
-    output: P,
+    output: &Path,
 ) -> Result<()> {
     check_config(&config)?;
 
-    if output.as_ref().exists() {
+    if output.exists() {
         return Err(anyhow!("output path already exists"));
     }
 
-    let queue_path = output.as_ref().join("job_queue");
+    let queue_path = output.join("job_queue");
     std::fs::create_dir_all(&queue_path)?;
 
     let hosts = top_hosts(
@@ -101,7 +101,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
     let job_queues: Vec<Mutex<FileQueueWriter<Job>>> = (0..config.num_job_queues)
         .map(|i| {
             let path = queue_path.join(format!("{}.queue", i));
-            FileQueueWriter::new(path)
+            FileQueueWriter::new(&path)
         })
         .collect::<Result<Vec<_>>>()?
         .into_iter()
@@ -186,7 +186,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
         stats: stats.into_inner().unwrap_or_else(|e| e.into_inner()),
     };
 
-    let metadata_path = output.as_ref().join("metadata.json");
+    let metadata_path = output.join("metadata.json");
 
     let metadata_file = std::fs::File::create(metadata_path)?;
     serde_json::to_writer_pretty(metadata_file, &metadata)?;

@@ -17,7 +17,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use stract_core::entrypoint::autosuggest_scrape::{self, Gl};
 use webgraph::WebgraphBuilder;
 
@@ -60,8 +60,8 @@ enum Commands {
     /// Parse the DMOZ dataset. DMOZ contains a list of websites and their categories.
     /// It can be used to calculate the topic centrality for websites or augments website descriptions during indexing.
     DmozParser {
-        dmoz_file: String,
-        output_path: String,
+        dmoz_file: PathBuf,
+        output_path: PathBuf,
     },
 
     /// Webgraph specific commands.
@@ -71,18 +71,18 @@ enum Commands {
     },
 
     /// Deploy the search server.
-    SearchServer { config_path: String },
+    SearchServer { config_path: PathBuf },
 
     /// Deploy the json http api. The api interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
-    Api { config_path: String },
+    Api { config_path: PathBuf },
 
     /// Scrape the Google autosuggest API for search queries.
     AutosuggestScrape {
         num_queries: usize,
         gl: Gl,
         ms_sleep_between_req: u64,
-        output_dir: String,
+        output_dir: PathBuf,
     },
 
     /// Deploy the crawler.
@@ -112,18 +112,18 @@ enum Commands {
 enum Crawler {
     /// Deploy the crawl worker. The worker is responsible for downloading webpages, saving them to S3,
     /// and sending newly discovered urls back to the crawl coordinator.
-    Worker { config_path: String },
+    Worker { config_path: PathBuf },
 
     /// Deploy the crawl coordinator. The crawl coordinator is responsible for
     /// distributing crawl jobs to the crawles and deciding which urls to crawl next.
-    Coordinator { config_path: String },
+    Coordinator { config_path: PathBuf },
 
     /// Deploy the crawl router. The crawl router is responsible for routing job responses and requests
     /// from the workers to the correct crawl coordinators.
-    Router { config_path: String },
+    Router { config_path: PathBuf },
 
     /// Create a crawl plan.
-    Plan { config_path: String },
+    Plan { config_path: PathBuf },
 }
 
 /// Commands to train or run inference on the classifier that predicts if a webpage is NSFW or SFW.
@@ -131,62 +131,61 @@ enum Crawler {
 enum SafetyClassifierOptions {
     /// Train the classifier
     Train {
-        dataset_path: String,
-        output_path: String,
+        dataset_path: PathBuf,
+        output_path: PathBuf,
     },
 
     /// Run a single prediction to test the model
-    Predict { model_path: String, text: String },
+    Predict { model_path: PathBuf, text: String },
 }
 
 #[derive(Subcommand)]
 enum CentralityMode {
     /// Calculate metrics for the host webgraph.
     Host {
-        webgraph_path: String,
-        output_path: String,
+        webgraph_path: PathBuf,
+        output_path: PathBuf,
     },
     /// Calculate metrics for the page webgraph.
     Page {
-        webgraph_path: String,
-        host_centrality_path: String,
-        output_path: String,
+        webgraph_path: PathBuf,
+        host_centrality_path: PathBuf,
+        output_path: PathBuf,
     },
 }
 
 #[derive(Subcommand)]
 enum WebgraphOptions {
     /// Create a new webgraph.
-    Create { config_path: String },
+    Create { config_path: PathBuf },
 
     /// Merge multiple webgraphs into a single graph.
     Merge {
         #[clap(required = true)]
-        paths: Vec<String>,
+        paths: Vec<PathBuf>,
     },
 
     /// Deploy the webgraph server. The webgraph server is responsible for serving the webgraph to the search servers.
     /// This is e.g. used to find similar sites etc.
-    Server { config_path: String },
+    Server { config_path: PathBuf },
 }
 
 #[derive(Subcommand)]
 enum IndexingOptions {
     /// Create the search index.
-    Search { config_path: String },
+    Search { config_path: PathBuf },
 
     /// Create the entity index. Used in the sidebar of the search UI.
     Entity {
-        wikipedia_dump_path: String,
-        output_path: String,
+        wikipedia_dump_path: PathBuf,
+        output_path: PathBuf,
     },
 
     /// Merge multiple search indexes into a single index.
-    Merge { indexes: Vec<String> },
+    Merge { indexes: Vec<PathBuf> },
 }
 
-fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
-    let path = path.as_ref();
+fn load_toml_config<T: DeserializeOwned>(path: &Path) -> T {
     let raw_config = fs::read_to_string(path)
         .with_context(|| format!("Failed to read config: '{}'", path.display()))
         .unwrap();
@@ -209,13 +208,13 @@ fn main() -> Result<()> {
     match args.command {
         Commands::Indexer { options } => match options {
             IndexingOptions::Search { config_path } => {
-                let config = load_toml_config(config_path);
+                let config = load_toml_config(&config_path);
                 entrypoint::Indexer::run(&config)?;
             }
             IndexingOptions::Entity {
                 wikipedia_dump_path,
                 output_path,
-            } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
+            } => entrypoint::EntityIndexer::run(&wikipedia_dump_path, &output_path)?,
             IndexingOptions::Merge { indexes } => {
                 entrypoint::Indexer::merge(indexes.into_iter().map(IndexPointer::from).collect())?
             }
@@ -234,20 +233,20 @@ fn main() -> Result<()> {
                     host_centrality_path,
                     output_path,
                 } => entrypoint::Centrality::build_derived_harmonic(
-                    webgraph_path,
-                    host_centrality_path,
-                    output_path,
+                    &webgraph_path,
+                    &host_centrality_path,
+                    &output_path,
                 )?,
             }
             tracing::info!("Done");
         }
         Commands::Webgraph { options } => match options {
             WebgraphOptions::Create { config_path } => {
-                let config = load_toml_config(config_path);
+                let config = load_toml_config(&config_path);
                 entrypoint::Webgraph::run(&config)?;
             }
             WebgraphOptions::Merge { mut paths } => {
-                let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open();
+                let mut webgraph = WebgraphBuilder::new(&paths.remove(0)).open();
 
                 for other_path in paths {
                     let other = WebgraphBuilder::new(&other_path).open();
@@ -256,7 +255,7 @@ fn main() -> Result<()> {
                 }
             }
             WebgraphOptions::Server { config_path } => {
-                let config: stract_config::WebgraphServerConfig = load_toml_config(config_path);
+                let config: stract_config::WebgraphServerConfig = load_toml_config(&config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -265,7 +264,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Api { config_path } => {
-            let config: stract_config::ApiConfig = load_toml_config(config_path);
+            let config: stract_config::ApiConfig = load_toml_config(&config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -273,7 +272,7 @@ fn main() -> Result<()> {
                 .block_on(api::run(config))?
         }
         Commands::SearchServer { config_path } => {
-            let config: stract_config::SearchServerConfig = load_toml_config(config_path);
+            let config: stract_config::SearchServerConfig = load_toml_config(&config_path);
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -286,7 +285,7 @@ fn main() -> Result<()> {
             ms_sleep_between_req,
             output_dir,
         } => {
-            autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
+            autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, &output_dir)?;
         }
         #[cfg(feature = "dev")]
         Commands::Configure {
@@ -302,10 +301,10 @@ fn main() -> Result<()> {
         Commands::DmozParser {
             dmoz_file,
             output_path,
-        } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
+        } => entrypoint::dmoz_parser::run(&dmoz_file, &output_path).unwrap(),
         Commands::Crawler { options } => match options {
             Crawler::Worker { config_path } => {
-                let config: stract_config::CrawlerConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlerConfig = load_toml_config(&config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -313,7 +312,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::worker(config))?
             }
             Crawler::Coordinator { config_path } => {
-                let config: stract_config::CrawlCoordinatorConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlCoordinatorConfig = load_toml_config(&config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -321,7 +320,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::coordinator(config))?
             }
             Crawler::Router { config_path } => {
-                let config: stract_config::CrawlRouterConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlRouterConfig = load_toml_config(&config_path);
 
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -329,7 +328,7 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::crawler::router(config))?
             }
             Crawler::Plan { config_path } => {
-                let config: stract_config::CrawlPlannerConfig = load_toml_config(config_path);
+                let config: stract_config::CrawlPlannerConfig = load_toml_config(&config_path);
 
                 entrypoint::crawler::planner(config)?;
             }
@@ -338,9 +337,9 @@ fn main() -> Result<()> {
             SafetyClassifierOptions::Train {
                 dataset_path,
                 output_path,
-            } => safety_classifier::train(dataset_path, output_path)?,
+            } => safety_classifier::train(&dataset_path, &output_path)?,
             SafetyClassifierOptions::Predict { model_path, text } => {
-                safety_classifier::predict(model_path, &text)?
+                safety_classifier::predict(&model_path, &text)?
             }
         },
     }

@@ -56,7 +56,7 @@ use crate::MainCollector;
 use crate::Result;
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,7 +71,7 @@ struct SegmentMergeCandidate {
 }
 
 pub struct InvertedIndex {
-    pub path: String,
+    pub path: PathBuf,
     tantivy_index: tantivy::Index,
     writer: IndexWriter,
     reader: IndexReader,
@@ -80,11 +80,11 @@ pub struct InvertedIndex {
 }
 
 impl InvertedIndex {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let schema = create_schema();
 
-        let tantivy_index = if path.as_ref().exists() {
-            let mmap_directory = MmapDirectory::open(&path)?;
+        let tantivy_index = if path.exists() {
+            let mmap_directory = MmapDirectory::open(path)?;
             tantivy::Index::open(mmap_directory)?
         } else {
             let index_settings = tantivy::IndexSettings {
@@ -95,8 +95,8 @@ impl InvertedIndex {
                 ..Default::default()
             };
 
-            fs::create_dir_all(&path)?;
-            let mmap_directory = MmapDirectory::open(&path)?;
+            fs::create_dir_all(path)?;
+            let mmap_directory = MmapDirectory::open(path)?;
             tantivy::Index::create(mmap_directory, schema.clone(), index_settings)?
         };
 
@@ -146,7 +146,7 @@ impl InvertedIndex {
             writer,
             reader,
             schema: Arc::new(schema),
-            path: path.as_ref().to_str().unwrap().to_string(),
+            path: path.to_owned(),
             tantivy_index,
             snippet_config: SnippetConfig::default(),
         })
@@ -167,7 +167,7 @@ impl InvertedIndex {
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = stdx::gen_temp_path();
-        Self::open(path)
+        Self::open(&path)
     }
 
     pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
@@ -408,11 +408,11 @@ impl InvertedIndex {
                 .expect("failed to load tantivy metadata for index");
 
             let x = other.path.clone();
-            let other_path = Path::new(x.as_str());
+            let other_path = Path::new(&x);
             other.writer.wait_merging_threads().unwrap();
 
             let path = self.path.clone();
-            let self_path = Path::new(path.as_str());
+            let self_path = Path::new(&path);
             self.writer.wait_merging_threads().unwrap();
 
             let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
@@ -446,7 +446,7 @@ impl InvertedIndex {
             .unwrap();
         }
 
-        Self::open(path).expect("failed to open index")
+        Self::open(&path).expect("failed to open index")
     }
 
     pub fn stop(self) {

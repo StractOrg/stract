@@ -64,17 +64,17 @@ pub struct DerivedCentrality {
 }
 
 impl DerivedCentrality {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open(path: &Path) -> Self {
         let inner = RocksDbStore::open(path);
         Self { inner }
     }
 
-    pub fn build<P: AsRef<Path>>(
+    pub fn build(
         host_harmonic: &RocksDbStore<NodeID, f64>,
         page_graph: &Webgraph,
-        output: P,
+        output: &Path,
     ) -> Result<Self> {
-        if output.as_ref().exists() {
+        if output.exists() {
             return Err(anyhow::anyhow!("output path already exists"));
         }
 
@@ -88,7 +88,7 @@ impl DerivedCentrality {
 
         let has_outgoing = has_outgoing.finalize();
 
-        let non_normalized = RocksDbStore::open(output.as_ref().join("non_normalized"));
+        let non_normalized = RocksDbStore::open(&output.join("non_normalized"));
 
         let norms: Mutex<BTreeMap<NodeID, f64>> = Mutex::new(BTreeMap::new());
 
@@ -123,7 +123,7 @@ impl DerivedCentrality {
 
         let norms = norms.into_inner().unwrap();
 
-        let db = RocksDbStore::open(output.as_ref());
+        let db = RocksDbStore::open(output);
         for (id, score) in non_normalized.iter() {
             let node = page_graph.id2node(&id).unwrap().into_host().id();
             let norm = norms.get(&node).unwrap();
@@ -133,7 +133,7 @@ impl DerivedCentrality {
         db.flush();
 
         drop(non_normalized);
-        std::fs::remove_dir_all(output.as_ref().join("non_normalized"))?;
+        std::fs::remove_dir_all(output.join("non_normalized"))?;
 
         Ok(Self { inner: db })
     }

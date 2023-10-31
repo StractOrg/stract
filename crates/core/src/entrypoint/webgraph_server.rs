@@ -185,16 +185,16 @@ pub async fn run(config: stract_config::WebgraphServerConfig) -> Result<()> {
     let searcher = DistributedSearcher::new(cluster);
 
     let host_graph = Arc::new(
-        WebgraphBuilder::new(config.host_graph_path)
+        WebgraphBuilder::new(&config.host_graph_path)
             .compression(Compression::Lz4)
             .open(),
     );
     let page_graph = Arc::new(
-        WebgraphBuilder::new(config.page_graph_path)
+        WebgraphBuilder::new(&config.page_graph_path)
             .compression(Compression::Lz4)
             .open(),
     );
-    let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
+    let inbound_similarity = InboundSimilarity::open(&config.inbound_similarity_path)?;
 
     let similar_sites_finder = SimilarSitesFinder::new(
         Arc::clone(&host_graph),

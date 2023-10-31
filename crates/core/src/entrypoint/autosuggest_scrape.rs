@@ -84,8 +84,8 @@ impl FromStr for Gl {
     }
 }
 
-fn save_queries<P: AsRef<Path>>(queries: &HashSet<String>, path: P) -> Result<()> {
-    let mut wtr = Writer::from_path(&path)?;
+fn save_queries(queries: &HashSet<String>, path: &Path) -> Result<()> {
+    let mut wtr = Writer::from_path(path)?;
 
     let mut queries: Vec<_> = queries.iter().collect();
     queries.sort();
@@ -99,11 +99,11 @@ fn save_queries<P: AsRef<Path>>(queries: &HashSet<String>, path: P) -> Result<()
     Ok(())
 }
 
-pub fn run<P: AsRef<Path>>(
+pub fn run(
     queries_to_scrape: usize,
     gl: Gl,
     ms_sleep_between_req: u64,
-    output_dir: P,
+    output_dir: &Path,
 ) -> Result<()> {
     let mut queries = HashSet::new();
     let mut queue = VecDeque::new();
@@ -120,9 +120,7 @@ pub fn run<P: AsRef<Path>>(
         queue.push_back(c.to_string());
     }
 
-    let path = output_dir
-        .as_ref()
-        .join(format!("queries_{:}.csv", gl.to_string().as_str()));
+    let path = output_dir.join(format!("queries_{:}.csv", gl.to_string().as_str()));
 
     let mut queries_since_last_save = 0;
 

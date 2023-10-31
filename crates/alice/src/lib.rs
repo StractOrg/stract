@@ -169,13 +169,13 @@ impl From<AliceAcceleratorConfig> for AcceleratorConfig {
 }
 
 impl Alice {
-    pub fn open<P: AsRef<Path>>(
-        folder: P,
+    pub fn open(
+        folder: &Path,
         accelerator: Option<AcceleratorConfig>,
         encryption_key: &[u8],
     ) -> Result<Alice> {
         let encryption_key = *Key::<Aes256Gcm>::from_slice(encryption_key);
-        let mut model = RawModel::open(folder.as_ref().join("model.safetensors"))?;
+        let mut model = RawModel::open(&folder.join("model.safetensors"))?;
 
         if let Some(accelerator) = accelerator {
             model.load_to_device(
@@ -187,7 +187,7 @@ impl Alice {
         }
 
         let inner = Rc::new(model);
-        let tokenizer = Arc::new(Tokenizer::open(folder.as_ref().join("tokenizer.json"))?);
+        let tokenizer = Arc::new(Tokenizer::open(&folder.join("tokenizer.json"))?);
 
         let end_tokens = vec![tokenizer.tokenizer.token_to_id("<|endoftext|>").unwrap() as i64];
 
@@ -281,7 +281,7 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Tokenizer> {
+    pub fn open(path: &Path) -> Result<Tokenizer> {
         let tokenizer = tokenizers::Tokenizer::from_file(path).map_err(|e| anyhow!(e))?;
 
         Ok(Self { tokenizer })

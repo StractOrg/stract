@@ -136,7 +136,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let state = {
         let mut cross_encoder = None;
 
-        if let Some(path) = config.crossencoder_model_path.as_ref() {
+        if let Some(path) = &config.crossencoder_model_path {
             cross_encoder = Some(CrossEncoderModel::open(path)?);
         }
 

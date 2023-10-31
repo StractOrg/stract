@@ -16,7 +16,7 @@ macro_rules! bench {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let index = Index::open(INDEX_PATH).unwrap();
+    let index = Index::open(INDEX_PATH.as_ref()).unwrap();
     let spell = Spell::for_searcher(index.inverted_index.tv_searcher());
 
     for _ in 0..100 {

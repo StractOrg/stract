@@ -213,7 +213,7 @@ mod tests {
 
     fn test_graph() -> Webgraph {
         let mut writer = WebgraphWriter::new(
-            stdx::gen_temp_path(),
+            &stdx::gen_temp_path(),
             executor::Executor::single_thread(),
             crate::Compression::default(),
         );
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn host_harmonic_centrality() {
         let mut writer = WebgraphWriter::new(
-            stdx::gen_temp_path(),
+            &stdx::gen_temp_path(),
             executor::Executor::single_thread(),
             crate::Compression::default(),
         );
@@ -336,7 +336,7 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         let mut other = WebgraphWriter::new(
-            stdx::gen_temp_path(),
+            &stdx::gen_temp_path(),
             executor::Executor::single_thread(),
             crate::Compression::default(),
         );

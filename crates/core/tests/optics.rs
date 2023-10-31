@@ -390,7 +390,7 @@ fn liked_sites() {
     let mut index = temporary_index().expect("Unable to open index");
 
     let mut writer = WebgraphWriter::new(
-        stdx::gen_temp_path(),
+        &stdx::gen_temp_path(),
         executor::Executor::single_thread(),
         webgraph::Compression::default(),
     );

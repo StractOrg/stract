@@ -10,8 +10,8 @@ const WEBGRAPH_PATH: &str = "data/webgraph";
 const INBOUND_SIMILARITY_PATH: &str = "data/centrality/inbound_similarity";
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let webgraph = Arc::new(WebgraphBuilder::new(WEBGRAPH_PATH).open());
-    let inbound = InboundSimilarity::open(INBOUND_SIMILARITY_PATH).unwrap();
+    let webgraph = Arc::new(WebgraphBuilder::new(WEBGRAPH_PATH.as_ref()).open());
+    let inbound = InboundSimilarity::open(INBOUND_SIMILARITY_PATH.as_ref()).unwrap();
 
     let finder = SimilarSitesFinder::new(
         webgraph,

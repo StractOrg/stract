@@ -38,7 +38,7 @@ pub struct EdgeStoreWriter {
 }
 
 impl EdgeStoreWriter {
-    pub fn open<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
+    pub fn open(path: &Path, compression: Compression, reversed: bool) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -69,7 +69,7 @@ impl EdgeStoreWriter {
         options.set_block_based_table_factory(&block_options);
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
-        let db = rocksdb::DB::open(&options, path.as_ref().join("writer")).unwrap();
+        let db = rocksdb::DB::open(&options, path.join("writer")).unwrap();
 
         Self {
             db,
@@ -163,7 +163,7 @@ struct PrefixDb {
 }
 
 impl PrefixDb {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    fn open(path: &Path) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -261,7 +261,7 @@ pub struct EdgeStore {
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool, compression: Compression) -> Self {
+    pub fn open(path: &Path, reversed: bool, compression: Compression) -> Self {
         let mut options = rocksdb::Options::default();
         options.create_if_missing(true);
 
@@ -295,12 +295,12 @@ impl EdgeStore {
 
         let ranges = match rocksdb::DB::open_cf_with_opts(
             &options,
-            path.as_ref().join("ranges"),
+            path.join("ranges"),
             [("nodes", options.clone()), ("labels", options.clone())],
         ) {
             Ok(db) => db,
             Err(_) => {
-                let mut ranges = rocksdb::DB::open(&options, path.as_ref().join("ranges")).unwrap();
+                let mut ranges = rocksdb::DB::open(&options, path.join("ranges")).unwrap();
 
                 ranges.create_cf("nodes", &options).unwrap();
                 ranges.create_cf("labels", &options).unwrap();
@@ -313,7 +313,7 @@ impl EdgeStore {
             .read(true)
             .create(true)
             .write(true)
-            .open(path.as_ref().join("labels"))
+            .open(path.join("labels"))
             .unwrap();
         let edge_labels = unsafe { Mmap::map(&edge_labels_file).unwrap() };
         let edge_labels_len = edge_labels.len();
@@ -322,7 +322,7 @@ impl EdgeStore {
             .read(true)
             .create(true)
             .write(true)
-            .open(path.as_ref().join("nodes"))
+            .open(path.join("nodes"))
             .unwrap();
         let edge_nodes = unsafe { Mmap::map(&edge_nodes_file).unwrap() };
         let edge_nodes_len = edge_nodes.len();
@@ -330,7 +330,7 @@ impl EdgeStore {
         Self {
             reversed,
             ranges,
-            prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
+            prefixes: PrefixDb::open(&path.join("prefixes")),
             _cache: cache,
             edge_labels,
             edge_labels_len,
@@ -417,8 +417,8 @@ impl EdgeStore {
 
     /// Build a new edge store from a set of edges. The edges must be sorted by
     /// either the from or to node, depending on the value of `reversed`.
-    fn build<P: AsRef<Path>>(
-        path: P,
+    fn build(
+        path: &Path,
         compression: Compression,
         reversed: bool,
         edges: impl Iterator<Item = InnerEdge<String>>,
@@ -601,7 +601,7 @@ mod tests {
     #[test]
     fn test_insert() {
         let kv: EdgeStoreWriter = EdgeStoreWriter::open(
-            stdx::gen_temp_path().join("test-segment"),
+            &stdx::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
         );
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_reversed() {
         let kv: EdgeStoreWriter = EdgeStoreWriter::open(
-            stdx::gen_temp_path().join("test-segment"),
+            &stdx::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
         );

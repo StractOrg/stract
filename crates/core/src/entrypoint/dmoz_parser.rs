@@ -122,7 +122,7 @@ impl Page {
     }
 }
 
-pub fn parse<P: AsRef<Path>>(dmoz_file: P) -> Result<human_website_annotations::Mapper> {
+pub fn parse(dmoz_file: &Path) -> Result<human_website_annotations::Mapper> {
     let file = File::open(dmoz_file)?;
     let reader = BufReader::new(file);
     let reader = BufReader::new(MultiGzDecoder::new(reader));
@@ -155,7 +155,7 @@ pub fn parse<P: AsRef<Path>>(dmoz_file: P) -> Result<human_website_annotations::
     Ok(map.into())
 }
 
-pub fn run<P: AsRef<Path>>(dmoz_file: P, output_path: P) -> Result<()> {
+pub fn run(dmoz_file: &Path, output_path: &Path) -> Result<()> {
     let mapper = parse(dmoz_file)?;
     mapper.save(output_path)?;
 

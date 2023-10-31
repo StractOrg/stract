@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
@@ -28,20 +29,20 @@ pub struct IndexingLocalConfig {
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
     pub batch_size: Option<usize>,
-    pub page_webgraph_path: Option<String>,
-    pub output_path: Option<String>,
+    pub page_webgraph_path: Option<PathBuf>,
+    pub output_path: Option<PathBuf>,
     pub host_centrality_threshold: Option<f64>,
-    pub topics_path: Option<String>,
-    pub host_centrality_store_path: String,
-    pub page_centrality_store_path: Option<String>,
-    pub safety_classifier_path: Option<String>,
+    pub topics_path: Option<PathBuf>,
+    pub host_centrality_store_path: PathBuf,
+    pub page_centrality_store_path: Option<PathBuf>,
+    pub safety_classifier_path: Option<PathBuf>,
     pub minimum_clean_words: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
-    pub host_graph_base_path: String,
-    pub page_graph_base_path: String,
+    pub host_graph_base_path: PathBuf,
+    pub page_graph_base_path: PathBuf,
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
@@ -185,14 +186,14 @@ impl Default for ApiThresholds {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
-    pub queries_csv_path: String,
+    pub queries_csv_path: PathBuf,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
-    pub crossencoder_model_path: Option<String>,
-    pub lambda_model_path: Option<String>,
-    pub qa_model_path: Option<String>,
-    pub bangs_path: String,
-    pub summarizer_path: String,
+    pub crossencoder_model_path: Option<PathBuf>,
+    pub lambda_model_path: Option<PathBuf>,
+    pub qa_model_path: Option<PathBuf>,
+    pub bangs_path: PathBuf,
+    pub summarizer_path: PathBuf,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -240,11 +241,11 @@ pub struct SearchServerConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub shard_id: ShardId,
-    pub index_path: String,
-    pub entity_index_path: Option<String>,
-    pub host_centrality_store_path: Option<String>,
-    pub linear_model_path: Option<String>,
-    pub lambda_model_path: Option<String>,
+    pub index_path: PathBuf,
+    pub entity_index_path: Option<PathBuf>,
+    pub host_centrality_store_path: Option<PathBuf>,
+    pub linear_model_path: Option<PathBuf>,
+    pub lambda_model_path: Option<PathBuf>,
     pub host: SocketAddr,
 
     #[serde(default)]
@@ -340,7 +341,7 @@ pub struct AliceLocalConfig {
     pub gossip_addr: SocketAddr,
     pub host: SocketAddr,
 
-    pub alice_path: String,
+    pub alice_path: PathBuf,
     pub accelerator: Option<AliceAcceleratorConfig>,
     /// base64 encoded
     pub encryption_key: String,
@@ -349,9 +350,9 @@ pub struct AliceLocalConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
-    pub host_graph_path: String,
-    pub page_graph_path: String,
-    pub inbound_similarity_path: String,
+    pub host_graph_path: PathBuf,
+    pub page_graph_path: PathBuf,
+    pub inbound_similarity_path: PathBuf,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
@@ -362,16 +363,16 @@ pub struct WebgraphServerConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WidgetsConfig {
-    pub thesaurus_paths: Vec<String>,
+    pub thesaurus_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
-    pub page_harmonic_path: String,
-    pub host_harmonic_path: String,
-    pub page_graph_path: String,
-    pub host_graph_path: String,
-    pub output_path: String,
+    pub page_harmonic_path: PathBuf,
+    pub host_harmonic_path: PathBuf,
+    pub page_graph_path: PathBuf,
+    pub host_graph_path: PathBuf,
+    pub output_path: PathBuf,
 
     pub num_job_queues: usize,
 

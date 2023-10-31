@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs, marker::PhantomData};
+use std::{fs, marker::PhantomData, path::Path};
 
 use rocksdb::{
     BlockBasedOptions, DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, Options,
@@ -39,12 +39,9 @@ where
     K: Serialize + DeserializeOwned,
     V: Serialize + DeserializeOwned,
 {
-    pub fn open<P>(path: P) -> Self
-    where
-        P: AsRef<std::path::Path>,
-    {
-        if !path.as_ref().exists() {
-            fs::create_dir_all(path.as_ref()).expect("faild to create dir");
+    pub fn open(path: &Path) -> Self {
+        if !path.exists() {
+            fs::create_dir_all(path).expect("faild to create dir");
         }
 
         let mut options = Options::default();

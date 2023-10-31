@@ -18,8 +18,8 @@ use stract_core::ranking::inbound_similarity::InboundSimilarity;
 use webgraph::{Node, WebgraphBuilder};
 
 pub fn main() {
-    let graph = WebgraphBuilder::new("data/webgraph").open();
-    let inbound = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
+    let graph = WebgraphBuilder::new("data/webgraph".as_ref()).open();
+    let inbound = InboundSimilarity::open("data/centrality/inbound_similarity".as_ref()).unwrap();
 
     for host in ["www.homedepot.com"] {
         println!("{host}:");

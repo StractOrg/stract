@@ -22,6 +22,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
+    path::Path,
 };
 
 use crate::Result;
@@ -97,7 +98,7 @@ impl<R: BufRead> Iterator for EntityIterator<R> {
 pub struct EntityIndexer;
 
 impl EntityIndexer {
-    pub fn run(wikipedia_dump_path: String, output_path: String) -> Result<()> {
+    pub fn run(wikipedia_dump_path: &Path, output_path: &Path) -> Result<()> {
         let reader = BufReader::new(File::open(wikipedia_dump_path)?);
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;

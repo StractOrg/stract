@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chrono::Utc;
 use rayon::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
 
 use itertools::Itertools;
@@ -66,7 +66,7 @@ impl From<JobConfig> for stract_config::WarcSource {
 pub struct Job {
     pub source_config: JobConfig,
     pub warc_paths: Vec<String>,
-    pub base_path: String,
+    pub base_path: PathBuf,
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,
 }
@@ -81,18 +81,18 @@ pub struct IndexingWorker {
 
 impl IndexingWorker {
     pub fn new(
-        host_centrality_store_path: String,
-        page_centrality_store_path: Option<String>,
-        webgraph_path: Option<String>,
-        topics_path: Option<String>,
-        safety_classifier_path: Option<String>,
+        host_centrality_store_path: &Path,
+        page_centrality_store_path: Option<&Path>,
+        webgraph_path: Option<&Path>,
+        topics_path: Option<&Path>,
+        safety_classifier_path: Option<&Path>,
     ) -> Self {
         Self {
             host_centrality_store: RocksDbStore::open(
-                Path::new(&host_centrality_store_path).join("harmonic"),
+                &Path::new(&host_centrality_store_path).join("harmonic"),
             ),
             page_centrality_store: page_centrality_store_path
-                .map(|p| RocksDbStore::open(Path::new(&p).join("derived_harmonic"))),
+                .map(|p| RocksDbStore::open(&p.join("derived_harmonic"))),
             webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
             safety_classifier: safety_classifier_path
@@ -110,7 +110,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     info!("processing {}", name);
 
-    let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
+    let mut index = Index::open(&Path::new(&job.base_path).join(name)).unwrap();
 
     let source: stract_config::WarcSource = job.source_config.clone().into();
 
@@ -286,10 +286,10 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct IndexPointer(String);
+pub struct IndexPointer(PathBuf);
 
-impl From<String> for IndexPointer {
-    fn from(path: String) -> Self {
+impl From<PathBuf> for IndexPointer {
+    fn from(path: PathBuf) -> Self {
         IndexPointer(path)
     }
 }
@@ -344,11 +344,11 @@ impl Indexer {
         let job_config: JobConfig = config.warc_source.clone().into();
 
         let worker = IndexingWorker::new(
-            config.host_centrality_store_path.clone(),
-            config.page_centrality_store_path.clone(),
-            config.page_webgraph_path.clone(),
-            config.topics_path.clone(),
-            config.safety_classifier_path.clone(),
+            &config.host_centrality_store_path,
+            config.page_centrality_store_path.as_deref(),
+            config.page_webgraph_path.as_deref(),
+            config.topics_path.as_deref(),
+            config.safety_classifier_path.as_deref(),
         );
 
         let indexes = warc_paths
@@ -367,7 +367,7 @@ impl Indexer {
                 base_path: config
                     .output_path
                     .clone()
-                    .unwrap_or_else(|| "data/index".to_string()),
+                    .unwrap_or_else(|| PathBuf::from("data/index")),
                 minimum_clean_words: config.minimum_clean_words,
             })
             .map(|job| {
@@ -399,11 +399,11 @@ impl Indexer {
 
             threads.push(thread::spawn(move || {
                 let mut it = indexes.into_iter();
-                let mut index = Index::open(it.next().unwrap().0).unwrap();
+                let mut index = Index::open(it.next().unwrap().0.as_ref()).unwrap();
 
                 for other in it {
                     let other_path = other.0;
-                    let other = Index::open(&other_path).unwrap();
+                    let other = Index::open(other_path.as_ref()).unwrap();
                     index = index.merge(other);
 
                     std::fs::remove_dir_all(other_path).unwrap();

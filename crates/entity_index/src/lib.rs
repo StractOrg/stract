@@ -172,13 +172,13 @@ pub struct EntityMatch {
 }
 
 impl EntityIndex {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            fs::create_dir_all(path.as_ref())?;
+    pub fn open(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            fs::create_dir_all(path)?;
         }
 
         let schema = schema();
-        let tv_path = path.as_ref().join("inverted_index");
+        let tv_path = path.join("inverted_index");
         let tantivy_index = if tv_path.exists() {
             tantivy::Index::open_in_dir(&tv_path)?
         } else {
@@ -186,9 +186,8 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
-        let attribute_occurrences = Box::new(RocksDbStore::open(
-            path.as_ref().join("attribute_occurrences"),
-        ));
+        let attribute_occurrences =
+            Box::new(RocksDbStore::open(&path.join("attribute_occurrences")));
 
         let stopwords: HashSet<String> = include_str!("../../core/stopwords/English.txt")
             .lines()
@@ -201,7 +200,7 @@ impl EntityIndex {
             Normal::with_stopwords(stopwords.clone().into_iter().collect()),
         );
 
-        let image_store = EntityImageStore::open(path.as_ref().join("images"));
+        let image_store = EntityImageStore::open(&path.join("images"));
 
         let writer = tantivy_index.writer(10_000_000_000)?;
         let reader = tantivy_index.reader()?;
@@ -495,7 +494,7 @@ mod tests {
 
     #[test]
     fn stopwords_title_ignored() {
-        let mut index = EntityIndex::open(stdx::gen_temp_path()).unwrap();
+        let mut index = EntityIndex::open(&stdx::gen_temp_path()).unwrap();
 
         index.insert(Entity {
             title: "the ashes".to_string(),

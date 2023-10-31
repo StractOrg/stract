@@ -257,7 +257,7 @@ pub struct LambdaMART {
 }
 
 impl LambdaMART {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let s = std::fs::read_to_string(path)?;
         let tree = Tree::parse(&s)?;
         Ok(Self { tree })

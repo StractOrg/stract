@@ -88,11 +88,11 @@ struct BaseImageStore {
 
 impl BaseImageStore {
     #[cfg(test)]
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    fn open(path: &Path) -> Self {
         Self::open_with_filters(path, Vec::new())
     }
 
-    fn open_with_filters<P: AsRef<Path>>(path: P, filters: Vec<Box<dyn ImageFilter>>) -> Self {
+    fn open_with_filters(path: &Path, filters: Vec<Box<dyn ImageFilter>>) -> Self {
         let store = Box::new(RocksDbStore::open(path));
 
         Self { store, filters }
@@ -145,7 +145,7 @@ pub struct EntityImageStore {
 }
 
 impl EntityImageStore {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open(path: &Path) -> Self {
         let store = BaseImageStore::open_with_filters(
             path,
             vec![Box::new(ResizeFilter {
@@ -238,7 +238,7 @@ mod tests {
             ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
         );
         let key = "test".to_string();
-        let mut store = BaseImageStore::open(stdx::gen_temp_path());
+        let mut store = BaseImageStore::open(&stdx::gen_temp_path());
 
         assert_eq!(store.get(&key), None);
         store.insert(key.clone(), image.clone());

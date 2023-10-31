@@ -132,16 +132,16 @@ pub struct RegionCount {
 }
 
 impl RegionCount {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let map: HashMap<Region, u64> = if !path.as_ref().exists() {
-            if let Some(parent) = path.as_ref().parent() {
+    pub fn open(path: &Path) -> Self {
+        let map: HashMap<Region, u64> = if !path.exists() {
+            if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent).unwrap();
             }
-            File::create(path.as_ref()).unwrap();
+            File::create(path).unwrap();
 
             HashMap::new()
         } else {
-            let json = std::fs::read_to_string(path.as_ref()).unwrap_or_default();
+            let json = std::fs::read_to_string(path).unwrap_or_default();
             serde_json::from_str(&json).unwrap_or_else(|_| HashMap::new())
         };
 
@@ -161,7 +161,7 @@ impl RegionCount {
             total_counts: map.values().sum(),
             map,
             fast_count,
-            path: path.as_ref().to_str().unwrap().to_string(),
+            path: path.to_str().unwrap().to_string(),
         }
     }
 
@@ -221,13 +221,13 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut a = RegionCount::open(gen_temp_path().join("region_count.json"));
+        let mut a = RegionCount::open(&gen_temp_path().join("region_count.json"));
 
         a.increment(&Region::Denmark);
         a.increment(&Region::Denmark);
         a.increment(&Region::US);
 
-        let mut b = RegionCount::open(gen_temp_path().join("region_count.json"));
+        let mut b = RegionCount::open(&gen_temp_path().join("region_count.json"));
 
         b.increment(&Region::US);
         b.increment(&Region::Germany);

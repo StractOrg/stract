@@ -62,7 +62,7 @@ pub struct Job {
     pub warc_paths: Vec<String>,
 }
 
-pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
+pub fn open_host_graph_writer(path: &Path) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
         executor::Executor::single_thread(),
@@ -70,7 +70,7 @@ pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWrit
     )
 }
 
-pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
+pub fn open_page_graph_writer(path: &Path) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
         executor::Executor::single_thread(),
@@ -173,8 +173,8 @@ impl Webgraph {
             let page_path = page_path.join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
-                host_graph: open_host_graph_writer(host_path),
-                page_graph: open_page_graph_writer(page_path),
+                host_graph: open_host_graph_writer(&host_path),
+                page_graph: open_page_graph_writer(&page_path),
             };
 
             let jobs = jobs.clone();

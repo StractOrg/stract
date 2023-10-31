@@ -92,7 +92,7 @@ pub struct Bangs {
 }
 
 impl Bangs {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+    pub fn from_path(path: &Path) -> Self {
         let json = fs::read_to_string(path).unwrap();
 
         Self::from_json(json.as_str())
