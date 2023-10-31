@@ -30,8 +30,8 @@ pub enum FeedKind {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct Feed {
-    url: Url,
-    kind: FeedKind,
+    pub url: Url,
+    pub kind: FeedKind,
 }
 
 pub struct ParsedFeed {

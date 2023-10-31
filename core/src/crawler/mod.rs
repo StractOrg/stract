@@ -23,6 +23,7 @@ use url::Url;
 use crate::{config::CrawlerConfig, warc, webpage::url_ext::UrlExt};
 
 use self::{warc_writer::WarcWriter, worker::WorkerThread};
+pub use worker::JobExecutor;
 
 pub mod coordinator;
 mod robots_txt;
@@ -175,7 +176,7 @@ pub struct DomainCrawled {
     pub budget_used: f64,
 }
 
-struct RetrieableUrl {
+pub struct RetrieableUrl {
     url: Url,
     retries: u8,
 }
@@ -186,10 +187,10 @@ impl From<Url> for RetrieableUrl {
     }
 }
 
-struct WorkerJob {
+pub struct WorkerJob {
     pub domain: Domain,
     pub urls: VecDeque<RetrieableUrl>,
-    pub wanrdering_urls: u64,
+    pub wandering_urls: u64,
 }
 
 impl From<Job> for WorkerJob {
@@ -197,18 +198,18 @@ impl From<Job> for WorkerJob {
         Self {
             domain: value.domain,
             urls: value.urls.into_iter().map(RetrieableUrl::from).collect(),
-            wanrdering_urls: value.wandering_urls,
+            wandering_urls: value.wandering_urls,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CrawlDatum {
-    url: Url,
-    status_code: u16,
-    payload_type: warc::PayloadType,
-    body: String,
-    fetch_time_ms: u64,
+    pub url: Url,
+    pub status_code: u16,
+    pub payload_type: warc::PayloadType,
+    pub body: String,
+    pub fetch_time_ms: u64,
 }
 
 pub struct Crawler {
@@ -219,7 +220,6 @@ pub struct Crawler {
 impl Crawler {
     pub async fn new(config: CrawlerConfig) -> Result<Self> {
         let writer = Arc::new(WarcWriter::new(config.s3.clone()));
-        let timeout = Duration::from_secs(config.timeout_seconds);
         let mut handles = Vec::new();
         let mut router_hosts = Vec::new();
 
@@ -228,12 +228,8 @@ impl Crawler {
         }
 
         for _ in 0..config.num_worker_threads {
-            let worker = WorkerThread::new(
-                Arc::clone(&writer),
-                config.clone(),
-                timeout,
-                router_hosts.clone(),
-            )?;
+            let worker =
+                WorkerThread::new(Arc::clone(&writer), config.clone(), router_hosts.clone())?;
 
             handles.push(tokio::spawn(async move {
                 worker.run().await;
@@ -250,4 +246,33 @@ impl Crawler {
 
         self.writer.finish().await.unwrap();
     }
+}
+
+#[async_trait::async_trait]
+pub trait DatumStream: Send + Sync {
+    async fn write(&self, crawl_datum: CrawlDatum) -> Result<()>;
+    async fn finish(&self) -> Result<()>;
+}
+
+pub fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> {
+    let timeout = Duration::from_secs(config.timeout_seconds);
+
+    let mut headers = reqwest::header::HeaderMap::default();
+    headers.insert(
+        reqwest::header::ACCEPT,
+        reqwest::header::HeaderValue::from_static("text/html"),
+    );
+    headers.insert(
+        reqwest::header::ACCEPT_LANGUAGE,
+        reqwest::header::HeaderValue::from_static("en-US,en;q=0.9,*;q=0.8"),
+    );
+
+    Ok(reqwest::Client::builder()
+        .timeout(timeout)
+        .connect_timeout(timeout)
+        .http2_keep_alive_interval(None)
+        .default_headers(headers)
+        .redirect(reqwest::redirect::Policy::limited(config.max_redirects))
+        .user_agent(&config.user_agent.full)
+        .build()?)
 }

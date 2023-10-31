@@ -40,8 +40,8 @@ use crate::{
 };
 
 use super::{
-    robots_txt::RobotsTxtManager, site_graph::SiteGraph, CrawlDatum, Domain, Error, Result,
-    RetrieableUrl, Site, UrlResponse, WarcWriter, WorkerJob,
+    reqwest_client, robots_txt::RobotsTxtManager, site_graph::SiteGraph, CrawlDatum, DatumStream,
+    Domain, Error, Result, RetrieableUrl, Site, UrlResponse, WarcWriter, WorkerJob,
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
@@ -63,27 +63,9 @@ impl WorkerThread {
     pub fn new(
         writer: Arc<WarcWriter>,
         config: CrawlerConfig,
-        timeout: Duration,
         router_hosts: Vec<SocketAddr>,
     ) -> Result<Self> {
-        let mut headers = reqwest::header::HeaderMap::default();
-        headers.insert(
-            reqwest::header::ACCEPT,
-            reqwest::header::HeaderValue::from_static("text/html"),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT_LANGUAGE,
-            reqwest::header::HeaderValue::from_static("en-US,en;q=0.9,*;q=0.8"),
-        );
-
-        let client = reqwest::Client::builder()
-            .timeout(timeout)
-            .connect_timeout(timeout)
-            .http2_keep_alive_interval(None)
-            .default_headers(headers)
-            .redirect(reqwest::redirect::Policy::limited(config.max_redirects))
-            .user_agent(&config.user_agent.full)
-            .build()?;
+        let client = reqwest_client(&config)?;
 
         Ok(Self {
             writer,
@@ -135,8 +117,8 @@ impl WorkerThread {
     }
 }
 
-struct JobExecutor {
-    writer: Arc<WarcWriter>,
+pub struct JobExecutor<S: DatumStream> {
+    writer: Arc<S>,
     client: reqwest::Client,
     politeness_factor: f32,
     robotstxt: RobotsTxtManager,
@@ -148,12 +130,12 @@ struct JobExecutor {
     job: WorkerJob,
 }
 
-impl JobExecutor {
-    fn new(
+impl<S: DatumStream> JobExecutor<S> {
+    pub fn new(
         job: WorkerJob,
         client: reqwest::Client,
         config: Arc<CrawlerConfig>,
-        writer: Arc<WarcWriter>,
+        writer: Arc<S>,
     ) -> Self {
         Self {
             writer,
@@ -171,11 +153,15 @@ impl JobExecutor {
             job,
         }
     }
-    async fn run(mut self) {
+
+    pub async fn run(mut self) {
         tracing::info!("Processing job: {:?}", self.job.domain);
 
         self.scheduled_urls().await;
-        self.wander().await;
+
+        if self.job.wandering_urls > 0 {
+            self.wander().await;
+        }
     }
 
     async fn scheduled_urls(&mut self) {
@@ -207,7 +193,7 @@ impl JobExecutor {
 
         let urls = urls
             .into_iter()
-            .take(self.job.wanrdering_urls as usize)
+            .take(self.job.wandering_urls as usize)
             .map(|(url, _)| url)
             .map(RetrieableUrl::from)
             .collect();

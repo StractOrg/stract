@@ -17,6 +17,7 @@
 pub mod defaults;
 
 use super::Result;
+use crate::feed::scheduler::SplitId;
 use crate::searcher::ShardId;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -379,4 +380,59 @@ pub struct CrawlPlannerConfig {
     pub crawl_budget: usize,
     pub top_host_fraction: f64,
     pub wander_fraction: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LiveIndexConfig {
+    pub split_path: String,
+    pub downloaded_db_path: String,
+
+    // crawler
+    pub user_agent: UserAgent,
+    #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
+    pub robots_txt_cache_sec: u64,
+    #[serde(default = "defaults::Crawler::politeness_factor")]
+    pub politeness_factor: f32,
+    #[serde(default = "defaults::Crawler::min_crawl_delay_ms")]
+    pub min_crawl_delay_ms: u64,
+    #[serde(default = "defaults::Crawler::max_crawl_delay_ms")]
+    pub max_crawl_delay_ms: u64,
+    #[serde(default = "defaults::Crawler::max_politeness_factor")]
+    pub max_politeness_factor: f32,
+    #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
+    pub max_url_slowdown_retry: u8,
+    #[serde(default = "defaults::Crawler::max_redirects")]
+    pub max_redirects: usize,
+    pub timeout_seconds: u64,
+
+    // indexer
+    pub host_centrality_store_path: String,
+    pub page_webgraph_path: Option<String>,
+    pub page_centrality_store_path: Option<String>,
+    pub safety_classifier_path: Option<String>,
+    pub host_centrality_threshold: Option<f64>,
+    pub minimum_clean_words: Option<usize>,
+
+    // search
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
+    pub split_id: SplitId,
+    pub index_path: String,
+    pub linear_model_path: Option<String>,
+    pub lambda_model_path: Option<String>,
+    pub host: SocketAddr,
+    #[serde(default)]
+    pub collector: CollectorConfig,
+    #[serde(default)]
+    pub snippet: SnippetConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LiveIndexSchedulerConfig {
+    pub schedule_path: String,
+    pub feed_index_path: String,
+    pub host_centrality_store_path: String,
+    pub host_graph_path: String,
+    pub num_splits: u64,
 }

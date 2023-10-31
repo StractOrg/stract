@@ -59,6 +59,7 @@ pub enum TextField {
     MicroformatTags,
     /// can either be NSFW or SFW (see safety classifier)
     SafetyClassification,
+    InsertionTimestamp,
 }
 
 impl From<TextField> for usize {
@@ -109,6 +110,7 @@ impl TextField {
             TextField::TitleTrigrams => Tokenizer::Trigram(TrigramTokenizer::default()),
             TextField::MicroformatTags => Tokenizer::default(),
             TextField::SafetyClassification => Tokenizer::Identity(Identity {}),
+            TextField::InsertionTimestamp => Tokenizer::Identity(Identity {}),
         }
     }
 
@@ -151,6 +153,7 @@ impl TextField {
             TextField::TitleTrigrams => false,
             TextField::MicroformatTags => true,
             TextField::SafetyClassification => false,
+            TextField::InsertionTimestamp => false,
         }
     }
 
@@ -185,6 +188,7 @@ impl TextField {
             TextField::TitleTrigrams => "title_trigrams",
             TextField::MicroformatTags => "microformat_tags",
             TextField::SafetyClassification => "safety_classification",
+            TextField::InsertionTimestamp => "insertion_timestamp",
         }
     }
 }
@@ -274,7 +278,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 60] = [
+pub static ALL_FIELDS: [Field; 61] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -304,6 +308,7 @@ pub static ALL_FIELDS: [Field; 60] = [
     Field::Text(TextField::TitleTrigrams),
     Field::Text(TextField::MicroformatTags),
     Field::Text(TextField::SafetyClassification),
+    Field::Text(TextField::InsertionTimestamp),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -439,6 +444,9 @@ impl Field {
             }
             Field::Text(TextField::SafetyClassification) => {
                 IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextField::InsertionTimestamp) => {
+                IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
             }
             Field::Fast(FastField::IsHomepage) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
@@ -619,6 +627,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
+            IndexingOption::DateTime(options) => builder.add_date_field(field.name(), options),
         };
     }
 
@@ -628,6 +637,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
 pub enum IndexingOption {
     Text(tantivy::schema::TextOptions),
     Integer(tantivy::schema::NumericOptions),
+    DateTime(tantivy::schema::DateOptions),
 }
 
 pub enum DataType {

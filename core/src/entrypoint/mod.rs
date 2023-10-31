@@ -36,6 +36,7 @@ pub use entity::EntityIndexer;
 pub use indexer::Indexer;
 use tracing::{debug, log::error};
 pub use webgraph::Webgraph;
+pub mod live_index;
 
 use crate::{config, warc::WarcFile};
 

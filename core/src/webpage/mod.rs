@@ -28,6 +28,7 @@ use kuchiki::{iter::NodeEdge, traits::TendrilSink, NodeRef};
 use regex::Regex;
 use std::{collections::HashMap, panic, str::FromStr};
 use tantivy::{
+    time::OffsetDateTime,
     tokenizer::{PreTokenizedString, Tokenizer},
     TantivyDocument,
 };
@@ -1195,6 +1196,12 @@ impl Html {
                 }
                 Field::Text(TextField::MicroformatTags) => {
                     doc.add_pre_tokenized_text(tantivy_field, microformats.clone());
+                }
+                Field::Text(TextField::InsertionTimestamp) => {
+                    doc.add_date(
+                        tantivy_field,
+                        tantivy::DateTime::from_utc(OffsetDateTime::now_utc()),
+                    );
                 }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, (self.is_homepage()).into());

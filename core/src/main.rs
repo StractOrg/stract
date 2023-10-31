@@ -107,6 +107,17 @@ enum Commands {
         #[clap(long)]
         alice: bool,
     },
+
+    LiveIndex {
+        #[clap(subcommand)]
+        options: LiveIndex,
+    },
+}
+
+#[derive(Subcommand)]
+enum LiveIndex {
+    Schedule { config_path: String },
+    Serve { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -342,6 +353,20 @@ fn main() -> Result<()> {
             } => safety_classifier::train(dataset_path, output_path)?,
             SafetyClassifierOptions::Predict { model_path, text } => {
                 safety_classifier::predict(model_path, &text)?
+            }
+        },
+        Commands::LiveIndex { options } => match options {
+            LiveIndex::Schedule { config_path } => {
+                let config = load_toml_config(config_path);
+                entrypoint::live_index::schedule(config)?;
+            }
+            LiveIndex::Serve { config_path } => {
+                let config = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::live_index::serve(config))?
             }
         },
     }

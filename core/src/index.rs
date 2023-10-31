@@ -17,7 +17,8 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 use tantivy::schema::Schema;
@@ -29,7 +30,6 @@ use crate::directory::{self, DirEntry};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
-use crate::subdomain_count::SubdomainCounter;
 use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::Webpage;
@@ -37,12 +37,10 @@ use crate::Result;
 
 const INVERTED_INDEX_SUBFOLDER_NAME: &str = "inverted_index";
 const REGION_COUNT_FILE_NAME: &str = "region_count.json";
-const SUBDOMAIN_COUNT_SUBFOLDER_NAME: &str = "subdomain_count";
 
 pub struct Index {
     pub inverted_index: InvertedIndex,
-    pub region_count: RegionCount,
-    pub subdomain_counter: SubdomainCounter,
+    pub region_count: Mutex<RegionCount>,
     pub path: String,
 }
 
@@ -59,10 +57,7 @@ impl Index {
 
         Ok(Self {
             inverted_index,
-            region_count,
-            subdomain_counter: SubdomainCounter::open(
-                path.as_ref().join(SUBDOMAIN_COUNT_SUBFOLDER_NAME),
-            ),
+            region_count: Mutex::new(region_count),
             path: path.as_ref().to_str().unwrap().to_string(),
         })
     }
@@ -71,6 +66,10 @@ impl Index {
         self.inverted_index.optimize_for_search()?;
 
         Ok(())
+    }
+
+    pub fn set_auto_merge_policy(&mut self) {
+        self.inverted_index.set_auto_merge_policy();
     }
 
     pub fn tokenizers(&self) -> &TokenizerManager {
@@ -83,20 +82,26 @@ impl Index {
         Self::open(path)
     }
 
-    pub fn insert(&mut self, webpage: Webpage) -> Result<()> {
-        self.subdomain_counter.increment(webpage.html.url().clone());
-
+    pub fn insert(&self, webpage: Webpage) -> Result<()> {
         if let Ok(region) = Region::guess_from(&webpage) {
-            self.region_count.increment(&region);
+            let mut reg = self.region_count.lock().unwrap_or_else(|e| e.into_inner());
+            reg.increment(&region);
         }
 
         self.inverted_index.insert(webpage)
     }
 
+    pub fn delete_all_before(&self, timestamp: SystemTime) -> Result<()> {
+        self.inverted_index
+            .delete_all_before(tantivy::DateTime::from_utc(timestamp.into()))
+    }
+
     pub fn commit(&mut self) -> Result<()> {
         self.inverted_index.commit()?;
-        self.region_count.commit();
-        self.subdomain_counter.commit();
+
+        let mut reg = self.region_count.lock().unwrap_or_else(|e| e.into_inner());
+        reg.commit();
+
         Ok(())
     }
 
@@ -128,13 +133,19 @@ impl Index {
         self.inverted_index.retrieve_websites(websites, query)
     }
 
-    pub fn merge(mut self, other: Self) -> Self {
+    pub fn merge(self, other: Self) -> Self {
         self.inverted_index.merge(other.inverted_index);
 
-        self.region_count.merge(other.region_count);
+        let mut self_region_count = self
+            .region_count
+            .into_inner()
+            .unwrap_or_else(|e| e.into_inner());
+        let other_region_count = other
+            .region_count
+            .into_inner()
+            .unwrap_or_else(|e| e.into_inner());
 
-        self.subdomain_counter.merge(other.subdomain_counter);
-        drop(self.subdomain_counter);
+        self_region_count.merge(other_region_count);
 
         Self::open(&self.path).expect("failed to open index")
     }

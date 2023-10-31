@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::path::Path;
+
+use anyhow::Result;
 use hashbrown::{HashMap, HashSet};
 use url::Url;
 
@@ -28,20 +31,70 @@ use crate::{
 
 use super::{index::FeedIndex, Feed};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct Domain(String);
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DomainFeeds {
-    domain: Domain,
-    feeds: Vec<Feed>,
+    pub domain: Domain,
+    pub feeds: Vec<Feed>,
 }
 
+impl From<&Url> for Domain {
+    fn from(url: &Url) -> Self {
+        Domain(url.icann_domain().unwrap_or_default().to_string())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SplitId(uuid::Uuid);
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Split {
-    feeds: Vec<DomainFeeds>,
+    pub id: SplitId,
+    pub feeds: Vec<DomainFeeds>,
+}
+
+impl Split {
+    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path.as_ref())?;
+        let writer = std::io::BufWriter::new(file);
+
+        serde_json::to_writer_pretty(writer, &self)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize split: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let file = std::fs::OpenOptions::new().read(true).open(path.as_ref())?;
+        let reader = std::io::BufReader::new(file);
+
+        serde_json::from_reader(reader)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize split: {}", e))
+    }
 }
 
 pub struct Schedule {
     splits: Vec<Split>,
+}
+impl Schedule {
+    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
+        if !path.as_ref().exists() {
+            std::fs::create_dir_all(&path)?;
+        }
+
+        for split in self.splits {
+            let name = split.id.0.to_string() + ".json";
+            split.save(path.as_ref().join(name))?;
+        }
+
+        Ok(())
+    }
 }
 
 pub fn schedule(
@@ -63,7 +116,7 @@ pub fn schedule(
         }
 
         let url = url.unwrap();
-        let domain = Domain(url.icann_domain().unwrap().to_string());
+        let domain = Domain::from(&url);
 
         all_feeds
             .entry(domain)
@@ -74,7 +127,10 @@ pub fn schedule(
     let mut splits = Vec::new();
 
     for _ in 0..num_splits {
-        splits.push(Split { feeds: Vec::new() });
+        splits.push(Split {
+            id: SplitId(uuid::Uuid::new_v4()),
+            feeds: Vec::new(),
+        });
     }
 
     for (i, (domain, feeds)) in all_feeds.into_iter().enumerate() {

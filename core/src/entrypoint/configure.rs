@@ -19,6 +19,7 @@ use tokio::io;
 use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
+use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
 use std::fs::{self};
@@ -142,8 +143,10 @@ fn create_inverted_index() -> Result<()> {
         }),
         warc_paths: vec![warc_path.to_str().unwrap().to_string()],
         base_path: out_path_tmp.to_str().unwrap().to_string(),
-        host_centrality_threshold: None,
-        minimum_clean_words: None,
+        settings: JobSettings {
+            host_centrality_threshold: None,
+            minimum_clean_words: None,
+        },
     };
 
     let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");

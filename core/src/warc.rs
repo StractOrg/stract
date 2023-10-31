@@ -299,7 +299,7 @@ impl Response {
 #[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
 pub struct Metadata {
     // fetchTimeMs
-    pub fetch_time_ms: usize,
+    pub fetch_time_ms: u64,
 }
 
 impl Metadata {
@@ -313,7 +313,7 @@ impl Metadata {
                 line.pop(); // remove colon
                 let key = line;
                 if key == "fetchTimeMs" {
-                    let fetch_time_ms = value.parse::<usize>()?;
+                    let fetch_time_ms = value.parse::<u64>()?;
                     return Ok(Self { fetch_time_ms });
                 }
             }

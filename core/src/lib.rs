@@ -57,6 +57,7 @@ mod intmap;
 mod kahan_sum;
 mod kv;
 mod leaky_queue;
+mod live_index;
 #[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;
@@ -74,7 +75,6 @@ mod simhash;
 pub mod similar_sites;
 mod snippet;
 pub mod spell;
-mod subdomain_count;
 #[cfg(feature = "libtorch")]
 pub mod summarizer;
 mod tokenizer;

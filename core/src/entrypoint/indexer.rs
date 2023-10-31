@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use anyhow::anyhow;
 use chrono::Utc;
 use rayon::prelude::*;
 use std::path::Path;
@@ -69,6 +70,11 @@ pub struct Job {
     pub source_config: JobConfig,
     pub warc_paths: Vec<String>,
     pub base_path: String,
+    pub settings: JobSettings,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct JobSettings {
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,
 }
@@ -76,16 +82,17 @@ pub struct Job {
 pub struct IndexingWorker {
     host_centrality_store: RocksDbStore<NodeID, f64>,
     page_centrality_store: Option<RocksDbStore<NodeID, f64>>,
-    webgraph: Option<Webgraph>,
+    page_webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
     safety_classifier: Option<safety_classifier::Model>,
+    job_settings: Option<JobSettings>,
 }
 
 impl IndexingWorker {
     pub fn new(
         host_centrality_store_path: String,
         page_centrality_store_path: Option<String>,
-        webgraph_path: Option<String>,
+        page_webgraph_path: Option<String>,
         topics_path: Option<String>,
         safety_classifier_path: Option<String>,
     ) -> Self {
@@ -95,11 +102,130 @@ impl IndexingWorker {
             ),
             page_centrality_store: page_centrality_store_path
                 .map(|p| RocksDbStore::open(Path::new(&p).join("derived_harmonic"))),
-            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
+            page_webgraph: page_webgraph_path
+                .map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
             safety_classifier: safety_classifier_path
                 .map(|path| safety_classifier::Model::open(path).unwrap()),
+            job_settings: None,
         }
+    }
+
+    pub fn set_job_settings(&mut self, job_settings: JobSettings) {
+        self.job_settings = Some(job_settings);
+    }
+
+    pub fn prepare_webpage(&self, body: &str, url: &str, fetch_time_ms: u64) -> Result<Webpage> {
+        let mut html = match Html::parse_without_text(body, url) {
+            Ok(html) => html,
+            Err(err) => {
+                debug!("error parsing html: {:?}", err);
+                return Err(anyhow!("error parsing html: {:?}", err));
+            }
+        };
+
+        if html.is_no_index() {
+            return Err(anyhow!("noindex"));
+        }
+
+        let title = html.title().unwrap_or_default();
+        if title.is_empty() || title.chars().all(|c| c.is_whitespace()) {
+            return Err(anyhow!("empty title"));
+        }
+
+        let node = Node::from(html.url());
+        let host_node_id = node.clone().into_host().id();
+
+        let mut host_centrality = self
+            .host_centrality_store
+            .get(&host_node_id)
+            .unwrap_or_default();
+
+        if let Some(host_centrality_threshold) =
+            self.job_settings.and_then(|s| s.host_centrality_threshold)
+        {
+            if host_centrality < host_centrality_threshold {
+                debug!("skipping due to low host_centrality value");
+                return Err(anyhow!("low host_centrality value"));
+            }
+        }
+
+        html.parse_text();
+
+        if html.empty_all_text() {
+            return Err(anyhow!("empty all text"));
+        }
+
+        if let Some(minimum_clean_words) = self.job_settings.and_then(|s| s.minimum_clean_words) {
+            match html.clean_text() {
+                Some(clean_text) => {
+                    if clean_text.split_whitespace().count() < minimum_clean_words {
+                        return Err(anyhow!("too few clean words"));
+                    }
+                }
+                None => return Err(anyhow!("no clean text")),
+            }
+        }
+
+        let backlink_labels: Vec<String> = self
+            .page_webgraph
+            .as_ref()
+            .map(|webgraph| {
+                webgraph
+                    .raw_ingoing_edges_with_labels(&Node::from(html.url()).id())
+                    .into_iter()
+                    .map(|edge| edge.label)
+                    .filter(|label| !label.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let mut page_centrality = 0.0;
+
+        if let Some(store) = self.page_centrality_store.as_ref() {
+            let node_id = node.id();
+
+            page_centrality = store.get(&node_id).unwrap_or_default();
+        }
+
+        if !page_centrality.is_finite() {
+            page_centrality = 0.0;
+        }
+
+        if !host_centrality.is_finite() {
+            host_centrality = 0.0;
+        }
+
+        let mut dmoz_description = None;
+
+        if let Some(mapper) = self.topics.as_ref() {
+            if let Some(info) = mapper.get(&html.url().host_str().unwrap_or_default().to_string()) {
+                dmoz_description = Some(info.description.clone())
+            }
+        }
+
+        let mut webpage = Webpage {
+            html,
+            backlink_labels,
+            page_centrality,
+            host_centrality,
+            fetch_time_ms,
+            pre_computed_score: 0.0,
+            node_id: Some(host_node_id),
+            dmoz_description,
+            safety_classification: None,
+        };
+
+        if let Some(model) = self.safety_classifier.as_ref() {
+            webpage.safety_classification = Some(model.predict(&webpage).label);
+        }
+
+        let mut signal_aggregator = SignalAggregator::new(None);
+        signal_aggregator.set_current_timestamp(Utc::now().timestamp().max(0) as usize);
+
+        webpage.pre_computed_score = signal_aggregator.precompute_score(&webpage);
+
+        Ok(webpage)
     }
 }
 
@@ -119,8 +245,6 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     let warc_files = download_all_warc_files(&job.warc_paths, &source);
     pin!(warc_files);
 
-    let current_timestamp = Utc::now().timestamp().max(0) as usize;
-
     for file in warc_files.by_ref() {
         for record in
             file.records()
@@ -130,138 +254,30 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                     None => false,
                 })
         {
-            let mut html =
-                match Html::parse_without_text(&record.response.body, &record.request.url) {
-                    Ok(html) => html,
-                    Err(err) => {
-                        debug!("error parsing html: {:?}", err);
-                        continue;
-                    }
-                };
-
-            if html.is_no_index() {
-                continue;
-            }
-
-            let title = html.title().unwrap_or_default();
-            if title.is_empty() || title.chars().all(|c| c.is_whitespace()) {
-                continue;
-            }
-
-            let node = Node::from(html.url());
-            let host_node_id = node.clone().into_host().id();
-
-            let mut host_centrality = worker
-                .host_centrality_store
-                .get(&host_node_id)
-                .unwrap_or_default();
-
-            if let Some(host_centrality_threshold) = job.host_centrality_threshold {
-                if host_centrality < host_centrality_threshold {
-                    debug!("skipping due to low host_centrality value");
-                    continue;
+            if let Ok(webpage) = worker.prepare_webpage(
+                &record.response.body,
+                &record.request.url,
+                record.metadata.fetch_time_ms,
+            ) {
+                if webpage.host_centrality > 0.0 {
+                    has_host_centrality = true;
                 }
-            }
 
-            html.parse_text();
-
-            if html.empty_all_text() {
-                continue;
-            }
-
-            if let Some(minimum_clean_words) = job.minimum_clean_words {
-                match html.clean_text() {
-                    Some(clean_text) => {
-                        if clean_text.split_whitespace().count() < minimum_clean_words {
-                            continue;
-                        }
-                    }
-                    None => continue,
+                if webpage.page_centrality > 0.0 {
+                    has_page_centrality = true;
                 }
-            }
 
-            let backlink_labels: Vec<String> = worker
-                .webgraph
-                .as_ref()
-                .map(|webgraph| {
-                    webgraph
-                        .raw_ingoing_edges_with_labels(&Node::from(html.url()).id())
-                        .into_iter()
-                        .map(|edge| edge.label)
-                        .filter(|label| !label.is_empty())
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let mut page_centrality = 0.0;
-
-            if let Some(store) = worker.page_centrality_store.as_ref() {
-                let node_id = node.id();
-
-                page_centrality = store.get(&node_id).unwrap_or_default();
-            }
-
-            if host_centrality > 0.0 {
-                has_host_centrality = true;
-            }
-
-            if page_centrality > 0.0 {
-                has_page_centrality = true;
-            }
-
-            if !backlink_labels.is_empty() {
-                has_backlinks = true;
-            }
-
-            if !page_centrality.is_finite() {
-                page_centrality = 0.0;
-            }
-
-            if !host_centrality.is_finite() {
-                host_centrality = 0.0;
-            }
-
-            let fetch_time_ms = record.metadata.fetch_time_ms as u64;
-
-            trace!("inserting webpage: {:?}", html.url());
-
-            trace!("title = {:?}", html.title());
-            trace!("text = {:?}", html.clean_text());
-
-            let mut dmoz_description = None;
-
-            if let Some(mapper) = worker.topics.as_ref() {
-                if let Some(info) =
-                    mapper.get(&html.url().host_str().unwrap_or_default().to_string())
-                {
-                    dmoz_description = Some(info.description.clone())
+                if !webpage.backlink_labels.is_empty() {
+                    has_backlinks = true;
                 }
-            }
+                trace!("inserting webpage: {:?}", webpage.html.url());
+                trace!("title = {:?}", webpage.html.title());
+                trace!("text = {:?}", webpage.html.clean_text());
 
-            let mut webpage = Webpage {
-                html,
-                backlink_labels,
-                page_centrality,
-                host_centrality,
-                fetch_time_ms,
-                pre_computed_score: 0.0,
-                node_id: Some(host_node_id),
-                dmoz_description,
-                safety_classification: None,
-            };
-
-            if let Some(model) = worker.safety_classifier.as_ref() {
-                webpage.safety_classification = Some(model.predict(&webpage).label);
-            }
-
-            let mut signal_aggregator = SignalAggregator::new(None);
-            signal_aggregator.set_current_timestamp(current_timestamp);
-
-            webpage.pre_computed_score = signal_aggregator.precompute_score(&webpage);
-
-            if let Err(err) = index.insert(webpage) {
-                warn!("{:?}", err);
-                panic!();
+                if let Err(err) = index.insert(webpage) {
+                    warn!("{:?}", err);
+                    panic!();
+                }
             }
         }
 
@@ -276,7 +292,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
         warn!("no page centrality values found in {}", name);
     }
 
-    if !has_backlinks && worker.webgraph.is_some() {
+    if !has_backlinks && worker.page_webgraph.is_some() {
         warn!("no backlinks found in {}", name);
     }
 
@@ -365,12 +381,14 @@ impl Indexer {
             .map(|warc_paths| Job {
                 source_config: job_config.clone(),
                 warc_paths,
-                host_centrality_threshold: config.host_centrality_threshold,
                 base_path: config
                     .output_path
                     .clone()
                     .unwrap_or_else(|| "data/index".to_string()),
-                minimum_clean_words: config.minimum_clean_words,
+                settings: JobSettings {
+                    host_centrality_threshold: config.host_centrality_threshold,
+                    minimum_clean_words: config.minimum_clean_words,
+                },
             })
             .map(|job| {
                 let pointer: IndexPointer = job.map(&worker);

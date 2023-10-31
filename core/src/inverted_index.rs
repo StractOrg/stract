@@ -188,6 +188,11 @@ impl InvertedIndex {
         self.snippet_config = config;
     }
 
+    pub fn set_auto_merge_policy(&mut self) {
+        let merge_policy = tantivy::merge_policy::LogMergePolicy::default();
+        self.writer.set_merge_policy(Box::new(merge_policy));
+    }
+
     pub fn fastfield_reader(&self, tv_searcher: &tantivy::Searcher) -> FastFieldReader {
         FastFieldReader::new(tv_searcher)
     }
@@ -213,6 +218,24 @@ impl InvertedIndex {
         self.reader.reload()?;
 
         Ok(())
+    }
+
+    fn delete(&self, query: Box<dyn tantivy::query::Query>) -> Result<()> {
+        self.writer.delete_query(query)?;
+
+        Ok(())
+    }
+
+    pub fn delete_all_before(&self, timestamp: tantivy::DateTime) -> Result<()> {
+        let query = tantivy::query::RangeQuery::new_date_bounds(
+            Field::Text(TextField::InsertionTimestamp)
+                .name()
+                .to_string(),
+            std::ops::Bound::Unbounded,
+            std::ops::Bound::Excluded(timestamp),
+        );
+
+        self.delete(Box::new(query))
     }
 
     pub fn search_initial(

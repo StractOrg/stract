@@ -211,7 +211,13 @@ impl LocalSearcher {
             aggregator.set_inbound_similarity(scorer);
         }
 
-        aggregator.set_region_count(self.index.region_count.clone());
+        aggregator.set_region_count(
+            self.index
+                .region_count
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+        );
 
         if let Some(model) = self.linear_regression.as_ref() {
             aggregator.set_linear_model(model.clone());

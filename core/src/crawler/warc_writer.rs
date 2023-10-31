@@ -21,12 +21,29 @@ use crate::{
     warc,
 };
 
-use super::{CrawlDatum, Result};
+use super::{CrawlDatum, DatumStream, Result};
 
 /// The WarcWriter is responsible for storing the crawl datums
 /// as WARC files on S3.
 pub struct WarcWriter {
     tx: tokio::sync::mpsc::Sender<WarcWriterMessage>,
+}
+
+#[async_trait::async_trait]
+impl DatumStream for WarcWriter {
+    async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
+        self.tx
+            .blocking_send(WarcWriterMessage::Crawl(crawl_datum))?;
+
+        Ok(())
+    }
+
+    async fn finish(&self) -> Result<()> {
+        self.tx.blocking_send(WarcWriterMessage::Finish)?;
+        self.tx.closed().await;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +114,7 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
                                 payload_type: Some(datum.payload_type),
                             },
                             metadata: warc::Metadata {
-                                fetch_time_ms: datum.fetch_time_ms as usize,
+                                fetch_time_ms: datum.fetch_time_ms,
                             },
                         };
 
@@ -130,18 +147,5 @@ impl WarcWriter {
         tokio::spawn(writer_task(rx, s3));
 
         Self { tx }
-    }
-
-    pub async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
-        self.tx.send(WarcWriterMessage::Crawl(crawl_datum)).await?;
-
-        Ok(())
-    }
-
-    pub async fn finish(&self) -> Result<()> {
-        self.tx.send(WarcWriterMessage::Finish).await?;
-        self.tx.closed().await;
-
-        Ok(())
     }
 }
