@@ -40,19 +40,19 @@ impl<T> FileQueueWriter<T>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
+    pub fn new(path: &std::path::Path) -> Result<Self> {
+        if !path.exists() {
+            std::fs::create_dir_all(path)?;
         }
 
         let file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .read(true)
-            .open(path.as_ref().join(DATA_KEY))?;
+            .open(path.join(DATA_KEY))?;
 
         Ok(Self {
-            path: path.as_ref().to_path_buf(),
+            path: path.to_path_buf(),
             writer: BufWriter::new(file),
             _marker: std::marker::PhantomData,
         })
@@ -84,7 +84,7 @@ where
         let file = self.writer.into_inner()?;
 
         Ok(FileQueue {
-            pointer: FilePointer::new(self.path)?,
+            pointer: FilePointer::new(&self.path)?,
             file: unsafe { Mmap::map(&file)? },
             _marker: std::marker::PhantomData,
         })
@@ -96,16 +96,16 @@ struct FilePointer {
 }
 
 impl FilePointer {
-    fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
+    fn new(path: &std::path::Path) -> Result<Self> {
+        if !path.exists() {
+            std::fs::create_dir_all(path)?;
         }
 
         let file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .read(true)
-            .open(path.as_ref().join(POINTER_KEY))?;
+            .open(path.join(POINTER_KEY))?;
 
         Ok(Self { file })
     }
@@ -140,12 +140,12 @@ impl<T> FileQueue<T>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
+    pub fn new(path: &std::path::Path) -> Result<Self> {
+        if !path.exists() {
+            std::fs::create_dir_all(path)?;
         }
 
-        let file = File::open(path.as_ref().join(DATA_KEY))?;
+        let file = File::open(path.join(DATA_KEY))?;
         let file = unsafe { Mmap::map(&file)? };
 
         Ok(Self {
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut writer = FileQueueWriter::new(crate::gen_temp_path()).unwrap();
+        let mut writer = FileQueueWriter::new(&crate::gen_temp_path()).unwrap();
 
         writer.push("Hello".to_string()).unwrap();
         writer.push("World".to_string()).unwrap();
@@ -201,7 +201,7 @@ mod tests {
         fn prop(data: Vec<String>) {
             let expected = data.clone();
 
-            let mut writer = FileQueueWriter::new(crate::gen_temp_path()).unwrap();
+            let mut writer = FileQueueWriter::new(&crate::gen_temp_path()).unwrap();
 
             for item in data {
                 writer.push(item).unwrap();

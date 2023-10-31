@@ -170,7 +170,7 @@ mod tests {
 
     fn create_path_graph(n: usize) -> Webgraph {
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
         );

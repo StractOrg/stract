@@ -91,14 +91,16 @@ impl IndexingWorker {
     ) -> Self {
         Self {
             host_centrality_store: RocksDbStore::open(
-                Path::new(&host_centrality_store_path).join("harmonic"),
+                &Path::new(&host_centrality_store_path).join("harmonic"),
             ),
             page_centrality_store: page_centrality_store_path
-                .map(|p| RocksDbStore::open(Path::new(&p).join("derived_harmonic"))),
-            webgraph: webgraph_path.map(|path| WebgraphBuilder::new(path).single_threaded().open()),
-            topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
+                .map(|p| RocksDbStore::open(&Path::new(&p).join("derived_harmonic"))),
+            webgraph: webgraph_path
+                .map(|path| WebgraphBuilder::new(path.as_ref()).single_threaded().open()),
+            topics: topics_path
+                .map(|path| human_website_annotations::Mapper::open(path.as_ref()).unwrap()),
             safety_classifier: safety_classifier_path
-                .map(|path| safety_classifier::Model::open(path).unwrap()),
+                .map(|path| safety_classifier::Model::open(path.as_ref()).unwrap()),
         }
     }
 }
@@ -112,7 +114,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     info!("processing {}", name);
 
-    let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
+    let mut index = Index::open(&Path::new(&job.base_path).join(name)).unwrap();
 
     let source: config::WarcSource = job.source_config.clone().into();
 
@@ -401,11 +403,11 @@ impl Indexer {
 
             threads.push(thread::spawn(move || {
                 let mut it = indexes.into_iter();
-                let mut index = Index::open(it.next().unwrap().0).unwrap();
+                let mut index = Index::open(it.next().unwrap().0.as_ref()).unwrap();
 
                 for other in it {
                     let other_path = other.0;
-                    let other = Index::open(&other_path).unwrap();
+                    let other = Index::open(other_path.as_ref()).unwrap();
                     index = index.merge(other);
 
                     std::fs::remove_dir_all(other_path).unwrap();

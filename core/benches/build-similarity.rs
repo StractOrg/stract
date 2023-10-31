@@ -4,7 +4,7 @@ use stract::{ranking::inbound_similarity::InboundSimilarity, webgraph::WebgraphB
 const WEBGRAPH_PATH: &str = "data/webgraph";
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let graph = WebgraphBuilder::new(WEBGRAPH_PATH).open();
+    let graph = WebgraphBuilder::new(WEBGRAPH_PATH.as_ref()).open();
 
     c.bench_function("Inbound similarity creation", |b| {
         b.iter(|| {

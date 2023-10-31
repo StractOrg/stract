@@ -18,7 +18,7 @@ async fn main() {
         .unwrap();
 
     let model = Alice::open(
-        "data/alice",
+        "data/alice".as_ref(),
         Some(AcceleratorConfig {
             layer_fraction: 1.0,
             quantize_fraction: 0.0,

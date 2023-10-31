@@ -39,10 +39,10 @@ macro_rules! bench {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let index = Index::open(INDEX_PATH).unwrap();
+    let index = Index::open(INDEX_PATH.as_ref()).unwrap();
     let mut searcher = LocalSearcher::new(index);
     searcher.set_inbound_similarity(
-        InboundSimilarity::open(Path::new(CENTRALITY_PATH).join("inbound_similarity")).unwrap(),
+        InboundSimilarity::open(&Path::new(CENTRALITY_PATH).join("inbound_similarity")).unwrap(),
     );
 
     for _ in 0..1000 {

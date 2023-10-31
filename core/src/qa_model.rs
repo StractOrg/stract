@@ -47,7 +47,7 @@ pub struct Answer {
 }
 
 impl QaModel {
-    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+    pub fn open(folder: &Path) -> Result<Self> {
         let truncation = TruncationParams {
             max_length: TRUNCATE_INPUT,
             ..Default::default()
@@ -56,12 +56,11 @@ impl QaModel {
             ..Default::default()
         };
 
-        let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+        let mut tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json"))?;
         tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
-        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
+        let model = tch::CModule::load(folder.join("model.pt"))?;
         Ok(Self {
             tokenizer,
             model,
@@ -199,7 +198,7 @@ mod tests {
 
     fn open_qa_model() -> QaModel {
         QaModel::open(
-            std::path::Path::new("../data/qa_model")
+            &std::path::Path::new("../data/qa_model")
                 .canonicalize()
                 .expect("QA model not found in data/qa_model"),
         )

@@ -231,7 +231,7 @@ pub struct ExtractiveSummarizer {
 }
 
 impl ExtractiveSummarizer {
-    pub fn open<P: AsRef<Path>>(path: P, top_n_passages: usize) -> Result<Self> {
+    pub fn open(path: &Path, top_n_passages: usize) -> Result<Self> {
         Ok(Self {
             passage_scorer: DualEncoder::open(path)?,
             top_n_passages,
@@ -323,16 +323,11 @@ pub struct Summarizer {
 }
 
 impl Summarizer {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         Ok(Self {
-            extractive: ExtractiveSummarizer::open(
-                path.as_ref().join("dual_encoder").as_path(),
-                50,
-            )?,
+            extractive: ExtractiveSummarizer::open(path.join("dual_encoder").as_path(), 50)?,
             abstractive: AbstractiveSummarizer {
-                model: Arc::new(AbstractiveModel::open(
-                    path.as_ref().join("abstractive").as_path(),
-                )?),
+                model: Arc::new(AbstractiveModel::open(path.join("abstractive").as_path())?),
             },
         })
     }
@@ -360,7 +355,7 @@ pub struct DualEncoder {
 }
 
 impl DualEncoder {
-    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+    pub fn open(folder: &Path) -> Result<Self> {
         let truncation = TruncationParams {
             max_length: 256,
             ..Default::default()
@@ -370,13 +365,12 @@ impl DualEncoder {
             ..Default::default()
         };
 
-        let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+        let mut tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json"))?;
 
         tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
-        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
+        let model = tch::CModule::load(folder.join("model.pt"))?;
         Ok(Self { model, tokenizer })
     }
 
@@ -442,7 +436,7 @@ pub struct AbstractiveModel {
 }
 
 impl AbstractiveModel {
-    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+    pub fn open(folder: &Path) -> Result<Self> {
         let truncation = TruncationParams {
             max_length: TRUNCATE_INPUT_ABSTRACTIVE,
             ..Default::default()
@@ -452,15 +446,14 @@ impl AbstractiveModel {
             ..Default::default()
         };
 
-        let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+        let mut tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json"))?;
 
         tokenizer.with_truncation(Some(truncation))?;
         tokenizer.with_padding(Some(padding));
 
-        let encoder = tch::CModule::load(folder.as_ref().join("traced_encoder.pt"))?;
-        let decoder = tch::CModule::load(folder.as_ref().join("traced_decoder.pt"))?;
-        let decoder_with_past = tch::CModule::load(folder.as_ref().join("traced_decoder_wp.pt"))?;
+        let encoder = tch::CModule::load(folder.join("traced_encoder.pt"))?;
+        let decoder = tch::CModule::load(folder.join("traced_decoder.pt"))?;
+        let decoder_with_past = tch::CModule::load(folder.join("traced_decoder_wp.pt"))?;
 
         Ok(Self {
             tokenizer,
@@ -850,7 +843,7 @@ mod tests {
     fn abstractive_summary() {
         let summarizer = AbstractiveSummarizer {
             model: Arc::new(
-                AbstractiveModel::open("../data/summarizer/abstractive")
+                AbstractiveModel::open("../data/summarizer/abstractive".as_ref())
                     .expect("abstractive summary model not found"),
             ),
         };

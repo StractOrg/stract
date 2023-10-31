@@ -27,7 +27,7 @@ pub struct SubdomainCounter {
 }
 
 impl SubdomainCounter {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open(path: &Path) -> Self {
         Self {
             inner: Box::new(RocksDbStore::open(path)),
         }

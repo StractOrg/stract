@@ -309,9 +309,9 @@ pub struct WebgraphBuilder {
 }
 
 impl WebgraphBuilder {
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+    pub fn new(path: &Path) -> Self {
         Self {
-            path: path.as_ref().into(),
+            path: path.into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
             compression: Compression::default(),
         }
@@ -328,7 +328,7 @@ impl WebgraphBuilder {
     }
 
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor, self.compression)
+        Webgraph::open(&self.path, self.executor, self.compression)
     }
 }
 
@@ -416,7 +416,7 @@ struct Meta {
 }
 
 impl Meta {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    fn open(path: &Path) -> Self {
         let mut reader = BufReader::new(
             File::options()
                 .create(true)
@@ -430,7 +430,7 @@ impl Meta {
         serde_json::from_str(&buf).unwrap_or_default()
     }
 
-    fn save<P: AsRef<Path>>(&self, path: P) {
+    fn save(&self, path: &Path) {
         let mut writer = BufWriter::new(
             File::options()
                 .create(true)
@@ -451,7 +451,7 @@ struct Id2NodeDb {
 }
 
 impl Id2NodeDb {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    fn open(path: &Path) -> Self {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
         opts.optimize_for_point_lookup(512);
@@ -537,32 +537,32 @@ pub struct WebgraphWriter {
 }
 
 impl WebgraphWriter {
-    fn meta<P: AsRef<Path>>(path: P) -> Meta {
-        let meta_path = path.as_ref().join("metadata.json");
-        Meta::open(meta_path)
+    fn meta(path: &Path) -> Meta {
+        let meta_path = path.join("metadata.json");
+        Meta::open(&meta_path)
     }
 
     fn save_metadata(&mut self) {
         let path = Path::new(&self.path).join("metadata.json");
-        self.meta.save(path);
+        self.meta.save(&path);
     }
 
-    pub fn new<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
-        fs::create_dir_all(&path).unwrap();
-        let mut meta = Self::meta(&path);
+    pub fn new(path: &Path, executor: Executor, compression: Compression) -> Self {
+        fs::create_dir_all(path).unwrap();
+        let mut meta = Self::meta(path);
         meta.comitted_segments.clear();
 
-        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
+        fs::create_dir_all(path.join("segments")).unwrap();
 
         let id = uuid::Uuid::new_v4().to_string();
-        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone(), compression);
+        let segment = SegmentWriter::open(&path.join("segments"), id.clone(), compression);
 
         meta.comitted_segments.push(id);
 
         Self {
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
+            path: path.as_os_str().to_str().unwrap().to_string(),
             segment,
-            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
+            id2node: Id2NodeDb::open(&path.join("id2node")),
             insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
             executor,
             meta,
@@ -638,36 +638,36 @@ pub struct Webgraph {
 }
 
 impl Webgraph {
-    fn meta<P: AsRef<Path>>(path: P) -> Meta {
-        let meta_path = path.as_ref().join("metadata.json");
-        Meta::open(meta_path)
+    fn meta(path: &Path) -> Meta {
+        let meta_path = path.join("metadata.json");
+        Meta::open(&meta_path)
     }
 
     fn save_metadata(&mut self) {
         let path = Path::new(&self.path).join("metadata.json");
-        self.meta.save(path);
+        self.meta.save(&path);
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
-        fs::create_dir_all(&path).unwrap();
-        let meta = Self::meta(&path);
+    fn open(path: &Path, executor: Executor, compression: Compression) -> Self {
+        fs::create_dir_all(path).unwrap();
+        let meta = Self::meta(path);
 
-        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
+        fs::create_dir_all(path.join("segments")).unwrap();
 
         let mut segments = Vec::new();
         for segment in &meta.comitted_segments {
             segments.push(Segment::open(
-                path.as_ref().join("segments"),
+                &path.join("segments"),
                 segment.clone(),
                 compression,
             ));
         }
 
         Self {
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
+            path: path.as_os_str().to_str().unwrap().to_string(),
             segments,
             executor: Arc::new(executor),
-            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
+            id2node: Id2NodeDb::open(&path.join("id2node")),
             meta,
             compression,
         }
@@ -684,7 +684,7 @@ impl Webgraph {
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
             self.segments
-                .push(Segment::open(new_path, id, self.compression));
+                .push(Segment::open(&new_path, id, self.compression));
         }
 
         self.save_metadata();
@@ -837,7 +837,7 @@ mod test {
         //        D
 
         let mut graph = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );
@@ -899,7 +899,7 @@ mod test {
             (Node::from("G"), Node::from("H"), String::new()),
         ] {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
             );
@@ -928,7 +928,7 @@ mod test {
             (Node::from("C"), Node::from("A"), String::new()),
         ] {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
             );
@@ -970,7 +970,7 @@ mod test {
     #[test]
     fn cap_label_length() {
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );
@@ -993,7 +993,7 @@ mod test {
     #[test]
     fn edges_by_host() {
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
         );

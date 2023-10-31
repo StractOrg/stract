@@ -179,7 +179,7 @@ impl InboundSimilarity {
         }
     }
 
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn save(&self, path: &Path) -> Result<()> {
         let mut file = BufWriter::new(
             File::options()
                 .create(true)
@@ -197,7 +197,7 @@ impl InboundSimilarity {
         self.vectors.get(node)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn it_favors_liked_sites() {
         let mut wrt = WebgraphWriter::new(
-            gen_temp_path(),
+            &gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
         );
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn it_ranks_search_results() {
         let mut wrt = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
         );

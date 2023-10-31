@@ -276,7 +276,7 @@ impl Dictionary {
         self.spellings.insert(normalized, lemma);
     }
 
-    pub fn build<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn build(path: &Path) -> Result<Self> {
         let reader = BufReader::new(File::open(path)?);
 
         let mut parser = TurtleParser::new(reader, None);
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn build_dict() {
-        let dict = Dictionary::build("../data/english-wordnet-2022-subset.ttl").unwrap();
+        let dict = Dictionary::build("../data/english-wordnet-2022-subset.ttl".as_ref()).unwrap();
 
         let infos = dict.get(Lemma("barely".to_string()));
 

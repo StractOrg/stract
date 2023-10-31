@@ -39,8 +39,9 @@ fn print_top_nodes(liked_sites: &[&str], top_n: usize, similarity_finder: &Simil
 
 pub fn main() {
     const TOP_N: usize = 50;
-    let graph = WebgraphBuilder::new("data/webgraph").open();
-    let inbound_similarity = InboundSimilarity::open("data/centrality/inbound_similarity").unwrap();
+    let graph = WebgraphBuilder::new("data/webgraph".as_ref()).open();
+    let inbound_similarity =
+        InboundSimilarity::open("data/centrality/inbound_similarity".as_ref()).unwrap();
 
     let similarity_finder = SimilarSitesFinder::new(
         graph.into(),

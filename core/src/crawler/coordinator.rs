@@ -22,7 +22,7 @@ pub struct CrawlCoordinator {
 }
 
 impl CrawlCoordinator {
-    pub fn new<P: AsRef<Path>>(jobs_queue: P) -> Result<Self> {
+    pub fn new(jobs_queue: &Path) -> Result<Self> {
         Ok(Self {
             jobs: Mutex::new(FileQueue::new(jobs_queue)?),
         })

@@ -29,7 +29,7 @@ pub struct Autosuggest {
 }
 
 impl Autosuggest {
-    pub fn load_csv<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn load_csv(path: &Path) -> Result<Self> {
         let mut queries: Vec<String> = Vec::new();
 
         let mut rdr = csv::Reader::from_path(path)?;

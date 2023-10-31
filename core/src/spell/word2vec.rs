@@ -138,7 +138,7 @@ pub struct Word2Vec {
 }
 
 impl Word2Vec {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+    pub fn open(path: &Path) -> Result<Self, Error> {
         let reader = BufReader::new(MultiGzDecoder::new(BufReader::new(File::open(path)?)));
         let reader = WordVectorReader::new_from_reader(reader)?;
         let vectors: HashMap<_, _> = reader.map(|(word, vec)| (word, WordVec(vec))).collect();

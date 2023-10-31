@@ -321,7 +321,7 @@ impl LocalSearcher {
         #[cfg(feature = "libtorch")]
         let pipeline = {
             use crate::ranking::models::cross_encoder::CrossEncoderModel;
-            match CrossEncoderModel::open("data/cross_encoder") {
+            match CrossEncoderModel::open("data/cross_encoder".as_ref()) {
                 Ok(model) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
                     &mut search_query,
                     Some(Arc::new(model)),

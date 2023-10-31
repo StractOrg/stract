@@ -112,11 +112,11 @@ pub struct InvertedIndex {
 }
 
 impl InvertedIndex {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let schema = create_schema();
 
-        let tantivy_index = if path.as_ref().exists() {
-            let mmap_directory = MmapDirectory::open(&path)?;
+        let tantivy_index = if path.exists() {
+            let mmap_directory = MmapDirectory::open(path)?;
             tantivy::Index::open(mmap_directory)?
         } else {
             let index_settings = tantivy::IndexSettings {
@@ -127,8 +127,8 @@ impl InvertedIndex {
                 ..Default::default()
             };
 
-            fs::create_dir_all(&path)?;
-            let mmap_directory = MmapDirectory::open(&path)?;
+            fs::create_dir_all(path)?;
+            let mmap_directory = MmapDirectory::open(path)?;
             tantivy::Index::create(mmap_directory, schema.clone(), index_settings)?
         };
 
@@ -178,7 +178,7 @@ impl InvertedIndex {
             writer,
             reader,
             schema: Arc::new(schema),
-            path: path.as_ref().to_str().unwrap().to_string(),
+            path: path.to_str().unwrap().to_string(),
             tantivy_index,
             snippet_config: SnippetConfig::default(),
         })
@@ -199,7 +199,7 @@ impl InvertedIndex {
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = crate::gen_temp_path();
-        Self::open(path)
+        Self::open(&path)
     }
 
     pub fn insert(&self, webpage: Webpage) -> Result<()> {
@@ -474,7 +474,7 @@ impl InvertedIndex {
             .unwrap();
         }
 
-        Self::open(path).expect("failed to open index")
+        Self::open(path.as_ref()).expect("failed to open index")
     }
 
     pub fn stop(self) {

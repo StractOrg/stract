@@ -174,7 +174,7 @@ pub async fn run(config: AliceLocalConfig) -> Result<(), anyhow::Error> {
 
     info!("starting alice");
     let alice = Alice::open(
-        &config.alice_path,
+        config.alice_path.as_ref(),
         config.accelerator.clone().map(|acc| acc.into()),
         &key,
     )?;

@@ -32,27 +32,19 @@ pub struct SegmentWriter {
 }
 
 impl SegmentWriter {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
+    pub fn open(folder_path: &Path, id: String, compression: Compression) -> Self {
         SegmentWriter {
             full_adjacency: EdgeStoreWriter::open(
-                folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
+                &folder_path.join(&id).join(ADJACENCY_STORE),
                 compression,
                 false,
             ),
             full_reversed_adjacency: EdgeStoreWriter::open(
-                folder_path
-                    .as_ref()
-                    .join(&id)
-                    .join(REVERSED_ADJACENCY_STORE),
+                &folder_path.join(&id).join(REVERSED_ADJACENCY_STORE),
                 compression,
                 true,
             ),
-            folder_path: folder_path
-                .as_ref()
-                .as_os_str()
-                .to_str()
-                .unwrap()
-                .to_string(),
+            folder_path: folder_path.as_os_str().to_str().unwrap().to_string(),
             id,
         }
     }
@@ -87,27 +79,19 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
+    pub fn open(folder_path: &Path, id: String, compression: Compression) -> Self {
         Segment {
             full_adjacency: EdgeStore::open(
-                folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
+                &folder_path.join(&id).join(ADJACENCY_STORE),
                 false,
                 compression,
             ),
             full_reversed_adjacency: EdgeStore::open(
-                folder_path
-                    .as_ref()
-                    .join(&id)
-                    .join(REVERSED_ADJACENCY_STORE),
+                &folder_path.join(&id).join(REVERSED_ADJACENCY_STORE),
                 true,
                 compression,
             ),
-            folder_path: folder_path
-                .as_ref()
-                .as_os_str()
-                .to_str()
-                .unwrap()
-                .to_string(),
+            folder_path: folder_path.as_os_str().to_str().unwrap().to_string(),
             id,
         }
     }
@@ -165,7 +149,7 @@ mod test {
         // 1─────►2◄┘
 
         let mut writer = SegmentWriter::open(
-            crate::gen_temp_path(),
+            &crate::gen_temp_path(),
             "test".to_string(),
             Compression::default(),
         );

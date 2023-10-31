@@ -104,10 +104,10 @@ pub async fn favicon() -> impl IntoResponse {
 }
 
 pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
-    let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
+    let autosuggest = Autosuggest::load_csv(config.queries_csv_path.as_ref())?;
 
     let lambda_model = match &config.lambda_model_path {
-        Some(path) => Some(LambdaMART::open(path)?),
+        Some(path) => Some(LambdaMART::open(path.as_ref())?),
         None => None,
     };
 
@@ -117,7 +117,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         query_store_queue
     });
 
-    let bangs = Bangs::from_path(&config.bangs_path);
+    let bangs = Bangs::from_path(config.bangs_path.as_ref());
 
     let cluster = Arc::new(
         Cluster::join(
@@ -136,12 +136,12 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let state = {
         let mut cross_encoder = None;
 
-        if let Some(path) = config.crossencoder_model_path.as_ref() {
-            cross_encoder = Some(CrossEncoderModel::open(path)?);
+        if let Some(path) = &config.crossencoder_model_path {
+            cross_encoder = Some(CrossEncoderModel::open(path.as_ref())?);
         }
 
         let qa_model = match &config.qa_model_path {
-            Some(path) => Some(QaModel::open(path)?),
+            Some(path) => Some(QaModel::open(path.as_ref())?),
             None => None,
         };
 
@@ -160,7 +160,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             autosuggest,
             counters,
             remote_webgraph,
-            summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
+            summarizer: Arc::new(Summarizer::open(config.summarizer_path.as_ref())?),
             improvement_queue: query_store_queue,
             cluster,
         })

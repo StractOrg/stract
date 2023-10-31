@@ -22,12 +22,9 @@ use std::path::Path;
 
 const TEST_SIZE: f64 = 0.2;
 
-pub fn train<P: AsRef<Path>>(dataset: P, output: P) -> Result<()> {
-    if !dataset.as_ref().exists() {
-        return Err(anyhow::anyhow!(
-            "dataset path {:?} does not exist",
-            dataset.as_ref()
-        ));
+pub fn train(dataset: &Path, output: &Path) -> Result<()> {
+    if !dataset.exists() {
+        return Err(anyhow::anyhow!("dataset path {:?} does not exist", dataset));
     }
 
     let mut model = webpage::safety_classifier::Model::new();
@@ -55,7 +52,7 @@ pub fn train<P: AsRef<Path>>(dataset: P, output: P) -> Result<()> {
     Ok(())
 }
 
-pub fn predict<P: AsRef<Path>>(model: P, text: &str) -> Result<()> {
+pub fn predict(model: &Path, text: &str) -> Result<()> {
     let model = webpage::safety_classifier::Model::open(model)?;
     let pred = model.predict_text(text);
 

@@ -34,9 +34,9 @@ pub struct FeedIndex {
 }
 
 impl FeedIndex {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
+    pub fn open(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            std::fs::create_dir_all(path)?;
         }
 
         let url_tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn feed_index() {
-        let mut index = FeedIndex::open(crate::gen_temp_path()).unwrap();
+        let mut index = FeedIndex::open(&crate::gen_temp_path()).unwrap();
 
         let a = Feed {
             url: Url::parse("https://a.com/feed.xml").unwrap(),

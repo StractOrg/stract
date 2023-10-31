@@ -61,7 +61,7 @@ pub struct Datapoint {
     pub text: String,
 }
 
-pub fn load_dataset<P: AsRef<Path>>(path: P) -> Result<Vec<Datapoint>> {
+pub fn load_dataset(path: &Path) -> Result<Vec<Datapoint>> {
     let mut datapoints = Vec::new();
     let mut reader = csv::Reader::from_path(path)?;
     for result in reader.deserialize() {
@@ -166,7 +166,7 @@ impl Model {
         }
     }
 
-    pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
+    pub fn save(self, path: &Path) -> Result<()> {
         let file = OpenOptions::new()
             .write(true)
             .create(true)
@@ -178,7 +178,7 @@ impl Model {
         Ok(())
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path)?;
 
         let model = bincode::deserialize_from(file)?;

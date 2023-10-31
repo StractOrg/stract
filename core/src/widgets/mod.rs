@@ -45,7 +45,7 @@ impl Widgets {
         }
 
         let thesaurus = if let Some(path) = config.thesaurus_paths.first() {
-            Some(thesaurus::Dictionary::build(path)?)
+            Some(thesaurus::Dictionary::build(path.as_ref())?)
         } else {
             None
         };
