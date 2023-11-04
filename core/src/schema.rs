@@ -598,6 +598,7 @@ impl Field {
                 | Field::Text(TextField::TitleIfHomepage)
                 | Field::Text(TextField::SiteWithout) // will match url
                 | Field::Text(TextField::Domain) // will match url
+                | Field::Text(TextField::InsertionTimestamp)
         ) && !self.is_fast()
     }
 

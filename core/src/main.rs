@@ -24,7 +24,6 @@ use stract::entrypoint::autosuggest_scrape::{self, Gl};
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
 
-use stract::entrypoint::indexer::IndexPointer;
 use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
 use stract::webgraph::WebgraphBuilder;
 use tracing_subscriber::prelude::*;
@@ -116,7 +115,10 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum LiveIndex {
+    /// Create a schedule of which feeds should go to which index.
     Schedule { config_path: String },
+
+    /// Serve the live index.
     Serve { config_path: String },
 }
 
@@ -193,8 +195,8 @@ enum IndexingOptions {
         output_path: String,
     },
 
-    /// Merge multiple search indexes into a single index.
-    Merge { indexes: Vec<String> },
+    /// Create the feed index. Used to find feeds to put into the live index.
+    Feed { config_path: String },
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
@@ -228,8 +230,9 @@ fn main() -> Result<()> {
                 wikipedia_dump_path,
                 output_path,
             } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
-            IndexingOptions::Merge { indexes } => {
-                entrypoint::Indexer::merge(indexes.into_iter().map(IndexPointer::from).collect())?
+            IndexingOptions::Feed { config_path } => {
+                let config = load_toml_config(config_path);
+                entrypoint::feed_indexer::build(config)?;
             }
         },
         Commands::Centrality { mode } => {

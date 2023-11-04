@@ -452,14 +452,9 @@ mod tests {
                         &format!("https://www.{i}.com"),
                     )
                     .unwrap(),
-                    backlink_labels: vec![],
                     host_centrality: (NUM_WEBSITES - i) as f64,
                     fetch_time_ms: 500,
-                    page_centrality: 0.0,
-                    pre_computed_score: 0.0,
-                    node_id: None,
-                    dmoz_description: None,
-                    safety_classification: None,
+                    ..Default::default()
                 })
                 .expect("failed to insert webpage");
         }

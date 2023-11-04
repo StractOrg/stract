@@ -253,7 +253,9 @@ impl FromStr for PayloadType {
             "text/html" => Ok(Self::Html),
             "application/pdf" => Ok(Self::Pdf),
             "application/rss" => Ok(Self::Rss),
+            "application/rss+xml" => Ok(Self::Rss),
             "application/atom" => Ok(Self::Atom),
+            "application/atom+xml" => Ok(Self::Atom),
             _ => Err(Error::WarcParse("Unknown payload type")),
         }
     }

@@ -97,6 +97,58 @@ impl From<DocAddress> for tantivy::DocAddress {
     }
 }
 
+pub fn merge_tantivy_segments<P: AsRef<Path>>(
+    writer: &mut IndexWriter,
+    mut segments: Vec<SegmentMeta>,
+    base_path: P,
+    max_num_segments: u64,
+) -> Result<()> {
+    assert!(max_num_segments > 0);
+
+    if segments.len() <= max_num_segments as usize {
+        return Ok(());
+    }
+
+    let num_segments = (max_num_segments + 1) / 2; // ceil(num_segments/2)
+
+    let mut merge_segments = Vec::new();
+
+    for _ in 0..num_segments {
+        merge_segments.push(SegmentMergeCandidate {
+            num_docs: 0,
+            segments: Vec::new(),
+        });
+    }
+
+    segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
+
+    for segment in segments {
+        let best_candidate = merge_segments
+            .iter_mut()
+            .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
+            .unwrap();
+
+        best_candidate.num_docs += segment.num_docs();
+        best_candidate.segments.push(segment);
+    }
+
+    for merge in merge_segments
+        .into_iter()
+        .filter(|merge| !merge.segments.is_empty())
+    {
+        let segment_ids: Vec<_> = merge.segments.iter().map(|segment| segment.id()).collect();
+        writer.merge(&segment_ids[..]).wait()?;
+
+        for segment in merge.segments {
+            for file in segment.list_files() {
+                std::fs::remove_file(base_path.as_ref().join(file)).ok();
+            }
+        }
+    }
+
+    Ok(())
+}
+
 struct SegmentMergeCandidate {
     num_docs: u32,
     segments: Vec<SegmentMeta>,
@@ -377,57 +429,16 @@ impl InvertedIndex {
         Ok(webpages)
     }
 
-    pub fn merge_into_max_segments(&mut self, max_num_segments: u32) -> Result<()> {
-        assert!(max_num_segments > 0);
-
-        let mut segments: Vec<_> = self
+    pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
+        let base_path = Path::new(&self.path);
+        let segments: Vec<_> = self
             .tantivy_index
             .load_metas()?
             .segments
             .into_iter()
             .collect();
 
-        if segments.len() <= max_num_segments as usize {
-            return Ok(());
-        }
-
-        let num_segments = (max_num_segments + 1) / 2; // ceil(num_segments/2)
-
-        let mut merge_segments = Vec::new();
-
-        for _ in 0..num_segments {
-            merge_segments.push(SegmentMergeCandidate {
-                num_docs: 0,
-                segments: Vec::new(),
-            });
-        }
-
-        segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
-
-        for segment in segments {
-            let best_candidate = merge_segments
-                .iter_mut()
-                .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
-                .unwrap();
-
-            best_candidate.num_docs += segment.num_docs();
-            best_candidate.segments.push(segment);
-        }
-
-        for merge in merge_segments
-            .into_iter()
-            .filter(|merge| !merge.segments.is_empty())
-        {
-            let segment_ids: Vec<_> = merge.segments.iter().map(|segment| segment.id()).collect();
-            self.writer.merge(&segment_ids[..]).wait()?;
-
-            let path = Path::new(&self.path);
-            for segment in merge.segments {
-                for file in segment.list_files() {
-                    std::fs::remove_file(path.join(file)).ok();
-                }
-            }
-        }
+        merge_tantivy_segments(&mut self.writer, segments, base_path, max_num_segments)?;
 
         Ok(())
     }
@@ -458,8 +469,8 @@ impl InvertedIndex {
                 .load_metas()
                 .expect("failed to load tantivy metadata for index");
 
-            let x = other.path.clone();
-            let other_path = Path::new(x.as_str());
+            let other_path = other.path.clone();
+            let other_path = Path::new(other_path.as_str());
             other.writer.wait_merging_threads().unwrap();
 
             let path = self.path.clone();
@@ -953,12 +964,8 @@ mod tests {
                 .unwrap(),
                 backlink_labels: vec!["B site is great".to_string()],
                 host_centrality: 1.0,
-                page_centrality: 0.0,
                 fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -1491,5 +1498,103 @@ mod tests {
             .unwrap();
         assert_eq!(webpage.title, "News website".to_string());
         assert_eq!(webpage.url, "https://www.example.com/".to_string());
+    }
+
+    #[test]
+    fn insertion_time_deletion() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let inserted_at = chrono::Utc::now() - chrono::Duration::days(4);
+        let cutoff = inserted_at + chrono::Duration::hours(1);
+
+        let a = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                        </head>
+                        <body>
+                            {CONTENT} test
+                        </body>
+                    </html>
+                "#,
+                    CONTENT = crate::rand_words(100)
+                ),
+                "https://www.a.com",
+            )
+            .unwrap(),
+            inserted_at,
+            ..Default::default()
+        };
+        let b = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>News website</title>
+                        </head>
+                        <body>
+                            {CONTENT} test
+                        </body>
+                    </html>
+                "#,
+                    CONTENT = crate::rand_words(100)
+                ),
+                "https://www.b.com",
+            )
+            .unwrap(),
+            inserted_at: chrono::Utc::now(),
+            ..Default::default()
+        };
+
+        index.insert(a).unwrap();
+        index.insert(b).unwrap();
+
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let ranker = Ranker::new(
+            SignalAggregator::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            Default::default(),
+        );
+
+        let mut result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
+
+        assert_eq!(result.documents.len(), 2);
+
+        index
+            .delete_all_before(tantivy::DateTime::from_utc(
+                tantivy::time::OffsetDateTime::from_unix_timestamp(cutoff.timestamp()).unwrap(),
+            ))
+            .unwrap();
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+
+        let ranker = Ranker::new(
+            SignalAggregator::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            Default::default(),
+        );
+
+        result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
+
+        assert_eq!(result.documents.len(), 1);
     }
 }

@@ -167,15 +167,8 @@ mod tests {
                     "https://www.a.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
-                host_centrality: 0.0,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -197,15 +190,9 @@ mod tests {
                     "https://www.b.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 5.0,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -246,15 +233,8 @@ mod tests {
                     "https://www.a.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
-                host_centrality: 0.0,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -277,14 +257,9 @@ mod tests {
                 )
                 .unwrap(),
                 backlink_labels: vec![],
-                host_centrality: 0.0,
                 fetch_time_ms: 500,
                 page_centrality: 5.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -324,15 +299,9 @@ mod tests {
                     "https://www.old.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 499,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -354,15 +323,9 @@ mod tests {
                     "https://www.new.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -398,15 +361,8 @@ mod tests {
                     "https://www.first.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
-                host_centrality: 0.0,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -436,15 +392,9 @@ mod tests {
                     </html>
                 "#,
                 "https://www.second.com").unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 0.00003,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-                
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
         })
             .expect("failed to insert webpage");
 
@@ -482,14 +432,8 @@ mod tests {
                 )
                 .unwrap(),
                 backlink_labels: vec!["test this is the best test site".to_string()],
-                host_centrality: 0.0,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -508,15 +452,9 @@ mod tests {
                     "https://www.second.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 0.00003,
                 fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -553,15 +491,9 @@ mod tests {
                     "https://www.body.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -581,15 +513,9 @@ mod tests {
                     "https://www.title.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 20,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -610,15 +536,9 @@ mod tests {
                     "https://www.centrality.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.02,
                 fetch_time_ms: 500,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
 
@@ -687,15 +607,8 @@ mod tests {
                     "https://www.first.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 0,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -717,15 +630,9 @@ mod tests {
                     "https://www.second.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 5000,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
@@ -766,15 +673,9 @@ mod tests {
                     "https://www.first.com/one",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 2,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -796,15 +697,9 @@ mod tests {
                     "https://www.second.com/one/two",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 1,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -826,15 +721,8 @@ mod tests {
                     "https://www.third.com/one/two123",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 0,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                node_id: None,
-                dmoz_description: None,
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

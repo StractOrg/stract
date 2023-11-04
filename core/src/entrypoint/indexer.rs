@@ -24,9 +24,9 @@ use serde::{Deserialize, Serialize};
 use tokio::pin;
 use tracing::{debug, info, trace, warn};
 
-use crate::config;
+use crate::config::{self, WarcSource};
 use crate::entrypoint::download_all_warc_files;
-use crate::index::{FrozenIndex, Index};
+use crate::index::Index;
 use crate::kv::rocksdb_store::RocksDbStore;
 use crate::kv::Kv;
 use crate::mapreduce::{Map, Reduce, Worker};
@@ -36,38 +36,9 @@ use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use crate::webpage::{safety_classifier, Html, Webpage};
 use crate::{human_website_annotations, Result};
 
-pub struct Indexer {}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum JobConfig {
-    Http(config::HttpConfig),
-    Local(config::LocalConfig),
-    S3(config::S3Config),
-}
-
-impl From<config::WarcSource> for JobConfig {
-    fn from(value: config::WarcSource) -> Self {
-        match value {
-            config::WarcSource::HTTP(config) => JobConfig::Http(config),
-            config::WarcSource::Local(config) => JobConfig::Local(config),
-            config::WarcSource::S3(config) => JobConfig::S3(config),
-        }
-    }
-}
-
-impl From<JobConfig> for config::WarcSource {
-    fn from(value: JobConfig) -> Self {
-        match value {
-            JobConfig::Http(config) => config::WarcSource::HTTP(config),
-            JobConfig::Local(config) => config::WarcSource::Local(config),
-            JobConfig::S3(config) => config::WarcSource::S3(config),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
-    pub source_config: JobConfig,
+    pub source_config: config::WarcSource,
     pub warc_paths: Vec<String>,
     pub base_path: String,
     pub settings: JobSettings,
@@ -214,6 +185,7 @@ impl IndexingWorker {
             node_id: Some(host_node_id),
             dmoz_description,
             safety_classification: None,
+            inserted_at: Utc::now(),
         };
 
         if let Some(model) = self.safety_classifier.as_ref() {
@@ -240,9 +212,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
 
     let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
 
-    let source: config::WarcSource = job.source_config.clone().into();
-
-    let warc_files = download_all_warc_files(&job.warc_paths, &source);
+    let warc_files = download_all_warc_files(&job.warc_paths, &job.source_config);
     pin!(warc_files);
 
     for file in warc_files.by_ref() {
@@ -314,31 +284,10 @@ impl From<String> for IndexPointer {
 
 impl Worker for IndexingWorker {}
 
-impl Map<IndexingWorker, FrozenIndex> for Job {
-    fn map(&self, worker: &IndexingWorker) -> FrozenIndex {
-        let index = process_job(self, worker);
-        index.into()
-    }
-}
-
 impl Map<IndexingWorker, IndexPointer> for Job {
     fn map(&self, worker: &IndexingWorker) -> IndexPointer {
         let index = process_job(self, worker);
         IndexPointer(index.path)
-    }
-}
-
-impl Reduce<FrozenIndex> for Index {
-    fn reduce(self, element: FrozenIndex) -> Self {
-        let other: Index = element.into();
-
-        let other_path = other.path.clone();
-
-        let res = self.merge(other);
-
-        std::fs::remove_dir_all(other_path).unwrap();
-
-        res
     }
 }
 
@@ -355,11 +304,12 @@ impl Reduce<Index> for Index {
     }
 }
 
+pub struct Indexer {}
 impl Indexer {
     pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
         let warc_paths = config.warc_source.paths()?;
 
-        let job_config: JobConfig = config.warc_source.clone().into();
+        let job_config: WarcSource = config.warc_source.clone();
 
         let worker = IndexingWorker::new(
             config.host_centrality_store_path.clone(),

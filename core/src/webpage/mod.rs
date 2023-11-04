@@ -128,6 +128,32 @@ pub struct Webpage {
     pub node_id: Option<NodeID>,
     pub dmoz_description: Option<String>,
     pub safety_classification: Option<safety_classifier::Label>,
+    pub inserted_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+impl Default for Webpage {
+    fn default() -> Self {
+        Self {
+            html: Html {
+                url: Url::parse("https://example.com").expect("Failed to parse url"),
+                root: kuchiki::parse_html().one("<html></html>"),
+                all_text: None,
+                clean_text: None,
+                lang: None,
+                robots: None,
+            },
+            backlink_labels: Default::default(),
+            host_centrality: Default::default(),
+            page_centrality: Default::default(),
+            fetch_time_ms: Default::default(),
+            pre_computed_score: Default::default(),
+            node_id: Default::default(),
+            dmoz_description: Default::default(),
+            safety_classification: Default::default(),
+            inserted_at: Utc::now(),
+        }
+    }
 }
 
 impl Webpage {
@@ -145,6 +171,7 @@ impl Webpage {
             node_id: None,
             dmoz_description: None,
             safety_classification: None,
+            inserted_at: Utc::now(),
         })
     }
 
@@ -195,6 +222,15 @@ impl Webpage {
                 .get_field(Field::Text(TextField::BacklinkText).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
+        );
+
+        doc.add_date(
+            schema
+                .get_field(Field::Text(TextField::InsertionTimestamp).name())
+                .expect("Failed to get insertion-timestamp field"),
+            tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
+                self.inserted_at.timestamp(),
+            )?),
         );
 
         let safety = self
@@ -1197,12 +1233,6 @@ impl Html {
                 Field::Text(TextField::MicroformatTags) => {
                     doc.add_pre_tokenized_text(tantivy_field, microformats.clone());
                 }
-                Field::Text(TextField::InsertionTimestamp) => {
-                    doc.add_date(
-                        tantivy_field,
-                        tantivy::DateTime::from_utc(OffsetDateTime::now_utc()),
-                    );
-                }
                 Field::Fast(FastField::IsHomepage) => {
                     doc.add_u64(tantivy_field, (self.is_homepage()).into());
                 }
@@ -1304,6 +1334,7 @@ impl Html {
                 }
                 Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SafetyClassification)
+                | Field::Text(TextField::InsertionTimestamp)
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::PageCentrality)
                 | Field::Fast(FastField::FetchTimeMs)
@@ -2199,14 +2230,9 @@ mod tests {
 
         let webpage = Webpage {
             html,
-            backlink_labels: Vec::new(),
-            host_centrality: 0.0,
-            page_centrality: 0.0,
             fetch_time_ms: 500,
-            pre_computed_score: 0.0,
-            node_id: None,
             dmoz_description: Some("dmoz description".to_string()),
-            safety_classification: None,
+            ..Default::default()
         };
 
         assert_eq!(
@@ -2234,14 +2260,9 @@ mod tests {
         .unwrap();
         let webpage = Webpage {
             html,
-            backlink_labels: Vec::new(),
-            host_centrality: 0.0,
-            page_centrality: 0.0,
             fetch_time_ms: 500,
-            pre_computed_score: 0.0,
-            node_id: None,
             dmoz_description: Some("dmoz description".to_string()),
-            safety_classification: None,
+            ..Default::default()
         };
 
         assert_eq!(webpage.dmoz_description(), None)

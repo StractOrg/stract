@@ -25,6 +25,7 @@ pub mod configure;
 pub mod crawler;
 pub mod dmoz_parser;
 mod entity;
+pub mod feed_indexer;
 pub mod indexer;
 pub mod safety_classifier;
 pub mod search_server;

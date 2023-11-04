@@ -436,3 +436,10 @@ pub struct LiveIndexSchedulerConfig {
     pub host_graph_path: String,
     pub num_splits: u64,
 }
+#[derive(Debug, Deserialize, Clone)]
+pub struct FeedIndexingConfig {
+    pub output_path: String,
+    pub warc_source: WarcSource,
+    pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
+}

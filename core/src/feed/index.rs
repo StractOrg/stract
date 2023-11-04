@@ -14,11 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use crate::tokenizer::{SiteOperatorUrlTokenizer, Tokenizer};
+use crate::{
+    inverted_index::merge_tantivy_segments,
+    tokenizer::{SiteOperatorUrlTokenizer, Tokenizer},
+};
 use anyhow::Result;
+use hashbrown::HashSet;
 use tantivy::{
+    merge_policy::NoMergePolicy,
     query::{PhraseQuery, TermQuery},
     schema::{IndexRecordOption, TextFieldIndexing, TextOptions, Value},
     tokenizer::Tokenizer as TantivyTokenizer,
@@ -28,17 +36,15 @@ use url::Url;
 use super::{Feed, FeedKind};
 
 pub struct FeedIndex {
+    tantivy_index: tantivy::Index,
     writer: tantivy::IndexWriter,
     reader: tantivy::IndexReader,
     schema: tantivy::schema::Schema,
+    pub path: PathBuf,
 }
 
 impl FeedIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
-        }
-
         let url_tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
         let kind_tokenizer = Tokenizer::default();
 
@@ -67,7 +73,13 @@ impl FeedIndex {
 
         let schema = builder.build();
 
-        let tv_index = tantivy::Index::create_in_dir(path, schema.clone())?;
+        let tv_index = if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref())?;
+            tantivy::Index::create_in_dir(path.as_ref(), schema.clone())?
+        } else {
+            tantivy::Index::open_in_dir(path.as_ref())?
+        };
+
         tv_index
             .tokenizers()
             .register(url_tokenizer.as_str(), url_tokenizer);
@@ -78,12 +90,17 @@ impl FeedIndex {
 
         let writer = tv_index.writer(50_000_000)?;
 
+        let merge_policy = NoMergePolicy;
+        writer.set_merge_policy(Box::new(merge_policy));
+
         let reader = tv_index.reader()?;
 
         Ok(Self {
+            tantivy_index: tv_index,
             writer,
             reader,
             schema,
+            path: path.as_ref().to_path_buf(),
         })
     }
 
@@ -169,6 +186,78 @@ impl FeedIndex {
         }
 
         Ok(res)
+    }
+
+    pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
+        let segments: Vec<_> = self
+            .tantivy_index
+            .load_metas()?
+            .segments
+            .into_iter()
+            .collect();
+
+        merge_tantivy_segments(&mut self.writer, segments, &self.path, max_num_segments)?;
+
+        Ok(())
+    }
+
+    pub fn merge(mut self, mut other: Self) -> Self {
+        let path = self.path.clone();
+
+        {
+            other.commit().expect("failed to commit index");
+            self.commit().expect("failed to commit index");
+
+            let other_meta = other
+                .tantivy_index
+                .load_metas()
+                .expect("failed to load tantivy metadata for index");
+
+            let mut meta = self
+                .tantivy_index
+                .load_metas()
+                .expect("failed to load tantivy metadata for index");
+
+            let other_path = other.path.clone();
+            let other_path = other_path.as_path();
+            other.writer.wait_merging_threads().unwrap();
+
+            let path = self.path.clone();
+            let self_path = path.as_path();
+            self.writer.wait_merging_threads().unwrap();
+
+            let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
+
+            for segment in other_meta.segments {
+                if ids.contains(&segment.id()) {
+                    continue;
+                }
+
+                // TODO: handle case where current index has segment with same name
+                for file in segment.list_files() {
+                    let p = other_path.join(&file);
+                    if p.exists() {
+                        fs::rename(p, self_path.join(&file)).unwrap();
+                    }
+                }
+                meta.segments.push(segment);
+            }
+
+            meta.segments
+                .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
+
+            fs::remove_dir_all(other_path).ok();
+
+            let self_path = Path::new(&path);
+
+            std::fs::write(
+                self_path.join("meta.json"),
+                serde_json::to_string_pretty(&meta).unwrap(),
+            )
+            .unwrap();
+        }
+
+        Self::open(path).expect("failed to open index")
     }
 }
 

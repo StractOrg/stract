@@ -218,6 +218,7 @@ impl EntityIndex {
         });
 
         info.into_iter()
+            .filter(|(_, value)| !value.text.is_empty())
             .map(|(key, mut value)| {
                 if let Some(start) = value.text.find(|c: char| !(c.is_whitespace() || c == '*')) {
                     value.text.replace_range(0..start, "");

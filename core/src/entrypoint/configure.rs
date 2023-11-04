@@ -137,7 +137,7 @@ fn create_inverted_index() -> Result<()> {
     let warc_path = Path::new(DATA_PATH).join("sample.warc.gz");
 
     let job = indexer::Job {
-        source_config: indexer::JobConfig::Local(crate::config::LocalConfig {
+        source_config: crate::config::WarcSource::Local(crate::config::LocalConfig {
             folder: ".".to_string(),
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),

@@ -100,15 +100,10 @@ mod tests {
                     "https://www.first.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
-                pre_computed_score: 0.0,
-                page_centrality: 0.0,
-
-                dmoz_description: None,
                 node_id: Some(Node::from("https://www.first.com").into_host().id()),
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -130,15 +125,10 @@ mod tests {
                     "https://www.second.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
                 host_centrality: 1.0,
                 fetch_time_ms: 499,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                dmoz_description: None,
                 node_id: Some(Node::from("https://www.second.com").into_host().id()),
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index
@@ -162,13 +152,8 @@ mod tests {
                 .unwrap(),
                 backlink_labels: vec![],
                 host_centrality: 1.0,
-                fetch_time_ms: 0,
-                page_centrality: 0.0,
-                pre_computed_score: 0.0,
-
-                dmoz_description: None,
                 node_id: Some(Node::from("https://www.third.com").into_host().id()),
-                safety_classification: None,
+                ..Default::default()
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

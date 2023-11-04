@@ -20,13 +20,11 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-use serde::{Deserialize, Serialize};
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use url::Url;
 
 use crate::collector::MainCollector;
-use crate::directory::{self, DirEntry};
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
@@ -167,43 +165,6 @@ impl Index {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FrozenIndex {
-    pub root: DirEntry,
-}
-
-impl From<FrozenIndex> for Index {
-    fn from(frozen: FrozenIndex) -> Self {
-        let path = match &frozen.root {
-            DirEntry::Folder { name, entries: _ } => name.clone(),
-            DirEntry::File {
-                name: _,
-                content: _,
-            } => {
-                panic!("Cannot open index from a file - must be directory.")
-            }
-        };
-
-        if Path::new(&path).exists() {
-            fs::remove_dir_all(&path).unwrap();
-        }
-
-        directory::recreate_folder(&frozen.root).unwrap();
-        Index::open(path).expect("failed to open index")
-    }
-}
-
-impl From<Index> for FrozenIndex {
-    fn from(mut index: Index) -> Self {
-        index.commit().expect("failed to commit index");
-        let path = index.path.clone();
-        index.inverted_index.stop();
-        let root = directory::scan_folder(path).unwrap();
-
-        Self { root }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::searcher::{LocalSearcher, SearchQuery};
@@ -211,54 +172,6 @@ mod tests {
     use super::*;
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
-
-    #[test]
-    fn serialize_deserialize_bincode() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(
-                Webpage::new(
-                    &format!(
-                        r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-                    {CONTENT}
-                </body>
-            </html>
-            "#
-                    ),
-                    "https://www.example.com",
-                )
-                .unwrap(),
-            )
-            .expect("failed to insert webpage");
-
-        index.commit().unwrap();
-
-        let path = index.path.clone();
-        let frozen: FrozenIndex = index.into();
-        let bytes = bincode::serialize(&frozen).unwrap();
-
-        std::fs::remove_dir_all(path).unwrap();
-
-        let deserialized_frozen: FrozenIndex = bincode::deserialize(&bytes).unwrap();
-        let index: Index = deserialized_frozen.into();
-        let searcher = LocalSearcher::from(index);
-
-        let result = searcher
-            .search(&SearchQuery {
-                query: "website".to_string(),
-                ..Default::default()
-            })
-            .expect("Search failed");
-
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.example.com/");
-    }
 
     #[test]
     fn bm25_all_docs() {
