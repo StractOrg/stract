@@ -4,7 +4,7 @@ import type { Actions } from './$types';
 import { api } from '$lib/api';
 import { fetchRemoteOptic } from '$lib/optics';
 
-export const load = async ({ locals, fetch, url }) => {
+export const load = async ({ locals, fetch, url, getClientAddress }) => {
   const searchParams: SearchParams | undefined =
     (locals['form'] && extractSearchParams(locals['form'])) || undefined;
 
@@ -34,7 +34,7 @@ export const load = async ({ locals, fetch, url }) => {
       fetchDiscussions: false,
       countResults: true,
     },
-    { fetch },
+    { fetch, headers: { 'X-Forwarded-For': getClientAddress() } },
   );
 
   const results = await data;

@@ -83,7 +83,6 @@ fn parse_atom(feed: &str) -> Result<ParsedFeed> {
                         .filter(std::result::Result::is_ok)
                         .find(|attr| attr.as_ref().unwrap().key.as_ref() == b"href")
                     {
-                        dbg!(&href);
                         if let Ok(href) = href
                             .unescape_value()
                             .map_err(|e| anyhow!(e))

@@ -17,7 +17,7 @@
 use anyhow::Result;
 use std::{
     path::Path,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     time::{Duration, SystemTime},
 };
 
@@ -215,7 +215,7 @@ impl Crawler {
     }
 }
 
-struct Index {
+pub struct Index {
     search_index: Arc<RwLock<crate::index::Index>>,
 }
 
@@ -247,6 +247,14 @@ impl Index {
 
     fn clone_inner_index(&self) -> Arc<RwLock<crate::index::Index>> {
         self.search_index.clone()
+    }
+
+    pub fn read(&self) -> RwLockReadGuard<'_, crate::index::Index> {
+        self.search_index.read().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn write(&self) -> RwLockWriteGuard<'_, crate::index::Index> {
+        self.search_index.write().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -363,5 +371,9 @@ impl IndexManager {
 
             tokio::time::sleep(EVENT_LOOP_INTERVAL).await;
         }
+    }
+
+    pub fn index(&self) -> Arc<Index> {
+        self.index.clone()
     }
 }

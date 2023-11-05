@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
 
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
@@ -25,7 +25,7 @@ use crate::config::{CollectorConfig, SnippetConfig};
 use crate::entity_index::{EntityIndex, EntityMatch};
 use crate::image_store::Image;
 use crate::index::Index;
-use crate::inverted_index::RetrievedWebpage;
+use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
 use crate::query::Query;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 #[cfg(not(feature = "libtorch"))]
@@ -40,13 +40,84 @@ use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpe
 use crate::spell::Spell;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
-use crate::{inverted_index, Error, Result};
+use crate::{inverted_index, live_index, Error, Result};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
 
-pub struct LocalSearcher {
-    index: Index,
+pub trait SearchableIndex {
+    type SearchGuard<'a>: SearchGuard<'a>
+    where
+        Self: 'a;
+
+    fn guard(&self) -> Self::SearchGuard<'_>;
+    fn optimize_for_search(&mut self);
+    fn set_snippet_config(&mut self, config: SnippetConfig);
+}
+
+pub trait SearchGuard<'a> {
+    fn search_index(&self) -> &'_ Index;
+    fn inverted_index(&self) -> &'_ InvertedIndex {
+        &self.search_index().inverted_index
+    }
+}
+
+impl SearchableIndex for Index {
+    type SearchGuard<'a> = NormalIndexSearchGuard<'a>;
+
+    fn guard(&self) -> Self::SearchGuard<'_> {
+        NormalIndexSearchGuard { search_index: self }
+    }
+
+    fn optimize_for_search(&mut self) {
+        self.optimize_for_search().unwrap();
+    }
+
+    fn set_snippet_config(&mut self, config: SnippetConfig) {
+        self.inverted_index.set_snippet_config(config);
+    }
+}
+
+pub struct NormalIndexSearchGuard<'a> {
+    search_index: &'a Index,
+}
+
+impl<'a> SearchGuard<'a> for NormalIndexSearchGuard<'a> {
+    fn search_index(&self) -> &'_ Index {
+        self.search_index
+    }
+}
+
+impl SearchableIndex for Arc<live_index::Index> {
+    type SearchGuard<'a> = LiveIndexSearchGuard<'a>;
+
+    fn guard(&self) -> Self::SearchGuard<'_> {
+        LiveIndexSearchGuard {
+            lock_guard: self.read(),
+        }
+    }
+
+    fn optimize_for_search(&mut self) {
+        self.write().optimize_for_search().unwrap();
+    }
+
+    fn set_snippet_config(&mut self, config: SnippetConfig) {
+        self.write().inverted_index.set_snippet_config(config);
+    }
+}
+
+pub struct LiveIndexSearchGuard<'a> {
+    lock_guard: RwLockReadGuard<'a, crate::index::Index>,
+}
+
+impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
+    fn search_index(&self) -> &'_ Index {
+        &self.lock_guard
+    }
+}
+
+pub struct LocalSearcher<I: SearchableIndex> {
+    index: I,
     spell: Option<Spell>,
     entity_index: Option<EntityIndex>,
     inbound_similarity: Option<InboundSimilarity>,
@@ -55,8 +126,11 @@ pub struct LocalSearcher {
     collector_config: CollectorConfig,
 }
 
-impl From<Index> for LocalSearcher {
-    fn from(index: Index) -> Self {
+impl<I> From<I> for LocalSearcher<I>
+where
+    I: SearchableIndex,
+{
+    fn from(index: I) -> Self {
         Self::new(index)
     }
 }
@@ -67,10 +141,13 @@ struct InvertedIndexResult {
     has_more: bool,
 }
 
-impl LocalSearcher {
-    pub fn new(index: Index) -> Self {
+impl<I> LocalSearcher<I>
+where
+    I: SearchableIndex,
+{
+    pub fn new(index: I) -> Self {
         let mut index = index;
-        index.optimize_for_search().unwrap();
+        index.optimize_for_search();
 
         LocalSearcher {
             index,
@@ -84,7 +161,7 @@ impl LocalSearcher {
     }
 
     pub fn build_spell_dict(&mut self) {
-        self.spell = Some(Spell::for_index(&self.index));
+        self.spell = Some(Spell::for_index(self.index.guard().search_index()));
     }
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
@@ -108,11 +185,16 @@ impl LocalSearcher {
     }
 
     pub fn set_snippet_config(&mut self, config: SnippetConfig) {
-        self.index.inverted_index.set_snippet_config(config);
+        self.index.set_snippet_config(config);
     }
 
-    fn parse_query(&self, ctx: &Ctx, query: &SearchQuery) -> Result<Query> {
-        let parsed_query = Query::parse(ctx, query, &self.index.inverted_index)?;
+    fn parse_query<'a, G: SearchGuard<'a>>(
+        &'a self,
+        ctx: &Ctx,
+        guard: &G,
+        query: &SearchQuery,
+    ) -> Result<Query> {
+        let parsed_query = Query::parse(ctx, query, guard.inverted_index())?;
 
         if parsed_query.is_empty() {
             Err(Error::EmptyQuery.into())
@@ -121,10 +203,11 @@ impl LocalSearcher {
         }
     }
 
-    fn ranker(
-        &self,
+    fn ranker<'a, G: SearchGuard<'a>>(
+        &'a self,
         query: &Query,
         ctx: &Ctx,
+        guard: &G,
         de_rank_similar: bool,
         aggregator: SignalAggregator,
     ) -> Result<Ranker> {
@@ -132,7 +215,7 @@ impl LocalSearcher {
 
         let mut ranker = Ranker::new(
             aggregator,
-            self.index.inverted_index.fastfield_reader(&ctx.tv_searcher),
+            guard.inverted_index().fastfield_reader(&ctx.tv_searcher),
             self.collector_config.clone(),
         );
 
@@ -147,11 +230,12 @@ impl LocalSearcher {
         if query_centrality_coeff > 0.0 {
             if let Some(inbound_sim) = self.inbound_similarity.as_ref() {
                 ranker = ranker
-                    .with_max_docs(1_000, self.index.num_segments())
+                    .with_max_docs(1_000, guard.inverted_index().num_segments())
                     .with_num_results(100);
 
                 let top_host_nodes =
-                    self.index
+                    guard
+                        .search_index()
                         .top_nodes(query, ctx, ranker.collector(ctx.clone()))?;
 
                 if !top_host_nodes.is_empty() {
@@ -167,15 +251,16 @@ impl LocalSearcher {
         Ok(ranker
             .with_max_docs(
                 self.collector_config.max_docs_considered,
-                self.index.num_segments(),
+                guard.inverted_index().num_segments(),
             )
             .with_num_results(query.num_results())
             .with_offset(query.offset()))
     }
 
-    fn search_inverted_index(
-        &self,
+    fn search_inverted_index<'a, G: SearchGuard<'a>>(
+        &'a self,
         ctx: &Ctx,
+        guard: &G,
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
@@ -185,7 +270,7 @@ impl LocalSearcher {
             self.lambda_model.clone(),
             self.collector_config.clone(),
         );
-        let parsed_query = self.parse_query(ctx, &query)?;
+        let parsed_query = self.parse_query(ctx, guard, &query)?;
 
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
 
@@ -212,7 +297,8 @@ impl LocalSearcher {
         }
 
         aggregator.set_region_count(
-            self.index
+            guard
+                .search_index()
                 .region_count
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
@@ -223,17 +309,17 @@ impl LocalSearcher {
             aggregator.set_linear_model(model.clone());
         }
 
-        let ranker = self.ranker(&parsed_query, ctx, de_rank_similar, aggregator)?;
+        let ranker = self.ranker(&parsed_query, ctx, guard, de_rank_similar, aggregator)?;
 
-        let res = self.index.inverted_index.search_initial(
+        let res = guard.inverted_index().search_initial(
             &parsed_query,
             ctx,
             ranker.collector(ctx.clone()),
         )?;
 
-        let fastfield_reader = self.index.inverted_index.fastfield_reader(&ctx.tv_searcher);
+        let fastfield_reader = guard.inverted_index().fastfield_reader(&ctx.tv_searcher);
 
-        let ranking_websites = self.index.inverted_index.retrieve_ranking_websites(
+        let ranking_websites = guard.inverted_index().retrieve_ranking_websites(
             ctx,
             res.top_websites,
             ranker.aggregator(),
@@ -243,7 +329,7 @@ impl LocalSearcher {
         let pipe_top_n = pipeline.top_n;
         let mut ranking_websites = pipeline.apply(ranking_websites);
 
-        let schema = self.index.schema();
+        let schema = guard.inverted_index().schema();
         for website in &mut ranking_websites {
             let doc: TantivyDocument = ctx.tv_searcher.doc(website.pointer.address.into())?;
             website.title = Some(
@@ -282,8 +368,10 @@ impl LocalSearcher {
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
-        let ctx = self.index.inverted_index.local_search_ctx();
-        let inverted_index_result = self.search_inverted_index(&ctx, query, de_rank_similar)?;
+        let guard = self.index.guard();
+        let ctx = guard.inverted_index().local_search_ctx();
+        let inverted_index_result =
+            self.search_inverted_index(&ctx, &guard, query, de_rank_similar)?;
         let correction = self.spell.as_ref().and_then(|s| s.correction(query));
         let sidebar = self.entity_sidebar(query);
 
@@ -301,18 +389,19 @@ impl LocalSearcher {
         websites: &[inverted_index::WebsitePointer],
         query: &str,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let ctx = self.index.inverted_index.local_search_ctx();
+        let guard = self.index.guard();
+        let ctx = guard.inverted_index().local_search_ctx();
         let query = SearchQuery {
             query: query.to_string(),
             ..Default::default()
         };
-        let query = Query::parse(&ctx, &query, &self.index.inverted_index)?;
+        let query = Query::parse(&ctx, &query, guard.inverted_index())?;
 
         if query.is_empty() {
             return Err(Error::EmptyQuery.into());
         }
 
-        self.index.retrieve_websites(websites, &query)
+        guard.inverted_index().retrieve_websites(websites, &query)
     }
 
     /// This function is mainly used for tests and benchmarks
@@ -405,11 +494,11 @@ impl LocalSearcher {
     }
 
     pub fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        self.index.get_webpage(url)
+        self.index.guard().inverted_index().get_webpage(url)
     }
 
     pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
-        self.index.get_homepage(url)
+        self.index.guard().inverted_index().get_homepage(url)
     }
 
     pub fn get_entity_image(&self, image_id: &str) -> Option<Image> {

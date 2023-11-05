@@ -51,7 +51,7 @@ sonic_service!(
 );
 
 pub struct SearchService {
-    local_searcher: LocalSearcher,
+    local_searcher: LocalSearcher<Index>,
     // dropping the handle leaves the cluster
     #[allow(unused)]
     cluster_handle: Cluster,

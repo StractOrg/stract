@@ -17,12 +17,10 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::SystemTime;
 
-use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
-use url::Url;
 
 use crate::collector::MainCollector;
 use crate::inverted_index::{self, InvertedIndex};
@@ -146,22 +144,6 @@ impl Index {
         self_region_count.merge(other_region_count);
 
         Self::open(&self.path).expect("failed to open index")
-    }
-
-    pub fn schema(&self) -> Arc<Schema> {
-        self.inverted_index.schema()
-    }
-
-    pub fn num_segments(&self) -> usize {
-        self.inverted_index.num_segments()
-    }
-
-    pub(crate) fn get_webpage(&self, url: &str) -> Option<inverted_index::RetrievedWebpage> {
-        self.inverted_index.get_webpage(url)
-    }
-
-    pub fn get_homepage(&self, url: &Url) -> Option<inverted_index::RetrievedWebpage> {
-        self.inverted_index.get_homepage(url)
     }
 }
 

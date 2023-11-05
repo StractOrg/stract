@@ -22,10 +22,23 @@ use crate::searcher::ShardId;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {
-    Searcher { host: SocketAddr, shard: ShardId },
-    Api { host: SocketAddr },
-    Webgraph { host: SocketAddr },
-    Alice { host: SocketAddr },
+    Searcher {
+        host: SocketAddr,
+        shard: ShardId,
+    },
+    LiveIndex {
+        host: SocketAddr,
+        split_id: crate::feed::scheduler::SplitId,
+    },
+    Api {
+        host: SocketAddr,
+    },
+    Webgraph {
+        host: SocketAddr,
+    },
+    Alice {
+        host: SocketAddr,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]

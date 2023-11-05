@@ -41,7 +41,10 @@ use crate::{
 };
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use axum::{
     http::StatusCode,
@@ -253,11 +256,12 @@ async fn search_metric<B>(
     // It is very important that the ip address is not stored. It is only used
     // for a probabilistic estimate of the number of unique users using a hyperloglog datastructure.
     let mut ip = None;
+
     if let Some(forwarded_for) = request.headers().get("x-forwarded-for") {
         let forwarded_for = forwarded_for.to_str().unwrap_or_default();
         if let Some(client_ip) = forwarded_for.split(',').next() {
-            if let Ok(client_ip) = client_ip.trim().parse::<SocketAddr>() {
-                ip = Some(client_ip.ip());
+            if let Ok(client_ip) = client_ip.trim().parse::<IpAddr>() {
+                ip = Some(client_ip);
             }
         }
     }
