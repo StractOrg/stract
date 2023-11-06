@@ -19,70 +19,51 @@ use crate::{
         cluster::Cluster,
         member::Service,
         sonic::replication::{
-            AllShardsSelector, RandomReplicaSelector, RandomShardSelector, RemoteClient,
-            ReplicatedClient, Shard, ShardIdentifier, ShardedClient, SpecificShardSelector,
+            AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient, Shard,
+            ShardIdentifier, ShardedClient, SpecificShardSelector,
         },
     },
     entrypoint::search_server::{self, SearchService},
-    image_store::Image,
+    feed::scheduler::SplitId,
     inverted_index::{RetrievedWebpage, WebsitePointer},
     ranking::pipeline::RankingWebsite,
-    Result,
 };
 
 use std::{collections::HashMap, sync::Arc};
 
 use futures::future::join_all;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use url::Url;
 
 use super::{InitialWebsiteResult, SearchQuery};
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Failed to get search result")]
-    SearchFailed,
-
-    #[error("Query cannot be empty")]
-    EmptyQuery,
-
-    #[error("Webpage not found")]
-    WebpageNotFound,
-}
 
 #[derive(Clone, Debug)]
 pub struct ScoredWebsitePointer {
     pub website: RankingWebsite,
-    pub shard: ShardId,
+    pub split_id: SplitId,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct ShardId(u64);
-
-impl ShardIdentifier for ShardId {}
+impl ShardIdentifier for SplitId {}
 
 #[derive(Debug)]
-pub struct InitialSearchResultShard {
+pub struct InitialSearchResultSplit {
     pub local_result: InitialWebsiteResult,
-    pub shard: ShardId,
+    pub split_id: SplitId,
 }
 
-pub struct DistributedSearcher {
+pub struct LiveSearcher {
     cluster: Arc<Cluster>,
 }
 
-impl DistributedSearcher {
+impl LiveSearcher {
     pub fn new(cluster: Arc<Cluster>) -> Self {
         Self { cluster }
     }
 
-    async fn client(&self) -> ShardedClient<SearchService, ShardId> {
+    async fn client(&self) -> ShardedClient<SearchService, SplitId> {
         let mut shards = HashMap::new();
         for member in self.cluster.members().await {
-            if let Service::Searcher { host, shard } = member.service {
-                shards.entry(shard).or_insert_with(Vec::new).push(host);
+            if let Service::LiveIndex { host, split_id } = member.service {
+                shards.entry(split_id).or_insert_with(Vec::new).push(host);
             }
         }
 
@@ -98,7 +79,7 @@ impl DistributedSearcher {
         ShardedClient::new(shard_clients)
     }
 
-    pub async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
+    pub async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultSplit> {
         let client = self.client().await;
         let mut results = Vec::new();
 
@@ -114,9 +95,9 @@ impl DistributedSearcher {
         {
             for (shard_id, mut res) in res {
                 if let Some(Some(res)) = res.pop() {
-                    results.push(InitialSearchResultShard {
+                    results.push(InitialSearchResultSplit {
                         local_result: res,
-                        shard: shard_id,
+                        split_id: shard_id,
                     });
                 }
             }
@@ -127,8 +108,8 @@ impl DistributedSearcher {
 
     async fn retrieve_webpages_from_shard(
         &self,
-        shard: ShardId,
-        client: &ShardedClient<SearchService, ShardId>,
+        split: SplitId,
+        client: &ShardedClient<SearchService, SplitId>,
         query: &str,
         pointers: Vec<(usize, WebsitePointer)>,
     ) -> Vec<(usize, RetrievedWebpage)> {
@@ -140,7 +121,7 @@ impl DistributedSearcher {
                     websites: pointers,
                     query: query.to_string(),
                 },
-                &SpecificShardSelector(shard),
+                &SpecificShardSelector(split),
                 &RandomReplicaSelector,
             )
             .await
@@ -166,15 +147,15 @@ impl DistributedSearcher {
 
         for (i, pointer) in top_websites {
             pointers
-                .entry(pointer.shard)
+                .entry(pointer.split_id.clone())
                 .or_default()
                 .push((*i, pointer.website.pointer.clone()));
         }
 
         let client = self.client().await;
         let mut futures = Vec::new();
-        for (shard, pointers) in pointers {
-            futures.push(self.retrieve_webpages_from_shard(shard, &client, query, pointers));
+        for (split_id, pointers) in pointers {
+            futures.push(self.retrieve_webpages_from_shard(split_id, &client, query, pointers));
         }
 
         let mut retrieved_webpages = Vec::new();
@@ -187,64 +168,5 @@ impl DistributedSearcher {
         retrieved_webpages.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         retrieved_webpages
-    }
-
-    pub async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let client = self.client().await;
-
-        let res = client
-            .send(
-                &search_server::GetWebpage {
-                    url: url.to_string(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-            .map_err(|_| Error::SearchFailed)?;
-
-        if let Some(Some(res)) = res.into_iter().flat_map(|(_, v)| v).next() {
-            Ok(Some(res))
-        } else {
-            Err(Error::WebpageNotFound.into())
-        }
-    }
-
-    pub async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let client = self.client().await;
-
-        let res = client
-            .send(
-                &search_server::GetHomepageDescriptions {
-                    urls: urls.to_vec(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await;
-
-        match res {
-            Ok(v) => v.into_iter().flat_map(|(_, v)| v).flatten().collect(),
-            _ => HashMap::new(),
-        }
-    }
-
-    pub async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
-        let client = self.client().await;
-
-        let (_, mut res) = client
-            .send(
-                &search_server::GetEntityImage {
-                    image_id: image_id.to_string(),
-                },
-                &RandomShardSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-            .map_err(|_| Error::SearchFailed)?
-            .pop()
-            .unwrap();
-
-        Ok(res.pop().flatten())
     }
 }

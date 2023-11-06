@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod replication;
 pub mod service;
 
 use std::{marker::PhantomData, time::Duration};

@@ -30,6 +30,7 @@ use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
+use crate::ranking::pipeline::{AsRankingWebsite, RankingWebsite};
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{
     create_stackoverflow_sidebar, DisplayedAnswer, DisplayedEntity, DisplayedSidebar,
@@ -46,14 +47,35 @@ use crate::{ceil_char_boundary, floor_char_boundary, query, Result};
 #[cfg(feature = "libtorch")]
 use crate::{qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel};
 
-use super::{
-    distributed, DistributedSearcher, InitialSearchResultShard, ScoredWebsitePointer, SearchQuery,
-    SearchResult, WebsitesResult,
-};
+use super::live::LiveSearcher;
+use super::{distributed, live, DistributedSearcher, SearchQuery, SearchResult, WebsitesResult};
+
+#[derive(Clone)]
+enum ScoredWebsitePointer {
+    Normal(distributed::ScoredWebsitePointer),
+    Live(live::ScoredWebsitePointer),
+}
+
+impl AsRankingWebsite for ScoredWebsitePointer {
+    fn as_ranking(&self) -> &RankingWebsite {
+        match self {
+            ScoredWebsitePointer::Normal(p) => &p.website,
+            ScoredWebsitePointer::Live(p) => &p.website,
+        }
+    }
+
+    fn as_mut_ranking(&mut self) -> &mut RankingWebsite {
+        match self {
+            ScoredWebsitePointer::Normal(p) => &mut p.website,
+            ScoredWebsitePointer::Live(p) => &mut p.website,
+        }
+    }
+}
 
 #[cfg(feature = "libtorch")]
 pub struct ApiSearcher {
     distributed_searcher: DistributedSearcher,
+    live_searcher: LiveSearcher,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
     qa_model: Option<Arc<QaModel>>,
@@ -84,7 +106,8 @@ impl ApiSearcher {
         config: ApiConfig,
     ) -> Self {
         Self {
-            distributed_searcher: DistributedSearcher::new(cluster),
+            distributed_searcher: DistributedSearcher::new(Arc::clone(&cluster)),
+            live_searcher: LiveSearcher::new(Arc::clone(&cluster)),
             cross_encoder: cross_encoder.map(Arc::new),
             lambda_model: lambda_model.map(Arc::new),
             qa_model: qa_model.map(Arc::new),
@@ -114,7 +137,8 @@ impl ApiSearcher {
 
     fn combine_results(
         &self,
-        initial_results: Vec<InitialSearchResultShard>,
+        initial_results: Vec<distributed::InitialSearchResultShard>,
+        live_results: Vec<live::InitialSearchResultSplit>,
         pipeline: RankingPipeline<ScoredWebsitePointer>,
     ) -> (Vec<ScoredWebsitePointer>, bool) {
         let mut collector =
@@ -124,10 +148,26 @@ impl ApiSearcher {
         for result in initial_results {
             for website in result.local_result.websites {
                 num_sites += 1;
-                let pointer = ScoredWebsitePointer {
+                let pointer = distributed::ScoredWebsitePointer {
                     website,
-                    shard: result.shard.clone(),
+                    shard: result.shard,
                 };
+
+                let pointer = ScoredWebsitePointer::Normal(pointer);
+
+                collector.insert(pointer);
+            }
+        }
+
+        for result in live_results {
+            for website in result.local_result.websites {
+                num_sites += 1;
+                let pointer = live::ScoredWebsitePointer {
+                    website,
+                    split_id: result.split_id.clone(),
+                };
+
+                let pointer = ScoredWebsitePointer::Live(pointer);
 
                 collector.insert(pointer);
             }
@@ -174,13 +214,14 @@ impl ApiSearcher {
 
         if let Some((shard, website)) = results.pop() {
             if website.score > self.thresholds.stackoverflow {
-                let scored_websites = vec![ScoredWebsitePointer { website, shard }];
+                let scored_websites =
+                    vec![(0, distributed::ScoredWebsitePointer { website, shard })];
                 let mut retrieved = self
                     .distributed_searcher
                     .retrieve_webpages(&scored_websites, &query.query)
                     .await;
 
-                if let Some(res) = retrieved.pop() {
+                if let Some((_, res)) = retrieved.pop() {
                     return Ok(Some(create_stackoverflow_sidebar(
                         res.schema_org,
                         Url::parse(&res.url).unwrap(),
@@ -194,7 +235,7 @@ impl ApiSearcher {
 
     async fn sidebar(
         &self,
-        initial_results: &[InitialSearchResultShard],
+        initial_results: &[distributed::InitialSearchResultShard],
         query: &SearchQuery,
     ) -> Result<Option<DisplayedSidebar>> {
         let entity = initial_results
@@ -303,11 +344,11 @@ impl ApiSearcher {
             return Ok(None);
         }
 
-        let (top_websites, _) = self.combine_results(initial_results, pipeline);
+        let (top_websites, _) = self.combine_results(initial_results, vec![], pipeline);
 
         let scores: Vec<_> = top_websites
             .iter()
-            .map(|pointer| pointer.website.score)
+            .map(|pointer| pointer.as_ranking().score)
             .collect();
 
         let median = if scores.len() % 2 == 0 {
@@ -322,9 +363,24 @@ impl ApiSearcher {
 
         let mut result: Vec<DisplayedWebpage> = self
             .distributed_searcher
-            .retrieve_webpages(&top_websites, &query.query)
+            .retrieve_webpages(
+                &top_websites
+                    .clone()
+                    .into_iter()
+                    .filter_map(|pointer| {
+                        if let ScoredWebsitePointer::Normal(p) = pointer {
+                            Some(p)
+                        } else {
+                            None
+                        }
+                    })
+                    .enumerate()
+                    .collect_vec(),
+                &query.query,
+            )
             .await
             .into_iter()
+            .map(|(_, webpage)| webpage)
             .map(DisplayedWebpage::from)
             .collect();
 
@@ -344,7 +400,7 @@ impl ApiSearcher {
             let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
 
             for signal in ALL_SIGNALS {
-                if let Some(signal_value) = pointer.website.signals.get(signal) {
+                if let Some(signal_value) = pointer.as_ranking().signals.get(signal) {
                     signals.insert(signal, *signal_value);
                 }
             }
@@ -378,16 +434,15 @@ impl ApiSearcher {
                 self.collector_config.clone(),
             )?;
 
-        let initial_results = self
-            .distributed_searcher
-            .search_initial(&search_query)
-            .await;
+        let (initial_results, live_results, widget, discussions) = tokio::join!(
+            self.distributed_searcher.search_initial(&search_query),
+            self.live_searcher.search_initial(&search_query),
+            self.widget(query),
+            self.discussions_widget(query)
+        );
 
+        let discussions = discussions?;
         let sidebar = self.sidebar(&initial_results, query).await?;
-
-        let discussions = self.discussions_widget(query).await?;
-
-        let widget = self.widget(query);
 
         let spell_corrected_query = if widget.is_none() {
             initial_results
@@ -403,14 +458,51 @@ impl ApiSearcher {
             .map(|result| result.local_result.num_websites)
             .sum();
 
-        let (top_websites, has_more_results) = self.combine_results(initial_results, pipeline);
+        let (top_websites, has_more_results) =
+            self.combine_results(initial_results, live_results, pipeline);
 
         // retrieve webpages
-        let mut retrieved_webpages: Vec<_> = self
+        let normal: Vec<_> = top_websites
+            .iter()
+            .enumerate()
+            .filter_map(|(i, pointer)| {
+                if let ScoredWebsitePointer::Normal(p) = pointer {
+                    Some((i, p.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let live: Vec<_> = top_websites
+            .iter()
+            .enumerate()
+            .filter_map(|(i, pointer)| {
+                if let ScoredWebsitePointer::Live(p) = pointer {
+                    Some((i, p.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let retrieved_normal: Vec<_> = self
             .distributed_searcher
-            .retrieve_webpages(&top_websites, &query.query)
-            .await
+            .retrieve_webpages(&normal, &query.query)
+            .await;
+
+        let retrieved_live: Vec<_> = self
+            .live_searcher
+            .retrieve_webpages(&live, &query.query)
+            .await;
+
+        let mut retrieved_webpages: Vec<_> =
+            retrieved_normal.into_iter().chain(retrieved_live).collect();
+        retrieved_webpages.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()
+            .map(|(_, webpage)| webpage)
             .map(DisplayedWebpage::from)
             .collect();
 
@@ -447,7 +539,7 @@ impl ApiSearcher {
         Ok(SearchResult::Websites(self.search_websites(query).await?))
     }
 
-    fn widget(&self, query: &SearchQuery) -> Option<Widget> {
+    async fn widget(&self, query: &SearchQuery) -> Option<Widget> {
         if query.page > 0 {
             return None;
         }
@@ -508,7 +600,7 @@ impl ApiSearcher {
         None
     }
 
-    pub async fn get_webpage(&self, url: &str) -> Result<RetrievedWebpage> {
+    pub async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
         self.distributed_searcher.get_webpage(url).await
     }
 

@@ -47,7 +47,12 @@ async fn summarize(
     params: SummarizeParams,
     state: Arc<State>,
 ) -> Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>> {
-    let webpage = state.searcher.get_webpage(&params.url).await?;
+    let webpage = state
+        .searcher
+        .get_webpage(&params.url)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Webpage not found: {}", params.url))?;
+
     let (tx, mut rx) = unbounded_channel();
 
     let summarizer = Arc::clone(&state.summarizer);

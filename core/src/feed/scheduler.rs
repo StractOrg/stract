@@ -49,6 +49,12 @@ impl From<&Url> for Domain {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct SplitId(uuid::Uuid);
 
+impl SplitId {
+    pub fn id(&self) -> uuid::Uuid {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Split {
     pub id: SplitId,
