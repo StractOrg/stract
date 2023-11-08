@@ -130,16 +130,25 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
             .into_par_iter()
             .progress_count(num_groups as u64)
             .for_each(|(domain, hosts)| {
+                if domain.as_str().is_empty() {
+                    return;
+                }
+
                 let mut total_wander_budget = 0;
                 let mut total_schedule_budget = 0;
                 let mut total_scheduled_urls = 0;
                 let mut urls = VecDeque::new();
 
-                for host in hosts {
-                    let mut pages = all_pages(&page_centrality, &page_graph, host);
+                for host in &hosts {
+                    let mut pages = all_pages(&page_centrality, &page_graph, *host);
+
+                    if pages.is_empty() {
+                        continue;
+                    }
+
                     pages.sort_by(|(_, a), (_, b)| b.total_cmp(a));
                     tracing::debug!("num pages: {}", pages.len());
-                    let host_centrality = host_centrality.get(&host).unwrap_or_default();
+                    let host_centrality = host_centrality.get(host).unwrap_or_default();
 
                     let host_budget = ((config.crawl_budget as f64 * host_centrality)
                         / total_host_centrality)
@@ -151,6 +160,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                     tracing::debug!("schedule_budget: {schedule_budget}");
                     let wander_budget = (host_budget as f64 * config.wander_fraction)
                         .max(0.0)
+                        .min(schedule_budget as f64)
                         .round() as u64;
                     tracing::debug!("wander_budget: {wander_budget}");
 
@@ -171,6 +181,13 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                     total_scheduled_urls += urls.len() as u64 - before as u64;
                 }
 
+                tracing::trace!(
+                    "domain: {:#?} hosts: {:#?} urls: {:#?}",
+                    domain,
+                    hosts,
+                    urls
+                );
+
                 let job = Job {
                     domain: domain.clone(),
                     urls,
@@ -179,6 +196,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
 
                 let domain_stats = DomainStats {
                     domain,
+                    num_hosts: hosts.len(),
                     schedule_budget: total_schedule_budget,
                     wander_budget: total_wander_budget,
                     scheduled_urls: total_scheduled_urls,
@@ -224,6 +242,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
 #[derive(serde::Serialize)]
 struct DomainStats {
     domain: Domain,
+    num_hosts: usize,
     schedule_budget: u64,
     scheduled_urls: u64,
     wander_budget: u64,
