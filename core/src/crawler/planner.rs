@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::{anyhow, Result};
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
@@ -40,9 +41,8 @@ fn all_pages(
     host: NodeID,
 ) -> Vec<(NodeID, f64)> {
     page_graph
-        .raw_ingoing_edges_by_host(&host)
+        .pages_by_host(&host)
         .into_iter()
-        .map(|e| e.to)
         .map(|id| (id, page_centrality.get(&id).unwrap_or_default()))
         .collect::<Vec<_>>()
 }
@@ -98,10 +98,12 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
         &host_centrality,
         TopHosts::Fraction(config.top_host_fraction),
     );
-    tracing::info!("found {} hosts", hosts.len());
+    let num_hosts = hosts.len();
+    tracing::info!("found {} hosts", num_hosts);
 
     let total_host_centrality = host_centrality.iter().map(|(_, v)| v).sum::<f64>();
     let grouped = group_domain(hosts, &host_graph);
+    let num_groups = grouped.len();
 
     let job_queues: Vec<Mutex<FileQueueWriter<Job>>> = (0..config.num_job_queues)
         .map(|i| {
@@ -124,70 +126,76 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
         .build()?;
 
     pool.install(|| {
-        grouped.into_par_iter().for_each(|(domain, hosts)| {
-            let mut total_wander_budget = 0;
-            let mut total_schedule_budget = 0;
-            let mut total_scheduled_urls = 0;
-            let mut urls = VecDeque::new();
+        grouped
+            .into_par_iter()
+            .progress_count(num_groups as u64)
+            .for_each(|(domain, hosts)| {
+                let mut total_wander_budget = 0;
+                let mut total_schedule_budget = 0;
+                let mut total_scheduled_urls = 0;
+                let mut urls = VecDeque::new();
 
-            for host in hosts {
-                let mut pages = all_pages(&page_centrality, &page_graph, host);
-                pages.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-                tracing::debug!("num pages: {}", pages.len());
-                let host_centrality = host_centrality.get(&host).unwrap_or_default();
+                for host in hosts {
+                    let mut pages = all_pages(&page_centrality, &page_graph, host);
+                    pages.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+                    tracing::debug!("num pages: {}", pages.len());
+                    let host_centrality = host_centrality.get(&host).unwrap_or_default();
 
-                let host_budget = ((config.crawl_budget as f64 * host_centrality)
-                    / total_host_centrality)
-                    .max(1.0) as u64;
-                tracing::debug!("host_budget: {host_budget}");
-                let schedule_budget =
-                    (host_budget as f64 * (1.0 - config.wander_fraction)).max(1.0) as u64;
-                tracing::debug!("schedule_budget: {schedule_budget}");
-                let wander_budget = (host_budget as f64 * config.wander_fraction).max(0.0) as u64;
-                tracing::debug!("wander_budget: {wander_budget}");
+                    let host_budget = ((config.crawl_budget as f64 * host_centrality)
+                        / total_host_centrality)
+                        .max(1.0) as u64;
+                    tracing::debug!("host_budget: {host_budget}");
+                    let schedule_budget = (host_budget as f64 * (1.0 - config.wander_fraction))
+                        .max(0.0)
+                        .round() as u64;
+                    tracing::debug!("schedule_budget: {schedule_budget}");
+                    let wander_budget = (host_budget as f64 * config.wander_fraction)
+                        .max(0.0)
+                        .round() as u64;
+                    tracing::debug!("wander_budget: {wander_budget}");
 
-                total_wander_budget += wander_budget;
-                total_schedule_budget += schedule_budget;
+                    total_wander_budget += wander_budget;
+                    total_schedule_budget += schedule_budget;
 
-                let before = urls.len();
-                urls.extend(
-                    pages
-                        .into_iter()
-                        .map(|(id, _)| id)
-                        .filter_map(|id| page_graph.id2node(&id))
-                        .map(|n| n.name)
-                        .filter_map(|n| Url::parse(&format!("http://{n}")).ok())
-                        .take(schedule_budget as usize),
-                );
+                    let before = urls.len();
+                    urls.extend(
+                        pages
+                            .into_iter()
+                            .map(|(id, _)| id)
+                            .filter_map(|id| page_graph.id2node(&id))
+                            .map(|n| n.name)
+                            .filter_map(|n| Url::parse(&format!("http://{n}")).ok())
+                            .take(schedule_budget as usize),
+                    );
 
-                total_scheduled_urls += urls.len() as u64 - before as u64;
-            }
+                    total_scheduled_urls += urls.len() as u64 - before as u64;
+                }
 
-            let job = Job {
-                domain: domain.clone(),
-                urls,
-                wandering_urls: total_wander_budget,
-            };
+                let job = Job {
+                    domain: domain.clone(),
+                    urls,
+                    wandering_urls: total_wander_budget,
+                };
 
-            let domain_stats = DomainStats {
-                domain,
-                schedule_budget: total_schedule_budget,
-                wander_budget: total_wander_budget,
-                scheduled_urls: total_scheduled_urls,
-            };
-            stats
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .push(domain_stats);
+                let domain_stats = DomainStats {
+                    domain,
+                    schedule_budget: total_schedule_budget,
+                    wander_budget: total_wander_budget,
+                    scheduled_urls: total_scheduled_urls,
+                };
+                stats
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .push(domain_stats);
 
-            // `fetch_add` wraps around on overflow
-            let queue_index = next_queue.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            job_queues[queue_index % job_queues.len()]
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .push(job)
-                .unwrap();
-        })
+                // `fetch_add` wraps around on overflow
+                let queue_index = next_queue.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                job_queues[queue_index % job_queues.len()]
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .push(job)
+                    .unwrap();
+            })
     });
 
     for queue in job_queues {

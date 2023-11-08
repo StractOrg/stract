@@ -136,6 +136,10 @@ impl Segment {
             .collect()
     }
 
+    pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
+        self.full_adjacency.nodes_by_prefix(host_node)
+    }
+
     pub fn id(&self) -> String {
         self.id.clone()
     }
