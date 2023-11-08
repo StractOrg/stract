@@ -1,13 +1,15 @@
 <script lang="ts">
-  import {HighlightAuto} from "svelte-highlight";
+  import { HighlightAuto } from 'svelte-highlight';
 
   export let code: string;
   export let transparentBackground = false;
 </script>
 
-<div class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus">
+<div
+  class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
+>
   <div class="overflow-auto px-3 py-2">
-    <HighlightAuto code={code}/>
+    <HighlightAuto {code} />
   </div>
 </div>
 

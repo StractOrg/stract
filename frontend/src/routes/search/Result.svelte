@@ -57,9 +57,9 @@
           <div class="inline">
             <span id="snippet-text" class="snippet-text">
               {#if webpage.snippet.date}
-              <span class="text-neutral">
-                {webpage.snippet.date} -
-              </span>
+                <span class="text-neutral">
+                  {webpage.snippet.date} -
+                </span>
               {/if}
               <span>
                 <TextSnippet snippet={webpage.snippet.text} />
@@ -70,7 +70,10 @@
       </div>
     {:else if webpage.snippet.type == 'stackOverflowQA'}
       <div class="snippet">
-        <StackOverflowSnippet question={webpage.snippet.question} answers={webpage.snippet.answers} />
+        <StackOverflowSnippet
+          question={webpage.snippet.question}
+          answers={webpage.snippet.answers}
+        />
       </div>
     {/if}
   </div>

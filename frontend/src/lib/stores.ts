@@ -25,14 +25,24 @@ const writableLocalStorage = <T>(
       ? parseJSONWithFallback(storedValue, defaultValue, `Failed to parse value stored in '${key}'`)
       : defaultValue,
   );
+
   store.subscribe(($value) => {
-    if (storage)
+    if (browser && storage) {
       if (typeof $value == 'undefined') {
         storage.removeItem(key);
       } else {
         storage.setItem(key, JSON.stringify($value));
       }
+    }
   });
+
+  const { set } = store;
+  store.set = (value: T) => {
+    if (storage) {
+      set(value);
+    }
+  };
+
   return store;
 };
 
@@ -55,16 +65,12 @@ const SITE_RANKINGS_KEY = 'siteRankings';
 export const siteRankingsStore = writableLocalStorage<SiteRakings>(SITE_RANKINGS_KEY, {});
 
 const SEARCH_QUERY_KEY = 'searchQuery';
-export const searchQueryStore = writableLocalStorage<string | undefined>(
-  SEARCH_QUERY_KEY,
-  void 0,
-  browser && sessionStorage,
-);
+export const searchQueryStore = writableLocalStorage<string | undefined>(SEARCH_QUERY_KEY, void 0);
 
 const THEME_KEY = 'theme';
 export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
 if (browser)
-  themeStore.subscribe(($theme) => {
+  themeStore?.subscribe(($theme) => {
     const c = document.documentElement.className.replace(/theme-[^ ]+/, ``);
     const theme = $theme?.toLowerCase() || '';
     document.documentElement.className = `${c} ${theme}`.trim();

@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use crate::hyperloglog::HyperLogLog;
 
 const THRESHOLD_SIM_ESTIMATE: f64 = 0.1;
-
 const HYPERLOGLOG_REGISTERS: usize = 128;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

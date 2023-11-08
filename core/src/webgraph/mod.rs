@@ -28,6 +28,7 @@ use utoipa::ToSchema;
 
 use crate::executor::Executor;
 use crate::intmap;
+use crate::webpage::url_ext::UrlExt;
 
 pub mod centrality;
 mod store;
@@ -187,7 +188,7 @@ impl Node {
 
         match url {
             Ok(url) => {
-                let host = url.host_str().unwrap_or_default().to_string();
+                let host = url.root_domain().unwrap_or_default().to_string();
                 Node { name: host }
             }
             Err(_) => Node {

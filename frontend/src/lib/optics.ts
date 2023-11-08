@@ -58,8 +58,7 @@ export const DEFAULT_OPTICS = [
   },
   {
     url: 'https://raw.githubusercontent.com/StractOrg/sample-optics/main/tilde.optic',
-    description:
-      'Only search in urls that contain a tilde (~).',
+    description: 'Only search in urls that contain a tilde (~).',
     name: 'Tilde',
     shown: false,
   },

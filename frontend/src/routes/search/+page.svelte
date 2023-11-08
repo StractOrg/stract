@@ -62,7 +62,7 @@
     };
 
   // NOTE: save the search query to be used in the header
-  $: searchQueryStore.set($page.url.search);
+  $: searchQueryStore?.set($page.url.search);
 
   $: {
     results;
@@ -96,9 +96,9 @@
   ] as const;
 
   const rankSite = (site: DisplayedWebpage, ranking: Ranking) => () => {
-    siteRankingsStore.update(($rankings) => ({
+    siteRankingsStore?.update(($rankings) => ({
       ...$rankings,
-      [site.host]: $rankings[site.host] == ranking ? void 0 : ranking,
+      [site.domain]: $rankings[site.domain] == ranking ? void 0 : ranking,
     }));
   };
 
@@ -119,13 +119,13 @@
   >
     <div>
       <h2 class="w-fit text-center">
-        Do you like results from {modal.site.host}?
+        Do you like results from {modal.site.domain}?
       </h2>
       <div class="flex justify-center space-x-1.5 pt-2">
         {#each rankingChoices as { ranking, kind, Icon }}
           <Button
             {kind}
-            pale={$siteRankingsStore[modal.site.host] != ranking}
+            pale={$siteRankingsStore[modal.site.domain] != ranking}
             padding={false}
             form="searchbar-form"
             on:click={rankSite(modal.site, ranking)}
@@ -153,7 +153,7 @@
       <div class="mx-auto flex w-full justify-between">
         <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
           <p class="h-fit">
-            {#if results.numHits != null }
+            {#if results.numHits != null}
               Found {results.numHits.toLocaleString()} results in {(
                 (results.searchDurationMs ?? 0) / 1000
               ).toFixed(2)}

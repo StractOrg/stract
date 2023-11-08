@@ -15,12 +15,12 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
     if (form) {
       params = form;
     } else {
-      throw redirect(300, '/');
+      throw redirect(301, '/');
     }
   }
 
   if (!params.query.trim()) {
-    throw redirect(300, '/');
+    throw redirect(301, '/');
   }
 
   const { data } = api.search(

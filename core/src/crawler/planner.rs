@@ -152,7 +152,8 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
 
                     let host_budget = ((config.crawl_budget as f64 * host_centrality)
                         / total_host_centrality)
-                        .max(1.0) as u64;
+                        .max(0.0)
+                        .round() as u64;
                     tracing::debug!("host_budget: {host_budget}");
                     let schedule_budget = (host_budget as f64 * (1.0 - config.wander_fraction))
                         .max(0.0)
@@ -160,7 +161,6 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                     tracing::debug!("schedule_budget: {schedule_budget}");
                     let wander_budget = (host_budget as f64 * config.wander_fraction)
                         .max(0.0)
-                        .min(schedule_budget as f64)
                         .round() as u64;
                     tracing::debug!("wander_budget: {wander_budget}");
 

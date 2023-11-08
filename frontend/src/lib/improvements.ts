@@ -11,7 +11,14 @@ export const updateQueryId = async ({
 }: {
   query: string;
   webpages: DisplayedWebpage[];
-}) => queryIdStore.set(await queryId({ query, urls: webpages.map((wp) => wp.url) }).data);
+}) => {
+  let allowStats: boolean | undefined;
+  allowStatsStore.subscribe((allow) => (allowStats = allow));
+
+  if (!allowStats) return;
+
+  queryIdStore.set(await queryId({ query, urls: webpages.map((wp) => wp.url) }).data);
+};
 
 export const improvements: Action<HTMLAnchorElement, number> = (node, webpageIndex) => {
   let queryId: string | undefined;

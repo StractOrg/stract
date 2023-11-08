@@ -169,7 +169,6 @@ pub struct DisplayedWebpage {
     pub url: String,
     pub site: String,
     pub domain: String,
-    pub host: String,
     pub pretty_url: String,
     pub snippet: Snippet,
     pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
@@ -191,7 +190,6 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
         let url = Url::parse(&webpage.url).unwrap();
         let domain = url.root_domain().unwrap_or_default().to_string();
-        let host = url.host_str().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
 
         Self {
@@ -200,7 +198,6 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             url: webpage.url,
             pretty_url,
             domain,
-            host,
             snippet,
             ranking_signals: None,
         }
