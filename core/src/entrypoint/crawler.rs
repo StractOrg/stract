@@ -69,7 +69,9 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
 pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
     let page_centrality = RocksDbStore::open(&config.page_harmonic_path);
     let host_centrality = RocksDbStore::open(&config.host_harmonic_path);
-    let page_graph = WebgraphBuilder::new(&config.page_graph_path).open();
+    let page_graph = WebgraphBuilder::new(&config.page_graph_path)
+        .single_threaded()
+        .open();
     let host_graph = WebgraphBuilder::new(&config.host_graph_path).open();
     let output_path = config.output_path.clone();
 
