@@ -233,11 +233,11 @@ impl ApiSearcher {
         Ok(None)
     }
 
-    async fn sidebar(
+    fn sidebar(
         &self,
         initial_results: &[distributed::InitialSearchResultShard],
-        query: &SearchQuery,
-    ) -> Result<Option<DisplayedSidebar>> {
+        stackoverflow: Option<DisplayedSidebar>,
+    ) -> Option<DisplayedSidebar> {
         let entity = initial_results
             .iter()
             .filter_map(|res| res.local_result.entity_sidebar.clone())
@@ -250,8 +250,8 @@ impl ApiSearcher {
             });
 
         match entity {
-            Some(entity) => Ok(Some(DisplayedSidebar::Entity(entity))),
-            None => Ok(self.stackoverflow_sidebar(query).await?),
+            Some(entity) => Some(DisplayedSidebar::Entity(entity)),
+            None => stackoverflow,
         }
     }
 
@@ -434,15 +434,17 @@ impl ApiSearcher {
                 self.collector_config.clone(),
             )?;
 
-        let (initial_results, live_results, widget, discussions) = tokio::join!(
+        let (initial_results, live_results, widget, discussions, stackoverflow) = tokio::join!(
             self.distributed_searcher.search_initial(&search_query),
             self.live_searcher.search_initial(&search_query),
             self.widget(query),
-            self.discussions_widget(query)
+            self.discussions_widget(query),
+            self.stackoverflow_sidebar(query),
         );
 
         let discussions = discussions?;
-        let sidebar = self.sidebar(&initial_results, query).await?;
+        let stackoverflow = stackoverflow?;
+        let sidebar = self.sidebar(&initial_results, stackoverflow);
 
         let spell_corrected_query = if widget.is_none() {
             initial_results
@@ -486,15 +488,11 @@ impl ApiSearcher {
             })
             .collect();
 
-        let retrieved_normal: Vec<_> = self
-            .distributed_searcher
-            .retrieve_webpages(&normal, &query.query)
-            .await;
-
-        let retrieved_live: Vec<_> = self
-            .live_searcher
-            .retrieve_webpages(&live, &query.query)
-            .await;
+        let (retrieved_normal, retrieved_live) = tokio::join!(
+            self.distributed_searcher
+                .retrieve_webpages(&normal, &query.query),
+            self.live_searcher.retrieve_webpages(&live, &query.query),
+        );
 
         let mut retrieved_webpages: Vec<_> =
             retrieved_normal.into_iter().chain(retrieved_live).collect();

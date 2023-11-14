@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { getDataset } from "./dataset";
 import type { SimpleWebpage } from "./webpage";
 
-const db = new Database("../data/ranking-annotation.sqlite", {
+const db = new Database("../../data/ranking-annotation.sqlite", {
   fileMustExist: false,
 });
 
@@ -22,7 +22,7 @@ function setupDB() {
 	url TEXT NOT NULL,
 	orig_rank INTEGER NOT NULL,
 	webpage_json TEXT NOT NULL,
-	anotated_rank INTEGER,
+	annotated_rank INTEGER,
 	PRIMARY KEY (qid, url)
   );
   `);
@@ -50,15 +50,48 @@ export type Query = {
 export function getQueries(): Query[] {
   const query = db.prepare(`
 		SELECT qid, query, EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.anotated_rank IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
 		) AS annotated
-		FROM queries
+		FROM queries ORDER BY qid
 	`);
 
   return query.all() as Query[];
 }
 
+export function getNextQuery(qid: string): Query | undefined {
+  const query = db.prepare(`
+    SELECT qid, query, EXISTS (
+      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+    ) AS annotated
+    FROM queries
+    WHERE qid > @qid
+    ORDER BY qid
+    LIMIT 1
+  `);
+
+  const res = query.get({ qid });
+
+  return res as Query | undefined;
+}
+
+export function getPreviousQuery(qid: string): Query | undefined {
+  const query = db.prepare(`
+    SELECT qid, query, EXISTS (
+      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+    ) AS annotated
+    FROM queries
+    WHERE qid < @qid
+    ORDER BY qid DESC
+    LIMIT 1
+  `);
+
+  const res = query.get({ qid });
+
+  return res as Query | undefined;
+}
+
 export type SearchResult = {
+  id: string;
   origRank: number;
   webpage: SimpleWebpage;
   annotatedRank: number | null;
@@ -66,7 +99,7 @@ export type SearchResult = {
 
 export function getSearchResults(qid: string): SearchResult[] {
   const queryResults = db.prepare(`
-		SELECT url, orig_rank as origRank, webpage_json, anotated_rank AS annotatedRank
+		SELECT url, orig_rank as origRank, webpage_json, annotated_rank AS annotatedRank
 		FROM search_results
 		WHERE qid = @qid
 	`);
@@ -74,6 +107,7 @@ export function getSearchResults(qid: string): SearchResult[] {
   const res = queryResults.all({ qid });
 
   return res.map((r: any) => ({
+    id: `${qid}-${r.url}`,
     origRank: r.origRank,
     annotatedRank: r.annotatedRank,
     webpage: JSON.parse(r.webpage_json),
@@ -81,29 +115,33 @@ export function getSearchResults(qid: string): SearchResult[] {
 }
 
 export const saveSearchResults = (qid: string, searchResults: SearchResult[]) => {
-  const insertSearchResults = db.prepare(`
-		INSERT INTO search_results (qid, url, orig_rank, webpage_json)
-		VALUES (@qid, @url, @origRank, @webpageJson)
-	`);
+  const upsertSearchResults = db.prepare(`
+    INSERT INTO search_results (qid, url, orig_rank, webpage_json, annotated_rank)
+    VALUES (@qid, @url, @origRank, @webpageJson, @annotatedRank)
+    ON CONFLICT(qid, url) DO UPDATE SET
+    annotated_rank = excluded.annotated_rank
+  `);
 
   for (const searchResult of searchResults) {
-    insertSearchResults.run({
+    upsertSearchResults.run({
       qid,
       url: searchResult.webpage.url,
       origRank: searchResult.origRank,
       webpageJson: JSON.stringify(searchResult.webpage),
+      annotatedRank: searchResult.annotatedRank,
     });
   }
 }
 
-export function getQuery(qid: String): Query {
+export function getQuery(qid: String): Query | undefined {
   const query = db.prepare(`
 		SELECT qid, query, EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.anotated_rank IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
 		) AS annotated
 		FROM queries
 		WHERE qid = @qid
 	`);
+  const res = query.get({ qid });
 
-  return query.get({ qid }) as Query;
+  return res as Query | undefined;
 }

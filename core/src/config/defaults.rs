@@ -29,6 +29,10 @@ impl Collector {
         20.0
     }
 
+    pub fn url_without_tld_penalty() -> f64 {
+        1.0
+    }
+
     pub fn max_docs_considered() -> usize {
         250_000
     }

@@ -1032,6 +1032,20 @@ impl Html {
         let url_without_query_hash = split_u128(hash(url_without_query.as_str()).0);
         let url_hash = split_u128(hash(self.url().as_str()).0);
 
+        let tld = self.url().tld().unwrap_or_default();
+        let url_without_tld = self
+            .url()
+            .host_str()
+            .unwrap_or_default()
+            .trim_end_matches(&tld)
+            .to_string()
+            + "/"
+            + self.url().path()
+            + "?"
+            + self.url().query().unwrap_or_default();
+
+        let url_without_tld_hash = split_u128(hash(url_without_tld).0);
+
         let domain_hash = split_u128(hash(self.url().root_domain().unwrap_or_default()).0);
         let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
 
@@ -1285,6 +1299,12 @@ impl Html {
                 }
                 Field::Fast(FastField::UrlHash2) => {
                     doc.add_u64(tantivy_field, url_hash[1]);
+                }
+                Field::Fast(FastField::UrlWithoutTldHash1) => {
+                    doc.add_u64(tantivy_field, url_without_tld_hash[0]);
+                }
+                Field::Fast(FastField::UrlWithoutTldHash2) => {
+                    doc.add_u64(tantivy_field, url_without_tld_hash[1]);
                 }
                 Field::Fast(FastField::DomainHash1) => {
                     doc.add_u64(tantivy_field, domain_hash[0]);

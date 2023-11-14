@@ -148,6 +148,9 @@ pub struct CollectorConfig {
     #[serde(default = "defaults::Collector::url_penalty")]
     pub url_penalty: f64,
 
+    #[serde(default = "defaults::Collector::url_without_tld_penalty")]
+    pub url_without_tld_penalty: f64,
+
     #[serde(default = "defaults::Collector::max_docs_considered")]
     pub max_docs_considered: usize,
 }
@@ -158,6 +161,7 @@ impl Default for CollectorConfig {
             site_penalty: defaults::Collector::site_penalty(),
             title_penalty: defaults::Collector::title_penalty(),
             url_penalty: defaults::Collector::url_penalty(),
+            url_without_tld_penalty: defaults::Collector::url_without_tld_penalty(),
             max_docs_considered: defaults::Collector::max_docs_considered(),
         }
     }
@@ -380,6 +384,7 @@ pub struct CrawlPlannerConfig {
     pub crawl_budget: usize,
     pub top_host_fraction: f64,
     pub wander_fraction: f64,
+    pub top_n_hosts_surplus: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

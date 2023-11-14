@@ -49,7 +49,6 @@ const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 struct ProcessedUrl {
     new_urls: Vec<Url>,
     response: UrlResponse,
-    fetch_time: Duration,
 }
 
 pub struct WorkerThread {
@@ -238,18 +237,6 @@ impl<S: DatumStream> JobExecutor<S> {
 
             let res = self.process_url(retryable_url.url.clone()).await;
 
-            let mut delay = res.fetch_time.mul_f32(self.politeness_factor);
-
-            if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
-                delay = Duration::from_millis(self.config.min_crawl_delay_ms);
-            }
-
-            if delay > Duration::from_millis(self.config.max_crawl_delay_ms) {
-                delay = Duration::from_millis(self.config.max_crawl_delay_ms);
-            }
-
-            tokio::time::sleep(delay).await;
-
             match res.response {
                 UrlResponse::Success { url } => {
                     self.crawled_urls.insert(url.clone());
@@ -337,7 +324,6 @@ impl<S: DatumStream> JobExecutor<S> {
                                 ProcessedUrl {
                                     new_urls,
                                     response: url_res,
-                                    fetch_time: Duration::from_millis(datum.fetch_time_ms),
                                 }
                             }
                             Err(_) => ProcessedUrl {
@@ -346,7 +332,6 @@ impl<S: DatumStream> JobExecutor<S> {
                                     url,
                                     status_code: None,
                                 },
-                                fetch_time: Duration::from_millis(datum.fetch_time_ms),
                             },
                         }
                     } else {
@@ -358,7 +343,6 @@ impl<S: DatumStream> JobExecutor<S> {
                         ProcessedUrl {
                             new_urls: Vec::new(),
                             response: url_res,
-                            fetch_time: Duration::from_millis(datum.fetch_time_ms),
                         }
                     }
                 } else {
@@ -383,7 +367,6 @@ impl<S: DatumStream> JobExecutor<S> {
                             url,
                             status_code: Some(datum.status_code),
                         },
-                        fetch_time: Duration::from_millis(datum.fetch_time_ms),
                     }
                 }
             }
@@ -396,7 +379,6 @@ impl<S: DatumStream> JobExecutor<S> {
                         url,
                         status_code: None,
                     },
-                    fetch_time: Duration::from_millis(0),
                 }
             }
         }
@@ -437,6 +419,18 @@ impl<S: DatumStream> JobExecutor<S> {
         let start = Instant::now();
         let res = self.fetch(url.clone()).await?;
         let fetch_time = start.elapsed();
+
+        let mut delay = fetch_time.mul_f32(self.politeness_factor);
+
+        if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
+            delay = Duration::from_millis(self.config.min_crawl_delay_ms);
+        }
+
+        if delay > Duration::from_millis(self.config.max_crawl_delay_ms) {
+            delay = Duration::from_millis(self.config.max_crawl_delay_ms);
+        }
+
+        tokio::time::sleep(delay).await;
 
         let headers: HashMap<_, _> = res
             .headers()

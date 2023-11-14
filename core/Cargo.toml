@@ -117,10 +117,6 @@ maplit = {workspace = true}
 proptest = {workspace = true}
 proptest-derive = {workspace = true}
 
-[[example]]
-name = "alice"
-required-features = ["with_alice"]
-
 [[bench]]
 harness = false
 name = "search-preindexed"

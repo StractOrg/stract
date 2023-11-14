@@ -67,6 +67,10 @@ export const siteRankingsStore = writableLocalStorage<SiteRakings>(SITE_RANKINGS
 const SEARCH_QUERY_KEY = 'searchQuery';
 export const searchQueryStore = writableLocalStorage<string | undefined>(SEARCH_QUERY_KEY, void 0);
 
+const QUERY_ID_KEY = 'queryId';
+export const queryIdStore = writableLocalStorage<string | undefined>(QUERY_ID_KEY, void 0);
+
+
 const THEME_KEY = 'theme';
 export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
 if (browser)

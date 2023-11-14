@@ -747,7 +747,7 @@ impl SignalAggregator {
                 .collect(),
         });
 
-        Self {
+        let mut s = Self {
             segment_reader: None,
             inbound_similarity: None,
             query_signal_coefficients,
@@ -759,7 +759,11 @@ impl SignalAggregator {
             current_timestamp: None,
             linear_regression: None,
             query,
-        }
+        };
+
+        s.set_current_timestamp(chrono::Utc::now().timestamp() as usize);
+
+        s
     }
 
     fn prepare_textfields(

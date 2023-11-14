@@ -1,6 +1,7 @@
-import { getQuery, getSearchResults, saveSearchResults } from "$lib/db";
+import { getNextQuery, getPreviousQuery, getQuery, getSearchResults, saveSearchResults } from "$lib/db";
 import type { Webpage } from "$lib/webpage";
 import { asSimpleWebpage } from "$lib/webpage";
+import { redirect } from "@sveltejs/kit";
 
 const search = async (query: string) => {
   return await fetch(`https://trystract.com/beta/api/search`, {
@@ -25,13 +26,22 @@ export const load = async ({ params }) => {
   const { slug } = params;
   const qid = slug;
 
-  const query = getQuery(qid);
+
+  if (!getQuery(qid)) {
+    throw redirect(301, "/");
+  }
+  const query = getQuery(qid)!;
+
+  const previousQuery = getPreviousQuery(qid);
+  const nextQuery = getNextQuery(qid);
+
   let searchResults = getSearchResults(query.qid);
 
   if (searchResults.length === 0) {
     const webpages = (await search(query.query)).map((w) => asSimpleWebpage(w));
     
     searchResults = webpages.map((w, i) => ({
+      id: `${query.qid}-${w.url}`,
       origRank: i,
       annotatedRank: null,
       webpage: w,
@@ -53,5 +63,5 @@ export const load = async ({ params }) => {
     }
   });
 
-  return { query, searchResults };
+  return { query, searchResults, previousQuery, nextQuery };
 };

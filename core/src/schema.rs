@@ -219,6 +219,8 @@ pub enum FastField {
     UrlHash2,
     DomainHash1,
     DomainHash2,
+    UrlWithoutTldHash1,
+    UrlWithoutTldHash2,
     PreComputedScore,
     HostNodeID1,
     HostNodeID2,
@@ -256,6 +258,8 @@ impl FastField {
             FastField::UrlHash2 => "url_hash2",
             FastField::DomainHash1 => "domain_hash1",
             FastField::DomainHash2 => "domain_hash2",
+            FastField::UrlWithoutTldHash1 => "url_without_tld_hash1",
+            FastField::UrlWithoutTldHash2 => "url_without_tld_hash2",
             FastField::PreComputedScore => "pre_computed_score",
             FastField::HostNodeID1 => "host_node_id1",
             FastField::HostNodeID2 => "host_node_id2",
@@ -278,7 +282,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 61] = [
+pub static ALL_FIELDS: [Field; 63] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -335,6 +339,8 @@ pub static ALL_FIELDS: [Field; 61] = [
     Field::Fast(FastField::UrlHash2),
     Field::Fast(FastField::DomainHash1),
     Field::Fast(FastField::DomainHash2),
+    Field::Fast(FastField::UrlWithoutTldHash1),
+    Field::Fast(FastField::UrlWithoutTldHash2),
     Field::Fast(FastField::PreComputedScore),
     Field::Fast(FastField::HostNodeID1),
     Field::Fast(FastField::HostNodeID2),
@@ -517,6 +523,12 @@ impl Field {
             Field::Fast(FastField::UrlHash2) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
+            Field::Fast(FastField::UrlWithoutTldHash1) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
+            Field::Fast(FastField::UrlWithoutTldHash2) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast())
+            }
             Field::Fast(FastField::DomainHash1) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
@@ -673,6 +685,8 @@ impl FastField {
             FastField::UrlHash2 => DataType::U64,
             FastField::DomainHash1 => DataType::U64,
             FastField::DomainHash2 => DataType::U64,
+            FastField::UrlWithoutTldHash1 => DataType::U64,
+            FastField::UrlWithoutTldHash2 => DataType::U64,
             FastField::PreComputedScore => DataType::U64,
             FastField::HostNodeID1 => DataType::U64,
             FastField::HostNodeID2 => DataType::U64,

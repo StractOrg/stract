@@ -15,8 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::{anyhow, Result};
 use indicatif::ParallelProgressIterator;
+use indicatif::ProgressIterator;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::{
     collections::VecDeque,
@@ -35,6 +37,8 @@ use crate::{
 
 use super::Domain;
 
+const MAX_SURPLUS_BUDGET_ITERATIONS: usize = 100;
+
 fn all_pages(
     page_centrality: &RocksDbStore<NodeID, f64>,
     page_graph: &Webgraph,
@@ -47,14 +51,14 @@ fn all_pages(
         .collect::<Vec<_>>()
 }
 
-fn group_domain(hosts: Vec<NodeID>, host_graph: &Webgraph) -> HashMap<Domain, Vec<NodeID>> {
+fn group_domain(hosts: &[NodeID], host_graph: &Webgraph) -> HashMap<Domain, Vec<NodeID>> {
     let mut domains: HashMap<Domain, Vec<NodeID>> = HashMap::new();
 
     for host in hosts {
-        let node = host_graph.id2node(&host).unwrap();
+        let node = host_graph.id2node(host).unwrap();
         if let Ok(url) = Url::parse(&format!("http://{}", node.name)) {
             let domain = Domain::from(url);
-            domains.entry(domain).or_default().push(host);
+            domains.entry(domain).or_default().push(*host);
         }
     }
 
@@ -101,8 +105,11 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
     let num_hosts = hosts.len();
     tracing::info!("found {} hosts", num_hosts);
 
-    let total_host_centrality = host_centrality.iter().map(|(_, v)| v).sum::<f64>();
-    let grouped = group_domain(hosts, &host_graph);
+    let mut total_host_centrality = hosts
+        .iter()
+        .filter_map(|v| host_centrality.get(v))
+        .sum::<f64>();
+    let grouped = group_domain(&hosts, &host_graph);
     let num_groups = grouped.len();
 
     let job_queues: Vec<Mutex<FileQueueWriter<Job>>> = (0..config.num_job_queues)
@@ -126,6 +133,85 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
         .build()?;
 
     pool.install(|| {
+        let host_pages: BTreeMap<_, _> = hosts
+            .par_iter()
+            .progress_count(num_hosts as u64)
+            .map(|host| {
+                let num_pages = page_graph.pages_by_host(host).len() as u64;
+                (*host, num_pages)
+            })
+            .collect();
+
+        let mut host_budgets: BTreeMap<_, _> = hosts
+            .par_iter()
+            .progress_count(num_hosts as u64)
+            .map(|host| {
+                let host_centrality = host_centrality.get(host).unwrap_or_default();
+
+                let host_budget = ((config.crawl_budget as f64 * host_centrality)
+                    / total_host_centrality)
+                    .round()
+                    .max(0.0) as u64;
+
+                let num_pages = host_pages.get(host).copied().unwrap_or_default();
+
+                (*host, host_budget.min(num_pages as u64))
+            })
+            .collect();
+
+        let mut surplus_budget = config.crawl_budget as u64
+            - host_budgets
+                .values()
+                .sum::<u64>()
+                .min(config.crawl_budget as u64);
+
+        let mut has_updated = true;
+        let mut i = 0;
+        while surplus_budget > 0 && has_updated && i < MAX_SURPLUS_BUDGET_ITERATIONS {
+            tracing::info!("trying to schedule surplus budget: {}", surplus_budget);
+            i += 1;
+
+            has_updated = false;
+            let mut new_surplus_budget = surplus_budget;
+            let mut new_total_host_centrality = 0.0;
+
+            for host in hosts.iter().take(config.top_n_hosts_surplus).progress() {
+                if new_surplus_budget == 0 {
+                    break;
+                }
+
+                let num_pages = host_pages.get(host).copied().unwrap_or_default();
+                let host_budget = host_budgets.get_mut(host).unwrap();
+
+                if num_pages > *host_budget {
+                    let centrality = host_centrality.get(host).unwrap_or_default();
+                    new_total_host_centrality += centrality;
+
+                    let part = (centrality * surplus_budget as f64 / total_host_centrality)
+                        .round()
+                        .max(0.0) as u64;
+
+                    let diff = num_pages - *host_budget;
+                    let extra = part.min(diff);
+
+                    if extra > 0 {
+                        has_updated = true;
+                    }
+
+                    let extra = ((extra as f64 / (1.0 - config.wander_fraction)) as u64)
+                        .min(new_surplus_budget);
+
+                    *host_budget += extra;
+                    new_surplus_budget -= extra;
+                }
+            }
+
+            total_host_centrality = new_total_host_centrality;
+            surplus_budget = new_surplus_budget;
+        }
+
+        tracing::info!("surplus done (remaining={})", surplus_budget);
+
         grouped
             .into_par_iter()
             .progress_count(num_groups as u64)
@@ -137,10 +223,12 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                 let mut total_wander_budget = 0;
                 let mut total_schedule_budget = 0;
                 let mut total_scheduled_urls = 0;
+                let mut total_known_urls = 0;
                 let mut urls = VecDeque::new();
 
                 for host in &hosts {
                     let mut pages = all_pages(&page_centrality, &page_graph, *host);
+                    total_known_urls += pages.len();
 
                     if pages.is_empty() {
                         continue;
@@ -148,16 +236,13 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
 
                     pages.sort_by(|(_, a), (_, b)| b.total_cmp(a));
                     tracing::debug!("num pages: {}", pages.len());
-                    let host_centrality = host_centrality.get(host).unwrap_or_default();
+                    let host_budget = host_budgets.get(host).copied().unwrap_or_default();
 
-                    let host_budget = ((config.crawl_budget as f64 * host_centrality)
-                        / total_host_centrality)
-                        .max(0.0)
-                        .round() as u64;
                     tracing::debug!("host_budget: {host_budget}");
                     let schedule_budget = (host_budget as f64 * (1.0 - config.wander_fraction))
-                        .max(0.0)
-                        .round() as u64;
+                        .round()
+                        .max(0.0) as u64;
+
                     tracing::debug!("schedule_budget: {schedule_budget}");
                     let wander_budget = (host_budget as f64 * config.wander_fraction)
                         .max(0.0)
@@ -200,6 +285,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                     schedule_budget: total_schedule_budget,
                     wander_budget: total_wander_budget,
                     scheduled_urls: total_scheduled_urls,
+                    known_urls: total_known_urls,
                 };
                 stats
                     .lock()
@@ -227,6 +313,16 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
         stats: stats.into_inner().unwrap_or_else(|e| e.into_inner()),
     };
 
+    tracing::info!(
+        "total scheduled urls: {}",
+        metadata.stats.iter().map(|d| d.scheduled_urls).sum::<u64>()
+    );
+
+    tracing::info!(
+        "total wander budget: {}",
+        metadata.stats.iter().map(|d| d.wander_budget).sum::<u64>()
+    );
+
     metadata
         .stats
         .sort_by(|a, b| b.schedule_budget.cmp(&a.schedule_budget));
@@ -242,6 +338,7 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
 #[derive(serde::Serialize)]
 struct DomainStats {
     domain: Domain,
+    known_urls: usize,
     num_hosts: usize,
     schedule_budget: u64,
     scheduled_urls: u64,

@@ -12,6 +12,9 @@
     "format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write ."
   },
   "devDependencies": {
+    "@iconify-json/heroicons": "^1.1.12",
+    "@iconify-json/simple-icons": "^1.1.69",
+    "@iconify/svelte": "^3.1.4",
     "@sveltejs/adapter-auto": "^2.0.0",
     "@sveltejs/kit": "^1.20.4",
     "@types/better-sqlite3": "^7.6.6",
@@ -30,12 +33,14 @@
     "tailwindcss": "^3.3.5",
     "tslib": "^2.4.1",
     "typescript": "^5.0.0",
+    "unplugin-icons": "^0.17.0",
     "vite": "^4.4.2"
   },
   "dependencies": {
     "better-sqlite3": "^9.0.0",
     "cassandra-driver": "^4.7.2",
-    "papaparse": "^5.4.1"
+    "papaparse": "^5.4.1",
+    "svelte-dnd-action": "^0.9.31"
   },
   "type": "module"
 }

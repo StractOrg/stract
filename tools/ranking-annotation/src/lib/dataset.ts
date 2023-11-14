@@ -11,7 +11,7 @@ export function getDataset(): Data | undefined {
     return dataset;
   }
 
-  const csvFilePath = path.resolve("../data/queries_us.csv");
+  const csvFilePath = path.resolve("../../data/queries_us.csv");
   const csvFile = readFileSync(csvFilePath, "utf-8");
 
   Papa.parse(csvFile, {

@@ -31,6 +31,7 @@ pub trait UrlExt {
     fn icann_domain(&self) -> Option<&str>;
     fn root_domain(&self) -> Option<&str>;
     fn subdomain(&self) -> Option<&str>;
+    fn tld(&self) -> Option<&str>;
 }
 
 impl UrlExt for url::Url {
@@ -58,6 +59,12 @@ impl UrlExt for url::Url {
 
         Some(subdomain)
     }
+
+    fn tld(&self) -> Option<&str> {
+        let host = self.host_str()?;
+        let suffix = std::str::from_utf8(ICANN_LIST.suffix(host.as_bytes())?.as_bytes()).ok()?;
+        Some(suffix)
+    }
 }
 
 #[cfg(test)]
@@ -84,5 +91,14 @@ mod tests {
         let url: Url = Url::parse("http://example.blogspot.com").unwrap();
         assert_eq!(url.domain().unwrap(), "example.blogspot.com");
         assert_eq!(url.icann_domain().unwrap(), "blogspot.com");
+    }
+
+    #[test]
+    fn suffix() {
+        let url: Url = Url::parse("http://example.blogspot.com").unwrap();
+        assert_eq!(url.tld().unwrap(), "com");
+
+        let url: Url = Url::parse("http://example.com").unwrap();
+        assert_eq!(url.tld().unwrap(), "com");
     }
 }

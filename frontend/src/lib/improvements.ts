@@ -1,9 +1,6 @@
 import type { Action } from 'svelte/action';
-import { writable } from 'svelte/store';
 import { getApiBase, type ApiOptions, type DisplayedWebpage, requestPlain } from './api';
-import { allowStatsStore } from './stores';
-
-const queryIdStore = writable<string | undefined>();
+import { allowStatsStore, queryIdStore } from './stores';
 
 export const updateQueryId = async ({
   query,

@@ -421,6 +421,7 @@ mod tests {
                             site: Prehashed(0),
                             title: Prehashed(0),
                             url: Prehashed(0),
+                            url_without_tld: Prehashed(0),
                             simhash: 0,
                         },
                         address: DocAddress {

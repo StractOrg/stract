@@ -291,10 +291,11 @@ mod tests {
                             <meta property="og:updated_time" content="1999-06-22T19:37:34+00:00" />
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100),
                     ),
                     "https://www.old.com",
                 )
@@ -312,13 +313,14 @@ mod tests {
                     <html>
                         <head>
                             <title>Title</title>
-                            <meta property="og:updated_time" content="2022-06-22T19:37:34+00:00" />
+                            <meta property="og:updated_time" content="2023-06-22T19:37:34+00:00" />
                         </head>
                         <body>
-                            {CONTENT}
+                            {CONTENT} {}
                         </body>
                     </html>
-                "#
+                "#,
+                        crate::rand_words(100)
                     ),
                     "https://www.new.com",
                 )
@@ -334,6 +336,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "title".to_string(),
+                return_ranking_signals: true,
                 ..Default::default()
             })
             .expect("Search failed");

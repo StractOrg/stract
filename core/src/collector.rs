@@ -47,6 +47,7 @@ pub struct Hashes {
     pub site: Prehashed,
     pub title: Prehashed,
     pub url: Prehashed,
+    pub url_without_tld: Prehashed,
     pub simhash: simhash::HashType,
 }
 
@@ -185,6 +186,11 @@ impl TopSegmentCollector {
                 site: self.get_hash(&doc, &FastField::SiteHash1, &FastField::SiteHash2),
                 title: self.get_hash(&doc, &FastField::TitleHash1, &FastField::TitleHash2),
                 url: self.get_hash(&doc, &FastField::UrlHash1, &FastField::UrlHash2),
+                url_without_tld: self.get_hash(
+                    &doc,
+                    &FastField::UrlWithoutTldHash1,
+                    &FastField::UrlWithoutTldHash2,
+                ),
                 simhash: simhash.unwrap(),
             },
             id: doc,
@@ -250,12 +256,14 @@ impl BucketCount {
 
         let taken_sites = *self.buckets.get(&hashes.site).unwrap_or(&0);
         let taken_urls = *self.buckets.get(&hashes.url).unwrap_or(&0);
+        let taken_urls_without_tld = *self.buckets.get(&hashes.url_without_tld).unwrap_or(&0);
         let taken_titles = *self.buckets.get(&hashes.title).unwrap_or(&0);
 
         let adjuster = 1.0
             / (1.0
                 + taken_sites as f64 * self.config.site_penalty
                 + taken_urls as f64 * self.config.url_penalty
+                + taken_urls_without_tld as f64 * self.config.url_without_tld_penalty
                 + taken_titles as f64 * self.config.title_penalty);
 
         doc.adjusted_score = doc.doc.score() * adjuster;
@@ -266,6 +274,7 @@ impl BucketCount {
 
         *self.buckets.entry(hashes.site).or_default() += 1;
         *self.buckets.entry(hashes.url).or_default() += 1;
+        *self.buckets.entry(hashes.url_without_tld).or_default() += 1;
         *self.buckets.entry(hashes.title).or_default() += 1;
     }
 }
@@ -310,13 +319,15 @@ impl<T: Doc> BucketCollector<T> {
 
     pub fn into_sorted_vec(mut self, de_rank_similar: bool) -> Vec<T> {
         let mut res = Vec::new();
+        let mut simhash_dups = Vec::new();
         let mut simhash = simhash::Table::default();
 
         while let Some(best_doc) = self.documents.pop_max() {
             let hashes = best_doc.doc.hashes();
 
-            if hashes.simhash != 0 {
+            if hashes.simhash != 0 && de_rank_similar {
                 if simhash.contains(&hashes.simhash) {
+                    simhash_dups.push(best_doc.doc);
                     continue;
                 }
                 simhash.insert(hashes.simhash);
@@ -333,6 +344,8 @@ impl<T: Doc> BucketCollector<T> {
                 break;
             }
         }
+
+        res.extend(simhash_dups);
 
         res
     }
@@ -505,6 +518,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        url_without_tld: 1.into(),
                         simhash: 12,
                     },
                     123,
@@ -515,6 +529,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 123,
                     },
                     124,
@@ -525,6 +540,7 @@ mod tests {
                         site: 3.into(),
                         title: 3.into(),
                         url: 3.into(),
+                        url_without_tld: 3.into(),
                         simhash: 1234,
                     },
                     125,
@@ -535,6 +551,7 @@ mod tests {
                         site: 4.into(),
                         title: 4.into(),
                         url: 4.into(),
+                        url_without_tld: 4.into(),
                         simhash: 12345,
                     },
                     126,
@@ -545,6 +562,7 @@ mod tests {
                         site: 5.into(),
                         title: 5.into(),
                         url: 5.into(),
+                        url_without_tld: 5.into(),
                         simhash: 123456,
                     },
                     127,
@@ -565,6 +583,7 @@ mod tests {
                         site: 3.into(),
                         title: 3.into(),
                         url: 3.into(),
+                        url_without_tld: 3.into(),
                         simhash: 12,
                     },
                     125,
@@ -575,6 +594,7 @@ mod tests {
                         site: 4.into(),
                         title: 4.into(),
                         url: 4.into(),
+                        url_without_tld: 4.into(),
                         simhash: 123,
                     },
                     126,
@@ -585,6 +605,7 @@ mod tests {
                         site: 5.into(),
                         title: 5.into(),
                         url: 5.into(),
+                        url_without_tld: 5.into(),
                         simhash: 1234,
                     },
                     127,
@@ -605,6 +626,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        url_without_tld: 1.into(),
                         simhash: 12,
                     },
                     125,
@@ -615,6 +637,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 123,
                     },
                     126,
@@ -625,6 +648,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 1234,
                     },
                     127,
@@ -642,6 +666,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        url_without_tld: 1.into(),
                         simhash: 12,
                     },
                     125,
@@ -652,6 +677,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 123,
                     },
                     126,
@@ -662,6 +688,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 1234,
                     },
                     127,
@@ -682,6 +709,7 @@ mod tests {
                         site: 1.into(),
                         title: 1.into(),
                         url: 1.into(),
+                        url_without_tld: 1.into(),
                         simhash: 1234,
                     },
                     125,
@@ -692,6 +720,7 @@ mod tests {
                         site: 2.into(),
                         title: 2.into(),
                         url: 2.into(),
+                        url_without_tld: 2.into(),
                         simhash: 1234,
                     },
                     126,
@@ -702,13 +731,14 @@ mod tests {
                         site: 3.into(),
                         title: 3.into(),
                         url: 3.into(),
+                        url_without_tld: 3.into(),
                         simhash: 1,
                     },
                     127,
                     5.0,
                 ),
             ],
-            &[(5.0, 127), (3.1, 126)],
+            &[(5.0, 127), (3.1, 126), (3.0, 125)],
         );
     }
 }
