@@ -1644,4 +1644,83 @@ mod tests {
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].domain, "example.com");
     }
+
+    #[test]
+    fn site_double_anchor() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>This is an example site</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://example.com/test",
+            )
+            .unwrap(),
+            fetch_time_ms: 500,
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>This is another sample website</title>
+                            </head>
+                            <body>
+                                example example example
+                            </body>
+                        </html>
+                    "#,
+                "https://another-example.com/",
+            )
+            .unwrap(),
+            fetch_time_ms: 500,
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 2);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Site(\"|example.com|\") } }",
+                    )
+                    .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://example.com/test");
+    }
 }

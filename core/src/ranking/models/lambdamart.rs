@@ -275,7 +275,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "train new model with updated signals"]
     fn simple() {
         let tree = include_str!("../../../testcases/lambdamart.txt");
         let tree = Tree::parse(tree).unwrap();
@@ -300,6 +299,6 @@ mod tests {
         features.insert(Signal::HostCentrality, 0.031143193);
         features.insert(Signal::Bm25StemmedCleanBody, 52.1262779236);
 
-        assert_eq!((tree.predict(&features).unwrap() * 1000.0) as u64, 1016);
+        assert_eq!((tree.predict(&features).unwrap() * 1000.0) as u64, 1038);
     }
 }

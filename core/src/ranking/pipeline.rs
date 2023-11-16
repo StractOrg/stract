@@ -349,7 +349,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         }
     }
 
-    pub fn ltr_for_query(
+    pub fn initial_for_query(
         query: &mut SearchQuery,
         model: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
@@ -374,6 +374,10 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn apply(self, websites: Vec<T>) -> Vec<T> {
+        if websites.len() <= 1 {
+            return websites;
+        }
+
         self.stage.apply(
             websites,
             self.top_n,

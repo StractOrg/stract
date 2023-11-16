@@ -265,7 +265,7 @@ where
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::ltr_for_query(
+        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::initial_for_query(
             &mut query,
             self.lambda_model.clone(),
             self.collector_config.clone(),

@@ -191,7 +191,7 @@ fn can_optimize_site_domain(patterns: &[PatternPart], field: Field) -> bool {
         && patterns[1..patterns.len() - 1]
             .iter()
             .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
-        && (matches!(field, Field::Text(TextField::SiteWithout))
+        && (matches!(field, Field::Text(TextField::UrlForSiteOperator))
             || matches!(field, Field::Text(TextField::Domain)))
 }
 
