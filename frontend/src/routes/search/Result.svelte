@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
+  import LockClosed from '~icons/heroicons/lock-closed';
   import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import { clearSummary, summariesStore } from '$lib/stores';
@@ -56,6 +57,9 @@
         <div class="line-clamp-3">
           <div class="inline">
             <span id="snippet-text" class="snippet-text">
+              <span>
+                <LockClosed class="inline-block w-4 h-4 mr-1 text-neutral" />
+              </span>
               {#if webpage.snippet.date}
                 <span class="text-neutral">
                   {webpage.snippet.date} -

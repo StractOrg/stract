@@ -17,10 +17,10 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::hyperloglog::HyperLogLog;
+use crate::hyperloglog::{self, HyperLogLog};
 
-const THRESHOLD_SIM_ESTIMATE: f64 = 0.1;
-const HYPERLOGLOG_REGISTERS: usize = 128;
+const HYPERLOGLOG_REGISTERS: usize = 2048;
+const MIN_POSTING_SIZE_HYPERLOGLOG: usize = 1024000;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
@@ -53,11 +53,6 @@ impl VeryJankyBloomFilter {
             .zip_eq(other.data.iter())
             .any(|(a, b)| a & b != 0)
     }
-}
-
-#[derive(Clone)]
-struct ScratchSpace {
-    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -102,44 +97,56 @@ impl Posting {
                     j += 1;
                 }
                 std::cmp::Ordering::Less => {
-                    match self.skip_pointers.get(i / self.skip_size + 1).copied() {
-                        Some(skip_a) => {
-                            if skip_a < b {
-                                i += self.skip_size - i % self.skip_size;
-                            } else {
-                                i += 1;
-                            }
-                        }
-                        None => {
-                            i += 1;
-                        }
-                    }
+                    i = self.next_skip_index(i, b);
                 }
                 std::cmp::Ordering::Greater => {
-                    match other.skip_pointers.get(j / other.skip_size + 1).copied() {
-                        Some(skip_b) => {
-                            if skip_b < a {
-                                j += other.skip_size - j % other.skip_size;
-                            } else {
-                                j += 1;
-                            }
-                        }
-                        None => {
-                            j += 1;
-                        }
-                    }
+                    j = other.next_skip_index(j, a);
                 }
             }
         }
 
         count
     }
+
+    fn next_skip_index(&self, current_index: usize, target: u64) -> usize {
+        let mut index = current_index;
+
+        while (index / self.skip_size) + 1 < self.skip_pointers.len() {
+            let skip_index = (index / self.skip_size) + 1;
+            let skip_value = self.skip_pointers[skip_index];
+
+            if skip_value >= target {
+                break;
+            }
+
+            index = skip_index * self.skip_size;
+
+            if index >= self.ranks.len() {
+                return self.ranks.len();
+            }
+        }
+
+        if index == current_index {
+            index += 1;
+        }
+
+        std::cmp::min(index, self.ranks.len())
+    }
+
+    fn len(&self) -> usize {
+        self.ranks.len()
+    }
+}
+
+#[derive(Clone)]
+struct ScratchSpace {
+    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
     bloom: VeryJankyBloomFilter,
-    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS>,
+    hyperloglog: Option<HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>>,
     posting: Posting,
     sqrt_len: f64,
 }
@@ -152,11 +159,18 @@ impl BitVec {
 
         let len = ranks.len();
         let mut bloom = VeryJankyBloomFilter::new(2);
-        let mut hyperloglog = HyperLogLog::default();
+        let mut hyperloglog = if ranks.len() > MIN_POSTING_SIZE_HYPERLOGLOG {
+            Some(HyperLogLog::default())
+        } else {
+            None
+        };
 
         for rank in &ranks {
             bloom.insert(*rank);
-            hyperloglog.add(*rank);
+
+            if let Some(hyperloglog) = &mut hyperloglog {
+                hyperloglog.add(*rank);
+            }
         }
 
         let posting = Posting::new(ranks);
@@ -178,22 +192,21 @@ impl BitVec {
             return 0.0;
         }
 
-        self.hyperloglog
-            .merge_into(&other.hyperloglog, &mut scratchspace.hyperloglog);
+        let intersect = match (self.hyperloglog.as_ref(), other.hyperloglog.as_ref()) {
+            (Some(a), Some(b)) => {
+                a.merge_into(b, &mut scratchspace.hyperloglog);
 
-        let union_est = scratchspace.hyperloglog.size();
+                let union_est = scratchspace.hyperloglog.size() as u64;
 
-        let intersect_est = (self.posting.ranks.len() + other.posting.ranks.len())
-            .checked_sub(union_est)
-            .unwrap_or_default();
+                (self.posting.len() as u64 + other.posting.len() as u64)
+                    .checked_sub(union_est)
+                    .unwrap_or_default()
+                    .min(self.posting.len() as u64)
+                    .min(other.posting.len() as u64) as f64
+            }
+            _ => self.posting.intersection_size(&other.posting) as f64,
+        };
 
-        let sim_est = (intersect_est as f64) / (self.sqrt_len * other.sqrt_len);
-
-        if sim_est < THRESHOLD_SIM_ESTIMATE {
-            return 0.0;
-        }
-
-        let intersect = self.posting.intersection_size(&other.posting) as f64;
         intersect / (self.sqrt_len * other.sqrt_len)
     }
 }

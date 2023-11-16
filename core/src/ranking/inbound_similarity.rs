@@ -22,11 +22,12 @@ use std::{
 };
 
 use dashmap::DashMap;
+use fnv::FnvHashMap as HashMap;
+use fnv::FnvHashSet as HashSet;
 use rayon::prelude::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    intmap::{IntMap, IntSet},
     webgraph::{NodeID, Webgraph},
     Result,
 };
@@ -38,8 +39,8 @@ pub struct Scorer {
     similarity: bitvec_similarity::BitVecSimilarity,
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
-    vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
-    cache: IntMap<NodeID, f64>,
+    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
+    cache: HashMap<NodeID, f64>,
     normalized: bool,
 }
 
@@ -126,14 +127,14 @@ impl Scorer {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct InboundSimilarity {
-    vectors: Arc<IntMap<NodeID, bitvec_similarity::BitVec>>,
+    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
 }
 
 impl InboundSimilarity {
     pub fn build(graph: &Webgraph) -> Self {
-        let mut vectors = IntMap::new();
+        let mut vectors = HashMap::default();
 
-        let adjacency: DashMap<NodeID, IntSet<NodeID>> = DashMap::new();
+        let adjacency: DashMap<NodeID, HashSet<NodeID>> = DashMap::new();
 
         graph.par_edges().for_each(|edge| {
             adjacency.entry(edge.to).or_default().insert(edge.from);
@@ -174,7 +175,7 @@ impl InboundSimilarity {
             liked,
             disliked,
             vectors: self.vectors.clone(),
-            cache: IntMap::new(),
+            cache: HashMap::default(),
             normalized,
         }
     }

@@ -18,6 +18,12 @@
 // It seemed a bit excessive to add another dependency just for hyperloglog
 // but huge credits to the authors of that crate.
 
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash as _, Hasher as _},
+    marker::PhantomData,
+};
+
 use serde::{Deserialize, Serialize};
 
 pub(crate) const THRESHOLD_DATA_OFFSET: usize = 4;
@@ -4295,25 +4301,51 @@ const ONE_OVER_POWER_OF_TWO: [f64; 256] = [
     1.727233711018889e-77,
 ];
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HyperLogLog<const N: usize> {
-    registers: Vec<u8>,
+pub trait HyperLogLogHasher: std::fmt::Debug + Clone + Copy + Send + Sync + 'static {
+    fn hash(item: u64) -> u64;
 }
 
-impl<const N: usize> Default for HyperLogLog<N> {
-    fn default() -> Self {
-        Self {
-            registers: vec![0; N],
-        }
-    }
-}
+#[derive(Clone, Copy, Debug)]
+pub struct FastHasher;
 
-impl<const N: usize> HyperLogLog<N> {
+impl HyperLogLogHasher for FastHasher {
     #[inline]
     fn hash(item: u64) -> u64 {
         item.wrapping_mul(11400714819323198549)
     }
+}
 
+#[derive(Clone, Copy, Debug)]
+pub struct StableHasher;
+
+impl HyperLogLogHasher for StableHasher {
+    #[inline]
+    fn hash(item: u64) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        item.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HyperLogLog<const N: usize, H = FastHasher>
+where
+    H: HyperLogLogHasher,
+{
+    registers: Vec<u8>,
+    _hasher: PhantomData<H>,
+}
+
+impl<H: HyperLogLogHasher, const N: usize> Default for HyperLogLog<N, H> {
+    fn default() -> Self {
+        Self {
+            registers: vec![0; N],
+            _hasher: PhantomData,
+        }
+    }
+}
+
+impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
     #[inline]
     fn am(&self) -> f64 {
         let m = self.registers.len();
@@ -4336,7 +4368,7 @@ impl<const N: usize> HyperLogLog<N> {
 
     pub fn add(&mut self, item: u64) {
         let b = self.b();
-        let hash = Self::hash(item) as usize;
+        let hash = H::hash(item) as usize;
 
         let j = hash >> (64 - b);
         let w = hash << b;

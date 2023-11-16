@@ -1435,6 +1435,44 @@ impl Html {
             .collect()
     }
 
+    pub fn likely_has_ads(&self) -> bool {
+        for script in self.scripts() {
+            if let Some(url) = script
+                .attributes
+                .get("src")
+                .and_then(|url| Url::parse(url).ok())
+            {
+                if let Some(domain) = url.root_domain() {
+                    return matches!(
+                        domain,
+                        "doubleclick.net" | "googlesyndication.com" | "amazon-adsystem.com"
+                    );
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn likely_has_paywall(&self) -> bool {
+        self.schema_org()
+            .into_iter()
+            .filter(|item| {
+                item.types_contains("NewsArticle")
+                    || item.types_contains("Article")
+                    || item.types_contains("BlogPosting")
+                    || item.types_contains("WebPage")
+                    || item.types_contains("WebPageElement")
+            })
+            .any(|item| {
+                item.properties
+                    .get("isAccessibleForFree")
+                    .and_then(|value| value.clone().one().and_then(|v| v.try_into_string()))
+                    .map(|value| value.parse().ok().unwrap_or(false))
+                    .unwrap_or(false)
+            })
+    }
+
     fn article_modified_time(&self) -> Option<DateTime<FixedOffset>> {
         self.metadata()
             .into_iter()

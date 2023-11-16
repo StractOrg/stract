@@ -16,12 +16,11 @@
 
 use serde::{Deserialize, Serialize};
 
-pub trait Key: PartialEq + Copy + std::fmt::Debug {
+pub trait Key: PartialOrd + Ord + PartialEq + Copy + std::fmt::Debug {
     const BIG_PRIME: Self;
 
     fn wrapping_mul(self, rhs: Self) -> Self;
-    fn bit_and(self, rhs: Self) -> Self;
-    fn from_usize(val: usize) -> Self;
+    fn modulus_usize(self, rhs: usize) -> usize;
     fn as_usize(self) -> usize;
 }
 
@@ -32,12 +31,8 @@ impl Key for u64 {
         self.wrapping_mul(rhs)
     }
 
-    fn bit_and(self, rhs: Self) -> Self {
-        self & rhs
-    }
-
-    fn from_usize(val: usize) -> Self {
-        val as Self
+    fn modulus_usize(self, rhs: usize) -> usize {
+        self as usize % rhs
     }
 
     fn as_usize(self) -> usize {
@@ -76,14 +71,11 @@ impl<K: Key, V> IntMap<K, V> {
     }
 
     fn bin_idx(&self, key: &K) -> usize {
-        let mask = K::from_usize(self.bins.len() - 1);
-        let key = key.wrapping_mul(K::BIG_PRIME);
-
-        key.bit_and(mask).as_usize()
+        key.modulus_usize(self.bins.len())
     }
 
     pub fn insert(&mut self, key: K, value: V) {
-        if self.len >= (self.bins.len() as f64 * 1.2) as usize {
+        if self.len >= (self.bins.len() as f64 * 1.5) as usize {
             self.grow();
         }
 
@@ -94,6 +86,7 @@ impl<K: Key, V> IntMap<K, V> {
             bin[idx] = (key, value);
         } else {
             bin.push((key, value));
+            bin.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
             self.len += 1;
         }
     }
@@ -113,14 +106,18 @@ impl<K: Key, V> IntMap<K, V> {
                 self.bins[bin_idx].push((key, value));
             }
         }
+
+        for bin in &mut self.bins {
+            bin.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+        }
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
         let bin = self.bin_idx(key);
-        self.bins[bin]
-            .iter()
-            .find(|(stored_key, _)| stored_key == key)
-            .map(|(_, val)| val)
+        match self.bins[bin].binary_search_by(|(stored_key, _)| stored_key.cmp(key)) {
+            Ok(idx) => Some(&self.bins[bin][idx].1),
+            Err(_) => None,
+        }
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
@@ -192,10 +189,6 @@ impl<K: Key> IntSet<K> {
 
     pub fn contains(&self, item: &K) -> bool {
         self.map.contains_key(item)
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = K> {
-        self.map.into_iter().map(|(k, _)| k)
     }
 }
 

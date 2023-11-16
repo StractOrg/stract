@@ -4234,6 +4234,7 @@ dependencies = [
  "eventsource-stream",
  "fend-core",
  "flate2",
+ "fnv",
  "fst",
  "futures",
  "half 2.3.1",

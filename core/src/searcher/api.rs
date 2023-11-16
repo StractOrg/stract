@@ -88,6 +88,7 @@ pub struct ApiSearcher {
 #[cfg(not(feature = "libtorch"))]
 pub struct ApiSearcher {
     distributed_searcher: DistributedSearcher,
+    live_searcher: LiveSearcher,
     lambda_model: Option<Arc<LambdaMART>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
@@ -126,7 +127,8 @@ impl ApiSearcher {
         config: ApiConfig,
     ) -> Self {
         Self {
-            distributed_searcher: DistributedSearcher::new(cluster),
+            distributed_searcher: DistributedSearcher::new(Arc::clone(&cluster)),
+            live_searcher: LiveSearcher::new(Arc::clone(&cluster)),
             lambda_model: lambda_model.map(Arc::new),
             bangs,
             collector_config: config.collector,
