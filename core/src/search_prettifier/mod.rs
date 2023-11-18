@@ -172,6 +172,8 @@ pub struct DisplayedWebpage {
     pub pretty_url: String,
     pub snippet: Snippet,
     pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
+    pub likely_has_ads: bool,
+    pub likely_has_paywall: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -200,6 +202,8 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             domain,
             snippet,
             ranking_signals: None,
+            likely_has_ads: webpage.likely_has_ads,
+            likely_has_paywall: webpage.likely_has_paywall,
         }
     }
 }

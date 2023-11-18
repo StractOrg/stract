@@ -31,7 +31,6 @@ pub enum TopHosts {
 pub fn top_hosts(host_centrality: &RocksDbStore<NodeID, f64>, top: TopHosts) -> Vec<NodeID> {
     let mut hosts = host_centrality
         .iter()
-        .map(|(id, centrality)| (id, centrality))
         .map(|(id, centrality)| {
             if !centrality.is_finite() {
                 (id, 0.0)

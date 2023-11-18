@@ -258,6 +258,8 @@ export type DisplayedSidebar =
     };
 export type DisplayedWebpage = {
   domain: string;
+  likelyHasAds: boolean;
+  likelyHasPaywall: boolean;
   prettyUrl: string;
   rankingSignals?: {};
   site: string;

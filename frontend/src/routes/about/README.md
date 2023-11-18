@@ -23,7 +23,7 @@ that our values will always be aligned with our users.
 ## How do we make money?
 
 Well, currently we don't. We are bootstraped and trying to keep costs low. In
-the future we will have contextual ads based on your current search query and a
+the future we will have, clearly labelled, contextual ads based on your current search query and a
 subscription option without ads. Just to re-iterate; we will only use your
 current search to match ads and will never track you across searches.
 

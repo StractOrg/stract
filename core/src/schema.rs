@@ -228,6 +228,8 @@ pub enum FastField {
     NumFlattenedSchemaTokens,
     NumPathAndQuerySlashes,
     NumPathAndQueryDigits,
+    LikelyHasAds,
+    LikelyHasPaywall,
 }
 
 impl FastField {
@@ -266,6 +268,8 @@ impl FastField {
             FastField::SimHash => "sim_hash",
             FastField::NumPathAndQuerySlashes => "num_path_and_query_slashes",
             FastField::NumPathAndQueryDigits => "num_path_and_query_digits",
+            FastField::LikelyHasAds => "likely_has_ads",
+            FastField::LikelyHasPaywall => "likely_has_paywall",
         }
     }
 }
@@ -282,7 +286,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 63] = [
+pub static ALL_FIELDS: [Field; 65] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -347,6 +351,8 @@ pub static ALL_FIELDS: [Field; 63] = [
     Field::Fast(FastField::SimHash),
     Field::Fast(FastField::NumPathAndQuerySlashes),
     Field::Fast(FastField::NumPathAndQueryDigits),
+    Field::Fast(FastField::LikelyHasAds),
+    Field::Fast(FastField::LikelyHasPaywall),
 ];
 
 impl Field {
@@ -577,6 +583,18 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
+            Field::Fast(FastField::LikelyHasAds) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast()
+                    .set_indexed()
+                    .set_stored(),
+            ),
+            Field::Fast(FastField::LikelyHasPaywall) => IndexingOption::Integer(
+                NumericOptions::default()
+                    .set_fast()
+                    .set_indexed()
+                    .set_stored(),
+            ),
         }
     }
 
@@ -693,6 +711,8 @@ impl FastField {
             FastField::SimHash => DataType::U64,
             FastField::NumPathAndQuerySlashes => DataType::U64,
             FastField::NumPathAndQueryDigits => DataType::U64,
+            FastField::LikelyHasAds => DataType::U64,
+            FastField::LikelyHasPaywall => DataType::U64,
         }
     }
 }

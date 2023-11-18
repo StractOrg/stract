@@ -587,6 +587,8 @@ pub struct RetrievedWebpage {
     pub updated_time: Option<NaiveDateTime>,
     pub schema_org: Vec<schema_org::Item>,
     pub region: Region,
+    pub likely_has_ads: bool,
+    pub likely_has_paywall: bool,
 }
 impl RetrievedWebpage {
     pub fn description(&self) -> Option<&String> {
@@ -677,6 +679,14 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         .to_string();
 
                     webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
+                }
+                Field::Fast(FastField::LikelyHasAds) => {
+                    webpage.likely_has_ads =
+                        value.value().as_value().as_u64().unwrap_or_default() != 0;
+                }
+                Field::Fast(FastField::LikelyHasPaywall) => {
+                    webpage.likely_has_paywall =
+                        value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }
                 _ => {}
             }

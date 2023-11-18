@@ -35,11 +35,14 @@ use tantivy::{
 use url::Url;
 use whatlang::Lang;
 
+mod adservers;
 mod just_text;
 pub mod region;
 pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
+
+use self::adservers::AD_SERVERS;
 
 use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
 
@@ -1352,6 +1355,12 @@ impl Html {
 
                     doc.add_u64(tantivy_field, num_digits as u64);
                 }
+                Field::Fast(FastField::LikelyHasAds) => {
+                    doc.add_u64(tantivy_field, self.likely_has_ads() as u64);
+                }
+                Field::Fast(FastField::LikelyHasPaywall) => {
+                    doc.add_u64(tantivy_field, self.likely_has_paywall() as u64);
+                }
                 Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SafetyClassification)
                 | Field::Text(TextField::InsertionTimestamp)
@@ -1442,11 +1451,46 @@ impl Html {
                 .get("src")
                 .and_then(|url| Url::parse(url).ok())
             {
+                if url.root_domain() == self.url().root_domain() {
+                    continue;
+                }
+
                 if let Some(domain) = url.root_domain() {
-                    return matches!(
-                        domain,
-                        "doubleclick.net" | "googlesyndication.com" | "amazon-adsystem.com"
-                    );
+                    if AD_SERVERS.is_adserver(domain) {
+                        return true;
+                    }
+                }
+
+                if let Some(host) = url.host_str() {
+                    if AD_SERVERS.is_adserver(host) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // check <link> tags
+        for node in self.root.select("link").unwrap() {
+            if let Some(url) = node
+                .attributes
+                .borrow()
+                .get("href")
+                .and_then(|url| Url::parse(url).ok())
+            {
+                if url.root_domain() == self.url().root_domain() {
+                    continue;
+                }
+
+                if let Some(domain) = url.root_domain() {
+                    if AD_SERVERS.is_adserver(domain) {
+                        return true;
+                    }
+                }
+
+                if let Some(host) = url.host_str() {
+                    if AD_SERVERS.is_adserver(host) {
+                        return true;
+                    }
                 }
             }
         }
