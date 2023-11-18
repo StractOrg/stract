@@ -29,17 +29,21 @@
 >
   <div>
     <slot name="title">
-      <div class="flex items-center space-x-1.5 pb-1 font-bold capitalize tracking-wide">
+      <div class="flex items-center space-x-1.5 font-bold capitalize tracking-wide">
         <svelte:component this={icon} />
         <span>
           {title}
         </span>
-        <div class="m-0 flex-1" />
-        <slot name="top-right" />
+        {#if $$slots['top-right']}
+          <div class="m-0 flex-1" />
+          <slot name="top-right" />
+        {/if}
       </div>
     </slot>
   </div>
-  <div class="pt-1">
-    <slot />
-  </div>
+  {#if $$slots.default}
+    <div class="mt-1 pt-1">
+      <slot />
+    </div>
+  {/if}
 </div>
