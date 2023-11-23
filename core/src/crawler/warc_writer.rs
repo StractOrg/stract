@@ -32,14 +32,13 @@ pub struct WarcWriter {
 #[async_trait::async_trait]
 impl DatumStream for WarcWriter {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
-        self.tx
-            .blocking_send(WarcWriterMessage::Crawl(crawl_datum))?;
+        self.tx.send(WarcWriterMessage::Crawl(crawl_datum)).await?;
 
         Ok(())
     }
 
     async fn finish(&self) -> Result<()> {
-        self.tx.blocking_send(WarcWriterMessage::Finish)?;
+        self.tx.send(WarcWriterMessage::Finish).await?;
         self.tx.closed().await;
 
         Ok(())

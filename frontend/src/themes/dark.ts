@@ -4,8 +4,8 @@ export const darkTheme = theme({
   name: 'dark',
   scheme: 'dark',
   colors: {
-    primary: base.navy[600],
-    primaryFocus: base.navy[500],
+    primary: base.navy[500],
+    primaryFocus: base.navy[400],
     primaryContent: '#fff',
 
     secondary: base.island[500],
@@ -16,18 +16,18 @@ export const darkTheme = theme({
     accentFocus: base.cocoa[400],
     accentContent: '#fff',
 
-    neutral: base.stone[400],
-    neutralFocus: base.stone[300],
-    neutralContent: base.stone[100],
+    neutral: base.zinc[400],
+    neutralFocus: base.zinc[100],
+    neutralContent: base.zinc[300],
 
-    base100: base.stone[900],
-    base200: base.stone[800],
-    base300: base.stone[700],
-    base400: base.stone[600],
+    base100: base.zinc[800],
+    base200: base.zinc[700],
+    base300: base.zinc[600],
+    base400: base.zinc[500],
     baseContent: base.island[50],
 
-    info: base.navy[700],
-    infoContent: base.navy[200],
+    info: base.navy[600],
+    infoContent: base.navy[100],
 
     success: base.green[600],
     successContent: base.green[100],
@@ -38,7 +38,7 @@ export const darkTheme = theme({
     error: base.cerise2[600],
     errorContent: base.cerise2[100],
 
-    link: base.sky[400],
+    link: base.sky[500],
     linkVisited: base.purple[500],
   },
 });

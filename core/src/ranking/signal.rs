@@ -245,7 +245,7 @@ impl Signal {
             Signal::Bm25CleanBody => 0.0063,
             Signal::Bm25CleanBodyBigrams => 0.0025,
             Signal::Bm25CleanBodyTrigrams => 0.0025,
-            Signal::Bm25StemmedTitle => 0.001,
+            Signal::Bm25StemmedTitle => 0.003,
             Signal::Bm25StemmedCleanBody => 0.001,
             Signal::Bm25AllBody => 0.0,
             Signal::Bm25Url => 0.00015,
