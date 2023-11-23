@@ -43,23 +43,24 @@ export const load = async ({ params }) => {
     searchResults = webpages.map((w, i) => ({
       id: `${query.qid}-${w.url}`,
       origRank: i,
-      annotatedRank: null,
+      annotation: null,
       webpage: w,
     }));
 
     saveSearchResults(query.qid, searchResults);
   }
 
-  // sort results by annotatedRank and then origRank
+  // sort results by annotation and then origRank
+  // annotation is 0-4 where 4 is best, null is unannotated
   searchResults.sort((a, b) => {
-    if (a.annotatedRank === null && b.annotatedRank === null) {
+    if ((a.annotation === null && b.annotation === null) || a.annotation === b.annotation) {
       return a.origRank - b.origRank;
-    } else if (a.annotatedRank === null) {
+    } else if (a.annotation === null) {
       return 1;
-    } else if (b.annotatedRank === null) {
+    } else if (b.annotation === null) {
       return -1;
     } else {
-      return a.annotatedRank - b.annotatedRank;
+      return b.annotation - a.annotation;
     }
   });
 

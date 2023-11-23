@@ -13,7 +13,7 @@ res = cur.execute(
         SELECT qid, query
 		FROM queries
         WHERE EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
 		)
 """
 )
@@ -22,24 +22,23 @@ queries = {qid: {"query": query} for qid, query in res.fetchall()}
 for qid in queries:
     res = cur.execute(
         """
-            SELECT qid, url, annotated_rank, webpage_json
+            SELECT qid, url, annotation, webpage_json
             FROM search_results
             WHERE qid = ?
     """,
         (qid,),
     )
     urls = {
-        url: {"rank": rank, "signals": json.loads(page)["rankingSignals"]}
-        for _, url, rank, page in res.fetchall()
+        url: {"label": label, "signals": json.loads(page)["rankingSignals"]}
+        for _, url, label, page in res.fetchall()
     }
     urls = [
-        (url, w["rank"], w["signals"])
+        (url, w["label"], w["signals"])
         for url, w in urls.items()
-        if w["rank"] is not None
+        if w["label"] is not None
     ]
 
-    urls = sorted(urls, key=lambda x: x[1], reverse=False)
-    urls = [(url, i, signals) for (url, _, signals), i in zip(urls, range(len(urls)))]
+    urls = sorted(urls, key=lambda x: x[1], reverse=True)
     queries[qid]["urls"] = urls
 
 

@@ -22,7 +22,7 @@ function setupDB() {
 	url TEXT NOT NULL,
 	orig_rank INTEGER NOT NULL,
 	webpage_json TEXT NOT NULL,
-	annotated_rank INTEGER,
+	annotation INTEGER,
 	PRIMARY KEY (qid, url)
   );
   `);
@@ -50,7 +50,7 @@ export type Query = {
 export function getQueries(): Query[] {
   const query = db.prepare(`
 		SELECT qid, query, EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
 		) AS annotated
 		FROM queries ORDER BY qid
 	`);
@@ -61,7 +61,7 @@ export function getQueries(): Query[] {
 export function getNextQuery(qid: string): Query | undefined {
   const query = db.prepare(`
     SELECT qid, query, EXISTS (
-      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
     ) AS annotated
     FROM queries
     WHERE qid > @qid
@@ -77,7 +77,7 @@ export function getNextQuery(qid: string): Query | undefined {
 export function getPreviousQuery(qid: string): Query | undefined {
   const query = db.prepare(`
     SELECT qid, query, EXISTS (
-      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+      SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
     ) AS annotated
     FROM queries
     WHERE qid < @qid
@@ -94,12 +94,12 @@ export type SearchResult = {
   id: string;
   origRank: number;
   webpage: SimpleWebpage;
-  annotatedRank: number | null;
+  annotation: number | null;
 };
 
 export function getSearchResults(qid: string): SearchResult[] {
   const queryResults = db.prepare(`
-		SELECT url, orig_rank as origRank, webpage_json, annotated_rank AS annotatedRank
+		SELECT url, orig_rank as origRank, webpage_json, annotation
 		FROM search_results
 		WHERE qid = @qid
 	`);
@@ -109,17 +109,17 @@ export function getSearchResults(qid: string): SearchResult[] {
   return res.map((r: any) => ({
     id: `${qid}-${r.url}`,
     origRank: r.origRank,
-    annotatedRank: r.annotatedRank,
+    annotation: r.annotation,
     webpage: JSON.parse(r.webpage_json),
   }));
 }
 
 export const saveSearchResults = (qid: string, searchResults: SearchResult[]) => {
   const upsertSearchResults = db.prepare(`
-    INSERT INTO search_results (qid, url, orig_rank, webpage_json, annotated_rank)
-    VALUES (@qid, @url, @origRank, @webpageJson, @annotatedRank)
+    INSERT INTO search_results (qid, url, orig_rank, webpage_json, annotation)
+    VALUES (@qid, @url, @origRank, @webpageJson, @annotation)
     ON CONFLICT(qid, url) DO UPDATE SET
-    annotated_rank = excluded.annotated_rank
+    annotation = excluded.annotation
   `);
 
   for (const searchResult of searchResults) {
@@ -128,7 +128,7 @@ export const saveSearchResults = (qid: string, searchResults: SearchResult[]) =>
       url: searchResult.webpage.url,
       origRank: searchResult.origRank,
       webpageJson: JSON.stringify(searchResult.webpage),
-      annotatedRank: searchResult.annotatedRank,
+      annotation: searchResult.annotation,
     });
   }
 }
@@ -136,7 +136,7 @@ export const saveSearchResults = (qid: string, searchResults: SearchResult[]) =>
 export function getQuery(qid: String): Query | undefined {
   const query = db.prepare(`
 		SELECT qid, query, EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotated_rank IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
 		) AS annotated
 		FROM queries
 		WHERE qid = @qid

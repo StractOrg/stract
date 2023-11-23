@@ -1,33 +1,13 @@
 <script lang="ts">
-  import Check from '~icons/heroicons/check-20-solid';
   import Home from '~icons/heroicons/home-20-solid';
   import ArrowLeft from '~icons/heroicons/arrow-left-20-solid';
   import ArrowRight from '~icons/heroicons/arrow-right-20-solid';
-  import { dndzone } from 'svelte-dnd-action';
   import type { PageData } from "./$types";
-  import type { SearchResult } from '$lib/db';
-    import { browser } from '$app/environment';
+  import { browser } from '$app/environment';
 
   $: shownSignals = -1;
   $: searchResults = data.searchResults;
-
-  function updateRanks() {
-    searchResults.forEach((res, i) => {
-      if (res.annotatedRank != null) {
-        res.annotatedRank = i;
-      }
-    });
-  }
-
-  function handleConsider(event: CustomEvent<{ items: SearchResult[] }>) {
-    searchResults = event.detail.items;
-  }
-
-  async function handleDrop(event: CustomEvent<{ items: SearchResult[] }>) {
-    searchResults = event.detail.items;
-    updateRanks();
-    await save();
-  }
+  $: selected = 0;
 
   async function save() {
     if (!browser) {
@@ -44,6 +24,45 @@
         results: searchResults,
       }),
     })
+  }
+
+  function handleKeyPress(event: KeyboardEvent) {
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selected = Math.max(0, selected - 1);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selected = Math.min(searchResults.length - 1, selected + 1);
+    }
+
+    // scroll to selected
+    const el = document.getElementById(searchResults[selected].id);
+    el!.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+
+    // if key is 0-4, set annotation
+    if (event.key >= "0" && event.key <= "4") {
+      searchResults[selected].annotation = parseInt(event.key);
+      save();
+    } else if (event.key === "§") {
+      searchResults[selected].annotation = 0;
+      save();
+    } else if (event.key === "Backspace" || event.key === "-") {
+      searchResults[selected].annotation = null;
+      save();
+    }
+
+    // go to next/previous query
+    if (event.key === "ArrowLeft") {
+      selected = 0;
+      window.location.href = `/annotate/${data.previousQuery?.qid}`;
+    } else if (event.key === "ArrowRight") {
+      selected = 0;
+      window.location.href = `/annotate/${data.nextQuery?.qid}`;
+    }
+
   }
 
   $: searchResults && save();
@@ -73,24 +92,27 @@
         </a>
       </div>
     </div>
-    <section use:dndzone={{ items: searchResults, dropTargetStyle: {} }} on:consider={handleConsider} on:finalize={handleDrop} class="flex flex-col space-y-3">
+    <section class="flex flex-col space-y-3">
       {#each searchResults as res, i (res.id)}
-        <div>
+        <div id={res.id}>
           <div class="relative">
-            <button class="absolute left-[-2em] top-3" on:click={() => (res.annotatedRank == null) ? res.annotatedRank = i : res.annotatedRank = null}>
-              {#if res.annotatedRank != null}
-                <div class="text-green-500">
-                  <Check class="w-6 h-6" />
-                </div>
-              {:else}
-                <div class="text-slate-200">
-                  <Check class="w-6 h-6" />
-                </div>
-              {/if}
-            </button>
-            <div class="py-2 px-2 bg-slate-100 border shadow-sm rounded-lg">
-              <div>
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+            <div role="listitem" class="py-2 px-2 {selected == i ? 'bg-slate-300' : 'bg-slate-100'} border shadow-sm rounded-lg" on:click={() => selected = i} on:keypress={handleKeyPress}>
+              <div class="w-full flex justify-between">
                 <a href="{res.webpage.url}" target="_blank">{res.webpage.url}</a>
+                {#if res.annotation != null}
+                  {#if res.annotation == 4}
+                    <div class="text-green-600">{res.annotation}</div>
+                  {:else if res.annotation == 3}
+                    <div class="text-green-500">{res.annotation}</div>
+                  {:else if res.annotation == 2}
+                    <div class="text-yellow-500">{res.annotation}</div>
+                  {:else if res.annotation == 1}
+                    <div class="text-red-500">{res.annotation}</div>
+                  {:else if res.annotation == 0}
+                    <div class="text-red-600">{res.annotation}</div>
+                  {/if}
+                {/if}
               </div>
               <div class="font-bold">
                 <a href="{res.webpage.url}" target="_blank">{res.webpage.title}</a>
@@ -126,3 +148,5 @@
     </section>
   </div>
 </div>
+
+<svelte:window on:keydown={handleKeyPress}/>

@@ -39,8 +39,7 @@
   "dependencies": {
     "better-sqlite3": "^9.0.0",
     "cassandra-driver": "^4.7.2",
-    "papaparse": "^5.4.1",
-    "svelte-dnd-action": "^0.9.31"
+    "papaparse": "^5.4.1"
   },
   "type": "module"
 }
