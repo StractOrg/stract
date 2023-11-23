@@ -4,7 +4,7 @@ docs_dir: src
 nav:
   - Introduction: index.md
   - Overview: overview.md
-  - Crawler: crawler.md
+  # - Crawler: crawler.md
   - Webgraph: webgraph.md
   - Search Index: search_index.md
   - Optics: optics.md
