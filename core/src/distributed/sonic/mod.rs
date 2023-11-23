@@ -27,6 +27,8 @@ use tokio::{
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
+const MAX_BODY_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024; // 1TB
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Got an IO error")]
@@ -98,6 +100,14 @@ where
         self.stream.read_exact(&mut header_buf).await?;
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
+        if header.body_size > MAX_BODY_SIZE_BYTES {
+            return Err(Error::Other(anyhow::anyhow!(
+                "body size too large: {} (max: {})",
+                header.body_size,
+                MAX_BODY_SIZE_BYTES
+            )));
+        }
+
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
         self.stream.flush().await?;
@@ -147,6 +157,14 @@ where
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
         stream.read_exact(&mut header_buf).await?;
         let header: Header = *bytemuck::from_bytes(&header_buf);
+
+        if header.body_size > MAX_BODY_SIZE_BYTES {
+            return Err(Error::Other(anyhow::anyhow!(
+                "body size too large: {} (max: {})",
+                header.body_size,
+                MAX_BODY_SIZE_BYTES
+            )));
+        }
 
         let mut buf = vec![0; header.body_size];
 
