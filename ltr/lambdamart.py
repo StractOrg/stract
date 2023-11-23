@@ -101,7 +101,7 @@ print("Train size:", len(X_train))
 print("Test size:", len(X_test))
 
 # Train model
-n_estimators = 100
+n_estimators = 50
 model = lgb.LGBMRanker(
     objective="lambdarank",
     metric="ndcg",
@@ -109,7 +109,7 @@ model = lgb.LGBMRanker(
     num_leaves=20,
     n_estimators=n_estimators,
     max_depth=10,
-    learning_rate=0.05,
+    learning_rate=0.1,
     label_gain=[i for i in range(max(y_train.max(), y_test.max()) + 1)],
 )
 model.fit(
@@ -123,24 +123,30 @@ model.fit(
     eval_metric="ndcg",
 )
 
-best_iteration = (
-    n_estimators - 1 if model.best_iteration_ is None else model.best_iteration_
-)
-
-print("Best iteration:", best_iteration)
-
 # dump model
 model.booster_.save_model(
     "data/lambdamart.txt",
-    start_iteration=best_iteration,
-    num_iteration=best_iteration,
 )
 
 # print feature importance
-pprint(
-    sorted(
-        [(id2feature[i], v) for i, v in enumerate(model.feature_importances_) if v > 0],
-        key=lambda x: x[1],
-        reverse=True,
-    )
-)
+# pprint(
+#     sorted(
+#         [(id2feature[i], v) for i, v in enumerate(model.feature_importances_) if v > 0],
+#         key=lambda x: x[1],
+#         reverse=True,
+#     )
+# )
+
+# verify that the saved model outputs the same scores
+# for the same input
+saved_model = lgb.Booster(model_file="data/lambdamart.txt")
+
+for i in range(len(X_test)):
+    assert model.predict(X_test[i : i + 1]) == saved_model.predict(X_test[i : i + 1])
+
+# print an example
+print("Example:")
+t = X_test[0]
+print("Features:")
+pprint({id2feature[i]: v for i, v in enumerate(t)})
+print("Score:", model.predict(t.reshape(1, -1))[0])
