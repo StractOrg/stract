@@ -3,9 +3,8 @@ import numpy as np
 import json
 from pprint import pprint
 import sqlite3
-import sys
 
-con = sqlite3.connect("data/ranking-annotation.sqlite")
+con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
 
 res = cur.execute(
@@ -129,13 +128,13 @@ model.booster_.save_model(
 )
 
 # print feature importance
-# pprint(
-#     sorted(
-#         [(id2feature[i], v) for i, v in enumerate(model.feature_importances_) if v > 0],
-#         key=lambda x: x[1],
-#         reverse=True,
-#     )
-# )
+pprint(
+    sorted(
+        [(id2feature[i], v) for i, v in enumerate(model.feature_importances_) if v > 0],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+)
 
 # verify that the saved model outputs the same scores
 # for the same input

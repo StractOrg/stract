@@ -5364,6 +5364,7 @@ checksum = "dcdcd0195a5b871e50926da8e881277f36a4621b3220d85092e7b91cc85f6bd9"
 dependencies = [
  "hashbrown 0.12.3",
  "once_cell",
+ "serde",
 ]
 
 [[package]]

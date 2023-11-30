@@ -448,3 +448,12 @@ pub struct FeedIndexingConfig {
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct WebSpellConfig {
+    pub output_path: String,
+    pub warc_source: WarcSource,
+    pub languages: Vec<whatlang::Lang>,
+    pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
+}

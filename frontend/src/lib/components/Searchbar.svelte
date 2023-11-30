@@ -93,7 +93,7 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-400 py-0.5 pl-5 pr-0.5 transition focus-within:shadow',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-400 pl-5 transition focus-within:shadow',
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
       hasFocus && 'shadow',
     )}
@@ -121,7 +121,9 @@
       bind:value={query}
       on:keydown={onKeydown}
     />
-    <Button type="submit">search</Button>
+    <div class="h-full py-0.5 pr-0.5">
+      <Button _class="py-0 h-full" type="submit">search</Button>
+    </div>
 
     {#if suggestions.length > 0}
       <div class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block" />

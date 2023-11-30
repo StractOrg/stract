@@ -37,7 +37,6 @@ use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIG
 use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
-use crate::spell::Spell;
 use crate::webgraph::Node;
 use crate::webpage::region::Region;
 use crate::{inverted_index, live_index, Error, Result};
@@ -118,7 +117,7 @@ impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
 
 pub struct LocalSearcher<I: SearchableIndex> {
     index: I,
-    spell: Option<Spell>,
+    // spell: Option<Spell>,
     entity_index: Option<EntityIndex>,
     inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
@@ -151,7 +150,7 @@ where
 
         LocalSearcher {
             index,
-            spell: None,
+            // spell: None,
             entity_index: None,
             inbound_similarity: None,
             linear_regression: None,
@@ -161,7 +160,7 @@ where
     }
 
     pub fn build_spell_dict(&mut self) {
-        self.spell = Some(Spell::for_index(self.index.guard().search_index()));
+        todo!("Spell checker is not implemented yet")
     }
 
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
@@ -372,11 +371,11 @@ where
         let ctx = guard.inverted_index().local_search_ctx();
         let inverted_index_result =
             self.search_inverted_index(&ctx, &guard, query, de_rank_similar)?;
-        let correction = self.spell.as_ref().and_then(|s| s.correction(query));
         let sidebar = self.entity_sidebar(query);
 
         Ok(InitialWebsiteResult {
-            spell_corrected_query: correction,
+            // spell_corrected_query: correction,
+            spell_corrected_query: None,
             websites: inverted_index_result.webpages,
             num_websites: inverted_index_result.num_hits,
             has_more: inverted_index_result.has_more,
@@ -574,54 +573,5 @@ mod tests {
                 )
             }
         }
-    }
-
-    #[test]
-    fn sentence_spell_correction() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(Webpage::new(
-                    r#"
-            <html>
-                <head>
-                    <title>Test website</title>
-                </head>
-                <body>
-    this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever
-                </body>
-            </html>
-            "#
-                ,
-                "https://www.example.com",
-            ).unwrap())
-            .expect("failed to insert webpage");
-
-        index.commit().unwrap();
-
-        let mut searcher = LocalSearcher::new(index);
-        searcher.build_spell_dict();
-
-        assert_eq!(
-            String::from(
-                searcher
-                    .spell
-                    .as_ref()
-                    .unwrap()
-                    .correction(&SearchQuery {
-                        query: "th best".to_string(),
-                        ..Default::default()
-                    })
-                    .unwrap()
-            ),
-            "the best".to_string()
-        );
-        assert_eq!(
-            searcher.spell.as_ref().unwrap().correction(&SearchQuery {
-                query: "the best".to_string(),
-                ..Default::default()
-            }),
-            None
-        );
     }
 }

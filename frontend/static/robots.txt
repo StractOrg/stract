@@ -1,0 +1,11 @@
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: dotbot
+Disallow: /
+
+User-agent: linkdexbot
+Disallow: /

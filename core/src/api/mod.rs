@@ -273,7 +273,7 @@ async fn search_metric<B>(
 
     if response.status().is_success() {
         state.counters.search_counter_success.inc();
-    } else {
+    } else if response.status().is_server_error() {
         state.counters.search_counter_fail.inc();
     }
 

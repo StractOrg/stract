@@ -29,7 +29,6 @@ use tokenizers::{PaddingParams, TruncationParams};
 use crate::{
     ceil_char_boundary,
     llm_utils::{self, ClonableTensor},
-    spell::word2vec::{Word2Vec, WordVec},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -42,9 +41,6 @@ pub enum Error {
 
     #[error("IO")]
     Io(#[from] std::io::Error),
-
-    #[error("Word2vec")]
-    Word2Vec(#[from] crate::spell::word2vec::Error),
 
     #[error("Unexpected output type")]
     UnexpectedOutputType,
@@ -176,51 +172,6 @@ trait PassageScorer {
     fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding>;
 
     fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32;
-}
-
-impl PassageScorer for Word2Vec {
-    type QueryEmbedding = Vec<WordVec>;
-
-    type PassageEmbedding = Self::QueryEmbedding;
-
-    fn embed_query(&self, query: &str) -> Option<Self::QueryEmbedding> {
-        let res: Self::QueryEmbedding = query
-            .split_whitespace()
-            .filter_map(|word| self.get(word).cloned())
-            .collect();
-
-        if res.is_empty() {
-            return None;
-        }
-
-        Some(res)
-    }
-
-    fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding> {
-        let res: Self::PassageEmbedding = passage
-            .split_whitespace()
-            .filter_map(|word| self.get(word).cloned())
-            .collect();
-
-        if res.is_empty() {
-            return None;
-        }
-
-        Some(res)
-    }
-
-    fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32 {
-        let mut score = 0.0;
-        let mut count = 0;
-
-        for passage_vec in passage {
-            score += query.iter().map(|vec| vec.sim(passage_vec)).sum::<f32>();
-
-            count += 1;
-        }
-
-        score / count as f32
-    }
 }
 
 pub struct ExtractiveSummarizer {

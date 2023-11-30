@@ -8,7 +8,7 @@
   <div class="mb-4 flex w-64">
     <BiglogoWithText />
   </div>
-  <div class="w-full md:mx-0 md:max-w-2xl">
+  <div class="w-full md:mx-0 md:max-w-xl">
     <Searchbar autofocus={true} />
   </div>
   <div class="mt-3 flex space-x-2 text-neutral">

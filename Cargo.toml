@@ -106,7 +106,7 @@ urlencoding = "2.1.2"
 utoipa = {version = "4.0.0", features = ["axum_extras"]}
 utoipa-swagger-ui = {version = "4.0.0", features = ["axum"]}
 uuid = "1.1.2"
-whatlang = "0.16.0"
+whatlang = {version = "0.16.0", features = ["serde"]}
 
 [profile.test.package]
 flate2.opt-level = 3

@@ -1,5 +1,5 @@
-graph_base_path = "data/webgraph"
-level = "host"
+languages = ["eng"]
+output_path = "data/web_spell"
 
 [warc_source]
 folder = "data"

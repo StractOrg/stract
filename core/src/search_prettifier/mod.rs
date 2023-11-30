@@ -28,7 +28,7 @@ use crate::{
     inverted_index::RetrievedWebpage,
     ranking::{Signal, SignalScore},
     snippet::TextSnippet,
-    spell::{self, CorrectionTerm},
+    web_spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
 };
 
@@ -66,8 +66,8 @@ pub struct HighlightedSpellCorrection {
     pub highlighted: String,
 }
 
-impl From<spell::Correction> for HighlightedSpellCorrection {
-    fn from(correction: spell::Correction) -> Self {
+impl From<web_spell::Correction> for HighlightedSpellCorrection {
+    fn from(correction: web_spell::Correction) -> Self {
         let mut highlighted = String::new();
         let mut raw = String::new();
 

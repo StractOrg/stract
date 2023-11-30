@@ -475,6 +475,10 @@ impl Html {
         Ok(res)
     }
 
+    pub fn lang(&self) -> Option<&'_ Lang> {
+        self.lang.as_ref()
+    }
+
     pub fn canonical_url(&self) -> Option<Url> {
         let mut canonical_url = None;
 

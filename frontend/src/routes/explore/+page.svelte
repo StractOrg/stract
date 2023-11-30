@@ -71,7 +71,7 @@
       </div>
       <form
         class={twJoin(
-          'mb-2 flex w-full max-w-lg rounded-full border border-base-400 bg-base-100 p-[2px] pl-3 transition focus-within:shadow',
+          'mb-2 flex w-full max-w-lg rounded-full border border-base-400 bg-base-100 p-[1px] pl-3 transition focus-within:shadow',
         )}
         id="site-input-container"
         on:submit|preventDefault={() => addWebsite(inputWebsite, true)}

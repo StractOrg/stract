@@ -71,11 +71,15 @@ enum Commands {
     },
 
     /// Deploy the search server.
-    SearchServer { config_path: String },
+    SearchServer {
+        config_path: String,
+    },
 
     /// Deploy the json http api. The api interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
-    Api { config_path: String },
+    Api {
+        config_path: String,
+    },
 
     /// Scrape the Google autosuggest API for search queries.
     AutosuggestScrape {
@@ -107,9 +111,15 @@ enum Commands {
         alice: bool,
     },
 
+    // Commands for the live index.
     LiveIndex {
         #[clap(subcommand)]
         options: LiveIndex,
+    },
+
+    // Build spell correction model.
+    WebSpell {
+        config_path: String,
     },
 }
 
@@ -385,6 +395,10 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::live_index::serve(config))?
             }
         },
+        Commands::WebSpell { config_path } => {
+            let config: config::WebSpellConfig = load_toml_config(config_path);
+            entrypoint::web_spell::run(config)?;
+        }
     }
 
     Ok(())

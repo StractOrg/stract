@@ -146,7 +146,7 @@
     class="m-0 grid w-full gap-y-6 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36"
     style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
   >
-    <div class="flex max-w-2xl flex-col space-y-5">
+    <div class="flex max-w-2xl flex-col space-y-3">
       <div class="w-full">
         <Searchbar {query} />
       </div>

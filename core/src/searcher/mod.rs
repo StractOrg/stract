@@ -33,7 +33,7 @@ use crate::{
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
     },
-    spell::Correction,
+    web_spell::Correction,
     webpage::region::Region,
     widgets::Widget,
 };

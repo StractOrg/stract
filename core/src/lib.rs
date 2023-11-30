@@ -73,13 +73,13 @@ pub mod searcher;
 mod simhash;
 pub mod similar_sites;
 mod snippet;
-pub mod spell;
 #[cfg(feature = "libtorch")]
 pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
 pub mod warc;
+pub mod web_spell;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;

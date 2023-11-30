@@ -18,8 +18,8 @@ use std::ops::Range;
 
 use crate::config::SnippetConfig;
 use crate::query::Query;
-use crate::spell::sentence_ranges;
 use crate::tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
+use crate::web_spell::sentence_ranges;
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
 use utoipa::ToSchema;

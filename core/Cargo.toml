@@ -140,10 +140,6 @@ name = "build-similarity"
 
 [[bench]]
 harness = false
-name = "spell-correction"
-
-[[bench]]
-harness = false
 name = "similar-sites"
 
 [[bench]]

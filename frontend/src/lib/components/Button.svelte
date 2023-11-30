@@ -18,6 +18,7 @@
   export let pale: boolean = false;
   export let padding: boolean = true;
   export let kind: Kind = 'primary';
+  export let _class: string = '';
 </script>
 
 <button
@@ -82,6 +83,7 @@
           kind == 'warning' && 'bg-warning text-warning-content hover:bg-warning-focus',
           kind == 'error' && 'bg-error text-error-content hover:bg-error-focus',
         ],
+        _class,
   )}
 >
   <slot />
