@@ -97,7 +97,7 @@ impl StoredDict {
             .iter()
             .map(|d| MergePointer {
                 term: String::new(),
-                freq: 0,
+                value: 0,
                 stream: d.map.stream(),
                 is_finished: false,
             })
@@ -134,7 +134,7 @@ impl StoredDict {
                     }
 
                     if pointer.term == term {
-                        freq += pointer.freq;
+                        freq += pointer.value;
                         pointer.advance();
                     }
                 }

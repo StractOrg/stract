@@ -127,7 +127,7 @@ pub fn tokenize(text: &str) -> Vec<String> {
 }
 pub struct MergePointer<'a> {
     pub term: String,
-    pub freq: u64,
+    pub value: u64,
     pub stream: fst::map::Stream<'a>,
     pub is_finished: bool,
 }
@@ -137,9 +137,9 @@ impl<'a> MergePointer<'a> {
         self.is_finished = self
             .stream
             .next()
-            .map(|(term, freq)| {
+            .map(|(term, value)| {
                 self.term = std::str::from_utf8(term).unwrap().to_string();
-                self.freq = freq;
+                self.value = value;
             })
             .is_none();
 

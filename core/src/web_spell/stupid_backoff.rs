@@ -22,7 +22,7 @@ use std::{
     path::Path,
 };
 
-use fst::IntoStreamer;
+use fst::{Automaton, IntoStreamer, Streamer};
 use serde::{Deserialize, Serialize};
 
 const DISCOUNT: f64 = 0.4;
@@ -53,6 +53,7 @@ impl AsRef<[u8]> for StoredNgram {
 pub struct StupidBackoffTrainer {
     max_ngram_size: usize,
     ngrams: BTreeMap<Ngram, u64>,
+    rotated_ngrams: BTreeMap<Ngram, u64>,
     n_counts: Vec<u64>,
 }
 
@@ -61,6 +62,7 @@ impl StupidBackoffTrainer {
         Self {
             max_ngram_size,
             ngrams: BTreeMap::new(),
+            rotated_ngrams: BTreeMap::new(),
             n_counts: vec![0; max_ngram_size],
         }
     }
@@ -79,6 +81,15 @@ impl StupidBackoffTrainer {
 
                 self.n_counts[i - 1] += 1;
             }
+
+            let mut ngram = Ngram {
+                terms: window.to_vec(),
+            };
+            ngram.terms.rotate_left(1);
+            self.rotated_ngrams
+                .entry(ngram)
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
         }
     }
 
@@ -101,6 +112,21 @@ impl StupidBackoffTrainer {
 
         builder.finish()?;
 
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(path.as_ref().join("rotated_ngrams.bin"))?;
+
+        let wtr = BufWriter::new(file);
+
+        let mut builder = fst::MapBuilder::new(wtr)?;
+
+        for (ngram, freq) in self.rotated_ngrams {
+            builder.insert(StoredNgram::from(ngram), freq)?;
+        }
+
+        builder.finish()?;
+
         bincode::serialize_into(
             File::create(path.as_ref().join("n_counts.bin"))?,
             &self.n_counts,
@@ -110,8 +136,68 @@ impl StupidBackoffTrainer {
     }
 }
 
+fn merge_streams(
+    mut builder: fst::MapBuilder<BufWriter<File>>,
+    streams: Vec<fst::map::Stream<'_, fst::automaton::AlwaysMatch>>,
+) -> Result<()> {
+    let mut pointers: Vec<_> = streams
+        .into_iter()
+        .map(|stream| MergePointer {
+            term: String::new(),
+            value: 0,
+            stream,
+            is_finished: false,
+        })
+        .collect();
+
+    for pointer in pointers.iter_mut() {
+        pointer.advance();
+    }
+
+    while pointers.iter().any(|p| !p.is_finished) {
+        let mut min_pointer: Option<&MergePointer<'_>> = None;
+
+        for pointer in pointers.iter() {
+            if pointer.is_finished {
+                continue;
+            }
+
+            if let Some(min) = min_pointer {
+                if pointer.term < min.term {
+                    min_pointer = Some(pointer);
+                }
+            } else {
+                min_pointer = Some(pointer);
+            }
+        }
+
+        if let Some(min_pointer) = min_pointer {
+            let term = min_pointer.term.clone();
+            let mut freq = 0;
+
+            for pointer in pointers.iter_mut() {
+                if pointer.is_finished {
+                    continue;
+                }
+
+                if pointer.term == term {
+                    freq += pointer.value;
+                    pointer.advance();
+                }
+            }
+
+            builder.insert(term, freq)?;
+        }
+    }
+
+    builder.finish()?;
+
+    Ok(())
+}
+
 pub struct StupidBackoff {
     ngrams: fst::Map<memmap::Mmap>,
+    rotated_ngrams: fst::Map<memmap::Mmap>,
     n_counts: Vec<u64>,
 }
 
@@ -120,21 +206,23 @@ impl StupidBackoff {
         let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
 
+        let mmap =
+            unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
+        let rotated_ngrams = fst::Map::new(mmap)?;
+
         let n_counts = bincode::deserialize_from(File::open(path.as_ref().join("n_counts.bin"))?)?;
 
-        Ok(Self { ngrams, n_counts })
+        Ok(Self {
+            ngrams,
+            rotated_ngrams,
+            n_counts,
+        })
     }
 
     pub fn merge<P: AsRef<Path>>(models: Vec<Self>, path: P) -> Result<Self> {
         if !path.as_ref().exists() {
             std::fs::create_dir_all(path.as_ref())?;
         }
-
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(path.as_ref().join("ngrams.bin"))?;
-
         let n_counts = models
             .iter()
             .fold(vec![0; models[0].n_counts.len()], |mut acc, m| {
@@ -145,65 +233,39 @@ impl StupidBackoff {
                 acc
             });
 
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(path.as_ref().join("ngrams.bin"))?;
+
         let wtr = BufWriter::new(file);
-        let mut builder = fst::MapBuilder::new(wtr)?;
+        let builder = fst::MapBuilder::new(wtr)?;
 
-        let mut pointers: Vec<_> = models
-            .iter()
-            .map(|d| MergePointer {
-                term: String::new(),
-                freq: 0,
-                stream: d.ngrams.stream(),
-                is_finished: false,
-            })
-            .collect();
+        let streams: Vec<_> = models.iter().map(|d| d.ngrams.stream()).collect();
 
-        for pointer in pointers.iter_mut() {
-            pointer.advance();
-        }
+        merge_streams(builder, streams)?;
 
-        while pointers.iter().any(|p| !p.is_finished) {
-            let mut min_pointer: Option<&MergePointer<'_>> = None;
+        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let ngrams = fst::Map::new(mmap)?;
 
-            for pointer in pointers.iter() {
-                if pointer.is_finished {
-                    continue;
-                }
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(path.as_ref().join("rotated_ngrams.bin"))?;
 
-                if let Some(min) = min_pointer {
-                    if pointer.term < min.term {
-                        min_pointer = Some(pointer);
-                    }
-                } else {
-                    min_pointer = Some(pointer);
-                }
-            }
+        let wtr = BufWriter::new(file);
+        let builder = fst::MapBuilder::new(wtr)?;
 
-            if let Some(min_pointer) = min_pointer {
-                let term = min_pointer.term.clone();
-                let mut freq = 0;
+        let streams: Vec<_> = models.iter().map(|d| d.ngrams.stream()).collect();
 
-                for pointer in pointers.iter_mut() {
-                    if pointer.is_finished {
-                        continue;
-                    }
+        merge_streams(builder, streams)?;
 
-                    if pointer.term == term {
-                        freq += pointer.freq;
-                        pointer.advance();
-                    }
-                }
-
-                builder.insert(term, freq)?;
-            }
-        }
-
-        builder.finish()?;
-
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref())?)? };
+        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let rotated_ngrams = fst::Map::new(mmap)?;
 
         Ok(Self {
-            ngrams: fst::Map::new(mmap)?,
+            ngrams,
+            rotated_ngrams,
             n_counts,
         })
     }
@@ -233,18 +295,23 @@ impl StupidBackoff {
         }
     }
 
-    pub fn contexts(&self, word: &str) -> Vec<Vec<String>> {
-        let q = " ".to_string() + word + " ";
-        let automaton = fst::automaton::Subsequence::new(q.as_str());
+    pub fn contexts(&self, word: &str) -> Vec<(Vec<String>, u64)> {
+        let q = word.to_string() + " ";
+        let automaton = fst::automaton::Str::new(&q).starts_with();
 
-        self.ngrams
-            .search(automaton)
-            .into_stream()
-            .into_str_keys()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|s| tokenize(&s))
-            .collect()
+        let mut stream = self.rotated_ngrams.search(automaton).into_stream();
+
+        let mut contexts = Vec::new();
+
+        while let Some((ngram, freq)) = stream.next() {
+            if let Ok(ngram) = std::str::from_utf8(ngram) {
+                let mut ngram = tokenize(ngram);
+                ngram.rotate_right(1);
+                contexts.push((ngram, freq));
+            }
+        }
+
+        contexts
     }
 }
 

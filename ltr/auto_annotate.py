@@ -1,24 +1,29 @@
-from openai import OpenAI
-from os import environ
+import numpy as np
 import re
+from llama_cpp import Llama
 import sqlite3
-import requests
 from tqdm import tqdm
 import json
 import time
+import requests
 
-NUM_RESULTS_PER_QUERY = 10
-PROMPT = """You are an expert data annotator employed at Google. Your task is to evaluate search results on an integer scale of 0-4, where a higher score means the result is more relevant. A relevant result should come from a trust-worthy source or niche blog and answer the users query.
-First briefly provide the reasoning for the evaluation and then give the relevancy on the form "Relevancy: {{}}" on a new line.
+NUM_RESULTS_PER_QUERY = 20
+NUM_ENSEMBLE_PREDS = 1
+PROMPT = """<|im_start|>system
+Perform the task to the best of your ability.<|im_end|>
+<|im_start|>user
+Think about this step-by-step. You task is to evaluate a single search result on an integer scale of 0-4, where a higher score means the result is more relevant. A relevant result should come from a trust-worthy source and answer the users query. The final relevancy should be on a new line on the form "Relevancy: {{}}". It is very important that you think about the steps before giving the final "Relevancy: {{}}" score.
 
 Query: "{}"
-URL: "{}"
+Url: "{}"
 Title: "{}"
-Snippet: "{}"
-Explanation:"""
-
-client = OpenAI(
-    api_key=environ.get("OPENAI_API_KEY"),
+Snippet: "{}"<|im_end|>
+<|im_start|>assistant
+"""
+llm = Llama(
+    n_gpu_layers=-1,
+    n_ctx=8000,
+    model_path="data/neuralhermes-2.5-mistral-7b.Q5_K_M.gguf",
 )
 
 
@@ -60,6 +65,16 @@ db = setup_db()
 
 cur = db.cursor()
 for query in all_queries:
+    if len(query) < 3:
+        continue
+
+    # check if query has large percentage of non-alphanumeric characters
+    if sum([c.isalnum() for c in query]) / len(query) < 0.5:
+        continue
+
+    if len(query) > 100:
+        continue
+
     cur.execute(
         """
         INSERT OR IGNORE INTO queries (query)
@@ -169,23 +184,30 @@ for qid, query in tqdm(unannotated_queries.items()):
     for url, orig_rank, webpage_json in tqdm(unnanotated_results):
         webpage = json.loads(webpage_json)
         prompt = get_prompt(query, url, webpage["title"], webpage["snippet"])
-        res = (
-            client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": prompt,
-                    }
-                ],
-                model="gpt-4-1106-preview",
+        res = 0
+        n = 0
+        for _ in range(NUM_ENSEMBLE_PREDS):
+            output = llm.create_completion(
+                prompt,
+                max_tokens=-1,
+                echo=False,
+                temperature=0.4,
+                stop=["<|im_start|>", "<|im_end|>"],
             )
-            .choices[0]
-            .message.content
-        )
+            output = output["choices"][0]["text"]
 
-        relevancy = get_relevancy(res)
-        if relevancy is None:
+            relevancy = get_relevancy(output)
+            if relevancy is None:
+                continue
+
+            n += 1
+            res += relevancy
+
+        if n == 0:
+            print("No relevancy annotation for", query, url)
             continue
+        relevancy = np.round(res / n).astype(int)
+        relevancy = max(0, min(4, int(relevancy)))
 
         cur.execute(
             """

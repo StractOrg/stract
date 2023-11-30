@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
-use crate::web_spell::{error_model::ErrorModel, stupid_backoff::IntoMiddle};
+use crate::web_spell::error_model::ErrorModel;
 
 use super::{stupid_backoff::StupidBackoffTrainer, tokenize, Result};
 use std::{
@@ -112,10 +113,12 @@ impl SecondTrainer {
     }
 
     pub fn train(self) -> Result<()> {
+        tracing::info!("training error model");
         let terms = self.term_dict.terms();
 
         let errors: Vec<_> = terms
             .into_par_iter()
+            .progress()
             .map(|term| {
                 // one edit for words of
                 // up to four characters, two edits for up to twelve
@@ -128,37 +131,46 @@ impl SecondTrainer {
                     3
                 };
 
-                let possible_errors = self
+                let possible_corrections = self
                     .term_dict
                     .search(&term, max_edit_distance)
                     .into_iter()
-                    .filter(|incorrect| {
-                        incorrect != &term
-                            && 10 * self.term_dict.freq(incorrect).unwrap_or_default()
-                                > self.term_dict.freq(&term).unwrap_or_default()
+                    .filter(|correction| {
+                        correction != &term
+                            && 10 * self.term_dict.freq(&term).unwrap_or_default()
+                                > self.term_dict.freq(correction).unwrap_or_default()
                     })
                     .collect::<Vec<_>>();
 
-                (term, possible_errors)
+                (term, possible_corrections)
             })
             .filter(|(_, errors)| !errors.is_empty())
-            .map(|(term, possible_errors)| {
+            .map(|(term, possible_corrections)| {
                 let contexts = self.lm_model.contexts(&term);
 
                 let best_terms = contexts
                     .into_iter()
+                    .filter_map(
+                        |(context, count)| {
+                            if count < 10 {
+                                None
+                            } else {
+                                Some(context)
+                            }
+                        },
+                    )
                     .filter(|c| c.len() != 3)
                     .map(|context| {
-                        let most_probable = possible_errors
+                        let most_probable = possible_corrections
                             .iter()
                             .chain(vec![&term])
                             .map(|t| {
                                 let mut words = context.clone();
                                 words[1] = t.clone();
 
-                                (self.lm_model.log_prob(&words, IntoMiddle::default()), t)
+                                (self.lm_model.freq(&words), t)
                             })
-                            .max_by(|(a, _), (b, _)| a.total_cmp(b))
+                            .max_by(|(a, _), (b, _)| a.cmp(b))
                             .unwrap()
                             .1
                             .clone();
@@ -180,17 +192,16 @@ impl SecondTrainer {
 
         let mut error_model = ErrorModel::new();
 
-        for (term, correction) in errors
+        for (term, possible_correction) in errors
             .into_iter()
-            .flat_map(|(term, correction)| {
-                correction
-                    .keys()
-                    .map(|other| (term.clone(), other.clone()))
-                    .collect::<Vec<_>>()
+            .flat_map(|(term, possible_corrections)| {
+                possible_corrections
+                    .into_keys()
+                    .map(move |other| (term.clone(), other.clone()))
             })
             .filter(|(a, b)| a != b)
         {
-            error_model.add(&term, &correction);
+            error_model.add(&term, &possible_correction);
         }
 
         error_model.save(self.path.join("error_model.json"))?;

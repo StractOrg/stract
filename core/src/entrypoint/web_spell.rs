@@ -20,7 +20,7 @@ use anyhow::Result;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{debug, info};
 use whatlang::Lang;
 
 use crate::{
@@ -90,11 +90,14 @@ impl SpellWorker {
     }
 
     fn next_training_step(self) -> Result<FnvHashMap<Lang, FirstTrainerResult>> {
+        debug!("next training step");
         let mut result = FnvHashMap::default();
 
         for (lang, trainer) in self.trainer {
             result.insert(lang, trainer.next_training_step()?);
         }
+
+        debug!("next training step created");
 
         Ok(result)
     }
@@ -120,7 +123,7 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
         })
         .collect_vec();
 
-    let num_workers = num_cpus::get();
+    let num_workers = (num_cpus::get()).min(jobs.len());
     let mut handlers = Vec::new();
 
     for i in 0..num_workers {
@@ -148,12 +151,14 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
     }
 
     for (lang, results) in combined {
+        info!("creating second trainer for {}", lang);
         let second_trainer = SecondTrainer::new(
             results,
             Path::new(&config.output_path)
                 .join("corrector")
                 .join(lang.to_string()),
         )?;
+        debug!("second trainer created");
 
         second_trainer.train()?;
     }

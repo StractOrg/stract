@@ -37,7 +37,7 @@ for qid in queries:
         if w["label"] is not None
     ]
 
-    urls = sorted(urls, key=lambda x: x[1], reverse=True)
+    urls = sorted(urls, key=lambda x: int(x[1]), reverse=True)
     queries[qid]["urls"] = urls
 
 
@@ -105,9 +105,9 @@ model = lgb.LGBMRanker(
     objective="lambdarank",
     metric="ndcg",
     importance_type="gain",
-    num_leaves=20,
+    num_leaves=15,
     n_estimators=n_estimators,
-    max_depth=10,
+    max_depth=3,
     learning_rate=0.1,
     label_gain=[i for i in range(max(y_train.max(), y_test.max()) + 1)],
 )
@@ -144,8 +144,8 @@ for i in range(len(X_test)):
     assert model.predict(X_test[i : i + 1]) == saved_model.predict(X_test[i : i + 1])
 
 # print an example
-print("Example:")
-t = X_test[0]
-print("Features:")
-pprint({id2feature[i]: v for i, v in enumerate(t)})
-print("Score:", model.predict(t.reshape(1, -1))[0])
+# print("Example:")
+# t = X_test[0]
+# print("Features:")
+# pprint({id2feature[i]: v for i, v in enumerate(t)})
+# print("Score:", model.predict(t.reshape(1, -1))[0])
