@@ -189,6 +189,12 @@ enum IndexingOptions {
     /// Create the search index.
     Search { config_path: String },
 
+    /// Merge multiple search indexes into a single index.
+    MergeSearch {
+        #[clap(required = true)]
+        paths: Vec<String>,
+    },
+
     /// Create the entity index. Used in the sidebar of the search UI.
     Entity {
         wikipedia_dump_path: String,
@@ -233,6 +239,13 @@ fn main() -> Result<()> {
             IndexingOptions::Feed { config_path } => {
                 let config = load_toml_config(config_path);
                 entrypoint::feed_indexer::build(config)?;
+            }
+            IndexingOptions::MergeSearch { paths } => {
+                let pointers = paths
+                    .into_iter()
+                    .map(entrypoint::indexer::IndexPointer::from)
+                    .collect::<Vec<_>>();
+                entrypoint::indexer::Indexer::merge(pointers)?;
             }
         },
         Commands::Centrality { mode } => {
