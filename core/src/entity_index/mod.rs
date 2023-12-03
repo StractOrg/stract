@@ -213,6 +213,7 @@ impl EntityIndex {
     pub fn prepare_writer(&mut self) {
         self.writer = Some(self.tv_index.writer(10_000_000_000).unwrap());
         self.attribute_occurrences = RocksDbStore::open(self.path.join("attribute_occurrences"));
+        self.image_store.prepare_writer();
     }
 
     fn best_info(&self, info: BTreeMap<String, Span>) -> Vec<(String, Span)> {

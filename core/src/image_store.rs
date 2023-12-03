@@ -81,8 +81,9 @@ pub trait ImageStore<K: Serialize> {
 }
 
 struct BaseImageStore {
-    store: Box<dyn Kv<String, Image>>,
+    store: RocksDbStore<String, Image>,
     filters: Vec<Box<dyn ImageFilter>>,
+    path: std::path::PathBuf,
 }
 
 impl BaseImageStore {
@@ -92,9 +93,17 @@ impl BaseImageStore {
     }
 
     fn open_with_filters<P: AsRef<Path>>(path: P, filters: Vec<Box<dyn ImageFilter>>) -> Self {
-        let store = Box::new(RocksDbStore::open(path));
+        let store = RocksDbStore::open_read_only(&path);
 
-        Self { store, filters }
+        Self {
+            store,
+            filters,
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+
+    fn prepare_writer(&mut self) {
+        self.store = RocksDbStore::open(&self.path);
     }
 
     fn insert(&mut self, key: String, mut image: Image) {
@@ -144,6 +153,9 @@ pub struct EntityImageStore {
 }
 
 impl EntityImageStore {
+    pub fn prepare_writer(&mut self) {
+        self.store.prepare_writer();
+    }
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let store = BaseImageStore::open_with_filters(
             path,
@@ -234,6 +246,7 @@ mod tests {
         );
         let key = "test".to_string();
         let mut store = BaseImageStore::open(crate::gen_temp_path());
+        store.prepare_writer();
 
         assert_eq!(store.get(&key), None);
         store.insert(key.clone(), image.clone());
