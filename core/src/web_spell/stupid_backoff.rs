@@ -353,3 +353,29 @@ impl NextWordsStrategy for IntoMiddle {
         res
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gen_temp_path;
+
+    #[test]
+    fn test_contexts() {
+        let mut trainer = StupidBackoffTrainer::new(3);
+
+        trainer.train(&tokenize(
+            "a b c d e f g h i j k l m n o p q r s t u v w x y z",
+        ));
+
+        let path = gen_temp_path();
+
+        trainer.build(&path).unwrap();
+
+        let model = StupidBackoff::open(&path).unwrap();
+
+        assert_eq!(
+            model.contexts("b"),
+            vec![(vec!["a".to_string(), "b".to_string(), "c".to_string()], 1)]
+        );
+    }
+}

@@ -67,6 +67,9 @@ queries = new_queries
 
 # Create dataset
 items = list(queries.items())
+# shuffle items
+np.random.shuffle(items)
+
 train_size = int(len(items) * 0.8)
 X_train = []
 y_train = []
@@ -105,10 +108,10 @@ model = lgb.LGBMRanker(
     objective="lambdarank",
     metric="ndcg",
     importance_type="gain",
-    num_leaves=15,
+    num_leaves=50,
     n_estimators=n_estimators,
-    max_depth=3,
-    learning_rate=0.1,
+    max_depth=10,
+    learning_rate=0.01,
     label_gain=[i for i in range(max(y_train.max(), y_test.max()) + 1)],
 )
 model.fit(

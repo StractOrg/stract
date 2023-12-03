@@ -138,7 +138,7 @@ impl SecondTrainer {
                     .filter(|correction| {
                         correction != &term
                             && 10 * self.term_dict.freq(&term).unwrap_or_default()
-                                > self.term_dict.freq(correction).unwrap_or_default()
+                                < self.term_dict.freq(correction).unwrap_or_default()
                     })
                     .collect::<Vec<_>>();
 

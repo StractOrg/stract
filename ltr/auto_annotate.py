@@ -7,12 +7,12 @@ import json
 import time
 import requests
 
-NUM_RESULTS_PER_QUERY = 20
+NUM_RESULTS_PER_QUERY = 50
 NUM_ENSEMBLE_PREDS = 1
 PROMPT = """<|im_start|>system
 Perform the task to the best of your ability.<|im_end|>
 <|im_start|>user
-Think about this step-by-step. You task is to evaluate a single search result on an integer scale of 0-4, where a higher score means the result is more relevant. A relevant result should come from a trust-worthy source and answer the users query. The final relevancy should be on a new line on the form "Relevancy: {{}}". It is very important that you think about the steps before giving the final "Relevancy: {{}}" score.
+Think about this step-by-step. You task is to evaluate a single search result on an integer scale of 0-10, where a higher score means the result is more relevant. A relevant result should come from a trust-worthy source and answer the users query. The final relevancy should be on a new line on the form "Relevancy: {{}}". It is very important that you think about the steps before giving the final "Relevancy: {{}}" score.
 
 Query: "{}"
 Url: "{}"
@@ -128,15 +128,13 @@ def get_search_results(query):
     ]
 
 
-# add search results to db
-print("Adding search results to db")
-for qid, query in tqdm(unannotated_queries.items()):
+def add_results(query):
     has_results = (
         cur.execute("SELECT 1 FROM search_results WHERE qid = ?", (qid,)).fetchone()
         is not None
     )
     if has_results:
-        continue
+        return
 
     results = get_search_results(query)
     time.sleep(1)
@@ -171,6 +169,7 @@ def get_relevancy(res):
 
 
 for qid, query in tqdm(unannotated_queries.items()):
+    add_results(query)
     unnanotated_results = cur.execute(
         """
         SELECT url, orig_rank, webpage_json
@@ -189,7 +188,7 @@ for qid, query in tqdm(unannotated_queries.items()):
         for _ in range(NUM_ENSEMBLE_PREDS):
             output = llm.create_completion(
                 prompt,
-                max_tokens=-1,
+                max_tokens=1024,
                 echo=False,
                 temperature=0.4,
                 stop=["<|im_start|>", "<|im_end|>"],
@@ -205,9 +204,13 @@ for qid, query in tqdm(unannotated_queries.items()):
 
         if n == 0:
             print("No relevancy annotation for", query, url)
+            print(output)
             continue
+
         relevancy = np.round(res / n).astype(int)
-        relevancy = max(0, min(4, int(relevancy)))
+        relevancy = max(0, min(10, int(relevancy)))
+
+        print(f'relevancy={relevancy} query="{query}" url={url}')
 
         cur.execute(
             """
