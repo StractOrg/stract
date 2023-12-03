@@ -160,7 +160,8 @@ pub struct EntityIndex {
     tv_index: tantivy::Index,
     schema: Arc<Schema>,
     stopwords: HashSet<String>,
-    attribute_occurrences: Box<dyn Kv<String, u32>>,
+    attribute_occurrences: RocksDbStore<String, u32>,
+    path: std::path::PathBuf,
 }
 
 impl EntityIndex {
@@ -178,9 +179,8 @@ impl EntityIndex {
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
 
-        let attribute_occurrences = Box::new(RocksDbStore::open(
-            path.as_ref().join("attribute_occurrences"),
-        ));
+        let attribute_occurrences =
+            RocksDbStore::open_read_only(path.as_ref().join("attribute_occurrences"));
 
         let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
             .lines()
@@ -206,11 +206,13 @@ impl EntityIndex {
             schema: Arc::new(schema),
             stopwords,
             attribute_occurrences,
+            path: path.as_ref().to_path_buf(),
         })
     }
 
     pub fn prepare_writer(&mut self) {
         self.writer = Some(self.tv_index.writer(10_000_000_000).unwrap());
+        self.attribute_occurrences = RocksDbStore::open(self.path.join("attribute_occurrences"));
     }
 
     fn best_info(&self, info: BTreeMap<String, Span>) -> Vec<(String, Span)> {

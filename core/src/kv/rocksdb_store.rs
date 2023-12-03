@@ -39,22 +39,13 @@ where
     K: Serialize + DeserializeOwned,
     V: Serialize + DeserializeOwned,
 {
-    pub fn open<P>(path: P) -> Self
-    where
-        P: AsRef<std::path::Path>,
-    {
-        if !path.as_ref().exists() {
-            fs::create_dir_all(path.as_ref()).expect("faild to create dir");
-        }
-
+    fn options(cache: &rocksdb::Cache) -> Options {
         let mut options = Options::default();
         options.create_if_missing(true);
 
         options.set_max_background_jobs(8);
         options.increase_parallelism(8);
         options.set_max_subcompactions(8);
-
-        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024); // 256 mb
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         options.set_level_compaction_dynamic_level_bytes(true);
@@ -68,10 +59,47 @@ where
         block_options.set_ribbon_filter(10.0);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_row_cache(&cache);
+        options.set_row_cache(cache);
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         options.optimize_for_point_lookup(512); // 512 MB
+
+        options
+    }
+
+    pub fn open_read_only<P>(path: P) -> Self
+    where
+        P: AsRef<std::path::Path>,
+    {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref()).expect("faild to create dir");
+        }
+
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024); // 256 mb
+        let options = Self::options(&cache);
+
+        // create db to ensure it exists
+        DB::open(&options, &path).expect("unable to open rocks db");
+
+        let db = DB::open_for_read_only(&options, path, false).expect("unable to open rocks db");
+
+        Self {
+            db,
+            _cache: cache,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn open<P>(path: P) -> Self
+    where
+        P: AsRef<std::path::Path>,
+    {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(path.as_ref()).expect("faild to create dir");
+        }
+
+        let cache = rocksdb::Cache::new_lru_cache(256 * 1024 * 1024); // 256 mb
+        let options = Self::options(&cache);
 
         let db = DB::open(&options, path).expect("unable to open rocks db");
 
