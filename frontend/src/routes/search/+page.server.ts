@@ -31,7 +31,7 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
       optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
       selectedRegion: params.selectedRegion,
       siteRankings: params.siteRankings,
-      fetchDiscussions: false,
+      fetchDiscussions: true,
       countResults: true,
     },
     { fetch, headers: { 'X-Forwarded-For': getClientAddress() } },
