@@ -158,7 +158,7 @@ impl BitVec {
         ranks.shrink_to_fit();
 
         let len = ranks.len();
-        let mut bloom = VeryJankyBloomFilter::new(2);
+        let mut bloom = VeryJankyBloomFilter::new(16);
         let mut hyperloglog = if ranks.len() > MIN_POSTING_SIZE_HYPERLOGLOG {
             Some(HyperLogLog::default())
         } else {

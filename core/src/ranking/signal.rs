@@ -267,7 +267,7 @@ impl Signal {
             Signal::FetchTimeMs => 0.001,
             Signal::UpdateTimestamp => 0.001,
             Signal::TrackerScore => 0.05,
-            Signal::Region => 0.01,
+            Signal::Region => 0.15,
             Signal::InboundSimilarity => 0.25,
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
