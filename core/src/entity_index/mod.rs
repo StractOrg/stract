@@ -45,16 +45,6 @@ use crate::{
 use self::entity::{Entity, Link, Span};
 pub(crate) mod entity;
 
-pub struct EntityIndex {
-    image_store: EntityImageStore,
-    image_downloader: ImageDownloader<String>,
-    writer: IndexWriter,
-    reader: IndexReader,
-    schema: Arc<Schema>,
-    stopwords: HashSet<String>,
-    attribute_occurrences: Box<dyn Kv<String, u32>>,
-}
-
 fn schema() -> Schema {
     let mut builder = tantivy::schema::Schema::builder();
 
@@ -162,6 +152,17 @@ pub struct EntityMatch {
     pub score: f32,
 }
 
+pub struct EntityIndex {
+    image_store: EntityImageStore,
+    image_downloader: ImageDownloader<String>,
+    writer: Option<IndexWriter>,
+    reader: IndexReader,
+    tv_index: tantivy::Index,
+    schema: Arc<Schema>,
+    stopwords: HashSet<String>,
+    attribute_occurrences: Box<dyn Kv<String, u32>>,
+}
+
 impl EntityIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
@@ -194,18 +195,22 @@ impl EntityIndex {
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
 
-        let writer = tantivy_index.writer(10_000_000_000)?;
         let reader = tantivy_index.reader()?;
 
         Ok(Self {
             image_store,
-            writer,
+            writer: None,
             reader,
             image_downloader: ImageDownloader::new(),
+            tv_index: tantivy_index,
             schema: Arc::new(schema),
             stopwords,
             attribute_occurrences,
         })
+    }
+
+    pub fn prepare_writer(&mut self) {
+        self.writer = Some(self.tv_index.writer(10_000_000_000).unwrap());
     }
 
     fn best_info(&self, info: BTreeMap<String, Span>) -> Vec<(String, Span)> {
@@ -266,11 +271,19 @@ impl EntityIndex {
             });
         }
         let doc = entity_to_tantivy(entity, &self.schema);
-        self.writer.add_document(doc).unwrap();
+        self.writer
+            .as_mut()
+            .expect("writer not prepared")
+            .add_document(doc)
+            .unwrap();
     }
 
     pub fn commit(&mut self) {
-        self.writer.commit().unwrap();
+        self.writer
+            .as_mut()
+            .expect("writer not prepared")
+            .commit()
+            .unwrap();
         self.reader.reload().unwrap();
         self.attribute_occurrences.flush();
         info!("downloading images");
@@ -488,6 +501,7 @@ mod tests {
     #[test]
     fn stopwords_title_ignored() {
         let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+        index.prepare_writer();
 
         index.insert(Entity {
             title: "the ashes".to_string(),

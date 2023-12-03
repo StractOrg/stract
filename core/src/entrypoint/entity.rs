@@ -103,6 +103,8 @@ impl EntityIndexer {
         let reader = BufReader::new(File::open(wikipedia_dump_path)?);
         let reader = BufReader::new(MultiBzDecoder::new(reader));
         let mut index = EntityIndex::open(output_path)?;
+        index.prepare_writer();
+
         EntityIterator::from(reader)
             .filter(|entity| !entity.categories.is_empty())
             .take(200_000)
