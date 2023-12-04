@@ -1,6 +1,6 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
-  import ExclamationCircle from '~icons/heroicons/shield-exclamation';
+  import ShieldExclamation from '~icons/heroicons/shield-exclamation';
   import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import { clearSummary, summariesStore } from '$lib/stores';
@@ -59,15 +59,15 @@
             <span id="snippet-text" class="snippet-text">
                 {#if webpage.likelyHasAds && webpage.likelyHasPaywall}
                 <span title="page likely has ads and paywall">
-                  <ExclamationCircle class="inline-block w-4 h-4 mr-1 text-primary" /> 
+                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
                 </span>
                 {:else if webpage.likelyHasAds}
                 <span title="page likely has ads">
-                  <ExclamationCircle class="inline-block w-4 h-4 mr-1 text-primary" /> 
+                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
                 </span>
                 {:else if webpage.likelyHasPaywall}
                 <span title="page likely has paywall">
-                  <ExclamationCircle class="inline-block w-4 h-4 mr-1 text-primary" /> 
+                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
                 </span>
                 {/if}
               {#if webpage.snippet.date}
