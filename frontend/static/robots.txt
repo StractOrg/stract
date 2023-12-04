@@ -9,3 +9,12 @@ Disallow: /
 
 User-agent: linkdexbot
 Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: rogerbot
+Disallow: /
+
+User-agent: exabot
+Disallow: /
