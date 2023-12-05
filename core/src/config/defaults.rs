@@ -154,7 +154,7 @@ impl Correction {
     }
 
     pub fn correction_threshold() -> f64 {
-        100.0 // logprob difference
+        50.0 // logprob difference
     }
 
     pub fn lm_prob_weight() -> f64 {

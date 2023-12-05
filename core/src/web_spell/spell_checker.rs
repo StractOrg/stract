@@ -106,8 +106,9 @@ impl LangSpellChecker {
                 let strat = IntoMiddle::default();
                 self.language_model.log_prob(&context, strat)
             };
+            let scaled_term_log_prob = self.config.lm_prob_weight * term_log_prob;
 
-            tracing::debug!(?term, ?term_log_prob);
+            tracing::debug!(?term, ?scaled_term_log_prob);
 
             let mut best_term: Option<(String, f64)> = None;
 
@@ -151,7 +152,7 @@ impl LangSpellChecker {
             }
 
             if let Some((best_term, score)) = best_term {
-                let diff = score.abs() - term_log_prob.abs();
+                let diff = score.abs() - scaled_term_log_prob.abs();
                 tracing::debug!(?best_term, ?score, ?diff);
                 if diff > self.config.correction_threshold {
                     corrections.push((i, best_term.clone()));
