@@ -52,8 +52,8 @@ pub enum Error {
     #[error("Bincode error: {0}")]
     Bincode(#[from] bincode::Error),
 
-    #[error("Corrector not found")]
-    CorrectorNotFound,
+    #[error("Checker not found")]
+    CheckerNotFound,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

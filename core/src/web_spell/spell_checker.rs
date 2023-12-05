@@ -63,6 +63,62 @@ impl LangSpellChecker {
         self.term_dict.search(term, max_edit_distance)
     }
 
+    fn lm_logprob(&self, term_idx: usize, context: &[String]) -> f64 {
+        if term_idx == 0 {
+            let strat = RightToLeft;
+            self.language_model.log_prob(context, strat)
+        } else if term_idx == context.len() - 1 {
+            let strat = LeftToRight;
+            self.language_model.log_prob(context, strat)
+        } else {
+            let strat = IntoMiddle::default();
+            self.language_model.log_prob(context, strat)
+        }
+    }
+
+    fn score_candidates(
+        &self,
+        term: &str,
+        candidates: &[String],
+        context: Vec<String>,
+        term_idx: usize,
+    ) -> Option<(String, f64)> {
+        let mut best_term: Option<(String, f64)> = None;
+        let mut context = context;
+
+        for candidate in candidates {
+            if candidate.as_str() == term {
+                continue;
+            }
+
+            context[term_idx] = candidate.clone();
+
+            let log_prob = self.lm_logprob(term_idx, &context);
+
+            let scaled_lm_log_prob = self.config.lm_prob_weight * log_prob;
+
+            let error_log_prob = if candidate.as_str() == term {
+                match error_model::possible_errors(term, candidate) {
+                    Some(error_seq) => {
+                        (1.0 - self.config.misspelled_prob).log2()
+                            + self.error_model.log_prob(&error_seq)
+                    }
+                    None => 0.0,
+                }
+            } else {
+                self.config.misspelled_prob
+            };
+
+            let score = scaled_lm_log_prob + error_log_prob;
+
+            if best_term.is_none() || score > best_term.as_ref().unwrap().1 {
+                best_term = Some((candidate.clone(), score));
+            }
+        }
+
+        best_term
+    }
+
     fn correct_once(&self, text: &str) -> Option<Correction> {
         let orig_terms = super::tokenize(text);
         let mut terms = orig_terms.clone();
@@ -96,62 +152,14 @@ impl LangSpellChecker {
             }
 
             let this_term_context_idx = this_term_context_idx.unwrap();
-            let term_log_prob = if this_term_context_idx == 0 {
-                let strat = RightToLeft;
-                self.language_model.log_prob(&context, strat)
-            } else if this_term_context_idx == context.len() - 1 {
-                let strat = LeftToRight;
-                self.language_model.log_prob(&context, strat)
-            } else {
-                let strat = IntoMiddle::default();
-                self.language_model.log_prob(&context, strat)
-            };
+            let term_log_prob = self.lm_logprob(this_term_context_idx, &context);
             let scaled_term_log_prob = self.config.lm_prob_weight * term_log_prob;
 
             tracing::debug!(?term, ?scaled_term_log_prob);
 
-            let mut best_term: Option<(String, f64)> = None;
-
-            for candidate in candidates {
-                if candidate == *term {
-                    continue;
-                }
-
-                context[this_term_context_idx] = candidate.clone();
-
-                let log_prob = if this_term_context_idx == 0 {
-                    let strat = RightToLeft;
-                    self.language_model.log_prob(&context, strat)
-                } else if this_term_context_idx == context.len() - 1 {
-                    let strat = LeftToRight;
-                    self.language_model.log_prob(&context, strat)
-                } else {
-                    let strat = IntoMiddle::default();
-                    self.language_model.log_prob(&context, strat)
-                };
-
-                let scaled_lm_log_prob = self.config.lm_prob_weight * log_prob;
-
-                let error_log_prob = if &candidate == term {
-                    match error_model::possible_errors(term, &candidate) {
-                        Some(error_seq) => {
-                            (1.0 - self.config.misspelled_prob).log2()
-                                + self.error_model.log_prob(&error_seq)
-                        }
-                        None => 0.0,
-                    }
-                } else {
-                    self.config.misspelled_prob
-                };
-
-                let score = scaled_lm_log_prob + error_log_prob;
-
-                if best_term.is_none() || score > best_term.as_ref().unwrap().1 {
-                    best_term = Some((candidate, score));
-                }
-            }
-
-            if let Some((best_term, score)) = best_term {
+            if let Some((best_term, score)) =
+                self.score_candidates(term, &candidates, context, this_term_context_idx)
+            {
                 let diff = score.abs() - scaled_term_log_prob.abs();
                 tracing::debug!(?best_term, ?score, ?diff);
                 if diff > self.config.correction_threshold {
@@ -179,6 +187,10 @@ impl LangSpellChecker {
     }
 
     fn correct(&self, text: &str) -> Option<Correction> {
+        // TODO:
+        // sometimes the text should be corrected more than once.
+        // we should make sure to only correct each term once so we don't
+        // get corrections to the corrections.
         self.correct_once(text.to_lowercase().as_str())
     }
 }
@@ -190,11 +202,11 @@ pub struct SpellChecker {
 impl SpellChecker {
     pub fn open<P: AsRef<Path>>(path: P, config: CorrectionConfig) -> Result<Self> {
         if !path.as_ref().exists() {
-            return Err(Error::CorrectorNotFound);
+            return Err(Error::CheckerNotFound);
         }
 
         if !path.as_ref().is_dir() {
-            return Err(Error::CorrectorNotFound);
+            return Err(Error::CheckerNotFound);
         }
 
         let mut lang_spell_checkers = FnvHashMap::default();
@@ -232,5 +244,43 @@ impl SpellChecker {
         self.lang_spell_checkers
             .get(lang)
             .and_then(|s| s.correct(text))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn correction(orig: &str, corrected: &str) -> Correction {
+        let mut res = Correction::empty(orig.to_string());
+
+        for (orig, corrected) in super::super::tokenize(orig)
+            .into_iter()
+            .zip(super::super::tokenize(corrected))
+        {
+            if orig == corrected {
+                res.push(CorrectionTerm::NotCorrected(orig));
+            } else {
+                res.push(CorrectionTerm::Corrected(corrected));
+            }
+        }
+
+        res
+    }
+    #[test]
+    fn simple() {
+        let path = Path::new("../data/web_spell/checker");
+
+        if !path.exists() {
+            return;
+        }
+
+        let spell_checker = SpellChecker::open(path, CorrectionConfig::default()).unwrap();
+
+        assert_eq!(spell_checker.correct("hello", &Lang::Eng), None);
+        assert_eq!(
+            spell_checker.correct("dudw", &Lang::Eng),
+            Some(correction("dudw", "dude"))
+        );
     }
 }

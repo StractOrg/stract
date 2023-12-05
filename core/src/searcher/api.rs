@@ -120,7 +120,7 @@ impl ApiSearcher {
             thresholds: config.thresholds,
             widgets: Widgets::new(config.widgets).unwrap(),
             spell_checker: config
-                .spell_corrector_path
+                .spell_checker_path
                 .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
         }
     }
@@ -141,7 +141,7 @@ impl ApiSearcher {
             thresholds: config.thresholds,
             widgets: Widgets::new(config.widgets).unwrap(),
             spell_checker: config
-                .spell_corrector_path
+                .spell_checker_path
                 .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
         }
     }

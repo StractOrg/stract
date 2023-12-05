@@ -520,6 +520,49 @@ impl<R: Read> Iterator for RecordIterator<R> {
     }
 }
 
+pub struct DeduplicatedWarcWriter {
+    writer: WarcWriter,
+    seen_url_hashes: std::collections::HashSet<md5::Digest>,
+}
+
+impl Default for DeduplicatedWarcWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DeduplicatedWarcWriter {
+    pub fn new() -> Self {
+        Self {
+            writer: WarcWriter::new(),
+            seen_url_hashes: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn write(&mut self, record: &WarcRecord) -> Result<()> {
+        let url_hash = md5::compute(&record.request.url);
+        if self.seen_url_hashes.contains(&url_hash) {
+            return Ok(());
+        }
+
+        self.seen_url_hashes.insert(url_hash);
+
+        self.writer.write(record)
+    }
+
+    pub fn finish(self) -> Result<Vec<u8>> {
+        self.writer.finish()
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        self.writer.num_bytes()
+    }
+
+    pub fn num_writes(&self) -> usize {
+        self.writer.num_writes()
+    }
+}
+
 pub struct WarcWriter {
     num_writes: usize,
     writer: GzEncoder<Vec<u8>>,

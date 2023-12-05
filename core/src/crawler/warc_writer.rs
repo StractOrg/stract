@@ -51,7 +51,7 @@ pub enum WarcWriterMessage {
     Finish,
 }
 
-async fn commit(writer: warc::WarcWriter, s3: config::S3Config) {
+async fn commit(writer: warc::DeduplicatedWarcWriter, s3: config::S3Config) {
     let filename = format!(
         "{}_{}.warc.gz",
         chrono::Utc::now().to_rfc3339(),
@@ -94,7 +94,7 @@ async fn commit(writer: warc::WarcWriter, s3: config::S3Config) {
 }
 
 async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3: S3Config) {
-    let mut writer = warc::WarcWriter::new();
+    let mut writer = warc::DeduplicatedWarcWriter::new();
 
     while let Some(message) = rx.recv().await {
         match message {
@@ -126,7 +126,7 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
 
                 if writer.num_bytes() > 1_000_000_000 {
                     commit(writer, s3.clone()).await;
-                    writer = warc::WarcWriter::new();
+                    writer = warc::DeduplicatedWarcWriter::new();
                 }
             }
             WarcWriterMessage::Finish => {

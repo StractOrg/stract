@@ -36,7 +36,7 @@ use crate::{
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     entrypoint::crawler::router::{NewJob, RouterService},
     warc,
-    webpage::Html,
+    webpage::{url_ext::UrlExt, Html},
 };
 
 use super::{
@@ -202,6 +202,10 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>, fetch_sitemap: bool) {
         while let Some(retryable_url) = urls.pop_front() {
+            if Domain::from(&retryable_url.url) != self.job.domain {
+                continue;
+            }
+
             if self.crawled_urls.contains(&retryable_url.url) {
                 continue;
             }
@@ -248,7 +252,7 @@ impl<S: DatumStream> JobExecutor<S> {
                             continue;
                         }
 
-                        if new_url.host_str() != retryable_url.url.host_str() {
+                        if new_url.root_domain() != retryable_url.url.root_domain() {
                             continue;
                         }
 

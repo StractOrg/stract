@@ -230,6 +230,7 @@ pub enum FastField {
     NumPathAndQueryDigits,
     LikelyHasAds,
     LikelyHasPaywall,
+    LinkDensity,
 }
 
 impl FastField {
@@ -270,6 +271,7 @@ impl FastField {
             FastField::NumPathAndQueryDigits => "num_path_and_query_digits",
             FastField::LikelyHasAds => "likely_has_ads",
             FastField::LikelyHasPaywall => "likely_has_paywall",
+            FastField::LinkDensity => "link_density",
         }
     }
 }
@@ -595,6 +597,9 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
+            Field::Fast(FastField::LinkDensity) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_stored())
+            }
         }
     }
 
@@ -713,6 +718,7 @@ impl FastField {
             FastField::NumPathAndQueryDigits => DataType::U64,
             FastField::LikelyHasAds => DataType::U64,
             FastField::LikelyHasPaywall => DataType::U64,
+            FastField::LinkDensity => DataType::U64,
         }
     }
 }

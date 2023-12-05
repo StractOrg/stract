@@ -124,6 +124,8 @@ pub enum Signal {
     UrlDigits,
     #[serde(rename = "url_slashes")]
     UrlSlashes,
+    #[serde(rename = "link_density")]
+    LinkDensity,
 }
 
 impl From<Signal> for usize {
@@ -132,7 +134,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 33] = [
+pub const ALL_SIGNALS: [Signal; 34] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -166,6 +168,7 @@ pub const ALL_SIGNALS: [Signal; 33] = [
     Signal::LambdaMART,
     Signal::UrlDigits,
     Signal::UrlSlashes,
+    Signal::LinkDensity,
 ];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
@@ -183,16 +186,28 @@ fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f6
     }
 }
 
+#[inline]
 fn score_trackers(num_trackers: f64) -> f64 {
     1.0 / (num_trackers + 1.0)
 }
 
+#[inline]
 fn score_digits(num_digits: f64) -> f64 {
     1.0 / (num_digits + 1.0)
 }
 
+#[inline]
 fn score_slashes(num_slashes: f64) -> f64 {
     1.0 / (num_slashes + 1.0)
+}
+
+#[inline]
+fn score_link_density(link_density: f64) -> f64 {
+    if link_density > 0.5 {
+        0.0
+    } else {
+        1.0 - link_density
+    }
 }
 
 fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
@@ -272,6 +287,7 @@ impl Signal {
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
             Signal::UrlDigits => 0.01,
+            Signal::LinkDensity => 0.00,
         }
     }
 
@@ -336,6 +352,15 @@ impl Signal {
                     .and_then(|val| val.into());
 
                 field_value.map(|val| val as f64)
+            }
+            Signal::LinkDensity => {
+                let field_value: Option<u64> = self
+                    .fastfield_value(signal_aggregator, doc)
+                    .and_then(|val| val.into());
+
+                field_value
+                    .map(|val| val as f64 / FLOAT_SCALING as f64)
+                    .map(score_link_density)
             }
             Signal::FetchTimeMs => {
                 let field_value: Option<u64> = self
@@ -500,6 +525,10 @@ impl Signal {
                     .count() as f64;
                 Some(score_slashes(num_slashes))
             }
+            Signal::LinkDensity => {
+                let link_density = webpage.html.link_density();
+                Some(score_link_density(link_density))
+            }
             Signal::Bm25Title
             | Signal::Bm25TitleBigrams
             | Signal::Bm25TitleTrigrams
@@ -549,6 +578,7 @@ impl Signal {
             Signal::Region => Some(FastField::Region),
             Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
             Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
+            Signal::LinkDensity => Some(FastField::LinkDensity),
             _ => None,
         }
     }

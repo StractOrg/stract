@@ -155,7 +155,7 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
         let second_trainer = SecondTrainer::new(
             results,
             Path::new(&config.output_path)
-                .join("corrector")
+                .join("checker")
                 .join(lang.code()),
         )?;
         debug!("second trainer created");

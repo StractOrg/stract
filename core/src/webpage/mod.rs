@@ -479,6 +479,16 @@ impl Html {
         self.lang.as_ref()
     }
 
+    pub fn link_density(&self) -> f64 {
+        (1.0 + self.anchor_links().len() as f64)
+            / (1.0
+                + self
+                    .clean_text
+                    .as_ref()
+                    .map(|s| s.len())
+                    .unwrap_or_default() as f64)
+    }
+
     pub fn canonical_url(&self) -> Option<Url> {
         let mut canonical_url = None;
 
@@ -1364,6 +1374,12 @@ impl Html {
                 }
                 Field::Fast(FastField::LikelyHasPaywall) => {
                     doc.add_u64(tantivy_field, self.likely_has_paywall() as u64);
+                }
+                Field::Fast(FastField::LinkDensity) => {
+                    doc.add_u64(
+                        tantivy_field,
+                        (self.link_density() * FLOAT_SCALING as f64) as u64,
+                    );
                 }
                 Field::Text(TextField::BacklinkText)
                 | Field::Text(TextField::SafetyClassification)
