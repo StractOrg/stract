@@ -36,6 +36,7 @@ use crate::search_prettifier::{
     create_stackoverflow_sidebar, DisplayedAnswer, DisplayedEntity, DisplayedSidebar,
     DisplayedWebpage, HighlightedSpellCorrection,
 };
+use crate::web_spell::SpellChecker;
 use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
@@ -83,6 +84,7 @@ pub struct ApiSearcher {
     collector_config: CollectorConfig,
     thresholds: ApiThresholds,
     widgets: Widgets,
+    spell_checker: Option<SpellChecker>,
 }
 
 #[cfg(not(feature = "libtorch"))]
@@ -94,6 +96,7 @@ pub struct ApiSearcher {
     collector_config: CollectorConfig,
     thresholds: ApiThresholds,
     widgets: Widgets,
+    spell_checker: Option<SpellChecker>,
 }
 
 impl ApiSearcher {
@@ -116,6 +119,9 @@ impl ApiSearcher {
             collector_config: config.collector,
             thresholds: config.thresholds,
             widgets: Widgets::new(config.widgets).unwrap(),
+            spell_checker: config
+                .spell_corrector_path
+                .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
         }
     }
 
@@ -134,6 +140,9 @@ impl ApiSearcher {
             collector_config: config.collector,
             thresholds: config.thresholds,
             widgets: Widgets::new(config.widgets).unwrap(),
+            spell_checker: config
+                .spell_corrector_path
+                .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
         }
     }
 
@@ -215,6 +224,7 @@ impl ApiSearcher {
         results.sort_by(|(_, a), (_, b)| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal));
 
         if let Some((shard, website)) = results.pop() {
+            tracing::debug!(?website.score, ?self.thresholds.stackoverflow, "stackoverflow score");
             if website.score > self.thresholds.stackoverflow {
                 let scored_websites =
                     vec![(0, distributed::ScoredWebsitePointer { website, shard })];
@@ -449,9 +459,9 @@ impl ApiSearcher {
         let sidebar = self.sidebar(&initial_results, stackoverflow);
 
         let spell_corrected_query = if widget.is_none() {
-            initial_results
-                .first()
-                .and_then(|result| result.local_result.spell_corrected_query.clone())
+            self.spell_checker
+                .as_ref()
+                .and_then(|s| s.correct(&query.query, &whatlang::Lang::Eng))
                 .map(HighlightedSpellCorrection::from)
         } else {
             None

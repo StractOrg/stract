@@ -197,6 +197,7 @@ pub struct ApiConfig {
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub qa_model_path: Option<String>,
+    pub spell_corrector_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
     pub query_store_db_host: Option<String>,
@@ -211,6 +212,9 @@ pub struct ApiConfig {
     pub thresholds: ApiThresholds,
 
     pub widgets: WidgetsConfig,
+
+    #[serde(default)]
+    pub correction_config: CorrectionConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -258,9 +262,6 @@ pub struct SearchServerConfig {
 
     #[serde(default)]
     pub snippet: SnippetConfig,
-
-    #[serde(default = "defaults::SearchServer::build_spell_dictionary")]
-    pub build_spell_dictionary: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -456,4 +457,31 @@ pub struct WebSpellConfig {
     pub languages: Vec<whatlang::Lang>,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+pub struct CorrectionConfig {
+    /// The probability that a word is misspelled
+    #[serde(default = "defaults::Correction::misspelled_prob")]
+    pub misspelled_prob: f64,
+
+    /// Lambda in eq. 2 (http://static.googleusercontent.com/media/research.google.com/en/us/pubs/archive/36180.pdf)
+    #[serde(default = "defaults::Correction::lm_prob_weight")]
+    pub lm_prob_weight: f64,
+
+    /// The threshold that the difference between the log probability of the best
+    /// correction and the observed word must be above for the word to be
+    /// corrected
+    #[serde(default = "defaults::Correction::correction_threshold")]
+    pub correction_threshold: f64,
+}
+
+impl Default for CorrectionConfig {
+    fn default() -> Self {
+        Self {
+            misspelled_prob: defaults::Correction::misspelled_prob(),
+            lm_prob_weight: defaults::Correction::lm_prob_weight(),
+            correction_threshold: defaults::Correction::correction_threshold(),
+        }
+    }
 }

@@ -145,3 +145,19 @@ impl SearchQuery {
         false
     }
 }
+
+pub struct Correction;
+
+impl Correction {
+    pub fn misspelled_prob() -> f64 {
+        0.1
+    }
+
+    pub fn correction_threshold() -> f64 {
+        100.0 // logprob difference
+    }
+
+    pub fn lm_prob_weight() -> f64 {
+        5.77
+    }
+}

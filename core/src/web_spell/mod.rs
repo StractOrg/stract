@@ -24,6 +24,7 @@ mod term_freqs;
 mod trainer;
 
 pub use error_model::ErrorModel;
+pub use spell_checker::SpellChecker;
 pub use stupid_backoff::StupidBackoff;
 pub use term_freqs::TermDict;
 pub use trainer::FirstTrainer;
@@ -50,6 +51,9 @@ pub enum Error {
 
     #[error("Bincode error: {0}")]
     Bincode(#[from] bincode::Error),
+
+    #[error("Corrector not found")]
+    CorrectorNotFound,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

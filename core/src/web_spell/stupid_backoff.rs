@@ -236,6 +236,13 @@ impl StupidBackoff {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
+            .open(path.as_ref().join("n_counts.bin"))?;
+
+        bincode::serialize_into(file, &n_counts)?;
+
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
             .open(path.as_ref().join("ngrams.bin"))?;
 
         let wtr = BufWriter::new(file);
@@ -293,6 +300,10 @@ impl StupidBackoff {
             let mut strat = strat;
             DISCOUNT.log2() + self.log_prob(strat.next_words(words), strat)
         }
+    }
+
+    pub fn prob<S: NextWordsStrategy>(&self, words: &[String], strat: S) -> f64 {
+        self.log_prob(words, strat).exp2()
     }
 
     pub fn contexts(&self, word: &str) -> Vec<(Vec<String>, u64)> {

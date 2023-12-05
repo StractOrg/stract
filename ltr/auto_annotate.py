@@ -7,7 +7,7 @@ import json
 import time
 import requests
 
-NUM_RESULTS_PER_QUERY = 50
+NUM_RESULTS_PER_QUERY = 100
 NUM_ENSEMBLE_PREDS = 1
 PROMPT = """<|im_start|>system
 Perform the task to the best of your ability.<|im_end|>
@@ -29,6 +29,9 @@ llm = Llama(
 
 with open("data/queries_us.csv") as f:
     all_queries = [line.strip() for line in f.readlines()]
+
+# shuffle queries
+np.random.shuffle(all_queries)
 
 
 def setup_db():
@@ -70,6 +73,10 @@ for query in all_queries:
 
     # check if query has large percentage of non-alphanumeric characters
     if sum([c.isalnum() for c in query]) / len(query) < 0.5:
+        continue
+
+    # only consider queries with at least two words
+    if len(query.split()) < 2:
         continue
 
     if len(query) > 100:

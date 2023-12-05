@@ -35,7 +35,7 @@ pub enum ErrorType {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ErrorSequence(Vec<ErrorType>);
 
-fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
+pub fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
     if a == b {
         return None;
     }
@@ -110,6 +110,42 @@ fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct StoredErrorModel {
+    errors: HashMap<String, u64>,
+    total: u64,
+}
+
+impl From<ErrorModel> for StoredErrorModel {
+    fn from(value: ErrorModel) -> Self {
+        let stored_errors = value
+            .errors
+            .into_iter()
+            .map(|(error_seq, count)| (serde_json::to_string(&error_seq).unwrap(), count))
+            .collect();
+
+        Self {
+            errors: stored_errors,
+            total: value.total,
+        }
+    }
+}
+
+impl From<StoredErrorModel> for ErrorModel {
+    fn from(value: StoredErrorModel) -> Self {
+        let errors = value
+            .errors
+            .into_iter()
+            .map(|(error_seq, count)| (serde_json::from_str(&error_seq).unwrap(), count))
+            .collect();
+
+        Self {
+            errors,
+            total: value.total,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ErrorModel {
     errors: HashMap<ErrorSequence, u64>,
     total: u64,
@@ -138,7 +174,7 @@ impl ErrorModel {
 
         let wrt = BufWriter::new(file);
 
-        serde_json::to_writer_pretty(wrt, &self)?;
+        serde_json::to_writer_pretty(wrt, &StoredErrorModel::from(self))?;
 
         Ok(())
     }
@@ -148,18 +184,28 @@ impl ErrorModel {
 
         let rdr = BufReader::new(file);
 
-        Ok(serde_json::from_reader(rdr)?)
+        let stored: StoredErrorModel = serde_json::from_reader(rdr)?;
+
+        Ok(stored.into())
     }
 
     pub fn add(&mut self, a: &str, b: &str) {
         if let Some(errors) = possible_errors(a, b) {
             *self.errors.entry(errors).or_insert(0) += 1;
+            self.total += 1;
         }
     }
 
     pub fn prob(&self, error: &ErrorSequence) -> f64 {
         let count = self.errors.get(error).unwrap_or(&0);
         *count as f64 / self.total as f64
+    }
+
+    pub fn log_prob(&self, error: &ErrorSequence) -> f64 {
+        match self.errors.get(error) {
+            Some(count) => (*count as f64).log2() - (self.total as f64).log2(),
+            None => 0.0,
+        }
     }
 }
 

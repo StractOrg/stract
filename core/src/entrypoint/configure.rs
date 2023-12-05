@@ -19,6 +19,7 @@ use tokio::io;
 use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
+use crate::config::{LocalConfig, WebSpellConfig};
 use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
@@ -67,6 +68,30 @@ fn download_files() {
                 }
             }
         });
+}
+
+fn build_spellchecker() -> Result<()> {
+    debug!("Building spellchecker");
+    let spellchecker_path = Path::new(DATA_PATH).join("web_spell");
+
+    if !spellchecker_path.exists() {
+        crate::entrypoint::web_spell::run(WebSpellConfig {
+            languages: vec![whatlang::Lang::Eng],
+            output_path: spellchecker_path.to_str().unwrap().to_string(),
+            warc_source: crate::config::WarcSource::Local(LocalConfig {
+                folder: ".".to_string(),
+                names: vec![Path::new(DATA_PATH)
+                    .join("sample.warc.gz")
+                    .to_str()
+                    .unwrap()
+                    .to_string()],
+            }),
+            limit_warc_files: None,
+            skip_warc_files: None,
+        })?;
+    }
+
+    Ok(())
 }
 
 fn create_webgraph() -> Result<()> {
@@ -204,6 +229,7 @@ fn index_files() -> Result<()> {
     parse_topics()?;
     create_inverted_index()?;
     create_entity_index()?;
+    build_spellchecker()?;
 
     Ok(())
 }
