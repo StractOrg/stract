@@ -213,13 +213,17 @@ fn score_link_density(link_density: f64) -> f64 {
 fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
     match aggregator.region_count.as_ref() {
         Some(region_count) => {
-            let boost = aggregator.selected_region.map_or(0.0, |region| {
-                if region == webpage_region {
-                    50.0
-                } else {
-                    0.0
-                }
-            });
+            let boost = aggregator
+                .query_data
+                .as_ref()
+                .and_then(|q| q.selected_region)
+                .map_or(0.0, |region| {
+                    if region != Region::All && region == webpage_region {
+                        50.0
+                    } else {
+                        0.0
+                    }
+                });
 
             boost + region_count.score(&webpage_region)
         }
@@ -692,10 +696,11 @@ struct SegmentReader {
 struct QueryData {
     simple_terms: Vec<String>,
     optic_rules: Vec<optics::Rule>,
+    selected_region: Option<Region>,
 }
 
 pub struct SignalAggregator {
-    query: Option<QueryData>,
+    query_data: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<SegmentReader>,
     inbound_similarity: Option<RefCell<inbound_similarity::Scorer>>,
@@ -703,7 +708,6 @@ pub struct SignalAggregator {
     update_time_cache: Vec<f64>,
     query_centrality: Option<RefCell<query_centrality::Scorer>>,
     region_count: Option<Arc<RegionCount>>,
-    selected_region: Option<Region>,
     current_timestamp: Option<usize>,
     linear_regression: Option<Arc<LinearRegression>>,
 }
@@ -721,7 +725,7 @@ impl Clone for SignalAggregator {
             .map(|scorer| RefCell::new(scorer.borrow().clone()));
 
         Self {
-            query: self.query.clone(),
+            query_data: self.query_data.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
             inbound_similarity,
@@ -729,7 +733,6 @@ impl Clone for SignalAggregator {
             update_time_cache: self.update_time_cache.clone(),
             query_centrality,
             region_count: self.region_count.clone(),
-            selected_region: self.selected_region,
             current_timestamp: self.current_timestamp,
             linear_regression: self.linear_regression.clone(),
         }
@@ -742,7 +745,7 @@ impl std::fmt::Debug for SignalAggregator {
             .field(
                 "query",
                 &self
-                    .query
+                    .query_data
                     .as_ref()
                     .map(|q| q.simple_terms.clone())
                     .unwrap_or_default(),
@@ -775,6 +778,7 @@ impl SignalAggregator {
                 })
                 .cloned()
                 .collect(),
+            selected_region: q.region().cloned(),
         });
 
         let mut s = Self {
@@ -785,10 +789,9 @@ impl SignalAggregator {
             update_time_cache,
             query_centrality: None,
             region_count: None,
-            selected_region: None,
             current_timestamp: None,
             linear_regression: None,
-            query,
+            query_data: query,
         };
 
         s.set_current_timestamp(chrono::Utc::now().timestamp() as usize);
@@ -804,7 +807,7 @@ impl SignalAggregator {
         let mut text_fields = EnumMap::new();
         let schema = tv_searcher.schema();
 
-        if let Some(query) = &self.query {
+        if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
                 for signal in ALL_SIGNALS {
                     if let Some(text_field) = signal.as_textfield() {
@@ -866,7 +869,7 @@ impl SignalAggregator {
     ) -> Vec<RuleBoost> {
         let mut optic_rule_boosts = Vec::new();
 
-        if let Some(query) = &self.query {
+        if let Some(query) = &self.query_data {
             optic_rule_boosts = query
                 .optic_rules
                 .iter()
@@ -920,10 +923,6 @@ impl SignalAggregator {
 
     pub fn set_region_count(&mut self, region_count: RegionCount) {
         self.region_count = Some(Arc::new(region_count));
-    }
-
-    pub fn set_selected_region(&mut self, region: Region) {
-        self.selected_region = Some(region);
     }
 
     pub fn set_current_timestamp(&mut self, current_timestamp: usize) {

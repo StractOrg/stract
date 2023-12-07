@@ -4,6 +4,8 @@ import json
 from pprint import pprint
 import sqlite3
 
+CATEGORICAL_FEATURES = ["is_homepage"]
+
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
 
@@ -77,7 +79,8 @@ q_train = []
 for query, urls in items[:train_size]:
     q_train.append(query)
     for url, data in urls.items():
-        X_train.append([data["features"].get(k, 0) for k in id2feature])
+        x = [data["features"].get(k, 0) for k in id2feature]
+        X_train.append(x)
         y_train.append(data["score"])
 
 X_test = []
@@ -110,8 +113,9 @@ model = lgb.LGBMRanker(
     importance_type="gain",
     num_leaves=50,
     n_estimators=n_estimators,
+    categorical_features=[feature2id[k] for k in CATEGORICAL_FEATURES],
     max_depth=10,
-    learning_rate=0.01,
+    learning_rate=0.1,
     label_gain=[i for i in range(max(y_train.max(), y_test.max()) + 1)],
 )
 model.fit(

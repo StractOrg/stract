@@ -149,7 +149,7 @@ def add_results(query):
     for i, result in enumerate(results):
         cur.execute(
             """
-            INSERT INTO search_results (qid, url, orig_rank, webpage_json)
+            INSERT OR IGNORE INTO search_results (qid, url, orig_rank, webpage_json)
             VALUES (?, ?, ?, ?)
             """,
             (qid, result["url"], i, json.dumps(result)),

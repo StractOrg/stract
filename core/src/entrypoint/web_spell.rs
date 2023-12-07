@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use fnv::FnvHashMap;
@@ -32,27 +32,34 @@ use crate::{
 };
 
 pub struct SpellWorker {
-    trainer: FnvHashMap<Lang, FirstTrainer>,
+    prev_trained: Vec<FnvHashMap<Lang, FirstTrainerResult>>,
+    languages: Vec<Lang>,
+    path: PathBuf,
 }
 
 impl SpellWorker {
     pub fn new<P: AsRef<Path>>(languages: &[Lang], path: P) -> Result<Self> {
-        let mut trainer = FnvHashMap::default();
-
-        for lang in languages {
-            trainer.insert(
-                *lang,
-                FirstTrainer::new(path.as_ref().join(lang.to_string()))?,
-            );
-        }
-
-        Ok(Self { trainer })
+        Ok(Self {
+            path: path.as_ref().to_path_buf(),
+            languages: languages.to_vec(),
+            prev_trained: Vec::new(),
+        })
     }
 
     pub fn process(&mut self, job: Job) -> Result<()> {
         let name = job.warc_path.split('/').last().unwrap();
 
         info!("processing {}", name);
+
+        let mut trainer_has_inserts = false;
+        let mut trainer: FnvHashMap<Lang, FirstTrainer> = Default::default();
+
+        for lang in &self.languages {
+            trainer.insert(
+                *lang,
+                FirstTrainer::new(self.path.as_path().join(name).join(lang.to_string()))?,
+            );
+        }
 
         let source = job.source_config.clone();
 
@@ -75,13 +82,17 @@ impl SpellWorker {
                     None => continue,
                 };
 
-                match (webpage.clean_text(), self.trainer.get_mut(&lang)) {
+                match (webpage.clean_text(), trainer.get_mut(&lang)) {
                     (Some(text), Some(trainer)) => {
                         trainer.add(text);
+                        trainer_has_inserts = true;
                     }
                     _ => continue,
                 }
             }
+        }
+        if trainer_has_inserts {
+            self.finish_training_step(trainer)?;
         }
 
         info!("finished processing {}", name);
@@ -89,17 +100,21 @@ impl SpellWorker {
         Ok(())
     }
 
-    fn next_training_step(self) -> Result<FnvHashMap<Lang, FirstTrainerResult>> {
+    fn finish_training_step(&mut self, trainer: FnvHashMap<Lang, FirstTrainer>) -> Result<()> {
         debug!("next training step");
-        let mut result = FnvHashMap::default();
+        let mut trained = FnvHashMap::default();
 
-        for (lang, trainer) in self.trainer {
-            result.insert(lang, trainer.next_training_step()?);
+        for (lang, trainer) in trainer {
+            trained.insert(lang, trainer.next_training_step()?);
         }
 
+        self.prev_trained.push(trained);
         debug!("next training step created");
+        Ok(())
+    }
 
-        Ok(result)
+    fn next_training_steps(self) -> Vec<FnvHashMap<Lang, FirstTrainerResult>> {
+        self.prev_trained
     }
 }
 
@@ -137,7 +152,7 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
                 worker.process(job).unwrap();
             }
 
-            worker.next_training_step().unwrap()
+            worker.next_training_steps()
         }));
     }
 
@@ -145,8 +160,10 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
     for handler in handlers {
         let trained = handler.join().unwrap();
 
-        for (lang, result) in trained.into_iter() {
-            combined.entry(lang).or_default().push(result);
+        for res in trained {
+            for (lang, result) in res {
+                combined.entry(lang).or_default().push(result);
+            }
         }
     }
 

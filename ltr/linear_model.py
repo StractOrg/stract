@@ -26,23 +26,32 @@ queries = {qid: {"query": query} for qid, query in res.fetchall()}
 for qid in queries:
     res = cur.execute(
         """
-            SELECT qid, url, annotation, webpage_json
+            SELECT qid, url, annotation, orig_rank, webpage_json
             FROM search_results
             WHERE qid = ?
     """,
         (qid,),
     )
     urls = {
-        url: {"label": label, "signals": json.loads(page)["rankingSignals"]}
-        for _, url, label, page in res.fetchall()
+        url: {
+            "label": label,
+            "orig_rank": orig_rank,
+            "signals": json.loads(page)["rankingSignals"],
+        }
+        for _, url, label, orig_rank, page in res.fetchall()
     }
     urls = [
-        (url, w["label"], w["signals"])
+        (url, w["label"], w["orig_rank"], w["signals"])
         for url, w in urls.items()
         if w["label"] is not None
     ]
 
-    urls = sorted(urls, key=lambda x: int(x[1]), reverse=True)
+    sorting_key = lambda x: (
+        -x[1],
+        x[2],
+    )
+
+    urls = sorted(urls, key=sorting_key)
     queries[qid]["urls"] = urls
 
 
@@ -50,7 +59,7 @@ feature2id = {}
 id2feature = {}
 
 for qid, data in queries.items():
-    for url, score, signals in data["urls"]:
+    for url, score, _, signals in data["urls"]:
         for feature, value in signals.items():
             if feature not in feature2id:
                 id = len(feature2id)
@@ -65,16 +74,12 @@ random.shuffle(scores)
 sorted_features = sorted(feature2id.items(), key=lambda x: x[1])
 
 for qid, data in queries.items():
-    for url, score, signals in data["urls"]:
+    for i, (url, score, _, signals) in enumerate(data["urls"]):
         signals = {feature2id[k]: v for k, v in signals.items()}
 
         signals = [signals[k] for _, k in sorted_features]
 
-        scores.append({"ranking_signals": signals, "score": score})
-
-
-for score in scores:
-    score["score"] = np.power(2, score["score"])
+        scores.append({"ranking_signals": signals, "score": 20 / (i + 1)})
 
 train = scores[: int(len(scores) * TRAIN_PERCENT)]
 test = scores[int(len(scores) * TRAIN_PERCENT) :]

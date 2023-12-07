@@ -32,7 +32,6 @@ use crate::{
     fastfield_reader::FastFieldReader,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
-    webpage::region::Region,
 };
 
 pub use self::signal::*;
@@ -63,11 +62,6 @@ impl Ranker {
             num_results: None,
             collector_config,
         }
-    }
-
-    pub fn with_region(mut self, region: Region) -> Self {
-        self.aggregator.set_selected_region(region);
-        self
     }
 
     pub fn with_offset(mut self, offset: usize) -> Self {

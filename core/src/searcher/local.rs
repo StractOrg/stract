@@ -38,7 +38,6 @@ use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::webgraph::Node;
-use crate::webpage::region::Region;
 use crate::{inverted_index, live_index, Error, Result};
 
 use super::WebsitesResult;
@@ -217,12 +216,6 @@ where
             guard.inverted_index().fastfield_reader(&ctx.tv_searcher),
             self.collector_config.clone(),
         );
-
-        if let Some(region) = query.region() {
-            if *region != Region::All {
-                ranker = ranker.with_region(*region);
-            }
-        }
 
         ranker.de_rank_similar(de_rank_similar);
 

@@ -27,6 +27,7 @@ use std::time::Duration;
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use fnv::FnvHashSet;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
@@ -522,7 +523,7 @@ impl<R: Read> Iterator for RecordIterator<R> {
 
 pub struct DeduplicatedWarcWriter {
     writer: WarcWriter,
-    seen_url_hashes: std::collections::HashSet<md5::Digest>,
+    seen_url_hashes: FnvHashSet<md5::Digest>,
 }
 
 impl Default for DeduplicatedWarcWriter {
@@ -535,7 +536,7 @@ impl DeduplicatedWarcWriter {
     pub fn new() -> Self {
         Self {
             writer: WarcWriter::new(),
-            seen_url_hashes: std::collections::HashSet::new(),
+            seen_url_hashes: FnvHashSet::default(),
         }
     }
 
