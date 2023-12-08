@@ -30,9 +30,9 @@ export const DEFAULT_OPTICS = [
     shown: true,
   },
   {
-    url: 'https://raw.githubusercontent.com/StractOrg/sample-optics/main/10k_short.optic',
-    description: 'Remove the top 10,000 most popular websites from search results.',
-    name: '10K Short',
+    url: 'https://raw.githubusercontent.com/StractOrg/sample-optics/main/fediverse.optic',
+    description: 'Only search in fediverse sites.',
+    name: 'Fediverse',
     shown: false,
   },
   {
@@ -41,6 +41,12 @@ export const DEFAULT_OPTICS = [
       'Search only in the indieweb + a list of blogs from blogroll.org and some hand-picked blogs from hackernews.',
     name: 'Indieweb & blogroll',
     shown: true,
+  },
+  {
+    url: 'https://raw.githubusercontent.com/StractOrg/sample-optics/main/10k_short.optic',
+    description: 'Remove the top 10,000 most popular websites from search results.',
+    name: '10K Short',
+    shown: false,
   },
   {
     url: 'https://raw.githubusercontent.com/StractOrg/sample-optics/main/devdocs.optic',

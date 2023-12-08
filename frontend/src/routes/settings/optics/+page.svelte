@@ -112,7 +112,6 @@
         class="col-span-2"
         type="text"
         name="Description"
-        required
         placeholder="Description"
         bind:value={description}
       />
