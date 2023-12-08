@@ -28,7 +28,7 @@ use utoipa::ToSchema;
 
 use crate::query::parser::Term;
 
-pub const BANG_PREFIX: char = '!';
+pub const BANG_PREFIXES: [char; 2] = ['!', '！'];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

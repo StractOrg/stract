@@ -20,7 +20,7 @@
         </div>
       </div>
     </div>
-    <div class="flex grow justify-between space-x-2">
+    <div class="flex grow justify-between space-x-2 text-sm">
       <div>
         <a href={answer.url}>{answer.url}</a>
       </div>
@@ -28,7 +28,7 @@
     </div>
   </div>
   <hr class="border-stone-700" />
-  <div class="flex flex-col space-y-3">
+  <div class="flex flex-col space-y-3 text-sm">
     {#each answer.body as part}
       {#if part.type == 'code'}
         <Code code={part.value} />

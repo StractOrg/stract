@@ -147,6 +147,29 @@ impl IndexingWorker {
                     .into_iter()
                     .map(|edge| edge.label)
                     .filter(|label| !label.is_empty())
+                    .filter(|label| {
+                        let label = label.to_lowercase();
+                        let stopwords = [
+                            "click",
+                            "click here",
+                            "here",
+                            "link",
+                            "website",
+                            "webpage",
+                            "page",
+                            "site",
+                            "url",
+                            "web",
+                            "visit",
+                            "more",
+                            "info",
+                            "information",
+                            "read",
+                            "read more",
+                        ];
+
+                        !stopwords.contains(&label.as_str())
+                    })
                     .collect()
             })
             .unwrap_or_default();

@@ -159,6 +159,11 @@ impl Calculator {
 
     pub fn try_calculate(&self, expr: &str) -> Result<Calculation, Error> {
         let expr = expr.replace(['"', '\''], "");
+        // check if expr has at least one digit
+        if !expr.chars().any(|c| c.is_ascii_digit()) {
+            return Err(Error::CalculatorParse);
+        }
+
         // if expr starts with "d[0-9]+", wrap it in "roll(...)"
         let expr = if DICE_REGEX.is_match(&expr) {
             format!("roll({})", expr)

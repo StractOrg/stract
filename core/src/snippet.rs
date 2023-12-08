@@ -72,6 +72,16 @@ pub struct TextSnippet {
     pub fragments: Vec<TextSnippetFragment>,
 }
 
+impl TextSnippet {
+    pub fn unhighlighted_string(&self) -> String {
+        self.fragments
+            .iter()
+            .map(|f| f.text.clone())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+}
+
 struct SnippetBuilder {
     fragment: String,
     highlights: Vec<Range<usize>>,

@@ -26,11 +26,12 @@ use crate::{
     entrypoint::search_server::{self, SearchService},
     feed::scheduler::SplitId,
     inverted_index::{RetrievedWebpage, WebsitePointer},
-    ranking::pipeline::RankingWebsite,
+    ranking::pipeline::{RankingWebsite, RetrievedWebpageRanking},
 };
 
 use std::{collections::HashMap, sync::Arc};
 
+use fnv::FnvHashMap;
 use futures::future::join_all;
 use itertools::Itertools;
 
@@ -142,7 +143,8 @@ impl LiveSearcher {
         &self,
         top_websites: &[(usize, ScoredWebsitePointer)],
         query: &str,
-    ) -> Vec<(usize, RetrievedWebpage)> {
+    ) -> Vec<(usize, RetrievedWebpageRanking)> {
+        let mut rankings = FnvHashMap::default();
         let mut pointers: HashMap<_, Vec<_>> = HashMap::new();
 
         for (i, pointer) in top_websites {
@@ -150,17 +152,22 @@ impl LiveSearcher {
                 .entry(pointer.split_id.clone())
                 .or_default()
                 .push((*i, pointer.website.pointer.clone()));
+
+            rankings.insert(*i, pointer.website.clone());
         }
 
         let client = self.client().await;
         let mut futures = Vec::new();
-        for (split_id, pointers) in pointers {
-            futures.push(self.retrieve_webpages_from_shard(split_id, &client, query, pointers));
+        for (shard, pointers) in pointers {
+            futures.push(self.retrieve_webpages_from_shard(shard, &client, query, pointers));
         }
 
         let mut retrieved_webpages = Vec::new();
         for pages in join_all(futures).await {
-            retrieved_webpages.extend(pages);
+            for (i, page) in pages {
+                retrieved_webpages
+                    .push((i, RetrievedWebpageRanking::new(page, rankings[&i].clone())));
+            }
         }
 
         debug_assert_eq!(retrieved_webpages.len(), top_websites.len());

@@ -1015,6 +1015,8 @@ impl Html {
             .to_string();
 
         let schemas: Vec<_> = self.schema_org();
+        let first_ingredient_tag_id =
+            find_recipe_first_ingredient_tag_id(&schemas, &self.root).unwrap_or_default();
 
         let schema_json = serde_json::to_string(&schemas).ok().unwrap_or_default();
 
@@ -1254,6 +1256,9 @@ impl Html {
                 }
                 Field::Text(TextField::AllBody) => {
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
+                }
+                Field::Text(TextField::RecipeFirstIngredientTagId) => {
+                    doc.add_text(tantivy_field, first_ingredient_tag_id.clone());
                 }
                 Field::Text(TextField::SchemaOrgJson) => {
                     doc.add_text(tantivy_field, schema_json.clone());
@@ -1711,6 +1716,52 @@ fn stemmer_from_lang(lang: &Lang) -> rust_stemmers::Stemmer {
         Lang::Tur => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Turkish),
         _ => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English),
     }
+}
+
+fn find_recipe_first_ingredient_tag_id(
+    schemas: &[schema_org::Item],
+    root: &NodeRef,
+) -> Option<String> {
+    schemas
+        .iter()
+        .filter_map(|schema| {
+            if let Some(ingredients) = schema.properties.get("recipeIngredient") {
+                if let Some(ingredient) = ingredients.clone().many().first() {
+                    if let Some(ingredient) = ingredient.try_into_string() {
+                        let ingredient = ingredient.trim();
+                        // find first occurrence in html
+                        if let Some(ingredient_node) = root
+                            .select("body")
+                            .unwrap()
+                            .flat_map(|node| node.as_node().descendants())
+                            .find(|node| {
+                                if let Some(text) = node.as_text() {
+                                    text.borrow().trim() == ingredient
+                                } else {
+                                    false
+                                }
+                            })
+                        {
+                            // find first parent that has an id
+                            if let Some(id) = ingredient_node
+                                .ancestors()
+                                .filter_map(|node| {
+                                    node.as_element().and_then(|e| {
+                                        e.attributes.borrow().get("id").map(|s| s.to_string())
+                                    })
+                                })
+                                .next()
+                            {
+                                return Some(id.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+
+            None
+        })
+        .next()
 }
 
 fn stem_tokens(tokens: &mut [tantivy::tokenizer::Token], lang: Lang) {
@@ -2591,5 +2642,66 @@ mod tests {
         assert!(microformats.contains(Microformat::HRecipe));
         assert!(!microformats.contains(Microformat::HCard));
         assert!(!microformats.contains(Microformat::HProduct));
+    }
+
+    #[test]
+    fn recipe_first_ingredient_tag() {
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                </head>
+                <body>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "Recipe",
+                  "author": "John Smith",
+                  "cookTime": "PT1H",
+                  "datePublished": "2009-05-08",
+                  "description": "This classic banana bread recipe comes from my mom -- the walnuts add a nice texture and flavor to the banana bread.",
+                  "image": "bananabread.jpg",
+                  "recipeIngredient": [
+                    "3 or 4 ripe bananas, smashed",
+                    "1 egg",
+                    "3/4 cup of sugar"
+                  ],
+                  "interactionStatistic": {
+                    "@type": "InteractionCounter",
+                    "interactionType": "https://schema.org/Comment",
+                    "userInteractionCount": "140"
+                  },
+                  "name": "Mom's World Famous Banana Bread",
+                  "nutrition": {
+                    "@type": "NutritionInformation",
+                    "calories": "240 calories",
+                    "fatContent": "9 grams fat"
+                  },
+                  "prepTime": "PT15M",
+                  "recipeInstructions": "Preheat the oven to 350 degrees. Mix in the ingredients in a bowl. Add the flour last. Pour the mixture into a loaf pan and bake for one hour.",
+                  "recipeYield": "1 loaf",
+                  "suitableForDiet": "https://schema.org/LowFatDiet"
+                }
+                </script>
+
+                <div id="ingredients">
+                    <h2>Ingredients</h2>
+                    <ul>
+                        <li>3 or 4 ripe bananas, smashed</li>
+                        <li>1 egg</li>
+                        <li>3/4 cup of sugar</li>
+                    </ul>
+                </body>
+            </html>
+            "#,
+            "https://www.example.com/",
+        ).unwrap();
+
+        let schemas = html.schema_org();
+
+        assert_eq!(
+            find_recipe_first_ingredient_tag_id(&schemas, &html.root),
+            Some("ingredients".to_string())
+        );
     }
 }

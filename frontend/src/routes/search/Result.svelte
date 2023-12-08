@@ -20,9 +20,9 @@
   const dispatch = createEventDispatcher<{ modal: HTMLButtonElement }>();
 </script>
 
-<div class="flex min-w-0 grow flex-col space-y-1">
+<div class="flex min-w-0 grow flex-col space-y-0.5">
   <div class="flex min-w-0">
-    <div class="flex min-w-0 grow flex-col space-y-1">
+    <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
         <a
           class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
@@ -46,7 +46,7 @@
       bind:this={button}
       on:click|stopPropagation={() => dispatch('modal', button)}
     >
-      <AdjustVertical class="text-xl" />
+      <AdjustVertical class="text-md" />
     </button>
   </div>
   <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">

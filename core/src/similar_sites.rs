@@ -77,9 +77,9 @@ impl SimilarSitesFinder {
     }
 
     pub fn find_similar_sites(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
-        const SIMILAR_DOMAINS_BUFFER: usize = 30;
+        const DEAD_LINKS_BUFFER: usize = 30;
         let orig_limit = limit.min(self.max_similar_sites);
-        let limit = orig_limit + nodes.len() + SIMILAR_DOMAINS_BUFFER;
+        let limit = orig_limit + nodes.len() + DEAD_LINKS_BUFFER;
 
         let nodes: Vec<_> = nodes
             .iter()
@@ -155,6 +155,9 @@ impl SimilarSitesFinder {
 
         scored_nodes
             .into_iter()
+            .filter(|ScoredNodeID { node_id, score: _ }| {
+                !self.webgraph.raw_outgoing_edges(node_id).is_empty()
+            })
             .filter_map(|ScoredNodeID { node_id, score }| {
                 let node = self.webgraph.id2node(&node_id).unwrap();
                 match Url::parse(&format!("http://{}", &node.name))

@@ -20,7 +20,7 @@ use tantivy::{
 };
 
 use crate::{
-    bangs::BANG_PREFIX,
+    bangs::BANG_PREFIXES,
     floor_char_boundary,
     schema::{Field, TextField, ALL_FIELDS},
 };
@@ -87,7 +87,7 @@ impl ToString for Term {
             Term::Title(title) => "intitle:".to_string() + title.as_str(),
             Term::Body(body) => "inbody:".to_string() + body.as_str(),
             Term::Url(url) => "inurl:".to_string() + url.as_str(),
-            Term::PossibleBang(bang) => BANG_PREFIX.to_string() + bang.as_str(),
+            Term::PossibleBang(bang) => BANG_PREFIXES[0].to_string() + bang.as_str(),
         }
     }
 }
@@ -233,7 +233,7 @@ impl Term {
             Term::PossibleBang(text) => {
                 let mut term = String::new();
 
-                term.push(BANG_PREFIX);
+                term.push(BANG_PREFIXES[0]);
                 term.push_str(text);
 
                 simple_into_tantivy(&term.into(), &[], fields)
@@ -372,9 +372,13 @@ fn parse_term(term: &str) -> Box<Term> {
         } else {
             Box::new(Term::Simple(term.to_string().into()))
         }
-    } else if let Some(bang) = term.strip_prefix(BANG_PREFIX) {
-        Box::new(Term::PossibleBang(bang.to_string()))
     } else {
+        for bang_prefix in BANG_PREFIXES {
+            if let Some(bang) = term.strip_prefix(bang_prefix) {
+                return Box::new(Term::PossibleBang(bang.to_string()));
+            }
+        }
+
         Box::new(Term::Simple(term.to_string().into()))
     }
 }

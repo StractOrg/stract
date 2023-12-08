@@ -143,10 +143,10 @@
 
 {#if results.type == 'websites'}
   <div
-    class="m-0 grid w-full gap-y-6 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:px-36"
+    class="m-0 grid w-full gap-y-6 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
     style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
   >
-    <div class="flex max-w-2xl flex-col space-y-3">
+    <div class="flex max-w-2xl flex-col space-y-2">
       <div class="w-full">
         <Searchbar {query} />
       </div>
@@ -233,7 +233,7 @@
 
     {#if results.sidebar}
       <div
-        class="row-start-2 mx-auto max-w-[90vw] justify-center md:col-start-2 md:row-span-2 md:row-start-1 md:pt-10"
+        class="row-start-2 mx-auto max-w-[90vw] md:max-w-[30vw] justify-center md:col-start-2 md:row-span-2 md:row-start-1 md:pt-5"
       >
         <Sidebar sidebar={results.sidebar} />
       </div>

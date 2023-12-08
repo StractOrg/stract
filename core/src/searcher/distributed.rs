@@ -26,12 +26,13 @@ use crate::{
     entrypoint::search_server::{self, SearchService},
     image_store::Image,
     inverted_index::{RetrievedWebpage, WebsitePointer},
-    ranking::pipeline::RankingWebsite,
+    ranking::pipeline::{RankingWebsite, RetrievedWebpageRanking},
     Result,
 };
 
 use std::{collections::HashMap, sync::Arc};
 
+use fnv::FnvHashMap;
 use futures::future::join_all;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -161,7 +162,8 @@ impl DistributedSearcher {
         &self,
         top_websites: &[(usize, ScoredWebsitePointer)],
         query: &str,
-    ) -> Vec<(usize, RetrievedWebpage)> {
+    ) -> Vec<(usize, RetrievedWebpageRanking)> {
+        let mut rankings = FnvHashMap::default();
         let mut pointers: HashMap<_, Vec<_>> = HashMap::new();
 
         for (i, pointer) in top_websites {
@@ -169,6 +171,8 @@ impl DistributedSearcher {
                 .entry(pointer.shard)
                 .or_default()
                 .push((*i, pointer.website.pointer.clone()));
+
+            rankings.insert(*i, pointer.website.clone());
         }
 
         let client = self.client().await;
@@ -179,7 +183,10 @@ impl DistributedSearcher {
 
         let mut retrieved_webpages = Vec::new();
         for pages in join_all(futures).await {
-            retrieved_webpages.extend(pages);
+            for (i, page) in pages {
+                retrieved_webpages
+                    .push((i, RetrievedWebpageRanking::new(page, rankings[&i].clone())));
+            }
         }
 
         debug_assert_eq!(retrieved_webpages.len(), top_websites.len());

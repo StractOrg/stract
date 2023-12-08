@@ -582,6 +582,10 @@ impl WebgraphWriter {
     }
 
     pub fn insert(&mut self, from: Node, to: Node, label: String) {
+        if from == to {
+            return;
+        }
+
         let (from_id, to_id) = (
             self.id_or_assign(from.clone()),
             self.id_or_assign(to.clone()),

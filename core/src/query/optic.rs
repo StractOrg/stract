@@ -1084,7 +1084,9 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "avengers endgame".to_string(),
-                optic: Some(Optic::parse(include_str!("../searcher/discussions.optic")).unwrap()),
+                optic: Some(
+                    Optic::parse(include_str!("../searcher/api/discussions.optic")).unwrap(),
+                ),
                 ..Default::default()
             })
             .unwrap()

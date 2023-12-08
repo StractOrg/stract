@@ -589,6 +589,7 @@ pub struct RetrievedWebpage {
     pub region: Region,
     pub likely_has_ads: bool,
     pub likely_has_paywall: bool,
+    pub recipe_first_ingredient_tag_id: Option<String>,
 }
 impl RetrievedWebpage {
     pub fn description(&self) -> Option<&String> {
@@ -687,6 +688,18 @@ impl From<TantivyDocument> for RetrievedWebpage {
                 Field::Fast(FastField::LikelyHasPaywall) => {
                     webpage.likely_has_paywall =
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
+                }
+                Field::Text(TextField::RecipeFirstIngredientTagId) => {
+                    let tag_id = value
+                        .value()
+                        .as_value()
+                        .as_str()
+                        .expect("Recipe first ingredient tag id field should be stored as text")
+                        .to_string();
+
+                    if !tag_id.is_empty() {
+                        webpage.recipe_first_ingredient_tag_id = Some(tag_id);
+                    }
                 }
                 _ => {}
             }

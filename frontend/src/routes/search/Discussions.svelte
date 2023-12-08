@@ -51,7 +51,7 @@
       </div>
     {/each}
     <div class="noscript:hidden mt-2">
-      <Button kind="neutral" pale on:click={() => (showMore = !showMore)}
+      <Button _class="py-1" kind="neutral" pale on:click={() => (showMore = !showMore)}
         >{showMore ? 'Show less' : 'Show more'}</Button
       >
     </div>

@@ -22,7 +22,7 @@ use crate::{
     collector::{self, BucketCollector},
     config::CollectorConfig,
     enum_map::EnumMap,
-    inverted_index::WebsitePointer,
+    inverted_index::{RetrievedWebpage, WebsitePointer},
     searcher::SearchQuery,
     Result,
 };
@@ -73,11 +73,43 @@ impl lambdamart::AsValue for SignalScore {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RetrievedWebpageRanking {
+    retrieved_webpage: RetrievedWebpage,
+    ranking: RankingWebsite,
+}
+
+impl RetrievedWebpageRanking {
+    pub fn new(retrieved_webpage: RetrievedWebpage, ranking: RankingWebsite) -> Self {
+        let mut ranking = ranking;
+        ranking.snippet = Some(retrieved_webpage.snippet.unhighlighted_string());
+
+        Self {
+            retrieved_webpage,
+            ranking,
+        }
+    }
+
+    pub fn into_retrieved_webpage(self) -> RetrievedWebpage {
+        self.retrieved_webpage
+    }
+}
+
+impl AsRankingWebsite for RetrievedWebpageRanking {
+    fn as_ranking(&self) -> &RankingWebsite {
+        &self.ranking
+    }
+
+    fn as_mut_ranking(&mut self) -> &mut RankingWebsite {
+        &mut self.ranking
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RankingWebsite {
     pub pointer: WebsitePointer,
     pub signals: EnumMap<Signal, SignalScore>,
     pub title: Option<String>,
-    pub clean_body: Option<String>,
+    pub snippet: Option<String>,
     pub optic_boost: Option<f64>,
     pub score: f64,
 }
@@ -87,9 +119,9 @@ impl RankingWebsite {
         let mut res = RankingWebsite {
             signals: EnumMap::new(),
             title: None,
-            clean_body: None,
             score: pointer.score.total,
             optic_boost: None,
+            snippet: None,
             pointer: pointer.clone(),
         };
 
@@ -129,36 +161,51 @@ impl<M: CrossEncoder> ReRanker<M> {
     }
 
     fn crossencoder_score_websites<T: AsRankingWebsite>(&self, websites: &mut [T]) {
-        let mut bodies = Vec::with_capacity(websites.len());
+        let mut snippets = Vec::with_capacity(websites.len());
+        let mut titles = Vec::with_capacity(websites.len());
 
         for website in websites.iter_mut() {
-            let website = website.as_mut_ranking();
-            let title = website.title.clone().unwrap_or_default();
-            let body = website.clean_body.clone().unwrap_or_default();
-            let text = title + ". " + body.as_str();
-            bodies.push(text);
+            titles.push(website.as_mut_ranking().title.clone().unwrap_or_default());
+            snippets.push(website.as_mut_ranking().snippet.clone().unwrap_or_default());
         }
 
         let query = &self.query.as_ref().unwrap().query;
-        let scores = self.crossencoder.run(query, &bodies);
+        let snippet_scores = self.crossencoder.run(query, &snippets);
+        let title_scores = self.crossencoder.run(query, &titles);
 
-        for (website, score) in websites.iter_mut().zip(scores) {
+        for ((website, snippet), title) in websites.iter_mut().zip(snippet_scores).zip(title_scores)
+        {
             let website = website.as_mut_ranking();
             website.signals.insert(
-                Signal::CrossEncoder,
+                Signal::CrossEncoderSnippet,
                 SignalScore {
-                    coefficient: self.crossencoder_coeff(),
-                    value: score,
+                    coefficient: self.crossencoder_snippet_coeff(),
+                    value: snippet,
+                },
+            );
+
+            website.signals.insert(
+                Signal::CrossEncoderTitle,
+                SignalScore {
+                    coefficient: self.crossencoder_title_coeff(),
+                    value: title,
                 },
             );
         }
     }
 
-    fn crossencoder_coeff(&self) -> f64 {
+    fn crossencoder_snippet_coeff(&self) -> f64 {
         self.signal_coefficients
             .as_ref()
-            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoder))
-            .unwrap_or(Signal::CrossEncoder.default_coefficient())
+            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoderSnippet))
+            .unwrap_or(Signal::CrossEncoderSnippet.default_coefficient())
+    }
+
+    fn crossencoder_title_coeff(&self) -> f64 {
+        self.signal_coefficients
+            .as_ref()
+            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoderSnippet))
+            .unwrap_or(Signal::CrossEncoderSnippet.default_coefficient())
     }
 }
 
@@ -293,10 +340,11 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 }
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
-    fn create_reranking<M: CrossEncoder + 'static>(
+    fn create_second_stage<M: CrossEncoder + 'static>(
         crossencoder: Option<Arc<M>>,
         lambda: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
+        top_n_considered: usize,
     ) -> Result<Self> {
         let scorer = match crossencoder {
             Some(cross_encoder) => {
@@ -307,7 +355,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
 
         let stage = RankingStage {
             scorer,
-            stage_top_n: 20,
+            stage_top_n: top_n_considered,
             derank_similar: true,
         };
 
@@ -319,25 +367,31 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         })
     }
 
-    pub fn reranking_for_query<M: CrossEncoder + 'static>(
+    pub fn reranker<M: CrossEncoder + 'static>(
         query: &mut SearchQuery,
         crossencoder: Option<Arc<M>>,
         lambda: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
+        top_n_considered: usize,
     ) -> Result<Self> {
-        let mut pipeline = Self::create_reranking(crossencoder, lambda, collector_config)?;
+        let mut pipeline =
+            Self::create_second_stage(crossencoder, lambda, collector_config, top_n_considered)?;
         pipeline.set_query_info(query);
 
         Ok(pipeline)
     }
 
-    fn create_ltr(model: Option<Arc<LambdaMART>>, collector_config: CollectorConfig) -> Self {
+    fn create_first_stage(
+        model: Option<Arc<LambdaMART>>,
+        collector_config: CollectorConfig,
+        stage_top_n: usize,
+    ) -> Self {
         let last_stage = RankingStage {
             scorer: Box::new(Initial {
                 model,
                 signal_coefficients: None,
             }),
-            stage_top_n: 100,
+            stage_top_n,
             derank_similar: true,
         };
 
@@ -349,12 +403,13 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         }
     }
 
-    pub fn initial_for_query(
+    pub fn first_stage(
         query: &mut SearchQuery,
         model: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
+        top_n_considered: usize,
     ) -> Self {
-        let mut pipeline = Self::create_ltr(model, collector_config);
+        let mut pipeline = Self::create_first_stage(model, collector_config, top_n_considered);
         pipeline.set_query_info(query);
 
         pipeline
@@ -436,7 +491,7 @@ mod tests {
                     signals,
                     optic_boost: None,
                     title: None,
-                    clean_body: None,
+                    snippet: None,
                     score: 1.0 / i as f64,
                 }
             })
@@ -445,13 +500,14 @@ mod tests {
 
     #[test]
     fn simple() {
-        let pipeline = RankingPipeline::reranking_for_query(
+        let pipeline = RankingPipeline::reranker(
             &mut SearchQuery {
                 ..Default::default()
             },
             Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
+            20,
         )
         .unwrap();
         assert_eq!(pipeline.collector_top_n(), 20);
@@ -475,7 +531,7 @@ mod tests {
     #[test]
     fn top_n() {
         let num_results = 100;
-        let pipeline = RankingPipeline::reranking_for_query(
+        let pipeline = RankingPipeline::reranker(
             &mut SearchQuery {
                 num_results,
                 ..Default::default()
@@ -483,6 +539,7 @@ mod tests {
             Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
+            num_results,
         )
         .unwrap();
 
@@ -508,7 +565,7 @@ mod tests {
     #[test]
     fn offsets() {
         let num_results = 20;
-        let pipeline = RankingPipeline::reranking_for_query(
+        let pipeline = RankingPipeline::reranker(
             &mut SearchQuery {
                 page: 0,
                 num_results,
@@ -517,13 +574,14 @@ mod tests {
             Some(Arc::new(DummyCrossEncoder {})),
             None,
             CollectorConfig::default(),
+            num_results,
         )
         .unwrap();
 
         let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
         let mut prev: Vec<_> = pipeline.apply(sample);
         for p in 1..1_000 {
-            let pipeline = RankingPipeline::reranking_for_query(
+            let pipeline = RankingPipeline::reranker(
                 &mut SearchQuery {
                     page: p,
                     ..Default::default()
@@ -531,6 +589,7 @@ mod tests {
                 Some(Arc::new(DummyCrossEncoder {})),
                 None,
                 CollectorConfig::default(),
+                num_results,
             )
             .unwrap();
 

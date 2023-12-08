@@ -412,7 +412,7 @@ impl JustText {
         res
     }
 
-    fn contextual_classification(&self, paragraphs: &mut Vec<ClassifiedParagraph>) {
+    fn contextual_classification(&self, paragraphs: &mut [ClassifiedParagraph]) {
         // good headings
         let num_paragraphs = paragraphs.len();
         for i in 0..num_paragraphs {
@@ -602,7 +602,7 @@ impl JustText {
             .initial_classification(paragraphs, lang)
             .into_iter()
             .filter(|par| par.paragraph.text.chars().any(|c| !c.is_whitespace()))
-            .collect();
+            .collect::<Vec<_>>();
 
         self.contextual_classification(&mut classified);
 

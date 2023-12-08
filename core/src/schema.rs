@@ -60,6 +60,7 @@ pub enum TextField {
     /// can either be NSFW or SFW (see safety classifier)
     SafetyClassification,
     InsertionTimestamp,
+    RecipeFirstIngredientTagId,
 }
 
 impl From<TextField> for usize {
@@ -111,6 +112,7 @@ impl TextField {
             TextField::MicroformatTags => Tokenizer::default(),
             TextField::SafetyClassification => Tokenizer::Identity(Identity {}),
             TextField::InsertionTimestamp => Tokenizer::Identity(Identity {}),
+            TextField::RecipeFirstIngredientTagId => Tokenizer::Identity(Identity {}),
         }
     }
 
@@ -154,6 +156,7 @@ impl TextField {
             TextField::MicroformatTags => true,
             TextField::SafetyClassification => false,
             TextField::InsertionTimestamp => false,
+            TextField::RecipeFirstIngredientTagId => false,
         }
     }
 
@@ -189,6 +192,7 @@ impl TextField {
             TextField::MicroformatTags => "microformat_tags",
             TextField::SafetyClassification => "safety_classification",
             TextField::InsertionTimestamp => "insertion_timestamp",
+            TextField::RecipeFirstIngredientTagId => "recipe_first_ingredient_tag_id",
         }
     }
 }
@@ -459,6 +463,9 @@ impl Field {
             Field::Text(TextField::SafetyClassification) => {
                 IndexingOption::Text(self.default_text_options())
             }
+            Field::Text(TextField::RecipeFirstIngredientTagId) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
+            }
             Field::Text(TextField::InsertionTimestamp) => {
                 IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
             }
@@ -634,6 +641,7 @@ impl Field {
                 | Field::Text(TextField::SiteWithout) // will match url
                 | Field::Text(TextField::Domain) // will match url
                 | Field::Text(TextField::InsertionTimestamp)
+                | Field::Text(TextField::RecipeFirstIngredientTagId)
         ) && !self.is_fast()
     }
 

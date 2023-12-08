@@ -17,8 +17,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLockReadGuard};
 
-use tantivy::schema::Value;
-use tantivy::TantivyDocument;
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
@@ -34,7 +32,6 @@ use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
-use crate::schema::TextField;
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::webgraph::Node;
@@ -116,7 +113,6 @@ impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
 
 pub struct LocalSearcher<I: SearchableIndex> {
     index: I,
-    // spell: Option<Spell>,
     entity_index: Option<EntityIndex>,
     inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
@@ -257,10 +253,11 @@ where
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::initial_for_query(
+        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::first_stage(
             &mut query,
             self.lambda_model.clone(),
             self.collector_config.clone(),
+            100,
         );
         let parsed_query = self.parse_query(ctx, guard, &query)?;
 
@@ -319,26 +316,7 @@ where
         )?;
 
         let pipe_top_n = pipeline.top_n;
-        let mut ranking_websites = pipeline.apply(ranking_websites);
-
-        let schema = guard.inverted_index().schema();
-        for website in &mut ranking_websites {
-            let doc: TantivyDocument = ctx.tv_searcher.doc(website.pointer.address.into())?;
-            website.title = Some(
-                doc.get_first(schema.get_field(TextField::Title.name()).unwrap())
-                    .map(|text| text.as_value().as_str().unwrap().to_string())
-                    .unwrap_or_default(),
-            );
-            website.clean_body = Some(
-                doc.get_first(
-                    schema
-                        .get_field(TextField::StemmedCleanBody.name())
-                        .unwrap(),
-                )
-                .map(|text| text.as_value().as_str().unwrap().to_string())
-                .unwrap_or_default(),
-            );
-        }
+        let ranking_websites = pipeline.apply(ranking_websites);
 
         let has_more = pipe_top_n == ranking_websites.len();
 
@@ -409,17 +387,19 @@ where
         let pipeline = {
             use crate::ranking::models::cross_encoder::CrossEncoderModel;
             match CrossEncoderModel::open("data/cross_encoder") {
-                Ok(model) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
+                Ok(model) => RankingPipeline::reranker::<CrossEncoderModel>(
                     &mut search_query,
                     Some(Arc::new(model)),
                     None,
                     self.collector_config.clone(),
+                    query.num_results,
                 )?,
-                Err(_) => RankingPipeline::reranking_for_query::<CrossEncoderModel>(
+                Err(_) => RankingPipeline::reranker::<CrossEncoderModel>(
                     &mut search_query,
                     None,
                     None,
                     self.collector_config.clone(),
+                    query.num_results,
                 )?,
             }
         };
@@ -427,11 +407,12 @@ where
         #[cfg(not(feature = "libtorch"))]
         let pipeline = {
             use crate::ranking::models::cross_encoder::DummyCrossEncoder;
-            RankingPipeline::reranking_for_query::<DummyCrossEncoder>(
+            RankingPipeline::reranker::<DummyCrossEncoder>(
                 &mut search_query,
                 None,
                 None,
                 self.collector_config.clone(),
+                query.num_results,
             )?
         };
 

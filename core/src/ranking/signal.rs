@@ -98,8 +98,10 @@ pub enum Signal {
     Bm25TitleIfHomepage,
     #[serde(rename = "bm25_backlink_text")]
     Bm25BacklinkText,
-    #[serde(rename = "cross_encoder")]
-    CrossEncoder,
+    #[serde(rename = "cross_encoder_snippet")]
+    CrossEncoderSnippet,
+    #[serde(rename = "cross_encoder_title")]
+    CrossEncoderTitle,
     #[serde(rename = "host_centrality")]
     HostCentrality,
     #[serde(rename = "page_centrality")]
@@ -134,7 +136,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 34] = [
+pub const ALL_SIGNALS: [Signal; 35] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -155,7 +157,8 @@ pub const ALL_SIGNALS: [Signal; 34] = [
     Signal::Bm25DomainIfHomepageNoTokenizer,
     Signal::Bm25TitleIfHomepage,
     Signal::Bm25BacklinkText,
-    Signal::CrossEncoder,
+    Signal::CrossEncoderSnippet,
+    Signal::CrossEncoderTitle,
     Signal::HostCentrality,
     Signal::PageCentrality,
     Signal::IsHomepage,
@@ -278,7 +281,8 @@ impl Signal {
             Signal::Bm25DomainIfHomepageNoTokenizer => 0.0036,
             Signal::Bm25TitleIfHomepage => 0.00022,
             Signal::Bm25BacklinkText => 0.003,
-            Signal::CrossEncoder => 0.17,
+            Signal::CrossEncoderSnippet => 0.17,
+            Signal::CrossEncoderTitle => 0.17,
             Signal::HostCentrality => 0.5,
             Signal::PageCentrality => 0.25,
             Signal::QueryCentrality => 0.0,
@@ -453,7 +457,8 @@ impl Signal {
                     .unwrap_or(0.0)
             }),
 
-            Signal::CrossEncoder => None, // this is calculated in a later step
+            Signal::CrossEncoderSnippet => None, // this is calculated in a later step
+            Signal::CrossEncoderTitle => None,   // this is calculated in a later step
             Signal::LambdaMART => None,
         };
 
@@ -553,7 +558,8 @@ impl Signal {
             | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
             | Signal::Bm25BacklinkText
-            | Signal::CrossEncoder
+            | Signal::CrossEncoderSnippet
+            | Signal::CrossEncoderTitle
             | Signal::InboundSimilarity
             | Signal::LambdaMART
             | Signal::QueryCentrality => {
