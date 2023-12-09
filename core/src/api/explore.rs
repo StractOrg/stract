@@ -16,14 +16,14 @@
 
 use axum::extract;
 use http::StatusCode;
-use optics::{Optic, SiteRankings};
+use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
 
 #[derive(serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExploreExportOpticParams {
-    chosen_sites: Vec<String>,
-    similar_sites: Vec<String>,
+    chosen_hosts: Vec<String>,
+    similar_hosts: Vec<String>,
 }
 
 #[allow(clippy::unused_async)]
@@ -36,13 +36,13 @@ pub struct ExploreExportOpticParams {
 )]
 pub async fn explore_export_optic(
     extract::Json(ExploreExportOpticParams {
-        chosen_sites,
-        similar_sites,
+        chosen_hosts,
+        similar_hosts,
     }): extract::Json<ExploreExportOpticParams>,
 ) -> Result<String, StatusCode> {
-    let rules = similar_sites
+    let rules = similar_hosts
         .into_iter()
-        .chain(chosen_sites.clone().into_iter())
+        .chain(chosen_hosts.clone().into_iter())
         .map(|site| optics::Rule {
             matches: vec![optics::Matching {
                 pattern: vec![
@@ -50,15 +50,15 @@ pub async fn explore_export_optic(
                     optics::PatternPart::Raw(site),
                     optics::PatternPart::Anchor,
                 ],
-                location: optics::MatchLocation::Site,
+                location: optics::MatchLocation::Domain,
             }],
             action: optics::Action::Boost(0),
         })
         .collect();
 
     let optic = Optic {
-        site_rankings: SiteRankings {
-            liked: chosen_sites,
+        host_rankings: HostRankings {
+            liked: chosen_hosts,
             ..Default::default()
         },
         rules,

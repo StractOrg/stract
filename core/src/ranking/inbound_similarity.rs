@@ -154,17 +154,17 @@ impl InboundSimilarity {
 
     pub fn scorer(
         &self,
-        liked_sites: &[NodeID],
-        disliked_sites: &[NodeID],
+        liked_hosts: &[NodeID],
+        disliked_hosts: &[NodeID],
         normalized: bool,
     ) -> Scorer {
-        let liked: Vec<_> = liked_sites
+        let liked: Vec<_> = liked_hosts
             .iter()
             .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
             .map(|(node, inbound)| NodeScorer::new(*node, inbound))
             .collect();
 
-        let disliked: Vec<_> = disliked_sites
+        let disliked: Vec<_> = disliked_hosts
             .iter()
             .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
             .map(|(node, inbound)| NodeScorer::new(*node, inbound))
@@ -215,7 +215,7 @@ impl InboundSimilarity {
 
 #[cfg(test)]
 mod tests {
-    use optics::SiteRankings;
+    use optics::HostRankings;
 
     use crate::{
         gen_temp_path,
@@ -229,7 +229,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_favors_liked_sites() {
+    fn it_favors_liked_hosts() {
         let mut wrt = WebgraphWriter::new(
             gen_temp_path(),
             crate::executor::Executor::single_thread(),
@@ -334,7 +334,7 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec!["a.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],

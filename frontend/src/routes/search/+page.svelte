@@ -13,7 +13,7 @@
   import { onMount } from 'svelte';
   import { twJoin } from 'tailwind-merge';
   import Button from '$lib/components/Button.svelte';
-  import { searchQueryStore, siteRankingsStore, summarize } from '$lib/stores';
+  import { searchQueryStore, hostRankingsStore, summarize } from '$lib/stores';
   import type { Ranking } from '$lib/rankings';
   import { flip } from 'svelte/animate';
   import Result from './Result.svelte';
@@ -96,7 +96,7 @@
   ] as const;
 
   const rankSite = (site: DisplayedWebpage, ranking: Ranking) => () => {
-    siteRankingsStore?.update(($rankings) => ({
+    hostRankingsStore?.update(($rankings) => ({
       ...$rankings,
       [site.domain]: $rankings[site.domain] == ranking ? void 0 : ranking,
     }));
@@ -125,7 +125,7 @@
         {#each rankingChoices as { ranking, kind, Icon }}
           <Button
             {kind}
-            pale={$siteRankingsStore[modal.site.domain] != ranking}
+            pale={$hostRankingsStore[modal.site.domain] != ranking}
             padding={false}
             form="searchbar-form"
             on:click={rankSite(modal.site, ranking)}

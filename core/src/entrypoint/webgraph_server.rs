@@ -32,7 +32,7 @@ use crate::distributed::sonic;
 use crate::distributed::sonic::service::Message;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
-use crate::similar_sites::SimilarSitesFinder;
+use crate::similar_hosts::SimilarHostsFinder;
 use crate::sonic_service;
 use crate::webgraph::Compression;
 use crate::webgraph::FullEdge;
@@ -43,70 +43,70 @@ use crate::Result;
 
 #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ScoredSite {
-    pub site: String,
+pub struct ScoredHost {
+    pub host: String,
     pub score: f64,
     pub description: Option<String>,
 }
 
-const MAX_SITES: usize = 20;
+const MAX_HOSTS: usize = 20;
 
 pub struct WebGraphService {
     searcher: DistributedSearcher,
-    similar_sites_finder: SimilarSitesFinder,
+    similar_hosts_finder: SimilarHostsFinder,
     host_graph: Arc<Webgraph>,
     page_graph: Arc<Webgraph>,
 }
 
 sonic_service!(
     WebGraphService,
-    [SimilarSites, Knows, IngoingLinks, OutgoingLinks]
+    [SimilarHosts, Knows, IngoingLinks, OutgoingLinks]
 );
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimilarSites {
-    pub sites: Vec<String>,
+pub struct SimilarHosts {
+    pub hosts: Vec<String>,
     pub top_n: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Knows {
-    pub site: String,
+    pub host: String,
 }
 
 #[async_trait::async_trait]
-impl Message<WebGraphService> for SimilarSites {
-    type Response = Vec<ScoredSite>;
+impl Message<WebGraphService> for SimilarHosts {
+    type Response = Vec<ScoredHost>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
-        let sites = &self.sites[..std::cmp::min(self.sites.len(), MAX_SITES)];
-        let similar_sites = server
-            .similar_sites_finder
-            .find_similar_sites(sites, self.top_n);
+        let sites = &self.hosts[..std::cmp::min(self.hosts.len(), MAX_HOSTS)];
+        let similar_hosts = server
+            .similar_hosts_finder
+            .find_similar_hosts(sites, self.top_n);
 
-        let urls = similar_sites
+        let urls = similar_hosts
             .iter()
             .filter_map(|s| Url::parse(&("http://".to_string() + s.node.name.as_str())).ok())
             .collect_vec();
 
         let descriptions = server.searcher.get_homepage_descriptions(&urls).await;
 
-        let similar_sites = similar_sites
+        let similar_hosts = similar_hosts
             .into_iter()
             .map(|site| {
                 let description = Url::parse(&("http://".to_string() + site.node.name.as_str()))
                     .ok()
                     .and_then(|url| descriptions.get(&url).cloned());
 
-                ScoredSite {
-                    site: site.node.name,
+                ScoredHost {
+                    host: site.node.name,
                     score: site.score,
                     description,
                 }
             })
             .collect_vec();
 
-        Ok(similar_sites)
+        Ok(similar_hosts)
     }
 }
 
@@ -115,9 +115,9 @@ impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
-        let node = Node::from(self.site.to_string()).into_host();
+        let node = Node::from(self.host.to_string()).into_host();
 
-        if server.similar_sites_finder.knows_about(&node) {
+        if server.similar_hosts_finder.knows_about(&node) {
             Ok(Some(node))
         } else {
             Ok(None)
@@ -202,17 +202,17 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     );
     let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
-    let similar_sites_finder = SimilarSitesFinder::new(
+    let similar_hosts_finder = SimilarHostsFinder::new(
         Arc::clone(&host_graph),
         inbound_similarity,
-        config.max_similar_sites,
+        config.max_similar_hosts,
     );
 
     let server = WebGraphService {
         host_graph,
         page_graph,
         searcher,
-        similar_sites_finder,
+        similar_hosts_finder,
     }
     .bind(addr)
     .await

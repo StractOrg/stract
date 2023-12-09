@@ -112,10 +112,10 @@ export const api = {
     ),
   exploreExport: (body: ExploreExportOpticParams, options?: ApiOptions) =>
     requestPlain('POST', `/beta/api/explore/export`, body, options),
+  hostsExport: (body: HostsExportOpticParams, options?: ApiOptions) =>
+    requestPlain('POST', `/beta/api/hosts/export`, body, options),
   search: (body: ApiSearchQuery, options?: ApiOptions) =>
     requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
-  sitesExport: (body: SitesExportOpticParams, options?: ApiOptions) =>
-    requestPlain('POST', `/beta/api/sites/export`, body, options),
   summarize: (
     query: {
       query: string;
@@ -125,7 +125,7 @@ export const api = {
   ) => sse<string>('GET', `/beta/api/summarize?${new URLSearchParams(query)}`, options),
   webgraphHostIngoing: (
     query: {
-      site: string;
+      host: string;
     },
     options?: ApiOptions,
   ) =>
@@ -136,18 +136,18 @@ export const api = {
     ),
   webgraphHostKnows: (
     query: {
-      site: string;
+      host: string;
     },
     options?: ApiOptions,
   ) =>
-    requestJson<KnowsSite>(
+    requestJson<KnowsHost>(
       'POST',
       `/beta/api/webgraph/host/knows?${new URLSearchParams(query)}`,
       options,
     ),
   webgraphHostOutgoing: (
     query: {
-      site: string;
+      host: string;
     },
     options?: ApiOptions,
   ) =>
@@ -156,8 +156,8 @@ export const api = {
       `/beta/api/webgraph/host/outgoing?${new URLSearchParams(query)}`,
       options,
     ),
-  webgraphHostSimilar: (body: SimilarSitesParams, options?: ApiOptions) =>
-    requestJson<ScoredSite[]>('POST', `/beta/api/webgraph/host/similar`, body, options),
+  webgraphHostSimilar: (body: SimilarHostsParams, options?: ApiOptions) =>
+    requestJson<ScoredHost[]>('POST', `/beta/api/webgraph/host/similar`, body, options),
   webgraphPageIngoing: (
     query: {
       page: string;
@@ -186,6 +186,7 @@ export type ApiSearchQuery = {
   countResults?: boolean;
   fetchDiscussions?: boolean;
   flattenResponse?: boolean;
+  hostRankings?: HostRankings;
   numResults?: number;
   optic?: string;
   page?: number;
@@ -193,7 +194,6 @@ export type ApiSearchQuery = {
   returnRankingSignals?: boolean;
   safeSearch?: boolean;
   selectedRegion?: Region;
-  siteRankings?: SiteRankings;
 };
 export type ApiSearchResult =
   | (WebsitesResult & {
@@ -282,8 +282,8 @@ export type EntitySnippetFragment =
     };
 export type Example = string;
 export type ExploreExportOpticParams = {
-  chosenSites: string[];
-  similarSites: string[];
+  chosenHosts: string[];
+  similarHosts: string[];
 };
 export type FullEdge = {
   from: Node;
@@ -294,9 +294,17 @@ export type HighlightedSpellCorrection = {
   highlighted: string;
   raw: string;
 };
-export type KnowsSite =
+export type HostRankings = {
+  blocked: string[];
+  disliked: string[];
+  liked: string[];
+};
+export type HostsExportOpticParams = {
+  hostRankings: HostRankings;
+};
+export type KnowsHost =
   | {
-      site: string;
+      host: string;
       type: 'known';
     }
   | {
@@ -320,26 +328,18 @@ export type PartOfSpeechMeaning = {
 };
 export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
 export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];
-export type ScoredSite = {
+export type ScoredHost = {
   description?: string;
+  host: string;
   score: number;
-  site: string;
 };
 export type SignalScore = {
   coefficient: number;
   value: number;
 };
-export type SimilarSitesParams = {
-  sites: string[];
+export type SimilarHostsParams = {
+  hosts: string[];
   topN: number;
-};
-export type SiteRankings = {
-  blocked: string[];
-  disliked: string[];
-  liked: string[];
-};
-export type SitesExportOpticParams = {
-  siteRankings: SiteRankings;
 };
 export type Snippet =
   | {

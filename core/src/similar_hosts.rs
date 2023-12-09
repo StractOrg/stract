@@ -57,28 +57,28 @@ impl Ord for ScoredNodeID {
 
 impl Eq for ScoredNodeID {}
 
-pub struct SimilarSitesFinder {
+pub struct SimilarHostsFinder {
     webgraph: Arc<Webgraph>,
     inbound_similarity: InboundSimilarity,
-    max_similar_sites: usize,
+    max_similar_hosts: usize,
 }
 
-impl SimilarSitesFinder {
+impl SimilarHostsFinder {
     pub fn new(
         webgraph: Arc<Webgraph>,
         inbound_similarity: InboundSimilarity,
-        max_similar_sites: usize,
+        max_similar_hosts: usize,
     ) -> Self {
         Self {
             webgraph,
             inbound_similarity,
-            max_similar_sites,
+            max_similar_hosts,
         }
     }
 
-    pub fn find_similar_sites(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
+    pub fn find_similar_hosts(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
         const DEAD_LINKS_BUFFER: usize = 30;
-        let orig_limit = limit.min(self.max_similar_sites);
+        let orig_limit = limit.min(self.max_similar_hosts);
         let limit = orig_limit + nodes.len() + DEAD_LINKS_BUFFER;
 
         let nodes: Vec<_> = nodes

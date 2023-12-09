@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{autosuggest, explore, search, sites, summarize, webgraph};
+use super::{autosuggest, explore, hosts, search, summarize, webgraph};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -31,13 +31,13 @@ use utoipa_swagger_ui::SwaggerUi;
             webgraph::page::outgoing_pages,
             autosuggest::route,
             summarize::summarize_route,
-            sites::sites_export_optic,
+            hosts::hosts_export_optic,
             explore::explore_export_optic,
         ),
         components(
             schemas(
                 crate::webpage::region::Region,
-                optics::SiteRankings,
+                optics::HostRankings,
                 search::ApiSearchQuery,
                 search::ApiSearchResult,
                 crate::searcher::WebsitesResult,
@@ -74,13 +74,13 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::bangs::BangHit,
                 crate::bangs::Bang,
 
-                webgraph::host::SimilarSitesParams,
-                webgraph::KnowsSite,
-                crate::entrypoint::webgraph_server::ScoredSite,
+                webgraph::host::SimilarHostsParams,
+                webgraph::KnowsHost,
+                crate::entrypoint::webgraph_server::ScoredHost,
 
                 autosuggest::Suggestion,
 
-                sites::SitesExportOpticParams,
+                hosts::HostsExportOpticParams,
                 explore::ExploreExportOpticParams,
 
                 crate::webgraph::Node,

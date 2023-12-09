@@ -30,7 +30,7 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
       safeSearch: params.safeSearch,
       optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
       selectedRegion: params.selectedRegion,
-      siteRankings: params.siteRankings,
+      hostRankings: params.host_rankings,
       fetchDiscussions: true,
       countResults: true,
     },

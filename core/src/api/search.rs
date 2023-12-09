@@ -16,7 +16,7 @@
 
 use crate::config::defaults;
 use http::StatusCode;
-use optics::{Optic, SiteRankings};
+use optics::{HostRankings, Optic};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
@@ -33,21 +33,6 @@ use super::State;
 
 use axum::{extract, response::IntoResponse};
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
-pub struct SearchParams {
-    /// Query
-    pub q: Option<String>,
-    /// Page
-    pub p: Option<usize>,
-    /// Language
-    pub gl: Option<String>,
-    pub optic: Option<String>,
-    /// Site rankings
-    pub sr: Option<String>,
-    /// Safe search
-    pub ss: Option<bool>,
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(title = "SearchQuery", example = json!({"query": "hello world"}))]
@@ -57,7 +42,7 @@ pub struct ApiSearchQuery {
     pub num_results: Option<usize>,
     pub selected_region: Option<Region>,
     pub optic: Option<String>,
-    pub site_rankings: Option<SiteRankings>,
+    pub host_rankings: Option<HostRankings>,
     pub safe_search: Option<bool>,
 
     #[serde(default = "defaults::SearchQuery::return_ranking_signals")]
@@ -91,7 +76,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             num_results: api.num_results.unwrap_or(default.num_results),
             selected_region: api.selected_region,
             optic,
-            site_rankings: api.site_rankings,
+            host_rankings: api.host_rankings,
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             fetch_discussions: api.fetch_discussions,
@@ -131,6 +116,7 @@ pub async fn api(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(query): extract::Json<ApiSearchQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    tracing::debug!(?query);
     let flatten_result = query.flatten_response;
     let query = SearchQuery::try_from(query);
 

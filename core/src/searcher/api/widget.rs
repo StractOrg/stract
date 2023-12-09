@@ -102,7 +102,7 @@ impl WidgetManager {
             query: query.query.clone(),
             num_results: NUM_RESULTS,
             optic: Some(Optic::parse(include_str!("discussions.optic")).unwrap()),
-            site_rankings: query.site_rankings.clone(),
+            host_rankings: query.host_rankings.clone(),
             return_ranking_signals: query.return_ranking_signals,
             ..Default::default()
         };

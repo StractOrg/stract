@@ -7,8 +7,8 @@ export type SearchParams = {
   optic: string | undefined;
   selectedRegion: Region | undefined;
   safeSearch: boolean;
-  compressedSiteRankings: string | null;
-  siteRankings: RankedSites | undefined;
+  compressedhost_rankings: string | null;
+  host_rankings: RankedSites | undefined;
 };
 
 export const extractSearchParams = (searchParams: URLSearchParams | FormData): SearchParams => {
@@ -19,8 +19,8 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     | Region
     | undefined;
   const safeSearch = (searchParams.get('ss') as string | undefined) == 'true';
-  const compressedSiteRankings = (searchParams.get('sr') as string | undefined) || null;
-  const siteRankings = compressedSiteRankings ? decompressRanked(compressedSiteRankings) : void 0;
+  const compressedhost_rankings = (searchParams.get('sr') as string | undefined) || null;
+  const host_rankings = compressedhost_rankings ? decompressRanked(compressedhost_rankings) : void 0;
 
   return {
     query,
@@ -28,7 +28,7 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     optic,
     selectedRegion,
     safeSearch,
-    compressedSiteRankings,
-    siteRankings,
+    compressedhost_rankings,
+    host_rankings,
   };
 };

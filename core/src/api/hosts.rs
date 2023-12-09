@@ -16,28 +16,28 @@
 
 use axum::{extract, Json};
 use http::StatusCode;
-use optics::{Optic, SiteRankings};
+use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
 
 #[derive(serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SitesExportOpticParams {
-    site_rankings: SiteRankings,
+pub struct HostsExportOpticParams {
+    host_rankings: HostRankings,
 }
 
 #[allow(clippy::unused_async)]
 #[utoipa::path(post,
-    path = "/beta/api/sites/export",
-    request_body(content = SitesExportOpticParams),
+    path = "/beta/api/hosts/export",
+    request_body(content = HostsExportOpticParams),
     responses(
-        (status = 200, description = "Export site rankings as an optic", body = String),
+        (status = 200, description = "Export host rankings as an optic", body = String),
     )
 )]
-pub async fn sites_export_optic(
-    extract::Json(SitesExportOpticParams { site_rankings }): extract::Json<SitesExportOpticParams>,
+pub async fn hosts_export_optic(
+    extract::Json(HostsExportOpticParams { host_rankings }): extract::Json<HostsExportOpticParams>,
 ) -> Result<Json<String>, StatusCode> {
     let optic = Optic {
-        site_rankings,
+        host_rankings,
         ..Default::default()
     };
 

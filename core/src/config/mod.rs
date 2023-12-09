@@ -363,8 +363,8 @@ pub struct WebgraphServerConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 
-    #[serde(default = "defaults::WebgraphServer::max_similar_sites")]
-    pub max_similar_sites: usize,
+    #[serde(default = "defaults::WebgraphServer::max_similar_hosts")]
+    pub max_similar_hosts: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

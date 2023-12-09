@@ -53,7 +53,7 @@ impl AsMultipleTantivyQuery for Optic {
                 UnionQuery::from(
                     self.rules
                         .iter()
-                        .chain(self.site_rankings.rules().iter())
+                        .chain(self.host_rankings.rules().iter())
                         .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
                         .map(|(occur, rule)| {
                             BooleanQuery::from(vec![(occur, rule.query)]).box_clone()
@@ -65,7 +65,7 @@ impl AsMultipleTantivyQuery for Optic {
         } else {
             self.rules
                 .iter()
-                .chain(self.site_rankings.rules().iter())
+                .chain(self.host_rankings.rules().iter())
                 .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
                 .map(|(occur, rule)| (occur, rule.query))
                 .collect()
@@ -233,7 +233,7 @@ impl AsTantivyQuery for Matching {
 
 #[cfg(test)]
 mod tests {
-    use optics::{Optic, SiteRankings};
+    use optics::{HostRankings, Optic};
 
     use crate::{
         gen_temp_path,
@@ -247,7 +247,7 @@ mod tests {
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[test]
-    fn discard_and_boost_sites() {
+    fn discard_and_boost_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
@@ -574,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    fn liked_sites() {
+    fn liked_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         let mut writer = WebgraphWriter::new(
@@ -700,9 +700,9 @@ mod tests {
                 optic: Some(
                     Optic::parse(
                         r#"
-                    Like(Site("www.a.com"));
-                    Like(Site("www.b.com"));
-                    Dislike(Site("www.c.com"));
+                    Like(Domain("www.a.com"));
+                    Like(Domain("www.b.com"));
+                    Dislike(Domain("www.c.com"));
                 "#,
                     )
                     .unwrap(),
@@ -1038,7 +1038,7 @@ mod tests {
                     )
                     .unwrap(),
                 ),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec!["a.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],
@@ -1251,7 +1251,7 @@ mod tests {
     }
 
     #[test]
-    fn active_optic_with_blocked_sites() {
+    fn active_optic_with_blocked_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
@@ -1306,7 +1306,7 @@ mod tests {
                     )
                     .unwrap(),
                 ),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec![],
                     disliked: vec![],
                     blocked: vec![String::from("example.com")],

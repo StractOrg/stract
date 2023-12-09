@@ -140,7 +140,7 @@ name = "build-similarity"
 
 [[bench]]
 harness = false
-name = "similar-sites"
+name = "similar-hosts"
 
 [[bench]]
 harness = false

@@ -71,7 +71,7 @@ mod search_ctx;
 mod search_prettifier;
 pub mod searcher;
 mod simhash;
-pub mod similar_sites;
+pub mod similar_hosts;
 mod snippet;
 #[cfg(feature = "libtorch")]
 pub mod summarizer;

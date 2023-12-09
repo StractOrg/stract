@@ -61,8 +61,8 @@ export const opticsShowStore = writableLocalStorage<Record<string, boolean>>(OPT
 const ALLOW_STATS_KEY = 'allowStats';
 export const allowStatsStore = writableLocalStorage<boolean>(ALLOW_STATS_KEY, true);
 
-const SITE_RANKINGS_KEY = 'siteRankings';
-export const siteRankingsStore = writableLocalStorage<SiteRakings>(SITE_RANKINGS_KEY, {});
+const HOST_RANKINGS_KEY = 'host_rankings';
+export const hostRankingsStore = writableLocalStorage<SiteRakings>(HOST_RANKINGS_KEY, {});
 
 const SEARCH_QUERY_KEY = 'searchQuery';
 export const searchQueryStore = writableLocalStorage<string | undefined>(SEARCH_QUERY_KEY, void 0);

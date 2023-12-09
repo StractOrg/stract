@@ -58,10 +58,10 @@ use self::webgraph::RemoteWebgraph;
 mod autosuggest;
 mod docs;
 mod explore;
+mod hosts;
 pub mod improvement;
 mod metrics;
 pub mod search;
-mod sites;
 mod summarize;
 pub mod user_count;
 mod webgraph;
@@ -224,7 +224,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                     "/api/webgraph/page/outgoing",
                     post(webgraph::page::outgoing_pages),
                 )
-                .route("/api/sites/export", post(sites::sites_export_optic))
+                .route("/api/hosts/export", post(hosts::hosts_export_optic))
                 .route("/api/explore/export", post(explore::explore_export_optic))
                 .route("/api/entity_image", get(search::entity_image))
                 .layer(cors_layer()),

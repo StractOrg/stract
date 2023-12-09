@@ -7,7 +7,7 @@ host_centrality_store_path = "data/centrality"
 index_path = "data/index"
 shard_id = 0
 # linear_model_path = "data/linear_model.json"
-lambda_model_path = "data/lambdamart.txt"
+# lambda_model_path = "data/lambdamart.txt"
 
 [snippet]
 max_considered_words = 10_000

@@ -264,23 +264,23 @@ where
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
 
         if let Some(inbound_sim) = &self.inbound_similarity {
-            let liked_sites: Vec<_> = parsed_query
-                .site_rankings()
+            let liked_hosts: Vec<_> = parsed_query
+                .host_rankings()
                 .liked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
                 .map(|node| node.id())
                 .collect();
 
-            let disliked_sites: Vec<_> = parsed_query
-                .site_rankings()
+            let disliked_hosts: Vec<_> = parsed_query
+                .host_rankings()
                 .disliked
                 .iter()
                 .map(|site| Node::from(site.clone()).into_host())
                 .map(|node| node.id())
                 .collect();
 
-            let scorer = inbound_sim.scorer(&liked_sites, &disliked_sites, false);
+            let scorer = inbound_sim.scorer(&liked_hosts, &disliked_hosts, false);
 
             aggregator.set_inbound_similarity(scorer);
         }

@@ -175,7 +175,7 @@ impl Searcher {
             optic,
             page: None,
             selected_region: None,
-            site_rankings: None,
+            host_rankings: None,
             return_ranking_signals: false,
             flatten_response: false,
             safe_search: Some(false),

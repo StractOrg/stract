@@ -2,7 +2,7 @@
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
   import { api } from '$lib/api';
-  import { safeSearchStore, siteRankingsStore, postSearchStore } from '$lib/stores';
+  import { safeSearchStore, hostRankingsStore, postSearchStore } from '$lib/stores';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
@@ -35,8 +35,8 @@
   $: if (didChangeInput) lastRealQuery = query;
   $: if (browser) updateSuggestions(lastRealQuery);
 
-  const compressedRanked = derived(siteRankingsStore, ($siteRankings) =>
-    compressRanked(rankingsToRanked($siteRankings)),
+  const compressedRanked = derived(hostRankingsStore, ($host_rankings) =>
+    compressRanked(rankingsToRanked($host_rankings)),
   );
 
   const selectSuggestion = (s: string) => (query = s);
@@ -88,7 +88,7 @@
   method={$postSearchStore ? 'POST' : 'GET'}
 >
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
-  <input type="hidden" value={$compressedRanked} name="sr" id="siteRankingsUuid" />
+  <input type="hidden" value={$compressedRanked} name="sr" id="host_rankingsUuid" />
 
   <label
     for="searchbar"

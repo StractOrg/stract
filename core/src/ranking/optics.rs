@@ -16,7 +16,7 @@
 
 #[cfg(test)]
 mod tests {
-    use optics::SiteRankings;
+    use optics::HostRankings;
 
     use crate::{
         gen_temp_path,
@@ -29,7 +29,7 @@ mod tests {
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[test]
-    fn site_rankings() {
+    fn host_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         let mut wrt = WebgraphWriter::new(
@@ -164,7 +164,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],
@@ -181,7 +181,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec!["www.first.com".to_string()],
                     disliked: vec![],
                     blocked: vec![],
@@ -198,7 +198,7 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
-                site_rankings: Some(SiteRankings {
+                host_rankings: Some(HostRankings {
                     liked: vec![],
                     disliked: vec!["www.second.com".to_string()],
                     blocked: vec!["first.com".to_string()],

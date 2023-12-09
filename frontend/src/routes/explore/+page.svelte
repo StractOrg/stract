@@ -2,7 +2,7 @@
   import XMark from '~icons/heroicons/x-mark';
   import PlusCircleOutline from '~icons/heroicons/plus-circle';
   import ChevronDown from '~icons/heroicons/chevron-down';
-  import { api, type ScoredSite } from '$lib/api';
+  import { api, type ScoredHost } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -16,43 +16,43 @@
 
   let inputWebsite = '';
   let limit = LIMIT_OPTIONS[0];
-  let chosenSites: string[] = [];
-  let similarSites: ScoredSite[] = [];
+  let chosenHosts: string[] = [];
+  let similarHosts: ScoredHost[] = [];
 
   let errorMessage = false;
 
   $: {
     api
-      .webgraphHostSimilar({ sites: chosenSites, topN: limit })
-      .data.then((res) => (similarSites = res));
+      .webgraphHostSimilar({ hosts: chosenHosts, topN: limit })
+      .data.then((res) => (similarHosts = res));
   }
 
-  const removeWebsite = async (site: string) => {
-    if (chosenSites.includes(site)) {
-      chosenSites = chosenSites.filter((s) => s != site);
+  const removeWebsite = async (host: string) => {
+    if (chosenHosts.includes(host)) {
+      chosenHosts = chosenHosts.filter((s) => s != host);
     }
   };
-  const addWebsite = async (site: string, clear = false) => {
+  const addWebsite = async (host: string, clear = false) => {
     errorMessage = false;
-    site = site.trim();
-    if (!site) return;
+    host = host.trim();
+    if (!host) return;
 
-    const result = await api.webgraphHostKnows({ site }).data;
+    const result = await api.webgraphHostKnows({ host }).data;
     match(result)
       .with({ type: 'unknown' }, () => {
         errorMessage = true;
       })
-      .with({ type: 'known' }, async ({ site }) => {
+      .with({ type: 'known' }, async ({ host }) => {
         if (clear) inputWebsite = '';
-        if (!chosenSites.includes(site)) chosenSites = [...chosenSites, site];
+        if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
       })
       .exhaustive();
   };
 
   const exportAsOptic = async () => {
     const { data } = api.exploreExport({
-      chosenSites,
-      similarSites: similarSites.map((site) => site.site),
+      chosenHosts: chosenHosts,
+      similarHosts: similarHosts.map((host) => host.host),
     });
     const optic = await data;
     const { default: fileSaver } = await import('file-saver');
@@ -100,11 +100,11 @@
         </div>
       {/if}
       <div class="flex flex-wrap justify-center gap-x-5 gap-y-3" id="sites-list">
-        {#each chosenSites as site (site)}
+        {#each chosenHosts as site (site)}
           <div transition:slide={{ duration: 100 }} animate:flip={{ duration: 200 }}>
             <Site
               href="http://{site}"
-              on:delete={() => (chosenSites = chosenSites.filter((s) => s != site))}
+              on:delete={() => (chosenHosts = chosenHosts.filter((s) => s != site))}
             >
               {site}
             </Site>
@@ -113,7 +113,7 @@
       </div>
     </div>
 
-    {#if chosenSites.length > 0 && similarSites.length > 0}
+    {#if chosenHosts.length > 0 && similarHosts.length > 0}
       <div class="flex flex-col space-y-4">
         <div class="grid grid-cols-[auto_auto_1fr_auto] items-center gap-5">
           <h2 class="text-2xl font-bold">Similar sites</h2>
@@ -129,7 +129,7 @@
           <Button on:click={exportAsOptic}>Export as optic</Button>
         </div>
         <div class="grid items-center gap-y-2">
-          {#each similarSites as site (site.site)}
+          {#each similarHosts as host (host.host)}
             <div
               class="col-span-full grid grid-cols-[auto_auto_minmax(auto,66%)] items-center gap-x-3"
               transition:fade={{ duration: 200 }}
@@ -139,21 +139,21 @@
                 <button
                   class={twJoin('group')}
                   on:click={() =>
-                    chosenSites.includes(site.site)
-                      ? removeWebsite(site.site)
-                      : addWebsite(site.site)}
+                    chosenHosts.includes(host.host)
+                      ? removeWebsite(host.host)
+                      : addWebsite(host.host)}
                 >
                   <PlusCircleOutline
                     class={twJoin(
                       'text-xl transition group-hover:scale-105 group-active:scale-95',
-                      chosenSites.includes(site.site) ? 'rotate-45 text-error' : 'text-success',
+                      chosenHosts.includes(host.host) ? 'rotate-45 text-error' : 'text-success',
                     )}
                   />
                 </button>
               </div>
-              <span>{site.score.toFixed(2)}</span>
+              <span>{host.score.toFixed(2)}</span>
               <div class="flex">
-                <a href="http://{site.site}" target="_blank" class="underline">{site.site}</a>
+                <a href="http://{host.host}" target="_blank" class="underline">{host.host}</a>
               </div>
             </div>
           {/each}

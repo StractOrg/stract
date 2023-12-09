@@ -109,7 +109,7 @@ impl Crawler {
 pub struct WebgraphServer;
 
 impl WebgraphServer {
-    pub fn max_similar_sites() -> usize {
+    pub fn max_similar_hosts() -> usize {
         1_000
     }
 }

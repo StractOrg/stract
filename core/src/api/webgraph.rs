@@ -54,34 +54,34 @@ pub mod host {
 
     #[derive(serde::Deserialize, ToSchema)]
     #[serde(rename_all = "camelCase")]
-    pub struct SimilarSitesParams {
-        pub sites: Vec<String>,
+    pub struct SimilarHostsParams {
+        pub hosts: Vec<String>,
         pub top_n: usize,
     }
 
     #[derive(serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
-    pub struct KnowsSiteParams {
-        pub site: String,
+    pub struct KnowsHostParams {
+        pub host: String,
     }
 
     #[derive(serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
     pub struct HostLinksParams {
-        pub site: String,
+        pub host: String,
     }
 
     #[allow(clippy::unused_async)]
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/similar",
-        request_body(content = SimilarSitesParams),
+        request_body(content = SimilarHostsParams),
         responses(
-            (status = 200, description = "List of similar sites", body = Vec<ScoredSite>),
+            (status = 200, description = "List of similar hosts", body = Vec<ScoredHost>),
         )
     )]
     pub async fn similar(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Json(params): extract::Json<SimilarSitesParams>,
+        extract::Json(params): extract::Json<SimilarHostsParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         state.counters.explore_counter.inc();
         let host = state
@@ -104,8 +104,8 @@ pub mod host {
 
         match conn
             .send_with_timeout(
-                &crate::entrypoint::webgraph_server::SimilarSites {
-                    sites: params.sites,
+                &crate::entrypoint::webgraph_server::SimilarHosts {
+                    hosts: params.hosts,
                     top_n: params.top_n,
                 },
                 Duration::from_secs(60),
@@ -122,14 +122,14 @@ pub mod host {
 
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/knows",
-        params(KnowsSiteParams),
+        params(KnowsHostParams),
         responses(
-            (status = 200, description = "Whether the site is known", body = KnowsSite),
+            (status = 200, description = "Whether the host is known", body = KnowsHost),
         )
     )]
     pub async fn knows(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Query(params): extract::Query<KnowsSiteParams>,
+        extract::Query(params): extract::Query<KnowsHostParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let host = state
             .remote_webgraph
@@ -151,17 +151,17 @@ pub mod host {
 
         match conn
             .send_with_timeout(
-                &crate::entrypoint::webgraph_server::Knows { site: params.site },
+                &crate::entrypoint::webgraph_server::Knows { host: params.host },
                 Duration::from_secs(60),
             )
             .await
         {
-            Ok(Some(node)) => Ok(Json(KnowsSite::Known { site: node.name })),
+            Ok(Some(node)) => Ok(Json(KnowsHost::Known { host: node.name })),
             Err(err) => {
                 tracing::error!("Failed to send request to webgraph: {}", err);
-                Ok(Json(KnowsSite::Unknown))
+                Ok(Json(KnowsHost::Unknown))
             }
-            _ => Ok(Json(KnowsSite::Unknown)),
+            _ => Ok(Json(KnowsHost::Unknown)),
         }
     }
 
@@ -176,7 +176,7 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<HostLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.site).into_host();
+        let node = Node::from(params.host).into_host();
         let links = ingoing_links(state, node, GraphLevel::Host)
             .await
             .map_err(|_| {
@@ -198,7 +198,7 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<HostLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.site).into_host();
+        let node = Node::from(params.host).into_host();
         let links = outgoing_links(state, node, GraphLevel::Host)
             .await
             .map_err(|_| {
@@ -326,7 +326,7 @@ async fn outgoing_links(
 
 #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum KnowsSite {
-    Known { site: String },
+pub enum KnowsHost {
+    Known { host: String },
     Unknown,
 }

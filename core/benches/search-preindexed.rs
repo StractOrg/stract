@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use optics::SiteRankings;
+use optics::HostRankings;
 use stract::{
     index::Index,
     ranking::inbound_similarity::InboundSimilarity,
@@ -21,13 +21,13 @@ macro_rules! bench {
                 $searcher
                     .search(&SearchQuery {
                         query: $query.to_string(),
-                        site_rankings: Some(SiteRankings {
+                        host_rankings: Some(HostRankings {
                             liked: vec![
                                 "docs.rs".to_string(),
-                                "news.ycombinator.com".to_string(),
-                                "pubmed.ncbi.nlm.nih.gov".to_string(),
+                                "ycombinator.com".to_string(),
+                                "nih.gov".to_string(),
                             ],
-                            disliked: vec!["www.pinterest.com".to_string()],
+                            disliked: vec!["pinterest.com".to_string()],
                             blocked: vec![],
                         }),
                         ..Default::default()

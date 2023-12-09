@@ -3,7 +3,7 @@
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
   import { rankingsToRanked } from '$lib/rankings';
-  import { siteRankingsStore } from '$lib/stores';
+  import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import { derived } from 'svelte/store';
 
@@ -34,22 +34,22 @@
     { text: 'Clear and export as optic', clear: true },
   ] as const;
 
-  const ranked = derived(siteRankingsStore, ($rankings) => rankingsToRanked($rankings));
+  const ranked = derived(hostRankingsStore, ($rankings) => rankingsToRanked($rankings));
 
   const unrankSite = (site: string) => () => {
-    siteRankingsStore.update(($rankings) => ({ ...$rankings, [site]: void 0 }));
+    hostRankingsStore.update(($rankings) => ({ ...$rankings, [site]: void 0 }));
   };
 
   const clearAndExport =
     ({ clear }: { clear: boolean }) =>
     async () => {
-      const { data } = api.sitesExport({
-        siteRankings: $ranked,
+      const { data } = api.hostsExport({
+        hostRankings: $ranked,
       });
       const { default: fileSaver } = await import('file-saver');
       fileSaver.saveAs(new Blob([await data]), 'exported.optic');
 
-      if (clear) siteRankingsStore.set({});
+      if (clear) hostRankingsStore.set({});
     };
 </script>
 

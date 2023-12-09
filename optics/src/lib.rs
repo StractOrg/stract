@@ -17,10 +17,9 @@
 pub mod ast;
 mod lexer;
 
-use std::convert::TryFrom;
-
 use ast::RankingCoeff;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use thiserror::Error;
 use utoipa::ToSchema;
 
@@ -81,13 +80,13 @@ impl TryFrom<RawOptic> for Optic {
             rules.push(Rule::try_from(rule)?);
         }
 
-        let mut liked_sites = Vec::new();
-        let mut disliked_sites = Vec::new();
+        let mut liked_hosts = Vec::new();
+        let mut disliked_hosts = Vec::new();
 
-        for pref in raw.site_preferences {
+        for pref in raw.host_preferences {
             match pref {
-                ast::RawSitePreference::Like(site) => liked_sites.push(site),
-                ast::RawSitePreference::Dislike(site) => disliked_sites.push(site),
+                ast::RawHostPreference::Like(host) => liked_hosts.push(host),
+                ast::RawHostPreference::Dislike(host) => disliked_hosts.push(host),
             }
         }
 
@@ -95,10 +94,10 @@ impl TryFrom<RawOptic> for Optic {
             rules,
             rankings: raw.rankings,
             discard_non_matching: raw.discard_non_matching,
-            site_rankings: SiteRankings {
-                liked: liked_sites,
-                disliked: disliked_sites,
-                blocked: Vec::new(), // blocked sites are handled by `$discard` syntax.
+            host_rankings: HostRankings {
+                liked: liked_hosts,
+                disliked: disliked_hosts,
+                blocked: Vec::new(), // blocked hosts are handled by `$discard` syntax.
             },
         })
     }
@@ -315,7 +314,7 @@ impl ToString for Action {
 #[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize)]
 pub struct Optic {
     pub rankings: Vec<RankingCoeff>,
-    pub site_rankings: SiteRankings,
+    pub host_rankings: HostRankings,
     pub rules: Vec<Rule>,
     pub discard_non_matching: bool,
 }
@@ -342,7 +341,7 @@ impl ToString for Optic {
             res.push_str(&format!("{};\n", ranking.to_string()));
         }
 
-        res.push_str(&self.site_rankings.to_string());
+        res.push_str(&self.host_rankings.to_string());
 
         res
     }
@@ -376,22 +375,22 @@ impl ToString for Rule {
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SiteRankings {
+pub struct HostRankings {
     pub liked: Vec<String>,
     pub disliked: Vec<String>,
     pub blocked: Vec<String>,
 }
 
-impl ToString for SiteRankings {
+impl ToString for HostRankings {
     fn to_string(&self) -> String {
         let mut res = String::new();
 
         for liked in &self.liked {
-            res.push_str(&format!("Like(Site(\"{}\"));\n", liked));
+            res.push_str(&format!("Like(Domain(\"{}\"));\n", liked));
         }
 
         for disliked in &self.disliked {
-            res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
+            res.push_str(&format!("Dislike(Domain(\"{}\"));\n", disliked));
         }
 
         for blocked in &self.blocked {
@@ -402,7 +401,7 @@ impl ToString for SiteRankings {
                         PatternPart::Raw(blocked.clone()),
                         PatternPart::Anchor,
                     ],
-                    location: MatchLocation::Site,
+                    location: MatchLocation::Domain,
                 }],
                 action: Action::Discard,
             };
@@ -414,15 +413,15 @@ impl ToString for SiteRankings {
     }
 }
 
-impl SiteRankings {
+impl HostRankings {
     pub fn rules(&self) -> Vec<Rule> {
         self.blocked
             .iter()
-            .map(|site| Rule {
+            .map(|host| Rule {
                 matches: vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
-                        PatternPart::Raw(site.clone()),
+                        PatternPart::Raw(host.clone()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Domain,
@@ -434,21 +433,21 @@ impl SiteRankings {
 
     pub fn into_optic(self) -> Optic {
         Optic {
-            site_rankings: self,
+            host_rankings: self,
             ..Default::default()
         }
     }
 
-    pub fn merge_into(&mut self, site_rankings: SiteRankings) {
-        self.liked.extend(site_rankings.liked);
-        self.disliked.extend(site_rankings.disliked);
-        self.blocked.extend(site_rankings.blocked);
+    pub fn merge_into(&mut self, host_rankings: HostRankings) {
+        self.liked.extend(host_rankings.liked);
+        self.disliked.extend(host_rankings.disliked);
+        self.blocked.extend(host_rankings.blocked);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::RankingTarget;
+    use crate::ast::{RankingCoeff, RankingTarget};
 
     use super::*;
     #[test]
@@ -482,7 +481,7 @@ mod tests {
                 target: RankingTarget::Signal("bm25".to_string()),
                 value: 1.0,
             }],
-            site_rankings: SiteRankings {
+            host_rankings: HostRankings {
                 liked: vec!["liked.com".to_string()],
                 disliked: vec!["disliked.com".to_string()],
                 blocked: vec![],

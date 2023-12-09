@@ -62,7 +62,7 @@ impl ToString for RankingCoeff {
 pub struct RawOptic {
     pub rules: Vec<RawRule>,
     pub rankings: Vec<RankingCoeff>,
-    pub site_preferences: Vec<RawSitePreference>,
+    pub host_preferences: Vec<RawHostPreference>,
     pub discard_non_matching: bool,
 }
 
@@ -70,14 +70,14 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
     fn from(blocks: Vec<RawOpticBlock>) -> Self {
         let mut rules = Vec::new();
         let mut rankings = Vec::new();
-        let mut site_preferences = Vec::new();
+        let mut host_preferences = Vec::new();
         let mut discard_non_matching = false;
 
         for block in blocks {
             match block {
                 RawOpticBlock::Ranking(ranking) => rankings.push(ranking),
                 RawOpticBlock::Rule(rule) => rules.push(rule),
-                RawOpticBlock::SitePreference(pref) => site_preferences.push(pref),
+                RawOpticBlock::HostPreference(pref) => host_preferences.push(pref),
                 RawOpticBlock::DiscardNonMatching => discard_non_matching = true,
             }
         }
@@ -85,7 +85,7 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
         RawOptic {
             rankings,
             rules,
-            site_preferences,
+            host_preferences,
             discard_non_matching,
         }
     }
@@ -94,7 +94,7 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
 #[derive(Debug)]
 pub enum RawOpticBlock {
     Rule(RawRule),
-    SitePreference(RawSitePreference),
+    HostPreference(RawHostPreference),
     Ranking(RankingCoeff),
     DiscardNonMatching,
 }
@@ -106,7 +106,7 @@ pub struct RawRule {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum RawSitePreference {
+pub enum RawHostPreference {
     Like(String),
     Dislike(String),
 }
@@ -219,7 +219,7 @@ mod tests {
                         value: 100.0,
                     },
                 ],
-                site_preferences: vec![],
+                host_preferences: vec![],
                 discard_non_matching: false,
             }
         );
@@ -261,7 +261,7 @@ mod tests {
                     },
                 ],
                 rankings: vec![],
-                site_preferences: vec![],
+                host_preferences: vec![],
                 discard_non_matching: false,
             }
         );
@@ -304,7 +304,7 @@ mod tests {
                     },
                 ],
                 rankings: vec![],
-                site_preferences: vec![],
+                host_preferences: vec![],
                 discard_non_matching: true,
             }
         );

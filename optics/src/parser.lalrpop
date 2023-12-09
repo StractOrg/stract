@@ -19,7 +19,7 @@ pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
 Block: RawOpticBlock = {
     <Rule> => RawOpticBlock::Rule(<>),
     <Ranking> => RawOpticBlock::Ranking(<>),
-    <SitePreference> => RawOpticBlock::SitePreference(<>),
+    <HostPreference> => RawOpticBlock::HostPreference(<>),
     "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
 }
 
@@ -87,9 +87,9 @@ RankingTarget: RankingTarget = {
     "Signal" "(" <StringLiteral> ")" => RankingTarget::Signal(<>.to_string()),
 }
 
-SitePreference: RawSitePreference = {
-    "Like" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Like(<>.to_string()),
-    "Dislike" "(" "Site" "(" <StringLiteral> ")" ")" => RawSitePreference::Dislike(<>.to_string())
+HostPreference: RawHostPreference = {
+    "Like" "(" "Domain" "(" <StringLiteral> ")" ")" => RawHostPreference::Like(<>.to_string()),
+    "Dislike" "(" "Domain" "(" <StringLiteral> ")" ")" => RawHostPreference::Dislike(<>.to_string())
 }
 
 extern {

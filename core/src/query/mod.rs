@@ -24,7 +24,7 @@ use crate::{
     webpage::{region::Region, safety_classifier},
     Result,
 };
-use optics::{Optic, SiteRankings};
+use optics::{HostRankings, Optic};
 use std::collections::HashMap;
 use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
 
@@ -48,7 +48,7 @@ pub struct Query {
     terms: Vec<Box<Term>>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
-    site_rankings: SiteRankings,
+    host_rankings: HostRankings,
     offset: usize,
     region: Option<Region>,
     optics: Vec<Optic>,
@@ -141,7 +141,7 @@ impl Query {
             .collect();
 
         let mut optics = Vec::new();
-        if let Some(site_rankigns_optic) = query.site_rankings.clone().map(|sr| sr.into_optic()) {
+        if let Some(site_rankigns_optic) = query.host_rankings.clone().map(|sr| sr.into_optic()) {
             optics.push(site_rankigns_optic);
         }
 
@@ -157,8 +157,8 @@ impl Query {
 
         Ok(Query {
             terms,
-            site_rankings: optics.iter().fold(SiteRankings::default(), |mut acc, el| {
-                acc.merge_into(el.site_rankings.clone());
+            host_rankings: optics.iter().fold(HostRankings::default(), |mut acc, el| {
+                acc.merge_into(el.host_rankings.clone());
                 acc
             }),
             simple_terms_text,
@@ -203,8 +203,8 @@ impl Query {
         self.region.as_ref()
     }
 
-    pub fn site_rankings(&self) -> &SiteRankings {
-        &self.site_rankings
+    pub fn host_rankings(&self) -> &HostRankings {
+        &self.host_rankings
     }
 
     pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {

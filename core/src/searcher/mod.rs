@@ -21,7 +21,7 @@ pub mod local;
 
 pub use distributed::*;
 pub use local::*;
-use optics::{Optic, SiteRankings};
+use optics::{HostRankings, Optic};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -67,7 +67,7 @@ pub struct SearchQuery {
     pub num_results: usize,
     pub selected_region: Option<Region>,
     pub optic: Option<Optic>,
-    pub site_rankings: Option<SiteRankings>,
+    pub host_rankings: Option<HostRankings>,
     pub return_ranking_signals: bool,
     pub safe_search: bool,
     pub fetch_discussions: bool,
@@ -94,7 +94,7 @@ impl Default for SearchQuery {
             num_results: NUM_RESULTS_PER_PAGE,
             selected_region: Default::default(),
             optic: Default::default(),
-            site_rankings: Default::default(),
+            host_rankings: Default::default(),
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
             fetch_discussions: defaults::SearchQuery::fetch_discussions(),
