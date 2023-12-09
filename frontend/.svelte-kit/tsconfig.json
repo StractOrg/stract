@@ -22,12 +22,14 @@
 		],
 		"moduleResolution": "node",
 		"module": "esnext",
+		"noEmit": true,
 		"target": "esnext",
 		"ignoreDeprecations": "5.0"
 	},
 	"include": [
 		"ambient.d.ts",
 		"./types/**/$types.d.ts",
+		"../vite.config.js",
 		"../vite.config.ts",
 		"../src/**/*.js",
 		"../src/**/*.ts",

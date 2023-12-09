@@ -65,6 +65,8 @@ pub struct Info {
     definition: Definition,
     examples: Vec<Example>,
     similar: Vec<Id>,
+    hyponyms: Vec<Id>,
+    hypernyms: Vec<Id>,
     pos: PartOfSpeech,
 }
 
@@ -108,6 +110,7 @@ impl Graph {
     }
 }
 
+#[derive(Debug)]
 struct EdgeQuery<'a> {
     to: NodeQuery<'a>,
     label: &'a str,
@@ -116,6 +119,14 @@ struct EdgeQuery<'a> {
 struct NodeQuery<'a> {
     node: &'a Node,
     graph: &'a Graph,
+}
+
+impl std::fmt::Debug for NodeQuery<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NodeQuery")
+            .field("node", &self.node)
+            .finish()
+    }
 }
 
 impl<'a> NodeQuery<'a> {
@@ -215,6 +226,16 @@ impl Dictionary {
         None
     }
 
+    fn ids2lemmas(&self, ids: &[Id]) -> Vec<Lemma> {
+        ids.iter()
+            .filter_map(|id| self.get_by_id(id.clone()))
+            .filter_map(|i| self.reverse_lemmas.get(&i.id))
+            .flatten()
+            .filter_map(|l| self.spellings.get(l))
+            .cloned()
+            .collect()
+    }
+
     pub fn lookup(&self, query: &str) -> Option<ThesaurusWidget> {
         let query = self.query_lemma(query)?;
         let lemma = Lemma(query);
@@ -234,16 +255,12 @@ impl Dictionary {
                 .push(WordMeaning {
                     definition: info.definition.clone(),
                     examples: info.examples.clone(),
-                    similar: info
-                        .similar
-                        .iter()
-                        .filter_map(|id| self.get_by_id(id.clone()))
-                        .filter_map(|i| self.reverse_lemmas.get(&i.id))
-                        .flatten()
-                        .filter_map(|l| self.spellings.get(l))
-                        .filter(|&l| l != &lemma)
-                        .cloned()
+                    similar: self
+                        .ids2lemmas(&info.similar)
+                        .into_iter()
+                        .filter(|l| l != &lemma)
                         .dedup_by(|a, b| a == b)
+                        .take(5)
                         .collect(),
                 });
         }
@@ -308,6 +325,7 @@ impl Dictionary {
         let value_str_regex = regex::Regex::new(r#""(.*)"@"#).unwrap();
 
         for entry in lexical_entries {
+            dbg!(&entry);
             let entry = NodeQuery::new(entry, &graph);
 
             let written_rep = entry
@@ -382,8 +400,22 @@ impl Dictionary {
                     .map(Example)
                     .collect();
 
+                dbg!(&concept.edges());
+
                 let similar: Vec<_> = concept
                     .filtered_edges(|e| e.label.contains("#similar"))
+                    .into_iter()
+                    .map(|e| Id(e.to.node.0.clone()))
+                    .collect();
+
+                let hyponyms: Vec<_> = concept
+                    .filtered_edges(|e| e.label.contains("#hyponym"))
+                    .into_iter()
+                    .map(|e| Id(e.to.node.0.clone()))
+                    .collect();
+
+                let hypernyms: Vec<_> = concept
+                    .filtered_edges(|e| e.label.contains("#hypernym"))
                     .into_iter()
                     .map(|e| Id(e.to.node.0.clone()))
                     .collect();
@@ -414,6 +446,8 @@ impl Dictionary {
                     definition,
                     examples,
                     similar,
+                    hyponyms,
+                    hypernyms,
                     pos,
                 };
 
