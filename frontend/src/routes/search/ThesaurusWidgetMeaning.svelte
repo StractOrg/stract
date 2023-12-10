@@ -4,11 +4,11 @@
     export let meaning: WordMeaning;
 </script>
 <div>
-    <div>
+    <div class="text-sm">
         {meaning.definition}
     </div>
     {#if meaning.similar.length > 0}
-        <div class="flex space-x-1 text-sm">
+        <div class="flex space-x-1 text-xs">
         <div class="font-medium text-primary-focus">Similar:</div>
         <div class="inline-block space-x-1">
             {#each meaning.similar as similar}
@@ -24,7 +24,7 @@
         </div>
         </div>
     {:else if meaning.examples.length > 0}
-        <div class="text-sm text-neutral-focus/60">
+        <div class="text-xs text-neutral-focus">
         "{meaning.examples[0]}"
         </div>
     {/if}

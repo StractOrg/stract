@@ -16,7 +16,7 @@
     form="searchbar-form"
     id="region-selector"
     name="gl"
-    class="m-0 font-light text-neutral-focus text-sm"
+    class="m-0 text-neutral-focus text-sm cursor-pointer"
     submitOnChange={searchOnChange}
     bind:value={selected}
     {options}

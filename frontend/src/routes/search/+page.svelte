@@ -146,20 +146,19 @@
     class="m-0 grid w-full gap-y-6 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
     style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
   >
-    <div class="flex max-w-2xl flex-col space-y-2">
+    <div class="flex max-w-2xl flex-col space-y-1">
       <div class="w-full">
         <Searchbar {query} />
       </div>
       <div class="mx-auto flex w-full justify-between">
-        <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
+        <div class="flex h-full flex-col justify-center space-x-2 text-xs text-neutral">
           <p class="h-fit">
             {#if results.numHits != null}
-              Found {results.numHits.toLocaleString()} results in {(
+              Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in <span class="font-medium">{(
                 (results.searchDurationMs ?? 0) / 1000
-              ).toFixed(2)}
-              seconds
+              ).toFixed(2)}s</span>
             {:else}
-              Search took {((results.searchDurationMs ?? 0) / 1000).toFixed(2)} seconds
+              Search took <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span>
             {/if}
           </p>
         </div>

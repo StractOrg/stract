@@ -154,10 +154,6 @@ where
         }
     }
 
-    pub fn build_spell_dict(&mut self) {
-        todo!("Spell checker is not implemented yet")
-    }
-
     pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
         self.entity_index = Some(entity_index);
     }

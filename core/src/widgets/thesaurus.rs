@@ -325,7 +325,6 @@ impl Dictionary {
         let value_str_regex = regex::Regex::new(r#""(.*)"@"#).unwrap();
 
         for entry in lexical_entries {
-            dbg!(&entry);
             let entry = NodeQuery::new(entry, &graph);
 
             let written_rep = entry
@@ -399,8 +398,6 @@ impl Dictionary {
                     })
                     .map(Example)
                     .collect();
-
-                dbg!(&concept.edges());
 
                 let similar: Vec<_> = concept
                     .filtered_edges(|e| e.label.contains("#similar"))

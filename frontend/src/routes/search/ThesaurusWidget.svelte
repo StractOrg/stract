@@ -97,7 +97,7 @@
       {/if}
     </button>
     {/if}
-    <div class="float-right mt-1 text-[0.75rem] italic text-neutral">
+    <div class="float-right mt-1 text-xs italic text-neutral">
       Data from <a href="https://en-word.net/" class="hover:underline">Open English WordNet</a> and
       <a href="https://wordnet.princeton.edu/" class="hover:underline">Princeton WordNet</a>
     </div>
