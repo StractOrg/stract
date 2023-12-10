@@ -811,6 +811,10 @@ impl Webgraph {
         self.id2node.keys()
     }
 
+    pub fn par_nodes(&self) -> impl ParallelIterator<Item = NodeID> + '_ {
+        self.id2node.keys().par_bridge()
+    }
+
     pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
         self.id2node.iter().map(|(id, node)| (node, id))
     }

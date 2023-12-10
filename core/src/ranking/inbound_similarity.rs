@@ -24,8 +24,8 @@ use std::{
 use dashmap::DashMap;
 use fnv::FnvHashMap as HashMap;
 use fnv::FnvHashSet as HashSet;
-use rayon::prelude::ParallelIterator;
-use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     webgraph::{NodeID, Webgraph},
@@ -36,26 +36,23 @@ use super::bitvec_similarity;
 
 #[derive(Clone)]
 pub struct Scorer {
-    similarity: bitvec_similarity::BitVecSimilarity,
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
-    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
-    cache: HashMap<NodeID, f64>,
+
+    similarities: Arc<CommutativeMap<NodeID, f64>>,
     normalized: bool,
 }
 
 #[derive(Debug, Clone)]
 struct NodeScorer {
     node: NodeID,
-    inbound: bitvec_similarity::BitVec,
     self_score: f64,
 }
 
 impl NodeScorer {
-    fn new(node: NodeID, inbound: bitvec_similarity::BitVec) -> Self {
+    fn new(node: NodeID) -> Self {
         Self {
             node,
-            inbound,
             self_score: 1.0,
         }
     }
@@ -64,38 +61,31 @@ impl NodeScorer {
         self.self_score = self_score;
     }
 
-    fn sim(
-        &self,
-        other: &NodeID,
-        other_inbound: &bitvec_similarity::BitVec,
-        similarity: &mut bitvec_similarity::BitVecSimilarity,
-    ) -> f64 {
+    fn sim(&self, other: &NodeID, similarities: &CommutativeMap<NodeID, f64>) -> f64 {
         if self.node == *other {
             self.self_score
         } else {
-            similarity.sim(&self.inbound, other_inbound)
+            similarities
+                .get(&(self.node, *other))
+                .copied()
+                .unwrap_or_default()
         }
     }
 }
 
 impl Scorer {
-    fn calculate_score(&mut self, node: &NodeID) -> f64 {
-        let s = match self.vectors.get(node) {
-            Some(vec) => {
-                (self.disliked.len() as f64)
-                    + (self
-                        .liked
-                        .iter()
-                        .map(|liked| liked.sim(node, vec, &mut self.similarity))
-                        .sum::<f64>()
-                        - self
-                            .disliked
-                            .iter()
-                            .map(|disliked| disliked.sim(node, vec, &mut self.similarity))
-                            .sum::<f64>())
-            }
-            None => 0.0,
-        };
+    pub fn score(&mut self, node: &NodeID) -> f64 {
+        let s = (self.disliked.len() as f64)
+            + (self
+                .liked
+                .iter()
+                .map(|liked| liked.sim(node, &self.similarities))
+                .sum::<f64>()
+                - self
+                    .disliked
+                    .iter()
+                    .map(|disliked| disliked.sim(node, &self.similarities))
+                    .sum::<f64>());
 
         if self.normalized {
             s / self.liked.len().max(1) as f64
@@ -103,15 +93,6 @@ impl Scorer {
             s
         }
         .max(0.0)
-    }
-    pub fn score(&mut self, node: &NodeID) -> f64 {
-        if let Some(cached) = self.cache.get(node) {
-            return *cached;
-        }
-
-        let score = self.calculate_score(node);
-        self.cache.insert(*node, score);
-        score
     }
 
     pub fn set_self_score(&mut self, self_score: f64) {
@@ -125,13 +106,69 @@ impl Scorer {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct InboundSimilarity {
-    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+struct OrderedTuple<T> {
+    elements: (T, T),
 }
 
-impl InboundSimilarity {
-    pub fn build(graph: &Webgraph) -> Self {
+impl<T> OrderedTuple<T>
+where
+    T: PartialEq + Eq + PartialOrd + Ord + std::hash::Hash + Copy,
+{
+    fn new(elements: (T, T)) -> Self {
+        if elements.0 > elements.1 {
+            Self {
+                elements: (elements.1, elements.0),
+            }
+        } else {
+            Self { elements }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct CommutativeMap<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    map: fnv::FnvHashMap<OrderedTuple<K>, V>,
+}
+
+impl<K, V> Default for CommutativeMap<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn default() -> Self {
+        Self {
+            map: fnv::FnvHashMap::default(),
+        }
+    }
+}
+
+impl<K, V> CommutativeMap<K, V>
+where
+    K: PartialEq + Eq + PartialOrd + Ord + std::hash::Hash + Copy + Serialize + DeserializeOwned,
+    V: Copy + Serialize + DeserializeOwned,
+{
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn insert(&mut self, key: (K, K), value: V) {
+        self.map.insert(OrderedTuple::new(key), value);
+    }
+
+    fn get(&self, key: &(K, K)) -> Option<&V> {
+        self.map.get(&OrderedTuple::new(*key))
+    }
+}
+
+struct VecMap {
+    vectors: HashMap<NodeID, bitvec_similarity::BitVec>,
+}
+
+impl VecMap {
+    fn build(graph: &Webgraph) -> Self {
         let mut vectors = HashMap::default();
 
         let adjacency: DashMap<NodeID, HashSet<NodeID>> = DashMap::new();
@@ -147,8 +184,65 @@ impl InboundSimilarity {
             );
         }
 
+        Self { vectors }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct InboundSimilarity {
+    similarities: Arc<CommutativeMap<NodeID, f64>>,
+    known: HashSet<NodeID>,
+}
+
+impl InboundSimilarity {
+    pub fn build(graph: &Webgraph) -> Self {
+        let inbound = VecMap::build(graph);
+
+        tracing::info!("Pre-calculating inbound similarities");
+        let pb = indicatif::ProgressBar::new(graph.nodes().count() as u64);
+        let sims: DashMap<OrderedTuple<NodeID>, f64> = graph
+            .par_nodes()
+            .flat_map(|node_id| {
+                pb.tick();
+                match inbound.vectors.get(&node_id) {
+                    Some(node_inb) => graph
+                        .raw_ingoing_edges(&node_id)
+                        .into_iter()
+                        .flat_map(|edge| {
+                            graph
+                                .raw_outgoing_edges(&edge.from)
+                                .into_iter()
+                                .map(|edge| edge.to)
+                        })
+                        .filter(|candidate| *candidate != node_id)
+                        .map(|candidate| {
+                            let candidate_inb = inbound.vectors.get(&candidate).unwrap();
+
+                            let sim = node_inb.sim(candidate_inb);
+
+                            (OrderedTuple::new((node_id, candidate)), sim)
+                        })
+                        .collect(),
+                    None => vec![],
+                }
+            })
+            .collect();
+
+        pb.finish_and_clear();
+
+        let mut similarities = CommutativeMap::new();
+        let mut known = HashSet::default();
+
+        for (key, value) in sims {
+            similarities.insert(key.elements, value);
+
+            known.insert(key.elements.0);
+            known.insert(key.elements.1);
+        }
+
         Self {
-            vectors: Arc::new(vectors),
+            similarities: Arc::new(similarities),
+            known,
         }
     }
 
@@ -160,22 +254,18 @@ impl InboundSimilarity {
     ) -> Scorer {
         let liked: Vec<_> = liked_hosts
             .iter()
-            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .map(|node| NodeScorer::new(*node))
             .collect();
 
         let disliked: Vec<_> = disliked_hosts
             .iter()
-            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .map(|node| NodeScorer::new(*node))
             .collect();
 
         Scorer {
-            similarity: bitvec_similarity::BitVecSimilarity::default(),
             liked,
             disliked,
-            vectors: self.vectors.clone(),
-            cache: HashMap::default(),
+            similarities: self.similarities.clone(),
             normalized,
         }
     }
@@ -194,10 +284,6 @@ impl InboundSimilarity {
         Ok(())
     }
 
-    pub fn get(&self, node: &NodeID) -> Option<&bitvec_similarity::BitVec> {
-        self.vectors.get(node)
-    }
-
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
@@ -209,7 +295,7 @@ impl InboundSimilarity {
     }
 
     pub fn knows_about(&self, node_id: NodeID) -> bool {
-        self.vectors.contains_key(&node_id)
+        self.known.contains(&node_id)
     }
 }
 

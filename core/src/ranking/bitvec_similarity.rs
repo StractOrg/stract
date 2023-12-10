@@ -17,11 +17,6 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::hyperloglog::{self, HyperLogLog};
-
-const HYPERLOGLOG_REGISTERS: usize = 2048;
-const MIN_POSTING_SIZE_HYPERLOGLOG: usize = 1024000;
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
     data: Vec<u64>,
@@ -132,21 +127,11 @@ impl Posting {
 
         std::cmp::min(index, self.ranks.len())
     }
-
-    fn len(&self) -> usize {
-        self.ranks.len()
-    }
-}
-
-#[derive(Clone)]
-struct ScratchSpace {
-    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
     bloom: VeryJankyBloomFilter,
-    hyperloglog: Option<HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>>,
     posting: Posting,
     sqrt_len: f64,
 }
@@ -159,31 +144,21 @@ impl BitVec {
 
         let len = ranks.len();
         let mut bloom = VeryJankyBloomFilter::new(16);
-        let mut hyperloglog = if ranks.len() > MIN_POSTING_SIZE_HYPERLOGLOG {
-            Some(HyperLogLog::default())
-        } else {
-            None
-        };
 
         for rank in &ranks {
             bloom.insert(*rank);
-
-            if let Some(hyperloglog) = &mut hyperloglog {
-                hyperloglog.add(*rank);
-            }
         }
 
         let posting = Posting::new(ranks);
 
         Self {
             bloom,
-            hyperloglog,
             posting,
             sqrt_len: (len as f64).sqrt(),
         }
     }
 
-    fn sim(&self, other: &Self, scratchspace: &mut ScratchSpace) -> f64 {
+    pub fn sim(&self, other: &Self) -> f64 {
         if self.sqrt_len == 0.0 || other.sqrt_len == 0.0 {
             return 0.0;
         }
@@ -192,47 +167,9 @@ impl BitVec {
             return 0.0;
         }
 
-        let intersect = match (self.hyperloglog.as_ref(), other.hyperloglog.as_ref()) {
-            (Some(a), Some(b)) => {
-                a.merge_into(b, &mut scratchspace.hyperloglog);
-
-                let union_est = scratchspace.hyperloglog.size() as u64;
-
-                (self.posting.len() as u64 + other.posting.len() as u64)
-                    .checked_sub(union_est)
-                    .unwrap_or_default()
-                    .min(self.posting.len() as u64)
-                    .min(other.posting.len() as u64) as f64
-            }
-            _ => self.posting.intersection_size(&other.posting) as f64,
-        };
+        let intersect = self.posting.intersection_size(&other.posting) as f64;
 
         intersect / (self.sqrt_len * other.sqrt_len)
-    }
-}
-
-#[derive(Clone)]
-pub struct BitVecSimilarity {
-    scratchspace: ScratchSpace,
-}
-
-impl Default for BitVecSimilarity {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BitVecSimilarity {
-    pub fn new() -> Self {
-        Self {
-            scratchspace: ScratchSpace {
-                hyperloglog: HyperLogLog::default(),
-            },
-        }
-    }
-
-    pub fn sim(&mut self, a: &BitVec, b: &BitVec) -> f64 {
-        a.sim(b, &mut self.scratchspace)
     }
 }
 
@@ -281,7 +218,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert!((expected - sim).abs() < 0.1);
     }
@@ -295,7 +232,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert_eq!(sim, 0.0);
     }
@@ -308,7 +245,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert_eq!(sim, 0.0);
     }
@@ -333,7 +270,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert!((expected - sim).abs() < 0.1);
     }
