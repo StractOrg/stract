@@ -128,10 +128,6 @@ impl<K: Key, V> IntMap<K, V> {
             .map(|(_, val)| val)
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = (K, V)> {
-        self.bins.into_iter().flat_map(|bin| bin.into_iter())
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = &(K, V)> {
         self.bins.iter().flat_map(|bin| bin.iter())
     }
@@ -185,10 +181,6 @@ impl<K: Key> IntSet<K> {
 
     pub fn insert(&mut self, item: K) {
         self.map.insert(item, ());
-    }
-
-    pub fn contains(&self, item: &K) -> bool {
-        self.map.contains_key(item)
     }
 }
 

@@ -20,12 +20,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
     data: Vec<u64>,
+    ones: usize,
 }
 
 impl VeryJankyBloomFilter {
     fn new(num_blooms: usize) -> Self {
         Self {
             data: vec![0; num_blooms],
+            ones: 0,
         }
     }
 
@@ -38,41 +40,40 @@ impl VeryJankyBloomFilter {
 
     fn insert(&mut self, item: u64) {
         let (a, b) = self.hash(&item);
+
+        // check if bit is already set
+        if self.data[a] & (1 << b) != 0 {
+            return;
+        }
+
         self.data[a] |= 1 << b;
+        self.ones += 1;
     }
 
     #[inline]
-    fn has_intersection(&self, other: &Self) -> bool {
+    fn ones(&self) -> usize {
+        self.ones
+    }
+
+    #[inline]
+    fn intersect_ones(&self, other: &Self) -> usize {
         self.data
             .iter()
             .zip_eq(other.data.iter())
-            .any(|(a, b)| a & b != 0)
+            .map(|(a, b)| a & b)
+            .map(|x| x.count_ones() as usize)
+            .sum()
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Posting {
     ranks: Vec<u64>,
-    skip_pointers: Vec<u64>,
-    skip_size: usize,
 }
 
 impl Posting {
     fn new(ranks: Vec<u64>) -> Self {
-        let skip_size = (ranks.len() as f64).sqrt() as usize;
-
-        let skip_pointers = ranks
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| i % skip_size == 0)
-            .map(|(_, rank)| *rank)
-            .collect();
-
-        Self {
-            ranks,
-            skip_pointers,
-            skip_size,
-        }
+        Self { ranks }
     }
 
     fn intersection_size(&self, other: &Self) -> usize {
@@ -92,40 +93,15 @@ impl Posting {
                     j += 1;
                 }
                 std::cmp::Ordering::Less => {
-                    i = self.next_skip_index(i, b);
+                    i += 1;
                 }
                 std::cmp::Ordering::Greater => {
-                    j = other.next_skip_index(j, a);
+                    j += 1;
                 }
             }
         }
 
         count
-    }
-
-    fn next_skip_index(&self, current_index: usize, target: u64) -> usize {
-        let mut index = current_index;
-
-        while (index / self.skip_size) + 1 < self.skip_pointers.len() {
-            let skip_index = (index / self.skip_size) + 1;
-            let skip_value = self.skip_pointers[skip_index];
-
-            if skip_value >= target {
-                break;
-            }
-
-            index = skip_index * self.skip_size;
-
-            if index >= self.ranks.len() {
-                return self.ranks.len();
-            }
-        }
-
-        if index == current_index {
-            index += 1;
-        }
-
-        std::cmp::min(index, self.ranks.len())
     }
 }
 
@@ -163,13 +139,24 @@ impl BitVec {
             return 0.0;
         }
 
-        if !self.bloom.has_intersection(&other.bloom) {
+        let max_bloom_ones = self.bloom.ones().max(other.bloom.ones());
+        let intersect_bloom_ones = self.bloom.intersect_ones(&other.bloom);
+
+        if (intersect_bloom_ones as f64) / (max_bloom_ones as f64) < 0.25 {
             return 0.0;
         }
 
         let intersect = self.posting.intersection_size(&other.posting) as f64;
 
         intersect / (self.sqrt_len * other.sqrt_len)
+    }
+
+    pub fn len(&self) -> usize {
+        self.posting.ranks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
