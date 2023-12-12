@@ -24,7 +24,8 @@ use std::{
 use dashmap::DashMap;
 use fnv::FnvHashMap as HashMap;
 use fnv::FnvHashSet as HashSet;
-use rayon::prelude::ParallelIterator;
+use indicatif::ParallelProgressIterator;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -137,16 +138,6 @@ struct PreCalculatedSimilarities {
 }
 
 impl PreCalculatedSimilarities {
-    fn new() -> Self {
-        Self {
-            map: HashMap::default(),
-        }
-    }
-
-    fn insert(&mut self, node: NodeID, other: NodeID, score: f64) {
-        self.map.entry(node).or_default().insert(other, score);
-    }
-
     fn get(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
         self.map.get(node)?.get(other).copied()
     }
@@ -206,34 +197,42 @@ impl InboundSimilarity {
         nodes.sort_by(|(_, a), (_, b)| b.cmp(a));
         nodes.truncate(PRECALCULATE_TOP_N);
 
-        let mut precalculated = PreCalculatedSimilarities::new();
+        let precalculated: HashMap<NodeID, HashMap<NodeID, f64>> = nodes
+            .into_par_iter()
+            .progress()
+            .map(|(node, _)| {
+                let node_vec = vectors.map.get(&node).unwrap();
 
-        for (node, _) in &nodes {
-            let node_vec = vectors.map.get(node).unwrap();
+                let candidates = graph
+                    .raw_ingoing_edges(&node)
+                    .into_iter()
+                    .map(|edge| edge.from)
+                    .flat_map(|c| graph.raw_outgoing_edges(&c).into_iter().map(|edge| edge.to))
+                    .filter(|c| *c != node)
+                    .collect::<HashSet<_>>();
 
-            let candidates = graph
-                .raw_ingoing_edges(node)
-                .into_iter()
-                .map(|edge| edge.from)
-                .flat_map(|c| graph.raw_outgoing_edges(&c).into_iter().map(|edge| edge.to))
-                .filter(|c| *c != *node)
-                .collect::<HashSet<_>>();
+                let mut candidates = candidates
+                    .into_iter()
+                    .filter_map(|c| vectors.map.get(&c).map(|vec| (c, vec)))
+                    .map(|(c, vec)| (c, node_vec.sim(vec)))
+                    .collect::<Vec<_>>();
+                candidates.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+                candidates.truncate(TOP_CANDIDATES_PER_PRECALCULATION);
 
-            let mut candidates = candidates
-                .into_iter()
-                .filter_map(|c| vectors.map.get(&c).map(|vec| (c, vec)))
-                .map(|(c, vec)| (c, node_vec.sim(vec)))
-                .collect::<Vec<_>>();
-            candidates.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-            candidates.truncate(TOP_CANDIDATES_PER_PRECALCULATION);
+                let mut map = HashMap::default();
 
-            for (candidate, _) in candidates {
-                if let Some(candidate_vec) = vectors.map.get(&candidate) {
-                    let score = node_vec.sim(candidate_vec);
-                    precalculated.insert(*node, candidate, score);
+                for (candidate, _) in candidates {
+                    if let Some(candidate_vec) = vectors.map.get(&candidate) {
+                        let score = node_vec.sim(candidate_vec);
+                        map.insert(candidate, score);
+                    }
                 }
-            }
-        }
+
+                (node, map)
+            })
+            .collect();
+
+        let precalculated = PreCalculatedSimilarities { map: precalculated };
 
         Self {
             vectors: Arc::new(vectors),
