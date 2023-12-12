@@ -386,11 +386,11 @@ impl ToString for HostRankings {
         let mut res = String::new();
 
         for liked in &self.liked {
-            res.push_str(&format!("Like(Domain(\"{}\"));\n", liked));
+            res.push_str(&format!("Like(Site(\"{}\"));\n", liked));
         }
 
         for disliked in &self.disliked {
-            res.push_str(&format!("Dislike(Domain(\"{}\"));\n", disliked));
+            res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
         }
 
         for blocked in &self.blocked {
@@ -401,7 +401,7 @@ impl ToString for HostRankings {
                         PatternPart::Raw(blocked.clone()),
                         PatternPart::Anchor,
                     ],
-                    location: MatchLocation::Domain,
+                    location: MatchLocation::Site,
                 }],
                 action: Action::Discard,
             };
@@ -417,6 +417,11 @@ impl HostRankings {
     pub fn rules(&self) -> Vec<Rule> {
         self.blocked
             .iter()
+            .map(|host| {
+                host.strip_prefix("www.")
+                    .map(|host| host.to_string())
+                    .unwrap_or(host.clone())
+            })
             .map(|host| Rule {
                 matches: vec![Matching {
                     pattern: vec![
@@ -424,7 +429,7 @@ impl HostRankings {
                         PatternPart::Raw(host.clone()),
                         PatternPart::Anchor,
                     ],
-                    location: MatchLocation::Domain,
+                    location: MatchLocation::Site,
                 }],
                 action: Action::Discard,
             })

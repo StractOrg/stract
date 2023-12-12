@@ -17,13 +17,13 @@ export const darkTheme = theme({
     accentContent: '#fff',
 
     neutral: base.zinc[400],
-    neutralFocus: base.zinc[100],
+    neutralFocus: base.zinc[300],
     neutralContent: base.zinc[300],
 
-    base100: base.zinc[800],
-    base200: base.zinc[700],
-    base300: base.zinc[600],
-    base400: base.zinc[500],
+    base100: base.zinc[900],
+    base200: base.zinc[800],
+    base300: base.zinc[700],
+    base400: base.zinc[600],
     baseContent: base.island[50],
 
     info: base.navy[600],

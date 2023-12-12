@@ -30,6 +30,7 @@ static ICANN_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::
 pub trait UrlExt {
     fn icann_domain(&self) -> Option<&str>;
     fn root_domain(&self) -> Option<&str>;
+    fn normalized_host(&self) -> Option<&str>;
     fn subdomain(&self) -> Option<&str>;
     fn tld(&self) -> Option<&str>;
 }
@@ -45,6 +46,10 @@ impl UrlExt for url::Url {
         let host = self.host_str()?;
         let suffix = std::str::from_utf8(FULL_LIST.domain(host.as_bytes())?.as_bytes()).ok()?;
         Some(suffix)
+    }
+
+    fn normalized_host(&self) -> Option<&str> {
+        self.host_str().map(|host| host.trim_start_matches("www."))
     }
 
     fn subdomain(&self) -> Option<&str> {

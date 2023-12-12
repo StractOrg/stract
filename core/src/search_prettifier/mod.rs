@@ -196,7 +196,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
 
         Self {
             title: webpage.title,
-            site: url.host_str().unwrap_or_default().to_string(),
+            site: url.normalized_host().unwrap_or_default().to_string(),
             url: webpage.url,
             pretty_url,
             domain,

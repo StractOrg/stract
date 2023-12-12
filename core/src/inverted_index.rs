@@ -51,6 +51,7 @@ use crate::tokenizer::{
 };
 use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
+use crate::webpage::url_ext::UrlExt;
 use crate::webpage::{schema_org, Webpage};
 use crate::Result;
 use crate::{combine_u64s, snippet};
@@ -550,7 +551,9 @@ impl InvertedIndex {
             .get_field(Field::Text(TextField::SiteIfHomepageNoTokenizer).name())
             .unwrap();
 
-        let term = tantivy::Term::from_field_text(field, url.host_str().unwrap_or_default());
+        let host = url.normalized_host().unwrap_or_default();
+
+        let term = tantivy::Term::from_field_text(field, host);
 
         let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
 

@@ -53,6 +53,7 @@ use crate::{
     llm_utils::ClonableTensor,
     search_prettifier::DisplayedWebpage,
     searcher::{SearchResult, WebsitesResult},
+    webpage::url_ext::UrlExt,
 };
 
 use self::{
@@ -114,7 +115,7 @@ impl SimplifiedWebsite {
         Self {
             title: webpage.title,
             text,
-            site: url.host_str().unwrap_or_default().to_string(),
+            site: url.normalized_host().unwrap_or_default().to_string(),
             url: url.to_string(),
         }
     }

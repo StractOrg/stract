@@ -21,14 +21,14 @@
     {#each shownDiscussions as discussion}
       <div class="overflow-hidden">
         <div>
-          <a class="text-sm" href={discussion.url}>
+          <a class="text-sm text-neutral-focus" href={discussion.url}>
             {discussion.domain}
           </a>
         </div>
         <details class="group">
           <summary class="flex cursor-pointer list-none items-center space-x-2">
             <a
-              class="text-md inline-block max-w-[calc(100%-10px)] truncate font-medium group-open:underline"
+              class="text-md text-neutral-focus inline-block max-w-[calc(100%-10px)] truncate font-medium group-open:underline"
               title={discussion.title}
               href={discussion.url}
             >

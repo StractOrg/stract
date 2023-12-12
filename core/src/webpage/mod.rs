@@ -932,17 +932,13 @@ impl Html {
     }
 
     fn pretokenize_domain(&self) -> PreTokenizedString {
-        let mut domain = self.url().root_domain().unwrap_or_default().to_string();
-
-        if let Some(stripped) = domain.strip_prefix("www.") {
-            domain = stripped.to_string();
-        }
+        let domain = self.url().root_domain().unwrap_or_default().to_string();
 
         self.pretokenize_string(domain)
     }
 
     fn pretokenize_site(&self) -> PreTokenizedString {
-        let site = self.url().host_str().unwrap_or_default().to_string();
+        let site = self.url().normalized_host().unwrap_or_default().to_string();
 
         self.pretokenize_string(site)
     }
@@ -1043,7 +1039,7 @@ impl Html {
             },
         };
 
-        let site_hash = split_u128(hash(self.url().host_str().unwrap_or_default()).0);
+        let site_hash = split_u128(hash(self.url().normalized_host().unwrap_or_default()).0);
 
         let mut url_without_query = self.url().clone();
         url_without_query.set_query(None);
@@ -1463,9 +1459,9 @@ impl Html {
 
         links
             .into_iter()
-            .filter(|link| link.host_str().is_some())
-            .filter(|link| link.host_str() != self.url().host_str())
-            .unique_by(|link| link.host_str().unwrap().to_string())
+            .filter(|link| link.normalized_host().is_some())
+            .filter(|link| link.normalized_host() != self.url().normalized_host())
+            .unique_by(|link| link.normalized_host().unwrap().to_string())
             .collect()
     }
 

@@ -88,8 +88,8 @@ RankingTarget: RankingTarget = {
 }
 
 HostPreference: RawHostPreference = {
-    "Like" "(" "Domain" "(" <StringLiteral> ")" ")" => RawHostPreference::Like(<>.to_string()),
-    "Dislike" "(" "Domain" "(" <StringLiteral> ")" ")" => RawHostPreference::Dislike(<>.to_string())
+    "Like" "(" "Site" "(" <StringLiteral> ")" ")" => RawHostPreference::Like(<>.to_string()),
+    "Dislike" "(" "Site" "(" <StringLiteral> ")" ")" => RawHostPreference::Dislike(<>.to_string())
 }
 
 extern {

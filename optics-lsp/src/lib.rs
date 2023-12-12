@@ -165,7 +165,8 @@ impl OpticsBackend {
                                 A search result must match all the parts of the `Matches` block in order to match the specific rule.".to_string()),
 
                                optics::Token::Site => Some("`Site(\"...\")` matches any search result where the pattern defined in `\"...\"` matches the site of the result. \
-                                You can use `*` as a wildcard term and `|` to indicate either the end or start of a string. \n\
+                                Note that when `Site` is used inside `Like` or `Dislike`, the pattern can only contain simple terms (no `*` and `|`). \n\n\
+                                When the site is used in a `Matches` block, you can use `*` as a wildcard term and `|` to indicate either the end or start of a string. \n\
                                Consider the pattern `\"|sub.*.com|\"`. This will ensure that the terms `sub` and `.` must appear at the beggining of the site, then followed by any \
                                domain-name that ends in `.` and `com`. Note that `|` can only be used in the beggining or end of a pattern and the pattern will only match full terms (no substring matching). \n\n\
                                This example illustrates the difference between `Domain`, `Site` and `Url`:\n\
@@ -181,8 +182,7 @@ impl OpticsBackend {
                                 ".to_string()),
 
                                 optics::Token::Domain => Some("`Domain(\"...\")` matches any search result where the pattern defined in `\"...\"` matches the domain of the result. \
-                                Note that when `Domain` is used inside `Like` or `Dislike`, the pattern can only contain simple terms (no `*` and `|`). \n\n\
-                                When the domain is used in a `Matches` block, you can use `*` as a wildcard term and `|` to indicate either the end or start of a domain. \n\
+                                You can use `*` as a wildcard term and `|` to indicate either the end or start of a domain. \n\
                                 Consider the pattern `\"example.org\"`. This is equivalent to doing a phrase search for `\"example.org\"` in the domain. Note that the pattern will only match full terms (no substring matching). \n\n\
                                 This example illustrates the difference between `Domain`, `Site` and `Url`:\n\
                                 Assume a search result has the url `https://sub.example.org/page`. the domain here is `example.org`, the site is `sub.example.org` and the url is the entire url (with protocol).\
@@ -230,11 +230,11 @@ impl OpticsBackend {
 
                                 optics::Token::Discard => Some("`Discard` discards the matching search result completely from the results page.".to_string()),
 
-                                optics::Token::Like => Some("`Like(Domain(...))` lets you like specific hosts. During ranking, we will calculate a centrality meassure from all you liked sites \
+                                optics::Token::Like => Some("`Like(Site(...))` lets you like specific hosts. During ranking, we will calculate a centrality meassure from all you liked sites \
                                 so results that are heavily linked to from your liked sites will be favored. Note therefore, that `Like` not only alters the ranking of the specifc site, \
                                 but also sites that are heavily linked to from the liked site.".to_string()),
 
-                                optics::Token::Dislike => Some("`Dislike(Domain(...))` lets you dislike specifc hosts. During ranking, we will calculate a centrality meassure from all you dislike sites \
+                                optics::Token::Dislike => Some("`Dislike(Site(...))` lets you dislike specifc hosts. During ranking, we will calculate a centrality meassure from all you dislike sites \
                                 so results that are heavily linked to from your disliked sites will be downranked. Note therefore, that `Dislike` not only alters the ranking of the specifc site, \
                                 but also sites that are heavily linked to from the disliked site.".to_string()),
 

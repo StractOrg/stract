@@ -98,7 +98,7 @@
   const rankSite = (site: DisplayedWebpage, ranking: Ranking) => () => {
     hostRankingsStore?.update(($rankings) => ({
       ...$rankings,
-      [site.domain]: $rankings[site.domain] == ranking ? void 0 : ranking,
+      [site.site]: $rankings[site.site] == ranking ? void 0 : ranking,
     }));
   };
 
@@ -119,13 +119,13 @@
   >
     <div>
       <h2 class="w-fit text-center">
-        Do you like results from {modal.site.domain}?
+        Do you like results from {modal.site.site}?
       </h2>
       <div class="flex justify-center space-x-1.5 pt-2">
         {#each rankingChoices as { ranking, kind, Icon }}
           <Button
             {kind}
-            pale={$hostRankingsStore[modal.site.domain] != ranking}
+            pale={$hostRankingsStore[modal.site.site] != ranking}
             padding={false}
             form="searchbar-form"
             on:click={rankSite(modal.site, ranking)}

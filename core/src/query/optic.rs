@@ -700,9 +700,9 @@ mod tests {
                 optic: Some(
                     Optic::parse(
                         r#"
-                    Like(Domain("www.a.com"));
-                    Like(Domain("www.b.com"));
-                    Dislike(Domain("www.c.com"));
+                    Like(Site("www.a.com"));
+                    Like(Site("www.b.com"));
+                    Dislike(Site("www.c.com"));
                 "#,
                     )
                     .unwrap(),
