@@ -5,7 +5,7 @@
 </script>
 
 <div class="mt-[25vh] flex w-full flex-1 flex-col items-center justify-start">
-  <div class="mb-4 flex w-64">
+  <div class="mb-2 flex w-64">
     <BiglogoWithText />
   </div>
   <div class="w-full md:mx-0 md:max-w-xl">
