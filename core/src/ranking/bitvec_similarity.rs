@@ -17,20 +17,17 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::hyperloglog::{self, HyperLogLog};
-
-const HYPERLOGLOG_REGISTERS: usize = 2048;
-const MIN_POSTING_SIZE_HYPERLOGLOG: usize = 1024000;
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct VeryJankyBloomFilter {
     data: Vec<u64>,
+    ones: usize,
 }
 
 impl VeryJankyBloomFilter {
     fn new(num_blooms: usize) -> Self {
         Self {
             data: vec![0; num_blooms],
+            ones: 0,
         }
     }
 
@@ -43,41 +40,40 @@ impl VeryJankyBloomFilter {
 
     fn insert(&mut self, item: u64) {
         let (a, b) = self.hash(&item);
+
+        // check if bit is already set
+        if self.data[a] & (1 << b) != 0 {
+            return;
+        }
+
         self.data[a] |= 1 << b;
+        self.ones += 1;
     }
 
     #[inline]
-    fn has_intersection(&self, other: &Self) -> bool {
+    fn ones(&self) -> usize {
+        self.ones
+    }
+
+    #[inline]
+    fn intersect_ones(&self, other: &Self) -> usize {
         self.data
             .iter()
             .zip_eq(other.data.iter())
-            .any(|(a, b)| a & b != 0)
+            .map(|(a, b)| a & b)
+            .map(|x| x.count_ones() as usize)
+            .sum()
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Posting {
     ranks: Vec<u64>,
-    skip_pointers: Vec<u64>,
-    skip_size: usize,
 }
 
 impl Posting {
     fn new(ranks: Vec<u64>) -> Self {
-        let skip_size = (ranks.len() as f64).sqrt() as usize;
-
-        let skip_pointers = ranks
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| i % skip_size == 0)
-            .map(|(_, rank)| *rank)
-            .collect();
-
-        Self {
-            ranks,
-            skip_pointers,
-            skip_size,
-        }
+        Self { ranks }
     }
 
     fn intersection_size(&self, other: &Self) -> usize {
@@ -97,56 +93,21 @@ impl Posting {
                     j += 1;
                 }
                 std::cmp::Ordering::Less => {
-                    i = self.next_skip_index(i, b);
+                    i += 1;
                 }
                 std::cmp::Ordering::Greater => {
-                    j = other.next_skip_index(j, a);
+                    j += 1;
                 }
             }
         }
 
         count
     }
-
-    fn next_skip_index(&self, current_index: usize, target: u64) -> usize {
-        let mut index = current_index;
-
-        while (index / self.skip_size) + 1 < self.skip_pointers.len() {
-            let skip_index = (index / self.skip_size) + 1;
-            let skip_value = self.skip_pointers[skip_index];
-
-            if skip_value >= target {
-                break;
-            }
-
-            index = skip_index * self.skip_size;
-
-            if index >= self.ranks.len() {
-                return self.ranks.len();
-            }
-        }
-
-        if index == current_index {
-            index += 1;
-        }
-
-        std::cmp::min(index, self.ranks.len())
-    }
-
-    fn len(&self) -> usize {
-        self.ranks.len()
-    }
-}
-
-#[derive(Clone)]
-struct ScratchSpace {
-    hyperloglog: HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BitVec {
     bloom: VeryJankyBloomFilter,
-    hyperloglog: Option<HyperLogLog<HYPERLOGLOG_REGISTERS, hyperloglog::StableHasher>>,
     posting: Posting,
     sqrt_len: f64,
 }
@@ -159,80 +120,43 @@ impl BitVec {
 
         let len = ranks.len();
         let mut bloom = VeryJankyBloomFilter::new(16);
-        let mut hyperloglog = if ranks.len() > MIN_POSTING_SIZE_HYPERLOGLOG {
-            Some(HyperLogLog::default())
-        } else {
-            None
-        };
 
         for rank in &ranks {
             bloom.insert(*rank);
-
-            if let Some(hyperloglog) = &mut hyperloglog {
-                hyperloglog.add(*rank);
-            }
         }
 
         let posting = Posting::new(ranks);
 
         Self {
             bloom,
-            hyperloglog,
             posting,
             sqrt_len: (len as f64).sqrt(),
         }
     }
 
-    fn sim(&self, other: &Self, scratchspace: &mut ScratchSpace) -> f64 {
+    pub fn sim(&self, other: &Self) -> f64 {
         if self.sqrt_len == 0.0 || other.sqrt_len == 0.0 {
             return 0.0;
         }
 
-        if !self.bloom.has_intersection(&other.bloom) {
+        let max_bloom_ones = self.bloom.ones().max(other.bloom.ones());
+        let intersect_bloom_ones = self.bloom.intersect_ones(&other.bloom);
+
+        if (intersect_bloom_ones as f64) / (max_bloom_ones as f64) < 0.25 {
             return 0.0;
         }
 
-        let intersect = match (self.hyperloglog.as_ref(), other.hyperloglog.as_ref()) {
-            (Some(a), Some(b)) => {
-                a.merge_into(b, &mut scratchspace.hyperloglog);
-
-                let union_est = scratchspace.hyperloglog.size() as u64;
-
-                (self.posting.len() as u64 + other.posting.len() as u64)
-                    .checked_sub(union_est)
-                    .unwrap_or_default()
-                    .min(self.posting.len() as u64)
-                    .min(other.posting.len() as u64) as f64
-            }
-            _ => self.posting.intersection_size(&other.posting) as f64,
-        };
+        let intersect = self.posting.intersection_size(&other.posting) as f64;
 
         intersect / (self.sqrt_len * other.sqrt_len)
     }
-}
 
-#[derive(Clone)]
-pub struct BitVecSimilarity {
-    scratchspace: ScratchSpace,
-}
-
-impl Default for BitVecSimilarity {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BitVecSimilarity {
-    pub fn new() -> Self {
-        Self {
-            scratchspace: ScratchSpace {
-                hyperloglog: HyperLogLog::default(),
-            },
-        }
+    pub fn len(&self) -> usize {
+        self.posting.ranks.len()
     }
 
-    pub fn sim(&mut self, a: &BitVec, b: &BitVec) -> f64 {
-        a.sim(b, &mut self.scratchspace)
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -281,7 +205,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert!((expected - sim).abs() < 0.1);
     }
@@ -295,7 +219,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert_eq!(sim, 0.0);
     }
@@ -308,7 +232,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert_eq!(sim, 0.0);
     }
@@ -333,7 +257,7 @@ mod tests {
         let a = BitVec::new(into_ranks(&a));
         let b = BitVec::new(into_ranks(&b));
 
-        let sim = BitVecSimilarity::default().sim(&a, &b);
+        let sim = a.sim(&b);
 
         assert!((expected - sim).abs() < 0.1);
     }

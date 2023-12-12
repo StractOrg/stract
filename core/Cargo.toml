@@ -120,27 +120,28 @@ proptest-derive = {workspace = true}
 
 [[bench]]
 harness = false
-name = "search-preindexed"
+name = "search_preindexed"
 
 [[bench]]
 harness = false
-name = "search-preindexed-optic"
+name = "search_preindexed_optic"
 
 [[bench]]
 harness = false
-name = "harmonic-centrality"
+name = "harmonic_centrality"
 
 [[bench]]
 harness = false
-name = "abstractive-summarizer"
+name = "abstractive_summarizer"
+required-features = ["libtorch"]
 
 [[bench]]
 harness = false
-name = "build-similarity"
+name = "build_similarity"
 
 [[bench]]
 harness = false
-name = "similar-hosts"
+name = "similar_hosts"
 
 [[bench]]
 harness = false
@@ -148,4 +149,11 @@ name = "hyperloglog"
 
 [[bench]]
 harness = false
-name = "naive-bayes"
+name = "naive_bayes"
+
+[[bench]]
+harness = false
+name = "bitvec_similarity"
+
+[[example]]
+name = "bitvec_similarity"

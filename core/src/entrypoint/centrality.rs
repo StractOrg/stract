@@ -71,7 +71,7 @@ pub struct Centrality;
 impl Centrality {
     pub fn build_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
         tracing::info!("Building harmonic centrality");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
+        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
         let store = RocksDbStore::open(base_output.as_ref().join("harmonic"));
 
@@ -103,7 +103,7 @@ impl Centrality {
 
     pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
         tracing::info!("Building inbound similarity");
-        let graph = WebgraphBuilder::new(webgraph_path).open();
+        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
         let sim = InboundSimilarity::build(&graph);
 

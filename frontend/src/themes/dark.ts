@@ -39,6 +39,6 @@ export const darkTheme = theme({
     errorContent: base.cerise2[100],
 
     link: base.sky[500],
-    linkVisited: base.purple[500],
+    linkVisited: base.purple[400],
   },
 });

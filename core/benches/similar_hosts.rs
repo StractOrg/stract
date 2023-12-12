@@ -6,7 +6,7 @@ use stract::{
     webgraph::WebgraphBuilder,
 };
 
-const WEBGRAPH_PATH: &str = "data/webgraph";
+const WEBGRAPH_PATH: &str = "data/webgraph_host";
 const INBOUND_SIMILARITY_PATH: &str = "data/centrality/inbound_similarity";
 
 pub fn criterion_benchmark(c: &mut Criterion) {

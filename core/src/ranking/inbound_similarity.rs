@@ -24,7 +24,8 @@ use std::{
 use dashmap::DashMap;
 use fnv::FnvHashMap as HashMap;
 use fnv::FnvHashSet as HashSet;
-use rayon::prelude::ParallelIterator;
+use indicatif::ParallelProgressIterator;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -34,28 +35,36 @@ use crate::{
 
 use super::bitvec_similarity;
 
+const PRECALCULATE_TOP_N: usize = 1_000;
+const TOP_CANDIDATES_PER_PRECALCULATION: usize = 1_000;
+
 #[derive(Clone)]
 pub struct Scorer {
-    similarity: bitvec_similarity::BitVecSimilarity,
     liked: Vec<NodeScorer>,
     disliked: Vec<NodeScorer>,
-    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
+    vectors: Arc<VecMap>,
     cache: HashMap<NodeID, f64>,
     normalized: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct NodeScorer {
     node: NodeID,
     inbound: bitvec_similarity::BitVec,
+    precalculated: Arc<PreCalculatedSimilarities>,
     self_score: f64,
 }
 
 impl NodeScorer {
-    fn new(node: NodeID, inbound: bitvec_similarity::BitVec) -> Self {
+    fn new(
+        node: NodeID,
+        inbound: bitvec_similarity::BitVec,
+        precalculated: Arc<PreCalculatedSimilarities>,
+    ) -> Self {
         Self {
             node,
             inbound,
+            precalculated,
             self_score: 1.0,
         }
     }
@@ -64,16 +73,14 @@ impl NodeScorer {
         self.self_score = self_score;
     }
 
-    fn sim(
-        &self,
-        other: &NodeID,
-        other_inbound: &bitvec_similarity::BitVec,
-        similarity: &mut bitvec_similarity::BitVecSimilarity,
-    ) -> f64 {
+    fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
         if self.node == *other {
             self.self_score
         } else {
-            similarity.sim(&self.inbound, other_inbound)
+            self.precalculated
+                .get(&self.node, other)
+                .or_else(|| self.precalculated.get(other, &self.node))
+                .unwrap_or_else(|| self.inbound.sim(other_inbound))
         }
     }
 }
@@ -86,12 +93,12 @@ impl Scorer {
                     + (self
                         .liked
                         .iter()
-                        .map(|liked| liked.sim(node, vec, &mut self.similarity))
+                        .map(|liked| liked.sim(node, vec))
                         .sum::<f64>()
                         - self
                             .disliked
                             .iter()
-                            .map(|disliked| disliked.sim(node, vec, &mut self.similarity))
+                            .map(|disliked| disliked.sim(node, vec))
                             .sum::<f64>())
             }
             None => 0.0,
@@ -126,13 +133,24 @@ impl Scorer {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub struct InboundSimilarity {
-    vectors: Arc<HashMap<NodeID, bitvec_similarity::BitVec>>,
+struct PreCalculatedSimilarities {
+    map: HashMap<NodeID, HashMap<NodeID, f64>>,
 }
 
-impl InboundSimilarity {
-    pub fn build(graph: &Webgraph) -> Self {
-        let mut vectors = HashMap::default();
+impl PreCalculatedSimilarities {
+    fn get(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
+        self.map.get(node)?.get(other).copied()
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct VecMap {
+    map: HashMap<NodeID, bitvec_similarity::BitVec>,
+}
+
+impl VecMap {
+    fn build(graph: &Webgraph) -> Self {
+        let mut map = HashMap::default();
 
         let adjacency: DashMap<NodeID, HashSet<NodeID>> = DashMap::new();
 
@@ -141,14 +159,84 @@ impl InboundSimilarity {
         });
 
         for (node_id, inbound) in adjacency {
-            vectors.insert(
+            map.insert(
                 node_id,
                 bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.bit_64()).collect()),
             );
         }
 
+        Self { map }
+    }
+
+    fn get(&self, id: &NodeID) -> Option<&bitvec_similarity::BitVec> {
+        self.map.get(id)
+    }
+
+    fn contains(&self, id: &NodeID) -> bool {
+        self.map.contains_key(id)
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct InboundSimilarity {
+    vectors: Arc<VecMap>,
+    precalculated: Arc<PreCalculatedSimilarities>,
+}
+
+impl InboundSimilarity {
+    pub fn build(graph: &Webgraph) -> Self {
+        let vectors = VecMap::build(graph);
+
+        tracing::info!("precalculating similarities...");
+
+        let mut nodes = vectors
+            .map
+            .iter()
+            .map(|(node, ranks)| (*node, ranks.len()))
+            .collect::<Vec<_>>();
+        nodes.sort_by(|(_, a), (_, b)| b.cmp(a));
+        nodes.truncate(PRECALCULATE_TOP_N);
+
+        let precalculated: HashMap<NodeID, HashMap<NodeID, f64>> = nodes
+            .into_par_iter()
+            .progress()
+            .map(|(node, _)| {
+                let node_vec = vectors.map.get(&node).unwrap();
+
+                let candidates = graph
+                    .raw_ingoing_edges(&node)
+                    .into_iter()
+                    .map(|edge| edge.from)
+                    .flat_map(|c| graph.raw_outgoing_edges(&c).into_iter().map(|edge| edge.to))
+                    .filter(|c| *c != node)
+                    .collect::<HashSet<_>>();
+
+                let mut candidates = candidates
+                    .into_iter()
+                    .filter_map(|c| vectors.map.get(&c).map(|vec| (c, vec)))
+                    .map(|(c, vec)| (c, node_vec.sim(vec)))
+                    .collect::<Vec<_>>();
+                candidates.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+                candidates.truncate(TOP_CANDIDATES_PER_PRECALCULATION);
+
+                let mut map = HashMap::default();
+
+                for (candidate, _) in candidates {
+                    if let Some(candidate_vec) = vectors.map.get(&candidate) {
+                        let score = node_vec.sim(candidate_vec);
+                        map.insert(candidate, score);
+                    }
+                }
+
+                (node, map)
+            })
+            .collect();
+
+        let precalculated = PreCalculatedSimilarities { map: precalculated };
+
         Self {
             vectors: Arc::new(vectors),
+            precalculated: Arc::new(precalculated),
         }
     }
 
@@ -161,17 +249,16 @@ impl InboundSimilarity {
         let liked: Vec<_> = liked_hosts
             .iter()
             .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound, self.precalculated.clone()))
             .collect();
 
         let disliked: Vec<_> = disliked_hosts
             .iter()
             .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound, self.precalculated.clone()))
             .collect();
 
         Scorer {
-            similarity: bitvec_similarity::BitVecSimilarity::default(),
             liked,
             disliked,
             vectors: self.vectors.clone(),
@@ -209,7 +296,7 @@ impl InboundSimilarity {
     }
 
     pub fn knows_about(&self, node_id: NodeID) -> bool {
-        self.vectors.contains_key(&node_id)
+        self.vectors.contains(&node_id)
     }
 }
 

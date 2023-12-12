@@ -1,6 +1,6 @@
 # We will always respect your privacy.
 
-When using Stract, you can rest assured that we do everything
+We believe privacy should be a fundamental right. When using Stract, you can rest assured that we do everything
 possible to keep your private information the way it's supposed to be - private.
 We mostly do this by simply not storing any of your private information at all.
 This keeps things simple, both for you and for us.

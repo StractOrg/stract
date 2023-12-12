@@ -16,11 +16,11 @@
 
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
 
+use fnv::{FnvHashMap, FnvHashSet};
 use hashbrown::HashSet;
 use url::Url;
 
 use crate::{
-    intmap::{IntMap, IntSet},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{Node, NodeID, Webgraph},
     webpage::url_ext::UrlExt,
@@ -99,13 +99,13 @@ impl SimilarHostsFinder {
 
         let mut scorer = self.inbound_similarity.scorer(&nodes, &[], true);
 
-        let mut backlinks: IntMap<NodeID, f64> = IntMap::new();
+        let mut backlinks = FnvHashMap::default();
 
         for node in &nodes {
             for edge in self.webgraph.raw_ingoing_edges(node) {
-                if !backlinks.contains_key(&edge.from) {
-                    backlinks.insert(edge.from, scorer.score(&edge.from));
-                }
+                backlinks
+                    .entry(edge.from)
+                    .or_insert_with(|| scorer.score(&edge.from));
             }
         }
 
@@ -119,7 +119,7 @@ impl SimilarHostsFinder {
         top_backlink_nodes.reverse();
 
         let mut scored_nodes = BinaryHeap::with_capacity(limit);
-        let mut checked_nodes = IntSet::new();
+        let mut checked_nodes = FnvHashSet::default();
 
         for (backlink_node, _) in top_backlink_nodes.into_iter().take(limit) {
             for edge in self.webgraph.raw_outgoing_edges(&backlink_node) {
