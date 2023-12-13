@@ -28,7 +28,7 @@
     </div>
   </div>
   <hr class="border-stone-700" />
-  <div class="flex flex-col space-y-3 text-sm">
+  <div class="space-y-3 text-sm inline-block max-h-96 overflow-y-scroll">
     {#each answer.body as part}
       {#if part.type == 'code'}
         <Code code={part.value} />

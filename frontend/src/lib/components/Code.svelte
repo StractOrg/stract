@@ -3,15 +3,27 @@
 
   export let code: string;
   export let transparentBackground = false;
+
+  $: codeHasNewlines = code.includes('\n');
 </script>
 
-<div
-  class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
->
-  <div class="overflow-auto px-3 py-2">
-    <HighlightAuto {code} />
+{#if codeHasNewlines}
+  <div
+    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
+  >
+    <div class="overflow-auto px-3 py-2">
+      <HighlightAuto {code} />
+    </div>
   </div>
-</div>
+{:else}
+  <span
+    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
+  >
+    <span class="overflow-auto px-3 py-2">
+      <code>{code}</code>
+    </span>
+  </span>
+{/if}
 
 <style lang="postcss">
   .code :global(.hljs-keyword) {
