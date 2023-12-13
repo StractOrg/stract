@@ -204,7 +204,7 @@ impl ErrorModel {
     pub fn log_prob(&self, error: &ErrorSequence) -> f64 {
         match self.errors.get(error) {
             Some(count) => (*count as f64).log2() - (self.total as f64).log2(),
-            None => 0.0,
+            None => 0.0 - (self.total as f64).log2(),
         }
     }
 }

@@ -97,7 +97,7 @@ impl LangSpellChecker {
 
             let scaled_lm_log_prob = self.config.lm_prob_weight * log_prob;
 
-            let error_log_prob = if candidate.as_str() == term {
+            let error_log_prob = if candidate.as_str() != term {
                 match error_model::possible_errors(term, candidate) {
                     Some(error_seq) => {
                         (1.0 - self.config.misspelled_prob).log2()
@@ -106,8 +106,9 @@ impl LangSpellChecker {
                     None => 0.0,
                 }
             } else {
-                self.config.misspelled_prob
+                self.config.misspelled_prob.log2()
             };
+            tracing::trace!(?candidate, ?scaled_lm_log_prob, ?error_log_prob);
 
             let score = scaled_lm_log_prob + error_log_prob;
 
@@ -153,14 +154,15 @@ impl LangSpellChecker {
 
             let this_term_context_idx = this_term_context_idx.unwrap();
             let term_log_prob = self.lm_logprob(this_term_context_idx, &context);
-            let scaled_term_log_prob = self.config.lm_prob_weight * term_log_prob;
+            let scaled_term_log_prob = self.config.lm_prob_weight * term_log_prob
+                + ((1.0 - self.config.misspelled_prob).log2());
 
             tracing::debug!(?term, ?scaled_term_log_prob);
 
             if let Some((best_term, score)) =
                 self.score_candidates(term, &candidates, context, this_term_context_idx)
             {
-                let diff = score.abs() - scaled_term_log_prob.abs();
+                let diff = score - scaled_term_log_prob;
                 tracing::debug!(?best_term, ?score, ?diff);
                 if diff > self.config.correction_threshold {
                     corrections.push((i, best_term.clone()));

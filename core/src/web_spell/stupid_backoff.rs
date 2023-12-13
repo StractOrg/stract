@@ -291,13 +291,17 @@ impl StupidBackoff {
 
     pub fn log_prob<S: NextWordsStrategy>(&self, words: &[String], strat: S) -> f64 {
         if words.len() >= self.ngrams.len() || words.is_empty() {
-            return 0.0;
+            return -(self.n_counts[0] as f64).log2();
         }
 
+        let mut strat = strat;
         if let Some(freq) = self.freq(words) {
-            (freq as f64 / self.n_counts[words.len() - 1] as f64).log2()
+            if let Some(next_freq) = self.freq(strat.inverse().next_words(words)) {
+                (freq as f64).log2() - (next_freq as f64).log2()
+            } else {
+                (freq as f64).log2() - (self.n_counts[words.len() - 1] as f64).log2()
+            }
         } else {
-            let mut strat = strat;
             DISCOUNT.log2() + self.log_prob(strat.next_words(words), strat)
         }
     }
@@ -326,42 +330,65 @@ impl StupidBackoff {
     }
 }
 
-pub trait NextWordsStrategy {
+pub trait NextWordsStrategy: Sized {
+    type Inv: NextWordsStrategy;
+
     fn next_words<'a>(&mut self, words: &'a [String]) -> &'a [String];
+    fn inverse(self) -> Self::Inv;
 }
 
 pub struct LeftToRight;
 
 impl NextWordsStrategy for LeftToRight {
+    type Inv = RightToLeft;
+
     fn next_words<'a>(&mut self, words: &'a [String]) -> &'a [String] {
         &words[1..]
+    }
+
+    fn inverse(self) -> Self::Inv {
+        RightToLeft
     }
 }
 
 pub struct RightToLeft;
 
 impl NextWordsStrategy for RightToLeft {
+    type Inv = LeftToRight;
+
     fn next_words<'a>(&mut self, words: &'a [String]) -> &'a [String] {
         &words[..words.len() - 1]
+    }
+
+    fn inverse(self) -> Self::Inv {
+        LeftToRight
     }
 }
 
 #[derive(Default)]
 pub struct IntoMiddle {
-    last_right: bool,
+    last_left: bool,
 }
 
 impl NextWordsStrategy for IntoMiddle {
+    type Inv = IntoMiddle;
+
     fn next_words<'a>(&mut self, words: &'a [String]) -> &'a [String] {
-        let res = if self.last_right {
-            &words[..words.len() - 1]
-        } else {
+        let res = if self.last_left {
             &words[1..]
+        } else {
+            &words[..words.len() - 1]
         };
 
-        self.last_right = !self.last_right;
+        self.last_left = !self.last_left;
 
         res
+    }
+
+    fn inverse(self) -> Self::Inv {
+        // TODO: this is not entirely correct.
+        // to score b in [a, b, c] we should score [a, c] in the rotated ngrams.
+        self
     }
 }
 

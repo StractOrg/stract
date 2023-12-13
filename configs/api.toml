@@ -17,3 +17,7 @@ stackoverflow = 0.0
 
 [widgets]
 thesaurus_paths = ["data/english-wordnet-2022-subset.ttl"]
+
+[correction_config]
+correction_threshold = 3.0
+lm_prob_weight = 1.0

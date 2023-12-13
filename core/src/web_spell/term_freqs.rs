@@ -242,6 +242,33 @@ impl TermDict {
         self.save_meta()?;
 
         self.stored.push(stored);
+        self.gc()?;
+
+        Ok(())
+    }
+
+    fn gc(&self) -> Result<()> {
+        let all_dicts = self
+            .path
+            .read_dir()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().unwrap_or_default() == "dict")
+            .map(|e| e.path())
+            .collect::<Vec<_>>();
+
+        for dict in all_dicts {
+            if !self.metadata.dicts.contains(
+                &dict
+                    .file_stem()
+                    .expect("dict files should have a filename")
+                    .to_str()
+                    .expect("dict filenames are created from uuid `.to_string()`, so they should be valid utf8")
+                    .parse()
+                    .expect("dict filenames are created from uuid `.to_string()`, so they should be valid uuids"),
+            ) {
+                std::fs::remove_file(dict)?;
+            }
+        }
 
         Ok(())
     }
@@ -250,6 +277,7 @@ impl TermDict {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(self.path.join("meta.json"))?;
 
         serde_json::to_writer_pretty(file, &self.metadata)?;
