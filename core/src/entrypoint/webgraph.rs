@@ -19,7 +19,7 @@ use crate::{
     entrypoint::download_all_warc_files,
     mapreduce::Worker,
     webgraph::{self, Node, WebgraphWriter},
-    webpage::Html,
+    webpage::{url_ext::UrlExt, Html},
     Result,
 };
 use itertools::Itertools;
@@ -128,7 +128,14 @@ impl WebgraphWorker {
                     source = source.into_host();
                     destination = destination.into_host();
 
-                    self.host_graph.insert(source, destination, link.text);
+                    let dest_domain = link.destination.root_domain();
+                    let source_domain = link.source.root_domain();
+                    if dest_domain.is_some()
+                        && source_domain.is_some()
+                        && dest_domain != source_domain
+                    {
+                        self.host_graph.insert(source, destination, link.text);
+                    }
                 }
             }
 

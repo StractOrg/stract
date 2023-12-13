@@ -16,11 +16,12 @@
 
 use publicsuffix::Psl;
 
-static FULL_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
-    include_str!("../../public_suffix_list.dat")
-        .parse()
-        .expect("Failed to parse public suffix list")
-});
+static PUBLIC_SUFFIX_LIST: once_cell::sync::Lazy<publicsuffix::List> =
+    once_cell::sync::Lazy::new(|| {
+        include_str!("../../public_suffix_list.dat")
+            .parse()
+            .expect("Failed to parse public suffix list")
+    });
 static ICANN_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
     include_str!("../../public_icann_suffix.dat")
         .parse()
@@ -44,7 +45,8 @@ impl UrlExt for url::Url {
 
     fn root_domain(&self) -> Option<&str> {
         let host = self.host_str()?;
-        let suffix = std::str::from_utf8(FULL_LIST.domain(host.as_bytes())?.as_bytes()).ok()?;
+        let suffix =
+            std::str::from_utf8(PUBLIC_SUFFIX_LIST.domain(host.as_bytes())?.as_bytes()).ok()?;
         Some(suffix)
     }
 
