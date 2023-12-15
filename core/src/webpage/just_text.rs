@@ -19,7 +19,54 @@ use std::collections::{HashMap, HashSet};
 use kuchiki::{iter::NodeEdge, NodeRef};
 use whatlang::Lang;
 
-use super::Preprocessor;
+pub struct Preprocessor<const N: usize> {
+    removed_tags: [&'static str; N],
+    num_open_tags: [i64; N],
+}
+
+impl<const N: usize> Preprocessor<N> {
+    pub fn new(removed_tags: [&'static str; N]) -> Self {
+        Self {
+            removed_tags,
+            num_open_tags: [0; N],
+        }
+    }
+
+    pub fn update(&mut self, edge: &NodeEdge<NodeRef>) {
+        match edge {
+            NodeEdge::Start(node) => {
+                if let Some(element) = node.as_element() {
+                    let element_name: &str = &element.name.local;
+                    if let Some((_, n)) = self
+                        .removed_tags
+                        .iter()
+                        .zip(self.num_open_tags.iter_mut())
+                        .find(|(name, _)| **name == element_name)
+                    {
+                        *n += 1;
+                    }
+                }
+            }
+            NodeEdge::End(node) => {
+                if let Some(element) = node.as_element() {
+                    let element_name: &str = &element.name.local;
+                    if let Some((_, n)) = self
+                        .removed_tags
+                        .iter()
+                        .zip(self.num_open_tags.iter_mut())
+                        .find(|(name, _)| **name == element_name)
+                    {
+                        *n -= 1;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn is_inside_removed(&self) -> bool {
+        self.num_open_tags.iter().any(|n| *n > 0)
+    }
+}
 
 // implementation of the JustText algorithm described in this thesis: https://is.muni.cz/th/45523/fi_d/phdthesis.pdf
 // reference implementation: https://github.com/miso-belica/jusText/blob/main/justext/core.py

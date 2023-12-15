@@ -134,6 +134,13 @@ fn schema_item_to_stackoverflow_answer(
     }
 }
 
+/// Limit the number of characters in a snippet
+/// to be less than `limit` characters. At least a single
+/// passage is returned, so the total number of characters
+/// in the returned passages may be more than `limit`.
+///
+/// This is useful for limiting the number of characters
+/// we send to the frontend.
 fn limit_chars(passages: &[CodeOrText], limit: usize) -> Vec<CodeOrText> {
     let mut res = Vec::new();
     let mut taken_chars = 0;
@@ -180,20 +187,9 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
 
             let mut answers = Vec::new();
 
-            if let Some(ans) = item
-                .properties
-                .get("acceptedAnswer")
-                .cloned()
-                .and_then(|ans| ans.one())
-                .and_then(|prop| prop.try_into_item())
-                .and_then(|item| {
-                    schema_item_to_stackoverflow_answer(
-                        item,
-                        Url::parse(&webpage.url).unwrap(),
-                        true,
-                    )
-                })
-            {
+            let url = Url::parse(&webpage.url).unwrap();
+
+            if let Some(ans) = get_accepted_answer(&item, url) {
                 answers.push(ans);
             }
 
@@ -251,15 +247,21 @@ pub fn create_stackoverflow_sidebar(schema_org: Vec<Item>, url: Url) -> Result<D
             .and_then(|prop| prop.try_into_string())
             .ok_or(Error::InvalidStackoverflowSchema)?;
 
-        item.properties
-            .get("acceptedAnswer")
-            .cloned()
-            .and_then(|ans| ans.one())
-            .and_then(|prop| prop.try_into_item())
-            .and_then(|item| schema_item_to_stackoverflow_answer(item, url, true))
+        get_accepted_answer(&item, url)
             .map(|answer| DisplayedSidebar::StackOverflow { title, answer })
             .ok_or(Error::InvalidStackoverflowSchema.into())
     } else {
         Err(Error::InvalidStackoverflowSchema.into())
     }
+}
+
+fn get_accepted_answer(item: &Item, url: Url) -> Option<StackOverflowAnswer> {
+    let item = item
+        .properties
+        .get("acceptedAnswer")
+        .cloned()?
+        .one()?
+        .try_into_item()?;
+
+    schema_item_to_stackoverflow_answer(item, url, true)
 }

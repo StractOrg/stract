@@ -94,8 +94,10 @@ impl DerivedCentrality {
         let non_normalized = RocksDbStore::open(output.as_ref().join("non_normalized"));
 
         let norms: Mutex<BTreeMap<NodeID, f64>> = Mutex::new(BTreeMap::new());
+        let pb = indicatif::ProgressBar::new(num_nodes as u64);
 
-        page_graph.node_ids().par_bridge().for_each(|(node, id)| {
+        page_graph.node_ids().for_each(|(node, id)| {
+            pb.inc(1);
             if has_outgoing.contains(&id.bit_64()) {
                 let host_node = node.clone().into_host().id();
 
@@ -123,6 +125,8 @@ impl DerivedCentrality {
                 }
             }
         });
+
+        pb.finish_and_clear();
 
         let norms = norms.into_inner().unwrap();
 
