@@ -6,7 +6,6 @@
   import ThesaurusWidgetMeaning from './ThesaurusWidgetMeaning.svelte';
 
   export let widget: ThesaurusWidget;
-  console.log(widget);
 
   // convert meanings into a list of either pos or meanings
   enum MeaningType {

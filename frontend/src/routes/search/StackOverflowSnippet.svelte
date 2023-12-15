@@ -3,6 +3,7 @@
   import Code from '$lib/components/Code.svelte';
   import HandThumbUp from '~icons/heroicons/hand-thumb-up';
   import Check from '~icons/heroicons/check';
+  import StackOverflowText from './StackOverflowText.svelte';
 
   export let question: StackOverflowQuestion;
   export let answers: StackOverflowAnswer[];
@@ -15,7 +16,7 @@
     {/if}
   {/each}
 </div>
-<div class="flex space-x-4 pt-2">
+<div class="flex space-x-4 pt-2 text-xs">
   {#each answers.slice(0, 3) as answer}
     <div class="w-1/3 overflow-hidden">
       <a
@@ -43,7 +44,7 @@
         <div>
           {#each answer.body as passage}
             {#if passage.type == 'text'}
-              {passage.value}
+              <StackOverflowText text={passage.value} />
             {:else if passage.type == 'code'}
               <Code code={passage.value} transparentBackground={true} />
             {/if}

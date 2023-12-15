@@ -33,7 +33,7 @@ use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::search_ctx::Ctx;
-use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage, HighlightedSpellCorrection};
+use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage};
 use crate::webgraph::Node;
 use crate::{inverted_index, live_index, Error, Result};
 
@@ -277,7 +277,6 @@ where
                 .collect();
 
             let scorer = inbound_sim.scorer(&liked_hosts, &disliked_hosts, false);
-
             aggregator.set_inbound_similarity(scorer);
         }
 
@@ -341,8 +340,6 @@ where
         let sidebar = self.entity_sidebar(query);
 
         Ok(InitialWebsiteResult {
-            // spell_corrected_query: correction,
-            spell_corrected_query: None,
             websites: inverted_index_result.webpages,
             num_websites: inverted_index_result.num_hits,
             has_more: inverted_index_result.has_more,
@@ -445,13 +442,11 @@ where
         }
 
         Ok(WebsitesResult {
-            spell_corrected_query: search_result
-                .spell_corrected_query
-                .map(HighlightedSpellCorrection::from),
             num_hits: search_result.num_websites,
             webpages,
             discussions: None,
             widget: None,
+            spell_corrected_query: None,
             direct_answer: None,
             sidebar: search_result
                 .entity_sidebar

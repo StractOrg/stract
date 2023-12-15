@@ -4,25 +4,25 @@
   export let code: string;
   export let transparentBackground = false;
 
-  $: codeHasNewlines = code.includes('\n');
+  $: isInline = !code.includes('\n');
 </script>
 
-{#if codeHasNewlines}
+{#if isInline}
+  <span
+    class="code rounded-md {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus inline-block mx-1"
+  >
+    <span class="overflow-auto px-2">
+      <code>{code}</code>
+    </span>
+  </span>
+{:else}
   <div
-    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
+    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus my-2"
   >
     <div class="overflow-auto px-3 py-2">
       <HighlightAuto {code} />
     </div>
   </div>
-{:else}
-  <span
-    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-sm text-neutral-focus"
-  >
-    <span class="overflow-auto px-3 py-2">
-      <code>{code}</code>
-    </span>
-  </span>
 {/if}
 
 <style lang="postcss">

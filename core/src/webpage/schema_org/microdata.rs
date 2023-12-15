@@ -57,7 +57,7 @@ fn parse_properties(node: NodeRef) -> Vec<RawProperty> {
                     );
 
                     res.push(RawProperty::Item(RawItem {
-                        itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
+                        itemtype: Some(RawOneOrMany::One("SoftwareSourceCode".to_string())),
                         properties,
                     }));
 

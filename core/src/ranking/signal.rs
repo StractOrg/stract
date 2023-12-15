@@ -924,6 +924,9 @@ impl SignalAggregator {
     }
 
     pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
+        let mut scorer = scorer;
+        scorer.set_default_if_precalculated(true);
+
         self.inbound_similarity = Some(RefCell::new(scorer));
     }
 

@@ -115,7 +115,10 @@ impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
-        let node = Node::from(self.host.to_string()).into_host();
+        let url = Url::parse(&("http://".to_string() + self.host.as_str()))
+            .map_err(|_| sonic::Error::BadRequest)?;
+
+        let node = Node::from(url).into_host();
 
         if server.similar_hosts_finder.knows_about(&node) {
             Ok(Some(node))

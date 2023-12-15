@@ -487,11 +487,11 @@ impl EdgeStore {
 
                 let edge_labels = &self.edge_labels[edge_range];
                 let edge_labels = self.compression.decompress(edge_labels);
-                let edge_labels: Vec<String> = bincode::deserialize(&edge_labels).unwrap();
+                let edge_labels: Vec<_> = bincode::deserialize(&edge_labels).unwrap();
 
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
+                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_labels
                     .into_iter()
@@ -528,7 +528,7 @@ impl EdgeStore {
 
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
+                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_nodes
                     .into_iter()
@@ -571,7 +571,7 @@ impl EdgeStore {
                 let node_range = bincode::deserialize::<Range<usize>>(&val).unwrap();
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<NodeID> = bincode::deserialize(&edge_nodes).unwrap();
+                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
 
                 edge_nodes.into_iter().map(move |other| {
                     if self.reversed {

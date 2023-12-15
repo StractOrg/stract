@@ -277,7 +277,12 @@ mod tests {
             return;
         }
 
-        let spell_checker = SpellChecker::open(path, CorrectionConfig::default()).unwrap();
+        let conf = CorrectionConfig {
+            correction_threshold: 16.0,
+            ..Default::default()
+        };
+
+        let spell_checker = SpellChecker::open(path, conf).unwrap();
 
         assert_eq!(spell_checker.correct("hello", &Lang::Eng), None);
         assert_eq!(

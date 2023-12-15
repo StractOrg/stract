@@ -33,7 +33,6 @@ use crate::{
     search_prettifier::{
         DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
     },
-    web_spell::Correction,
     webpage::region::Region,
     widgets::Widget,
 };
@@ -76,7 +75,6 @@ pub struct SearchQuery {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
-    pub spell_corrected_query: Option<Correction>,
     pub num_websites: Option<usize>,
     pub websites: Vec<RankingWebsite>,
     pub has_more: bool,

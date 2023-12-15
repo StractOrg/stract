@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(
             text[1],
             RawProperty::Item(RawItem {
-                itemtype: Some(RawOneOrMany::One("SourceCode".to_string())),
+                itemtype: Some(RawOneOrMany::One("SoftwareSourceCode".to_string())),
                 properties: hashmap! {
                     "text".to_string() => RawOneOrMany::One(RawProperty::String("<p>\n<a href=\"foo\">\n".to_string()))
                 }
@@ -414,7 +414,7 @@ mod tests {
                 .unwrap()
                 .one()
                 .unwrap(),
-            "SourceCode".to_string()
+            "SoftwareSourceCode".to_string()
         );
         assert!(
             parts[1]

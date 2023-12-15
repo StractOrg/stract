@@ -50,6 +50,22 @@ pub enum CodeOrText {
     Text(String),
 }
 
+fn parse_code(item: schema_org::Item) -> Option<CodeOrText> {
+    let s = item
+        .properties
+        .get("text")
+        .and_then(|p| p.clone().one())
+        .and_then(|prop| prop.try_into_string())
+        .unwrap_or_default()
+        .to_string();
+
+    if s.is_empty() {
+        return None;
+    }
+
+    Some(CodeOrText::Code(s))
+}
+
 fn parse_so_answer(
     text: OneOrMany<Property>,
     date: OneOrMany<Property>,
@@ -63,15 +79,7 @@ fn parse_so_answer(
         .into_iter()
         .map(|prop| match prop {
             Property::String(s) => CodeOrText::Text(s),
-            Property::Item(item) => CodeOrText::Code(
-                item.properties
-                    .get("text")
-                    .and_then(|p| p.clone().one())
-                    .and_then(|prop| prop.try_into_string())
-                    .unwrap_or_default()
-                    .trim()
-                    .to_string(),
-            ),
+            Property::Item(item) => parse_code(item).unwrap(),
         })
         .collect();
 
@@ -148,8 +156,9 @@ fn limit_chars(passages: &[CodeOrText], limit: usize) -> Vec<CodeOrText> {
 }
 
 pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
-    match webpage
-        .schema_org
+    let schema_org = &webpage.schema_org;
+
+    match schema_org
         .iter()
         .find(|item| item.types_contains("QAPage"))
         .and_then(|item| item.properties.get("mainEntity"))
@@ -165,13 +174,7 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 .into_iter()
                 .map(|prop| match prop {
                     Property::String(s) => CodeOrText::Text(s),
-                    Property::Item(item) => CodeOrText::Code(
-                        item.properties
-                            .get("text")
-                            .and_then(|p| p.clone().one())
-                            .and_then(|prop| prop.try_into_string())
-                            .unwrap_or_default(),
-                    ),
+                    Property::Item(item) => parse_code(item).unwrap(),
                 })
                 .collect();
 

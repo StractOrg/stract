@@ -53,6 +53,7 @@ struct NodeScorer {
     inbound: bitvec_similarity::BitVec,
     precalculated: Arc<PreCalculatedSimilarities>,
     self_score: f64,
+    default_if_precalculated: bool,
 }
 
 impl NodeScorer {
@@ -66,6 +67,7 @@ impl NodeScorer {
             inbound,
             precalculated,
             self_score: 1.0,
+            default_if_precalculated: false,
         }
     }
 
@@ -73,9 +75,21 @@ impl NodeScorer {
         self.self_score = self_score;
     }
 
+    fn set_default_if_precalculated(&mut self, default_if_precalculated: bool) {
+        self.default_if_precalculated = default_if_precalculated;
+    }
+
     fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
         if self.node == *other {
             self.self_score
+        } else if self.default_if_precalculated {
+            self.precalculated
+                .get_or_default_if_precalculated(&self.node, other)
+                .or_else(|| {
+                    self.precalculated
+                        .get_or_default_if_precalculated(other, &self.node)
+                })
+                .unwrap_or_else(|| self.inbound.sim(other_inbound))
         } else {
             self.precalculated
                 .get(&self.node, other)
@@ -130,6 +144,24 @@ impl Scorer {
             scorer.set_self_score(self_score);
         }
     }
+
+    /// Speedups calculation when we encounter a node for which we have
+    /// precalculated similarities. This means, the chosen node is a node
+    /// with many inbound links. If we encounter another node for which
+    /// we have no precalcalculated similarities with the chosen node, they
+    /// are most likely not very similar, so we can just assume a similarity
+    /// of 0.0.
+    ///
+    /// Needless to say, this is less accurate than calculating the similarity.
+    pub fn set_default_if_precalculated(&mut self, default_if_precalculated: bool) {
+        for scorer in self.liked.iter_mut() {
+            scorer.set_default_if_precalculated(default_if_precalculated);
+        }
+
+        for scorer in self.disliked.iter_mut() {
+            scorer.set_default_if_precalculated(default_if_precalculated);
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -138,6 +170,10 @@ struct PreCalculatedSimilarities {
 }
 
 impl PreCalculatedSimilarities {
+    fn get_or_default_if_precalculated(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
+        Some(self.map.get(node)?.get(other).copied().unwrap_or_default())
+    }
+
     fn get(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
         self.map.get(node)?.get(other).copied()
     }

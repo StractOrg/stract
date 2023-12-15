@@ -50,6 +50,8 @@ impl RemoteWebgraph {
 }
 
 pub mod host {
+    use url::Url;
+
     use super::*;
 
     #[derive(serde::Deserialize, ToSchema)]
@@ -176,7 +178,9 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<HostLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.host).into_host();
+        let url = Url::parse(&("http://".to_string() + params.host.as_str()))
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(url).into_host();
         let links = ingoing_links(state, node, GraphLevel::Host)
             .await
             .map_err(|_| {
@@ -198,7 +202,9 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<HostLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.host).into_host();
+        let url = Url::parse(&("http://".to_string() + params.host.as_str()))
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(url).into_host();
         let links = outgoing_links(state, node, GraphLevel::Host)
             .await
             .map_err(|_| {

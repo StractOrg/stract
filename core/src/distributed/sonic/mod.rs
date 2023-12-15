@@ -46,6 +46,9 @@ pub enum Error {
     #[error("Could not build connection pool")]
     PoolCreation,
 
+    #[error("The request could not be processed")]
+    BadRequest,
+
     #[error("Other")]
     Other(#[from] anyhow::Error),
 }

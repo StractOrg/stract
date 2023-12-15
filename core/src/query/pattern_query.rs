@@ -59,19 +59,14 @@ impl PatternQuery {
         schema: &tantivy::schema::Schema,
         fastfield_reader: FastFieldReader,
     ) -> Self {
-        let mut field = Field::Text(field);
-        let mut tv_field = schema.get_field(field.name()).unwrap();
+        let field = Field::Text(field);
+        let tv_field = schema.get_field(field.name()).unwrap();
 
         if can_optimize_site_domain(&patterns, field) {
             if patterns.len() == 3 {
                 let PatternPart::Raw(term) = &patterns[1] else {
                     unreachable!()
                 };
-
-                if let Field::Text(TextField::UrlForSiteOperator) = field {
-                    field = Field::Text(TextField::SiteWithout);
-                    tv_field = schema.get_field(field.name()).unwrap();
-                }
 
                 return Self {
                     patterns: Vec::new(),
@@ -224,7 +219,7 @@ impl FastSiteDomainPatternWeight {
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
         let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::SiteWithout) => Field::Text(TextField::SiteNoTokenizer),
+            Field::Text(TextField::UrlForSiteOperator) => Field::Text(TextField::SiteNoTokenizer),
             Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
             _ => unreachable!(),
         };

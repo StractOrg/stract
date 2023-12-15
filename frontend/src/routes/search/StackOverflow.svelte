@@ -2,6 +2,7 @@
   import HandThumbUp from '~icons/heroicons/hand-thumb-up';
   import type { StackOverflowAnswer } from '$lib/api';
   import Code from '$lib/components/Code.svelte';
+  import StackOverflowText from './StackOverflowText.svelte';
 
   export let title: string;
   export let answer: StackOverflowAnswer;
@@ -28,12 +29,12 @@
     </div>
   </div>
   <hr class="border-stone-700" />
-  <div class="space-y-3 text-sm inline-block max-h-96 overflow-y-scroll">
+  <div class="text-sm inline-block max-h-96 overflow-y-scroll">
     {#each answer.body as part}
       {#if part.type == 'code'}
         <Code code={part.value} />
       {:else if part.type == 'text'}
-        <span>{part.value}</span>
+        <StackOverflowText text={part.value} />
       {/if}
     {/each}
   </div>
