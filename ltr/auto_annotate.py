@@ -114,7 +114,7 @@ def simplify_snippet(snippet):
 
 
 def get_search_results(query):
-    url = "https://trystract.com/beta/api/search"
+    url = "https://stract.com/beta/api/search"
 
     payload = {
         "query": query,

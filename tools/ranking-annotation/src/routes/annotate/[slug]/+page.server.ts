@@ -4,7 +4,7 @@ import { asSimpleWebpage } from "$lib/webpage";
 import { redirect } from "@sveltejs/kit";
 
 const search = async (query: string) => {
-  return await fetch(`https://trystract.com/beta/api/search`, {
+  return await fetch(`https://stract.com/beta/api/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

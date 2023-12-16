@@ -57,7 +57,7 @@ queries = set(
 )
 
 
-## exported from https://trystract.com/explore
+## exported from https://stract.com/explore
 nsfw_optic = """DiscardNonMatching;
 Rule {
 	Matches {
@@ -5068,7 +5068,7 @@ Like(Site("redtube.com"));
 def search(json):
     json["numResults"] = 50
     r = requests.post(
-        "https://trystract.com/beta/api/search",
+        "https://stract.com/beta/api/search",
         json=json,
     ).json()
 

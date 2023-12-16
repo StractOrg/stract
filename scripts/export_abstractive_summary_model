@@ -75,6 +75,6 @@ traced_decoder.save("data/summarizer/abstractive/traced_decoder.pt")
 traced_encoder.save("data/summarizer/abstractive/traced_encoder.pt")
 
 urllib.request.urlretrieve(
-    "http://s3.trystract.com/public/truncated_word2vec.bin.gz",
+    "http://s3.stract.com/public/truncated_word2vec.bin.gz",
     "data/summarizer/word2vec.bin.gz",
 )

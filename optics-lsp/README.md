@@ -1,5 +1,5 @@
 # Optics VS Code Extension
-This extension makes it easier to edit `.optic` files. An optic is used by [Stract](https://trystract.com) and gives you complete control over which search results gets returned and how they are ranked. This extension includes syntax highlighting for the optics language and an LSP to detect syntax errors.
+This extension makes it easier to edit `.optic` files. An optic is used by [Stract](https://stract.com) and gives you complete control over which search results gets returned and how they are ranked. This extension includes syntax highlighting for the optics language and an LSP to detect syntax errors.
 
 ## Sample `.optic` syntax
 This small sample hopefully gives you a quick introduction to the optics language.

@@ -1,5 +1,5 @@
 [package]
-authors = ['Stract ApS. <hello@trystract.com>']
+authors = ['Stract ApS. <hello@stract.com>']
 default-run = "stract"
 edition = "2021"
 license = "AGPL-3.0-or-later"

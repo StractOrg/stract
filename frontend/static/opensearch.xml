@@ -2,8 +2,8 @@
   <ShortName>Stract</ShortName>
   <Description>Open source search engine.</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="32" height="32" type="image/x-icon">https://trystract.com/favicon.ico</Image>
-  <Url rel="results" type="text/html" template="https://trystract.com/search?q={searchTerms}"/>
-  <Url rel="suggestions" type="application/x-suggestions+json" template="https://trystract.com/beta/api/autosuggest/browser?q={searchTerms}"/>
-  <moz:SearchForm>https://trystract.com/</moz:SearchForm>
+  <Image width="32" height="32" type="image/x-icon">https://stract.com/favicon.ico</Image>
+  <Url rel="results" type="text/html" template="https://stract.com/search?q={searchTerms}"/>
+  <Url rel="suggestions" type="application/x-suggestions+json" template="https://stract.com/beta/api/autosuggest/browser?q={searchTerms}"/>
+  <moz:SearchForm>https://stract.com/</moz:SearchForm>
 </OpenSearchDescription>

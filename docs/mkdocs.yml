@@ -31,6 +31,6 @@ extra_css:
 extra:
   expand: true
   generator: false
-  homepage: https://trystract.com
+  homepage: https://stract.com
 plugins:
   - search

@@ -2,16 +2,16 @@
 <p align="center">
   <img src="git-assets/big-logo.svg" height="120" />
   <br />
-  <a target="_blank" href="https://docs.trystract.com">
+  <a target="_blank" href="https://docs.stract.com">
     <img src="https://img.shields.io/badge/overview-docs-0b7bff?labelColor=white" style="max-width: 100%;">
   </a>
-  <a target="_blank" href="https://trystract.com/beta/api/docs">
+  <a target="_blank" href="https://stract.com/beta/api/docs">
     <img src="https://img.shields.io/badge/api-docs-0b7bff?labelColor=white" style="max-width: 100%;">
   </a>
 </p>
 <br />
 
-Stract is an open source web search engine hosted at [trystract.com](https://trystract.com/) targeted towards tinkerers and developers.
+Stract is an open source web search engine hosted at [stract.com](https://stract.com/) targeted towards tinkerers and developers.
 
 <br />
 <p align="center">
@@ -35,13 +35,13 @@ Stract is an open source web search engine hosted at [trystract.com](https://try
 * And much more!
 
 # 👩‍💻 Setup
-We recommend everyone to use the hosted version at [trystract.com](https://trystract.com/), but you can also follow the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md) to setup the engine locally.
+We recommend everyone to use the hosted version at [stract.com](https://stract.com/), but you can also follow the steps outlined in [CONTRIBUTING.md](CONTRIBUTING.md) to setup the engine locally.
 
 # ‍💼 License
 Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) file.
 
 # 📬 Contact
-You can contact us at [hello@trystract.com](mailto:hello@trystract.com) or come hang out in our [Discord](https://discord.gg/BmzKHffWJM) or [Matrix](https://matrix.to/#/#stract:matrix.org) server.
+You can contact us at [hello@stract.com](mailto:hello@stract.com) or come hang out in our [Discord](https://discord.gg/BmzKHffWJM) or [Matrix](https://matrix.to/#/#stract:matrix.org) server.
 
 # 🏆 Thank you!
 We truly stand on the shoulders of giants and this project would not have been even remotely feasible without them. An especially huge thank you to

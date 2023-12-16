@@ -12,6 +12,6 @@ token = "<user_agent_token>" # e.g. 'StractBot'
 [s3]
 access_key = "<access_key>"
 bucket = "crawl"
-endpoint = "http://s3.trystract.com"
+endpoint = "http://s3.stract.com"
 folder = "test"
 secret_key = "<secret_key>"

@@ -54,7 +54,7 @@ fn download_files() {
                 }
 
                 info!("Downloading {}", name);
-                let body = reqwest::get(format!("http://s3.trystract.com/{BUCKET_NAME}/{name}"))
+                let body = reqwest::get(format!("http://s3.stract.com/{BUCKET_NAME}/{name}"))
                     .await
                     .unwrap();
 
@@ -265,11 +265,9 @@ pub fn alice() -> Result<()> {
         .block_on(async {
             for name in ["model.safetensors", "tokenizer.json"] {
                 info!("Downloading {}", name);
-                let body = reqwest::get(format!(
-                    "http://s3.trystract.com/{BUCKET_NAME}/alice/{name}"
-                ))
-                .await
-                .unwrap();
+                let body = reqwest::get(format!("http://s3.stract.com/{BUCKET_NAME}/alice/{name}"))
+                    .await
+                    .unwrap();
 
                 let mut file = File::create(Path::new(DATA_PATH).join("alice").join(name))
                     .await

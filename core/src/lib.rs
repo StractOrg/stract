@@ -16,7 +16,7 @@
 
 //! Main library for Stract.
 
-#![doc(html_logo_url = "https://trystract.com/images/biglogo.svg")]
+#![doc(html_logo_url = "https://stract.com/images/biglogo.svg")]
 // #![warn(clippy::pedantic)]
 // #![warn(missing_docs)]
 // #![warn(clippy::missing_docs_in_private_items)]

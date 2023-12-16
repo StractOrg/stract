@@ -2,7 +2,7 @@
 
 Stract is an [open source](https://github.com/StractOrg/stract/) web search engine. StractBot is the name of our crawler that collects pages from the web in order to build the index.
 It is written in Rust and the source code can be found [here](https://github.com/StractOrg/stract/tree/main/core/src/crawler).
-The crawler uses the user agent `Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://trystract.com/webmasters)`.
+The crawler uses the user agent `Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://stract.com/webmasters)`.
 
 ## Politeness
 
@@ -15,4 +15,4 @@ The robots.txt file is cached for 1 hour, so changes to the file should be respe
 
 ## Contact us
 
-If you have any concerns or bad experiences with our crawler, please don't hesitate to reach out to us at [crawler@trystract.com](mailto:crawler@trystract.com). Chances are that others experience the same problems and we would love to fix them.
+If you have any concerns or bad experiences with our crawler, please don't hesitate to reach out to us at [crawler@stract.com](mailto:crawler@stract.com). Chances are that others experience the same problems and we would love to fix them.
