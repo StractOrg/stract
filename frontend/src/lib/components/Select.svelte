@@ -43,6 +43,9 @@
 
 <style lang="postcss">
   select {
-    @apply rounded border-none bg-transparent py-0 text-right;
+    @apply rounded border-none bg-transparent py-0 text-right bg-base-100;
+  }
+  option {
+    @apply text-neutral-focus bg-base-100;
   }
 </style>

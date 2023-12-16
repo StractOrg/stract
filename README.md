@@ -2,6 +2,7 @@
 <p align="center">
   <img src="git-assets/big-logo.svg" height="120" />
   <br />
+  <br />
   <a target="_blank" href="https://docs.stract.com">
     <img src="https://img.shields.io/badge/overview-docs-0b7bff?labelColor=white" style="max-width: 100%;">
   </a>
