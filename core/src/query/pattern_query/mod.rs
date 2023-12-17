@@ -167,7 +167,7 @@ impl tantivy::query::Query for PatternQuery {
 }
 
 #[derive(Debug)]
-enum SmallPatternPart {
+pub enum SmallPatternPart {
     Term,
     Wildcard,
     Anchor,
