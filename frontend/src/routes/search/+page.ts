@@ -47,7 +47,7 @@ export const load: PageLoad = async (req) => {
     prevPageSearchParams,
     nextPageSearchParams,
     results,
-    globals: globals({
+    globals: await globals({
       title: `${params.query} – Stract`,
       header: { divider: true },
     }),
