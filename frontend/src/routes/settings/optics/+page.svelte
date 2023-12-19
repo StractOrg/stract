@@ -35,7 +35,7 @@
       if (e instanceof TypeError) {
         error = e;
       }
-      console.error(e);
+      console.error('Failed to add optic', e);
     }
   };
 

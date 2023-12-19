@@ -424,11 +424,13 @@ impl<S: DatumStream> JobExecutor<S> {
         let res = self.fetch(url.clone()).await?;
         let fetch_time = start.elapsed();
 
-        let mut delay = fetch_time.mul_f32(self.politeness_factor);
+        let mut delay = fetch_time;
 
         if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
             delay = Duration::from_millis(self.config.min_crawl_delay_ms);
         }
+
+        delay = delay.mul_f32(self.politeness_factor);
 
         if delay > Duration::from_millis(self.config.max_crawl_delay_ms) {
             delay = Duration::from_millis(self.config.max_crawl_delay_ms);
