@@ -107,8 +107,7 @@ Remember to always give proper attributions to the sources you use from the sear
     }
 }
 
-pub fn router<S: Clone + Send + Sync + 'static, B: axum::body::HttpBody + Send + Sync + 'static>(
-) -> impl Into<Router<S, B>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> impl Into<Router<S>> {
     SwaggerUi::new("/beta/api/docs")
         .url("/beta/api/docs/openapi.json", ApiDoc::openapi())
         .config(

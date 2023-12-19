@@ -247,11 +247,11 @@ pub fn metrics_router(registry: crate::metrics::PrometheusRegistry) -> Router {
         .with_state(Arc::new(registry))
 }
 
-async fn search_metric<B>(
+async fn search_metric(
     extract::State(state): extract::State<Arc<State>>,
     extract::ConnectInfo(addr): extract::ConnectInfo<SocketAddr>,
-    request: axum::http::Request<B>,
-    next: middleware::Next<B>,
+    request: axum::extract::Request,
+    next: middleware::Next,
 ) -> Response {
     // It is very important that the ip address is not stored. It is only used
     // for a probabilistic estimate of the number of unique users using a hyperloglog datastructure.
