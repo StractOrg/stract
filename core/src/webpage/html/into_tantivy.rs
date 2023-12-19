@@ -17,7 +17,7 @@
 use crate::{
     ceil_char_boundary,
     prehashed::hash,
-    schema::{FastField, TextField},
+    schema::{FastField, FieldMapping, TextField},
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
@@ -30,7 +30,7 @@ use whatlang::Lang;
 
 use super::{find_recipe_first_ingredient_tag_id, schema_org, Html};
 
-use crate::schema::{Field, ALL_FIELDS, FLOAT_SCALING};
+use crate::schema::{Field, FLOAT_SCALING};
 
 impl Html {
     fn pretokenize_title(&self) -> Result<PreTokenizedString> {
@@ -197,7 +197,10 @@ impl Html {
         let domain_hash = split_u128(hash(self.url().root_domain().unwrap_or_default()).0);
         let title_hash = split_u128(hash(self.title().unwrap_or_default()).0);
 
-        for field in &ALL_FIELDS {
+        for field in schema
+            .fields()
+            .filter_map(|(field, _)| FieldMapping::get(field.field_id() as usize))
+        {
             let tantivy_field = schema
                 .get_field(field.name())
                 .unwrap_or_else(|_| panic!("Unknown field: {}", field.name()));

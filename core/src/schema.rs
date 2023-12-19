@@ -292,7 +292,7 @@ pub enum Field {
     Text(TextField),
 }
 
-pub static ALL_FIELDS: [Field; 65] = [
+static ALL_FIELDS: [Field; 65] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -360,6 +360,20 @@ pub static ALL_FIELDS: [Field; 65] = [
     Field::Fast(FastField::LikelyHasAds),
     Field::Fast(FastField::LikelyHasPaywall),
 ];
+
+pub struct FieldMapping;
+
+impl FieldMapping {
+    #[inline]
+    pub fn get(field_id: usize) -> Option<&'static Field> {
+        ALL_FIELDS.get(field_id)
+    }
+
+    #[inline]
+    pub fn all() -> impl Iterator<Item = &'static Field> {
+        ALL_FIELDS.iter()
+    }
+}
 
 impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
