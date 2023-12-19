@@ -38,7 +38,9 @@ pub struct SummarizeParams {
 
 fn summarize_blocking(iter: impl Iterator<Item = String>, tx: UnboundedSender<String>) {
     for tok in iter {
-        tx.send(tok).unwrap();
+        if tx.send(tok).is_err() {
+            break;
+        }
     }
 }
 

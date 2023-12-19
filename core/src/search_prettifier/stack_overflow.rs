@@ -77,9 +77,9 @@ fn parse_so_answer(
     let text: Vec<_> = text
         .many()
         .into_iter()
-        .map(|prop| match prop {
-            Property::String(s) => CodeOrText::Text(s),
-            Property::Item(item) => parse_code(item).unwrap(),
+        .filter_map(|prop| match prop {
+            Property::String(s) => Some(CodeOrText::Text(s)),
+            Property::Item(item) => parse_code(item),
         })
         .collect();
 
