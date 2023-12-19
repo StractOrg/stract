@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{future::IntoFuture, net::SocketAddr};
 
 use anyhow::Result;
+use tokio::net::TcpListener;
 
 use crate::{
     api::{metrics_router, router, user_count, Counters},
@@ -82,12 +83,19 @@ pub async fn run(config: config::ApiConfig) -> Result<()> {
 
     let addr = config.host;
     tracing::info!("api server listening on {}", addr);
-    let server =
-        axum::Server::bind(&addr).serve(app.into_make_service_with_connect_info::<SocketAddr>());
+    let server = axum::serve(
+        TcpListener::bind(&addr).await.unwrap(),
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .into_future();
 
     let addr = config.prometheus_host;
     tracing::info!("prometheus exporter listening on {}", addr);
-    let metrics_server = axum::Server::bind(&addr).serve(metrics_app.into_make_service());
+    let metrics_server = axum::serve(
+        TcpListener::bind(&addr).await.unwrap(),
+        metrics_app.into_make_service(),
+    )
+    .into_future();
 
     tokio::try_join!(server, metrics_server)?;
 

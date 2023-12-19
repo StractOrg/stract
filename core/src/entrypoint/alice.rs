@@ -27,7 +27,7 @@ use axum::{
     Router,
 };
 use base64::Engine;
-use tokio::sync::Mutex;
+use tokio::{net::TcpListener, sync::Mutex};
 use tokio_stream::Stream;
 use tokio_stream::StreamExt as _;
 use tracing::info;
@@ -192,10 +192,12 @@ pub async fn run(config: AliceLocalConfig) -> Result<(), anyhow::Error> {
     let app = router(alice, cluster);
 
     info!("alice is ready to accept requests on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(
+        TcpListener::bind(&addr).await.unwrap(),
+        app.into_make_service(),
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }
