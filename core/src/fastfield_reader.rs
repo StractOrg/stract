@@ -20,7 +20,7 @@ use tantivy::{columnar::ColumnValues, DocId, SegmentId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{DataType, FastField, ALL_FIELDS},
+    schema::{DataType, FastField, FieldMapping},
 };
 
 #[derive(Default, Clone)]
@@ -48,7 +48,7 @@ impl FastFieldReader {
 
             let mut field_readers = Vec::new();
 
-            for field in ALL_FIELDS.iter().filter_map(|field| field.as_fast()) {
+            for field in FieldMapping::all().filter_map(|field| field.as_fast()) {
                 let field_reader = match field.data_type() {
                     DataType::U64 => {
                         let reader = fastfield_readers.u64(field.name()).unwrap();

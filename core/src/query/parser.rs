@@ -22,7 +22,7 @@ use tantivy::{
 use crate::{
     bangs::BANG_PREFIXES,
     floor_char_boundary,
-    schema::{Field, TextField, ALL_FIELDS},
+    schema::{Field, FieldMapping, TextField},
 };
 
 #[derive(Debug, Clone)]
@@ -103,10 +103,10 @@ fn simple_into_tantivy(
         .iter()
         .filter(|field| {
             matches!(
-                ALL_FIELDS[field.field_id() as usize],
-                Field::Text(TextField::AllBody)
-                    | Field::Text(TextField::Title)
-                    | Field::Text(TextField::Url)
+                FieldMapping::get(field.field_id() as usize),
+                Some(Field::Text(TextField::AllBody))
+                    | Some(Field::Text(TextField::Title))
+                    | Some(Field::Text(TextField::Url))
             )
         })
         .copied()
@@ -150,22 +150,23 @@ impl Term {
             Term::Phrase(phrase) => {
                 let mut phrases = Vec::with_capacity(fields.len());
 
-                for field in fields
+                for (field, tv_field) in fields
                     .iter()
-                    .filter(|field| ALL_FIELDS[field.field_id() as usize].is_searchable())
-                    .filter(|field| ALL_FIELDS[field.field_id() as usize].has_pos())
+                    .filter_map(|tv_field| {
+                        FieldMapping::get(tv_field.field_id() as usize)
+                            .map(|mapped| (mapped, *tv_field))
+                    })
+                    .filter(|(field, _)| field.is_searchable())
+                    .filter(|(field, _)| field.has_pos())
                 {
-                    let mut processed_terms = Term::process_tantivy_term(phrase, *field);
+                    let mut processed_terms = Term::process_tantivy_term(phrase, tv_field);
 
                     if processed_terms.is_empty() {
                         continue;
                     }
 
                     if processed_terms.len() == 1 {
-                        let options = ALL_FIELDS[field.field_id() as usize]
-                            .as_text()
-                            .unwrap()
-                            .index_option();
+                        let options = field.as_text().unwrap().index_option();
 
                         phrases.push((
                             Occur::Should,
@@ -196,8 +197,8 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            ALL_FIELDS[field.field_id() as usize],
-                            Field::Text(TextField::Title)
+                            FieldMapping::get(field.field_id() as usize),
+                            Some(Field::Text(TextField::Title))
                         )
                     })
                     .unwrap();
@@ -209,8 +210,8 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            ALL_FIELDS[field.field_id() as usize],
-                            Field::Text(TextField::AllBody)
+                            FieldMapping::get(field.field_id() as usize),
+                            Some(Field::Text(TextField::AllBody))
                         )
                     })
                     .unwrap();
@@ -222,8 +223,8 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            ALL_FIELDS[field.field_id() as usize],
-                            Field::Text(TextField::Url)
+                            FieldMapping::get(field.field_id() as usize),
+                            Some(Field::Text(TextField::Url))
                         )
                     })
                     .unwrap();
@@ -247,7 +248,11 @@ impl Term {
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> {
         fields
             .iter()
-            .filter(|field| ALL_FIELDS[field.field_id() as usize].is_searchable())
+            .filter_map(|tv_field| {
+                FieldMapping::get(tv_field.field_id() as usize)
+                    .filter(|field| field.is_searchable())
+                    .map(|_| tv_field)
+            })
             .map(|field| (Occur::Should, Term::tantivy_text_query(field, &term.0)))
             .collect()
     }
@@ -260,8 +265,8 @@ impl Term {
             .iter()
             .filter(|field| {
                 matches!(
-                    ALL_FIELDS[field.field_id() as usize],
-                    Field::Text(TextField::UrlForSiteOperator)
+                    FieldMapping::get(field.field_id() as usize),
+                    Some(Field::Text(TextField::UrlForSiteOperator))
                 )
             })
             .map(|field| {
@@ -293,7 +298,8 @@ impl Term {
     ) -> Box<dyn tantivy::query::Query + 'static> {
         let mut processed_terms = Term::process_tantivy_term(term, *field);
 
-        let option = ALL_FIELDS[field.field_id() as usize]
+        let option = FieldMapping::get(field.field_id() as usize)
+            .unwrap()
             .as_text()
             .unwrap()
             .index_option();
@@ -323,9 +329,9 @@ impl Term {
         term: &str,
         tantivy_field: tantivy::schema::Field,
     ) -> Vec<tantivy::Term> {
-        match ALL_FIELDS[tantivy_field.field_id() as usize] {
-            Field::Fast(_) => vec![tantivy::Term::from_field_text(tantivy_field, term)],
-            Field::Text(text_field) => {
+        match FieldMapping::get(tantivy_field.field_id() as usize) {
+            Some(Field::Fast(_)) => vec![tantivy::Term::from_field_text(tantivy_field, term)],
+            Some(Field::Text(text_field)) => {
                 let mut terms: Vec<tantivy::Term> = Vec::new();
                 let mut tokenizer = text_field.query_tokenizer();
                 let mut token_stream = tokenizer.token_stream(term);
@@ -336,6 +342,7 @@ impl Term {
 
                 terms
             }
+            None => vec![],
         }
     }
 }

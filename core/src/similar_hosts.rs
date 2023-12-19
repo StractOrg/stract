@@ -156,6 +156,7 @@ impl SimilarHostsFinder {
         scored_nodes
             .into_iter()
             .filter(|ScoredNodeID { node_id, score: _ }| {
+                // remove dead links (nodes without outgoing edges might be dead links)
                 !self.webgraph.raw_outgoing_edges(node_id).is_empty()
             })
             .filter_map(|ScoredNodeID { node_id, score }| {

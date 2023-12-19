@@ -43,7 +43,7 @@ use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
-use crate::schema::{FastField, Field, TextField, ALL_FIELDS};
+use crate::schema::{FastField, Field, FieldMapping, TextField};
 use crate::search_ctx::Ctx;
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
@@ -605,8 +605,8 @@ impl From<TantivyDocument> for RetrievedWebpage {
         let mut webpage = RetrievedWebpage::default();
 
         for value in doc.field_values() {
-            match ALL_FIELDS[value.field.field_id() as usize] {
-                Field::Text(TextField::Title) => {
+            match FieldMapping::get(value.field.field_id() as usize).copied() {
+                Some(Field::Text(TextField::Title)) => {
                     webpage.title = value
                         .value()
                         .as_value()
@@ -614,7 +614,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         .expect("Title field should be text")
                         .to_string();
                 }
-                Field::Text(TextField::StemmedCleanBody) => {
+                Some(Field::Text(TextField::StemmedCleanBody)) => {
                     webpage.body = value
                         .value()
                         .as_value()
@@ -622,7 +622,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         .expect("Body field should be text")
                         .to_string();
                 }
-                Field::Text(TextField::Description) => {
+                Some(Field::Text(TextField::Description)) => {
                     let desc = value
                         .value()
                         .as_value()
@@ -632,7 +632,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
 
                     webpage.description = if desc.is_empty() { None } else { Some(desc) }
                 }
-                Field::Text(TextField::Url) => {
+                Some(Field::Text(TextField::Url)) => {
                     webpage.url = value
                         .value()
                         .as_value()
@@ -640,7 +640,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         .expect("Url field should be text")
                         .to_string();
                 }
-                Field::Fast(FastField::LastUpdated) => {
+                Some(Field::Fast(FastField::LastUpdated)) => {
                     webpage.updated_time = {
                         let timestamp = value.value().as_value().as_u64().unwrap() as i64;
                         if timestamp == 0 {
@@ -650,7 +650,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         }
                     }
                 }
-                Field::Text(TextField::AllBody) => {
+                Some(Field::Text(TextField::AllBody)) => {
                     webpage.dirty_body = value
                         .value()
                         .as_value()
@@ -658,13 +658,13 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         .expect("All body field should be text")
                         .to_string();
                 }
-                Field::Fast(FastField::Region) => {
+                Some(Field::Fast(FastField::Region)) => {
                     webpage.region = {
                         let id = value.value().as_value().as_u64().unwrap();
                         Region::from_id(id)
                     }
                 }
-                Field::Text(TextField::DmozDescription) => {
+                Some(Field::Text(TextField::DmozDescription)) => {
                     let desc = value
                         .value()
                         .as_value()
@@ -674,7 +674,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
 
                     webpage.dmoz_description = if desc.is_empty() { None } else { Some(desc) }
                 }
-                Field::Text(TextField::SchemaOrgJson) => {
+                Some(Field::Text(TextField::SchemaOrgJson)) => {
                     let json = value
                         .value()
                         .as_value()
@@ -684,15 +684,15 @@ impl From<TantivyDocument> for RetrievedWebpage {
 
                     webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
                 }
-                Field::Fast(FastField::LikelyHasAds) => {
+                Some(Field::Fast(FastField::LikelyHasAds)) => {
                     webpage.likely_has_ads =
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }
-                Field::Fast(FastField::LikelyHasPaywall) => {
+                Some(Field::Fast(FastField::LikelyHasPaywall)) => {
                     webpage.likely_has_paywall =
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }
-                Field::Text(TextField::RecipeFirstIngredientTagId) => {
+                Some(Field::Text(TextField::RecipeFirstIngredientTagId)) => {
                     let tag_id = value
                         .value()
                         .as_value()

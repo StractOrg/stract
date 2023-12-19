@@ -25,7 +25,7 @@ use tantivy::{
 use crate::{
     fastfield_reader::FastFieldReader,
     ranking::bm25::Bm25Weight,
-    schema::{FastField, Field, TextField, ALL_FIELDS},
+    schema::{FastField, Field, FieldMapping, TextField},
 };
 
 use super::scorer::{
@@ -64,9 +64,11 @@ impl FastSiteDomainPatternWeight {
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
-        let field_no_tokenizer = match ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::UrlForSiteOperator) => Field::Text(TextField::SiteNoTokenizer),
-            Field::Text(TextField::Domain) => Field::Text(TextField::DomainNoTokenizer),
+        let field_no_tokenizer = match FieldMapping::get(self.field.field_id() as usize) {
+            Some(Field::Text(TextField::UrlForSiteOperator)) => {
+                Field::Text(TextField::SiteNoTokenizer)
+            }
+            Some(Field::Text(TextField::Domain)) => Field::Text(TextField::DomainNoTokenizer),
             _ => unreachable!(),
         };
 
@@ -168,22 +170,28 @@ impl PatternWeight {
             return Ok(None);
         }
 
-        let num_tokens_fastfield = match &ALL_FIELDS[self.field.field_id() as usize] {
-            Field::Text(TextField::Title) => Ok(FastField::NumTitleTokens),
-            Field::Text(TextField::CleanBody) => Ok(FastField::NumCleanBodyTokens),
-            Field::Text(TextField::Url) => Ok(FastField::NumUrlTokens),
-            Field::Text(TextField::Domain) => Ok(FastField::NumDomainTokens),
-            Field::Text(TextField::UrlForSiteOperator) => {
+        let num_tokens_fastfield = match FieldMapping::get(self.field.field_id() as usize) {
+            Some(Field::Text(TextField::Title)) => Ok(FastField::NumTitleTokens),
+            Some(Field::Text(TextField::CleanBody)) => Ok(FastField::NumCleanBodyTokens),
+            Some(Field::Text(TextField::Url)) => Ok(FastField::NumUrlTokens),
+            Some(Field::Text(TextField::Domain)) => Ok(FastField::NumDomainTokens),
+            Some(Field::Text(TextField::UrlForSiteOperator)) => {
                 Ok(FastField::NumUrlForSiteOperatorTokens)
             }
-            Field::Text(TextField::Description) => Ok(FastField::NumDescriptionTokens),
-            Field::Text(TextField::MicroformatTags) => Ok(FastField::NumMicroformatTagsTokens),
-            Field::Text(TextField::FlattenedSchemaOrgJson) => {
+            Some(Field::Text(TextField::Description)) => Ok(FastField::NumDescriptionTokens),
+            Some(Field::Text(TextField::MicroformatTags)) => {
+                Ok(FastField::NumMicroformatTagsTokens)
+            }
+            Some(Field::Text(TextField::FlattenedSchemaOrgJson)) => {
                 Ok(FastField::NumFlattenedSchemaTokens)
             }
-            field => Err(TantivyError::InvalidArgument(format!(
+            Some(field) => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",
                 field.name()
+            ))),
+            None => Err(TantivyError::InvalidArgument(format!(
+                "Field with id {} is not supported in pattern query",
+                self.field.field_id()
             ))),
         }?;
 

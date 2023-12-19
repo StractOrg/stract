@@ -16,12 +16,13 @@
 
 //! In-memory graph that the worker constructs for the site during crawl.
 
-use hashbrown::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
+
 use url::Url;
 
 use crate::{hyperloglog::HyperLogLog, kahan_sum::KahanSum};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Node {
     url: Url,
 }
@@ -38,13 +39,13 @@ impl From<Node> for Url {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeRef(usize);
 
 #[derive(Default)]
 pub struct SiteGraph {
     nodes: Vec<Node>,
-    node_refs: HashMap<Node, NodeRef>,
+    node_refs: BTreeMap<Node, NodeRef>,
     edges: Vec<(NodeRef, NodeRef)>,
 }
 
@@ -73,28 +74,28 @@ impl SiteGraph {
         self.nodes.get(node_ref.0)
     }
 
-    pub fn compute_centralities(&self) -> HashMap<NodeRef, f64> {
-        let mut counters: HashMap<_, _> = self
+    pub fn compute_centralities(&self) -> BTreeMap<NodeRef, f64> {
+        let mut counters: BTreeMap<_, _> = self
             .node_refs
-            .iter()
-            .map(|(_, node_ref)| {
+            .values()
+            .map(|node_ref| {
                 let mut counter: HyperLogLog<64> = HyperLogLog::default();
                 counter.add(node_ref.0 as u64);
                 (*node_ref, counter)
             })
             .collect();
 
-        let mut centralities: HashMap<_, _> = self
+        let mut centralities: BTreeMap<_, _> = self
             .node_refs
-            .iter()
-            .map(|(_, node_ref)| {
+            .values()
+            .map(|node_ref| {
                 let kahan = KahanSum::default();
 
                 (*node_ref, kahan)
             })
             .collect();
 
-        let mut changed_nodes: HashSet<_> = self.node_refs.values().copied().collect();
+        let mut changed_nodes: BTreeSet<_> = self.node_refs.values().copied().collect();
         let mut t = 0;
 
         loop {
@@ -103,7 +104,7 @@ impl SiteGraph {
             }
 
             let mut new_counters = counters.clone();
-            let mut new_changed_nodes = HashSet::new();
+            let mut new_changed_nodes = BTreeSet::new();
 
             for (from, to) in &self.edges {
                 if changed_nodes.contains(from) {
