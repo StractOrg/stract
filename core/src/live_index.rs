@@ -26,7 +26,9 @@ use url::Url;
 
 use crate::{
     config::{CrawlerConfig, LiveIndexConfig},
-    crawler::{reqwest_client, CrawlDatum, DatumStream, JobExecutor, RetrieableUrl, WorkerJob},
+    crawler::{
+        reqwest_client, CrawlDatum, DatumStream, JobExecutor, RetrieableUrl, WeightedUrl, WorkerJob,
+    },
     entrypoint::indexer::IndexingWorker,
     feed::{
         self,
@@ -147,7 +149,11 @@ impl Crawler {
         let domain = urls.first().unwrap().into();
         let job = WorkerJob {
             domain,
-            urls: urls.clone().into_iter().map(RetrieableUrl::from).collect(),
+            urls: urls
+                .clone()
+                .into_iter()
+                .map(|url| RetrieableUrl::from(WeightedUrl { url, weight: 1.0 }))
+                .collect(),
             wandering_urls: 0,
         };
 

@@ -31,7 +31,7 @@ pub mod router;
 pub use router::Router;
 mod file_queue;
 pub mod planner;
-mod site_graph;
+mod wander_prirotiser;
 mod warc_writer;
 mod worker;
 
@@ -119,12 +119,18 @@ impl Domain {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WeightedUrl {
+    pub url: Url,
+    pub weight: f64,
+}
+
 /// All urls in a job must be from the same domain and only one job per domain.
 /// at a time. This ensures that we stay polite when crawling.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Job {
     pub domain: Domain,
-    pub urls: VecDeque<Url>,
+    pub urls: VecDeque<WeightedUrl>,
     pub wandering_urls: u64,
 }
 
@@ -177,13 +183,22 @@ pub struct DomainCrawled {
 }
 
 pub struct RetrieableUrl {
-    url: Url,
+    weighted_url: WeightedUrl,
     retries: u8,
 }
 
-impl From<Url> for RetrieableUrl {
-    fn from(url: Url) -> Self {
-        Self { url, retries: 0 }
+impl RetrieableUrl {
+    pub fn url(&self) -> &Url {
+        &self.weighted_url.url
+    }
+}
+
+impl From<WeightedUrl> for RetrieableUrl {
+    fn from(weighted_url: WeightedUrl) -> Self {
+        Self {
+            weighted_url,
+            retries: 0,
+        }
     }
 }
 

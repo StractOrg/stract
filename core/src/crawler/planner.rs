@@ -27,6 +27,7 @@ use std::{
 };
 use url::Url;
 
+use crate::crawler::WeightedUrl;
 use crate::webgraph::centrality::{top_hosts, TopHosts};
 use crate::{
     config::CrawlPlannerConfig,
@@ -256,10 +257,12 @@ pub fn make_crawl_plan<P: AsRef<Path>>(
                     urls.extend(
                         pages
                             .into_iter()
-                            .map(|(id, _)| id)
-                            .filter_map(|id| page_graph.id2node(&id))
-                            .map(|n| n.name)
-                            .filter_map(|n| Url::parse(&format!("http://{n}")).ok())
+                            .filter_map(|(id, score)| page_graph.id2node(&id).map(|n| (n, score)))
+                            .map(|(n, score)| (n.name, score))
+                            .filter_map(|(n, score)| {
+                                Url::parse(&format!("http://{n}")).ok().map(|u| (u, score))
+                            })
+                            .map(|(url, score)| WeightedUrl { url, weight: score })
                             .take(schedule_budget as usize),
                     );
 

@@ -40,8 +40,9 @@ use crate::{
 };
 
 use super::{
-    reqwest_client, robots_txt::RobotsTxtManager, site_graph::SiteGraph, CrawlDatum, DatumStream,
-    Domain, Error, Result, RetrieableUrl, Site, UrlResponse, WarcWriter, WorkerJob,
+    reqwest_client, robots_txt::RobotsTxtManager, wander_prirotiser::WanderPrioritiser, CrawlDatum,
+    DatumStream, Domain, Error, Result, RetrieableUrl, Site, UrlResponse, WarcWriter, WeightedUrl,
+    WorkerJob,
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
@@ -125,7 +126,7 @@ pub struct JobExecutor<S: DatumStream> {
     crawled_sitemaps: HashSet<Site>,
     sitemap_urls: HashSet<Url>,
     config: Arc<CrawlerConfig>,
-    site_graph: SiteGraph,
+    wander_prioritiser: WanderPrioritiser,
     job: WorkerJob,
 }
 
@@ -148,7 +149,7 @@ impl<S: DatumStream> JobExecutor<S> {
             crawled_sitemaps: HashSet::new(),
             sitemap_urls: HashSet::new(),
             config,
-            site_graph: SiteGraph::new(),
+            wander_prioritiser: WanderPrioritiser::new(),
             job,
         }
     }
@@ -170,15 +171,9 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn wander(&mut self) {
         let mut urls: Vec<(Url, f64)> = self
-            .site_graph
-            .compute_centralities()
+            .wander_prioritiser
+            .top_and_clear(self.job.wandering_urls as usize)
             .into_iter()
-            .map(|(node_ref, score)| {
-                (
-                    Url::from(self.site_graph.get_node(node_ref).unwrap().clone()),
-                    score,
-                )
-            })
             .chain(self.sitemap_urls.drain().map(|url| (url.clone(), 0.0)))
             .filter(|(url, _)| !self.crawled_urls.contains(url))
             .filter(|(url, _)| self.job.domain == Domain::from(url))
@@ -186,7 +181,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .collect();
 
         urls.sort_by(|(a, _), (b, _)| a.cmp(b));
-        urls.dedup();
+        urls.dedup_by(|(a, _), (b, _)| a == b);
 
         urls.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
@@ -194,6 +189,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .into_iter()
             .take(self.job.wandering_urls as usize)
             .map(|(url, _)| url)
+            .map(|url| WeightedUrl { url, weight: 0.0 })
             .map(RetrieableUrl::from)
             .collect();
 
@@ -202,11 +198,11 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>, fetch_sitemap: bool) {
         while let Some(retryable_url) = urls.pop_front() {
-            if Domain::from(&retryable_url.url) != self.job.domain {
+            if Domain::from(retryable_url.url()) != self.job.domain {
                 continue;
             }
 
-            if self.crawled_urls.contains(&retryable_url.url) {
+            if self.crawled_urls.contains(retryable_url.url()) {
                 continue;
             }
 
@@ -214,8 +210,8 @@ impl<S: DatumStream> JobExecutor<S> {
                 continue;
             }
 
-            if retryable_url.url.host_str().is_none()
-                || !matches!(retryable_url.url.scheme(), "http" | "https")
+            if retryable_url.url().host_str().is_none()
+                || !matches!(retryable_url.url().scheme(), "http" | "https")
             {
                 continue;
             }
@@ -223,41 +219,44 @@ impl<S: DatumStream> JobExecutor<S> {
             if !self.config.dry_run
                 && !self
                     .robotstxt
-                    .is_allowed(&retryable_url.url, &self.config.user_agent.token)
+                    .is_allowed(retryable_url.url(), &self.config.user_agent.token)
                     .await
             {
                 continue;
             }
 
-            let site = Site(retryable_url.url.host_str().unwrap_or_default().to_string());
+            let site = Site(
+                retryable_url
+                    .url()
+                    .host_str()
+                    .unwrap_or_default()
+                    .to_string(),
+            );
             if !self.config.dry_run && fetch_sitemap && !self.crawled_sitemaps.contains(&site) {
                 self.crawled_sitemaps.insert(site.clone());
 
-                if let Some(sitemap) = self.robotstxt.sitemap(&retryable_url.url).await {
+                if let Some(sitemap) = self.robotstxt.sitemap(retryable_url.url()).await {
                     self.sitemap_urls
                         .extend(self.urls_from_sitemap(sitemap, 0, 5).await);
                 }
             }
 
-            let res = self.process_url(retryable_url.url.clone()).await;
+            let res = self.process_url(retryable_url.url().clone()).await;
 
             match res.response {
-                UrlResponse::Success { url } => {
-                    self.crawled_urls.insert(url.clone());
-
-                    let from_node = self.site_graph.add_node(url.clone().into());
+                UrlResponse::Success { url: _ } => {
+                    let weight = retryable_url.weighted_url.weight;
 
                     for new_url in res.new_urls {
                         if new_url.host_str().is_none() {
                             continue;
                         }
 
-                        if new_url.root_domain() != retryable_url.url.root_domain() {
+                        if new_url.root_domain() != retryable_url.url().root_domain() {
                             continue;
                         }
 
-                        let to_node = self.site_graph.add_node(new_url.clone().into());
-                        self.site_graph.add_edge(from_node, to_node);
+                        self.wander_prioritiser.inc(new_url, weight);
                     }
                 }
                 UrlResponse::Failed {
