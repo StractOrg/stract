@@ -43,7 +43,7 @@ use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
-use crate::schema::{FastField, Field, FieldMapping, TextField};
+use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
@@ -605,7 +605,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
         let mut webpage = RetrievedWebpage::default();
 
         for value in doc.field_values() {
-            match FieldMapping::get(value.field.field_id() as usize).copied() {
+            match Field::get(value.field.field_id() as usize).copied() {
                 Some(Field::Text(TextField::Title)) => {
                     webpage.title = value
                         .value()

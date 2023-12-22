@@ -17,7 +17,7 @@
 use crate::{
     ceil_char_boundary,
     prehashed::hash,
-    schema::{FastField, FieldMapping, TextField},
+    schema::{FastField, TextField},
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
@@ -199,7 +199,7 @@ impl Html {
 
         for field in schema
             .fields()
-            .filter_map(|(field, _)| FieldMapping::get(field.field_id() as usize))
+            .filter_map(|(field, _)| Field::get(field.field_id() as usize))
         {
             let tantivy_field = schema
                 .get_field(field.name())

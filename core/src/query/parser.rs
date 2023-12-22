@@ -22,7 +22,7 @@ use tantivy::{
 use crate::{
     bangs::BANG_PREFIXES,
     floor_char_boundary,
-    schema::{Field, FieldMapping, TextField},
+    schema::{Field, TextField},
 };
 
 #[derive(Debug, Clone)]
@@ -103,7 +103,7 @@ fn simple_into_tantivy(
         .iter()
         .filter(|field| {
             matches!(
-                FieldMapping::get(field.field_id() as usize),
+                Field::get(field.field_id() as usize),
                 Some(Field::Text(TextField::AllBody))
                     | Some(Field::Text(TextField::Title))
                     | Some(Field::Text(TextField::Url))
@@ -153,8 +153,7 @@ impl Term {
                 for (field, tv_field) in fields
                     .iter()
                     .filter_map(|tv_field| {
-                        FieldMapping::get(tv_field.field_id() as usize)
-                            .map(|mapped| (mapped, *tv_field))
+                        Field::get(tv_field.field_id() as usize).map(|mapped| (mapped, *tv_field))
                     })
                     .filter(|(field, _)| field.is_searchable())
                     .filter(|(field, _)| field.has_pos())
@@ -197,7 +196,7 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            FieldMapping::get(field.field_id() as usize),
+                            Field::get(field.field_id() as usize),
                             Some(Field::Text(TextField::Title))
                         )
                     })
@@ -210,7 +209,7 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            FieldMapping::get(field.field_id() as usize),
+                            Field::get(field.field_id() as usize),
                             Some(Field::Text(TextField::AllBody))
                         )
                     })
@@ -223,7 +222,7 @@ impl Term {
                     .iter()
                     .find(|field| {
                         matches!(
-                            FieldMapping::get(field.field_id() as usize),
+                            Field::get(field.field_id() as usize),
                             Some(Field::Text(TextField::Url))
                         )
                     })
@@ -249,7 +248,7 @@ impl Term {
         fields
             .iter()
             .filter_map(|tv_field| {
-                FieldMapping::get(tv_field.field_id() as usize)
+                Field::get(tv_field.field_id() as usize)
                     .filter(|field| field.is_searchable())
                     .map(|_| tv_field)
             })
@@ -265,7 +264,7 @@ impl Term {
             .iter()
             .filter(|field| {
                 matches!(
-                    FieldMapping::get(field.field_id() as usize),
+                    Field::get(field.field_id() as usize),
                     Some(Field::Text(TextField::UrlForSiteOperator))
                 )
             })
@@ -298,7 +297,7 @@ impl Term {
     ) -> Box<dyn tantivy::query::Query + 'static> {
         let mut processed_terms = Term::process_tantivy_term(term, *field);
 
-        let option = FieldMapping::get(field.field_id() as usize)
+        let option = Field::get(field.field_id() as usize)
             .unwrap()
             .as_text()
             .unwrap()
@@ -329,7 +328,7 @@ impl Term {
         term: &str,
         tantivy_field: tantivy::schema::Field,
     ) -> Vec<tantivy::Term> {
-        match FieldMapping::get(tantivy_field.field_id() as usize) {
+        match Field::get(tantivy_field.field_id() as usize) {
             Some(Field::Fast(_)) => vec![tantivy::Term::from_field_text(tantivy_field, term)],
             Some(Field::Text(text_field)) => {
                 let mut terms: Vec<tantivy::Term> = Vec::new();

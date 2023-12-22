@@ -361,9 +361,7 @@ static ALL_FIELDS: [Field; 65] = [
     Field::Fast(FastField::LikelyHasPaywall),
 ];
 
-pub struct FieldMapping;
-
-impl FieldMapping {
+impl Field {
     #[inline]
     pub fn get(field_id: usize) -> Option<&'static Field> {
         ALL_FIELDS.get(field_id)
@@ -373,9 +371,6 @@ impl FieldMapping {
     pub fn all() -> impl Iterator<Item = &'static Field> {
         ALL_FIELDS.iter()
     }
-}
-
-impl Field {
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
         let tokenizer = self.as_text().unwrap().indexing_tokenizer();
         let option = self.as_text().unwrap().index_option();

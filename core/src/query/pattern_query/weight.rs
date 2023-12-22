@@ -25,7 +25,7 @@ use tantivy::{
 use crate::{
     fastfield_reader::FastFieldReader,
     ranking::bm25::Bm25Weight,
-    schema::{FastField, Field, FieldMapping, TextField},
+    schema::{FastField, Field, TextField},
 };
 
 use super::scorer::{
@@ -64,7 +64,7 @@ impl FastSiteDomainPatternWeight {
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
-        let field_no_tokenizer = match FieldMapping::get(self.field.field_id() as usize) {
+        let field_no_tokenizer = match Field::get(self.field.field_id() as usize) {
             Some(Field::Text(TextField::UrlForSiteOperator)) => {
                 Field::Text(TextField::SiteNoTokenizer)
             }
@@ -170,7 +170,7 @@ impl PatternWeight {
             return Ok(None);
         }
 
-        let num_tokens_fastfield = match FieldMapping::get(self.field.field_id() as usize) {
+        let num_tokens_fastfield = match Field::get(self.field.field_id() as usize) {
             Some(Field::Text(TextField::Title)) => Ok(FastField::NumTitleTokens),
             Some(Field::Text(TextField::CleanBody)) => Ok(FastField::NumCleanBodyTokens),
             Some(Field::Text(TextField::Url)) => Ok(FastField::NumUrlTokens),
