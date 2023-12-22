@@ -376,7 +376,10 @@ impl ApiSearcher {
             .retrieve_webpages(&search_query.query, &top_websites)
             .await;
 
-        let mut search_query = query.clone();
+        let mut search_query = SearchQuery {
+            page: 0,
+            ..query.clone()
+        };
 
         #[cfg(feature = "libtorch")]
         let pipeline: RankingPipeline<RetrievedWebpageRanking> = RankingPipeline::reranker(
