@@ -100,7 +100,6 @@ pub mod router {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct NewJob {}
 
-    #[async_trait::async_trait]
     impl Message<RouterService> for NewJob {
         type Response = Option<Job>;
 
@@ -124,7 +123,6 @@ pub mod coordinator {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct GetJob {}
 
-    #[async_trait::async_trait]
     impl Message<CoordinatorService> for GetJob {
         type Response = Option<Job>;
 

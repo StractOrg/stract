@@ -74,7 +74,6 @@ pub struct Knows {
     pub host: String,
 }
 
-#[async_trait::async_trait]
 impl Message<WebGraphService> for SimilarHosts {
     type Response = Vec<ScoredHost>;
 
@@ -110,7 +109,6 @@ impl Message<WebGraphService> for SimilarHosts {
     }
 }
 
-#[async_trait::async_trait]
 impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
@@ -140,7 +138,6 @@ pub struct IngoingLinks {
     pub level: GraphLevel,
 }
 
-#[async_trait::async_trait]
 impl Message<WebGraphService> for IngoingLinks {
     type Response = Vec<FullEdge>;
 
@@ -161,7 +158,6 @@ pub struct OutgoingLinks {
     pub level: GraphLevel,
 }
 
-#[async_trait::async_trait]
 impl Message<WebGraphService> for OutgoingLinks {
     type Response = Vec<FullEdge>;
 

@@ -29,7 +29,6 @@ pub trait Service: Sized + Send + Sync + 'static {
     async fn handle(req: Self::Request, server: &Self) -> Result<Self::Response>;
 }
 
-#[async_trait::async_trait]
 pub trait Message<S: Service> {
     type Response;
     async fn handle(self, server: &S) -> Result<Self::Response>;
@@ -291,7 +290,6 @@ mod tests {
         #[derive(Debug, Clone, Serialize, Deserialize)]
         pub struct Reset;
 
-        #[async_trait::async_trait]
         impl Message<CounterService> for Change {
             type Response = i32;
 
@@ -303,7 +301,6 @@ mod tests {
             }
         }
 
-        #[async_trait::async_trait]
         impl Message<CounterService> for Reset {
             type Response = ();
 
