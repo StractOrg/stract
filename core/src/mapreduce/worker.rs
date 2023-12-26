@@ -19,14 +19,12 @@ use std::net::SocketAddr;
 use crate::mapreduce::MapReduceServer;
 
 use super::{Map, Result, Task};
-use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, info};
 
 #[derive(Default)]
 pub struct StatelessWorker {}
 
-#[async_trait]
 pub trait Worker {
     async fn run<I, O>(&self, addr: SocketAddr) -> Result<()>
     where
