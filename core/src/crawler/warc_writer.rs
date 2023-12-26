@@ -29,7 +29,6 @@ pub struct WarcWriter {
     tx: tokio::sync::mpsc::Sender<WarcWriterMessage>,
 }
 
-#[async_trait::async_trait]
 impl DatumStream for WarcWriter {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
         self.tx.send(WarcWriterMessage::Crawl(crawl_datum)).await?;

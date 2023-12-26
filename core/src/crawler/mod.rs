@@ -263,7 +263,6 @@ impl Crawler {
     }
 }
 
-#[async_trait::async_trait]
 pub trait DatumStream: Send + Sync {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()>;
     async fn finish(&self) -> Result<()>;
