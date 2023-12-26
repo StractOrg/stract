@@ -25,7 +25,6 @@ aes-gcm = {workspace = true}
 anyhow = {workspace = true}
 async-channel = {workspace = true}
 async-stream = {workspace = true}
-async-trait = {workspace = true}
 axum = {workspace = true}
 axum-extra = {workspace = true}
 axum-macros = {workspace = true}

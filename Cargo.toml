@@ -14,7 +14,6 @@ aes-gcm = "0.10.2"
 anyhow = {version = "1.0.72", features = ["backtrace"]}
 async-channel = "1.8.0"
 async-stream = "0.3.3"
-async-trait = "0.1.57"
 axum = "0.7.2"
 axum-extra = {version = "0.9.0"}
 axum-macros = "0.4.0"
