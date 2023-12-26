@@ -20,13 +20,15 @@ use tokio::net::ToSocketAddrs;
 
 use super::Result;
 
-#[async_trait::async_trait]
 pub trait Service: Sized + Send + Sync + 'static {
     type Request: serde::de::DeserializeOwned + Send + Sync;
     type RequestRef<'a>: serde::Serialize + Send + Sync;
     type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
 
-    async fn handle(req: Self::Request, server: &Self) -> Result<Self::Response>;
+    fn handle(
+        req: Self::Request,
+        server: &Self,
+    ) -> impl std::future::Future<Output = Result<Self::Response>> + Send + '_;
 }
 
 pub trait Message<S: Service> {
@@ -181,17 +183,22 @@ macro_rules! sonic_service {
                     }
                 }
             )*
-            #[async_trait::async_trait]
             impl sonic::service::Service for $service {
                 type Request = Request;
                 type RequestRef<'a> = RequestRef<'a>;
                 type Response = Response;
 
-                async fn handle(req: Request, server: &Self) -> sonic::Result<Response> {
-                    match req {
-                        $(
-                            Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
-                        )*
+                // NOTE: This is a workaround for the fact that async functions
+                // don't have a Send bound by default, and there's currently no
+                // way of specifying that.
+                #[allow(clippy::manual_async_fn)]
+                fn handle(req: Request, server: &Self) -> impl std::future::Future<Output = sonic::Result<Self::Response>> + Send + '_ {
+                    async move {
+                        match req {
+                            $(
+                                Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
+                            )*
+                        }
                     }
                 }
             }

@@ -22,7 +22,7 @@
 // #![warn(clippy::missing_docs_in_private_items)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
-#![feature(async_fn_in_trait)]
+#![feature(async_fn_in_trait, return_position_impl_trait_in_trait)]
 
 use std::path::PathBuf;
 use thiserror::Error;
