@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "optics", "kuchiki"]
+members = ["core", "optics", "kuchiki", "zimba"]
 resolver = "2"
 
 [profile.release]
@@ -51,6 +51,7 @@ libc = "0.2.142"
 logos = "0.13.0"
 lz-str = "0.2.1"
 lz4_flex = "0.11.1"
+lzma = "0.2.2"
 maplit = "1.0.2"
 md5 = "0.7.0"
 memmap = "0.7.0"
@@ -107,6 +108,7 @@ utoipa = {version = "4.0.0", features = ["axum_extras"]}
 utoipa-swagger-ui = {version = "5.0.0", features = ["axum"]}
 uuid = "1.1.2"
 whatlang = {version = "0.16.0", features = ["serde"]}
+zstd = "0.13"
 
 [profile.test.package]
 flate2.opt-level = 3
