@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{collections::VecDeque, future::Future, sync::Arc, time::Duration};
 
 use hashbrown::HashMap;
 
@@ -264,8 +264,8 @@ impl Crawler {
 }
 
 pub trait DatumStream: Send + Sync {
-    async fn write(&self, crawl_datum: CrawlDatum) -> Result<()>;
-    async fn finish(&self) -> Result<()>;
+    fn write(&self, crawl_datum: CrawlDatum) -> impl Future<Output = Result<()>> + Send;
+    fn finish(&self) -> impl Future<Output = Result<()>> + Send;
 }
 
 pub fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> {
