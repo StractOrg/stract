@@ -17,6 +17,8 @@
 //! Zim file reader.
 //! https://wiki.openzim.org/wiki/ZIM_file_format
 
+pub mod wiki;
+
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -232,6 +234,14 @@ struct ClusterPointer(u64);
 
 #[derive(Debug)]
 struct ClusterPointerList(Vec<ClusterPointer>);
+
+impl std::ops::Index<u32> for ClusterPointerList {
+    type Output = ClusterPointer;
+
+    fn index(&self, index: u32) -> &Self::Output {
+        &self.0[index as usize]
+    }
+}
 
 impl ClusterPointerList {
     fn from_bytes(bytes: &[u8], num_clusters: u32) -> Result<Self, Error> {
@@ -556,12 +566,12 @@ impl Zim {
         DirEntryIterator::new(&self.mmap, &self.url_pointers)
     }
 
-    pub fn get_cluster(&self, index: usize) -> Result<Option<Cluster>, Error> {
-        if index >= self.header.cluster_count as usize {
+    pub fn get_cluster(&self, index: u32) -> Result<Option<Cluster>, Error> {
+        if index >= self.header.cluster_count {
             return Ok(None);
         }
 
-        let pointer = self.cluster_pointers.0[index].0 as usize;
+        let pointer = self.cluster_pointers[index].0 as usize;
         Ok(Some(Cluster::from_bytes(&self.mmap[pointer..])?))
     }
 
@@ -615,6 +625,10 @@ mod tests {
 
     #[test]
     fn it_works() {
+        if !Path::new("../data/test.zim").exists() {
+            return;
+        }
+
         let zim = Zim::open("../data/test.zim").unwrap();
 
         assert_eq!(zim.header.magic, 72173914);
@@ -636,5 +650,6 @@ mod tests {
         };
 
         assert_eq!(url, "African_Americans");
+        assert_eq!(zim.all_dir_entries().count(), 8477);
     }
 }

@@ -45,6 +45,7 @@ fn download_files() {
                 "content.rdf.u8.gz",
                 "english-wordnet-2022-subset.ttl",
                 "lambdamart.txt",
+                "test.zim",
             ] {
                 let path = Path::new(DATA_PATH).join(name);
 
