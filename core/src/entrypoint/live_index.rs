@@ -79,7 +79,6 @@ impl SearchService {
     }
 }
 
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for RetrieveWebsites {
     type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
@@ -93,7 +92,6 @@ impl sonic::service::Message<SearchService> for RetrieveWebsites {
     }
 }
 
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for Search {
     type Response = Option<InitialWebsiteResult>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {

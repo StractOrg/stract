@@ -113,7 +113,6 @@ pub struct RetrieveWebsites {
     pub websites: Vec<inverted_index::WebsitePointer>,
     pub query: String,
 }
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for RetrieveWebsites {
     type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
@@ -131,7 +130,6 @@ impl sonic::service::Message<SearchService> for RetrieveWebsites {
 pub struct Search {
     pub query: SearchQuery,
 }
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for Search {
     type Response = Option<InitialWebsiteResult>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
@@ -146,7 +144,6 @@ impl sonic::service::Message<SearchService> for Search {
 pub struct GetWebpage {
     pub url: String,
 }
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for GetWebpage {
     type Response = Option<RetrievedWebpage>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
@@ -158,7 +155,6 @@ impl sonic::service::Message<SearchService> for GetWebpage {
 pub struct GetHomepageDescriptions {
     pub urls: Vec<Url>,
 }
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
     type Response = HashMap<Url, String>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
@@ -180,7 +176,6 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
 pub struct GetEntityImage {
     pub image_id: String,
 }
-#[async_trait::async_trait]
 impl sonic::service::Message<SearchService> for GetEntityImage {
     type Response = Option<Image>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {

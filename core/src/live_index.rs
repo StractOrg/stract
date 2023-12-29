@@ -264,7 +264,6 @@ impl Index {
     }
 }
 
-#[async_trait::async_trait]
 impl DatumStream for Indexer {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
         let webpage = self.worker.prepare_webpage(
