@@ -19,6 +19,8 @@
 
 pub mod wiki;
 
+pub use wiki::{Article, ArticleIterator, Image, ImageIterator};
+
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -585,6 +587,10 @@ impl Zim {
 
     pub fn title_pointers(&self) -> &TitlePointerList {
         &self.title_pointers
+    }
+
+    pub fn articles(&self) -> Result<ArticleIterator<'_>, Error> {
+        ArticleIterator::new(self)
     }
 }
 

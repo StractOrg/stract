@@ -2960,12 +2960,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "parse_wiki_text"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd59a245c58efa02bd73c9462fd9d4c28952d650092c6bcba43b60b4707171dd"
-
-[[package]]
 name = "password-hash"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4365,7 +4359,6 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "optics",
- "parse_wiki_text",
  "proptest",
  "proptest-derive",
  "publicsuffix",
@@ -4404,6 +4397,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "whatlang",
+ "zimba",
 ]
 
 [[package]]

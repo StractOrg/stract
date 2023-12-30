@@ -48,7 +48,6 @@ mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;
 pub mod hyperloglog;
-mod image_downloader;
 mod image_store;
 mod improvement;
 pub mod index;

@@ -14,13 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs,
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, fs, path::Path, sync::Arc};
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 use serde::{Deserialize, Serialize};
@@ -31,13 +25,9 @@ use tantivy::{
     tokenizer::Tokenizer,
     DocAddress, IndexReader, IndexWriter, Searcher, TantivyDocument, Term,
 };
-use tracing::info;
-use url::Url;
 
 use crate::{
-    image_downloader::{ImageDownloadJob, ImageDownloader},
     image_store::{EntityImageStore, Image, ImageStore},
-    kv::{rocksdb_store::RocksDbStore, Kv},
     tokenizer::Normal,
     Result,
 };
@@ -110,32 +100,6 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     doc
 }
 
-fn wikipedify_url(url: &str) -> Vec<Url> {
-    let mut name = url.replace(' ', "_");
-
-    if name.starts_with("File:") {
-        if let Some(index) = name.find("File:") {
-            name = name[index + "File:".len()..].to_string();
-        }
-    }
-
-    let hex = format!("{:?}", md5::compute(&name));
-    vec![
-        Url::parse(&format!(
-            "https://upload.wikimedia.org/wikipedia/commons/{:}/{:}",
-            hex[0..1].to_string() + "/" + &hex[0..2],
-            name
-        ))
-        .unwrap(),
-        Url::parse(&format!(
-            "https://upload.wikimedia.org/wikipedia/en/{:}/{:}",
-            hex[0..1].to_string() + "/" + &hex[0..2],
-            name
-        ))
-        .unwrap(),
-    ]
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StoredEntity {
     pub title: String,
@@ -154,14 +118,11 @@ pub struct EntityMatch {
 
 pub struct EntityIndex {
     image_store: EntityImageStore,
-    image_downloader: ImageDownloader<String>,
     writer: Option<IndexWriter>,
     reader: IndexReader,
     tv_index: tantivy::Index,
     schema: Arc<Schema>,
     stopwords: HashSet<String>,
-    attribute_occurrences: RocksDbStore<String, u32>,
-    path: std::path::PathBuf,
 }
 
 impl EntityIndex {
@@ -178,9 +139,6 @@ impl EntityIndex {
             fs::create_dir_all(&tv_path)?;
             tantivy::Index::create_in_dir(&tv_path, schema.clone())?
         };
-
-        let attribute_occurrences =
-            RocksDbStore::open_read_only(path.as_ref().join("attribute_occurrences"));
 
         let stopwords: HashSet<String> = include_str!("../../stopwords/English.txt")
             .lines()
@@ -201,78 +159,22 @@ impl EntityIndex {
             image_store,
             writer: None,
             reader,
-            image_downloader: ImageDownloader::new(),
             tv_index: tantivy_index,
             schema: Arc::new(schema),
             stopwords,
-            attribute_occurrences,
-            path: path.as_ref().to_path_buf(),
         })
     }
 
     pub fn prepare_writer(&mut self) {
         self.writer = Some(self.tv_index.writer(10_000_000_000).unwrap());
-        self.attribute_occurrences = RocksDbStore::open(self.path.join("attribute_occurrences"));
         self.image_store.prepare_writer();
     }
 
-    fn best_info(&self, info: BTreeMap<String, Span>) -> Vec<(String, Span)> {
-        let mut info: Vec<_> = info.into_iter().collect();
-
-        info.sort_by(|(a, _), (b, _)| {
-            self.get_attribute_occurrence(b)
-                .unwrap_or(0)
-                .cmp(&self.get_attribute_occurrence(a).unwrap_or(0))
-        });
-
-        info.into_iter()
-            .filter(|(_, value)| !value.text.is_empty())
-            .map(|(key, mut value)| {
-                if let Some(start) = value.text.find(|c: char| !(c.is_whitespace() || c == '*')) {
-                    value.text.replace_range(0..start, "");
-                    for link in &mut value.links {
-                        link.start = link.start.saturating_sub(start);
-                        link.end = link.end.saturating_sub(start);
-                    }
-                }
-
-                (key.replace('_', " "), value)
-            })
-            .filter(|(key, _)| {
-                !matches!(
-                    key.as_str(),
-                    "caption"
-                        | "image size"
-                        | "label"
-                        | "landscape"
-                        | "signature"
-                        | "name"
-                        | "website"
-                        | "logo"
-                        | "image caption"
-                        | "alt"
-                )
-            })
-            .take(5)
-            .collect()
+    fn best_info(&self, info: Vec<(String, Span)>) -> Vec<(String, Span)> {
+        info.into_iter().take(5).collect()
     }
 
     pub fn insert(&mut self, entity: Entity) {
-        for attribute in entity.info.keys() {
-            let current = self.attribute_occurrences.get(attribute).unwrap_or(0);
-            self.attribute_occurrences
-                .insert(attribute.to_string(), current + 1);
-        }
-
-        if let Some(image) = entity.image.clone() {
-            let image = wikipedify_url(&image).into_iter().collect();
-
-            self.image_downloader.schedule(ImageDownloadJob {
-                key: entity.title.clone(),
-                urls: image,
-                timeout: Some(Duration::from_secs(10)),
-            });
-        }
         let doc = entity_to_tantivy(entity, &self.schema);
         self.writer
             .as_mut()
@@ -288,9 +190,6 @@ impl EntityIndex {
             .commit()
             .unwrap();
         self.reader.reload().unwrap();
-        self.attribute_occurrences.flush();
-        info!("downloading images");
-        self.image_downloader.download(&mut self.image_store);
     }
 
     fn related_entities(&self, doc: DocAddress) -> Vec<EntityMatch> {
@@ -419,7 +318,7 @@ impl EntityIndex {
             )
             .unwrap()
         } else {
-            BTreeMap::new()
+            Vec::new()
         };
 
         let best_info = self.best_info(info);
@@ -467,39 +366,11 @@ impl EntityIndex {
 
         self.image_store.get(&key)
     }
-
-    pub fn get_attribute_occurrence(&self, attribute: &String) -> Option<u32> {
-        self.attribute_occurrences.get(attribute)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
-
-    #[test]
-    fn wikipedia_image_url_aristotle() {
-        assert_eq!(
-            wikipedify_url("Aristotle Altemps Inv8575.jpg")
-                .first()
-                .unwrap()
-                .as_str(),
-            "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
-        );
-    }
-
-    #[test]
-    fn wikipedia_image_url_with_file() {
-        assert_eq!(
-            wikipedify_url("File:Aristotle Altemps Inv8575.jpg")
-                .first()
-                .unwrap()
-                .as_str(),
-            "https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
-        );
-    }
 
     #[test]
     fn stopwords_title_ignored() {
@@ -512,10 +383,8 @@ mod tests {
                 text: String::new(),
                 links: Vec::new(),
             },
-            info: BTreeMap::new(),
+            info: Vec::new(),
             image: None,
-            paragraphs: Vec::new(),
-            categories: HashSet::new(),
         });
 
         index.commit();

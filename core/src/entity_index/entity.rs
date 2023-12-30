@@ -14,55 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::{BTreeMap, HashSet};
-
 use itertools::Itertools;
-use parse_wiki_text::{Node, Parameter};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-pub trait WikiNodeExt<'a> {
-    fn as_text(&self) -> Option<&'a str>;
-    fn as_category_target(&self) -> Option<&'a str>;
-    fn as_template(&self) -> Option<(&Vec<Node<'a>>, &Vec<Parameter<'a>>)>;
-}
-impl<'a> WikiNodeExt<'a> for Node<'a> {
-    fn as_text(&self) -> Option<&'a str> {
-        match self {
-            Node::Text { value, .. } => Some(value),
-            _ => None,
-        }
-    }
-    fn as_category_target(&self) -> Option<&'a str> {
-        match self {
-            Node::Category { target, .. } => Some(target),
-            _ => None,
-        }
-    }
-    fn as_template(&self) -> Option<(&Vec<Node<'a>>, &Vec<Parameter<'a>>)> {
-        match self {
-            Node::Template {
-                name, parameters, ..
-            } => Some((name, parameters)),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Paragraph {
-    pub title: Option<String>,
-    pub content: Span,
-}
 
 #[derive(Debug)]
 pub struct Entity {
     pub title: String,
     pub page_abstract: Span,
-    pub info: BTreeMap<String, Span>,
+    pub info: Vec<(String, Span)>,
     pub image: Option<String>,
-    pub paragraphs: Vec<Paragraph>,
-    pub categories: HashSet<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -85,6 +46,10 @@ impl Span {
         }
     }
 
+    pub fn add_text(&mut self, text: &str) {
+        self.text.push_str(text);
+    }
+
     pub fn add_link(&mut self, text: &str, target: String) {
         let link = Link {
             target,
@@ -95,36 +60,15 @@ impl Span {
         self.text.push_str(text);
     }
 
-    pub fn add_node(&mut self, node: &Node) {
-        match node {
-            Node::Link { target, text, .. } => {
-                let text = text.iter().filter_map(|node| node.as_text()).join("");
-                self.add_link(&text, target.to_string());
+    pub fn trim_end(&mut self) {
+        self.text = self.text.trim_end().to_string();
+
+        while let Some(last_link) = self.links.last() {
+            if last_link.end > self.text.len() {
+                self.links.pop();
+            } else {
+                break;
             }
-            Node::Text { value, .. } => {
-                if *value == "\n" {
-                    if !self.text.chars().all(|c| c.is_whitespace()) {
-                        self.text.push_str(". ");
-                    }
-                } else {
-                    self.text.push_str(value);
-                }
-            }
-            Node::Template { parameters, .. } if self.text.is_empty() => {
-                for other_span in parameters
-                    .iter()
-                    .filter(|parameter| parameter.name.is_none())
-                    .map(|parameter| Span::from(&parameter.value[..]))
-                {
-                    self.merge(other_span);
-                    self.text.push(' ');
-                }
-                self.text = self.text.trim_end().to_string();
-            }
-            Node::ParagraphBreak { .. } => {
-                self.text.push('\n');
-            }
-            _ => {}
         }
     }
 }
@@ -233,15 +177,5 @@ impl EntitySnippet {
                 }
             })
             .join("")
-    }
-}
-
-impl<'a> From<&[Node<'a>]> for Span {
-    fn from(nodes: &[Node<'a>]) -> Self {
-        let mut span = Span::default();
-        for node in nodes {
-            span.add_node(node);
-        }
-        span
     }
 }

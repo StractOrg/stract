@@ -68,7 +68,6 @@ min-max-heap = {workspace = true}
 num_cpus = {workspace = true}
 once_cell = {workspace = true}
 optics = {path = "../optics"}
-parse_wiki_text = {workspace = true}
 publicsuffix = {workspace = true}
 quick-xml = {workspace = true}
 rand = {workspace = true}
@@ -104,6 +103,7 @@ utoipa = {workspace = true}
 utoipa-swagger-ui = {workspace = true}
 uuid = {workspace = true}
 whatlang = {workspace = true}
+zimba = {path = "../zimba"}
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = {workspace = true}
