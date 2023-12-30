@@ -209,6 +209,11 @@ pub struct Image {
     pub mime_type: String,
     pub content: Vec<u8>,
 }
+impl Image {
+    pub fn bytes(&self) -> &[u8] {
+        &self.content
+    }
+}
 
 impl<'a> Iterator for ImageIterator<'a> {
     type Item = Image;

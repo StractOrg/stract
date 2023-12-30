@@ -592,6 +592,10 @@ impl Zim {
     pub fn articles(&self) -> Result<ArticleIterator<'_>, Error> {
         ArticleIterator::new(self)
     }
+
+    pub fn images(&self) -> Result<ImageIterator<'_>, Error> {
+        ImageIterator::new(self)
+    }
 }
 
 pub struct DirEntryIterator<'a> {

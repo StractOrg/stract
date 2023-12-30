@@ -10,11 +10,11 @@
     {#if entity.imageId}
       <div class="w-lg mb-5">
         <a href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
-          <img
-            alt="Image of {entity.title}"
-            class="h-full w-full rounded-full"
-            src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
-          />
+            <img
+              alt="Image of {entity.title}"
+              class="h-full w-full max-h-40 object-scale-down rounded-full"
+              src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
+            />
         </a>
       </div>
     {/if}
@@ -38,7 +38,7 @@
     {#if entity.info.length > 0}
       <div class="mb-2 mt-7 flex w-full flex-col px-4 text-sm">
         <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-          {#each entity.info as [key, value] (key)}
+          {#each entity.info as [key, value]}
             <div class="text-neutral">{@html key}</div>
             <div>
               <EntitySnippet snippet={value} />
@@ -59,7 +59,7 @@
                     <img
                       alt="Image of {related.title}"
                       class="h-full w-full rounded-full object-cover"
-                      src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}"
+                      src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}&maxWidth=200&maxHeight=200"
                     />
                   </a>
                 </div>

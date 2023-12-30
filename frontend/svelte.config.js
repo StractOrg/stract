@@ -32,7 +32,7 @@ const config = {
         // NOTE: Disabled in order to fetch optic sources client-side
         // 'connect-src': ["'self'", 'http://localhost:3000/'],
         'connect-src': ['*'],
-        'img-src': ["'self'", 'data:', 'stract.com', '0.0.0.0:3000'],
+        'img-src': ["'self'", 'data:', 'stract.com', '0.0.0.0:3000', 'localhost:3000'],
         'style-src': ["'self'", "'unsafe-inline'"],
       },
     },

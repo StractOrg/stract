@@ -69,6 +69,12 @@ fn schema() -> Schema {
             )
             .set_stored(),
     );
+    builder.add_text_field(
+        "image",
+        TextOptions::default()
+            .set_indexing_options(TextFieldIndexing::default())
+            .set_stored(),
+    );
 
     builder.build()
 }
@@ -96,6 +102,10 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     };
 
     doc.add_text(schema.get_field("has_image").unwrap(), has_image);
+    doc.add_text(
+        schema.get_field("image").unwrap(),
+        entity.image.unwrap_or_default(),
+    );
 
     doc
 }
@@ -189,6 +199,7 @@ impl EntityIndex {
             .expect("writer not prepared")
             .commit()
             .unwrap();
+        self.image_store.flush();
         self.reader.reload().unwrap();
     }
 
@@ -211,7 +222,7 @@ impl EntityIndex {
             (Occur::Must, image_query.box_clone()),
         ]);
 
-        match searcher.search(&query, &TopDocs::with_limit(1_000)) {
+        match searcher.search(&query, &TopDocs::with_limit(100)) {
             Ok(result) => result
                 .into_iter()
                 .filter(|(_, related_doc)| doc != *related_doc)
@@ -221,7 +232,7 @@ impl EntityIndex {
 
                     EntityMatch { entity, score }
                 })
-                .filter(|m| m.entity.image_id.is_some())
+                .filter(|entity_match| entity_match.entity.image_id.is_some())
                 .take(4)
                 .collect(),
             Err(_) => Vec::new(),
@@ -289,6 +300,7 @@ impl EntityIndex {
         let entity_abstract = self.schema.get_field("abstract").unwrap();
         let info = self.schema.get_field("info").unwrap();
         let links = self.schema.get_field("links").unwrap();
+        let image_field = self.schema.get_field("image").unwrap();
 
         let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
         let title = doc
@@ -329,8 +341,21 @@ impl EntityIndex {
             Vec::new()
         };
 
-        let image_id = BASE64_ENGINE.encode(&title);
-        let image_id = if self.retrieve_image(&image_id).is_some() {
+        let image_id = doc
+            .get_first(image_field)
+            .and_then(|val| match val {
+                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
+                _ => None,
+            })
+            .unwrap();
+
+        let image_id = if !image_id.is_empty() {
+            BASE64_ENGINE.encode(image_id)
+        } else {
+            String::new()
+        };
+
+        let image_id = if !image_id.is_empty() && self.retrieve_image(&image_id).is_some() {
             Some(image_id)
         } else {
             None
@@ -366,6 +391,10 @@ impl EntityIndex {
 
         self.image_store.get(&key)
     }
+
+    pub fn insert_image(&mut self, name: String, image: Image) {
+        self.image_store.insert(name, image);
+    }
 }
 
 #[cfg(test)]
@@ -398,5 +427,37 @@ mod tests {
             index.search("the ashes").unwrap().entity.title.as_str(),
             "the ashes"
         );
+    }
+
+    #[test]
+    fn image() {
+        let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+        index.prepare_writer();
+
+        index.insert(Entity {
+            title: "the ashes".to_string(),
+            page_abstract: Span {
+                text: String::new(),
+                links: Vec::new(),
+            },
+            info: Vec::new(),
+            image: Some("test".to_string()),
+        });
+
+        index.commit();
+
+        let image = Image::empty(32, 32);
+        index.insert_image("test".to_string(), image.clone());
+
+        index.commit();
+
+        assert_eq!(
+            index.search("ashes").unwrap().entity.image_id,
+            Some(BASE64_ENGINE.encode("test"))
+        );
+
+        assert!(index
+            .retrieve_image(&index.search("ashes").unwrap().entity.image_id.unwrap())
+            .is_some());
     }
 }

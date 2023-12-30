@@ -22,6 +22,7 @@ use crate::{
         entity::{Entity, Span},
         EntityIndex,
     },
+    image_store::Image,
     Result,
 };
 
@@ -67,15 +68,24 @@ fn article_to_entity(article: Article) -> Entity {
                 .select("tr")
                 .unwrap()
                 .filter_map(|tr| {
-                    let mut tds = tr.as_node().select("td").unwrap();
-                    let mut key = tds.next()?.text_contents().trim().to_string();
+                    let mut tds: Vec<_> = tr
+                        .as_node()
+                        .children()
+                        .filter(|n| n.as_element().is_some())
+                        .collect();
 
-                    while key.is_empty() {
-                        key = tds.next()?.text_contents().trim().to_string();
+                    if tds.len() != 2 {
+                        return None;
                     }
-                    key = key.trim_end_matches(':').to_string();
 
-                    let value = node_into_span(tds.next()?.as_node());
+                    let key = tds
+                        .swap_remove(0)
+                        .text_contents()
+                        .trim()
+                        .trim_end_matches(':')
+                        .to_string();
+
+                    let value = node_into_span(&tds.swap_remove(0));
                     Some((key, value))
                 })
                 .collect()
@@ -161,6 +171,14 @@ impl EntityIndexer {
 
         for entity in EntityIterator::new(&zim)? {
             index.insert(entity);
+        }
+
+        index.commit();
+
+        for image in zim.images()? {
+            if let Ok(decoded_image) = Image::from_bytes(image.bytes()) {
+                index.insert_image(image.url, decoded_image);
+            }
         }
 
         index.commit();
@@ -353,6 +371,48 @@ mod tests {
             ---
             
             The lion (Panthera leo) is a large cat of the genus Panthera native to Africa and India. It has a muscular, broad-chested body; short, rounded head; round ears; and a hairy tuft at the end of its tail. It is sexually dimorphic; adult male lions are larger than females and have a prominent mane. It is a social species, forming groups called prides. A lion's pride consists of a few adult males, related females, and cubs. Groups of female lions usually hunt together, preying mostly on large ungulates. The lion is an apex and keystone predator; although some lions scavenge when opportunities occur and have been known to hunt [humans](Human), lions typically do not actively seek out and prey on humans.
+            "###),
+        )
+    }
+
+    #[test]
+    fn aristotle() {
+        check_abstract(
+            "Aristotle",
+            "Aristotle",
+            include_str!("../../testcases/entity/aristotle.html"),
+            expect!(@r###"
+            Title: Aristotle
+            Image: Some("Aristotle_Altemps_Inv8575.jpg.webp")
+            Info:
+             - Born: 384 BC                                            Stagira, Chalcidian League
+             - Died:
+                322 BC (aged 61–62)                                            Chalcis, Euboea, Macedonian
+                                                                Empire
+             - Education: Platonic Academy
+             - Notable
+                                                            work:                                                                                                                                 …
+             - Era: Ancient Greek philosophy
+             - Region: Western philosophy
+             - School:                                                                                                                                 …
+             - Notable students: Alexander the Great, Theophrastus, Aristoxenus
+             - Main interests:                                                                                                                                 …
+             - Notable ideas:
+                Aristotelianism
+                                                                                                                                                …
+                                                                        syllogism                                                      Four caus…
+                                                                        substance, essence, accident                                            …
+                                                                        actuality                                                      Theory of…
+                                                                        aether                                                      Rational ani…
+                                                                        epideictic and forensic rhetoric                                        …
+                                                                        Paradeigma                                                      Family a…
+                                                                        the state                                                      Golden me…
+                                                                        sophia, episteme, nous, phronesis, techne                               …
+                                                                        logos, pathos                                                      Views…
+            
+            ---
+            
+            Aristotle (/ˈærɪˌstɒtəl/; Greek: Ἀριστοτέλης Aristotélēs, pronounced [aristotélɛːs]; 384–322 BC) was an Ancient Greek philosopher and polymath. His writings cover a broad range of subjects spanning the natural sciences, philosophy, linguistics, economics, politics, psychology and the arts. As the founder of the Peripatetic school of philosophy in the Lyceum in Athens, he began the wider Aristotelian tradition that followed, which set the groundwork for the development of modern science.
             "###),
         )
     }
