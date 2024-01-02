@@ -33,6 +33,14 @@ pub struct Span {
 }
 
 impl Span {
+    #[cfg(test)]
+    pub fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            links: vec![],
+        }
+    }
+
     pub fn merge(&mut self, other_span: Span) {
         let orig_end = self.text.len();
         self.text.push_str(&other_span.text);
@@ -70,6 +78,10 @@ impl Span {
                 break;
             }
         }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
     }
 }
 

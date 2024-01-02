@@ -148,8 +148,14 @@ fn node_into_span(node: &NodeRef) -> Span {
                 }
                 "ul" | "ol" | "li" | "div" => {
                     let child_span = node_into_span(&child);
+
+                    if !span.text().ends_with(|c: char| c.is_whitespace())
+                        && !child_span.text().starts_with(|c: char| c.is_whitespace())
+                    {
+                        span.add_text(" ");
+                    }
+
                     span.merge(child_span);
-                    span.add_text(" ");
                 }
                 _ => {}
             }
@@ -400,18 +406,18 @@ mod tests {
              - Notable ideas:
                 Aristotelianism
                                                                                                                                                 …
-                                                                        syllogism                                                      Four caus…
+                                                                        syllogism                                                     Four cause…
                                                                         substance, essence, accident                                            …
-                                                                        actuality                                                      Theory of…
-                                                                        aether                                                      Rational ani…
+                                                                        actuality                                                     Theory of …
+                                                                        aether                                                     Rational anim…
                                                                         epideictic and forensic rhetoric                                        …
-                                                                        Paradeigma                                                      Family a…
-                                                                        the state                                                      Golden me…
+                                                                        Paradeigma                                                     Family as…
+                                                                        the state                                                     Golden mea…
                                                                         sophia, episteme, nous, phronesis, techne                               …
-                                                                        logos, pathos                                                      Views…
-            
+                                                                        logos, pathos                                                     Views …
+
             ---
-            
+
             Aristotle (/ˈærɪˌstɒtəl/; Greek: Ἀριστοτέλης Aristotélēs, pronounced [aristotélɛːs]; 384–322 BC) was an Ancient Greek philosopher and polymath. His writings cover a broad range of subjects spanning the natural sciences, philosophy, linguistics, economics, politics, psychology and the arts. As the founder of the Peripatetic school of philosophy in the Lyceum in Athens, he began the wider Aristotelian tradition that followed, which set the groundwork for the development of modern science.
             "###),
         )
@@ -429,5 +435,16 @@ mod tests {
         let entity = it.next().unwrap();
 
         assert_eq!(entity.title, "Animal");
+
+        let aristotle = it.find(|e| e.title == "Aristotle").unwrap();
+
+        assert_eq!(aristotle.title, "Aristotle");
+        assert_eq!(
+            aristotle.info[0],
+            (
+                "Born".to_string(),
+                Span::new("384 BC Stagira, Chalcidian League")
+            )
+        );
     }
 }
