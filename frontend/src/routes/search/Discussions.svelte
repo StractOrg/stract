@@ -57,3 +57,10 @@
     </div>
   </div>
 </div>
+
+<style>
+  /* hide marker in safari */
+  summary::-webkit-details-marker {
+    display: none;
+  }
+</style>

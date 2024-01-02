@@ -10,11 +10,13 @@
     {#if entity.imageId}
       <div class="w-lg mb-5">
         <a href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
+          <div class="h-40">
             <img
               alt="Image of {entity.title}"
-              class="h-full w-full max-h-40 object-scale-down rounded-full"
+              class="h-full w-full object-contain rounded-full"
               src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
             />
+          </div>
         </a>
       </div>
     {/if}
@@ -54,15 +56,15 @@
           {#each entity.relatedEntities as related (related.title)}
             <div class="flex flex-col items-center p-4">
               {#if related.imageId != null}
-                <div class="mb-3 h-20 w-20">
-                  <a href="/search?q={encodeURIComponent(related.title)}">
+                <a href="/search?q={encodeURIComponent(related.title)}">
+                  <div class="h-20 w-20">
                     <img
                       alt="Image of {related.title}"
                       class="h-full w-full rounded-full object-cover"
                       src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}&maxWidth=200&maxHeight=200"
                     />
-                  </a>
-                </div>
+                  </div>
+                </a>
               {/if}
 
               <div class="line-clamp-3 text-center">

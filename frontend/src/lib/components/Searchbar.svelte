@@ -107,7 +107,7 @@
       {autofocus}
       placeholder="Search"
       autocomplete="off"
-      class="border-none bg-transparent focus:ring-0"
+      class="border-none bg-transparent focus:ring-0 text-lg"
       on:focus={() => {
         hasFocus = true;
       }}
@@ -116,7 +116,14 @@
         // don't blur yet since the clicked element would disapper
         if (e.relatedTarget instanceof Node && suggestionsDiv?.contains(e.relatedTarget)) return;
 
-        requestIdleCallback(() => (hasFocus = false));
+        // requestIdleCallback is not supported in Safari
+        // https://caniuse.com/requestidlecallback
+        // @ts-ignore
+        if (window.requestIdleCallback) {
+          requestIdleCallback(() => (hasFocus = false));
+        } else {
+          hasFocus = false;
+        }
       }}
       bind:value={query}
       on:keydown={onKeydown}

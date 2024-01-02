@@ -150,8 +150,8 @@
       <div class="w-full">
         <Searchbar {query} />
       </div>
-      <div class="mx-auto flex w-full justify-between">
-        <div class="flex h-full flex-col justify-center space-x-2 text-sm text-neutral">
+      <div class="mx-auto flex w-full justify-end sm:justify-between">
+        <div class="hidden sm:flex h-full flex-col space-x-2 text-xs text-neutral">
           <p class="h-fit">
             {#if results.numHits != null}
               Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in <span class="font-medium">{(
