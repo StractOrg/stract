@@ -175,11 +175,21 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetEntityImage {
     pub image_id: String,
+    pub max_width: Option<u64>,
+    pub max_height: Option<u64>,
 }
 impl sonic::service::Message<SearchService> for GetEntityImage {
     type Response = Option<Image>;
     async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        Ok(server.local_searcher.get_entity_image(&self.image_id))
+        Ok(server
+            .local_searcher
+            .get_entity_image(&self.image_id)
+            .map(|img| {
+                let max_width = self.max_width.unwrap_or(u64::MAX) as u32;
+                let max_height = self.max_height.unwrap_or(u64::MAX) as u32;
+
+                img.resize_max(max_width, max_height)
+            }))
     }
 }
 

@@ -583,6 +583,12 @@ dependencies = [
 
 [[package]]
 name = "byteorder"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fc10e8cc6b2580fda3f36eb6dc5316657f812a3df879a44a66fc9f0fdbc4855"
+
+[[package]]
+name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
@@ -1539,7 +1545,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
- "byteorder",
+ "byteorder 1.5.0",
 ]
 
 [[package]]
@@ -1959,7 +1965,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f3dfdbdd72063086ff443e297b61695500514b1e41095b6fb9a5ab48a70a711"
 dependencies = [
  "bytemuck",
- "byteorder",
+ "byteorder 1.5.0",
  "color_quant",
  "exr",
  "gif",
@@ -2382,6 +2388,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ea9b256699eda7b0387ffbc776dd625e28bde3918446381781245b7a50349d8"
 dependencies = [
  "twox-hash",
+]
+
+[[package]]
+name = "lzma"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "782ba3f542e8bc1349386c15e9dc3119ae6da96479f96b3863cc7a88bbdfd4e4"
+dependencies = [
+ "byteorder 0.5.3",
 ]
 
 [[package]]
@@ -2943,12 +2958,6 @@ dependencies = [
  "smallvec",
  "windows-targets 0.48.5",
 ]
-
-[[package]]
-name = "parse_wiki_text"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd59a245c58efa02bd73c9462fd9d4c28952d650092c6bcba43b60b4707171dd"
 
 [[package]]
 name = "password-hash"
@@ -3940,7 +3949,7 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "bigdecimal",
- "byteorder",
+ "byteorder 1.5.0",
  "bytes",
  "chrono",
  "dashmap",
@@ -3972,7 +3981,7 @@ source = "git+https://github.com/scylladb/scylla-rust-driver?rev=82c1c99f0ff8650
 dependencies = [
  "async-trait",
  "bigdecimal",
- "byteorder",
+ "byteorder 1.5.0",
  "bytes",
  "chrono",
  "lz4_flex",
@@ -4310,7 +4319,7 @@ dependencies = [
  "bincode",
  "bitvec",
  "bytemuck",
- "byteorder",
+ "byteorder 1.5.0",
  "bzip2",
  "chitchat",
  "chrono",
@@ -4349,7 +4358,6 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "optics",
- "parse_wiki_text",
  "proptest",
  "proptest-derive",
  "publicsuffix",
@@ -4388,6 +4396,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "whatlang",
+ "zimba",
 ]
 
 [[package]]
@@ -4506,7 +4515,7 @@ dependencies = [
  "async-trait",
  "base64 0.21.4",
  "bitpacking",
- "byteorder",
+ "byteorder 1.5.0",
  "census",
  "crc32fast",
  "crossbeam-channel",
@@ -4577,7 +4586,7 @@ version = "0.6.0"
 source = "git+https://github.com/quickwit-oss/tantivy?rev=182f58cea#182f58cea6bb012fc81b20a92317484e861e0e80"
 dependencies = [
  "async-trait",
- "byteorder",
+ "byteorder 1.5.0",
  "ownedbytes",
  "serde",
  "time",
@@ -4589,7 +4598,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc3c506b1a8443a3a65352df6382a1fb6a7afe1a02e871cee0d25e2c3d5f3944"
 dependencies = [
- "byteorder",
+ "byteorder 1.5.0",
  "regex-syntax 0.6.29",
  "utf8-ranges",
 ]
@@ -5674,13 +5683,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "zimba"
+version = "0.1.0"
+dependencies = [
+ "lzma",
+ "memmap2",
+ "thiserror",
+ "zstd 0.13.0",
+]
+
+[[package]]
 name = "zip"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
 dependencies = [
  "aes",
- "byteorder",
+ "byteorder 1.5.0",
  "bzip2",
  "constant_time_eq",
  "crc32fast",

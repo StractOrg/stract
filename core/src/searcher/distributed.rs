@@ -236,13 +236,20 @@ impl DistributedSearcher {
         }
     }
 
-    pub async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
+    pub async fn get_entity_image(
+        &self,
+        image_id: &str,
+        max_height: Option<u64>,
+        max_width: Option<u64>,
+    ) -> Result<Option<Image>> {
         let client = self.client().await;
 
         let (_, mut res) = client
             .send(
                 &search_server::GetEntityImage {
                     image_id: image_id.to_string(),
+                    max_height,
+                    max_width,
                 },
                 &RandomShardSelector,
                 &RandomReplicaSelector,

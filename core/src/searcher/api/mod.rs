@@ -447,7 +447,14 @@ impl ApiSearcher {
         self.distributed_searcher.get_webpage(url).await
     }
 
-    pub async fn get_entity_image(&self, image_id: &str) -> Result<Option<Image>> {
-        self.distributed_searcher.get_entity_image(image_id).await
+    pub async fn get_entity_image(
+        &self,
+        image_id: &str,
+        max_height: Option<u64>,
+        max_width: Option<u64>,
+    ) -> Result<Option<Image>> {
+        self.distributed_searcher
+            .get_entity_image(image_id, max_height, max_width)
+            .await
     }
 }

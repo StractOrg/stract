@@ -133,18 +133,18 @@ trait ImageFilter: Send + Sync {
     fn transform(&self, image: Image) -> Image;
 }
 
-struct ResizeFilter {
+struct MaxSizeFilter {
     width: u32,
     height: u32,
 }
 
-impl ImageFilter for ResizeFilter {
+impl ImageFilter for MaxSizeFilter {
     fn transform(&self, image: Image) -> Image {
-        Image(
-            image
-                .0
-                .resize(self.width, self.height, FilterType::Gaussian),
-        )
+        Image(image.0.resize(
+            self.width.min(image.0.width()),
+            self.height.min(image.0.height()),
+            FilterType::Lanczos3,
+        ))
     }
 }
 
@@ -159,9 +159,9 @@ impl EntityImageStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let store = BaseImageStore::open_with_filters(
             path,
-            vec![Box::new(ResizeFilter {
-                width: 200,
-                height: 200,
+            vec![Box::new(MaxSizeFilter {
+                width: 400,
+                height: 400,
             })],
         );
 
@@ -170,12 +170,12 @@ impl EntityImageStore {
 }
 
 impl ImageStore<String> for EntityImageStore {
-    fn insert(&mut self, entity_name: String, image: Image) {
-        self.store.insert(entity_name, image);
+    fn insert(&mut self, name: String, image: Image) {
+        self.store.insert(name, image);
     }
 
-    fn get(&self, entity_name: &String) -> Option<Image> {
-        self.store.get(entity_name)
+    fn get(&self, name: &String) -> Option<Image> {
+        self.store.get(name)
     }
 
     fn merge(&mut self, other: Self) {
@@ -188,16 +188,21 @@ impl ImageStore<String> for EntityImageStore {
 }
 
 impl Image {
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Image> {
-        if let Ok(img) = image::load_from_memory(&bytes) {
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Image> {
+        if let Ok(img) = image::load_from_memory(bytes) {
             Ok(Self(img))
-        } else if let Ok(img) =
-            image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        } else if let Ok(img) = image::load_from_memory_with_format(bytes, image::ImageFormat::Jpeg)
+        {
+            Ok(Self(img))
+        } else if let Ok(img) = image::load_from_memory_with_format(bytes, image::ImageFormat::WebP)
+        {
+            Ok(Self(img))
+        } else if let Ok(img) = image::load_from_memory_with_format(bytes, image::ImageFormat::Gif)
         {
             Ok(Self(img))
         } else {
             Ok(Self(image::load_from_memory_with_format(
-                &bytes,
+                bytes,
                 image::ImageFormat::Png,
             )?))
         }
@@ -216,8 +221,12 @@ impl Image {
         bytes
     }
 
-    pub fn resize(self, width: u32, height: u32) -> Self {
-        ResizeFilter { width, height }.transform(self)
+    pub fn resize_max(self, width: u32, height: u32) -> Self {
+        MaxSizeFilter { width, height }.transform(self)
+    }
+
+    pub fn empty(width: u32, height: u32) -> Self {
+        Self(image::DynamicImage::new_rgb8(width, height))
     }
 }
 
@@ -262,7 +271,7 @@ mod tests {
         assert_eq!(image.0.width(), 32);
         assert_eq!(image.0.height(), 32);
 
-        let transformed_image = ResizeFilter {
+        let transformed_image = MaxSizeFilter {
             width: 16,
             height: 16,
         }

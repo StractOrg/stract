@@ -155,6 +155,8 @@ pub async fn api(
 #[serde(rename_all = "camelCase")]
 pub struct EntityImageParams {
     pub image_id: String,
+    pub max_width: Option<u64>,
+    pub max_height: Option<u64>,
 }
 
 #[utoipa::path(
@@ -169,7 +171,11 @@ pub async fn entity_image(
     extract::Query(query): extract::Query<EntityImageParams>,
     extract::State(state): extract::State<Arc<State>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    match state.searcher.get_entity_image(&query.image_id).await {
+    match state
+        .searcher
+        .get_entity_image(&query.image_id, query.max_height, query.max_width)
+        .await
+    {
         Ok(Some(result)) => {
             let bytes = result.as_raw_bytes();
 

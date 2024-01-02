@@ -285,11 +285,11 @@ impl EdgeStore {
         block_options.set_format_version(5);
         block_options.set_cache_index_and_filter_blocks(true);
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
+        block_options.set_block_cache(&cache);
 
         block_options.set_ribbon_filter(10.0);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_row_cache(&cache);
         options.set_compression_type(rocksdb::DBCompressionType::Lz4);
         options.optimize_for_point_lookup(512);
 

@@ -38,13 +38,13 @@ fn download_files() {
         .unwrap()
         .block_on(async {
             for name in [
-                "enwiki_subset.xml.bz2",
                 "queries_us.csv",
                 "sample.warc.gz",
                 "bangs.json",
                 "content.rdf.u8.gz",
                 "english-wordnet-2022-subset.ttl",
                 "lambdamart.txt",
+                "test.zim",
             ] {
                 let path = Path::new(DATA_PATH).join(name);
 
@@ -206,7 +206,7 @@ fn create_entity_index() -> Result<()> {
         std::fs::remove_dir_all(&out_path)?;
     }
 
-    let wiki_path = Path::new(DATA_PATH).join("enwiki_subset.xml.bz2");
+    let wiki_path = Path::new(DATA_PATH).join("test.zim");
 
     EntityIndexer::run(
         wiki_path.to_str().unwrap().to_string(),
