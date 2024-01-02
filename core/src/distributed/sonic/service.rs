@@ -33,7 +33,7 @@ pub trait Service: Sized + Send + Sync + 'static {
 
 pub trait Message<S: Service> {
     type Response;
-    async fn handle(self, server: &S) -> Result<Self::Response>;
+    fn handle(self, server: &S) -> impl std::future::Future<Output = Result<Self::Response>>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
     fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;

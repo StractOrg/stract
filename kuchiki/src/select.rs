@@ -142,7 +142,7 @@ impl ToCss for PseudoElement {
     where
         W: fmt::Write,
     {
-        match *self {}
+        Ok(())
     }
 }
 
@@ -299,10 +299,10 @@ impl selectors::Element for NodeDataRef<ElementData> {
 
     fn match_pseudo_element(
         &self,
-        pseudo: &PseudoElement,
+        _pseudo: &PseudoElement,
         _context: &mut matching::MatchingContext<KuchikiSelectors>,
     ) -> bool {
-        match *pseudo {}
+        true
     }
 
     fn match_non_ts_pseudo_class<F>(
