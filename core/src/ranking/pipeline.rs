@@ -340,7 +340,7 @@ pub struct RankingPipeline<T: AsRankingWebsite> {
 }
 
 impl<T: AsRankingWebsite> RankingPipeline<T> {
-    fn create_second_stage<M: CrossEncoder + 'static>(
+    fn create_reranking_stage<M: CrossEncoder + 'static>(
         crossencoder: Option<Arc<M>>,
         lambda: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
@@ -375,13 +375,13 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         top_n_considered: usize,
     ) -> Result<Self> {
         let mut pipeline =
-            Self::create_second_stage(crossencoder, lambda, collector_config, top_n_considered)?;
+            Self::create_reranking_stage(crossencoder, lambda, collector_config, top_n_considered)?;
         pipeline.set_query_info(query);
 
         Ok(pipeline)
     }
 
-    fn create_first_stage(
+    fn create_recall_stage(
         model: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
         stage_top_n: usize,
@@ -403,13 +403,13 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
         }
     }
 
-    pub fn first_stage(
+    pub fn recall_stage(
         query: &mut SearchQuery,
         model: Option<Arc<LambdaMART>>,
         collector_config: CollectorConfig,
         top_n_considered: usize,
     ) -> Self {
-        let mut pipeline = Self::create_first_stage(model, collector_config, top_n_considered);
+        let mut pipeline = Self::create_recall_stage(model, collector_config, top_n_considered);
         pipeline.set_query_info(query);
 
         pipeline

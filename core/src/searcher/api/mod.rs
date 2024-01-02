@@ -330,7 +330,7 @@ impl ApiSearcher {
 
         // This pipeline should be created before the first search is performed
         // so the query knows how many results to fetch from the indices
-        let first_pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::first_stage(
+        let recall_pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::recall_stage(
             &mut search_query,
             self.lambda_model.clone(),
             self.collector_config.clone(),
@@ -369,7 +369,7 @@ impl ApiSearcher {
             self.collector_config.clone(),
             initial_results,
             live_results,
-            first_pipeline,
+            recall_pipeline,
         );
 
         let retrieved_webpages = self
@@ -382,16 +382,17 @@ impl ApiSearcher {
         };
 
         #[cfg(feature = "libtorch")]
-        let pipeline: RankingPipeline<RetrievedWebpageRanking> = RankingPipeline::reranker(
-            &mut search_query,
-            self.cross_encoder.clone(),
-            self.lambda_model.clone(),
-            self.collector_config.clone(),
-            query.num_results,
-        )?;
+        let reranking_pipeline: RankingPipeline<RetrievedWebpageRanking> =
+            RankingPipeline::reranker(
+                &mut search_query,
+                self.cross_encoder.clone(),
+                self.lambda_model.clone(),
+                self.collector_config.clone(),
+                query.num_results,
+            )?;
 
         #[cfg(not(feature = "libtorch"))]
-        let pipeline: RankingPipeline<RetrievedWebpageRanking> =
+        let reranking_pipeline: RankingPipeline<RetrievedWebpageRanking> =
             RankingPipeline::reranker::<DummyCrossEncoder>(
                 &mut search_query,
                 None,
@@ -400,7 +401,7 @@ impl ApiSearcher {
                 query.num_results,
             )?;
 
-        let retrieved_webpages = pipeline.apply(retrieved_webpages);
+        let retrieved_webpages = reranking_pipeline.apply(retrieved_webpages);
 
         let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()

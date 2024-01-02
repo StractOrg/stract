@@ -109,7 +109,7 @@ impl WidgetManager {
 
         // This pipeline should be created before the first search is performed
         // so the query knows how many results to fetch from the indices
-        let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::first_stage(
+        let pipeline: RankingPipeline<ScoredWebsitePointer> = RankingPipeline::recall_stage(
             &mut query,
             self.lambda_model.clone(),
             self.collector_config.clone(),
