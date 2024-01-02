@@ -507,7 +507,7 @@ impl Cluster {
     }
 }
 
-pub struct Zim {
+pub struct ZimFile {
     header: Header,
     mime_types: MimeTypes,
     url_pointers: UrlPointerList,
@@ -516,8 +516,8 @@ pub struct Zim {
     mmap: memmap2::Mmap,
 }
 
-impl Zim {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Zim, Error> {
+impl ZimFile {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<ZimFile, Error> {
         let file = File::open(path)?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
 
@@ -564,10 +564,6 @@ impl Zim {
         Ok(Some(DirEntry::from_bytes(&self.mmap[pointer..])?))
     }
 
-    pub fn all_dir_entries(&self) -> DirEntryIterator<'_> {
-        DirEntryIterator::new(&self.mmap, &self.url_pointers)
-    }
-
     pub fn get_cluster(&self, index: u32) -> Result<Option<Cluster>, Error> {
         if index >= self.header.cluster_count {
             return Ok(None);
@@ -587,6 +583,10 @@ impl Zim {
 
     pub fn title_pointers(&self) -> &TitlePointerList {
         &self.title_pointers
+    }
+
+    pub fn dir_entries(&self) -> DirEntryIterator<'_> {
+        DirEntryIterator::new(&self.mmap, &self.url_pointers)
     }
 
     pub fn articles(&self) -> Result<ArticleIterator<'_>, Error> {
@@ -639,14 +639,14 @@ mod tests {
             return;
         }
 
-        let zim = Zim::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../data/test.zim").unwrap();
 
         assert_eq!(zim.header.magic, 72173914);
         assert_eq!(zim.header.major_version, 5);
         assert_eq!(zim.header.minor_version, 0);
 
         let first_article = zim
-            .all_dir_entries()
+            .dir_entries()
             .find(|x| match x {
                 Ok(DirEntry::Content { namespace, .. }) => *namespace == 'A',
                 _ => false,
@@ -660,6 +660,6 @@ mod tests {
         };
 
         assert_eq!(url, "African_Americans");
-        assert_eq!(zim.all_dir_entries().count(), 8477);
+        assert_eq!(zim.dir_entries().count(), 8477);
     }
 }

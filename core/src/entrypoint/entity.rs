@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use kuchiki::{traits::TendrilSink, NodeRef};
-use zimba::{Article, ArticleIterator, Zim};
+use zimba::{Article, ArticleIterator, ZimFile};
 
 use crate::{
     entity_index::{
@@ -31,7 +31,7 @@ struct EntityIterator<'a> {
 }
 
 impl<'a> EntityIterator<'a> {
-    pub fn new(zim: &'a Zim) -> Result<EntityIterator<'a>> {
+    pub fn new(zim: &'a ZimFile) -> Result<EntityIterator<'a>> {
         Ok(Self {
             articles: zim.articles()?,
         })
@@ -171,7 +171,7 @@ pub struct EntityIndexer;
 
 impl EntityIndexer {
     pub fn run(wikipedia_dump_path: String, output_path: String) -> Result<()> {
-        let zim = Zim::open(wikipedia_dump_path)?;
+        let zim = ZimFile::open(wikipedia_dump_path)?;
         let mut index = EntityIndex::open(output_path)?;
         index.prepare_writer();
 
@@ -429,7 +429,7 @@ mod tests {
             return;
         }
 
-        let zim = Zim::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../data/test.zim").unwrap();
         let mut it = EntityIterator::new(&zim).unwrap();
 
         let entity = it.next().unwrap();

@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 
-use crate::{Cluster, DirEntry, Error, Zim};
+use crate::{Cluster, DirEntry, Error, ZimFile};
 
 struct ArticleRef {
     blob_number: u32,
@@ -30,7 +30,7 @@ struct WorkingCluster<T> {
 }
 
 pub struct ArticleIterator<'a> {
-    zim: &'a Zim,
+    zim: &'a ZimFile,
     // key: cluster number, value: list of article refs in that cluster
     articles: Vec<(u64, Vec<ArticleRef>)>,
 
@@ -38,9 +38,9 @@ pub struct ArticleIterator<'a> {
 }
 
 impl<'a> ArticleIterator<'a> {
-    pub fn new(zim: &'a Zim) -> Result<ArticleIterator<'a>, Error> {
+    pub fn new(zim: &'a ZimFile) -> Result<ArticleIterator<'a>, Error> {
         let mut articles = HashMap::new();
-        for entry in zim.all_dir_entries() {
+        for entry in zim.dir_entries() {
             let entry = entry?;
 
             if let DirEntry::Content {
@@ -146,7 +146,7 @@ struct ImageRef {
 }
 
 pub struct ImageIterator<'a> {
-    zim: &'a Zim,
+    zim: &'a ZimFile,
     // key: cluster number, value: list of article refs in that cluster
     images: Vec<(u64, Vec<ImageRef>)>,
 
@@ -154,9 +154,9 @@ pub struct ImageIterator<'a> {
 }
 
 impl<'a> ImageIterator<'a> {
-    pub fn new(zim: &'a Zim) -> Result<ImageIterator<'a>, Error> {
+    pub fn new(zim: &'a ZimFile) -> Result<ImageIterator<'a>, Error> {
         let mut images = HashMap::new();
-        for entry in zim.all_dir_entries() {
+        for entry in zim.dir_entries() {
             let entry = entry?;
 
             if let DirEntry::Content {
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_article_iterator() {
-        let zim = Zim::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../data/test.zim").unwrap();
         let mut iter = ArticleIterator::new(&zim).unwrap();
 
         let article = iter.next().unwrap();
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_image_iterator() {
-        let zim = Zim::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../data/test.zim").unwrap();
         let mut iter = ImageIterator::new(&zim).unwrap();
 
         let image = iter.next().unwrap();
