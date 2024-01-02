@@ -1,12 +1,9 @@
 <script lang="ts">
   import ThemeSelect from '$lib/components/ThemeSelect.svelte';
-  import PostSearchSelect from '$lib/components/PostSearchSelect.svelte';
-  import { safeSearchStore } from '$lib/stores';
-
-  const safeSearchOptions = [
-    ['on', true],
-    ['off', false],
-  ] as const;
+  import PostSearchSelect from './PostSearchSelect.svelte';
+  import SafeSearchSelect from './SafeSearchSelect.svelte';
+  import MarkPagesWithAdsSelect from './MarkPagesWithAdsSelect.svelte';
+  import MarkPagesWithPaywallSelect from './MarkPagesWithPaywallSelect.svelte';
 
   const settings = [
     {
@@ -24,6 +21,16 @@
       description: 'Send search queries using POST instead of GET',
       type: 'post',
     },
+    {
+      title: 'Mark results that contains ads',
+      description: 'Add a marker to search results where it is likely that the page contains ads',
+      type: 'mark-pages-with-ads',
+    },
+    {
+      title: 'Mark results that contains paywall',
+      description: 'Add a marker to search results where it is likely that the page contains a paywall',
+      type: 'mark-pages-with-paywall',
+    }
   ] as const;
 </script>
 
@@ -33,34 +40,22 @@
     <div class="flex flex-col space-y-5">
       {#each settings as setting}
         <div class="flex flex-col pr-1 sm:flex-row sm:justify-between">
-          <div class="flex flex-col">
+          <div class="flex flex-col pr-5">
             <h2 class="text-lg">{setting.title}</h2>
-            <p>{setting.description}</p>
+            <p class="text-sm">{setting.description}</p>
           </div>
           <div class="flex flex-col pr-5 sm:flex-row sm:justify-between sm:space-y-0">
             <div>
               {#if setting.type == 'safe-search'}
-                <div class="flex space-x-4 pr-2">
-                  {#each safeSearchOptions as [name, state]}
-                    <label
-                      class="flex cursor-pointer flex-col items-center"
-                      for="safe-search-{state}"
-                    >
-                      <input
-                        type="radio"
-                        name="safe-search"
-                        id="safe-search-{state}"
-                        value={state}
-                        bind:group={$safeSearchStore}
-                      />
-                      <span class="capitalize">{name}</span>
-                    </label>
-                  {/each}
-                </div>
+                <SafeSearchSelect />
               {:else if setting.type == 'theme'}
                 <ThemeSelect />
               {:else if setting.type == 'post'}
                 <PostSearchSelect />
+              {:else if setting.type == 'mark-pages-with-ads'}
+                <MarkPagesWithAdsSelect />
+              {:else if setting.type == 'mark-pages-with-paywall'}
+                <MarkPagesWithPaywallSelect />
               {/if}
             </div>
           </div>

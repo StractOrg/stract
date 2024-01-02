@@ -1,9 +1,8 @@
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
-  import ShieldExclamation from '~icons/heroicons/shield-exclamation';
   import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
-  import { clearSummary, summariesStore } from '$lib/stores';
+  import { clearSummary, summariesStore, markPagesWithAdsStore, markPagesWithPaywallStore } from '$lib/stores';
   import Summary from './Summary.svelte';
   import { derived } from 'svelte/store';
   import { improvements } from '$lib/improvements';
@@ -57,23 +56,23 @@
         <div class="line-clamp-3">
           <div class="inline">
             <span id="snippet-text" class="snippet-text">
-                {#if webpage.likelyHasAds && webpage.likelyHasPaywall}
-                <span title="page likely has ads and paywall">
-                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
+                {#if (webpage.likelyHasAds && $markPagesWithAdsStore ) && (webpage.likelyHasPaywall && $markPagesWithPaywallStore)}
+                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has ads and paywall">
+                  has ads + paywall
                 </span>
-                {:else if webpage.likelyHasAds}
-                <span title="page likely has ads">
-                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
+                {:else if (webpage.likelyHasAds && $markPagesWithAdsStore)}
+                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has ads">
+                  has ads
                 </span>
-                {:else if webpage.likelyHasPaywall}
-                <span title="page likely has paywall">
-                  <ShieldExclamation class="inline-block w-4 pb-0.5 h-[1em] text-primary" /> 
+                {:else if (webpage.likelyHasPaywall && $markPagesWithPaywallStore)}
+                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has paywall" >
+                  paywall
                 </span>
                 {/if}
               {#if webpage.snippet.date}
                 <span class="text-neutral">
-                  {webpage.snippet.date} -
-                </span>
+                  {webpage.snippet.date}
+                </span> -
               {/if}
               <span>
                 <TextSnippet snippet={webpage.snippet.text} />

@@ -70,6 +70,12 @@ export const searchQueryStore = writableLocalStorage<string | undefined>(SEARCH_
 const QUERY_ID_KEY = 'queryId';
 export const queryIdStore = writableLocalStorage<string | undefined>(QUERY_ID_KEY, void 0);
 
+const MARK_PAGES_WITH_ADS_KEY = 'markPagesWithAds';
+export const markPagesWithAdsStore = writableLocalStorage<boolean>(MARK_PAGES_WITH_ADS_KEY, false);
+
+const MARK_PAGES_WITH_PAYWALL_KEY = 'markPagesWithPaywall';
+export const markPagesWithPaywallStore = writableLocalStorage<boolean>(MARK_PAGES_WITH_PAYWALL_KEY, true);
+
 
 const THEME_KEY = 'theme';
 export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
