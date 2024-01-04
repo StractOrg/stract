@@ -72,7 +72,7 @@ impl IndexingWorker {
                 Path::new(&host_centrality_store_path).join("harmonic"),
             ),
             page_centrality_store: page_centrality_store_path
-                .map(|p| RocksDbStore::open(Path::new(&p).join("derived_harmonic"))),
+                .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic"))),
             page_webgraph: page_webgraph_path
                 .map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),

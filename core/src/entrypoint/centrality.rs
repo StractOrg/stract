@@ -21,7 +21,7 @@ use crate::{
     kv::{rocksdb_store::RocksDbStore, Kv},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{
-        centrality::{derived_harmonic::DerivedCentrality, harmonic::HarmonicCentrality},
+        centrality::{approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality},
         Node, WebgraphBuilder,
     },
 };
@@ -111,24 +111,15 @@ impl Centrality {
             .unwrap();
     }
 
-    pub fn build_derived_harmonic<P: AsRef<Path>>(
-        webgraph_path: P,
-        host_centrality_path: P,
-        base_output: P,
-    ) -> Result<()> {
-        tracing::info!("Building derived harmonic centrality");
+    pub fn build_approx_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) -> Result<()> {
+        tracing::info!("Building approximated harmonic centrality for page graph");
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
-        let host_centrality = RocksDbStore::open(host_centrality_path.as_ref().join("harmonic"));
 
-        let derived = DerivedCentrality::build(
-            &host_centrality,
-            &graph,
-            base_output.as_ref().join("derived_harmonic"),
-        )?;
+        let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("approx_harmonic"));
 
         let mut top_nodes = BinaryHeap::new();
 
-        for (node_id, centrality) in derived.iter() {
+        for (node_id, centrality) in approx.iter() {
             if top_nodes.len() < 1_000_000 {
                 top_nodes.push((Reverse(SortableFloat(centrality)), node_id));
             } else {
@@ -144,7 +135,7 @@ impl Centrality {
             .map(|(score, id)| (graph.id2node(&id).unwrap(), score.0 .0))
             .collect();
 
-        store_csv(derived, base_output.as_ref().join("derived_centrality.csv"));
+        store_csv(derived, base_output.as_ref().join("approx_harmonic.csv"));
 
         Ok(())
     }

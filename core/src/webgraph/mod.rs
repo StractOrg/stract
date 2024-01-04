@@ -22,6 +22,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
 
+use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use url::Url;
 use utoipa::ToSchema;
@@ -333,24 +334,29 @@ impl WebgraphBuilder {
 
 pub trait ShortestPaths {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
-    fn raw_distances(&self, source: Node) -> BTreeMap<NodeID, u8>;
-    fn raw_reversed_distances(&self, source: Node) -> BTreeMap<NodeID, u8>;
+    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
+    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
 
-fn dijkstra<F1, F2, L>(source: Node, node_edges: F1, edge_node: F2) -> BTreeMap<NodeID, u8>
+fn dijkstra_multi<F1, F2, L>(
+    sources: &[NodeID],
+    node_edges: F1,
+    edge_node: F2,
+) -> BTreeMap<NodeID, u8>
 where
     L: EdgeLabel,
     F1: Fn(NodeID) -> Vec<Edge<L>>,
     F2: Fn(&Edge<L>) -> NodeID,
 {
-    let source_id = source.id();
     let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
 
     let mut queue = BinaryHeap::new();
 
-    queue.push(cmp::Reverse((0, source_id)));
-    distances.insert(source_id, 0);
+    for source_id in sources.iter().copied() {
+        queue.push(cmp::Reverse((0, source_id)));
+        distances.insert(source_id, 0);
+    }
 
     while let Some(state) = queue.pop() {
         let (cost, v) = state.0;
@@ -377,30 +383,30 @@ where
 
 impl ShortestPaths for Webgraph {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_distances(source)
+        self.raw_distances(source.id())
             .into_iter()
             .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
             .collect()
     }
 
-    fn raw_distances(&self, source: Node) -> BTreeMap<NodeID, u8> {
-        dijkstra(
-            source,
+    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
+        dijkstra_multi(
+            &[source],
             |node| self.raw_outgoing_edges(&node),
             |edge| edge.to,
         )
     }
 
-    fn raw_reversed_distances(&self, source: Node) -> BTreeMap<NodeID, u8> {
-        dijkstra(
-            source,
+    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
+        dijkstra_multi(
+            &[source],
             |node| self.raw_ingoing_edges(&node),
             |edge| edge.from,
         )
     }
 
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_reversed_distances(source)
+        self.raw_reversed_distances(source.id())
             .into_iter()
             .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
             .collect()
@@ -826,6 +832,13 @@ impl Webgraph {
 
     pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
         self.id2node.keys()
+    }
+
+    pub fn random_nodes(&self, num: usize) -> Vec<NodeID> {
+        let mut rng = rand::thread_rng();
+        let mut nodes = self.nodes().collect::<Vec<_>>();
+        nodes.shuffle(&mut rng);
+        nodes.into_iter().take(num).collect()
     }
 
     pub fn par_nodes(&self) -> impl ParallelIterator<Item = NodeID> + '_ {

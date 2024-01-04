@@ -173,7 +173,6 @@ enum CentralityMode {
     /// Calculate metrics for the page webgraph.
     Page {
         webgraph_path: String,
-        host_centrality_path: String,
         output_path: String,
     },
 }
@@ -269,13 +268,8 @@ fn main() -> Result<()> {
                 }
                 CentralityMode::Page {
                     webgraph_path,
-                    host_centrality_path,
                     output_path,
-                } => entrypoint::Centrality::build_derived_harmonic(
-                    webgraph_path,
-                    host_centrality_path,
-                    output_path,
-                )?,
+                } => entrypoint::Centrality::build_approx_harmonic(webgraph_path, output_path)?,
             }
             tracing::info!("Done");
         }

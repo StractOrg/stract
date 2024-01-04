@@ -18,6 +18,7 @@ use crate::kv::{rocksdb_store::RocksDbStore, Kv};
 
 use super::NodeID;
 
+pub mod approx_harmonic;
 pub mod betweenness;
 pub mod derived_harmonic;
 pub mod harmonic;

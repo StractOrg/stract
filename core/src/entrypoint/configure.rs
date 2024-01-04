@@ -144,7 +144,7 @@ fn calculate_centrality() {
     let out_path_page = Path::new(DATA_PATH).join("centrality_page");
 
     if !out_path_page.exists() {
-        Centrality::build_derived_harmonic(webgraph_page, out_path, out_path_page).unwrap();
+        Centrality::build_approx_harmonic(webgraph_page, out_path_page).unwrap();
     }
 }
 

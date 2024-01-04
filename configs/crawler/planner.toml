@@ -2,7 +2,7 @@ host_graph_path = "data/webgraph_host"
 host_harmonic_path = "data/centrality/harmonic"
 output_path = "data/crawlplan"
 page_graph_path = "data/webgraph_page"
-page_harmonic_path = "data/centrality_page/derived_harmonic"
+page_harmonic_path = "data/centrality_page/approx_harmonic"
 
 num_job_queues = 5
 
