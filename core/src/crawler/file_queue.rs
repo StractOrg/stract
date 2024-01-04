@@ -118,12 +118,12 @@ impl FilePointer {
             return 0;
         }
 
-        usize::from_be_bytes(buf)
+        usize::from_le_bytes(buf)
     }
 
     fn set(&mut self, pointer: usize) -> Result<()> {
         self.file.seek(std::io::SeekFrom::Start(0))?;
-        self.file.write_all(&pointer.to_be_bytes())?;
+        self.file.write_all(&pointer.to_le_bytes())?;
         self.file.flush()?;
 
         Ok(())

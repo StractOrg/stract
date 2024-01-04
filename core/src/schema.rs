@@ -226,8 +226,7 @@ pub enum FastField {
     UrlWithoutTldHash1,
     UrlWithoutTldHash2,
     PreComputedScore,
-    HostNodeID1,
-    HostNodeID2,
+    HostNodeID,
     SimHash,
     NumFlattenedSchemaTokens,
     NumPathAndQuerySlashes,
@@ -268,8 +267,7 @@ impl FastField {
             FastField::UrlWithoutTldHash1 => "url_without_tld_hash1",
             FastField::UrlWithoutTldHash2 => "url_without_tld_hash2",
             FastField::PreComputedScore => "pre_computed_score",
-            FastField::HostNodeID1 => "host_node_id1",
-            FastField::HostNodeID2 => "host_node_id2",
+            FastField::HostNodeID => "host_node_id",
             FastField::SimHash => "sim_hash",
             FastField::NumPathAndQuerySlashes => "num_path_and_query_slashes",
             FastField::NumPathAndQueryDigits => "num_path_and_query_digits",
@@ -292,7 +290,7 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 65] = [
+static ALL_FIELDS: [Field; 64] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -352,8 +350,7 @@ static ALL_FIELDS: [Field; 65] = [
     Field::Fast(FastField::UrlWithoutTldHash1),
     Field::Fast(FastField::UrlWithoutTldHash2),
     Field::Fast(FastField::PreComputedScore),
-    Field::Fast(FastField::HostNodeID1),
-    Field::Fast(FastField::HostNodeID2),
+    Field::Fast(FastField::HostNodeID),
     Field::Fast(FastField::SimHash),
     Field::Fast(FastField::NumPathAndQuerySlashes),
     Field::Fast(FastField::NumPathAndQueryDigits),
@@ -571,13 +568,7 @@ impl Field {
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::HostNodeID1) => IndexingOption::Integer(
-                NumericOptions::default()
-                    .set_fast()
-                    .set_indexed()
-                    .set_stored(),
-            ),
-            Field::Fast(FastField::HostNodeID2) => IndexingOption::Integer(
+            Field::Fast(FastField::HostNodeID) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
@@ -728,8 +719,7 @@ impl FastField {
             FastField::UrlWithoutTldHash1 => DataType::U64,
             FastField::UrlWithoutTldHash2 => DataType::U64,
             FastField::PreComputedScore => DataType::U64,
-            FastField::HostNodeID1 => DataType::U64,
-            FastField::HostNodeID2 => DataType::U64,
+            FastField::HostNodeID => DataType::U64,
             FastField::SimHash => DataType::U64,
             FastField::NumPathAndQuerySlashes => DataType::U64,
             FastField::NumPathAndQueryDigits => DataType::U64,

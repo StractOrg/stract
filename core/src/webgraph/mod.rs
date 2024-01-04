@@ -39,20 +39,22 @@ pub const MAX_LABEL_LENGTH: usize = 1024;
 #[derive(
     Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-pub struct NodeID(u128);
+pub struct NodeID(u64);
 
 impl NodeID {
-    pub fn bit_64(self) -> u64 {
-        self.0 as u64
-    }
-
-    pub fn bit_128(self) -> u128 {
+    pub fn as_u64(self) -> u64 {
         self.0
     }
 }
 
 impl From<u128> for NodeID {
     fn from(val: u128) -> Self {
+        NodeID(val as u64)
+    }
+}
+
+impl From<u64> for NodeID {
+    fn from(val: u64) -> Self {
         NodeID(val)
     }
 }
@@ -73,7 +75,7 @@ impl From<Node> for FullNodeID {
 }
 
 impl intmap::Key for NodeID {
-    const BIG_PRIME: Self = NodeID(335579573203413586826293107669396558523);
+    const BIG_PRIME: Self = NodeID(11400714819323198549);
 
     fn wrapping_mul(self, rhs: Self) -> Self {
         NodeID(self.0.wrapping_mul(rhs.0))
@@ -84,7 +86,7 @@ impl intmap::Key for NodeID {
     }
 
     fn modulus_usize(self, rhs: usize) -> usize {
-        (self.0 % (rhs as u128)) as usize
+        (self.0 % (rhs as u64)) as usize
     }
 }
 
@@ -195,7 +197,7 @@ impl Node {
 
     pub fn id(&self) -> NodeID {
         let digest = md5::compute(self.name.as_bytes());
-        NodeID(u128::from_be_bytes(*digest))
+        u128::from_le_bytes(*digest).into()
     }
 }
 
@@ -453,10 +455,25 @@ impl Id2NodeDb {
         opts.create_if_missing(true);
         opts.optimize_for_point_lookup(512);
 
+        opts.set_allow_mmap_reads(true);
+        opts.set_allow_mmap_writes(true);
+        opts.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
+        opts.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
+        opts.set_target_file_size_multiplier(10);
+
         let mut block_opts = rocksdb::BlockBasedOptions::default();
         block_opts.set_ribbon_filter(5.0);
 
+        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
+        opts.set_level_compaction_dynamic_level_bytes(true);
+        opts.set_bytes_per_sync(1048576);
+        block_opts.set_block_size(16 * 1024);
+        block_opts.set_format_version(5);
+        block_opts.set_cache_index_and_filter_blocks(true);
+        block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
+
         opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb::DBCompressionType::Zstd);
 
         let db = rocksdb::DB::open(&opts, path).unwrap();
 
@@ -469,7 +486,7 @@ impl Id2NodeDb {
 
         self.db
             .put_opt(
-                id.bit_128().to_be_bytes(),
+                id.as_u64().to_le_bytes(),
                 bincode::serialize(node).unwrap(),
                 &opts,
             )
@@ -478,7 +495,7 @@ impl Id2NodeDb {
 
     fn get(&self, id: &NodeID) -> Option<Node> {
         self.db
-            .get(id.bit_128().to_be_bytes())
+            .get(id.as_u64().to_le_bytes())
             .unwrap()
             .map(|bytes| bincode::deserialize(&bytes).unwrap())
     }
@@ -488,7 +505,7 @@ impl Id2NodeDb {
             .iterator(rocksdb::IteratorMode::Start)
             .filter_map(|r| {
                 let (key, _) = r.ok()?;
-                Some(NodeID(u128::from_be_bytes((*key).try_into().unwrap())))
+                Some(NodeID(u64::from_le_bytes((*key).try_into().unwrap())))
             })
     }
 
@@ -499,7 +516,7 @@ impl Id2NodeDb {
                 let (key, value) = r.ok()?;
 
                 Some((
-                    NodeID(u128::from_be_bytes((*key).try_into().unwrap())),
+                    NodeID(u64::from_le_bytes((*key).try_into().unwrap())),
                     bincode::deserialize(&value).unwrap(),
                 ))
             })
@@ -510,7 +527,7 @@ impl Id2NodeDb {
 
         for (id, node) in iter {
             batch.put(
-                id.bit_128().to_be_bytes(),
+                id.as_u64().to_le_bytes(),
                 bincode::serialize(&node).unwrap(),
             );
         }

@@ -41,7 +41,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 
     for node in graph.nodes() {
         let mut counter = HyperLogLog::default();
-        counter.add(node.bit_64());
+        counter.add(node.as_u64());
 
         counters.insert(node, counter);
         centralities.insert(node, KahanSum::default());
@@ -52,7 +52,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let mut changed_nodes = BloomFilter::new(num_nodes as u64, 0.05);
 
     for node in graph.nodes() {
-        changed_nodes.insert(node.bit_64());
+        changed_nodes.insert(node.as_u64());
     }
 
     info!("Found {} nodes in the graph", num_nodes);
@@ -92,7 +92,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .any(|(to, from)| *from > *to)
                         {
                             counter_to.merge(counter_from);
-                            new_changed_nodes.insert(edge.to.bit_64());
+                            new_changed_nodes.insert(edge.to.as_u64());
 
                             new_exact_changed_nodes.insert(edge.to);
 
@@ -106,7 +106,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         } else {
             exact_changed_nodes = BTreeSet::default();
             graph.edges().for_each(|edge| {
-                if changed_nodes.contains(&edge.from.bit_64()) {
+                if changed_nodes.contains(&edge.from.as_u64()) {
                     if let (Some(counter_to), Some(counter_from)) =
                         (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {
@@ -117,7 +117,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                             .any(|(to, from)| *from > *to)
                         {
                             counter_to.merge(counter_from);
-                            new_changed_nodes.insert(edge.to.bit_64());
+                            new_changed_nodes.insert(edge.to.as_u64());
 
                             if exact_counting {
                                 exact_changed_nodes.insert(edge.to);

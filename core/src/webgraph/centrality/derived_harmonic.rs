@@ -44,7 +44,7 @@ impl BloomMap {
     }
 
     fn insert(&self, item: &NodeID) {
-        let h = item.bit_64();
+        let h = item.as_u64();
         self.map[(h as usize) % self.map.len()]
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -98,7 +98,7 @@ impl DerivedCentrality {
 
         page_graph.node_ids().for_each(|(node, id)| {
             pb.inc(1);
-            if has_outgoing.contains(&id.bit_64()) {
+            if has_outgoing.contains(&id.as_u64()) {
                 let host_node = node.clone().into_host().id();
 
                 if let Some(harmonic) = host_harmonic.get(&host_node) {

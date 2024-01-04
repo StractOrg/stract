@@ -197,7 +197,7 @@ impl VecMap {
         for (node_id, inbound) in adjacency {
             map.insert(
                 node_id,
-                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.bit_64()).collect()),
+                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.as_u64()).collect()),
             );
         }
 

@@ -45,6 +45,7 @@ use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
+use crate::snippet;
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
@@ -54,7 +55,6 @@ use crate::webpage::region::Region;
 use crate::webpage::url_ext::UrlExt;
 use crate::webpage::{schema_org, Webpage};
 use crate::Result;
-use crate::{combine_u64s, snippet};
 use crate::{schema::create_schema, tokenizer::Tokenizer};
 use std::collections::HashSet;
 use std::fs;
@@ -381,22 +381,16 @@ impl InvertedIndex {
         let searcher = self.reader.searcher();
         let doc: TantivyDocument = searcher.doc(website.address.into())?;
 
-        let field1 = self
+        let field = self
             .schema()
-            .get_field(Field::Fast(FastField::HostNodeID1).name())
-            .unwrap();
-        let field2 = self
-            .schema()
-            .get_field(Field::Fast(FastField::HostNodeID2).name())
+            .get_field(Field::Fast(FastField::HostNodeID).name())
             .unwrap();
 
-        let id1 = doc.get_first(field1).unwrap().as_u64().unwrap();
-        let id2 = doc.get_first(field2).unwrap().as_u64().unwrap();
+        let id = doc.get_first(field).unwrap().as_u64().unwrap();
 
-        if id1 == u64::MAX && id2 == u64::MAX {
+        if id == u64::MAX {
             Ok(None)
         } else {
-            let id = combine_u64s([id1, id2]);
             Ok(Some(id.into()))
         }
     }

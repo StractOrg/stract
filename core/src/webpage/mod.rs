@@ -16,7 +16,6 @@
 
 use crate::{
     schema::{FastField, TextField},
-    split_u128,
     webgraph::NodeID,
     Result,
 };
@@ -199,31 +198,18 @@ impl Webpage {
 
         match &self.node_id {
             Some(node_id) => {
-                let [node_id1, node_id2] = split_u128(node_id.bit_128());
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastField::HostNodeID1).name())
-                        .expect("Failed to get node_id field 1"),
-                    node_id1,
-                );
-                doc.add_u64(
-                    schema
-                        .get_field(Field::Fast(FastField::HostNodeID2).name())
-                        .expect("Failed to get node_id field 2"),
-                    node_id2,
+                        .get_field(Field::Fast(FastField::HostNodeID).name())
+                        .expect("Failed to get node_id field"),
+                    node_id.as_u64(),
                 );
             }
             None => {
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastField::HostNodeID1).name())
-                        .expect("Failed to get node_id field 1"),
-                    u64::MAX,
-                );
-                doc.add_u64(
-                    schema
-                        .get_field(Field::Fast(FastField::HostNodeID2).name())
-                        .expect("Failed to get node_id field 2"),
+                        .get_field(Field::Fast(FastField::HostNodeID).name())
+                        .expect("Failed to get node_id field"),
                     u64::MAX,
                 );
             }

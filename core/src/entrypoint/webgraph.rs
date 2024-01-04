@@ -109,13 +109,14 @@ impl WebgraphWorker {
                         }
                     };
 
-                for link in webpage
+                for mut link in webpage
                     .anchor_links()
                     .into_iter()
                     .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
                 {
                     let source = link.source.clone();
                     let destination = link.destination.clone();
+                    link.text = link.text.chars().take(128).collect();
 
                     trace!("inserting link {:?}", link);
                     let mut source = Node::from(source);
@@ -194,13 +195,14 @@ impl Webgraph {
                     worker.process_job(job);
                 }
 
-                (worker.host_graph.finalize(), worker.page_graph.finalize())
+                worker
             }));
         }
 
         let mut graphs = Vec::new();
         for handler in handlers {
-            graphs.push(handler.join().unwrap());
+            let worker = handler.join().unwrap();
+            graphs.push((worker.host_graph.finalize(), worker.page_graph.finalize()));
         }
 
         let (mut host_graph, mut page_graph) = graphs.pop().unwrap();

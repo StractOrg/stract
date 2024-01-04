@@ -25,8 +25,8 @@ const ADJACENCY_STORE: &str = "adjacency";
 const REVERSED_ADJACENCY_STORE: &str = "reversed_adjacency";
 
 pub struct SegmentWriter {
-    full_adjacency: EdgeStoreWriter,
-    full_reversed_adjacency: EdgeStoreWriter,
+    adjacency: EdgeStoreWriter,
+    reversed_adjacency: EdgeStoreWriter,
     id: String,
     folder_path: String,
 }
@@ -34,12 +34,12 @@ pub struct SegmentWriter {
 impl SegmentWriter {
     pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         SegmentWriter {
-            full_adjacency: EdgeStoreWriter::open(
+            adjacency: EdgeStoreWriter::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 compression,
                 false,
             ),
-            full_reversed_adjacency: EdgeStoreWriter::open(
+            reversed_adjacency: EdgeStoreWriter::open(
                 folder_path
                     .as_ref()
                     .join(&id)
@@ -61,27 +61,27 @@ impl SegmentWriter {
         self.flush();
 
         Segment {
-            full_adjacency: self.full_adjacency.finalize(),
-            full_reversed_adjacency: self.full_reversed_adjacency.finalize(),
+            adjacency: self.adjacency.finalize(),
+            reversed_adjacency: self.reversed_adjacency.finalize(),
             folder_path: self.folder_path,
             id: self.id,
         }
     }
 
     pub fn flush(&mut self) {
-        self.full_adjacency.flush();
-        self.full_reversed_adjacency.flush();
+        self.adjacency.flush();
+        self.reversed_adjacency.flush();
     }
 
     pub fn insert(&mut self, edges: &[InnerEdge<String>]) {
-        self.full_adjacency.put(edges.iter());
-        self.full_reversed_adjacency.put(edges.iter());
+        self.adjacency.put(edges.iter());
+        self.reversed_adjacency.put(edges.iter());
     }
 }
 
 pub struct Segment {
-    full_adjacency: EdgeStore,
-    full_reversed_adjacency: EdgeStore,
+    adjacency: EdgeStore,
+    reversed_adjacency: EdgeStore,
     id: String,
     folder_path: String,
 }
@@ -89,12 +89,12 @@ pub struct Segment {
 impl Segment {
     pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         Segment {
-            full_adjacency: EdgeStore::open(
+            adjacency: EdgeStore::open(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 false,
                 compression,
             ),
-            full_reversed_adjacency: EdgeStore::open(
+            reversed_adjacency: EdgeStore::open(
                 folder_path
                     .as_ref()
                     .join(&id)
@@ -113,23 +113,23 @@ impl Segment {
     }
 
     pub fn outgoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
-        self.full_adjacency.get_with_label(node)
+        self.adjacency.get_with_label(node)
     }
 
     pub fn outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.full_adjacency.get_without_label(node)
+        self.adjacency.get_without_label(node)
     }
 
     pub fn ingoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
-        self.full_reversed_adjacency.get_with_label(node)
+        self.reversed_adjacency.get_with_label(node)
     }
 
     pub fn ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.full_reversed_adjacency.get_without_label(node)
+        self.reversed_adjacency.get_without_label(node)
     }
 
     pub fn ingoing_edges_by_host(&self, host_node: &NodeID) -> Vec<Edge<()>> {
-        self.full_reversed_adjacency
+        self.reversed_adjacency
             .nodes_by_prefix(host_node)
             .into_iter()
             .flat_map(|node| self.ingoing_edges(&node))
@@ -137,7 +137,7 @@ impl Segment {
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
-        self.full_reversed_adjacency.nodes_by_prefix(host_node)
+        self.reversed_adjacency.nodes_by_prefix(host_node)
     }
 
     pub fn id(&self) -> String {
@@ -149,7 +149,7 @@ impl Segment {
     }
 
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
-        self.full_adjacency.iter_without_label()
+        self.adjacency.iter_without_label()
     }
 }
 

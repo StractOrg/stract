@@ -17,7 +17,7 @@
 use crate::fastfield_reader::FieldValue;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
-use crate::{combine_u64s, Result};
+use crate::Result;
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
@@ -301,26 +301,17 @@ impl Signal {
 
     fn host_id(&self, aggregator: &SignalAggregator, doc: DocId) -> Option<NodeID> {
         aggregator.segment_reader.as_ref().and_then(|reader| {
-            let node_id1: Option<u64> = reader
+            let node_id: Option<u64> = reader
                 .fastfield_reader
-                .get_field_reader(&FastField::HostNodeID1)
+                .get_field_reader(&FastField::HostNodeID)
                 .get(&doc)
                 .into();
-            let node_id1 = node_id1.unwrap();
+            let node_id = node_id.unwrap();
 
-            let node_id2: Option<u64> = reader
-                .fastfield_reader
-                .get_field_reader(&FastField::HostNodeID2)
-                .get(&doc)
-                .into();
-            let node_id2 = node_id2.unwrap();
-
-            if node_id1 == u64::MAX && node_id2 == u64::MAX {
+            if node_id == u64::MAX {
                 None
             } else {
-                let id = combine_u64s([node_id1, node_id2]);
-
-                Some(NodeID::from(id))
+                Some(node_id.into())
             }
         })
     }

@@ -69,5 +69,5 @@ impl PartialEq for Prehashed {
 
 pub fn hash<T: AsRef<[u8]>>(val: T) -> Prehashed {
     let digest = md5::compute(val);
-    Prehashed(u128::from_be_bytes(*digest))
+    Prehashed(u128::from_le_bytes(*digest))
 }

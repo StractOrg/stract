@@ -526,8 +526,7 @@ impl Html {
                 | Field::Fast(FastField::FetchTimeMs)
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
-                | Field::Fast(FastField::HostNodeID1)
-                | Field::Fast(FastField::HostNodeID2)
+                | Field::Fast(FastField::HostNodeID)
                 | Field::Text(TextField::DmozDescription) => {}
             }
         }
