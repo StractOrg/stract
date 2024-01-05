@@ -45,7 +45,9 @@ pub struct Webpage {
     pub html: Html,
     pub backlink_labels: Vec<String>,
     pub host_centrality: f64,
+    pub host_centrality_rank: f64,
     pub page_centrality: f64,
+    pub page_centrality_rank: f64,
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
@@ -68,7 +70,9 @@ impl Default for Webpage {
             },
             backlink_labels: Default::default(),
             host_centrality: Default::default(),
+            host_centrality_rank: u64::MAX as f64,
             page_centrality: Default::default(),
+            page_centrality_rank: u64::MAX as f64,
             fetch_time_ms: Default::default(),
             pre_computed_score: Default::default(),
             node_id: Default::default(),
@@ -86,15 +90,7 @@ impl Webpage {
 
         Ok(Self {
             html,
-            backlink_labels: Vec::new(),
-            host_centrality: 0.0,
-            page_centrality: 0.0,
-            fetch_time_ms: 0,
-            pre_computed_score: 0.0,
-            node_id: None,
-            dmoz_description: None,
-            safety_classification: None,
-            inserted_at: Utc::now(),
+            ..Default::default()
         })
     }
 
@@ -177,9 +173,23 @@ impl Webpage {
 
         doc.add_u64(
             schema
+                .get_field(Field::Fast(FastField::HostCentralityRank).name())
+                .expect("Failed to get host_centrality_rank field"),
+            self.host_centrality_rank as u64,
+        );
+
+        doc.add_u64(
+            schema
                 .get_field(Field::Fast(FastField::PageCentrality).name())
                 .expect("Failed to get page_centrality field"),
             (self.page_centrality * FLOAT_SCALING as f64) as u64,
+        );
+
+        doc.add_u64(
+            schema
+                .get_field(Field::Fast(FastField::PageCentralityRank).name())
+                .expect("Failed to get page_centrality_rank field"),
+            self.page_centrality_rank as u64,
         );
 
         doc.add_u64(

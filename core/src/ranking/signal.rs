@@ -104,8 +104,12 @@ pub enum Signal {
     CrossEncoderTitle,
     #[serde(rename = "host_centrality")]
     HostCentrality,
+    #[serde(rename = "host_centrality_rank")]
+    HostCentralityRank,
     #[serde(rename = "page_centrality")]
     PageCentrality,
+    #[serde(rename = "page_centrality_rank")]
+    PageCentralityRank,
     #[serde(rename = "is_homepage")]
     IsHomepage,
     #[serde(rename = "fetch_time_ms")]
@@ -136,7 +140,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 35] = [
+pub const ALL_SIGNALS: [Signal; 37] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -160,7 +164,9 @@ pub const ALL_SIGNALS: [Signal; 35] = [
     Signal::CrossEncoderSnippet,
     Signal::CrossEncoderTitle,
     Signal::HostCentrality,
+    Signal::HostCentralityRank,
     Signal::PageCentrality,
+    Signal::PageCentralityRank,
     Signal::IsHomepage,
     Signal::FetchTimeMs,
     Signal::UpdateTimestamp,
@@ -187,6 +193,11 @@ fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f6
     } else {
         0.0
     }
+}
+
+#[inline]
+fn score_rank(rank: f64) -> f64 {
+    1.0 / (rank + 1.0)
 }
 
 #[inline]
@@ -284,7 +295,9 @@ impl Signal {
             Signal::CrossEncoderSnippet => 0.17,
             Signal::CrossEncoderTitle => 0.17,
             Signal::HostCentrality => 0.5,
+            Signal::HostCentralityRank => 0.0,
             Signal::PageCentrality => 0.25,
+            Signal::PageCentralityRank => 0.0,
             Signal::QueryCentrality => 0.0,
             Signal::IsHomepage => 0.0005,
             Signal::FetchTimeMs => 0.001,
@@ -344,6 +357,13 @@ impl Signal {
                     .and_then(|val| val.into());
 
                 field_value.map(|val| val as f64 / FLOAT_SCALING as f64)
+            }
+            Signal::HostCentralityRank | Signal::PageCentralityRank => {
+                let field_value: Option<u64> = self
+                    .fastfield_value(signal_aggregator, doc)
+                    .and_then(|val| val.into());
+
+                field_value.map(|val| val as f64).map(score_rank)
             }
             Signal::IsHomepage => {
                 let field_value: Option<u64> = self
@@ -470,7 +490,9 @@ impl Signal {
 
         let value = match self {
             Signal::HostCentrality => Some(webpage.host_centrality),
+            Signal::HostCentralityRank => Some(webpage.host_centrality_rank),
             Signal::PageCentrality => Some(webpage.page_centrality),
+            Signal::PageCentralityRank => Some(webpage.page_centrality_rank),
             Signal::IsHomepage => Some(webpage.html.is_homepage().into()),
             Signal::FetchTimeMs => {
                 let fetch_time_ms = webpage.fetch_time_ms as usize;
@@ -571,7 +593,9 @@ impl Signal {
     fn as_fastfield(&self) -> Option<FastField> {
         match self {
             Signal::HostCentrality => Some(FastField::HostCentrality),
+            Signal::HostCentralityRank => Some(FastField::HostCentralityRank),
             Signal::PageCentrality => Some(FastField::PageCentrality),
+            Signal::PageCentralityRank => Some(FastField::PageCentralityRank),
             Signal::IsHomepage => Some(FastField::IsHomepage),
             Signal::FetchTimeMs => Some(FastField::FetchTimeMs),
             Signal::UpdateTimestamp => Some(FastField::LastUpdated),

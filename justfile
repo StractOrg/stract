@@ -12,8 +12,6 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- search-server configs/search_server.toml"
 @dev-webgraph:
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- webgraph server configs/webgraph/server.toml"
-@dev-alice:
-    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- alice serve configs/alice.toml"
 @dev-frontend:
     cd frontend && npm run dev
 

@@ -44,6 +44,7 @@ mod distributed;
 mod entity_index;
 mod enum_map;
 mod executor;
+mod external_sort;
 mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;

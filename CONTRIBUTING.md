@@ -31,7 +31,6 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 * Update ulimit. RocksDB tends to exceed the max number of allowed open files, so you will have to run `ulimit -n 10240` to increase the allowed max number of open files.
 * Install [just](https://github.com/casey/just) by running `cargo install just`. This allows you to run the scripts in the `justfile` file. A justfile is basically a simple Makefile. Since libtorch requires some specific environment variables to be set, you need to preface all `cargo run` and `cargo test` commands with `just` (so they becom `just cargo run` and `just cargo test`) .
 * Run the command `just configure` which should automatically configures the rest of your dev environment. The script creates a python virtual environment, installs relevant dependencies, traces and exports the ML models and creates a small local index which you can use for development.
-* (Optional) run `just configure --alice` to download the weights for Alice (the AI assistant that can search on the web).
 * (Optional) Install [cargo-watch](https://github.com/watchexec/cargo-watch) by running `cargo install cargo-watch`. This makes frontend development easier.
 * (Optional) Install [abeye](https://github.com/oeb25/abeye) by running `cargo install --git https://github.com/oeb25/abeye --locked`. This is used for generating the API client used by the frontend by running `just openapi`.
 

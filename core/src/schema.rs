@@ -201,7 +201,9 @@ impl TextField {
 pub enum FastField {
     IsHomepage,
     HostCentrality,
+    HostCentralityRank,
     PageCentrality,
+    PageCentralityRank,
     FetchTimeMs,
     LastUpdated,
     TrackerScore,
@@ -240,7 +242,9 @@ impl FastField {
     pub fn name(&self) -> &str {
         match self {
             FastField::HostCentrality => "host_centrality",
+            FastField::HostCentralityRank => "host_centrality_rank",
             FastField::PageCentrality => "page_centrality",
+            FastField::PageCentralityRank => "page_centrality_rank",
             FastField::IsHomepage => "is_homepage",
             FastField::FetchTimeMs => "fetch_time_ms",
             FastField::LastUpdated => "last_updated",
@@ -290,7 +294,7 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 64] = [
+static ALL_FIELDS: [Field; 66] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -324,7 +328,9 @@ static ALL_FIELDS: [Field; 64] = [
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
+    Field::Fast(FastField::HostCentralityRank),
     Field::Fast(FastField::PageCentrality),
+    Field::Fast(FastField::PageCentralityRank),
     Field::Fast(FastField::FetchTimeMs),
     Field::Fast(FastField::LastUpdated),
     Field::Fast(FastField::TrackerScore),
@@ -481,7 +487,13 @@ impl Field {
             Field::Fast(FastField::HostCentrality) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
+            Field::Fast(FastField::HostCentralityRank) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
             Field::Fast(FastField::PageCentrality) => {
+                IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
+            }
+            Field::Fast(FastField::PageCentralityRank) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
             Field::Fast(FastField::FetchTimeMs) => {
@@ -693,7 +705,9 @@ impl FastField {
         match self {
             FastField::IsHomepage => DataType::U64,
             FastField::HostCentrality => DataType::U64,
+            FastField::HostCentralityRank => DataType::U64,
             FastField::PageCentrality => DataType::U64,
+            FastField::PageCentralityRank => DataType::U64,
             FastField::FetchTimeMs => DataType::U64,
             FastField::LastUpdated => DataType::U64,
             FastField::TrackerScore => DataType::U64,

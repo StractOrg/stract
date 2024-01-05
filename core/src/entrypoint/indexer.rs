@@ -52,7 +52,9 @@ pub struct JobSettings {
 
 pub struct IndexingWorker {
     host_centrality_store: RocksDbStore<NodeID, f64>,
+    host_centrality_rank_store: RocksDbStore<NodeID, f64>,
     page_centrality_store: Option<RocksDbStore<NodeID, f64>>,
+    page_centrality_rank_store: Option<RocksDbStore<NodeID, f64>>,
     page_webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
     safety_classifier: Option<safety_classifier::Model>,
@@ -71,8 +73,15 @@ impl IndexingWorker {
             host_centrality_store: RocksDbStore::open(
                 Path::new(&host_centrality_store_path).join("harmonic"),
             ),
+            host_centrality_rank_store: RocksDbStore::open(
+                Path::new(&host_centrality_store_path).join("harmonic_rank"),
+            ),
             page_centrality_store: page_centrality_store_path
+                .as_ref()
                 .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic"))),
+            page_centrality_rank_store: page_centrality_store_path
+                .as_ref()
+                .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic_rank"))),
             page_webgraph: page_webgraph_path
                 .map(|path| WebgraphBuilder::new(path).single_threaded().open()),
             topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
@@ -111,6 +120,11 @@ impl IndexingWorker {
             .host_centrality_store
             .get(&host_node_id)
             .unwrap_or_default();
+
+        let mut host_centrality_rank = self
+            .host_centrality_rank_store
+            .get(&host_node_id)
+            .unwrap_or(u64::MAX as f64);
 
         if let Some(host_centrality_threshold) =
             self.job_settings.and_then(|s| s.host_centrality_threshold)
@@ -182,12 +196,28 @@ impl IndexingWorker {
             page_centrality = store.get(&node_id).unwrap_or_default();
         }
 
+        let mut page_centrality_rank = u64::MAX as f64;
+
+        if let Some(store) = self.page_centrality_rank_store.as_ref() {
+            let node_id = node.id();
+
+            page_centrality_rank = store.get(&node_id).unwrap_or(u64::MAX as f64);
+        }
+
         if !page_centrality.is_finite() {
             page_centrality = 0.0;
         }
 
         if !host_centrality.is_finite() {
             host_centrality = 0.0;
+        }
+
+        if !page_centrality_rank.is_finite() {
+            page_centrality_rank = u64::MAX as f64;
+        }
+
+        if !host_centrality_rank.is_finite() {
+            host_centrality_rank = u64::MAX as f64;
         }
 
         let mut dmoz_description = None;
@@ -202,7 +232,9 @@ impl IndexingWorker {
             html,
             backlink_labels,
             page_centrality,
+            page_centrality_rank,
             host_centrality,
+            host_centrality_rank,
             fetch_time_ms,
             pre_computed_score: 0.0,
             node_id: Some(host_node_id),

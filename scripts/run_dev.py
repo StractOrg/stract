@@ -10,7 +10,6 @@ os.environ["DYLD_LIBRARY_PATH"] = "libtorch/lib"
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--release", action="store_true")
-parser.add_argument("--alice", action="store_true")
 
 args = parser.parse_args()
 
@@ -23,9 +22,6 @@ processes.append(subprocess.Popen(["just", "dev-api"]))
 processes.append(subprocess.Popen(["just", "dev-search-server"]))
 processes.append(subprocess.Popen(["just", "dev-webgraph"]))
 processes.append(subprocess.Popen(["just", "dev-frontend"]))
-
-if args.alice:
-    processes.append(subprocess.Popen(["just", "dev-alice"]))
 
 # kill processes on ctrl-c
 import time

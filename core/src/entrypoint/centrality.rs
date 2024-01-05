@@ -15,9 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use std::{cmp::Reverse, collections::BinaryHeap, fs::File, path::Path};
+use serde::{Deserialize, Serialize};
+use std::{cmp::Reverse, fs::File, path::Path};
 
 use crate::{
+    external_sort::ExternalSorter,
     kv::{rocksdb_store::RocksDbStore, Kv},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{
@@ -44,6 +46,7 @@ fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
     wtr.flush().unwrap();
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct SortableFloat(f64);
 
 impl PartialEq for SortableFloat {
@@ -70,7 +73,10 @@ pub struct Centrality;
 
 impl Centrality {
     pub fn build_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
-        tracing::info!("Building harmonic centrality");
+        tracing::info!(
+            "Building harmonic centrality for {}",
+            webgraph_path.as_ref().to_str().unwrap()
+        );
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
         let store = RocksDbStore::open(base_output.as_ref().join("harmonic"));
@@ -80,29 +86,36 @@ impl Centrality {
         }
         store.flush();
 
-        let mut top_harmonics = BinaryHeap::new();
+        let rank_store = RocksDbStore::open(base_output.as_ref().join("harmonic_rank"));
+        let mut top_harmonics = Vec::new();
+        for (rank, node, centrality) in ExternalSorter::new()
+            .with_chunk_size(100_000_000)
+            .sort(
+                harmonic_centrality
+                    .iter()
+                    .map(|(node_id, centrality)| (Reverse(SortableFloat(centrality)), *node_id)),
+            )
+            .unwrap()
+            .enumerate()
+            .map(|(rank, (Reverse(SortableFloat(centrality)), node_id))| {
+                (rank, node_id, centrality)
+            })
+        {
+            rank_store.insert(node, rank as f64);
 
-        for (node_id, centrality) in harmonic_centrality.iter() {
             if top_harmonics.len() < 1_000_000 {
-                top_harmonics.push((Reverse(SortableFloat(centrality)), *node_id));
-            } else {
-                let mut min = top_harmonics.peek_mut().unwrap();
-                if min.0 .0 < SortableFloat(centrality) {
-                    *min = (Reverse(SortableFloat(centrality)), *node_id);
-                }
+                top_harmonics.push((graph.id2node(&node).unwrap(), centrality));
             }
         }
 
-        let harmonics: Vec<_> = top_harmonics
-            .into_iter()
-            .map(|(score, id)| (graph.id2node(&id).unwrap(), score.0 .0))
-            .collect();
-
-        store_csv(harmonics, base_output.as_ref().join("harmonic.csv"));
+        store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
     }
 
     pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
-        tracing::info!("Building inbound similarity");
+        tracing::info!(
+            "Building inbound similarity for {}",
+            webgraph_path.as_ref().to_str().unwrap()
+        );
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
         let sim = InboundSimilarity::build(&graph);
@@ -112,30 +125,37 @@ impl Centrality {
     }
 
     pub fn build_approx_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) -> Result<()> {
-        tracing::info!("Building approximated harmonic centrality for page graph");
+        tracing::info!(
+            "Building approximated harmonic centrality for {}",
+            webgraph_path.as_ref().to_str().unwrap()
+        );
+
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("approx_harmonic"));
+        let approx_rank = RocksDbStore::open(base_output.as_ref().join("approx_harmonic_rank"));
 
-        let mut top_nodes = BinaryHeap::new();
+        let mut top_nodes = Vec::new();
 
-        for (node_id, centrality) in approx.iter() {
+        for (rank, node, centrality) in ExternalSorter::new()
+            .with_chunk_size(100_000_000)
+            .sort(
+                approx
+                    .iter()
+                    .map(|(node_id, centrality)| (Reverse(SortableFloat(centrality)), node_id)),
+            )?
+            .enumerate()
+            .map(|(rank, (Reverse(SortableFloat(centrality)), node_id))| {
+                (rank, node_id, centrality)
+            })
+        {
+            approx_rank.insert(node, rank as f64);
             if top_nodes.len() < 1_000_000 {
-                top_nodes.push((Reverse(SortableFloat(centrality)), node_id));
-            } else {
-                let mut min = top_nodes.peek_mut().unwrap();
-                if min.0 .0 < SortableFloat(centrality) {
-                    *min = (Reverse(SortableFloat(centrality)), node_id);
-                }
+                top_nodes.push((graph.id2node(&node).unwrap(), centrality));
             }
         }
 
-        let derived: Vec<_> = top_nodes
-            .into_iter()
-            .map(|(score, id)| (graph.id2node(&id).unwrap(), score.0 .0))
-            .collect();
-
-        store_csv(derived, base_output.as_ref().join("approx_harmonic.csv"));
+        store_csv(top_nodes, base_output.as_ref().join("approx_harmonic.csv"));
 
         Ok(())
     }

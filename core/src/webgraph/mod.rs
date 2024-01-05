@@ -335,6 +335,7 @@ impl WebgraphBuilder {
 pub trait ShortestPaths {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
     fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
+    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8>;
     fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
@@ -343,6 +344,7 @@ fn dijkstra_multi<F1, F2, L>(
     sources: &[NodeID],
     node_edges: F1,
     edge_node: F2,
+    max_dist: Option<u8>,
 ) -> BTreeMap<NodeID, u8>
 where
     L: EdgeLabel,
@@ -367,6 +369,12 @@ where
             continue;
         }
 
+        if let Some(max_dist) = max_dist {
+            if cost > max_dist {
+                return distances;
+            }
+        }
+
         for edge in node_edges(v) {
             if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
                 let d = cost + 1;
@@ -389,11 +397,21 @@ impl ShortestPaths for Webgraph {
             .collect()
     }
 
+    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8> {
+        dijkstra_multi(
+            &[source],
+            |node| self.raw_outgoing_edges(&node),
+            |edge| edge.to,
+            Some(max_dist),
+        )
+    }
+
     fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
         dijkstra_multi(
             &[source],
             |node| self.raw_outgoing_edges(&node),
             |edge| edge.to,
+            None,
         )
     }
 
@@ -402,6 +420,7 @@ impl ShortestPaths for Webgraph {
             &[source],
             |node| self.raw_ingoing_edges(&node),
             |edge| edge.from,
+            None,
         )
     }
 

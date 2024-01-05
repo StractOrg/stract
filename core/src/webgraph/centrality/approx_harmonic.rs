@@ -48,7 +48,7 @@ impl ApproxHarmonic {
         let norm = num_nodes as f64 / (num_samples as f64 * (num_nodes as f64 - 1.0));
 
         sampled.into_par_iter().progress().for_each(|source| {
-            let dists = graph.raw_distances(source);
+            let dists = graph.raw_distances_with_max(source, 5);
 
             let res = res.lock().unwrap();
             for (target, dist) in dists {
