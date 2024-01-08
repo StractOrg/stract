@@ -49,11 +49,11 @@ impl EdgeStoreWriter {
         options.set_allow_mmap_reads(true);
         options.set_allow_mmap_writes(true);
         options.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
-        options.set_target_file_size_base(128 * 1024 * 1024); // 128 MB
+        options.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
         options.set_target_file_size_multiplier(10);
 
         options.set_max_write_buffer_number(4);
-        options.set_min_write_buffer_number_to_merge(2);
+        options.set_min_write_buffer_number_to_merge(1);
         options.set_level_zero_slowdown_writes_trigger(-1);
         options.set_level_zero_stop_writes_trigger(-1);
 
@@ -67,7 +67,7 @@ impl EdgeStoreWriter {
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_compression_type(rocksdb::DBCompressionType::Zstd);
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         let db = rocksdb::DB::open(&options, path.as_ref().join("writer")).unwrap();
 
@@ -459,9 +459,9 @@ impl EdgeStore {
             if let Some(last_node) = last_node {
                 if (reversed && edge.to.id != last_node) || (!reversed && edge.from.id != last_node)
                 {
-                    // batch
-                    //     .sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
-                    // batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
+                    batch
+                        .sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
+                    batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
                     s.put(&batch);
                     batch.clear();
                 }
@@ -472,8 +472,8 @@ impl EdgeStore {
         }
 
         if !batch.is_empty() {
-            // batch.sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
-            // batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
+            batch.sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
+            batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
             s.put(&batch);
         }
 
