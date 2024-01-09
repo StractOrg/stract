@@ -615,9 +615,7 @@ impl WebgraphWriter {
     fn id_or_assign(&mut self, node: Node) -> FullNodeID {
         let id = FullNodeID::from(node.clone());
 
-        if self.id2node(&id.id).is_none() {
-            self.id2node.put(&id.id, &node);
-        }
+        self.id2node.put(&id.id, &node);
 
         id
     }
