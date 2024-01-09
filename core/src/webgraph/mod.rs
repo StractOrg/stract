@@ -487,7 +487,6 @@ impl Id2NodeDb {
         opts.set_target_file_size_multiplier(10);
 
         let mut block_opts = rocksdb::BlockBasedOptions::default();
-        block_opts.set_ribbon_filter(5.0);
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         opts.set_level_compaction_dynamic_level_bytes(true);
@@ -498,7 +497,7 @@ impl Id2NodeDb {
         block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
 
         opts.set_block_based_table_factory(&block_opts);
-        opts.set_compression_type(rocksdb::DBCompressionType::Zstd);
+        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         let db = rocksdb::DB::open(&opts, path).unwrap();
 
