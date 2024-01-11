@@ -46,6 +46,7 @@ pub struct WebgraphConstructConfig {
     pub page_graph_base_path: String,
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
 }
 

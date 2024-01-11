@@ -160,6 +160,7 @@ impl Webgraph {
 
         let jobs: Vec<_> = warc_paths
             .into_iter()
+            .skip(config.skip_warc_files.unwrap_or(0))
             .take(config.limit_warc_files.unwrap_or(usize::MAX))
             .chunks(config.batch_size.unwrap_or(1))
             .into_iter()

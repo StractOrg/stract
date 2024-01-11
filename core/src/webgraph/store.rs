@@ -459,8 +459,9 @@ impl EdgeStore {
             if let Some(last_node) = last_node {
                 if (reversed && edge.to.id != last_node) || (!reversed && edge.from.id != last_node)
                 {
-                    batch
-                        .sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
+                    batch.sort_unstable_by_key(
+                        |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
+                    );
                     batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
                     s.put(&batch);
                     batch.clear();
@@ -472,7 +473,9 @@ impl EdgeStore {
         }
 
         if !batch.is_empty() {
-            batch.sort_by_key(|e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id });
+            batch.sort_unstable_by_key(
+                |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
+            );
             batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
             s.put(&batch);
         }
