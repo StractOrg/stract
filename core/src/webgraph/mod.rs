@@ -548,15 +548,25 @@ impl Id2NodeDb {
 
     fn batch_put(&mut self, iter: impl Iterator<Item = (NodeID, Node)>) {
         let mut batch = rocksdb::WriteBatch::default();
+        let mut count = 0;
 
         for (id, node) in iter {
             batch.put(
                 id.as_u64().to_le_bytes(),
                 bincode::serialize(&node).unwrap(),
             );
+            count += 1;
+
+            if count > 10_000 {
+                self.db.write(batch).unwrap();
+                batch = rocksdb::WriteBatch::default();
+                count = 0;
+            }
         }
 
-        self.db.write(batch).unwrap();
+        if count > 0 {
+            self.db.write(batch).unwrap();
+        }
     }
 
     fn flush(&self) {

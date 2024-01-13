@@ -279,10 +279,12 @@ fn main() -> Result<()> {
                 entrypoint::Webgraph::run(&config)?;
             }
             WebgraphOptions::Merge { mut paths } => {
-                let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open();
+                let mut webgraph = WebgraphBuilder::new(paths.remove(0))
+                    .single_threaded()
+                    .open();
 
                 for other_path in paths {
-                    let other = WebgraphBuilder::new(&other_path).open();
+                    let other = WebgraphBuilder::new(&other_path).single_threaded().open();
                     webgraph.merge(other);
                     std::fs::remove_dir_all(other_path).unwrap();
                 }
