@@ -128,16 +128,11 @@ fn simple_into_tantivy(
 }
 
 impl Term {
-    pub fn as_simple_text(&self) -> &str {
+    pub fn as_simple_text(&self) -> Option<&str> {
         match self {
-            Term::Simple(term) => &term.0,
-            Term::Phrase(terms) => terms,
-            Term::Not(term) => term.as_simple_text(),
-            Term::Site(term) => term,
-            Term::Title(term) => term,
-            Term::Body(term) => term,
-            Term::Url(term) => term,
-            Term::PossibleBang(term) => term,
+            Term::Simple(term) => Some(&term.0),
+            Term::Phrase(p) => Some(p),
+            _ => None,
         }
     }
 

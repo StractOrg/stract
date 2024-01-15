@@ -132,9 +132,9 @@ impl Query {
         let simple_terms_text: Vec<String> = terms
             .clone()
             .into_iter()
+            .filter_map(|term| term.as_simple_text().map(|s| s.to_string()))
             .flat_map(|term| {
-                term.as_simple_text()
-                    .split_ascii_whitespace()
+                term.split_ascii_whitespace()
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>()
             })
