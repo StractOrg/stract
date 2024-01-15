@@ -36,9 +36,14 @@ pub struct ApproxHarmonic {
 
 impl ApproxHarmonic {
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output: P) -> Self {
-        let num_nodes = graph.nodes().count();
+        let num_nodes = graph.par_nodes().count();
+
+        tracing::info!("found {} nodes in graph", num_nodes);
 
         let num_samples = ((num_nodes as f64).log2() / EPSILON.powi(2)).ceil() as usize;
+
+        tracing::info!("sampling {} nodes", num_samples);
+
         let sampled = graph.random_nodes(num_samples);
 
         let res = Mutex::new(Self {

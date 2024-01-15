@@ -176,6 +176,13 @@ impl Webgraph {
         let host_path = &config.host_graph_base_path;
         let page_path = &config.page_graph_base_path;
 
+        const MAX_FINALIZE_CONCURRENT: usize = 8;
+        let (s, r) = crossbeam_channel::bounded(MAX_FINALIZE_CONCURRENT);
+
+        for _ in 0..MAX_FINALIZE_CONCURRENT {
+            s.send(())?;
+        }
+
         for i in 0..num_workers {
             let host_path = host_path.clone();
             let host_path = Path::new(&host_path);
@@ -191,19 +198,22 @@ impl Webgraph {
             };
 
             let jobs = jobs.clone();
+            let (s, r) = (s.clone(), r.clone());
             handlers.push(std::thread::spawn(move || {
                 for job in jobs.iter().skip(i).step_by(num_workers) {
                     worker.process_job(job);
                 }
 
-                worker
+                r.recv().unwrap();
+                let res = (worker.host_graph.finalize(), worker.page_graph.finalize());
+                s.send(()).unwrap();
+                res
             }));
         }
 
         let mut graphs = Vec::new();
         for handler in handlers {
-            let worker = handler.join().unwrap();
-            graphs.push((worker.host_graph.finalize(), worker.page_graph.finalize()));
+            graphs.push(handler.join().unwrap());
         }
 
         let (mut host_graph, mut page_graph) = graphs.pop().unwrap();
