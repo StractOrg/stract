@@ -138,7 +138,7 @@ impl RankingWebsite {
     }
 }
 
-trait Scorer<T: AsRankingWebsite>: Send + Sync {
+trait Scorer<T>: Send + Sync {
     fn score(&self, websites: &mut [T]);
     fn set_query_info(&mut self, _query: &SearchQuery) {}
 }
@@ -287,7 +287,7 @@ impl<T: AsRankingWebsite> Scorer<T> for Initial {
     }
 }
 
-struct RankingStage<T: AsRankingWebsite> {
+struct RankingStage<T> {
     scorer: Box<dyn Scorer<T>>,
     stage_top_n: usize,
     derank_similar: bool,
@@ -332,7 +332,7 @@ impl<T: AsRankingWebsite> RankingStage<T> {
     }
 }
 
-pub struct RankingPipeline<T: AsRankingWebsite> {
+pub struct RankingPipeline<T> {
     stage: RankingStage<T>,
     page: usize,
     pub top_n: usize,

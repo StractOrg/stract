@@ -42,6 +42,10 @@ where
     }
 
     pub async fn stackoverflow(&self, query: &SearchQuery) -> Result<Option<DisplayedSidebar>> {
+        if !query.fetch_sidebar {
+            return Ok(None);
+        }
+
         let query = SearchQuery {
             query: query.query.clone(),
             num_results: 1,

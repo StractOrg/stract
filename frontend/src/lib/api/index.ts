@@ -185,6 +185,7 @@ export const api = {
 export type ApiSearchQuery = {
   countResults?: boolean;
   fetchDiscussions?: boolean;
+  fetchSidebar?: boolean;
   flattenResponse?: boolean;
   hostRankings?: HostRankings;
   numResults?: number;

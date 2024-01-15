@@ -133,6 +133,10 @@ impl SearchQuery {
         false
     }
 
+    pub fn fetch_sidebar() -> bool {
+        false
+    }
+
     pub fn count_results() -> bool {
         false
     }

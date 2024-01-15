@@ -371,9 +371,12 @@ where
 
         let discussions = discussions?;
         let stackoverflow = stackoverflow?;
-        let sidebar = self
-            .sidebar_manager
-            .sidebar(&initial_results, stackoverflow);
+        let sidebar = if query.fetch_sidebar {
+            self.sidebar_manager
+                .sidebar(&initial_results, stackoverflow)
+        } else {
+            None
+        };
 
         let spell_corrected_query = if widget.is_none() {
             self.spell_checker

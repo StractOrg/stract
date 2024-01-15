@@ -54,6 +54,9 @@ pub struct ApiSearchQuery {
     #[serde(default = "defaults::SearchQuery::fetch_discussions")]
     pub fetch_discussions: bool,
 
+    #[serde(default = "defaults::SearchQuery::fetch_sidebar")]
+    pub fetch_sidebar: bool,
+
     #[serde(default = "defaults::SearchQuery::count_results")]
     pub count_results: bool,
 }
@@ -80,6 +83,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             fetch_discussions: api.fetch_discussions,
+            fetch_sidebar: api.fetch_sidebar,
             count_results: api.count_results,
         })
     }

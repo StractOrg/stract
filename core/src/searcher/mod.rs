@@ -70,6 +70,7 @@ pub struct SearchQuery {
     pub return_ranking_signals: bool,
     pub safe_search: bool,
     pub fetch_discussions: bool,
+    pub fetch_sidebar: bool,
     pub count_results: bool,
 }
 
@@ -96,6 +97,7 @@ impl Default for SearchQuery {
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
             fetch_discussions: defaults::SearchQuery::fetch_discussions(),
+            fetch_sidebar: defaults::SearchQuery::fetch_sidebar(),
             count_results: defaults::SearchQuery::count_results(),
         }
     }
