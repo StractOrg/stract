@@ -158,7 +158,7 @@ struct SegmentMergeCandidate {
 pub struct InvertedIndex {
     pub path: String,
     tantivy_index: tantivy::Index,
-    writer: IndexWriter,
+    writer: Option<IndexWriter>,
     reader: IndexReader,
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
@@ -220,15 +220,10 @@ impl InvertedIndex {
             .tokenizers()
             .register(tokenizer.as_str(), tokenizer);
 
-        let writer = tantivy_index.writer_with_num_threads(1, 1_000_000_000)?;
-
-        let merge_policy = NoMergePolicy;
-        writer.set_merge_policy(Box::new(merge_policy));
-
         let reader: IndexReader = tantivy_index.reader_builder().try_into()?;
 
         Ok(InvertedIndex {
-            writer,
+            writer: None,
             reader,
             schema: Arc::new(schema),
             path: path.as_ref().to_str().unwrap().to_string(),
@@ -237,13 +232,29 @@ impl InvertedIndex {
         })
     }
 
+    pub fn prepare_writer(&mut self) -> Result<()> {
+        let writer = self
+            .tantivy_index
+            .writer_with_num_threads(1, 1_000_000_000)?;
+
+        let merge_policy = NoMergePolicy;
+        writer.set_merge_policy(Box::new(merge_policy));
+
+        self.writer = Some(writer);
+
+        Ok(())
+    }
+
     pub fn set_snippet_config(&mut self, config: SnippetConfig) {
         self.snippet_config = config;
     }
 
     pub fn set_auto_merge_policy(&mut self) {
         let merge_policy = tantivy::merge_policy::LogMergePolicy::default();
-        self.writer.set_merge_policy(Box::new(merge_policy));
+        self.writer
+            .as_mut()
+            .expect("writer has not been prepared")
+            .set_merge_policy(Box::new(merge_policy));
     }
 
     pub fn fastfield_reader(&self, tv_searcher: &tantivy::Searcher) -> FastFieldReader {
@@ -257,24 +268,36 @@ impl InvertedIndex {
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = crate::gen_temp_path();
-        Self::open(path)
+        let mut s = Self::open(path)?;
+
+        s.prepare_writer()?;
+
+        Ok(s)
     }
 
     pub fn insert(&self, webpage: Webpage) -> Result<()> {
         self.writer
+            .as_ref()
+            .expect("writer has not been prepared")
             .add_document(webpage.into_tantivy(&self.schema)?)?;
         Ok(())
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.writer.commit()?;
+        self.writer
+            .as_mut()
+            .expect("writer has not been prepared")
+            .commit()?;
         self.reader.reload()?;
 
         Ok(())
     }
 
     fn delete(&self, query: Box<dyn tantivy::query::Query>) -> Result<()> {
-        self.writer.delete_query(query)?;
+        self.writer
+            .as_ref()
+            .expect("writer has not been prepared")
+            .delete_query(query)?;
 
         Ok(())
     }
@@ -433,7 +456,12 @@ impl InvertedIndex {
             .into_iter()
             .collect();
 
-        merge_tantivy_segments(&mut self.writer, segments, base_path, max_num_segments)?;
+        merge_tantivy_segments(
+            self.writer.as_mut().expect("writer has not been prepared"),
+            segments,
+            base_path,
+            max_num_segments,
+        )?;
 
         Ok(())
     }
@@ -466,11 +494,20 @@ impl InvertedIndex {
 
             let other_path = other.path.clone();
             let other_path = Path::new(other_path.as_str());
-            other.writer.wait_merging_threads().unwrap();
+            other
+                .writer
+                .take()
+                .expect("writer has not been prepared")
+                .wait_merging_threads()
+                .unwrap();
 
             let path = self.path.clone();
             let self_path = Path::new(path.as_str());
-            self.writer.wait_merging_threads().unwrap();
+            self.writer
+                .take()
+                .expect("writer has not been prepared")
+                .wait_merging_threads()
+                .unwrap();
 
             let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
 
@@ -506,8 +543,12 @@ impl InvertedIndex {
         Self::open(path).expect("failed to open index")
     }
 
-    pub fn stop(self) {
-        self.writer.wait_merging_threads().unwrap()
+    pub fn stop(mut self) {
+        self.writer
+            .take()
+            .expect("writer has not been prepared")
+            .wait_merging_threads()
+            .unwrap()
     }
 
     pub fn schema(&self) -> Arc<Schema> {
@@ -1169,6 +1210,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         let mut index = index1.merge(index2);
+        index.prepare_writer().unwrap();
         index.commit().unwrap();
 
         let ctx = index.local_search_ctx();

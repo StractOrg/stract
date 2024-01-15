@@ -315,6 +315,7 @@ impl Signal {
     fn host_id(&self, aggregator: &SignalAggregator, doc: DocId) -> Option<NodeID> {
         aggregator.segment_reader.as_ref().and_then(|reader| {
             let node_id: Option<u64> = reader
+                .borrow_mut()
                 .fastfield_reader
                 .get_field_reader(&FastField::HostNodeID)
                 .get(&doc)
@@ -333,6 +334,7 @@ impl Signal {
         aggregator.segment_reader.as_ref().and_then(|reader| {
             self.as_fastfield().map(|fast_field| {
                 reader
+                    .borrow_mut()
                     .fastfield_reader
                     .get_field_reader(&fast_field)
                     .get(&doc)
@@ -340,11 +342,7 @@ impl Signal {
         })
     }
 
-    fn compute(
-        self,
-        signal_aggregator: &mut SignalAggregator,
-        doc: DocId,
-    ) -> Option<ComputedSignal> {
+    fn compute(self, signal_aggregator: &SignalAggregator, doc: DocId) -> Option<ComputedSignal> {
         let coefficient = signal_aggregator.coefficient(&self);
         if coefficient == 0.0 {
             return None;
@@ -460,8 +458,9 @@ impl Signal {
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
             | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
-            | Signal::Bm25BacklinkText => signal_aggregator.segment_reader.as_mut().map(|reader| {
+            | Signal::Bm25BacklinkText => signal_aggregator.segment_reader.as_ref().map(|reader| {
                 reader
+                    .borrow_mut()
                     .text_fields
                     .get_mut(self.as_textfield().unwrap())
                     .map(|field| bm25(field, doc))
@@ -723,7 +722,7 @@ struct QueryData {
 pub struct SignalAggregator {
     query_data: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
-    segment_reader: Option<SegmentReader>,
+    segment_reader: Option<RefCell<SegmentReader>>,
     inbound_similarity: Option<RefCell<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
@@ -731,6 +730,7 @@ pub struct SignalAggregator {
     region_count: Option<Arc<RegionCount>>,
     current_timestamp: Option<usize>,
     linear_regression: Option<Arc<LinearRegression>>,
+    order: SignalOrder,
 }
 
 impl Clone for SignalAggregator {
@@ -756,6 +756,7 @@ impl Clone for SignalAggregator {
             region_count: self.region_count.clone(),
             current_timestamp: self.current_timestamp,
             linear_regression: self.linear_regression.clone(),
+            order: self.order.clone(),
         }
     }
 }
@@ -813,8 +814,10 @@ impl SignalAggregator {
             current_timestamp: None,
             linear_regression: None,
             query_data: query,
+            order: SignalOrder::empty(),
         };
 
+        s.order = SignalOrder::new(&s);
         s.set_current_timestamp(chrono::Utc::now().timestamp() as usize);
 
         s
@@ -923,13 +926,13 @@ impl SignalAggregator {
         let text_fields = self.prepare_textfields(tv_searcher, segment_reader)?;
         let optic_rule_boosts = self.prepare_optic(tv_searcher, segment_reader, fastfield_reader);
 
-        self.segment_reader = Some(SegmentReader {
+        self.segment_reader = Some(RefCell::new(SegmentReader {
             text_fields,
             fastfield_reader: fastfield_segment_reader,
             optic_boosts: OpticBoosts {
                 rules: optic_rule_boosts,
             },
-        });
+        }));
 
         Ok(())
     }
@@ -977,21 +980,16 @@ impl SignalAggregator {
     /// scores calculated for their text related signals. The wrong ranking will most likely
     /// be returned.
     /// This function also assumes that the segment reader has been set.
-    pub fn compute_signals(
-        &mut self,
-        doc: DocId,
-    ) -> impl Iterator<Item = Option<ComputedSignal>> + '_ {
-        ALL_SIGNALS
-            .into_iter()
-            .map(move |signal| signal.compute(self, doc))
+    pub fn compute_signals(&self, doc: DocId) -> impl Iterator<Item = Option<ComputedSignal>> + '_ {
+        self.order.compute(doc, self)
     }
 
     pub fn boosts(&mut self, doc: DocId) -> Option<f64> {
-        self.segment_reader.as_mut().map(|segment_reader| {
+        self.segment_reader.as_ref().map(|segment_reader| {
             let mut downrank = 0.0;
             let mut boost = 0.0;
 
-            for rule in &mut segment_reader.optic_boosts.rules {
+            for rule in &mut segment_reader.borrow_mut().optic_boosts.rules {
                 if rule.docset.doc() > doc {
                     continue;
                 }
@@ -1046,4 +1044,107 @@ pub struct ComputedSignal {
 pub struct SignalScore {
     pub coefficient: f64,
     pub value: f64,
+}
+
+#[derive(Clone)]
+pub struct SignalOrder {
+    text_signals: EnumMap<TextField, NGramSignalOrder>,
+    other_signals: Vec<Signal>,
+}
+
+impl SignalOrder {
+    pub fn empty() -> Self {
+        Self {
+            text_signals: EnumMap::new(),
+            other_signals: Vec::new(),
+        }
+    }
+
+    pub fn new(signal_aggregator: &SignalAggregator) -> Self {
+        let mut text_signals = EnumMap::new();
+        let mut other_signals = Vec::new();
+
+        for signal in ALL_SIGNALS {
+            if signal_aggregator.coefficient(&signal) == 0.0 {
+                continue;
+            }
+
+            if let Some(text_field) = signal.as_textfield() {
+                let mono = text_field.monogram_field();
+
+                if !text_signals.contains_key(mono) {
+                    text_signals.insert(mono, NGramSignalOrder::default());
+                }
+
+                let ngram = text_field.ngram_size();
+                text_signals.get_mut(mono).unwrap().push(signal, ngram);
+            } else {
+                other_signals.push(signal);
+            }
+        }
+
+        Self {
+            text_signals,
+            other_signals,
+        }
+    }
+
+    fn compute<'a>(
+        &'a self,
+        doc: DocId,
+        signal_aggregator: &'a SignalAggregator,
+    ) -> impl Iterator<Item = Option<ComputedSignal>> + 'a {
+        self.text_signals
+            .values()
+            .flat_map(move |ngram| ngram.compute(doc, signal_aggregator))
+            .map(Some)
+            .chain(
+                self.other_signals
+                    .iter()
+                    .map(move |signal| signal.compute(signal_aggregator, doc)),
+            )
+    }
+}
+
+/// If an ngram of size n matches the query for a given document in a given field,
+/// the score of all ngrams where n' < n is dampened by NGRAM_DAMPENING.
+///
+/// A dampening factor of 0.0 means that we ignore all ngrams where n' < n. A dampening factor of 1.0
+/// does not dampen any ngrams.
+const NGRAM_DAMPENING: f64 = 0.4;
+
+#[derive(Debug, Default, Clone)]
+pub struct NGramSignalOrder {
+    /// ordered by descending ngram size. e.g. [title_bm25_trigram, title_bm25_bigram, title_bm25]
+    signals: Vec<(usize, Signal)>,
+}
+
+impl NGramSignalOrder {
+    fn push(&mut self, signal: Signal, ngram: usize) {
+        self.signals.push((ngram, signal));
+        self.signals.sort_unstable_by(|(a, _), (b, _)| b.cmp(a));
+    }
+
+    fn compute<'a>(
+        &'a self,
+        doc: DocId,
+        signal_aggregator: &'a SignalAggregator,
+    ) -> impl Iterator<Item = ComputedSignal> + 'a {
+        let mut hits = 0.0;
+
+        self.signals
+            .iter()
+            .map(|(_, s)| s)
+            .filter_map(move |signal| {
+                signal.compute(signal_aggregator, doc).map(|mut c| {
+                    c.score.coefficient *= NGRAM_DAMPENING.powf(hits);
+
+                    if c.score.value > 0.0 {
+                        hits += 1.0;
+                    }
+
+                    c
+                })
+            })
+    }
 }

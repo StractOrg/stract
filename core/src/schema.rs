@@ -70,6 +70,80 @@ impl From<TextField> for usize {
 }
 
 impl TextField {
+    pub fn ngram_size(&self) -> usize {
+        match self {
+            TextField::Title => 1,
+            TextField::CleanBody => 1,
+            TextField::StemmedTitle => 1,
+            TextField::StemmedCleanBody => 1,
+            TextField::AllBody => 1,
+            TextField::Url => 1,
+            TextField::UrlNoTokenizer => 1,
+            TextField::UrlForSiteOperator => 1,
+            TextField::SiteWithout => 1,
+            TextField::Domain => 1,
+            TextField::SiteNoTokenizer => 1,
+            TextField::DomainNoTokenizer => 1,
+            TextField::DomainNameNoTokenizer => 1,
+            TextField::SiteIfHomepageNoTokenizer => 1,
+            TextField::DomainIfHomepage => 1,
+            TextField::DomainNameIfHomepageNoTokenizer => 1,
+            TextField::DomainIfHomepageNoTokenizer => 1,
+            TextField::TitleIfHomepage => 1,
+            TextField::BacklinkText => 1,
+            TextField::Description => 1,
+            TextField::DmozDescription => 1,
+            TextField::SchemaOrgJson => 1,
+            TextField::FlattenedSchemaOrgJson => 1,
+            TextField::CleanBodyBigrams => 2,
+            TextField::TitleBigrams => 2,
+            TextField::CleanBodyTrigrams => 3,
+            TextField::TitleTrigrams => 3,
+            TextField::MicroformatTags => 1,
+            TextField::SafetyClassification => 1,
+            TextField::InsertionTimestamp => 1,
+            TextField::RecipeFirstIngredientTagId => 1,
+        }
+    }
+
+    pub fn monogram_field(&self) -> TextField {
+        match self {
+            TextField::Title => TextField::Title,
+            TextField::CleanBody => TextField::CleanBody,
+            TextField::StemmedTitle => TextField::StemmedTitle,
+            TextField::StemmedCleanBody => TextField::StemmedCleanBody,
+            TextField::AllBody => TextField::AllBody,
+            TextField::Url => TextField::Url,
+            TextField::UrlNoTokenizer => TextField::UrlNoTokenizer,
+            TextField::UrlForSiteOperator => TextField::UrlForSiteOperator,
+            TextField::SiteWithout => TextField::SiteWithout,
+            TextField::Domain => TextField::Domain,
+            TextField::SiteNoTokenizer => TextField::SiteNoTokenizer,
+            TextField::DomainNoTokenizer => TextField::DomainNoTokenizer,
+            TextField::DomainNameNoTokenizer => TextField::DomainNameNoTokenizer,
+            TextField::SiteIfHomepageNoTokenizer => TextField::SiteIfHomepageNoTokenizer,
+            TextField::DomainIfHomepage => TextField::DomainIfHomepage,
+            TextField::DomainNameIfHomepageNoTokenizer => {
+                TextField::DomainNameIfHomepageNoTokenizer
+            }
+            TextField::DomainIfHomepageNoTokenizer => TextField::DomainIfHomepageNoTokenizer,
+            TextField::TitleIfHomepage => TextField::TitleIfHomepage,
+            TextField::BacklinkText => TextField::BacklinkText,
+            TextField::Description => TextField::Description,
+            TextField::DmozDescription => TextField::DmozDescription,
+            TextField::SchemaOrgJson => TextField::SchemaOrgJson,
+            TextField::FlattenedSchemaOrgJson => TextField::FlattenedSchemaOrgJson,
+            TextField::CleanBodyBigrams => TextField::CleanBody,
+            TextField::TitleBigrams => TextField::Title,
+            TextField::CleanBodyTrigrams => TextField::CleanBody,
+            TextField::TitleTrigrams => TextField::Title,
+            TextField::MicroformatTags => TextField::MicroformatTags,
+            TextField::SafetyClassification => TextField::SafetyClassification,
+            TextField::InsertionTimestamp => TextField::InsertionTimestamp,
+            TextField::RecipeFirstIngredientTagId => TextField::RecipeFirstIngredientTagId,
+        }
+    }
+
     pub fn query_tokenizer(&self) -> Tokenizer {
         match self {
             TextField::TitleBigrams => Tokenizer::default(),

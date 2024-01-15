@@ -27,7 +27,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 pub mod entrypoint;
-mod inverted_index;
+pub mod inverted_index;
 
 pub mod mapreduce;
 
@@ -35,7 +35,7 @@ pub mod mapreduce;
 pub mod alice;
 mod api;
 mod autosuggest;
-mod bangs;
+pub mod bangs;
 mod bloom;
 mod collector;
 pub mod config;
@@ -49,7 +49,7 @@ mod fastfield_reader;
 pub mod feed;
 mod human_website_annotations;
 pub mod hyperloglog;
-mod image_store;
+pub mod image_store;
 mod improvement;
 pub mod index;
 mod intmap;
@@ -117,7 +117,7 @@ pub enum Error {
     UnknownRobotsMetaTag,
 }
 
-pub(crate) type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
+pub type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
 pub fn gen_temp_path() -> PathBuf {

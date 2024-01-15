@@ -68,6 +68,10 @@ where
         }
     }
 
+    pub fn contains_key(&self, key: K) -> bool {
+        self.get(key).is_some()
+    }
+
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.inner.iter_mut().filter_map(|value| value.as_mut())
     }

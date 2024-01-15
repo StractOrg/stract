@@ -371,6 +371,9 @@ pub struct WebgraphServerConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WidgetsConfig {
     pub thesaurus_paths: Vec<String>,
+
+    #[serde(default = "defaults::Widgets::calculator_fetch_currencies_exchange")]
+    pub calculator_fetch_currencies_exchange: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

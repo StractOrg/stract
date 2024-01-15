@@ -29,6 +29,7 @@ use crate::{
     ranking::pipeline::{RankingWebsite, RetrievedWebpageRanking},
 };
 
+use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 
 use fnv::FnvHashMap;
@@ -80,33 +81,6 @@ impl LiveSearcher {
         ShardedClient::new(shard_clients)
     }
 
-    pub async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultSplit> {
-        let client = self.client().await;
-        let mut results = Vec::new();
-
-        if let Ok(res) = client
-            .send(
-                &search_server::Search {
-                    query: query.clone(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-        {
-            for (shard_id, mut res) in res {
-                if let Some(Some(res)) = res.pop() {
-                    results.push(InitialSearchResultSplit {
-                        local_result: res,
-                        split_id: shard_id,
-                    });
-                }
-            }
-        }
-
-        results
-    }
-
     async fn retrieve_webpages_from_shard(
         &self,
         split: SplitId,
@@ -138,8 +112,37 @@ impl LiveSearcher {
             _ => vec![],
         }
     }
+}
 
-    pub async fn retrieve_webpages(
+impl SearchClient for LiveSearcher {
+    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultSplit> {
+        let client = self.client().await;
+        let mut results = Vec::new();
+
+        if let Ok(res) = client
+            .send(
+                &search_server::Search {
+                    query: query.clone(),
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            for (shard_id, mut res) in res {
+                if let Some(Some(res)) = res.pop() {
+                    results.push(InitialSearchResultSplit {
+                        local_result: res,
+                        split_id: shard_id,
+                    });
+                }
+            }
+        }
+
+        results
+    }
+
+    async fn retrieve_webpages(
         &self,
         top_websites: &[(usize, ScoredWebsitePointer)],
         query: &str,
@@ -176,4 +179,16 @@ impl LiveSearcher {
 
         retrieved_webpages
     }
+}
+
+pub trait SearchClient {
+    fn search_initial(
+        &self,
+        query: &SearchQuery,
+    ) -> impl Future<Output = Vec<InitialSearchResultSplit>> + Send;
+    fn retrieve_webpages(
+        &self,
+        top_websites: &[(usize, ScoredWebsitePointer)],
+        query: &str,
+    ) -> impl Future<Output = Vec<(usize, RetrievedWebpageRanking)>> + Send;
 }

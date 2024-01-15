@@ -36,7 +36,7 @@ use crate::{
 
 pub type MainCollector = TweakedScoreTopCollector<InitialScoreTweaker>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MaxDocsConsidered {
     pub total_docs: usize,
     pub segments: usize,
@@ -168,6 +168,7 @@ impl TopSegmentCollector {
             false
         }
     }
+
     fn collect(&mut self, doc: DocId, score: Score) {
         if self.is_done() {
             return;

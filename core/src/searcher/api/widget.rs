@@ -27,7 +27,7 @@ use crate::ranking::pipeline::{AsRankingWebsite, RankingPipeline};
 use crate::search_prettifier::DisplayedAnswer;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::searcher::api::{add_ranking_signals, combine_results, ScoredWebsitePointer};
-use crate::searcher::{DistributedSearcher, SearchQuery};
+use crate::searcher::{distributed, SearchQuery};
 use crate::widgets::Widget;
 use crate::{ceil_char_boundary, floor_char_boundary, query, Result};
 use crate::{
@@ -36,9 +36,9 @@ use crate::{
 };
 
 #[cfg(feature = "libtorch")]
-pub struct WidgetManager {
+pub struct WidgetManager<S> {
     widgets: Widgets,
-    distributed_searcher: Arc<DistributedSearcher>,
+    distributed_searcher: Arc<S>,
     thresholds: ApiThresholds,
     collector_config: CollectorConfig,
     lambda_model: Option<Arc<LambdaMART>>,
@@ -46,24 +46,27 @@ pub struct WidgetManager {
 }
 
 #[cfg(not(feature = "libtorch"))]
-pub struct WidgetManager {
+pub struct WidgetManager<S> {
     widgets: Widgets,
-    distributed_searcher: Arc<DistributedSearcher>,
+    distributed_searcher: Arc<S>,
     thresholds: ApiThresholds,
     collector_config: CollectorConfig,
     lambda_model: Option<Arc<LambdaMART>>,
 }
 
-impl WidgetManager {
+impl<S> WidgetManager<S>
+where
+    S: distributed::SearchClient,
+{
     #[cfg(feature = "libtorch")]
     pub fn new(
         widgets: Widgets,
-        distributed_searcher: Arc<DistributedSearcher>,
+        distributed_searcher: Arc<S>,
         thresholds: ApiThresholds,
         collector_config: CollectorConfig,
         lambda_model: Option<Arc<LambdaMART>>,
         qa_model: Option<Arc<QaModel>>,
-    ) -> WidgetManager {
+    ) -> WidgetManager<S> {
         Self {
             widgets,
             distributed_searcher,
@@ -77,11 +80,11 @@ impl WidgetManager {
     #[cfg(not(feature = "libtorch"))]
     pub fn new(
         widgets: Widgets,
-        distributed_searcher: Arc<DistributedSearcher>,
+        distributed_searcher: Arc<S>,
         thresholds: ApiThresholds,
         collector_config: CollectorConfig,
         lambda_model: Option<Arc<LambdaMART>>,
-    ) -> WidgetManager {
+    ) -> WidgetManager<S> {
         Self {
             widgets,
             distributed_searcher,

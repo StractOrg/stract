@@ -75,7 +75,11 @@ impl Index {
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = crate::gen_temp_path();
-        Self::open(path)
+        let mut s = Self::open(path)?;
+
+        s.prepare_writer()?;
+
+        Ok(s)
     }
 
     pub fn insert(&self, webpage: Webpage) -> Result<()> {
@@ -144,6 +148,10 @@ impl Index {
         self_region_count.merge(other_region_count);
 
         Self::open(&self.path).expect("failed to open index")
+    }
+
+    pub(crate) fn prepare_writer(&mut self) -> Result<()> {
+        self.inverted_index.prepare_writer()
     }
 }
 

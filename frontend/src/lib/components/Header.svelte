@@ -32,7 +32,7 @@
       <a
         href={url}
         class={twJoin(
-          'relative z-10 border-b p-2',
+          'relative z-10 border-b p-2 text-neutral-focus',
           $page.url.pathname.startsWith(url.split('?')[0]) ? 'border-accent' : 'border-transparent',
         )}
       >

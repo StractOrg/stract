@@ -32,6 +32,7 @@ use crate::distributed::sonic;
 use crate::distributed::sonic::service::Message;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
+use crate::searcher::SearchClient;
 use crate::similar_hosts::SimilarHostsFinder;
 use crate::sonic_service;
 use crate::webgraph::Compression;

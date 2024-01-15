@@ -50,8 +50,14 @@ impl Widgets {
             None
         };
 
+        let exchange_update = if config.calculator_fetch_currencies_exchange {
+            calculator::ExchangeUpdate::AsyncTokio
+        } else {
+            calculator::ExchangeUpdate::None
+        };
+
         Ok(Self {
-            calculator: Calculator::new(calculator::ExchangeUpdate::AsyncTokio),
+            calculator: Calculator::new(exchange_update),
             thesaurus,
         })
     }

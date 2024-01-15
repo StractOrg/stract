@@ -16,7 +16,7 @@
 
 pub mod api;
 pub mod distributed;
-mod live;
+pub mod live;
 pub mod local;
 
 pub use distributed::*;

@@ -114,14 +114,6 @@ impl WebgraphServer {
     }
 }
 
-pub struct SearchServer;
-
-impl SearchServer {
-    pub fn build_spell_dictionary() -> bool {
-        true
-    }
-}
-
 pub struct SearchQuery;
 
 impl SearchQuery {
@@ -159,5 +151,13 @@ impl Correction {
 
     pub fn lm_prob_weight() -> f64 {
         5.77
+    }
+}
+
+pub struct Widgets;
+
+impl Widgets {
+    pub fn calculator_fetch_currencies_exchange() -> bool {
+        true
     }
 }

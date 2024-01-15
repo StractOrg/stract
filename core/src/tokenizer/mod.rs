@@ -339,7 +339,7 @@ impl<'a> tantivy::tokenizer::TokenStream for SimpleTokenStream<'a> {
     }
 }
 
-struct NGramTokenStream<'a, const N: usize> {
+pub struct NGramTokenStream<'a, const N: usize> {
     inner: BoxTokenStream<'a>,
     token: tantivy::tokenizer::Token,
     token_window: [tantivy::tokenizer::Token; N],
@@ -347,7 +347,7 @@ struct NGramTokenStream<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> NGramTokenStream<'a, N> {
-    fn new(inner: BoxTokenStream<'a>) -> Self {
+    pub fn new(inner: BoxTokenStream<'a>) -> Self {
         Self {
             inner,
             token: tantivy::tokenizer::Token::default(),

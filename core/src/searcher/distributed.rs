@@ -36,6 +36,7 @@ use fnv::FnvHashMap;
 use futures::future::join_all;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use thiserror::Error;
 use url::Url;
 
@@ -61,6 +62,12 @@ pub struct ScoredWebsitePointer {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct ShardId(u64);
+
+impl ShardId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
 
 impl ShardIdentifier for ShardId {}
 
@@ -99,33 +106,6 @@ impl DistributedSearcher {
         ShardedClient::new(shard_clients)
     }
 
-    pub async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
-        let client = self.client().await;
-        let mut results = Vec::new();
-
-        if let Ok(res) = client
-            .send(
-                &search_server::Search {
-                    query: query.clone(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-        {
-            for (shard_id, mut res) in res {
-                if let Some(Some(res)) = res.pop() {
-                    results.push(InitialSearchResultShard {
-                        local_result: res,
-                        shard: shard_id,
-                    });
-                }
-            }
-        }
-
-        results
-    }
-
     async fn retrieve_webpages_from_shard(
         &self,
         shard: ShardId,
@@ -157,8 +137,37 @@ impl DistributedSearcher {
             _ => vec![],
         }
     }
+}
 
-    pub async fn retrieve_webpages(
+impl SearchClient for DistributedSearcher {
+    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
+        let client = self.client().await;
+        let mut results = Vec::new();
+
+        if let Ok(res) = client
+            .send(
+                &search_server::Search {
+                    query: query.clone(),
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            for (shard_id, mut res) in res {
+                if let Some(Some(res)) = res.pop() {
+                    results.push(InitialSearchResultShard {
+                        local_result: res,
+                        shard: shard_id,
+                    });
+                }
+            }
+        }
+
+        results
+    }
+
+    async fn retrieve_webpages(
         &self,
         top_websites: &[(usize, ScoredWebsitePointer)],
         query: &str,
@@ -196,7 +205,7 @@ impl DistributedSearcher {
         retrieved_webpages
     }
 
-    pub async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
+    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
         let client = self.client().await;
 
         let res = client
@@ -217,7 +226,7 @@ impl DistributedSearcher {
         }
     }
 
-    pub async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
+    async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         let client = self.client().await;
 
         let res = client
@@ -236,7 +245,7 @@ impl DistributedSearcher {
         }
     }
 
-    pub async fn get_entity_image(
+    async fn get_entity_image(
         &self,
         image_id: &str,
         max_height: Option<u64>,
@@ -261,4 +270,30 @@ impl DistributedSearcher {
 
         Ok(res.pop().flatten())
     }
+}
+
+pub trait SearchClient {
+    fn search_initial(
+        &self,
+        query: &SearchQuery,
+    ) -> impl Future<Output = Vec<InitialSearchResultShard>> + Send;
+    fn retrieve_webpages(
+        &self,
+        top_websites: &[(usize, ScoredWebsitePointer)],
+        query: &str,
+    ) -> impl Future<Output = Vec<(usize, RetrievedWebpageRanking)>> + Send;
+    fn get_webpage(
+        &self,
+        url: &str,
+    ) -> impl Future<Output = Result<Option<RetrievedWebpage>>> + Send;
+    fn get_homepage_descriptions(
+        &self,
+        urls: &[Url],
+    ) -> impl Future<Output = HashMap<Url, String>> + Send;
+    fn get_entity_image(
+        &self,
+        image_id: &str,
+        max_height: Option<u64>,
+        max_width: Option<u64>,
+    ) -> impl Future<Output = Result<Option<Image>>> + Send;
 }

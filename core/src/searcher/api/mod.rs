@@ -38,7 +38,6 @@ use crate::widgets::Widgets;
 use crate::{
     bangs::Bangs,
     collector::BucketCollector,
-    distributed::cluster::Cluster,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
 };
 #[cfg(feature = "libtorch")]
@@ -48,8 +47,7 @@ use crate::{query, Result};
 use self::sidebar::SidebarManager;
 use self::widget::WidgetManager;
 
-use super::live::LiveSearcher;
-use super::{distributed, live, DistributedSearcher, SearchQuery, SearchResult, WebsitesResult};
+use super::{distributed, live, SearchQuery, SearchResult, WebsitesResult};
 
 #[derive(Clone)]
 pub enum ScoredWebsitePointer {
@@ -138,41 +136,46 @@ pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[Scored
 }
 
 #[cfg(feature = "libtorch")]
-pub struct ApiSearcher {
-    distributed_searcher: Arc<DistributedSearcher>,
-    sidebar_manager: SidebarManager,
-    live_searcher: LiveSearcher,
+pub struct ApiSearcher<S, L> {
+    distributed_searcher: Arc<S>,
+    sidebar_manager: SidebarManager<S>,
+    live_searcher: Option<L>,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
-    widget_manager: WidgetManager,
+    widget_manager: WidgetManager<S>,
     spell_checker: Option<SpellChecker>,
 }
 
 #[cfg(not(feature = "libtorch"))]
-pub struct ApiSearcher {
-    distributed_searcher: Arc<DistributedSearcher>,
-    live_searcher: LiveSearcher,
-    sidebar_manager: SidebarManager,
+pub struct ApiSearcher<S, L> {
+    distributed_searcher: Arc<S>,
+    live_searcher: Option<L>,
+    sidebar_manager: SidebarManager<S>,
     lambda_model: Option<Arc<LambdaMART>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
-    widget_manager: WidgetManager,
+    widget_manager: WidgetManager<S>,
     spell_checker: Option<SpellChecker>,
 }
 
-impl ApiSearcher {
+impl<S, L> ApiSearcher<S, L>
+where
+    S: distributed::SearchClient,
+    L: live::SearchClient,
+{
     #[cfg(feature = "libtorch")]
     pub fn new(
-        cluster: Arc<Cluster>,
+        dist_searcher: S,
+        live_searcher: Option<L>,
         cross_encoder: Option<CrossEncoderModel>,
         lambda_model: Option<LambdaMART>,
         qa_model: Option<QaModel>,
         bangs: Bangs,
         config: ApiConfig,
     ) -> Self {
-        let dist_searcher = Arc::new(DistributedSearcher::new(Arc::clone(&cluster)));
+        let dist_searcher = Arc::new(dist_searcher);
         let sidebar_manager =
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
 
@@ -191,7 +194,7 @@ impl ApiSearcher {
         Self {
             distributed_searcher: dist_searcher,
             sidebar_manager,
-            live_searcher: LiveSearcher::new(Arc::clone(&cluster)),
+            live_searcher,
             cross_encoder: cross_encoder.map(Arc::new),
             lambda_model,
             bangs,
@@ -205,12 +208,13 @@ impl ApiSearcher {
 
     #[cfg(not(feature = "libtorch"))]
     pub fn new(
-        cluster: Arc<Cluster>,
+        dist_searcher: S,
+        live_searcher: Option<L>,
         lambda_model: Option<LambdaMART>,
         bangs: Bangs,
         config: ApiConfig,
     ) -> Self {
-        let dist_searcher = Arc::new(DistributedSearcher::new(Arc::clone(&cluster)));
+        let dist_searcher = Arc::new(dist_searcher);
         let sidebar_manager =
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
         let lambda_model = lambda_model.map(Arc::new);
@@ -226,7 +230,7 @@ impl ApiSearcher {
         Self {
             distributed_searcher: dist_searcher,
             sidebar_manager,
-            live_searcher: LiveSearcher::new(Arc::clone(&cluster)),
+            live_searcher,
             lambda_model,
             bangs,
             collector_config: config.collector,
@@ -306,7 +310,7 @@ impl ApiSearcher {
 
         let (retrieved_normal, retrieved_live) = tokio::join!(
             self.distributed_searcher.retrieve_webpages(&normal, query),
-            self.live_searcher.retrieve_webpages(&live, query),
+            self.retrieve_webpages_from_live(&live, query),
         );
 
         let mut retrieved_webpages: Vec<_> =
@@ -317,6 +321,27 @@ impl ApiSearcher {
             .into_iter()
             .map(|(_, webpage)| webpage)
             .collect::<Vec<_>>()
+    }
+
+    async fn search_initial_from_live(
+        &self,
+        query: &SearchQuery,
+    ) -> Option<Vec<live::InitialSearchResultSplit>> {
+        match &self.live_searcher {
+            Some(searcher) => Some(searcher.search_initial(query).await),
+            None => None,
+        }
+    }
+
+    async fn retrieve_webpages_from_live(
+        &self,
+        pointers: &[(usize, live::ScoredWebsitePointer)],
+        query: &str,
+    ) -> Vec<(usize, RetrievedWebpageRanking)> {
+        match &self.live_searcher {
+            Some(searcher) => searcher.retrieve_webpages(pointers, query).await,
+            None => vec![],
+        }
     }
 
     async fn search_websites(&self, query: &SearchQuery) -> Result<WebsitesResult> {
@@ -336,10 +361,9 @@ impl ApiSearcher {
             self.collector_config.clone(),
             20,
         );
-
         let (initial_results, live_results, widget, discussions, stackoverflow) = tokio::join!(
             self.distributed_searcher.search_initial(&search_query),
-            self.live_searcher.search_initial(&search_query),
+            self.search_initial_from_live(&search_query),
             self.widget_manager.widget(query),
             self.widget_manager.discussions(query),
             self.sidebar_manager.stackoverflow(query),
@@ -368,7 +392,7 @@ impl ApiSearcher {
         let (top_websites, has_more_results) = combine_results(
             self.collector_config.clone(),
             initial_results,
-            live_results,
+            live_results.unwrap_or_default(),
             recall_pipeline,
         );
 

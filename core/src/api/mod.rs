@@ -32,7 +32,7 @@ use crate::{
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
     ranking::models::lambdamart::LambdaMART,
-    searcher::api::ApiSearcher,
+    searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
 };
 
 #[cfg(feature = "libtorch")]
@@ -76,7 +76,7 @@ pub struct Counters {
 #[cfg(feature = "libtorch")]
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: ApiSearcher,
+    pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
@@ -88,7 +88,7 @@ pub struct State {
 #[cfg(not(feature = "libtorch"))]
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: ApiSearcher,
+    pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
     pub remote_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
@@ -135,6 +135,9 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     );
     let remote_webgraph = RemoteWebgraph::new(cluster.clone());
 
+    let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
+    let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
+
     #[cfg(feature = "libtorch")]
     let state = {
         let mut cross_encoder = None;
@@ -149,7 +152,8 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         };
 
         let searcher = ApiSearcher::new(
-            cluster.clone(),
+            dist_searcher,
+            Some(live_searcher),
             cross_encoder,
             lambda_model,
             qa_model,
@@ -171,7 +175,13 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
 
     #[cfg(not(feature = "libtorch"))]
     let state = {
-        let searcher = ApiSearcher::new(cluster.clone(), lambda_model, bangs, config.clone());
+        let searcher = ApiSearcher::new(
+            dist_searcher,
+            Some(live_searcher),
+            lambda_model,
+            bangs,
+            config.clone(),
+        );
 
         Arc::new(State {
             config: config.clone(),

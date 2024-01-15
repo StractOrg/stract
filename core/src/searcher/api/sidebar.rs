@@ -22,19 +22,19 @@ use url::Url;
 
 use crate::{
     search_prettifier::{create_stackoverflow_sidebar, DisplayedEntity, DisplayedSidebar},
-    searcher::{distributed, DistributedSearcher, SearchQuery},
+    searcher::{distributed, SearchQuery},
 };
 
-pub struct SidebarManager {
-    distributed_searcher: Arc<DistributedSearcher>,
+pub struct SidebarManager<S> {
+    distributed_searcher: Arc<S>,
     thresholds: ApiThresholds,
 }
 
-impl SidebarManager {
-    pub fn new(
-        distributed_searcher: Arc<DistributedSearcher>,
-        thresholds: ApiThresholds,
-    ) -> SidebarManager {
+impl<S> SidebarManager<S>
+where
+    S: distributed::SearchClient,
+{
+    pub fn new(distributed_searcher: Arc<S>, thresholds: ApiThresholds) -> SidebarManager<S> {
         Self {
             distributed_searcher,
             thresholds,

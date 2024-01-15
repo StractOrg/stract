@@ -266,6 +266,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
     info!("processing {}", name);
 
     let mut index = Index::open(Path::new(&job.base_path).join(name)).unwrap();
+    index.prepare_writer().unwrap();
 
     let warc_files = download_all_warc_files(&job.warc_paths, &job.source_config);
     pin!(warc_files);

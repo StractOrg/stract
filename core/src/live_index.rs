@@ -228,6 +228,7 @@ pub struct Index {
 impl Index {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut search_index = crate::index::Index::open(path.as_ref().join("index"))?;
+        search_index.prepare_writer()?;
         search_index.set_auto_merge_policy();
 
         let search_index = Arc::new(RwLock::new(search_index));
