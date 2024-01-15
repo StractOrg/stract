@@ -533,6 +533,14 @@ impl Id2NodeDb {
             })
     }
 
+    fn estimate_num_keys(&self) -> usize {
+        self.db
+            .property_int_value("rocksdb.estimate-num-keys")
+            .ok()
+            .flatten()
+            .unwrap_or_default() as usize
+    }
+
     fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
         self.db
             .iterator(rocksdb::IteratorMode::Start)
@@ -873,6 +881,10 @@ impl Webgraph {
 
     pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
         self.id2node.iter().map(|(id, node)| (node, id))
+    }
+
+    pub fn estimate_num_nodes(&self) -> usize {
+        self.id2node.estimate_num_keys()
     }
 
     /// Iterate all edges in the graph at least once.
