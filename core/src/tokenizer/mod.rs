@@ -109,9 +109,17 @@ impl Normal {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct BigramTokenizer {
     inner_tokenizer: Normal,
+}
+
+impl Default for BigramTokenizer {
+    fn default() -> Self {
+        Self {
+            inner_tokenizer: Normal::with_stopwords(vec![".".to_string()]),
+        }
+    }
 }
 
 impl BigramTokenizer {
@@ -120,9 +128,17 @@ impl BigramTokenizer {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct TrigramTokenizer {
     inner_tokenizer: Normal,
+}
+
+impl Default for TrigramTokenizer {
+    fn default() -> Self {
+        Self {
+            inner_tokenizer: Normal::with_stopwords(vec![".".to_string()]),
+        }
+    }
 }
 
 impl TrigramTokenizer {
@@ -1001,10 +1017,8 @@ key1.key2="this\" is @ a # test""#;
             vec!["thisis".to_string(), "isa".to_string(), "atest".to_string(),]
         );
 
-        assert_eq!(
-            tokenize_bigram("this.is"),
-            vec!["this.".to_string(), ".is".to_string(),]
-        );
+        // '.' is a stopword
+        assert_eq!(tokenize_bigram("this.is"), vec!["thisis".to_string()]);
     }
 
     #[test]
