@@ -870,7 +870,7 @@ impl Webgraph {
 
     pub fn random_nodes(&self, num: usize) -> Vec<NodeID> {
         let mut rng = rand::thread_rng();
-        let mut nodes = self.nodes().collect::<Vec<_>>();
+        let mut nodes = self.nodes().take(num).collect::<Vec<_>>();
         nodes.shuffle(&mut rng);
         nodes.into_iter().take(num).collect()
     }
