@@ -426,10 +426,13 @@ impl Indexer {
             threads.push(thread::spawn(move || {
                 let mut it = indexes.into_iter();
                 let mut index = Index::open(it.next().unwrap().0).unwrap();
+                index.prepare_writer().unwrap();
 
                 for other in it {
                     let other_path = other.0;
-                    let other = Index::open(&other_path).unwrap();
+                    let mut other = Index::open(&other_path).unwrap();
+                    other.prepare_writer().unwrap();
+
                     index = index.merge(other);
 
                     std::fs::remove_dir_all(other_path).unwrap();
