@@ -233,6 +233,10 @@ impl InvertedIndex {
     }
 
     pub fn prepare_writer(&mut self) -> Result<()> {
+        if self.writer.is_some() {
+            return Ok(());
+        }
+
         let writer = self
             .tantivy_index
             .writer_with_num_threads(1, 1_000_000_000)?;
@@ -284,6 +288,7 @@ impl InvertedIndex {
     }
 
     pub fn commit(&mut self) -> Result<()> {
+        self.prepare_writer()?;
         self.writer
             .as_mut()
             .expect("writer has not been prepared")
@@ -448,6 +453,7 @@ impl InvertedIndex {
     }
 
     pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
+        self.prepare_writer()?;
         let base_path = Path::new(&self.path);
         let segments: Vec<_> = self
             .tantivy_index
@@ -476,6 +482,9 @@ impl InvertedIndex {
     }
 
     pub fn merge(mut self, mut other: InvertedIndex) -> Self {
+        self.prepare_writer().expect("failed to prepare writer");
+        other.prepare_writer().expect("failed to prepare writer");
+
         let path = self.path.clone();
 
         {
@@ -540,7 +549,11 @@ impl InvertedIndex {
             .unwrap();
         }
 
-        Self::open(path).expect("failed to open index")
+        let mut res = Self::open(path).expect("failed to open index");
+
+        res.prepare_writer().expect("failed to prepare writer");
+
+        res
     }
 
     pub fn stop(mut self) {

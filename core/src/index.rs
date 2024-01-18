@@ -147,7 +147,9 @@ impl Index {
 
         self_region_count.merge(other_region_count);
 
-        Self::open(&self.path).expect("failed to open index")
+        let mut res = Self::open(&self.path).expect("failed to open index");
+        res.prepare_writer().expect("failed to prepare writer");
+        res
     }
 
     pub(crate) fn prepare_writer(&mut self) -> Result<()> {
