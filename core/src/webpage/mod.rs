@@ -21,8 +21,6 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 
-#[cfg(test)]
-use kuchiki::traits::TendrilSink;
 use std::collections::HashMap;
 use tantivy::{time::OffsetDateTime, TantivyDocument};
 use url::Url;
@@ -60,14 +58,7 @@ pub struct Webpage {
 impl Default for Webpage {
     fn default() -> Self {
         Self {
-            html: Html {
-                url: Url::parse("https://example.com").expect("Failed to parse url"),
-                root: kuchiki::parse_html().one("<html></html>"),
-                all_text: None,
-                clean_text: None,
-                lang: None,
-                robots: None,
-            },
+            html: Html::parse_without_text("<html></html>", "https://example.com/").unwrap(),
             backlink_labels: Default::default(),
             host_centrality: Default::default(),
             host_centrality_rank: u64::MAX as f64,

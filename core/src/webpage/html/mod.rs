@@ -40,12 +40,12 @@ pub static URL_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(
 
 #[derive(Debug)]
 pub struct Html {
-    pub(crate) url: Url,
-    pub(crate) root: NodeRef, // this is reference counted (cheap to clone)
-    pub(crate) all_text: Option<String>,
-    pub(crate) clean_text: Option<String>,
-    pub(crate) lang: Option<Lang>,
-    pub(crate) robots: Option<EnumSet<RobotsMeta>>,
+    url: Url,
+    root: NodeRef, // this is reference counted (cheap to clone)
+    all_text: Option<String>,
+    clean_text: Option<String>,
+    lang: Option<Lang>,
+    robots: Option<EnumSet<RobotsMeta>>,
 }
 
 impl Html {
@@ -89,6 +89,12 @@ impl Html {
             query_mut.clear();
             if !queries.is_empty() {
                 query_mut.extend_pairs(queries);
+            }
+        }
+
+        if let Some(canonical) = res.canonical_url() {
+            if canonical.root_domain() == res.url.root_domain() {
+                res.url = canonical;
             }
         }
 
@@ -1000,6 +1006,11 @@ mod tests {
             Some(Url::parse("https://example.com/canonical.html").unwrap())
         );
 
+        assert_eq!(
+            html.url(),
+            &Url::parse("https://example.com/canonical.html").unwrap()
+        );
+
         let html = Html::parse(
             r#"
             <html>
@@ -1014,6 +1025,30 @@ mod tests {
         .unwrap();
 
         assert_eq!(html.canonical_url(), None);
+        assert_eq!(
+            html.url(),
+            &Url::parse("https://www.example.com/whatever").unwrap()
+        );
+
+        let html = Html::parse(
+            r#"
+            <html>
+                <head>
+                    <link rel="canonical" href="https://another-example.com/canonical.html" />
+                </head>
+                <body>
+                </body>
+            </html>
+        "#,
+            "https://www.example.com/whatever",
+        )
+        .unwrap();
+
+        assert_eq!(
+            html.canonical_url(),
+            Some(Url::parse("https://another-example.com/canonical.html").unwrap())
+        );
+
         assert_eq!(
             html.url(),
             &Url::parse("https://www.example.com/whatever").unwrap()

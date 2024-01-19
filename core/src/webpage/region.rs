@@ -94,7 +94,7 @@ impl Region {
     }
 
     pub fn guess_from(webpage: &Webpage) -> Result<Self> {
-        match webpage.html.lang {
+        match webpage.html.lang() {
             Some(lang) => match lang {
                 whatlang::Lang::Eng => Ok(Region::US),
                 whatlang::Lang::Spa => Ok(Region::Spain),
