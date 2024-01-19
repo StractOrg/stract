@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use anyhow::anyhow;
 use encoding_rs::{Encoding, UTF_8};
 use futures::{future::BoxFuture, FutureExt};
 use hashbrown::{HashMap, HashSet};
@@ -401,26 +402,33 @@ impl<S: DatumStream> JobExecutor<S> {
             return Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
         }
 
-        let backoff = ExponentialBackoff::from_millis(self.config.min_crawl_delay_ms)
-            .with_limit(Duration::from_millis(self.config.max_crawl_delay_ms))
-            .take(3);
-
-        let mut res = Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
-        for time in backoff {
-            if let Ok(cur_res) = self.client.get(url.to_string()).send().await {
-                res = Ok(cur_res);
-                break;
-            } else {
-                tokio::time::sleep(time).await;
-            }
-        }
-
-        res
+        self.client
+            .get(url.to_string())
+            .send()
+            .await
+            .map_err(|e| e.into())
     }
 
     async fn crawl_url(&self, url: Url) -> Result<CrawlDatum> {
         let start = Instant::now();
-        let res = self.fetch(url.clone()).await?;
+
+        let res = if url.scheme() == "http" {
+            let mut https = url.clone();
+            https
+                .set_scheme("https")
+                .map_err(|_| anyhow!("set scheme on url failed"))?;
+
+            match self.fetch(https).await {
+                Ok(res) => Ok(res),
+                Err(_) => {
+                    tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms)).await;
+                    self.fetch(url.clone()).await
+                }
+            }
+        } else {
+            self.fetch(url.clone()).await
+        };
+
         let fetch_time = start.elapsed();
 
         let mut delay = fetch_time;
@@ -436,6 +444,8 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         tokio::time::sleep(delay).await;
+
+        let res = res?;
 
         let headers: HashMap<_, _> = res
             .headers()
