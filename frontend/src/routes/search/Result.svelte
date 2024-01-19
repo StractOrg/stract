@@ -41,7 +41,7 @@
       </a>
     </div>
     <button
-      class="noscript:hidden hidden w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus md:flex"
+      class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
       bind:this={button}
       on:click|stopPropagation={() => dispatch('modal', button)}
     >
@@ -50,7 +50,7 @@
   </div>
   <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">
     {#if $summary}
-      <Summary {...$summary} on:hide={() => clearSummary(webpage)} />
+      <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
     {:else if webpage.snippet.type == 'normal'}
       <div class="snippet">
         <div class="line-clamp-3">

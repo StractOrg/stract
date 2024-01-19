@@ -56,6 +56,7 @@ itertools = {workspace = true}
 kuchiki = {path = "../kuchiki"}
 lalrpop-util = {workspace = true}
 libc = {workspace = true}
+log = {workspace = true}
 logos = {workspace = true}
 lz-str = {workspace = true}
 lz4_flex = {workspace = true}
@@ -128,11 +129,6 @@ name = "search_preindexed_optic"
 [[bench]]
 harness = false
 name = "harmonic_centrality"
-
-[[bench]]
-harness = false
-name = "abstractive_summarizer"
-required-features = ["libtorch"]
 
 [[bench]]
 harness = false

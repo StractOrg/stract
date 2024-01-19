@@ -9,6 +9,9 @@ queries_csv_path = "data/queries_us.csv"
 spell_checker_path = "data/web_spell/checker"
 # qa_model_path = "data/qa_model"
 bangs_path = "data/bangs.json"
+# openai_api_model = "data/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+openai_api_model = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+openai_api_uri = "http://localhost:4000"
 summarizer_path = "data/summarizer"
 
 [thresholds]

@@ -13,18 +13,18 @@ export const load: PageLoad = async (req) => {
     if (form) {
       params = form;
     } else {
-      redirect(300, '/');
+      redirect(301, '/');
     }
   }
 
   if (!params.query.trim()) {
-    redirect(300, '/');
+    redirect(301, '/');
   }
 
   const results = req.data['results'];
 
   if (results.type == 'bang') {
-    redirect(300, results.redirectTo);
+    redirect(301, results.redirectTo);
   }
 
   const prevPageSearchParams = match(params.currentPage > 1)

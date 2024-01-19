@@ -5,3 +5,5 @@ datasets
 gensim
 safetensors
 pandas
+llama-cpp-python[server]
+llama-cpp-python

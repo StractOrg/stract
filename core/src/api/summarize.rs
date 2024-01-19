@@ -23,7 +23,6 @@ use axum::response::{sse::Event, Sse};
 use futures::stream::Stream;
 use http::StatusCode;
 use serde::Deserialize;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::StreamExt as _;
 use utoipa::IntoParams;
 
@@ -34,14 +33,6 @@ use crate::Result;
 pub struct SummarizeParams {
     pub url: String,
     pub query: String,
-}
-
-fn summarize_blocking(iter: impl Iterator<Item = String>, tx: UnboundedSender<String>) {
-    for tok in iter {
-        if tx.send(tok).is_err() {
-            break;
-        }
-    }
 }
 
 #[cfg(feature = "libtorch")]
@@ -55,18 +46,10 @@ async fn summarize(
         .await?
         .ok_or_else(|| anyhow::anyhow!("Webpage not found: {}", params.url))?;
 
-    let (tx, mut rx) = unbounded_channel();
-
-    let summarizer = Arc::clone(&state.summarizer);
-    let it = summarizer.summarize_iter(&params.query, &webpage.body)?;
-
-    tokio::task::spawn_blocking(move || summarize_blocking(it, tx));
-
-    let stream = async_stream::stream! {
-        while let Some(item) = rx.recv().await {
-            yield item;
-        }
-    };
+    let stream = state
+        .summarizer
+        .summarize(&params.query, &webpage.body)
+        .await?;
 
     Ok(
         Sse::new(stream.map(|term| Event::default().data(term)).map(Ok))

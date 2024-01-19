@@ -317,7 +317,7 @@ impl EdgeStore {
         block_options.set_ribbon_filter(10.0);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        options.set_compression_type(rocksdb::DBCompressionType::None);
         options.optimize_for_point_lookup(512);
 
         let ranges = match rocksdb::DB::open_cf_with_opts(

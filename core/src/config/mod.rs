@@ -201,6 +201,8 @@ pub struct ApiConfig {
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,
+    pub openai_api_uri: String,
+    pub openai_api_model: String,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,

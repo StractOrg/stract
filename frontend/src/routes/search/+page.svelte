@@ -1,20 +1,13 @@
 <script lang="ts">
-  import HandThumbDown from '~icons/heroicons/hand-thumb-down-20-solid';
-  import HandThumbUp from '~icons/heroicons/hand-thumb-up-20-solid';
-  import NoSymbol from '~icons/heroicons/no-symbol-20-solid';
   import ChevronLeft from '~icons/heroicons/chevron-left-20-solid';
   import ChevronRight from '~icons/heroicons/chevron-right-20-solid';
   import OpticSelector from '$lib/components/OpticSelector.svelte';
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
-  import { scale } from 'svelte/transition';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
   import type { DisplayedWebpage } from '$lib/api';
   import { onMount } from 'svelte';
-  import { twJoin } from 'tailwind-merge';
-  import Button from '$lib/components/Button.svelte';
-  import { searchQueryStore, hostRankingsStore, summarize } from '$lib/stores';
-  import type { Ranking } from '$lib/rankings';
+  import { searchQueryStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import Result from './Result.svelte';
   import Sidebar from './Sidebar.svelte';
@@ -24,6 +17,7 @@
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
+  import Modal from './Modal.svelte';
 
   export let data: PageData;
   $: results = data.results;
@@ -55,7 +49,7 @@
       //     |   x <--
       //     +---+
       modal = {
-        top: window.scrollY + rect.top + rect.height / 2,
+        top: window.scrollY + rect.top + rect.height/2,
         left: window.scrollX + rect.right,
         site,
       };
@@ -77,68 +71,10 @@
     if (browser && results.type == 'websites') updateQueryId({ query, webpages: results.webpages });
   }
 
-  const rankingChoices = [
-    {
-      ranking: 'liked',
-      kind: 'success',
-      Icon: HandThumbUp,
-    },
-    {
-      ranking: 'disliked',
-      kind: 'warning',
-      Icon: HandThumbDown,
-    },
-    {
-      ranking: 'blocked',
-      kind: 'error',
-      Icon: NoSymbol,
-    },
-  ] as const;
-
-  const rankSite = (site: DisplayedWebpage, ranking: Ranking) => () => {
-    hostRankingsStore?.update(($rankings) => ({
-      ...$rankings,
-      [site.site]: $rankings[site.site] == ranking ? void 0 : ranking,
-    }));
-  };
-
-  const summarizeSite = (site: DisplayedWebpage) => () => summarize(query, site);
 </script>
 
 {#if modal}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div
-    class={twJoin(
-      'absolute -translate-y-1/2 transition-all',
-      'h-fit w-52 flex-col items-center overflow-hidden rounded-lg border bg-base-100 px-2 py-5 text-sm drop-shadow-md',
-    )}
-    style="top: {modal.top}px; left: calc({modal.left}px + 1rem)"
-    transition:scale={{ duration: 150 }}
-    on:click|stopPropagation={() => {}}
-  >
-    <div>
-      <h2 class="w-fit text-center">
-        Do you like results from {modal.site.site}?
-      </h2>
-      <div class="flex justify-center space-x-1.5 pt-2">
-        {#each rankingChoices as { ranking, kind, Icon }}
-          <Button
-            {kind}
-            pale={$hostRankingsStore[modal.site.site] != ranking}
-            padding={false}
-            form="searchbar-form"
-            on:click={rankSite(modal.site, ranking)}
-          >
-            <Icon class="w-4" />
-          </Button>
-        {/each}
-      </div>
-      <div class="mt-4 flex justify-center">
-        <Button pale on:click={summarizeSite(modal.site)}>Summarize Result</Button>
-      </div>
-    </div>
-  </div>
+  <Modal {query} {modal} />
 {/if}
 
 {#if results.type == 'websites'}

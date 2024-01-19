@@ -86,7 +86,7 @@ if (browser)
     document.documentElement.className = `${c} ${theme}`.trim();
   });
 
-type SummaryState = { inProgress: boolean; data: string } | undefined;
+type SummaryState = { inProgress: boolean; tokens: string[]} | undefined;
 export const summariesStore = writable<Record<string, SummaryState>>({});
 
 // Actions
@@ -99,7 +99,7 @@ export const summarize = (query: string, site: DisplayedWebpage) => {
     }));
   };
 
-  updateSummary(() => ({ inProgress: true, data: '' }));
+  updateSummary(() => ({ inProgress: true, tokens: [] }));
 
   const { listen, cancel } = api.summarize({ query, url: site.url });
 
@@ -108,14 +108,14 @@ export const summarize = (query: string, site: DisplayedWebpage) => {
       .with({ type: 'message' }, ({ data }) =>
         updateSummary((summary) => ({
           inProgress: true,
-          data: (summary?.data ?? '') + data,
+          tokens: [...(summary?.tokens ?? []), data]
         })),
       )
       .with({ type: 'error' }, () => {
         cancel();
         updateSummary((summary) => ({
           inProgress: false,
-          data: summary?.data ?? '',
+          tokens: [...(summary?.tokens ?? [])]
         }));
       })
       .exhaustive();

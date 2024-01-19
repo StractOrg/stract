@@ -167,7 +167,11 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             autosuggest,
             counters,
             remote_webgraph,
-            summarizer: Arc::new(Summarizer::open(&config.summarizer_path)?),
+            summarizer: Arc::new(Summarizer::new(
+                &config.summarizer_path,
+                config.openai_api_uri.clone(),
+                config.openai_api_model.clone(),
+            )?),
             improvement_queue: query_store_queue,
             cluster,
         })

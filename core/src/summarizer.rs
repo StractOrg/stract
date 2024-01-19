@@ -14,39 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use futures::stream::Stream;
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     ops::Range,
     path::Path,
-    sync::Arc,
 };
+use tokio_stream::StreamExt;
 
+use crate::{llm_utils::OpenAiApi, Result};
 use itertools::{intersperse, Itertools};
-use tch::{IValue, Kind, Tensor};
+use tch::Tensor;
 use tokenizers::{PaddingParams, TruncationParams};
 
-use crate::{
-    ceil_char_boundary,
-    llm_utils::{self, ClonableTensor},
-};
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Torch")]
-    Tch(#[from] tch::TchError),
-
-    #[error("Tokenizer")]
-    Tokenizer(#[from] tokenizers::Error),
-
-    #[error("IO")]
-    Io(#[from] std::io::Error),
-
-    #[error("Unexpected output type")]
-    UnexpectedOutputType,
-}
-
-type Result<T> = std::result::Result<T, Error>;
+use crate::ceil_char_boundary;
 
 #[derive(Clone)]
 struct CandidatePassage<'a> {
@@ -186,8 +168,8 @@ impl ExtractiveSummarizer {
         Ok(Self {
             passage_scorer: DualEncoder::open(path)?,
             top_n_passages,
-            window_size: 100,
-            overlap: 10,
+            window_size: 64,
+            overlap: 0,
         })
     }
 
@@ -274,34 +256,29 @@ pub struct Summarizer {
 }
 
 impl Summarizer {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        openai_api_uri: String,
+        model_name: String,
+    ) -> Result<Self> {
         Ok(Self {
             extractive: ExtractiveSummarizer::open(
                 path.as_ref().join("dual_encoder").as_path(),
-                50,
+                16,
             )?,
-            abstractive: AbstractiveSummarizer {
-                model: Arc::new(AbstractiveModel::open(
-                    path.as_ref().join("abstractive").as_path(),
-                )?),
-            },
+            abstractive: AbstractiveSummarizer::new(openai_api_uri, model_name),
         })
     }
 
-    pub fn summarize(&self, query: &str, text: &str) -> String {
-        let summary = self.extractive.summarize(query, text);
-        match self.abstractive.summarize(summary.as_str()) {
-            Ok(stream) => stream.collect(),
-            Err(err) => {
-                tracing::error!("Abstractive summarization failed: {}", err);
-                summary
-            }
-        }
-    }
+    pub async fn summarize(&self, query: &str, text: &str) -> Result<impl Stream<Item = String>> {
+        let words = text.split_whitespace().count();
 
-    pub fn summarize_iter(&self, query: &str, text: &str) -> Result<impl Iterator<Item = String>> {
-        let summary = self.extractive.summarize(query, text);
-        self.abstractive.summarize(&summary)
+        if words < 2000 {
+            self.abstractive.summarize(text).await
+        } else {
+            let summary = self.extractive.summarize(query, text);
+            self.abstractive.summarize(&summary).await
+        }
     }
 }
 
@@ -322,9 +299,9 @@ impl DualEncoder {
         };
 
         let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
+            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json")).unwrap();
 
-        tokenizer.with_truncation(Some(truncation))?;
+        tokenizer.with_truncation(Some(truncation)).unwrap();
         tokenizer.with_padding(Some(padding));
 
         let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
@@ -380,376 +357,90 @@ impl PassageScorer for DualEncoder {
     }
 }
 
-const TRUNCATE_INPUT_ABSTRACTIVE: usize = 1024;
-pub struct AbstractiveModel {
-    encoder: tch::CModule,
-    decoder: tch::CModule,
-    decoder_with_past: tch::CModule,
-    tokenizer: tokenizers::Tokenizer,
-
-    bos_token_id: usize,
-    eos_token_id: usize,
-    begin_decoder_token: usize,
-}
-
-impl AbstractiveModel {
-    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
-        let truncation = TruncationParams {
-            max_length: TRUNCATE_INPUT_ABSTRACTIVE,
-            ..Default::default()
-        };
-
-        let padding = PaddingParams {
-            ..Default::default()
-        };
-
-        let mut tokenizer =
-            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))?;
-
-        tokenizer.with_truncation(Some(truncation))?;
-        tokenizer.with_padding(Some(padding));
-
-        let encoder = tch::CModule::load(folder.as_ref().join("traced_encoder.pt"))?;
-        let decoder = tch::CModule::load(folder.as_ref().join("traced_decoder.pt"))?;
-        let decoder_with_past = tch::CModule::load(folder.as_ref().join("traced_decoder_wp.pt"))?;
-
-        Ok(Self {
-            tokenizer,
-            encoder,
-            decoder,
-            decoder_with_past,
-
-            bos_token_id: 0,
-            eos_token_id: 2,
-            begin_decoder_token: 2,
-        })
-    }
-
-    fn parse_decoder_output(
-        &self,
-        output: IValue,
-    ) -> std::result::Result<(Tensor, Vec<Vec<ClonableTensor>>), Error> {
-        let mut output = if let IValue::Tuple(tup) = output {
-            Ok(tup)
-        } else {
-            Err(Error::UnexpectedOutputType)
-        }?;
-
-        if output.len() != 2 {
-            return Err(Error::UnexpectedOutputType);
-        }
-
-        let logits = if let IValue::Tensor(t) = output.remove(0) {
-            Ok(t)
-        } else {
-            Err(Error::UnexpectedOutputType)
-        }?;
-
-        let caches = if let IValue::Tuple(caches) = output.remove(0) {
-            Ok(caches)
-        } else {
-            Err(Error::UnexpectedOutputType)
-        }?;
-
-        let past_key_values = if caches.len() == 12 {
-            let mut new_caches = Vec::with_capacity(caches.len());
-
-            for cache in caches {
-                if let IValue::Tuple(cache) = cache {
-                    let mut c = Vec::with_capacity(2);
-                    for cache in cache.into_iter().take(2) {
-                        if let IValue::Tensor(cache) = cache {
-                            c.push(ClonableTensor(cache));
-                        } else {
-                            return Err(Error::UnexpectedOutputType);
-                        }
-                    }
-
-                    new_caches.push(c);
-                } else {
-                    return Err(Error::UnexpectedOutputType);
-                }
-            }
-
-            Ok(new_caches)
-        } else {
-            Err(Error::UnexpectedOutputType)
-        }?;
-
-        Ok((logits, past_key_values))
-    }
-}
+const TRUNCATE_WORDS_ABSTRACTIVE: usize = 1024;
 
 pub struct AbstractiveSummarizer {
-    model: Arc<AbstractiveModel>,
+    api: String,
+    model: String,
 }
 
 impl AbstractiveSummarizer {
-    pub fn new(model: AbstractiveModel) -> Self {
-        Self {
-            model: Arc::new(model),
+    pub fn new(api: String, model: String) -> Self {
+        Self { api, model }
+    }
+
+    fn client(&self, max_tokens: Option<u64>) -> OpenAiApi {
+        let mut builder = OpenAiApi::builder(self.api.clone(), self.model.clone())
+            .top_p(0.9)
+            .temp(0.0)
+            .stop(vec!["</s>", "<|endoftext|>"]);
+
+        if let Some(max_tokens) = max_tokens {
+            builder = builder.max_tokens(max_tokens);
         }
+
+        builder.build()
     }
 
-    pub fn summarize(&self, text: &str) -> Result<impl Iterator<Item = String>> {
-        self.summarize_with_max(text, Some(128))
+    fn first_prompt(&self, text: &str) -> String {
+        let wc = 100;
+        format!(
+            r##"[INST] I will provide you with piece of content (e.g. articles, papers, documentation, etc.)
+
+You will generate summaries of the content. Refer to the content using words as "this article discusses" etc.
+The summaries should be -{wc} words.
+
+After you have generated the summary, identify 1-3 informative entities from the content which are missing from the summary that can be used to make a more concise summary.
+
+A Missing Entity is:
+
+Relevant: to the main story.
+Specific: descriptive yet concise (5 words or fewer).
+Novel: not in the previous summary.
+Faithful: present in the content piece.
+Anywhere: located anywhere in the Article.
+
+Finaly, give guidance on how to improve the summary.
+
+Content to summarize:
+{text}
+[/INST]"##,
+        )
     }
 
-    pub fn summarize_with_max(
-        &self,
-        text: &str,
-        max_summary_tokens: Option<usize>,
-    ) -> Result<impl Iterator<Item = String>> {
-        let ids = self
-            .model
-            .tokenizer
-            .encode(text, false)
-            .unwrap()
-            .get_ids()
-            .iter()
-            .map(|id| *id as i64)
-            .collect_vec();
+    fn final_prompt(&self, text: &str, prev_summary: &str) -> String {
+        let wc = 100;
+        format!(
+            r##"[INST] I will provide you with piece of content (e.g. articles, papers, documentation, etc.) and a summary of the content.
 
-        let ids = Tensor::from_slice(&ids).reshape([1, -1]);
+You will improve upon the previous summary to generate a highly consice summary of the content. The summary should be -{wc} words.
 
-        let decoder_tokens = Tensor::from_slice(&[
-            self.model.begin_decoder_token as i64,
-            self.model.bos_token_id as i64,
-        ])
-        .reshape([1, -1]);
+Content to summarize:
+{text}
 
-        self.generate(&ids, &decoder_tokens, max_summary_tokens)
+Previous summary:
+{prev_summary}
+[/INST] Summary:"##,
+        )
     }
 
-    fn generate(
-        &self,
-        encoder_ids: &Tensor,
-        decoder_start_tokens: &Tensor,
-        max_new_tokens: Option<usize>,
-    ) -> Result<impl Iterator<Item = String>> {
-        let tau = 0.8;
-        let temp = 1.0;
+    pub async fn summarize(&self, text: &str) -> Result<impl Stream<Item = String>> {
+        let text = text
+            .split_ascii_whitespace()
+            .take(TRUNCATE_WORDS_ABSTRACTIVE)
+            .join(" ");
 
-        let encoded = self.model.initial(encoder_ids, decoder_start_tokens)?;
+        let prompt = self.first_prompt(&text);
+        let first_summary = self.client(Some(2048)).generate(&prompt).await?;
 
-        let token_it = TokenStreamingGenerator {
-            model: Arc::clone(&self.model),
-            tau,
-            temp,
-            banned_tokens: vec![self.model.bos_token_id as i64],
-            end_tokens: vec![self.model.eos_token_id as i64],
-            next_token_logits: Some(encoded.next_token_logits),
-            memory: encoded.memory,
-            num_tokens_generated: 0,
-            max_new_tokens,
-        };
+        let prompt = self.final_prompt(&text, &first_summary);
 
-        let it = StringStreamingGenerator {
-            token_streamer: token_it,
-            tokens: Vec::new(),
-        };
-
-        Ok(it)
+        Ok(self
+            .client(Some(128))
+            .stream(&prompt)
+            .await?
+            .filter_map(|tok| tok.ok()))
     }
-}
-
-#[derive(Clone)]
-pub struct BartMemory {
-    encoder_hidden_states: ClonableTensor,
-    past_key_values: Vec<Vec<ClonableTensor>>,
-}
-
-impl AbstractiveModel {
-    fn initial(
-        &self,
-        encoder_ids: &Tensor,
-        decoder_ids: &Tensor,
-    ) -> std::result::Result<DecoderOutput, Error> {
-        let encoder_hidden_states = self.encoder.forward_ts(&[encoder_ids])?;
-
-        let decoder_output = self.decoder.forward_is(&[
-            IValue::Tensor(decoder_ids.shallow_clone()),
-            IValue::Tensor(encoder_hidden_states.shallow_clone()),
-        ])?;
-
-        let (logits, past_key_values) = self.parse_decoder_output(decoder_output)?;
-
-        // logits is [batch_size, seq_len, vocab_size]
-        // get last token logits
-        let next_token_logits = logits.select(1, logits.size()[1] - 1);
-
-        Ok(DecoderOutput {
-            next_token_logits,
-            memory: BartMemory {
-                encoder_hidden_states: ClonableTensor(encoder_hidden_states),
-                past_key_values,
-            },
-        })
-    }
-
-    fn step(
-        &self,
-        last_token: i64,
-        memory: &BartMemory,
-    ) -> std::result::Result<DecoderOutput, Error> {
-        let ids = Tensor::from_slice(&[last_token]).reshape([1, 1]);
-
-        let past_key_value: IValue = IValue::Tuple(
-            memory
-                .past_key_values
-                .iter()
-                .map(|c| {
-                    IValue::Tuple(
-                        c.iter()
-                            .map(|c| IValue::Tensor(c.0.shallow_clone()))
-                            .collect_vec(),
-                    )
-                })
-                .collect_vec(),
-        );
-
-        let decoder_output = self.decoder_with_past.forward_is(&[
-            IValue::Tensor(ids),
-            IValue::Tensor(memory.encoder_hidden_states.clone().0),
-            past_key_value,
-        ])?;
-
-        let (logits, past_key_values) = self.parse_decoder_output(decoder_output)?;
-
-        // logits is [batch_size, seq_len, vocab_size]
-        // get last token logits
-        let next_token_logits = logits.select(1, logits.size()[1] - 1).squeeze();
-
-        Ok(DecoderOutput {
-            next_token_logits,
-            memory: BartMemory {
-                encoder_hidden_states: memory.encoder_hidden_states.clone(),
-                past_key_values,
-            },
-        })
-    }
-}
-
-pub struct TokenStreamingGenerator {
-    model: Arc<AbstractiveModel>,
-    tau: f64,
-    temp: f64,
-    banned_tokens: Vec<i64>,
-    end_tokens: Vec<i64>,
-    next_token_logits: Option<Tensor>,
-    memory: BartMemory,
-    num_tokens_generated: usize,
-    max_new_tokens: Option<usize>,
-}
-
-impl Iterator for TokenStreamingGenerator {
-    type Item = i64;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match &self.next_token_logits {
-            Some(next_token_logits) => {
-                if let Some(max_new_tokens) = self.max_new_tokens {
-                    if self.num_tokens_generated >= max_new_tokens {
-                        self.next_token_logits = None;
-                        return None;
-                    }
-                }
-
-                let mut probs = next_token_logits.softmax(-1, Kind::Float).squeeze();
-
-                // remove banned tokens
-                for token in &self.banned_tokens {
-                    let _ = probs.index_fill_(0, &Tensor::from_slice(&[*token]), 0.0);
-                }
-
-                let next_token = llm_utils::sample_typical(probs, self.temp, self.tau);
-
-                if self.end_tokens.contains(&next_token) {
-                    self.next_token_logits = None;
-                    return None;
-                }
-
-                let encoded = self.model.step(next_token, &self.memory).ok()?;
-
-                self.next_token_logits = Some(encoded.next_token_logits);
-                self.memory = encoded.memory;
-
-                self.num_tokens_generated += 1;
-
-                Some(next_token)
-            }
-            None => None,
-        }
-    }
-}
-
-pub struct StringStreamingGenerator {
-    token_streamer: TokenStreamingGenerator,
-    tokens: Vec<u32>,
-}
-
-impl Iterator for StringStreamingGenerator {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.token_streamer.next() {
-                Some(token) => {
-                    self.tokens.push(token as u32);
-
-                    if let Some(s) = self
-                        .token_streamer
-                        .model
-                        .tokenizer
-                        .decode(&self.tokens, true)
-                        .ok()
-                        .and_then(|s| {
-                            if !s.contains('\u{fffd}') {
-                                // valid utf-8 string
-                                Some(s)
-                            } else {
-                                None
-                            }
-                        })
-                    {
-                        self.tokens.clear();
-                        return Some(s);
-                    }
-                }
-                None => {
-                    if self.tokens.is_empty() {
-                        return None;
-                    } else {
-                        match self
-                            .token_streamer
-                            .model
-                            .tokenizer
-                            .decode(&self.tokens, true)
-                        {
-                            Ok(s) => {
-                                self.tokens.clear();
-
-                                if !s.contains('\u{fffd}') {
-                                    return Some(s);
-                                } else {
-                                    return None;
-                                }
-                            }
-                            Err(_) => {
-                                self.tokens.clear();
-                                return None;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct DecoderOutput {
-    next_token_logits: Tensor,
-    memory: BartMemory,
 }
 
 #[cfg(test)]
@@ -795,31 +486,5 @@ mod tests {
         for (p, range) in it {
             assert_eq!(p, &text[range]);
         }
-    }
-
-    #[test]
-    fn abstractive_summary() {
-        let summarizer = AbstractiveSummarizer {
-            model: Arc::new(
-                AbstractiveModel::open("../data/summarizer/abstractive")
-                    .expect("abstractive summary model not found"),
-            ),
-        };
-
-        let text = r#"Aristotle (/ˈærɪstɒtəl/;[1] Greek: Ἀριστοτέλης Aristotélēs, pronounced [aristotélɛːs]; 384–322 BC) was an Ancient Greek philosopher and polymath. His writings cover a broad range of subjects including physics, biology, zoology, metaphysics, logic, ethics, aesthetics, poetry, drama, music, rhetoric, psychology, linguistics, economics, politics, meteorology, geology, and government. As the founder of the Peripatetic school of philosophy in the Lyceum in Athens, he began the wider Aristotelian tradition that followed, which set the groundwork for the development of modern science.
-        Little is known about Aristotle's life. He was born in the city of Stagira in Northern Greece during the Classical period. His father, Nicomachus, died when Aristotle was a child, and he was brought up by a guardian. At seventeen or eighteen years of age he joined Plato's Academy in Athens and remained there until the age of thirty-seven (c. 347 BC). Shortly after Plato died, Aristotle left Athens and, at the request of Philip II of Macedon, tutored his son Alexander the Great beginning in 343 BC. He established a library in the Lyceum which helped him to produce many of his hundreds of books on papyrus scrolls.
-        Though Aristotle wrote many elegant treatises and dialogues for publication, only around a third of his original output has survived, none of it intended for publication. Aristotle provided a complex synthesis of the various philosophies existing prior to him. It was above all from his teachings that the West inherited its intellectual lexicon, as well as problems and methods of inquiry. As a result, his philosophy has exerted a unique influence on almost every form of knowledge in the West and it continues to be a subject of contemporary philosophical discussion.
-        Aristotle's views profoundly shaped medieval scholarship. The influence of physical science extended from Late Antiquity and the Early Middle Ages into the Renaissance, and were not replaced systematically until the Enlightenment and theories such as classical mechanics were developed. Some of Aristotle's zoological observations found in his biology, such as on the hectocotyl (reproductive) arm of the octopus, were disbelieved until the 19th century. He also influenced Judeo-Islamic philosophies during the Middle Ages, as well as Christian theology, especially the Neoplatonism of the Early Church and the scholastic tradition of the Catholic Church. Aristotle was revered among medieval Muslim scholars as "The First Teacher", and among medieval Christians like Thomas Aquinas as simply "The Philosopher", while the poet Dante called him "the master of those who know". His works contain the earliest known formal study of logic, and were studied by medieval scholars such as Peter Abelard and John Buridan. Aristotle's influence on logic continued well into the 19th century. In addition, his ethics, though always influential, gained renewed interest with the modern advent of virtue ethics."#;
-
-        let start = std::time::Instant::now();
-        let summary = summarizer
-            .summarize_with_max(text, Some(16))
-            .unwrap()
-            .collect::<String>();
-
-        println!("Elapsed: {:?}", start.elapsed());
-        println!("{:?}", &summary);
-
-        assert!(summary.len() > 50);
     }
 }

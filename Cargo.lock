@@ -4346,6 +4346,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "libc",
+ "log",
  "logos",
  "lz-str",
  "lz4_flex",

@@ -45,6 +45,7 @@ fn download_files() {
                 "english-wordnet-2022-subset.ttl",
                 "lambdamart.txt",
                 "test.zim",
+                "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
             ] {
                 let path = Path::new(DATA_PATH).join(name);
 
