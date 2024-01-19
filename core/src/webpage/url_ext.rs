@@ -33,6 +33,7 @@ pub trait UrlExt {
     fn root_domain(&self) -> Option<&str>;
     fn normalized_host(&self) -> Option<&str>;
     fn subdomain(&self) -> Option<&str>;
+    fn is_homepage(&self) -> bool;
     fn tld(&self) -> Option<&str>;
 }
 
@@ -65,6 +66,10 @@ impl UrlExt for url::Url {
         }
 
         Some(subdomain)
+    }
+
+    fn is_homepage(&self) -> bool {
+        self.path() == "/" && self.query().is_none()
     }
 
     fn tld(&self) -> Option<&str> {

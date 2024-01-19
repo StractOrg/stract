@@ -435,17 +435,24 @@ impl InvertedIndex {
             .filter_map(|res| res.ok())
             .collect();
 
-        for page in &mut webpages {
-            if !page.body.is_empty() {
-                page.snippet =
-                    snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
-            } else {
+        for (url, page) in webpages.iter_mut().filter_map(|page| {
+            let url = Url::parse(&page.url).ok()?;
+            Some((url, page))
+        }) {
+            let min_body_len = if url.is_homepage() { 1024 } else { 256 };
+
+            if page.body.len() < min_body_len
+                && !page.description.as_deref().unwrap_or_default().is_empty()
+            {
                 page.snippet = snippet::generate(
                     query,
                     page.description.as_deref().unwrap_or_default(),
                     &page.region,
                     self.snippet_config.clone(),
                 );
+            } else {
+                page.snippet =
+                    snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
             }
         }
 
