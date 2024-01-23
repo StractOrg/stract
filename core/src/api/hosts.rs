@@ -25,7 +25,6 @@ pub struct HostsExportOpticParams {
     host_rankings: HostRankings,
 }
 
-#[allow(clippy::unused_async)]
 #[utoipa::path(post,
     path = "/beta/api/hosts/export",
     request_body(content = HostsExportOpticParams),

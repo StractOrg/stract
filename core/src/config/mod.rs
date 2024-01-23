@@ -175,9 +175,6 @@ pub struct ApiThresholds {
 
     #[serde(default = "defaults::Api::entity_sidebar")]
     pub entity_sidebar: f64,
-
-    #[serde(default = "defaults::Api::discussions_widget")]
-    pub discussions_widget: f64,
 }
 
 impl Default for ApiThresholds {
@@ -185,7 +182,6 @@ impl Default for ApiThresholds {
         Self {
             stackoverflow: defaults::Api::stackoverflow(),
             entity_sidebar: defaults::Api::entity_sidebar(),
-            discussions_widget: defaults::Api::discussions_widget(),
         }
     }
 }

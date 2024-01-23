@@ -22,7 +22,9 @@ use utoipa_swagger_ui::SwaggerUi;
 #[derive(OpenApi)]
 #[openapi(
         paths(
-            search::api,
+            search::search,
+            search::widget,
+            search::sidebar,
             webgraph::host::similar,
             webgraph::host::knows,
             webgraph::host::ingoing_hosts,
@@ -40,6 +42,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 optics::HostRankings,
                 search::ApiSearchQuery,
                 search::ApiSearchResult,
+                search::WidgetQuery,
+                search::SidebarQuery,
                 crate::searcher::WebsitesResult,
                 crate::search_prettifier::HighlightedSpellCorrection,
                 crate::search_prettifier::DisplayedWebpage,

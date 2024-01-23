@@ -27,7 +27,7 @@ use crate::{
         member::{Member, Service},
         sonic,
     },
-    entity_index::EntityIndex,
+    entity_index::{EntityIndex, EntityMatch},
     image_store::Image,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
@@ -44,6 +44,7 @@ sonic_service!(
     [
         RetrieveWebsites,
         Search,
+        SearchEntity,
         GetWebpage,
         GetHomepageDescriptions,
         GetEntityImage,
@@ -190,6 +191,18 @@ impl sonic::service::Message<SearchService> for GetEntityImage {
 
                 img.resize_max(max_width, max_height)
             }))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchEntity {
+    pub query: String,
+}
+
+impl sonic::service::Message<SearchService> for SearchEntity {
+    type Response = Option<EntityMatch>;
+    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
+        Ok(server.local_searcher.search_entity(&self.query))
     }
 }
 

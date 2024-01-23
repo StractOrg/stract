@@ -32,9 +32,9 @@ use crate::inverted_index::RetrievedWebpage;
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::pipeline::{AsRankingWebsite, RankingWebsite, RetrievedWebpageRanking};
 use crate::ranking::ALL_SIGNALS;
-use crate::search_prettifier::{DisplayedWebpage, HighlightedSpellCorrection};
+use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
-use crate::widgets::Widgets;
+use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
     collector::BucketCollector,
@@ -79,10 +79,13 @@ pub fn combine_results(
 ) -> (Vec<ScoredWebsitePointer>, bool) {
     let mut collector = BucketCollector::new(pipeline.collector_top_n(), collector_config);
 
-    let mut num_sites: usize = 0;
+    let mut has_more = false;
     for result in initial_results {
+        if result.local_result.has_more {
+            has_more = true;
+        }
+
         for website in result.local_result.websites {
-            num_sites += 1;
             let pointer = distributed::ScoredWebsitePointer {
                 website,
                 shard: result.shard,
@@ -95,8 +98,11 @@ pub fn combine_results(
     }
 
     for result in live_results {
+        if result.local_result.has_more {
+            has_more = true;
+        }
+
         for website in result.local_result.websites {
-            num_sites += 1;
             let pointer = live::ScoredWebsitePointer {
                 website,
                 split_id: result.split_id.clone(),
@@ -114,10 +120,7 @@ pub fn combine_results(
         .take(pipeline.collector_top_n())
         .collect::<Vec<_>>();
 
-    let offset = pipeline.offset();
-
     let res = pipeline.apply(top_websites);
-    let has_more = num_sites.saturating_sub(offset) > res.len();
 
     (res, has_more)
 }
@@ -130,6 +133,8 @@ pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[Scored
                 signals.insert(signal, *signal_value);
             }
         }
+
+        website.score = Some(pointer.as_ranking().score);
 
         website.ranking_signals = Some(signals);
     }
@@ -144,7 +149,7 @@ pub struct ApiSearcher<S, L> {
     lambda_model: Option<Arc<LambdaMART>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
-    widget_manager: WidgetManager<S>,
+    widget_manager: WidgetManager,
     spell_checker: Option<SpellChecker>,
 }
 
@@ -156,7 +161,7 @@ pub struct ApiSearcher<S, L> {
     lambda_model: Option<Arc<LambdaMART>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
-    widget_manager: WidgetManager<S>,
+    widget_manager: WidgetManager,
     spell_checker: Option<SpellChecker>,
 }
 
@@ -180,16 +185,8 @@ where
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
 
         let lambda_model = lambda_model.map(Arc::new);
-        let qa_model = qa_model.map(Arc::new);
 
-        let widget_manager = WidgetManager::new(
-            Widgets::new(config.widgets).unwrap(),
-            Arc::clone(&dist_searcher),
-            config.thresholds.clone(),
-            config.collector.clone(),
-            lambda_model.clone(),
-            qa_model,
-        );
+        let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
 
         Self {
             distributed_searcher: dist_searcher,
@@ -219,13 +216,7 @@ where
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
         let lambda_model = lambda_model.map(Arc::new);
 
-        let widget_manager = WidgetManager::new(
-            Widgets::new(config.widgets).unwrap(),
-            Arc::clone(&dist_searcher),
-            config.thresholds.clone(),
-            config.collector.clone(),
-            lambda_model.clone(),
-        );
+        let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
 
         Self {
             distributed_searcher: dist_searcher,
@@ -277,6 +268,14 @@ where
         }
 
         Ok(self.bangs.get(&parsed_terms))
+    }
+
+    pub async fn widget(&self, query: &str) -> Option<Widget> {
+        self.widget_manager.widget(query).await
+    }
+
+    pub async fn sidebar(&self, query: &str) -> Option<DisplayedSidebar> {
+        self.sidebar_manager.sidebar(query).await
     }
 
     async fn retrieve_webpages(
@@ -352,6 +351,7 @@ where
         }
 
         let mut search_query = query.clone();
+        let top_n = search_query.num_results;
 
         // This pipeline should be created before the first search is performed
         // so the query knows how many results to fetch from the indices
@@ -359,33 +359,19 @@ where
             &mut search_query,
             self.lambda_model.clone(),
             self.collector_config.clone(),
-            20,
+            top_n,
         );
-        let (initial_results, live_results, widget, discussions, stackoverflow) = tokio::join!(
+
+        let (initial_results, live_results) = tokio::join!(
             self.distributed_searcher.search_initial(&search_query),
             self.search_initial_from_live(&search_query),
-            self.widget_manager.widget(query),
-            self.widget_manager.discussions(query),
-            self.sidebar_manager.stackoverflow(query),
         );
 
-        let discussions = discussions?;
-        let stackoverflow = stackoverflow?;
-        let sidebar = if query.fetch_sidebar {
-            self.sidebar_manager
-                .sidebar(&initial_results, stackoverflow)
-        } else {
-            None
-        };
-
-        let spell_corrected_query = if widget.is_none() {
-            self.spell_checker
-                .as_ref()
-                .and_then(|s| s.correct(&query.query, &whatlang::Lang::Eng))
-                .map(HighlightedSpellCorrection::from)
-        } else {
-            None
-        };
+        let spell_corrected_query = self
+            .spell_checker
+            .as_ref()
+            .and_then(|s| s.correct(&query.query, &whatlang::Lang::Eng))
+            .map(HighlightedSpellCorrection::from);
 
         let num_docs = initial_results
             .iter()
@@ -444,20 +430,12 @@ where
             add_ranking_signals(&mut retrieved_webpages, &top_websites);
         }
 
-        let direct_answer = self
-            .widget_manager
-            .answer(&query.query, &mut retrieved_webpages);
-
         let search_duration_ms = start.elapsed().as_millis();
 
         Ok(WebsitesResult {
             spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,
-            direct_answer,
-            sidebar,
-            widget,
-            discussions,
             search_duration_ms,
             has_more_results,
         })

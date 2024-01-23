@@ -34,6 +34,7 @@ export const load: PageLoad = async (req) => {
       return newParams;
     })
     .otherwise(() => {});
+
   const nextPageSearchParams = match(results.type == 'websites' && results.hasMoreResults)
     .with(true, () => {
       const newParams = new URLSearchParams(url.searchParams);

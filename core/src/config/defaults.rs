@@ -48,10 +48,6 @@ impl Api {
     pub fn entity_sidebar() -> f64 {
         10.0
     }
-
-    pub fn discussions_widget() -> f64 {
-        0.1
-    }
 }
 
 pub struct Snippet;
@@ -126,14 +122,6 @@ impl SearchQuery {
     }
 
     pub fn safe_search() -> bool {
-        false
-    }
-
-    pub fn fetch_discussions() -> bool {
-        false
-    }
-
-    pub fn fetch_sidebar() -> bool {
         false
     }
 

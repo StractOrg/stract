@@ -19,7 +19,7 @@
   let innerWidth = 0;
 
   let left = modal.left;
-  let top = modal.top + 32;
+  $: top = modal.top + 32;
 
   $: {
     if (innerWidth < mediumWidthCutoff) {

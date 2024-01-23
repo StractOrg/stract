@@ -1053,48 +1053,6 @@ mod tests {
     }
 
     #[test]
-    fn discussion_optic() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        index
-            .insert(Webpage {
-                html: Html::parse(
-                    include_str!("../../testcases/schema_org/infinity_war.html"),
-                    "https://a.com",
-                )
-                .unwrap(),
-                fetch_time_ms: 500,
-                ..Default::default()
-            })
-            .expect("failed to insert webpage");
-        index.commit().expect("failed to commit index");
-
-        let searcher = LocalSearcher::from(index);
-        let res = searcher
-            .search(&SearchQuery {
-                query: "avengers endgame".to_string(),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-
-        assert!(!res.is_empty());
-        assert_eq!(&res[0].url, "https://a.com/");
-
-        let res = searcher
-            .search(&SearchQuery {
-                query: "avengers endgame".to_string(),
-                optic: Some(
-                    Optic::parse(include_str!("../searcher/api/discussions.optic")).unwrap(),
-                ),
-                ..Default::default()
-            })
-            .unwrap()
-            .webpages;
-        assert!(res.is_empty());
-    }
-
-    #[test]
     fn special_pattern_syntax() {
         let mut index = Index::temporary().expect("Unable to open index");
 

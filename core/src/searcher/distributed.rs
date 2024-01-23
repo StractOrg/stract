@@ -23,6 +23,7 @@ use crate::{
             ReplicatedClient, Shard, ShardIdentifier, ShardedClient, SpecificShardSelector,
         },
     },
+    entity_index::EntityMatch,
     entrypoint::search_server::{self, SearchService},
     image_store::Image,
     inverted_index::{RetrievedWebpage, WebsitePointer},
@@ -270,6 +271,25 @@ impl SearchClient for DistributedSearcher {
 
         Ok(res.pop().flatten())
     }
+
+    async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
+        let client = self.client().await;
+
+        let (_, mut res) = client
+            .send(
+                &search_server::SearchEntity {
+                    query: query.to_string(),
+                },
+                &RandomShardSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+            .ok()?
+            .pop()
+            .unwrap();
+
+        res.pop().flatten()
+    }
 }
 
 pub trait SearchClient {
@@ -277,19 +297,25 @@ pub trait SearchClient {
         &self,
         query: &SearchQuery,
     ) -> impl Future<Output = Vec<InitialSearchResultShard>> + Send;
+
     fn retrieve_webpages(
         &self,
         top_websites: &[(usize, ScoredWebsitePointer)],
         query: &str,
     ) -> impl Future<Output = Vec<(usize, RetrievedWebpageRanking)>> + Send;
+
+    fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
+
     fn get_webpage(
         &self,
         url: &str,
     ) -> impl Future<Output = Result<Option<RetrievedWebpage>>> + Send;
+
     fn get_homepage_descriptions(
         &self,
         urls: &[Url],
     ) -> impl Future<Output = HashMap<Url, String>> + Send;
+
     fn get_entity_image(
         &self,
         image_id: &str,

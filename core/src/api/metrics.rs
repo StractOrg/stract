@@ -19,7 +19,6 @@ use std::sync::Arc;
 use axum::{extract, response::IntoResponse};
 use axum_macros::debug_handler;
 
-#[allow(clippy::unused_async)]
 #[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 pub async fn route(

@@ -1,4 +1,4 @@
-import type { Region } from './api';
+import type { Region, Widget, DisplayedSidebar, DisplayedWebpage, WebsitesResult, BangHit } from './api';
 import { decompressRanked, type RankedSites } from './rankings';
 
 export type SearchParams = {
@@ -10,6 +10,17 @@ export type SearchParams = {
   compressedhost_rankings: string | null;
   host_rankings: RankedSites | undefined;
 };
+
+export type SearchResults = 
+  | (WebsitesResult & {
+    type: 'websites';
+    widget?: Widget;
+    sidebar?: DisplayedSidebar;
+    discussions?: DisplayedWebpage[];
+  })
+  | (BangHit & {
+    type: 'bang';
+  });
 
 export const extractSearchParams = (searchParams: URLSearchParams | FormData): SearchParams => {
   const query = (searchParams.get('q') as string | undefined) ?? '';
@@ -32,3 +43,42 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     host_rankings,
   };
 };
+
+export const discussionsOptic: string = `DiscardNonMatching;
+
+Rule {
+    Matches {
+        Schema("QAPage"),
+    }
+};
+
+Rule {
+    Matches {
+        Schema("DiscussionForumPosting"),
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|reddit.com|"),
+        Url("comments"),
+    }
+};
+
+Rule {
+    Matches {
+        Site("|lemmy.world|")
+    }
+};
+
+Rule {
+    Matches {
+        Site("|lemmy.ml|")
+    }
+};
+
+Rule {
+    Matches {
+        Site("|sh.itjust.works|")
+    }
+};`;

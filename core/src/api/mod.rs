@@ -96,7 +96,6 @@ pub struct State {
     pub cluster: Arc<Cluster>,
 }
 
-#[allow(clippy::unused_async)]
 pub async fn favicon() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
@@ -201,7 +200,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     Ok(Router::new()
         .merge(
             Router::new()
-                .route("/beta/api/search", post(search::api))
+                .route("/beta/api/search", post(search::search))
                 .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
                 .layer(cors_layer()),
         )
@@ -217,6 +216,8 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         .nest(
             "/beta",
             Router::new()
+                .route("/api/search/widget", post(search::widget))
+                .route("/api/search/sidebar", post(search::sidebar))
                 .route("/api/autosuggest", post(autosuggest::route))
                 .route("/api/autosuggest/browser", get(autosuggest::browser))
                 .route("/api/summarize", get(summarize::summarize_route))

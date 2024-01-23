@@ -73,7 +73,6 @@ pub mod host {
         pub host: String,
     }
 
-    #[allow(clippy::unused_async)]
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/similar",
         request_body(content = SimilarHostsParams),

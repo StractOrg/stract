@@ -21,7 +21,7 @@ use optics::Optic;
 use url::Url;
 
 use crate::{
-    search_prettifier::{create_stackoverflow_sidebar, DisplayedEntity, DisplayedSidebar},
+    search_prettifier::{create_stackoverflow_sidebar, DisplayedSidebar},
     searcher::{distributed, SearchQuery},
 };
 
@@ -41,13 +41,9 @@ where
         }
     }
 
-    pub async fn stackoverflow(&self, query: &SearchQuery) -> Result<Option<DisplayedSidebar>> {
-        if !query.fetch_sidebar {
-            return Ok(None);
-        }
-
+    pub async fn stackoverflow(&self, query: &str) -> Result<Option<DisplayedSidebar>> {
         let query = SearchQuery {
-            query: query.query.clone(),
+            query: query.to_string(),
             num_results: 1,
             optic: Some(Optic::parse(include_str!("stackoverflow.optic")).unwrap()),
             ..Default::default()
@@ -93,25 +89,18 @@ where
         Ok(None)
     }
 
-    pub fn sidebar(
-        &self,
-        initial_results: &[distributed::InitialSearchResultShard],
-        stackoverflow: Option<DisplayedSidebar>,
-    ) -> Option<DisplayedSidebar> {
-        let entity = initial_results
-            .iter()
-            .filter_map(|res| res.local_result.entity_sidebar.clone())
-            .map(DisplayedEntity::from)
-            .filter(|entity| entity.match_score as f64 > self.thresholds.entity_sidebar)
-            .max_by(|a, b| {
-                a.match_score
-                    .partial_cmp(&b.match_score)
-                    .unwrap_or(Ordering::Equal)
-            });
+    pub async fn sidebar(&self, query: &str) -> Option<DisplayedSidebar> {
+        let (entity, stackoverflow) = futures::join!(
+            self.distributed_searcher.search_entity(query),
+            self.stackoverflow(query)
+        );
 
-        match entity {
-            Some(entity) => Some(DisplayedSidebar::Entity(entity)),
-            None => stackoverflow,
+        if let Some(entity) = entity {
+            if entity.score as f64 > self.thresholds.entity_sidebar {
+                return Some(DisplayedSidebar::Entity(entity.into()));
+            }
         }
+
+        stackoverflow.ok().flatten()
     }
 }

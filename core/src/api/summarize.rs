@@ -67,7 +67,6 @@ async fn summarize(
     Err::<Sse<BoxStream<_>>, anyhow::Error>(anyhow::anyhow!("Summarization is not enabled"))
 }
 
-#[allow(clippy::unused_async)]
 #[utoipa::path(
     get,
     path = "/beta/api/summarize",

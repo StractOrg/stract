@@ -63,10 +63,6 @@
     modal = void 0;
   }
 
-  // $: {
-  //   results.discussions = results.webpages;
-  // }
-
   $: {
     if (browser && results.type == 'websites') updateQueryId({ query, webpages: results.webpages });
   }
@@ -126,10 +122,6 @@
         <Widget widget={results.widget} />
       {/if}
 
-      {#if results.directAnswer}
-        <DirectAnswer directAnswer={results.directAnswer} />
-      {/if}
-
       {#if results.webpages}
         <div class="grid grid-cols-1 space-y-10 place-self-start">
           {#each results.webpages as webpage, resultIndex (`${query}-${webpage.url}`)}
@@ -138,9 +130,7 @@
             </div>
           {/each}
           {#if results.discussions}
-            <div class="row-start-5">
-              <Discussions discussions={results.discussions} />
-            </div>
+            <Discussions discussions={results.discussions} />
           {/if}
         </div>
       {/if}

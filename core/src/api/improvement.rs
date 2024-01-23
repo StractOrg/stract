@@ -37,7 +37,6 @@ pub struct StoreParams {
     pub urls: Vec<String>,
 }
 
-#[allow(clippy::unused_async)]
 pub async fn click(
     extract::Query(params): extract::Query<ClickParams>,
     extract::State(state): extract::State<Arc<State>>,
@@ -62,7 +61,6 @@ impl TryFrom<StoreParams> for StoredQuery {
     }
 }
 
-#[allow(clippy::unused_async)]
 pub async fn store(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(params): extract::Json<StoreParams>,

@@ -324,7 +324,11 @@ impl<T: AsRankingWebsite> RankingStage<T> {
             collector.insert(website);
         }
 
-        collector.into_sorted_vec(self.derank_similar)
+        collector
+            .into_sorted_vec(self.derank_similar)
+            .into_iter()
+            .take(top_n)
+            .collect()
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
@@ -442,7 +446,7 @@ impl<T: AsRankingWebsite> RankingPipeline<T> {
     }
 
     pub fn collector_top_n(&self) -> usize {
-        self.initial_top_n().max(self.top_n) + self.top_n * self.page
+        (self.initial_top_n().max(self.top_n) + self.top_n * self.page) + 1
     }
 
     pub fn initial_top_n(&self) -> usize {
@@ -510,7 +514,7 @@ mod tests {
             20,
         )
         .unwrap();
-        assert_eq!(pipeline.collector_top_n(), 20);
+        assert_eq!(pipeline.collector_top_n(), 20 + 1);
 
         let sample = sample_websites(pipeline.collector_top_n());
         let res: Vec<_> = pipeline

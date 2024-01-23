@@ -28,13 +28,9 @@ use utoipa::ToSchema;
 use crate::{
     bangs::BangHit,
     config::defaults,
-    entity_index::EntityMatch,
     ranking::pipeline::RankingWebsite,
-    search_prettifier::{
-        DisplayedAnswer, DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection,
-    },
+    search_prettifier::{DisplayedWebpage, HighlightedSpellCorrection},
     webpage::region::Region,
-    widgets::Widget,
 };
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
@@ -51,10 +47,6 @@ pub struct WebsitesResult {
     pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: Option<usize>,
-    pub sidebar: Option<DisplayedSidebar>,
-    pub widget: Option<Widget>,
-    pub direct_answer: Option<DisplayedAnswer>,
-    pub discussions: Option<Vec<DisplayedWebpage>>,
     pub search_duration_ms: u128,
     pub has_more_results: bool,
 }
@@ -69,8 +61,6 @@ pub struct SearchQuery {
     pub host_rankings: Option<HostRankings>,
     pub return_ranking_signals: bool,
     pub safe_search: bool,
-    pub fetch_discussions: bool,
-    pub fetch_sidebar: bool,
     pub count_results: bool,
 }
 
@@ -79,7 +69,6 @@ pub struct InitialWebsiteResult {
     pub num_websites: Option<usize>,
     pub websites: Vec<RankingWebsite>,
     pub has_more: bool,
-    pub entity_sidebar: Option<EntityMatch>,
 }
 
 impl Default for SearchQuery {
@@ -96,8 +85,6 @@ impl Default for SearchQuery {
             host_rankings: Default::default(),
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
-            fetch_discussions: defaults::SearchQuery::fetch_discussions(),
-            fetch_sidebar: defaults::SearchQuery::fetch_sidebar(),
             count_results: defaults::SearchQuery::count_results(),
         }
     }

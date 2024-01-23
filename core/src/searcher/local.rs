@@ -33,7 +33,7 @@ use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::search_ctx::Ctx;
-use crate::search_prettifier::{DisplayedEntity, DisplayedWebpage};
+use crate::search_prettifier::DisplayedWebpage;
 use crate::webgraph::Node;
 use crate::{inverted_index, live_index, Error, Result};
 
@@ -311,9 +311,9 @@ where
         )?;
 
         let pipe_top_n = pipeline.top_n;
-        let ranking_websites = pipeline.apply(ranking_websites);
+        let has_more = ranking_websites.len() > pipe_top_n;
 
-        let has_more = pipe_top_n == ranking_websites.len();
+        let ranking_websites = pipeline.apply(ranking_websites);
 
         Ok(InvertedIndexResult {
             webpages: ranking_websites,
@@ -322,10 +322,10 @@ where
         })
     }
 
-    fn entity_sidebar(&self, query: &SearchQuery) -> Option<EntityMatch> {
+    pub fn search_entity(&self, query: &str) -> Option<EntityMatch> {
         self.entity_index
             .as_ref()
-            .and_then(|index| index.search(&query.query))
+            .and_then(|index| index.search(query))
     }
 
     pub fn search_initial(
@@ -337,13 +337,11 @@ where
         let ctx = guard.inverted_index().local_search_ctx();
         let inverted_index_result =
             self.search_inverted_index(&ctx, &guard, query, de_rank_similar)?;
-        let sidebar = self.entity_sidebar(query);
 
         Ok(InitialWebsiteResult {
             websites: inverted_index_result.webpages,
             num_websites: inverted_index_result.num_hits,
             has_more: inverted_index_result.has_more,
-            entity_sidebar: sidebar,
         })
     }
 
@@ -370,8 +368,6 @@ where
     /// This function is mainly used for tests and benchmarks
     pub fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         use std::time::Instant;
-
-        use crate::search_prettifier::DisplayedSidebar;
 
         let start = Instant::now();
         let mut search_query = query.clone();
@@ -444,14 +440,7 @@ where
         Ok(WebsitesResult {
             num_hits: search_result.num_websites,
             webpages,
-            discussions: None,
-            widget: None,
             spell_corrected_query: None,
-            direct_answer: None,
-            sidebar: search_result
-                .entity_sidebar
-                .map(DisplayedEntity::from)
-                .map(DisplayedSidebar::Entity),
             search_duration_ms: start.elapsed().as_millis(),
             has_more_results,
         })

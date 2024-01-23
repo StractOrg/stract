@@ -51,12 +51,6 @@ pub struct ApiSearchQuery {
     #[serde(default = "defaults::SearchQuery::flatten_response")]
     pub flatten_response: bool,
 
-    #[serde(default = "defaults::SearchQuery::fetch_discussions")]
-    pub fetch_discussions: bool,
-
-    #[serde(default = "defaults::SearchQuery::fetch_sidebar")]
-    pub fetch_sidebar: bool,
-
     #[serde(default = "defaults::SearchQuery::count_results")]
     pub count_results: bool,
 }
@@ -82,8 +76,6 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             host_rankings: api.host_rankings,
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
-            fetch_discussions: api.fetch_discussions,
-            fetch_sidebar: api.fetch_sidebar,
             count_results: api.count_results,
         })
     }
@@ -105,8 +97,6 @@ impl From<SearchResult> for ApiSearchResult {
     }
 }
 
-#[allow(clippy::unused_async)]
-#[allow(clippy::match_wild_err_arm)]
 #[debug_handler]
 #[utoipa::path(
     post,
@@ -116,7 +106,7 @@ impl From<SearchResult> for ApiSearchResult {
         (status = 200, description = "Search results", body = ApiSearchResult),
     )
 )]
-pub async fn api(
+pub async fn search(
     extract::State(state): extract::State<Arc<State>>,
     extract::Json(query): extract::Json<ApiSearchQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -153,6 +143,48 @@ pub async fn api(
             }
         },
     }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct WidgetQuery {
+    pub query: String,
+}
+
+#[debug_handler]
+#[utoipa::path(
+    post,
+    path = "/beta/api/search/widget",
+    request_body(content = WidgetQuery),
+    responses(
+        (status = 200, description = "The resulting widget if one matches the query", body = Option<Widget>),
+    )
+)]
+pub async fn widget(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Json(req): extract::Json<WidgetQuery>,
+) -> impl IntoResponse {
+    Json(state.searcher.widget(&req.query).await)
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct SidebarQuery {
+    pub query: String,
+}
+
+#[debug_handler]
+#[utoipa::path(
+    post,
+    path = "/beta/api/search/sidebar",
+    request_body(content = SidebarQuery),
+    responses(
+        (status = 200, description = "The sidebar if one matches the query", body = Option<DisplayedSidebar>),
+    )
+)]
+pub async fn sidebar(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Json(req): extract::Json<SidebarQuery>,
+) -> impl IntoResponse {
+    Json(state.searcher.sidebar(&req.query).await)
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]

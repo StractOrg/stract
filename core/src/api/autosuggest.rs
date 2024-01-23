@@ -52,7 +52,6 @@ pub struct AutosuggestQuery {
     q: String,
 }
 
-#[allow(clippy::unused_async)]
 #[utoipa::path(
     post,
     path = "/beta/api/autosuggest",

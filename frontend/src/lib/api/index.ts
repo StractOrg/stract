@@ -116,6 +116,10 @@ export const api = {
     requestPlain('POST', `/beta/api/hosts/export`, body, options),
   search: (body: ApiSearchQuery, options?: ApiOptions) =>
     requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
+  searchSidebar: (body: SidebarQuery, options?: ApiOptions) =>
+    requestJson<DisplayedSidebar>('POST', `/beta/api/search/sidebar`, body, options),
+  searchWidget: (body: WidgetQuery, options?: ApiOptions) =>
+    requestJson<Widget>('POST', `/beta/api/search/widget`, body, options),
   summarize: (
     query: {
       query: string;
@@ -184,8 +188,6 @@ export const api = {
 
 export type ApiSearchQuery = {
   countResults?: boolean;
-  fetchDiscussions?: boolean;
-  fetchSidebar?: boolean;
   flattenResponse?: boolean;
   hostRankings?: HostRankings;
   numResults?: number;
@@ -263,6 +265,7 @@ export type DisplayedWebpage = {
   likelyHasPaywall: boolean;
   prettyUrl: string;
   rankingSignals?: {};
+  score?: number;
   site: string;
   snippet: Snippet;
   title: string;
@@ -334,6 +337,9 @@ export type ScoredHost = {
   host: string;
   score: number;
 };
+export type SidebarQuery = {
+  query: string;
+};
 export type SignalScore = {
   coefficient: number;
   value: number;
@@ -385,15 +391,11 @@ export type ThesaurusWidget = {
 };
 export type UrlWrapper = string;
 export type WebsitesResult = {
-  directAnswer?: DisplayedAnswer;
-  discussions?: DisplayedWebpage[];
   hasMoreResults: boolean;
   numHits?: number;
   searchDurationMs: number;
-  sidebar?: DisplayedSidebar;
   spellCorrectedQuery?: HighlightedSpellCorrection;
   webpages: DisplayedWebpage[];
-  widget?: Widget;
 };
 export type Widget =
   | {
@@ -404,6 +406,9 @@ export type Widget =
       type: 'thesaurus';
       value: ThesaurusWidget;
     };
+export type WidgetQuery = {
+  query: string;
+};
 export type WordMeaning = {
   definition: Definition;
   examples: Example[];

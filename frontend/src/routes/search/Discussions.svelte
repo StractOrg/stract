@@ -5,14 +5,34 @@
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import Button from '$lib/components/Button.svelte';
 
-  export let discussions: DisplayedWebpage[];
+  export let discussions: DisplayedWebpage[] | undefined;
 
   let showMore = false;
 
-  $: shownDiscussions = showMore ? discussions : discussions.slice(0, 4);
+  $: {
+    let medianScore = 0;
+    if (discussions) {
+      const scores = discussions.map((d) => d.score || 0);
+      scores.sort((a, b) => a - b);
+      const mid = Math.floor(scores.length / 2);
+      medianScore = scores.length % 2 !== 0 ? scores[mid] : (scores[mid - 1] + scores[mid]) / 2;
+    }
+
+    if (medianScore < 0.1) {
+      discussions = undefined;
+    }
+
+    let numDiscussions = discussions?.length || 0;
+    if (numDiscussions < 5) {
+      discussions = undefined;
+    }
+  }
+
+  $: shownDiscussions = showMore ? discussions : discussions?.slice(0, 4);
 </script>
 
-<div class="flex flex-col space-y-1.5 overflow-hidden">
+{#if shownDiscussions && shownDiscussions.length > 0}
+<div class="flex flex-col space-y-1.5 overflow-hidden row-start-5">
   <div class="flex items-center space-x-1 text-lg">
     <ChatBubbleLeftRight class="text-sm text-neutral" />
     <span>Discussions</span>
@@ -64,3 +84,4 @@
     display: none;
   }
 </style>
+{/if}
