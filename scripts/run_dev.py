@@ -20,6 +20,7 @@ processes = []
 
 processes.append(subprocess.Popen(["just", "dev-api"]))
 processes.append(subprocess.Popen(["just", "dev-search-server"]))
+processes.append(subprocess.Popen(["just", "dev-entity-search-server"]))
 processes.append(subprocess.Popen(["just", "dev-webgraph"]))
 processes.append(subprocess.Popen(["just", "dev-frontend"]))
 processes.append(subprocess.Popen(["just", "dev-llm"]))

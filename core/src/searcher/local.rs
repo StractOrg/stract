@@ -20,8 +20,6 @@ use std::sync::{Arc, RwLockReadGuard};
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
-use crate::entity_index::{EntityIndex, EntityMatch};
-use crate::image_store::Image;
 use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
 use crate::query::Query;
@@ -113,7 +111,6 @@ impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
 
 pub struct LocalSearcher<I: SearchableIndex> {
     index: I,
-    entity_index: Option<EntityIndex>,
     inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
@@ -145,17 +142,11 @@ where
 
         LocalSearcher {
             index,
-            // spell: None,
-            entity_index: None,
             inbound_similarity: None,
             linear_regression: None,
             lambda_model: None,
             collector_config: CollectorConfig::default(),
         }
-    }
-
-    pub fn set_entity_index(&mut self, entity_index: EntityIndex) {
-        self.entity_index = Some(entity_index);
     }
 
     pub fn set_inbound_similarity(&mut self, inbound: InboundSimilarity) {
@@ -322,12 +313,6 @@ where
         })
     }
 
-    pub fn search_entity(&self, query: &str) -> Option<EntityMatch> {
-        self.entity_index
-            .as_ref()
-            .and_then(|index| index.search(query))
-    }
-
     pub fn search_initial(
         &self,
         query: &SearchQuery,
@@ -452,12 +437,6 @@ where
 
     pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         self.index.guard().inverted_index().get_homepage(url)
-    }
-
-    pub fn get_entity_image(&self, image_id: &str) -> Option<Image> {
-        self.entity_index
-            .as_ref()
-            .and_then(|index| index.retrieve_image(image_id))
     }
 }
 

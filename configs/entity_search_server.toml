@@ -1,0 +1,5 @@
+cluster_id = "dev_search"
+gossip_addr = "0.0.0.0:3010"
+gossip_seed_nodes = ["0.0.0.0:3005"]
+host = "0.0.0.0:3009"
+index_path = "data/entity"

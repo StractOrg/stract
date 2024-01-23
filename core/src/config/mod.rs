@@ -250,7 +250,6 @@ pub struct SearchServerConfig {
     pub gossip_addr: SocketAddr,
     pub shard_id: ShardId,
     pub index_path: String,
-    pub entity_index_path: Option<String>,
     pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
@@ -261,6 +260,15 @@ pub struct SearchServerConfig {
 
     #[serde(default)]
     pub snippet: SnippetConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EntitySearchServerConfig {
+    pub cluster_id: String,
+    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
+    pub gossip_addr: SocketAddr,
+    pub index_path: String,
+    pub host: SocketAddr,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

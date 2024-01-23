@@ -19,12 +19,15 @@ use crate::{
         cluster::Cluster,
         member::Service,
         sonic::replication::{
-            AllShardsSelector, RandomReplicaSelector, RandomShardSelector, RemoteClient,
-            ReplicatedClient, Shard, ShardIdentifier, ShardedClient, SpecificShardSelector,
+            AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient, Shard,
+            ShardIdentifier, ShardedClient, SpecificShardSelector,
         },
     },
     entity_index::EntityMatch,
-    entrypoint::search_server::{self, SearchService},
+    entrypoint::{
+        entity_search_server,
+        search_server::{self, SearchService},
+    },
     image_store::Image,
     inverted_index::{RetrievedWebpage, WebsitePointer},
     ranking::pipeline::{RankingWebsite, RetrievedWebpageRanking},
@@ -105,6 +108,17 @@ impl DistributedSearcher {
         }
 
         ShardedClient::new(shard_clients)
+    }
+
+    async fn entity_client(&self) -> ReplicatedClient<entity_search_server::SearchService> {
+        let mut replicas = Vec::new();
+        for member in self.cluster.members().await {
+            if let Service::EntitySearcher { host } = member.service {
+                replicas.push(RemoteClient::new(host));
+            }
+        }
+
+        ReplicatedClient::new(replicas)
     }
 
     async fn retrieve_webpages_from_shard(
@@ -252,43 +266,37 @@ impl SearchClient for DistributedSearcher {
         max_height: Option<u64>,
         max_width: Option<u64>,
     ) -> Result<Option<Image>> {
-        let client = self.client().await;
+        let client = self.entity_client().await;
 
-        let (_, mut res) = client
+        Ok(client
             .send(
-                &search_server::GetEntityImage {
+                &entity_search_server::GetEntityImage {
                     image_id: image_id.to_string(),
                     max_height,
                     max_width,
                 },
-                &RandomShardSelector,
                 &RandomReplicaSelector,
             )
             .await
             .map_err(|_| Error::SearchFailed)?
             .pop()
-            .unwrap();
-
-        Ok(res.pop().flatten())
+            .unwrap())
     }
 
     async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
-        let client = self.client().await;
+        let client = self.entity_client().await;
 
-        let (_, mut res) = client
+        client
             .send(
-                &search_server::SearchEntity {
+                &entity_search_server::Search {
                     query: query.to_string(),
                 },
-                &RandomShardSelector,
                 &RandomReplicaSelector,
             )
             .await
             .ok()?
             .pop()
-            .unwrap();
-
-        res.pop().flatten()
+            .unwrap()
     }
 }
 

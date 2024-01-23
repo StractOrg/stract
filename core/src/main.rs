@@ -24,7 +24,9 @@ use stract::entrypoint::autosuggest_scrape::{self, Gl};
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
 
-use stract::entrypoint::{self, api, safety_classifier, search_server, webgraph_server};
+use stract::entrypoint::{
+    self, api, entity_search_server, safety_classifier, search_server, webgraph_server,
+};
 use stract::webgraph::WebgraphBuilder;
 use tracing_subscriber::prelude::*;
 
@@ -72,6 +74,11 @@ enum Commands {
 
     /// Deploy the search server.
     SearchServer {
+        config_path: String,
+    },
+
+    /// Deploy the entity search server.
+    EntitySearchServer {
         config_path: String,
     },
 
@@ -313,6 +320,14 @@ fn main() -> Result<()> {
                 .enable_all()
                 .build()?
                 .block_on(search_server::run(config))?
+        }
+        Commands::EntitySearchServer { config_path } => {
+            let config: config::EntitySearchServerConfig = load_toml_config(config_path);
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(entity_search_server::run(config))?
         }
         Commands::AutosuggestScrape {
             num_queries: queries_to_scrape,

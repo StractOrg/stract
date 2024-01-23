@@ -26,6 +26,9 @@ pub enum Service {
         host: SocketAddr,
         shard: ShardId,
     },
+    EntitySearcher {
+        host: SocketAddr,
+    },
     LiveIndex {
         host: SocketAddr,
         split_id: crate::feed::scheduler::SplitId,

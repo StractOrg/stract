@@ -27,8 +27,6 @@ use crate::{
         member::{Member, Service},
         sonic,
     },
-    entity_index::{EntityIndex, EntityMatch},
-    image_store::Image,
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     ranking::{
@@ -44,10 +42,8 @@ sonic_service!(
     [
         RetrieveWebsites,
         Search,
-        SearchEntity,
         GetWebpage,
         GetHomepageDescriptions,
-        GetEntityImage,
     ]
 );
 
@@ -60,19 +56,12 @@ pub struct SearchService {
 
 impl SearchService {
     async fn new(config: config::SearchServerConfig) -> Result<Self> {
-        let entity_index = config
-            .entity_index_path
-            .map(|path| EntityIndex::open(path).unwrap());
         let centrality_store = config
             .host_centrality_store_path
             .map(|p| InboundSimilarity::open(Path::new(&p).join("inbound_similarity")).unwrap());
         let search_index = Index::open(config.index_path)?;
 
         let mut local_searcher = LocalSearcher::new(search_index);
-
-        if let Some(entity_index) = entity_index {
-            local_searcher.set_entity_index(entity_index);
-        }
 
         if let Some(centrality_store) = centrality_store {
             local_searcher.set_inbound_similarity(centrality_store);
@@ -170,39 +159,6 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
         }
 
         Ok(result)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetEntityImage {
-    pub image_id: String,
-    pub max_width: Option<u64>,
-    pub max_height: Option<u64>,
-}
-impl sonic::service::Message<SearchService> for GetEntityImage {
-    type Response = Option<Image>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        Ok(server
-            .local_searcher
-            .get_entity_image(&self.image_id)
-            .map(|img| {
-                let max_width = self.max_width.unwrap_or(u64::MAX) as u32;
-                let max_height = self.max_height.unwrap_or(u64::MAX) as u32;
-
-                img.resize_max(max_width, max_height)
-            }))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchEntity {
-    pub query: String,
-}
-
-impl sonic::service::Message<SearchService> for SearchEntity {
-    type Response = Option<EntityMatch>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        Ok(server.local_searcher.search_entity(&self.query))
     }
 }
 

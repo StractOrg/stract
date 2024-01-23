@@ -10,6 +10,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- api configs/api.toml"
 @dev-search-server:
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- search-server configs/search_server.toml"
+@dev-entity-search-server:
+    cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- entity-search-server configs/entity_search_server.toml"
 @dev-webgraph:
     cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- webgraph server configs/webgraph/server.toml"
 @dev-llm:
