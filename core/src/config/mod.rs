@@ -360,12 +360,20 @@ pub struct AliceLocalConfig {
     pub encryption_key: String,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum WebgraphGranularity {
+    Host,
+    Page,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
-    pub host_graph_path: String,
-    pub page_graph_path: String,
-    pub inbound_similarity_path: String,
+    pub graph_path: String,
+    pub granularity: WebgraphGranularity,
+    pub inbound_similarity_path: Option<String>,
+
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,

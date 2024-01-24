@@ -25,6 +25,7 @@ use url::Url;
 use utoipa::ToSchema;
 
 use crate::config;
+use crate::config::WebgraphGranularity;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
@@ -53,10 +54,10 @@ pub struct ScoredHost {
 const MAX_HOSTS: usize = 20;
 
 pub struct WebGraphService {
+    granularity: WebgraphGranularity,
     searcher: DistributedSearcher,
-    similar_hosts_finder: SimilarHostsFinder,
-    host_graph: Arc<Webgraph>,
-    page_graph: Arc<Webgraph>,
+    similar_hosts_finder: Option<SimilarHostsFinder>,
+    graph: Arc<Webgraph>,
 }
 
 sonic_service!(
@@ -79,9 +80,15 @@ impl Message<WebGraphService> for SimilarHosts {
     type Response = Vec<ScoredHost>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+        if server.similar_hosts_finder.is_none() {
+            return Ok(vec![]);
+        }
+
         let sites = &self.hosts[..std::cmp::min(self.hosts.len(), MAX_HOSTS)];
         let similar_hosts = server
             .similar_hosts_finder
+            .as_ref()
+            .unwrap()
             .find_similar_hosts(sites, self.top_n);
 
         let urls = similar_hosts
@@ -119,7 +126,12 @@ impl Message<WebGraphService> for Knows {
 
         let node = Node::from(url).into_host();
 
-        if server.similar_hosts_finder.knows_about(&node) {
+        if server
+            .similar_hosts_finder
+            .as_ref()
+            .map(|finder| finder.knows_about(&node))
+            .unwrap_or(false)
+        {
             Ok(Some(node))
         } else {
             Ok(None)
@@ -128,27 +140,20 @@ impl Message<WebGraphService> for Knows {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GraphLevel {
-    Host,
-    Page,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IngoingLinks {
     pub node: Node,
-    pub level: GraphLevel,
 }
 
 impl Message<WebGraphService> for IngoingLinks {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
-        match self.level {
-            GraphLevel::Host => {
+        match server.granularity {
+            WebgraphGranularity::Host => {
                 let node = self.node.into_host();
-                Ok(server.host_graph.ingoing_edges(node))
+                Ok(server.graph.ingoing_edges(node))
             }
-            GraphLevel::Page => Ok(server.page_graph.ingoing_edges(self.node)),
+            WebgraphGranularity::Page => Ok(server.graph.ingoing_edges(self.node)),
         }
     }
 }
@@ -156,19 +161,18 @@ impl Message<WebGraphService> for IngoingLinks {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutgoingLinks {
     pub node: Node,
-    pub level: GraphLevel,
 }
 
 impl Message<WebGraphService> for OutgoingLinks {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
-        match self.level {
-            GraphLevel::Host => {
+        match server.granularity {
+            WebgraphGranularity::Host => {
                 let node = self.node.into_host();
-                Ok(server.host_graph.outgoing_edges(node))
+                Ok(server.graph.outgoing_edges(node))
             }
-            GraphLevel::Page => Ok(server.page_graph.outgoing_edges(self.node)),
+            WebgraphGranularity::Page => Ok(server.graph.outgoing_edges(self.node)),
         }
     }
 }
@@ -181,7 +185,10 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         Cluster::join(
             Member {
                 id: config.cluster_id,
-                service: Service::Webgraph { host: addr },
+                service: Service::Webgraph {
+                    host: addr,
+                    granularity: config.granularity,
+                },
             },
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
@@ -190,29 +197,26 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     );
     let searcher = DistributedSearcher::new(cluster);
 
-    let host_graph = Arc::new(
-        WebgraphBuilder::new(config.host_graph_path)
+    let graph = Arc::new(
+        WebgraphBuilder::new(config.graph_path)
             .compression(Compression::Lz4)
             .open(),
     );
-    let page_graph = Arc::new(
-        WebgraphBuilder::new(config.page_graph_path)
-            .compression(Compression::Lz4)
-            .open(),
-    );
-    let inbound_similarity = InboundSimilarity::open(config.inbound_similarity_path)?;
 
-    let similar_hosts_finder = SimilarHostsFinder::new(
-        Arc::clone(&host_graph),
-        inbound_similarity,
-        config.max_similar_hosts,
-    );
+    let similar_hosts_finder = config.inbound_similarity_path.map(|path| {
+        let inbound_similarity = InboundSimilarity::open(path).unwrap();
+        SimilarHostsFinder::new(
+            Arc::clone(&graph),
+            inbound_similarity,
+            config.max_similar_hosts,
+        )
+    });
 
     let server = WebGraphService {
-        host_graph,
-        page_graph,
+        graph,
         searcher,
         similar_hosts_finder,
+        granularity: config.granularity,
     }
     .bind(addr)
     .await

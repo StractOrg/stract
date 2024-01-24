@@ -21,8 +21,8 @@ use http::StatusCode;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
+    config::WebgraphGranularity,
     distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
-    entrypoint::webgraph_server::GraphLevel,
     webgraph::{FullEdge, Node},
 };
 
@@ -37,13 +37,13 @@ impl RemoteWebgraph {
         Self { cluster }
     }
 
-    async fn host(&self) -> Option<SocketAddr> {
+    async fn host(&self, level: WebgraphGranularity) -> Option<SocketAddr> {
         self.cluster
             .members()
             .await
             .iter()
             .find_map(|member| match member.service {
-                Service::Webgraph { host } => Some(host),
+                Service::Webgraph { host, granularity } if granularity == level => Some(host),
                 _ => None,
             })
     }
@@ -87,7 +87,7 @@ pub mod host {
         state.counters.explore_counter.inc();
         let host = state
             .remote_webgraph
-            .host()
+            .host(WebgraphGranularity::Host)
             .await
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -134,7 +134,7 @@ pub mod host {
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let host = state
             .remote_webgraph
-            .host()
+            .host(WebgraphGranularity::Host)
             .await
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -180,7 +180,7 @@ pub mod host {
         let url = Url::parse(&("http://".to_string() + params.host.as_str()))
             .map_err(|_| StatusCode::BAD_REQUEST)?;
         let node = Node::from(url).into_host();
-        let links = ingoing_links(state, node, GraphLevel::Host)
+        let links = ingoing_links(state, node, WebgraphGranularity::Host)
             .await
             .map_err(|_| {
                 tracing::error!("Failed to send request to webgraph");
@@ -204,7 +204,7 @@ pub mod host {
         let url = Url::parse(&("http://".to_string() + params.host.as_str()))
             .map_err(|_| StatusCode::BAD_REQUEST)?;
         let node = Node::from(url).into_host();
-        let links = outgoing_links(state, node, GraphLevel::Host)
+        let links = outgoing_links(state, node, WebgraphGranularity::Host)
             .await
             .map_err(|_| {
                 tracing::error!("Failed to send request to webgraph");
@@ -236,7 +236,7 @@ pub mod page {
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let node = Node::from(params.page);
-        let links = ingoing_links(state, node, GraphLevel::Page)
+        let links = ingoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
                 tracing::error!("Failed to send request to webgraph");
@@ -258,7 +258,7 @@ pub mod page {
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let node = Node::from(params.page);
-        let links = outgoing_links(state, node, GraphLevel::Page)
+        let links = outgoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
                 tracing::error!("Failed to send request to webgraph");
@@ -272,13 +272,15 @@ pub mod page {
 async fn ingoing_links(
     state: Arc<State>,
     node: Node,
-    level: GraphLevel,
+    level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
     let host = state
         .remote_webgraph
-        .host()
+        .host(level)
         .await
-        .ok_or(anyhow::anyhow!("no remote webgraph"))?;
+        .ok_or(anyhow::anyhow!(
+            "no remote webgraph for granularity {level:?}"
+        ))?;
 
     let retry = ExponentialBackoff::from_millis(30)
         .with_limit(Duration::from_millis(200))
@@ -293,7 +295,7 @@ async fn ingoing_links(
 
     Ok(conn
         .send_with_timeout(
-            &crate::entrypoint::webgraph_server::IngoingLinks { node, level },
+            &crate::entrypoint::webgraph_server::IngoingLinks { node },
             Duration::from_secs(60),
         )
         .await?)
@@ -302,13 +304,15 @@ async fn ingoing_links(
 async fn outgoing_links(
     state: Arc<State>,
     node: Node,
-    level: GraphLevel,
+    level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
     let host = state
         .remote_webgraph
-        .host()
+        .host(level)
         .await
-        .ok_or(anyhow::anyhow!("no remote webgraph"))?;
+        .ok_or(anyhow::anyhow!(
+            "no remote webgraph for granularity {level:?}"
+        ))?;
 
     let retry = ExponentialBackoff::from_millis(30)
         .with_limit(Duration::from_millis(200))
@@ -323,7 +327,7 @@ async fn outgoing_links(
 
     Ok(conn
         .send_with_timeout(
-            &crate::entrypoint::webgraph_server::OutgoingLinks { node, level },
+            &crate::entrypoint::webgraph_server::OutgoingLinks { node },
             Duration::from_secs(60),
         )
         .await?)

@@ -18,7 +18,7 @@ use std::net::SocketAddr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::searcher::ShardId;
+use crate::{config::WebgraphGranularity, searcher::ShardId};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {
@@ -38,6 +38,7 @@ pub enum Service {
     },
     Webgraph {
         host: SocketAddr,
+        granularity: WebgraphGranularity,
     },
     Alice {
         host: SocketAddr,
