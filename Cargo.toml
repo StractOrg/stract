@@ -1,5 +1,10 @@
 [workspace]
-members = ["core", "optics", "kuchiki", "zimba"]
+members = [
+    "crates/core",
+    "crates/optics",
+    "crates/kuchiki",
+    "crates/zimba",
+]
 resolver = "2"
 
 [profile.release]

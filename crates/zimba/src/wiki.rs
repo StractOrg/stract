@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_article_iterator() {
-        let zim = ZimFile::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../../data/test.zim").unwrap();
         let mut iter = ArticleIterator::new(&zim).unwrap();
 
         let article = iter.next().unwrap();
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_image_iterator() {
-        let zim = ZimFile::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../../data/test.zim").unwrap();
         let mut iter = ImageIterator::new(&zim).unwrap();
 
         let image = iter.next().unwrap();

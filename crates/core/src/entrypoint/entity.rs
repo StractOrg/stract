@@ -282,7 +282,7 @@ mod tests {
             Image: Some("Impact_event.jpg.webp")
             Info:
 
-            
+
             ---
 
             The Cretaceous–Paleogene (K–Pg) extinction event, also known as the Cretaceous–Tertiary (K–T) extinction, was a sudden mass extinction of three-quarters of the [plant](Plant) and [animal](Animal) species on Earth, approximately 66 million years ago. The event caused the extinction of all non-avian [dinosaurs](Dinosaur). Most other tetrapods weighing more than 25 kilograms (55 pounds) also became extinct, with the exception of some ectothermic species such as sea turtles and crocodilians. It marked the end of the Cretaceous period, and with it the Mesozoic era, while heralding the beginning of the Cenozoic era, which continues to this day.
@@ -326,9 +326,9 @@ mod tests {
              - (unranked): Holozoa
              - (unranked): Filozoa
              - Kingdom: [Animalia](Animal)
-            
+
             ---
-            
+
             Animals are multicellular, [eukaryotic](Eukaryotic) organisms in the biological kingdom Animalia. With few exceptions, animals consume organic material, breathe oxygen, have myocytes and are able to move, can reproduce sexually, and grow from a hollow sphere of cells, the blastula, during embryonic development.
             "###),
         )
@@ -344,10 +344,10 @@ mod tests {
             Title: World Heritage Site
             Image: Some("Placa_conmemorativa_de_la_inscripci%C3%B3n_en_la_Lista_del_Patrimonio_Mundial_del_Parque_Nacional_de_Do%C3%B1ana.jpg.webp")
             Info:
-            
-            
+
+
             ---
-            
+
             A World Heritage Site is a landmark or area with legal protection by an international convention administered by the United Nations Educational, Scientific and Cultural Organization (UNESCO). World Heritage Sites are designated by UNESCO for having cultural, historical, scientific or other forms of significance. The sites are judged to contain "cultural and natural heritage around the world considered to be of outstanding value to [humanity](Human)".
             "###),
         )
@@ -373,9 +373,9 @@ mod tests {
              - Subfamily: Pantherinae
              - Genus: Panthera
              - Species:                                                                                             P. leo[2]
-            
+
             ---
-            
+
             The lion (Panthera leo) is a large cat of the genus Panthera native to Africa and India. It has a muscular, broad-chested body; short, rounded head; round ears; and a hairy tuft at the end of its tail. It is sexually dimorphic; adult male lions are larger than females and have a prominent mane. It is a social species, forming groups called prides. A lion's pride consists of a few adult males, related females, and cubs. Groups of female lions usually hunt together, preying mostly on large ungulates. The lion is an apex and keystone predator; although some lions scavenge when opportunities occur and have been known to hunt [humans](Human), lions typically do not actively seek out and prey on humans.
             "###),
         )
@@ -425,11 +425,11 @@ mod tests {
 
     #[test]
     fn zim() {
-        if !Path::new("../data/test.zim").exists() {
+        if !Path::new("../../data/test.zim").exists() {
             return;
         }
 
-        let zim = ZimFile::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../../data/test.zim").unwrap();
         let mut it = EntityIterator::new(&zim).unwrap();
 
         let entity = it.next().unwrap();

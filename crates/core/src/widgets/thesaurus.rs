@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn build_dict() {
-        let dict = Dictionary::build("../data/english-wordnet-2022-subset.ttl").unwrap();
+        let dict = Dictionary::build("../../data/english-wordnet-2022-subset.ttl").unwrap();
 
         let infos = dict.get(Lemma("barely".to_string()));
 

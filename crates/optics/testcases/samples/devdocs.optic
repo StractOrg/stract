@@ -1,0 +1,192 @@
+DiscardNonMatching;
+
+/*
+    Some documentation sites from devdocs.io
+    Please open a PR if you feel like some sites are missing
+*/
+
+Rule {
+    Matches {
+        Site("|developer.mozilla.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|docs.rs|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|readthedocs.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|cppreference.com|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|python.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|pytorch.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Site("|doc.rust-lang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Site("|docs.npmjs.com|")
+    }
+};
+
+Rule {
+    Matches {
+        Site("|docs.julialang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|kotlinlang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|kubernetes.io|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|latexref.xyz|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|mariadb.com|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|nginx.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|nim-lang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|nixos.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|nodejs.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|numpy.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|openjdk.java.net|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|php.net|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|postgresql.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|qt.io|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|reactjs.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|reactnative.dev|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|redis.io|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|scala-lang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|scikit-learn.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|sqlite.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|tailwindcss.com|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|typescriptlang.org|")
+    }
+};
+
+Rule {
+    Matches {
+        Domain("|devdocs.io|")
+    }
+};

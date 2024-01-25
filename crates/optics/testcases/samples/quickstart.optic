@@ -1,0 +1,201 @@
+// You can get syntax highlighting for this file with the following vscode
+// extension: https://marketplace.visualstudio.com/items?itemName=Stract.Optics
+
+// Optics is a domain-specific language that lets you write small programs to
+// influence the search results that gets returned to you from Stract or other
+// search engines that supports Optics. The goal of Optics is to give you very
+// fine grained control over your own search experience. Let's see how this is
+// done.
+
+
+// As you might have guessed, comments can either be line-comments with "//" or
+// block-comments "/* ... */". Optics constists of a sequence of rules where
+// each rule defines how a particular search result should be altered given that
+// they match the specific rule.
+Rule {
+	Matches {
+		Title("Top * of 2022")
+	},
+	Action(Downrank(3))
+};
+Rule {
+	Matches {
+		Url("reddit.com/r/*/comments")
+	},
+	Action(Boost(3))
+};
+
+// Let's unwrap what happens in the first two rules. The first rule matches all
+// search results where some pattern occurs in the title of the search result.
+// The pattern "Top * of 2022" indicates that a matching search result must
+// contain the term "top" (non-case-sensitive) followed by any number of
+// wildcard terms, which is then followed by the terms "of" and "2022" in
+// sequence. This will e.g. match the titles "Top movies of 2022" and "See the
+// top tourist attractions of 2022 in Paris". Note that the wildcard can match
+// more than one term and that the pattern does not have to be at the beginning
+// or end of the title. You can use the special token "|" in a pattern to
+// indicate the beginning or end of the title, so the pattern "|Top * of 2022"
+// would only match "Top movies of 2022" but not "See the top tourist
+// attractions of 2022 in Paris". Patterns also only match entire terms so the
+// pattern "an*how" would not match the term "anyhow" but instead "an <wildcard>
+// how".
+
+// The second rule matches search results where the pattern matches the url of
+// the result. Both rules specify an action that will be applied to the matching
+// results: the first rule downranks these types of listicles whereas the second
+// rule boosts reddit comments. The action can either be
+// `Action(Boost(<float>))`, `Action(Downrank(<float>))` or `Action(Discard)` to
+// completely discard the result. If no action is specified in a rule it is
+// equivalent to `Action(Boost(1))` which will slightly boost a result.
+
+// You can specify any number of patterns in a `Matches` block. A result will
+// only match if it matches all the patterns in the block. As an example, this
+// rule will only discard listicles from "esquire.com" but other results from
+// the same domain will not be discarded.
+Rule {
+	Matches {
+		Title("Top * of 2022"),
+		Domain("esquire.com")
+	},
+	Action(Discard)
+};
+
+// Currently we support the following match-locations in the `Matches` block:
+// - Site
+// - Url
+// - Domain
+// - Title
+// - Description
+// - Content
+// - Schema
+
+// The most special of these is probably the `Schema` location. This allows you
+// to match results that contains specific https://schema.org entities. This is
+// also the only match-location where you cannot use the special pattern
+// characters "*" and "|". `Schema` only supports simple patterns. The following
+// rule boosts all pages that contains the
+// https://schema.org/DiscussionForumPosting entity
+Rule {
+	Matches {
+		Schema("DiscussionForumPosting")
+	},
+	Action(Boost(5))
+};
+
+// By default, any search result that does not match the optic would simply not
+// have any special action applied to it and the search result's score would be
+// unaltered. This behaviour can be changed by specifying `DiscardNonMatching`
+DiscardNonMatching;
+// Now all search resuts that does not match any of the specified rules will be
+// discarded.
+
+
+// The `Rule` block we have looked at so far only alters search results that
+// matches the specific rules and leaves other results intact. To explain the
+// next part, it will be helpful to know a little bit about how most web search
+// engines rank their results.
+
+// Back in the days when Google launched, it completely disrupted the existing
+// search engines by having a lot of technical advantages. One of the most
+// ground breaking things they did was the introduction of their core ranking
+// algorithm called PageRank. The idea is, that websites that have links from
+// other trustworthy websites must themselves be trustworthy. The idea to
+// analyze website links and use this for ranking gave Google way better search
+// results than their competitors. However, websites quickly realized this and
+// started actively building links to their own website, which skews the
+// PageRank metric. In essense, websites with a high PageRank are no longer
+// guaranteed to be trustworthy but might just be the best websites at link
+// building.
+
+// At Stract we use a similar link based metric called Harmonic Centrality. It
+// is calculated by taking the sum of the inverse distances from all other
+// websites to a particular website. Imagine site A links to B that then links
+// to C. This gives the following normalized centralities
+// A ---> B ---> C 
+// 0    0.33    0.5
+
+// While harmonic centrality is believed to be more resistant to link building
+// than PageRank, it is still susceptible to it. Both PageRank, Harmonic
+// centrality and other link based metrics also suffer from the fact that they
+// are not personalized. They create a single global score for each site in the
+// webgraph even though different people might find different sites more
+// trustworthy than others.
+
+//  Let's now get back from our detour and see what this means for our optics.
+
+// In optics you have the ability to like and dislike sites. We then use these
+// site. This is the same thing that happens whenever you like a search result
+// directly in the Stract UI.
+Like(Site("news.ycombinator.com"));
+Dislike(Site("w3schools.com"));
+
+// We then boost sites that is linked from the same sites as the ones you like,
+// and downrank sites that is linked from the same sites as the ones you
+// dislike. The idea is that if you like site A in the following graph you will
+// probably also like site B since they both have links from site C.
+//    C
+//   / \
+//  v   v
+//  A   B
+
+// One thing to note here is that only simple patterns can be used inside
+// `Like(Site("..."))` and `Dislike(Site("..."))`. The special tokens "*" and
+// "|" will not work here.
+
+// We have now covered how you can alter the scores of specific search results
+// and indicate which sites you like more than others. While harmonic centrality
+// plays a large role in the final score of a search result, in reality it is
+// actually multiple signals that gets combined to determine the final score for
+// each search result. Using the `Ranking` block you can choose to boost
+// specific signals. For example, this will the title text signal (bm25_title)
+// and host centrality (harmonic centrality for site hostnames) by a factor of
+// 10.
+Ranking(Signal("bm25_title"), 10);
+Ranking(Signal("host_centrality"), 10);
+
+// Note that different signals might be scaled differently based on the nature
+// of how they are calculated, so a higher coefficient does not necesarrily
+// result in a larger influence on the final score. Currently we support the
+// following signals, but since this list is highly dynamic we encourage you to
+// consult the source code
+// (https://github.com/StractOrg/stract/blob/main/core/src/ranking/signal.rs)
+// for the most up-to-date list and to see how each signal is calculated:
+// - bm25
+// - bm25_title
+// - bm25_clean_body
+// - bm25_stemmed_title
+// - bm25_stemmed_clean_body
+// - bm25_all_body
+// - bm25_url
+// - bm25_site
+// - bm25_domain
+// - bm25_site_no_tokenizer
+// - bm25_domain_no_tokenizer
+// - bm25_domain_if_homepage
+// - bm25_domain_name_if_homepage_no_tokenizer
+// - bm25_title_if_homepage
+// - bm25_backlink_text
+// - bm25_description
+// - cross_encoder
+// - host_centrality
+// - is_homepage
+// - fetch_time_ms
+// - update_timestamp
+// - tracker_score
+// - region
+// - query_centrality
+// - inbound_similarity
+// - lambda_mart
+
+// Changing the ranking is considered an advanced feature and should only be
+// used if you know what you are doing. The ranking signals are updated
+// frequently and might change in the future without much notice.
+
+
+// Last but not least, when you have developed your optic it can be installed in
+// Stract by uploading the Optic to github, and copy the "raw" url into
+// https://stract.com/settings/optics. E.g. the url for this Optic is
+// "https://raw.githubusercontent.com/StractOrg/sample-optics/main/quickstart.optic"
+
+// Alternatively you can host it anywhere that returns a simple plain-text HTTP
+// response and is publicly available.

@@ -54,7 +54,6 @@ image = {workspace = true}
 indicatif = {workspace = true}
 itertools = {workspace = true}
 kuchiki = {path = "../kuchiki"}
-lalrpop-util = {workspace = true}
 libc = {workspace = true}
 log = {workspace = true}
 logos = {workspace = true}
@@ -107,9 +106,6 @@ zimba = {path = "../zimba"}
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = {workspace = true}
-
-[build-dependencies]
-lalrpop = {workspace = true}
 
 [dev-dependencies]
 criterion = {workspace = true}

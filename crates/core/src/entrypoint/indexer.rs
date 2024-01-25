@@ -387,10 +387,7 @@ impl Indexer {
             .map(|warc_paths| Job {
                 source_config: job_config.clone(),
                 warc_paths,
-                base_path: config
-                    .output_path
-                    .clone()
-                    .unwrap_or_else(|| "data/index".to_string()),
+                base_path: config.output_path.clone().expect("output path not set"),
                 settings: JobSettings {
                     host_centrality_threshold: config.host_centrality_threshold,
                     minimum_clean_words: config.minimum_clean_words,

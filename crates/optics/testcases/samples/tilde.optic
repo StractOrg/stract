@@ -1,0 +1,8 @@
+
+DiscardNonMatching;
+
+Rule {
+    Matches {
+        Url("~")
+    }
+};

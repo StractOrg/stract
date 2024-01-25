@@ -197,6 +197,7 @@ impl UrlPointerList {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct TitlePointer(u32);
 
 #[derive(Debug)]
@@ -635,11 +636,11 @@ mod tests {
 
     #[test]
     fn it_works() {
-        if !Path::new("../data/test.zim").exists() {
+        if !Path::new("../../data/test.zim").exists() {
             return;
         }
 
-        let zim = ZimFile::open("../data/test.zim").unwrap();
+        let zim = ZimFile::open("../../data/test.zim").unwrap();
 
         assert_eq!(zim.header.magic, 72173914);
         assert_eq!(zim.header.major_version, 5);
