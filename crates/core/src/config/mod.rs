@@ -193,7 +193,6 @@ pub struct ApiConfig {
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
-    pub qa_model_path: Option<String>,
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
     pub summarizer_path: String,

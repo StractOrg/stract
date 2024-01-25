@@ -134,7 +134,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
         crossencoder_model_path: None,
         lambda_model_path: None,
-        qa_model_path: None,
         spell_checker_path: Some("data/web_spell".to_string()),
         bangs_path: "data/bangs.json".to_string(),
         summarizer_path: "data/summarizer".to_string(),

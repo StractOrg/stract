@@ -28,6 +28,8 @@ use crate::bangs::{Bang, BangHit};
 use crate::config::{ApiConfig, CollectorConfig};
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
+#[cfg(feature = "libtorch")]
+use crate::ranking::models::cross_encoder::CrossEncoderModel;
 #[cfg(not(feature = "libtorch"))]
 use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::pipeline::{AsRankingWebsite, RankingWebsite, RetrievedWebpageRanking};
@@ -40,8 +42,6 @@ use crate::{
     collector::BucketCollector,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
 };
-#[cfg(feature = "libtorch")]
-use crate::{qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel};
 use crate::{query, Result};
 
 use self::sidebar::SidebarManager;
@@ -176,7 +176,6 @@ where
         live_searcher: Option<L>,
         cross_encoder: Option<CrossEncoderModel>,
         lambda_model: Option<LambdaMART>,
-        qa_model: Option<QaModel>,
         bangs: Bangs,
         config: ApiConfig,
     ) -> Self {

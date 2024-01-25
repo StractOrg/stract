@@ -55,13 +55,10 @@ mod kahan_sum;
 mod kv;
 mod leaky_queue;
 mod live_index;
-#[cfg(feature = "libtorch")]
 mod llm_utils;
 mod metrics;
 pub mod naive_bayes;
 pub mod prehashed;
-#[cfg(feature = "libtorch")]
-mod qa_model;
 mod query;
 pub mod ranking;
 mod schema;

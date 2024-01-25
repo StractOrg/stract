@@ -36,9 +36,7 @@ use crate::{
 };
 
 #[cfg(feature = "libtorch")]
-use crate::{
-    qa_model::QaModel, ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer,
-};
+use crate::{ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer};
 
 use anyhow::Result;
 use std::{
@@ -145,17 +143,11 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             cross_encoder = Some(CrossEncoderModel::open(path)?);
         }
 
-        let qa_model = match &config.qa_model_path {
-            Some(path) => Some(QaModel::open(path)?),
-            None => None,
-        };
-
         let searcher = ApiSearcher::new(
             dist_searcher,
             Some(live_searcher),
             cross_encoder,
             lambda_model,
-            qa_model,
             bangs,
             config.clone(),
         );
