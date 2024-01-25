@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="git-assets/big-logo.svg" height="120" />
+  <img src="assets/big-logo.svg" height="120" />
   <br />
   <br />
   <a target="_blank" href="https://docs.stract.com">
@@ -16,7 +16,7 @@ Stract is an open source web search engine hosted at [stract.com](https://stract
 
 <br />
 <p align="center">
-  <img src="git-assets/screenshot.png" width="80%" />
+  <img src="assets/screenshot.png" width="80%" />
 </p>
 <br />
 <br />

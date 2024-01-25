@@ -2,9 +2,10 @@
 authors = ['Stract ApS. <hello@stract.com>']
 default-run = "stract"
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "AGPL-3.0"
 name = "stract"
 version = "0.1.0"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

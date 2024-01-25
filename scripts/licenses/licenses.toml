@@ -1,0 +1,23 @@
+no-clearly-defined = true
+private = { ignore = true }
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "MPL-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0",
+    "Unicode-DFS-2016",
+    "OpenSSL",
+    "Zlib",
+    "WTFPL",
+    "Unlicense",
+    "zlib-acknowledgement",
+]
+
+workarounds = [
+    "ring",
+]
+
+[stract]
+accepted = ["AGPL-3.0"]
