@@ -1,10 +1,9 @@
 [package]
-edition = "2021"
 name = "zimba"
+authors = ['Stract ApS. <hello@stract.com>']
+edition = "2021"
 version = "0.1.0"
 license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 lzma = {workspace = true}

@@ -4,6 +4,7 @@ members = [
     "crates/optics",
     "crates/kuchiki",
     "crates/zimba",
+    "crates/ggml-sys",
 ]
 resolver = "2"
 
@@ -113,6 +114,9 @@ utoipa-swagger-ui = {version = "5.0.0", features = ["axum"]}
 uuid = "1.1.2"
 whatlang = {version = "0.16.0", features = ["serde"]}
 zstd = "0.13"
+bindgen = "0.69.2"
+cmake = "0.1"
+cc = { version = "1", features = ["parallel"] }
 
 [profile.test.package]
 flate2.opt-level = 3
