@@ -31,7 +31,6 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     ./scripts/export_crossencoder
     ./scripts/export_abstractive_summary_model
     ./scripts/export_dual_encoder
-    ./scripts/export_fact_model
 
 @configure *ARGS:
     just setup {{ARGS}}
