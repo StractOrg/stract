@@ -113,9 +113,6 @@ enum Commands {
     Configure {
         #[clap(long)]
         skip_download: bool,
-
-        #[clap(long)]
-        alice: bool,
     },
 
     // Commands for the live index.
@@ -338,15 +335,8 @@ fn main() -> Result<()> {
             autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
         #[cfg(feature = "dev")]
-        Commands::Configure {
-            skip_download,
-            alice,
-        } => {
-            if alice && !skip_download {
-                configure::alice()?;
-            } else {
-                configure::run(skip_download)?;
-            }
+        Commands::Configure { skip_download } => {
+            configure::run(skip_download)?;
         }
         Commands::DmozParser {
             dmoz_file,

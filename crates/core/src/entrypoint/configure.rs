@@ -250,38 +250,3 @@ pub fn run(skip_download: bool) -> Result<()> {
 
     Ok(())
 }
-
-pub fn alice() -> Result<()> {
-    // create /data/alice folder
-    let p = Path::new(DATA_PATH).join("alice");
-
-    if !p.exists() {
-        fs::create_dir_all(p)?;
-    }
-
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            for name in ["model.safetensors", "tokenizer.json"] {
-                info!("Downloading {}", name);
-                let body = reqwest::get(format!("http://s3.stract.com/{BUCKET_NAME}/alice/{name}"))
-                    .await
-                    .unwrap();
-
-                let mut file = File::create(Path::new(DATA_PATH).join("alice").join(name))
-                    .await
-                    .unwrap();
-                let mut bytes = body.bytes_stream();
-
-                while let Some(item) = bytes.next().await {
-                    io::copy(&mut item.unwrap().as_ref(), &mut file)
-                        .await
-                        .unwrap();
-                }
-            }
-        });
-
-    Ok(())
-}

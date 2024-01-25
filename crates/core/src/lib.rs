@@ -31,8 +31,6 @@ pub mod inverted_index;
 
 pub mod mapreduce;
 
-#[cfg(feature = "with_alice")]
-pub mod alice;
 mod api;
 mod autosuggest;
 pub mod bangs;

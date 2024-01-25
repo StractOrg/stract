@@ -15,8 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! The entrypoint module contains all entrypoints that runs the executables.
-#[cfg(feature = "with_alice")]
-pub mod alice;
 pub mod api;
 pub mod autosuggest_scrape;
 mod centrality;

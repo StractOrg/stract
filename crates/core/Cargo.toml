@@ -11,11 +11,10 @@ publish = false
 
 [features]
 cors = []
-default = ["cors", "with_alice", "libtorch"]
+default = ["cors", "libtorch"]
 dev = ["cors"]
 libtorch = ["dep:tch"]
 prod = ["cors", "libtorch"]
-with_alice = ["libtorch"]
 
 [[bin]]
 name = "stract"

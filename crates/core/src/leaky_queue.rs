@@ -41,18 +41,6 @@ impl<T: Clone> LeakyQueue<T> {
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop_front()
     }
-
-    pub fn back(&self) -> Option<&T> {
-        self.inner.back()
-    }
-
-    pub fn front(&self) -> Option<&T> {
-        self.inner.front()
-    }
-
-    pub fn front_mut(&mut self) -> Option<&mut T> {
-        self.inner.front_mut()
-    }
 }
 
 #[cfg(test)]

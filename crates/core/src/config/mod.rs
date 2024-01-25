@@ -331,35 +331,6 @@ pub enum AcceleratorDevice {
     Mps,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum AcceleratorDtype {
-    Float,
-    Bf16,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AliceAcceleratorConfig {
-    pub layer_fraction: f64,
-    /// percentage of layers on accelerator to quantize
-    pub quantize_fraction: f64,
-    pub device: AcceleratorDevice,
-    pub dtype: AcceleratorDtype,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AliceLocalConfig {
-    pub cluster_id: String,
-    pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
-    pub gossip_addr: SocketAddr,
-    pub host: SocketAddr,
-
-    pub alice_path: String,
-    pub accelerator: Option<AliceAcceleratorConfig>,
-    /// base64 encoded
-    pub encryption_key: String,
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum WebgraphGranularity {

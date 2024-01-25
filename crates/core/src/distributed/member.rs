@@ -40,9 +40,6 @@ pub enum Service {
         host: SocketAddr,
         granularity: WebgraphGranularity,
     },
-    Alice {
-        host: SocketAddr,
-    },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
