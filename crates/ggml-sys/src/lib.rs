@@ -24,9 +24,9 @@ mod tests {
             let c = ggml_add(ctx, a, b);
 
             let gf = ggml_new_graph(ctx);
-
             ggml_build_forward_expand(gf, c);
-            ggml_graph_compute_with_ctx(ctx, gf, std::ffi::c_int::from(1));
+
+            ggml_graph_compute_with_ctx(ctx, gf, 1);
 
             let res = ggml_get_f32_1d(c, 0);
             assert_eq!(res, 4.0);

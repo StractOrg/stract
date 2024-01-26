@@ -1,5 +1,5 @@
 [package]
-authors = ['Stract ApS. <hello@stract.com>']
+authors = ['Stract <hello@stract.com>']
 default-run = "stract"
 edition = "2021"
 license = "AGPL-3.0"
@@ -76,7 +76,6 @@ reqwest = {workspace = true}
 ring = {workspace = true}
 rio_api = {workspace = true}
 rio_turtle = {workspace = true}
-rkyv = {workspace = true}
 robotstxt-with-cache = {workspace = true}
 rocksdb = {workspace = true}
 rust-s3 = {workspace = true}

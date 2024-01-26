@@ -1,5 +1,5 @@
 # NOTE: The list has been modified to only contain ad servers.
-# 
+#
 # Ad servers trackers, and others, as hostnames and domains all on one line for use in various applications
 #
 # For more information about this list, see: https://pgl.yoyo.org/adservers/
