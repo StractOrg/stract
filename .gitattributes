@@ -1,2 +1,3 @@
 core/testcases/** linguist-vendored
 scripts/** linguist-vendored
+*.html linguist-vendored
