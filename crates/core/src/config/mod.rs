@@ -188,6 +188,7 @@ impl Default for ApiThresholds {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
+    pub summarizer_path: String,
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
@@ -195,7 +196,6 @@ pub struct ApiConfig {
     pub lambda_model_path: Option<String>,
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
-    pub summarizer_path: String,
     pub openai_api_uri: String,
     pub openai_api_model: String,
     pub query_store_db_host: Option<String>,

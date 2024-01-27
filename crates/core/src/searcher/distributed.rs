@@ -296,7 +296,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .ok()?
             .pop()
-            .unwrap()
+            .flatten()
     }
 }
 

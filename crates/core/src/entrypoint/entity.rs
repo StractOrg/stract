@@ -175,15 +175,31 @@ impl EntityIndexer {
         let mut index = EntityIndex::open(output_path)?;
         index.prepare_writer();
 
+        let mut inserts = 0;
+
         for entity in EntityIterator::new(&zim)? {
             index.insert(entity);
+            inserts += 1;
+
+            if inserts > 10_000 {
+                index.commit();
+                inserts = 0;
+            }
         }
 
         index.commit();
+        inserts = 0;
 
         for image in zim.images()? {
             if let Ok(decoded_image) = Image::from_bytes(image.bytes()) {
                 index.insert_image(image.url, decoded_image);
+
+                inserts += 1;
+
+                if inserts > 10_000 {
+                    index.commit();
+                    inserts = 0;
+                }
             }
         }
 
