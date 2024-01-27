@@ -26,6 +26,7 @@
 //! This allows us to perform more advanced queries than just term lookups,
 //! but the principle is the same.
 use chrono::NaiveDateTime;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tantivy::collector::Count;
 use tantivy::directory::MmapDirectory;
@@ -45,8 +46,8 @@ use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
-use crate::snippet;
 use crate::snippet::TextSnippet;
+use crate::snippet::{self, TextSnippetFragment};
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
 };
@@ -439,20 +440,36 @@ impl InvertedIndex {
             let url = Url::parse(&page.url).ok()?;
             Some((url, page))
         }) {
-            let min_body_len = if url.is_homepage() { 1024 } else { 256 };
+            if query.simple_terms().is_empty() {
+                let snippet = if let Some(description) = page.description.as_deref() {
+                    description.split_whitespace().take(50).join(" ")
+                } else {
+                    page.body.split_whitespace().take(50).join(" ")
+                };
 
-            if page.body.len() < min_body_len
-                && !page.description.as_deref().unwrap_or_default().is_empty()
-            {
-                page.snippet = snippet::generate(
-                    query,
-                    page.description.as_deref().unwrap_or_default(),
-                    &page.region,
-                    self.snippet_config.clone(),
-                );
+                page.snippet = TextSnippet {
+                    fragments: vec![TextSnippetFragment::new_unhighlighted(snippet)],
+                };
             } else {
-                page.snippet =
-                    snippet::generate(query, &page.body, &page.region, self.snippet_config.clone());
+                let min_body_len = if url.is_homepage() { 1024 } else { 256 };
+
+                if page.body.len() < min_body_len
+                    && !page.description.as_deref().unwrap_or_default().is_empty()
+                {
+                    page.snippet = snippet::generate(
+                        query,
+                        page.description.as_deref().unwrap_or_default(),
+                        &page.region,
+                        self.snippet_config.clone(),
+                    );
+                } else {
+                    page.snippet = snippet::generate(
+                        query,
+                        &page.body,
+                        &page.region,
+                        self.snippet_config.clone(),
+                    );
+                }
             }
         }
 

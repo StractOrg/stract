@@ -61,6 +61,13 @@ pub struct TextSnippetFragment {
 }
 
 impl TextSnippetFragment {
+    pub fn new_unhighlighted(text: String) -> Self {
+        TextSnippetFragment {
+            kind: TextSnippetFragmentKind::Normal,
+            text,
+        }
+    }
+
     pub fn text(&self) -> &str {
         &self.text
     }

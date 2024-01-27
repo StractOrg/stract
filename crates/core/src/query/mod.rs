@@ -134,6 +134,7 @@ impl Query {
             .into_iter()
             .filter_map(|term| term.as_simple_text().map(|s| s.to_string()))
             .flat_map(|term| {
+                // term might be a phrase, so we split it into words
                 term.split_ascii_whitespace()
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>()
