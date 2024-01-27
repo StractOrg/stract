@@ -29,10 +29,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 @prepare_models:
     just setup_python_env
     ./scripts/export_crossencoder
-    ./scripts/export_qa_model
     ./scripts/export_abstractive_summary_model
     ./scripts/export_dual_encoder
-    ./scripts/export_fact_model
 
 @configure *ARGS:
     just setup {{ARGS}}

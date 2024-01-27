@@ -1,5 +1,11 @@
 [workspace]
-members = ["core", "optics", "kuchiki", "zimba"]
+members = [
+    "crates/core",
+    "crates/optics",
+    "crates/kuchiki",
+    "crates/zimba",
+    "crates/ggml-sys", "crates/ggml",
+]
 resolver = "2"
 
 [profile.release]
@@ -38,7 +44,7 @@ fnv = "1.0.3"
 fst = {version = "0.4.7", features = ["levenshtein"]}
 futures = "0.3.21"
 half = {version = "2.2.1", features = ["serde"]}
-hashbrown = {version = "0.14.0", features = ["serde", "rkyv"]}
+hashbrown = {version = "0.14.0", features = ["serde" ]}
 http = "1.0.0"
 image = "0.24.3"
 indicatif = {version = "0.17.7", features = ["rayon"]}
@@ -71,11 +77,6 @@ reqwest = {version = "0.11.16", features = ["blocking", "stream", "json"]}
 ring = "0.17.3"
 rio_api = "0.8.4"
 rio_turtle = "0.8.4"
-rkyv = {version = "0.7.42", default_features = false, features = [
-  "std",
-  "validation",
-  "size_64",
-]}
 robotstxt-with-cache = "0.4.0"
 rocksdb = {version = "0.21.0", features = ["default", "jemalloc", "io-uring"]}
 rusqlite = {version = "0.29.0", features = [
@@ -108,6 +109,9 @@ utoipa-swagger-ui = {version = "5.0.0", features = ["axum"]}
 uuid = "1.1.2"
 whatlang = {version = "0.16.0", features = ["serde"]}
 zstd = "0.13"
+bindgen = "0.69.2"
+cmake = "0.1"
+cc = { version = "1", features = ["parallel"] }
 
 [profile.test.package]
 flate2.opt-level = 3

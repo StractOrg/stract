@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+just cargo check
+just cargo check --no-default-features
+cd frontend && npm run check

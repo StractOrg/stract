@@ -1,0 +1,12 @@
+[package]
+name = "zimba"
+authors = ['Stract <hello@stract.com>']
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+
+[dependencies]
+lzma = {workspace = true}
+memmap2 = {workspace = true}
+thiserror = {workspace = true}
+zstd = {workspace = true}

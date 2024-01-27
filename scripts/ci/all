@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+./scripts/ci/check
+just cargo t
+./scripts/licenses.sh
