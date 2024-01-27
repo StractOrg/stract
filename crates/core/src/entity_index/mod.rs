@@ -203,7 +203,7 @@ impl EntityIndex {
         self.reader.reload().unwrap();
     }
 
-    fn related_entities(&self, doc: DocAddress) -> Vec<EntityMatch> {
+    fn related_entities(&self, doc: DocAddress, image_id: Option<&String>) -> Vec<EntityMatch> {
         let searcher = self.reader.searcher();
         let more_like_this_query = MoreLikeThisQuery::builder()
             .with_min_doc_frequency(1)
@@ -222,6 +222,12 @@ impl EntityIndex {
             (Occur::Must, image_query.box_clone()),
         ]);
 
+        let mut images = HashSet::new();
+
+        if let Some(image_id) = image_id {
+            images.insert(image_id.clone());
+        }
+
         match searcher.search(&query, &TopDocs::with_limit(100)) {
             Ok(result) => result
                 .into_iter()
@@ -232,7 +238,17 @@ impl EntityIndex {
 
                     EntityMatch { entity, score }
                 })
-                .filter(|entity_match| entity_match.entity.image_id.is_some())
+                .filter(|entity_match| {
+                    if let Some(image_id) = &entity_match.entity.image_id {
+                        let res = !images.contains(image_id);
+
+                        images.insert(image_id.clone());
+
+                        res
+                    } else {
+                        false
+                    }
+                })
                 .take(4)
                 .collect(),
             Err(_) => Vec::new(),
@@ -339,12 +355,6 @@ impl EntityIndex {
 
         let best_info = self.best_info(info);
 
-        let related_entities = if get_related {
-            self.related_entities(doc_address)
-        } else {
-            Vec::new()
-        };
-
         let image_id = doc
             .get_first(image_field)
             .and_then(|val| match val {
@@ -363,6 +373,12 @@ impl EntityIndex {
             Some(image_id)
         } else {
             None
+        };
+
+        let related_entities = if get_related {
+            self.related_entities(doc_address, image_id.as_ref())
+        } else {
+            Vec::new()
         };
 
         let links: Vec<Link> = if get_links {
