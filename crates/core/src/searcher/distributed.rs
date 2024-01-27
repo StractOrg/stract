@@ -234,7 +234,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?;
 
-        if let Some(Some(res)) = res.into_iter().flat_map(|(_, v)| v).next() {
+        if let Some(res) = res.into_iter().flat_map(|(_, v)| v).flat_map(|v| v).next() {
             Ok(Some(res))
         } else {
             Err(Error::WebpageNotFound.into())
@@ -280,7 +280,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?
             .pop()
-            .unwrap())
+            .flatten())
     }
 
     async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
