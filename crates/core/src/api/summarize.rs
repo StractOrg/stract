@@ -46,6 +46,10 @@ async fn summarize(
         .await?
         .ok_or_else(|| anyhow::anyhow!("Webpage not found: {}", params.url))?;
 
+    if webpage.body.is_empty() {
+        return Err(anyhow::anyhow!("Webpage body is empty"));
+    }
+
     let stream = state
         .summarizer
         .summarize(&params.query, &webpage.body)

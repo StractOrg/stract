@@ -120,7 +120,15 @@ impl Message<WebGraphService> for SimilarHosts {
 impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
-    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(mut self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+        if let Some(suf) = self.host.strip_prefix("http://") {
+            self.host = suf.to_string();
+        }
+
+        if let Some(suf) = self.host.strip_prefix("https://") {
+            self.host = suf.to_string();
+        }
+
         let url = Url::parse(&("http://".to_string() + self.host.as_str()))
             .map_err(|_| sonic::Error::BadRequest)?;
 
