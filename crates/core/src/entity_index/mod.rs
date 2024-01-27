@@ -20,7 +20,7 @@ use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::TopDocs,
-    query::{BooleanQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
+    query::{BooleanQuery, BoostQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
     schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
     tokenizer::Tokenizer,
     DocAddress, IndexReader, IndexWriter, Searcher, TantivyDocument, Term,
@@ -255,9 +255,13 @@ impl EntityIndex {
 
             term_queries.push((
                 Occur::Must,
-                TermQuery::new(
-                    Term::from_field_text(title, &token.text),
-                    IndexRecordOption::WithFreqsAndPositions,
+                BoostQuery::new(
+                    TermQuery::new(
+                        Term::from_field_text(title, &token.text),
+                        IndexRecordOption::WithFreqsAndPositions,
+                    )
+                    .box_clone(),
+                    5.0,
                 )
                 .box_clone(),
             ));
