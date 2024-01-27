@@ -411,6 +411,7 @@ mod tests {
         index.prepare_writer();
 
         index.insert(Entity {
+            is_disambiguation: false,
             title: "the ashes".to_string(),
             page_abstract: Span {
                 text: String::new(),
@@ -439,6 +440,7 @@ mod tests {
         index.prepare_writer();
 
         index.insert(Entity {
+            is_disambiguation: false,
             title: "the ashes".to_string(),
             page_abstract: Span {
                 text: String::new(),

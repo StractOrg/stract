@@ -99,7 +99,10 @@ fn article_to_entity(article: Article) -> Entity {
         .map(|n| node_into_span(n.as_node()))
         .unwrap_or_default();
 
+    let is_disambiguation = root.select_first("#disambigbox").is_some();
+
     Entity {
+        is_disambiguation,
         title,
         page_abstract,
         image,
@@ -177,7 +180,7 @@ impl EntityIndexer {
 
         let mut inserts = 0;
 
-        for entity in EntityIterator::new(&zim)? {
+        for entity in EntityIterator::new(&zim)?.filter(|e| !e.is_disambiguation) {
             index.insert(entity);
             inserts += 1;
 

@@ -20,6 +20,7 @@ use utoipa::ToSchema;
 
 #[derive(Debug)]
 pub struct Entity {
+    pub is_disambiguation: bool,
     pub title: String,
     pub page_abstract: Span,
     pub info: Vec<(String, Span)>,
