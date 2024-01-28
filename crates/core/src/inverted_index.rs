@@ -442,7 +442,13 @@ impl InvertedIndex {
         }) {
             if query.simple_terms().is_empty() {
                 let snippet = if let Some(description) = page.description.as_deref() {
-                    description.split_whitespace().take(50).join(" ")
+                    let snip = description.split_whitespace().take(50).join(" ");
+
+                    if snip.split_ascii_whitespace().count() < 10 {
+                        page.body.split_whitespace().take(50).join(" ")
+                    } else {
+                        snip
+                    }
                 } else {
                     page.body.split_whitespace().take(50).join(" ")
                 };

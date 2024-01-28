@@ -99,7 +99,20 @@ fn article_to_entity(article: Article) -> Entity {
         .map(|n| node_into_span(n.as_node()))
         .unwrap_or_default();
 
-    let is_disambiguation = root.select_first("#disambigbox").is_some();
+    let mut is_disambiguation = false;
+
+    if let Some(catlinks) = root.select_first("#catlinks") {
+        for link in catlinks.as_node().select("a").unwrap() {
+            if link
+                .text_contents()
+                .to_ascii_lowercase()
+                .contains("disambiguation")
+            {
+                is_disambiguation = true;
+                break;
+            }
+        }
+    }
 
     Entity {
         is_disambiguation,
