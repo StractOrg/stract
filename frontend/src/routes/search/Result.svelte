@@ -2,12 +2,19 @@
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
   import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
-  import { clearSummary, summariesStore, markPagesWithAdsStore, markPagesWithPaywallStore } from '$lib/stores';
+  import {
+    clearSummary,
+    summariesStore,
+    markPagesWithAdsStore,
+    markPagesWithPaywallStore,
+  } from '$lib/stores';
   import Summary from './Summary.svelte';
   import { derived } from 'svelte/store';
   import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
+  import Article from '$lib/components/Article.svelte';
+  import BiglogoBeta from '$lib/images/BiglogoBeta.svelte';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;
@@ -24,7 +31,7 @@
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
         <a
-          class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
+          class="text-neutral-focus max-w-[calc(100%-100px)] truncate"
           href={webpage.url}
           use:improvements={resultIndex}
         >
@@ -32,7 +39,7 @@
         </a>
       </div>
       <a
-        class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+        class="text-link visited:text-link-visited max-w-[calc(100%-30px)] truncate text-xl font-medium hover:underline"
         title={webpage.title}
         href={webpage.url}
         use:improvements={resultIndex}
@@ -41,14 +48,14 @@
       </a>
     </div>
     <button
-      class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
+      class="noscript:hidden text-neutral hover:text-neutral-focus flex w-5 min-w-fit items-center justify-center bg-transparent hover:cursor-pointer"
       bind:this={button}
       on:click|stopPropagation={() => dispatch('modal', button)}
     >
       <AdjustVertical class="text-md" />
     </button>
   </div>
-  <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">
+  <div class="text-neutral-focus text-sm font-normal [&>b]:font-bold">
     {#if $summary}
       <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
     {:else if webpage.snippet.type == 'normal'}
@@ -56,19 +63,28 @@
         <div class="line-clamp-3">
           <div class="inline">
             <span id="snippet-text" class="snippet-text">
-                {#if (webpage.likelyHasAds && $markPagesWithAdsStore ) && (webpage.likelyHasPaywall && $markPagesWithPaywallStore)}
-                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has ads and paywall">
+              {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+                <span
+                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  title="page likely has ads and paywall"
+                >
                   has ads + paywall
                 </span>
-                {:else if (webpage.likelyHasAds && $markPagesWithAdsStore)}
-                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has ads">
+              {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
+                <span
+                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  title="page likely has ads"
+                >
                   has ads
                 </span>
-                {:else if (webpage.likelyHasPaywall && $markPagesWithPaywallStore)}
-                <span class="text-neutral text-center border p-0.5 rounded border-primary text-xs" title="page likely has paywall" >
+              {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+                <span
+                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  title="page likely has paywall"
+                >
                   paywall
                 </span>
-                {/if}
+              {/if}
               {#if webpage.snippet.date}
                 <span class="text-neutral">
                   {webpage.snippet.date}

@@ -49,7 +49,7 @@
       //     |   x <--
       //     +---+
       modal = {
-        top: window.scrollY + rect.top + rect.height/2,
+        top: window.scrollY + rect.top + rect.height / 2,
         left: window.scrollX + rect.right,
         site,
       };
@@ -66,7 +66,6 @@
   $: {
     if (browser && results.type == 'websites') updateQueryId({ query, webpages: results.webpages });
   }
-
 </script>
 
 {#if modal}
@@ -75,7 +74,7 @@
 
 {#if results.type == 'websites'}
   <div
-    class="m-0 grid w-full gap-y-5 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] grid-rows-[auto_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
+    class="m-0 grid w-full grid-rows-[auto_1fr] gap-y-5 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
     style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
   >
     <div class="flex max-w-2xl flex-col space-y-1">
@@ -83,14 +82,16 @@
         <Searchbar {query} />
       </div>
       <div class="mx-auto flex w-full justify-end sm:justify-between">
-        <div class="hidden sm:flex h-full flex-col space-x-2 text-xs text-neutral">
+        <div class="text-neutral hidden h-full flex-col space-x-2 text-xs sm:flex">
           <p class="h-fit">
             {#if results.numHits != null}
-              Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in <span class="font-medium">{(
-                (results.searchDurationMs ?? 0) / 1000
-              ).toFixed(2)}s</span>
+              Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
+              <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
+              >
             {:else}
-              Search took <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span>
+              Search took <span class="font-medium"
+                >{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
+              >
             {/if}
           </p>
         </div>
@@ -123,7 +124,7 @@
       {/if}
 
       {#if results.webpages}
-        <div class="grid grid-cols-1 space-y-10 place-self-start">
+        <div class="grid w-full grid-cols-1 space-y-10 place-self-start">
           {#each results.webpages as webpage, resultIndex (`${query}-${webpage.url}`)}
             <div animate:flip={{ duration: 150 }}>
               <Result {webpage} {resultIndex} on:modal={openSearchModal(webpage)} />
@@ -139,18 +140,18 @@
         <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
           {#if data.prevPageSearchParams}
             <a href="/search?{data.prevPageSearchParams}">
-              <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
+              <ChevronLeft class="text-primary hover:text-primary-focus text-xl" />
             </a>
           {:else}
-            <ChevronLeft class="text-xl text-neutral" />
+            <ChevronLeft class="text-neutral text-xl" />
           {/if}
           <div>Page {data.currentPage}</div>
           {#if data.nextPageSearchParams}
             <a href="/search?{data.nextPageSearchParams}">
-              <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
+              <ChevronRight class="text-primary hover:text-primary-focus text-xl" />
             </a>
           {:else}
-            <ChevronRight class="text-xl text-neutral" />
+            <ChevronRight class="text-neutral text-xl" />
           {/if}
         </div>
       </div>
@@ -158,7 +159,7 @@
 
     {#if results.sidebar}
       <div
-        class="row-start-2 mx-auto max-w-[90vw] md:max-w-[30vw] justify-center md:col-start-2 md:row-span-2 md:row-start-1 md:pt-5"
+        class="row-start-2 mx-auto max-w-[90vw] justify-center md:col-start-2 md:row-span-2 md:row-start-1 md:max-w-[30vw] md:pt-5"
       >
         <Sidebar sidebar={results.sidebar} />
       </div>
