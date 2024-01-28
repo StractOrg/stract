@@ -32,56 +32,58 @@
 </script>
 
 {#if shownDiscussions && shownDiscussions.length > 0}
-<div class="flex flex-col space-y-1.5 overflow-hidden row-start-5">
-  <div class="flex items-center space-x-1 text-lg">
-    <ChatBubbleLeftRight class="text-sm text-neutral" />
-    <span>Discussions</span>
-  </div>
-  <div class="flex flex-col">
-    {#each shownDiscussions as discussion}
-      <div class="overflow-hidden">
-        <div>
-          <a class="text-sm text-neutral-focus" href={discussion.url}>
-            {discussion.domain}
-          </a>
-        </div>
-        <details class="group">
-          <summary class="flex cursor-pointer list-none items-center space-x-2">
-            <a
-              class="text-md text-neutral-focus inline-block max-w-[calc(100%-10px)] truncate font-medium group-open:underline"
-              title={discussion.title}
-              href={discussion.url}
-            >
-              {discussion.title}
+  <div class="row-start-5 flex flex-col space-y-1.5 overflow-hidden">
+    <div class="flex items-center space-x-1 text-lg">
+      <ChatBubbleLeftRight class="text-neutral text-sm" />
+      <span>Discussions</span>
+    </div>
+    <div class="flex flex-col">
+      {#each shownDiscussions as discussion}
+        <div class="overflow-hidden">
+          <div>
+            <a class="text-neutral-focus text-sm" href={discussion.url}>
+              {discussion.domain}
             </a>
-            <ChevronDown class="text-sm transition group-open:rotate-180" />
-          </summary>
-
-          {#if discussion.snippet.type == 'normal'}
-            <div class="mb-3 text-sm font-normal text-neutral-focus">
-              {#if typeof discussion.snippet.date == 'string'}
-                <span class="text-neutral">{discussion.snippet.date}</span>
-              {/if}
-              <span class="[&:nth-child(2)]:before:content-['—']">
-                <TextSnippet snippet={discussion.snippet.text} />
+          </div>
+          <details class="group">
+            <summary class="flex cursor-pointer list-none items-center space-x-2">
+              <a
+                class="text-md text-neutral-focus inline-block max-w-[calc(100%-10px)] truncate font-medium group-open:underline"
+                title={discussion.title}
+                href={discussion.url}
+              >
+                {discussion.title}
+              </a>
+              <span>
+                <ChevronDown class="text-sm transition group-open:rotate-180" />
               </span>
-            </div>
-          {/if}
-        </details>
+            </summary>
+
+            {#if discussion.snippet.type == 'normal'}
+              <div class="text-neutral-focus mb-3 text-sm font-normal">
+                {#if typeof discussion.snippet.date == 'string'}
+                  <span class="text-neutral">{discussion.snippet.date}</span>
+                {/if}
+                <span class="[&:nth-child(2)]:before:content-['—']">
+                  <TextSnippet snippet={discussion.snippet.text} />
+                </span>
+              </div>
+            {/if}
+          </details>
+        </div>
+      {/each}
+      <div class="noscript:hidden mt-2">
+        <Button _class="py-1" kind="neutral" pale on:click={() => (showMore = !showMore)}
+          >{showMore ? 'Show less' : 'Show more'}</Button
+        >
       </div>
-    {/each}
-    <div class="noscript:hidden mt-2">
-      <Button _class="py-1" kind="neutral" pale on:click={() => (showMore = !showMore)}
-        >{showMore ? 'Show less' : 'Show more'}</Button
-      >
     </div>
   </div>
-</div>
 
-<style>
-  /* hide marker in safari */
-  summary::-webkit-details-marker {
-    display: none;
-  }
-</style>
+  <style>
+    /* hide marker in safari */
+    summary::-webkit-details-marker {
+      display: none;
+    }
+  </style>
 {/if}
