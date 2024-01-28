@@ -59,37 +59,35 @@
 
 <svelte:window bind:innerWidth />
 
-
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
-class={twJoin(
+  class={twJoin(
     'absolute -translate-y-1/2 transition-all',
-    'h-fit flex-col items-center overflow-hidden rounded-lg border bg-base-100 px-2 py-5 text-sm drop-shadow-md',
-)}
-style="top: {top}px; left: calc({left}px); width: {widthPixels}px;"
-transition:scale={{ duration: 150 }}
-on:click|stopPropagation={() => {}}
+    'bg-base-100 h-fit flex-col items-center overflow-hidden rounded-lg border px-2 py-5 text-sm drop-shadow-md',
+  )}
+  style="top: {top}px; left: calc({left}px); width: {widthPixels}px;"
+  transition:scale={{ duration: 150 }}
+  on:click|stopPropagation={() => {}}
 >
   <div>
-    <h2 class="w-fit text-center">
-    Do you like results from {modal.site.site}?
-    </h2>
+    <h2 class="w-full text-center">Do you like results from</h2>
+    <p class="text-center">{modal.site.site}?</p>
     <div class="flex justify-center space-x-1.5 pt-2">
-    {#each rankingChoices as { ranking, kind, Icon }}
+      {#each rankingChoices as { ranking, kind, Icon }}
         <Button
-        {kind}
-        pale={$hostRankingsStore[modal.site.site] != ranking}
-        padding={false}
-        form="searchbar-form"
-        on:click={rankSite(modal.site, ranking)}
+          {kind}
+          pale={$hostRankingsStore[modal.site.site] != ranking}
+          padding={false}
+          form="searchbar-form"
+          on:click={rankSite(modal.site, ranking)}
         >
-        <Icon class="w-4" />
+          <Icon class="w-4" />
         </Button>
-    {/each}
+      {/each}
     </div>
     <div class="mt-4 flex justify-center">
-    <Button pale on:click={summarizeSite(modal.site)}>Summarize Result</Button>
+      <Button pale on:click={summarizeSite(modal.site)}>Summarize Result</Button>
     </div>
   </div>
 </div>
