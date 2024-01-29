@@ -181,7 +181,10 @@ impl LangSpellChecker {
             if orig == possible_correction {
                 res.push(CorrectionTerm::NotCorrected(orig));
             } else {
-                res.push(CorrectionTerm::Corrected(possible_correction));
+                res.push(CorrectionTerm::Corrected {
+                    orig,
+                    correction: possible_correction,
+                });
             }
         }
 
@@ -263,7 +266,10 @@ mod tests {
             if orig == corrected {
                 res.push(CorrectionTerm::NotCorrected(orig));
             } else {
-                res.push(CorrectionTerm::Corrected(corrected));
+                res.push(CorrectionTerm::Corrected {
+                    orig,
+                    correction: corrected,
+                });
             }
         }
 

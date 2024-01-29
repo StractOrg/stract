@@ -80,11 +80,14 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
         )
       : { data: undefined };
 
-  const [websites, widget, sidebar, discussionsRes] = await Promise.all([
+  const { data: spellcheckReq } = api.searchSpellcheck({ query: params.query });
+
+  const [websites, widget, sidebar, discussionsRes, spellCorrection] = await Promise.all([
     websitesReq,
     widgetReq,
     sidebarReq,
     discussionsReq,
+    spellcheckReq,
   ]);
   const discussions = discussionsRes?.type == 'websites' ? discussionsRes.webpages : undefined;
 
@@ -95,6 +98,7 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
           widget,
           sidebar,
           discussions,
+          spellCorrection,
         }
       : {
           ...websites,

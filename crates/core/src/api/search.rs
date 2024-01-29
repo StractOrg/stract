@@ -188,6 +188,27 @@ pub async fn sidebar(
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct SpellcheckQuery {
+    pub query: String,
+}
+
+#[debug_handler]
+#[utoipa::path(
+    post,
+    path = "/beta/api/search/spellcheck",
+    request_body(content = SpellcheckQuery),
+    responses(
+        (status = 200, description = "The corrected string with the changes highlighted using <b>...<\\b> elements. Returns empty response if there is no correction to be made.", body = Option<HighlightedSpellCorrection>),
+    )
+)]
+pub async fn spellcheck(
+    extract::State(state): extract::State<Arc<State>>,
+    extract::Json(req): extract::Json<SpellcheckQuery>,
+) -> impl IntoResponse {
+    Json(state.searcher.spell_check(&req.query))
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityImageParams {
     pub image_id: String,

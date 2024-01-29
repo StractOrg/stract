@@ -425,7 +425,6 @@ where
         Ok(WebsitesResult {
             num_hits: search_result.num_websites,
             webpages,
-            spell_corrected_query: None,
             search_duration_ms: start.elapsed().as_millis(),
             has_more_results,
         })

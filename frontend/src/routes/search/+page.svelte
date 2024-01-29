@@ -106,14 +106,14 @@
       </div>
     </div>
     <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-5">
-      {#if results.spellCorrectedQuery}
+      {#if results.spellCorrection}
         <div>
           <div>
             Did you mean:{' '}
             <a
               class="font-medium"
-              href="/search?q={encodeURIComponent(results.spellCorrectedQuery.raw)}"
-              >{@html results.spellCorrectedQuery.highlighted}</a
+              href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
+              >{@html results.spellCorrection.highlighted}</a
             >
           </div>
         </div>

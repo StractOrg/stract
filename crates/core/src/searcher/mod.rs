@@ -26,11 +26,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    bangs::BangHit,
-    config::defaults,
-    ranking::pipeline::RankingWebsite,
-    search_prettifier::{DisplayedWebpage, HighlightedSpellCorrection},
-    webpage::region::Region,
+    bangs::BangHit, config::defaults, ranking::pipeline::RankingWebsite,
+    search_prettifier::DisplayedWebpage, webpage::region::Region,
 };
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
@@ -44,7 +41,6 @@ pub enum SearchResult {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WebsitesResult {
-    pub spell_corrected_query: Option<HighlightedSpellCorrection>,
     pub webpages: Vec<DisplayedWebpage>,
     pub num_hits: Option<usize>,
     pub search_duration_ms: u128,

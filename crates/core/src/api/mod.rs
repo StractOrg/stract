@@ -210,6 +210,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             Router::new()
                 .route("/api/search/widget", post(search::widget))
                 .route("/api/search/sidebar", post(search::sidebar))
+                .route("/api/search/spellcheck", post(search::spellcheck))
                 .route("/api/autosuggest", post(autosuggest::route))
                 .route("/api/autosuggest/browser", get(autosuggest::browser))
                 .route("/api/summarize", get(summarize::summarize_route))

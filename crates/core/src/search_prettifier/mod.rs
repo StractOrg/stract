@@ -73,7 +73,10 @@ impl From<web_spell::Correction> for HighlightedSpellCorrection {
 
         for term in correction.terms {
             match term {
-                CorrectionTerm::Corrected(correction) => {
+                CorrectionTerm::Corrected {
+                    orig: _,
+                    correction,
+                } => {
                     highlighted
                         .push_str(&("<b><i>".to_string() + correction.as_str() + "</i></b>"));
                     raw.push_str(&correction);

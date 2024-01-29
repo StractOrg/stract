@@ -1,4 +1,12 @@
-import type { Region, Widget, DisplayedSidebar, DisplayedWebpage, WebsitesResult, BangHit } from './api';
+import type {
+  Region,
+  Widget,
+  DisplayedSidebar,
+  DisplayedWebpage,
+  WebsitesResult,
+  BangHit,
+  HighlightedSpellCorrection,
+} from './api';
 import { decompressRanked, type RankedSites } from './rankings';
 
 export type SearchParams = {
@@ -11,16 +19,17 @@ export type SearchParams = {
   host_rankings: RankedSites | undefined;
 };
 
-export type SearchResults = 
+export type SearchResults =
   | (WebsitesResult & {
-    type: 'websites';
-    widget?: Widget;
-    sidebar?: DisplayedSidebar;
-    discussions?: DisplayedWebpage[];
-  })
+      type: 'websites';
+      spellCorrection?: HighlightedSpellCorrection;
+      widget?: Widget;
+      sidebar?: DisplayedSidebar;
+      discussions?: DisplayedWebpage[];
+    })
   | (BangHit & {
-    type: 'bang';
-  });
+      type: 'bang';
+    });
 
 export const extractSearchParams = (searchParams: URLSearchParams | FormData): SearchParams => {
   const query = (searchParams.get('q') as string | undefined) ?? '';
@@ -31,7 +40,9 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     | undefined;
   const safeSearch = (searchParams.get('ss') as string | undefined) == 'true';
   const compressedhost_rankings = (searchParams.get('sr') as string | undefined) || null;
-  const host_rankings = compressedhost_rankings ? decompressRanked(compressedhost_rankings) : void 0;
+  const host_rankings = compressedhost_rankings
+    ? decompressRanked(compressedhost_rankings)
+    : void 0;
 
   return {
     query,

@@ -52,6 +52,11 @@ impl CompoundAwareTerm {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SimpleTerm(String);
+impl SimpleTerm {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 impl From<String> for SimpleTerm {
     fn from(value: String) -> Self {

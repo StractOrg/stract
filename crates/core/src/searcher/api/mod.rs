@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use itertools::intersperse;
+use itertools::{intersperse, Itertools};
 use url::Url;
 
 use crate::bangs::{Bang, BangHit};
@@ -277,6 +277,63 @@ where
         self.sidebar_manager.sidebar(query).await
     }
 
+    pub fn spell_check(&self, query: &str) -> Option<HighlightedSpellCorrection> {
+        let query = query.to_lowercase();
+
+        let terms = query::parser::parse(&query);
+
+        let simple_query = terms
+            .clone()
+            .into_iter()
+            .filter_map(|term| match *term {
+                query::parser::Term::Simple(t) => Some(String::from(t)),
+                _ => None,
+            })
+            .join(" ");
+
+        let corrections = self
+            .spell_checker
+            .as_ref()
+            .and_then(|s| s.correct(&simple_query, &whatlang::Lang::Eng))?;
+
+        let correction_map: HashMap<String, String> = corrections
+            .terms
+            .into_iter()
+            .filter_map(|t| match t {
+                crate::web_spell::CorrectionTerm::Corrected { orig, correction } => {
+                    Some((orig, correction))
+                }
+                crate::web_spell::CorrectionTerm::NotCorrected(_) => None,
+            })
+            .collect();
+
+        let mut correction = crate::web_spell::Correction::empty(query);
+
+        for term in terms {
+            match *term {
+                query::parser::Term::Simple(t) => {
+                    if let Some(term_correction) = correction_map.get(t.as_str()) {
+                        correction.push(crate::web_spell::CorrectionTerm::Corrected {
+                            orig: String::from(t),
+                            correction: term_correction.to_string(),
+                        });
+                    } else {
+                        correction.push(crate::web_spell::CorrectionTerm::NotCorrected(
+                            String::from(t),
+                        ));
+                    }
+                }
+                _ => {
+                    correction.push(crate::web_spell::CorrectionTerm::NotCorrected(
+                        term.to_string(),
+                    ));
+                }
+            }
+        }
+
+        Some(HighlightedSpellCorrection::from(correction))
+    }
+
     async fn retrieve_webpages(
         &self,
         query: &str,
@@ -366,12 +423,6 @@ where
             self.search_initial_from_live(&search_query),
         );
 
-        let spell_corrected_query = self
-            .spell_checker
-            .as_ref()
-            .and_then(|s| s.correct(&query.query, &whatlang::Lang::Eng))
-            .map(HighlightedSpellCorrection::from);
-
         let num_docs = initial_results
             .iter()
             .map(|result| result.local_result.num_websites)
@@ -432,7 +483,6 @@ where
         let search_duration_ms = start.elapsed().as_millis();
 
         Ok(WebsitesResult {
-            spell_corrected_query,
             num_hits: num_docs,
             webpages: retrieved_webpages,
             search_duration_ms,

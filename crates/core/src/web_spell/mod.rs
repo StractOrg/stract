@@ -66,7 +66,7 @@ pub struct Correction {
 
 #[derive(PartialEq, Eq, Debug, Serialize, Deserialize, Clone)]
 pub enum CorrectionTerm {
-    Corrected(String),
+    Corrected { orig: String, correction: String },
     NotCorrected(String),
 }
 
@@ -74,7 +74,10 @@ impl From<Correction> for String {
     fn from(correction: Correction) -> Self {
         intersperse(
             correction.terms.into_iter().map(|term| match term {
-                CorrectionTerm::Corrected(correction) => correction,
+                CorrectionTerm::Corrected {
+                    orig: _,
+                    correction,
+                } => correction,
                 CorrectionTerm::NotCorrected(orig) => orig,
             }),
             " ".to_string(),

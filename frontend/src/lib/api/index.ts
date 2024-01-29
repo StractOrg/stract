@@ -118,6 +118,8 @@ export const api = {
     requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
   searchSidebar: (body: SidebarQuery, options?: ApiOptions) =>
     requestJson<DisplayedSidebar>('POST', `/beta/api/search/sidebar`, body, options),
+  searchSpellcheck: (body: SpellcheckQuery, options?: ApiOptions) =>
+    requestJson<HighlightedSpellCorrection>('POST', `/beta/api/search/spellcheck`, body, options),
   searchWidget: (body: WidgetQuery, options?: ApiOptions) =>
     requestJson<Widget>('POST', `/beta/api/search/widget`, body, options),
   summarize: (
@@ -359,6 +361,9 @@ export type Snippet =
       question: StackOverflowQuestion;
       type: 'stackOverflowQA';
     };
+export type SpellcheckQuery = {
+  query: string;
+};
 export type StackOverflowAnswer = {
   accepted: boolean;
   body: CodeOrText[];
@@ -394,7 +399,6 @@ export type WebsitesResult = {
   hasMoreResults: boolean;
   numHits?: number;
   searchDurationMs: number;
-  spellCorrectedQuery?: HighlightedSpellCorrection;
   webpages: DisplayedWebpage[];
 };
 export type Widget =
