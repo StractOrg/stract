@@ -7,7 +7,8 @@
 
   export let url: string;
 
-  $: tokens = ($summariesStore[url]?.tokens ?? []);
+  $: tokens = $summariesStore[url]?.tokens ?? [];
+  $: inProgress = $summariesStore[url]?.inProgress ?? false;
 
   const dispatch = createEventDispatcher<{ hide: null }>();
 </script>
@@ -17,10 +18,10 @@
     <XMark />
   </button>
 
-  <p class="line-clamp-3">
+  <p class="line-clamp-3" aria-live="polite" aria-busy={inProgress ? 'true' : 'false'}>
     {#if tokens.length > 0}
       {#each tokens as tok}
-        <span transition:fade={{duration: 500}}>{tok}</span>
+        <span transition:fade={{ duration: 500 }}>{tok}</span>
       {/each}
     {:else}
       <span class="flex">
