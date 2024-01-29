@@ -295,7 +295,7 @@ mod tests {
                 )
                 .unwrap(),
                 host_centrality: 1.0,
-                fetch_time_ms: 499,
+                fetch_time_ms: 4999,
                 ..Default::default()
             })
             .expect("failed to insert webpage");
@@ -320,7 +320,7 @@ mod tests {
                 )
                 .unwrap(),
                 host_centrality: 1.0,
-                fetch_time_ms: 500,
+                fetch_time_ms: 5000,
                 ..Default::default()
             })
             .expect("failed to insert webpage");

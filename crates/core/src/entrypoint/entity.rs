@@ -38,6 +38,12 @@ impl<'a> EntityIterator<'a> {
     }
 }
 
+impl From<Article> for Entity {
+    fn from(article: Article) -> Self {
+        article_to_entity(article)
+    }
+}
+
 fn article_to_entity(article: Article) -> Entity {
     let root = kuchiki::parse_html().one(article.content);
 
@@ -99,20 +105,18 @@ fn article_to_entity(article: Article) -> Entity {
         .map(|n| node_into_span(n.as_node()))
         .unwrap_or_default();
 
-    let mut is_disambiguation = false;
-
-    if let Some(catlinks) = root.select_first("#catlinks") {
-        for link in catlinks.as_node().select("a").unwrap() {
-            if link
-                .text_contents()
-                .to_ascii_lowercase()
-                .contains("disambiguation")
-            {
-                is_disambiguation = true;
-                break;
-            }
-        }
-    }
+    let is_disambiguation = root
+        .select("meta")
+        .map(|mut metas| {
+            metas.any(|meta| {
+                meta.attributes
+                    .borrow()
+                    .get("property")
+                    .map(|prop| prop == "mw:PageProp/disambiguation")
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
 
     Entity {
         is_disambiguation,
@@ -478,5 +482,30 @@ mod tests {
                 Span::new("384 BC Stagira, Chalcidian League")
             )
         );
+    }
+
+    #[test]
+    fn disambig() {
+        let content = include_str!("../../testcases/entity/disambig.html");
+        let article = Article {
+            url: "disambig".to_string(),
+            title: "disambig".to_string(),
+            content: content.to_string(),
+        };
+
+        let entity = Entity::from(article);
+
+        assert!(entity.is_disambiguation);
+
+        let content = include_str!("../../testcases/entity/aristotle.html");
+        let article = Article {
+            url: "disambig".to_string(),
+            title: "disambig".to_string(),
+            content: content.to_string(),
+        };
+
+        let entity = Entity::from(article);
+
+        assert!(!entity.is_disambiguation);
     }
 }
