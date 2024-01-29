@@ -427,6 +427,7 @@ mod tests {
         index.prepare_writer();
 
         index.insert(Entity {
+            article_url: String::new(),
             is_disambiguation: false,
             title: "the ashes".to_string(),
             page_abstract: Span {
@@ -456,6 +457,7 @@ mod tests {
         index.prepare_writer();
 
         index.insert(Entity {
+            article_url: String::new(),
             is_disambiguation: false,
             title: "the ashes".to_string(),
             page_abstract: Span {

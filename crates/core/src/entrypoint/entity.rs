@@ -119,6 +119,7 @@ fn article_to_entity(article: Article) -> Entity {
         .unwrap_or(false);
 
     Entity {
+        article_url: article.url,
         is_disambiguation,
         title,
         page_abstract,
@@ -197,7 +198,10 @@ impl EntityIndexer {
 
         let mut inserts = 0;
 
-        for entity in EntityIterator::new(&zim)?.filter(|e| !e.is_disambiguation) {
+        for entity in EntityIterator::new(&zim)?
+            .filter(|e| !e.is_disambiguation)
+            .filter(|e| !e.article_url.starts_with("Portal:"))
+        {
             index.insert(entity);
             inserts += 1;
 
