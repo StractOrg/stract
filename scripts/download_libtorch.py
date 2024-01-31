@@ -68,10 +68,10 @@ def install_libtorch(gpu=False):
 
 def create_symlinks():
     # Create symlinks from libtorch to core/libtorch
-    if os.path.exists("./core/libtorch"):
+    if os.path.exists("./crates/core/libtorch"):
         return
 
-    os.symlink("../libtorch", "./core/libtorch")
+    os.symlink("../libtorch", "./crates/core/libtorch")
 
 
 if __name__ == "__main__":

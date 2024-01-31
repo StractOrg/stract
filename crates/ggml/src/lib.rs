@@ -1,6 +1,7 @@
 mod context;
 mod dims;
-mod tensor;
+pub mod nn;
+pub mod tensor;
 
 pub use context::*;
 pub use dims::*;

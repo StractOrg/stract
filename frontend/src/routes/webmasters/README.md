@@ -1,7 +1,7 @@
 # Stract Crawler
 
 Stract is an [open source](https://github.com/StractOrg/stract/) web search engine. StractBot is the name of our crawler that collects pages from the web in order to build the index.
-It is written in Rust and the source code can be found [here](https://github.com/StractOrg/stract/tree/main/core/src/crawler).
+It is written in Rust and the source code can be found [here](https://github.com/StractOrg/stract/tree/main/crates/core/src/crawler).
 The crawler uses the user agent `Mozilla/5.0 (compatible; StractBot/0.1; open source search engine; +https://stract.com/webmasters)`.
 
 ## Politeness

@@ -15,14 +15,12 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "prettier.configPath": "frontend/.prettierrc",
-  "prettier.documentSelectors": [
-    "**/*.svelte"
-  ],
+  "prettier.documentSelectors": ["**/*.svelte"],
   "svelte.enable-ts-plugin": true,
   "tailwindCSS.experimental.configFile": "frontend/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "optics-lsp/Cargo.toml",
-    "./core/Cargo.toml"
+    "./crates/core/Cargo.toml"
   ]
 }

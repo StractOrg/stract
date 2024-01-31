@@ -52,7 +52,7 @@ impl InnerGraph {
 
 pub struct Graph<const OUT_DIMS: usize>
 where
-    Dims<OUT_DIMS>: ValidDims<OUT_DIMS>,
+    Dims<OUT_DIMS>: ValidDims,
 {
     inner: InnerGraph,
     out: Tensor<OUT_DIMS>,
@@ -60,7 +60,7 @@ where
 
 impl<const OUT_DIMS: usize> Graph<OUT_DIMS>
 where
-    Dims<OUT_DIMS>: ValidDims<OUT_DIMS>,
+    Dims<OUT_DIMS>: ValidDims,
 {
     fn inner(&self) -> &InnerGraph {
         &self.inner
@@ -99,7 +99,7 @@ impl Context {
 
     pub fn build_graph<const OUT_DIMS: usize>(&self, out: Tensor<OUT_DIMS>) -> Graph<OUT_DIMS>
     where
-        Dims<OUT_DIMS>: ValidDims<OUT_DIMS>,
+        Dims<OUT_DIMS>: ValidDims,
     {
         Graph::build(self, out)
     }
@@ -110,7 +110,7 @@ impl Context {
 
     pub fn compute<const OUT_DIMS: usize>(&self, graph: &mut Graph<OUT_DIMS>)
     where
-        Dims<OUT_DIMS>: ValidDims<OUT_DIMS>,
+        Dims<OUT_DIMS>: ValidDims,
     {
         unsafe {
             ggml_sys::ggml_graph_compute_with_ctx(
