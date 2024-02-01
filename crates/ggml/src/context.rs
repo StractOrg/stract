@@ -28,7 +28,9 @@ impl InnerContext {
 
 impl Drop for InnerContext {
     fn drop(&mut self) {
-        unsafe { ggml_sys::ggml_free(self.ctx.as_ptr()) }
+        unsafe {
+            ggml_sys::ggml_free(self.ctx.as_ptr());
+        }
     }
 }
 

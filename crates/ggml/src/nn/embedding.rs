@@ -5,8 +5,8 @@ pub struct Embedding {
 }
 
 impl Embedding {
-    pub fn new(ctx: &mut Context, t: GgmlType, vocab_size: u64, embedding_dim: u64) -> Self {
-        let tensor = Tensor::new(ctx, t, [embedding_dim, vocab_size]);
+    pub fn new(ctx: &mut Context, vocab_size: u64, embedding_dim: u64) -> Self {
+        let tensor = Tensor::new(ctx, GgmlType::default(), [embedding_dim, vocab_size]);
 
         Self { tensor }
     }
@@ -24,7 +24,7 @@ mod tests {
     fn test_embedding() {
         let mut ctx = Context::new(128 * 1024 * 1024, 1);
 
-        let mut embedding = Embedding::new(&mut ctx, GgmlType::F32, 10, 128);
+        let mut embedding = Embedding::new(&mut ctx, 10, 128);
 
         let input = Tensor::new(&mut ctx, GgmlType::I32, [10]);
 

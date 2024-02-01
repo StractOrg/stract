@@ -160,8 +160,9 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             remote_webgraph,
             summarizer: Arc::new(Summarizer::new(
                 &config.summarizer_path,
-                config.openai_api_uri.clone(),
-                config.openai_api_model.clone(),
+                config.llm.api_base.clone(),
+                config.llm.model.clone(),
+                config.llm.api_key.clone(),
             )?),
             improvement_queue: query_store_queue,
             cluster,

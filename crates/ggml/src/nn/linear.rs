@@ -6,8 +6,8 @@ pub struct Linear {
 }
 
 impl Linear {
-    pub fn new(ctx: &mut Context, t: GgmlType, input_size: u64, output_size: u64) -> Self {
-        let weight = Tensor::new(ctx, t, [input_size, output_size, 1]);
+    pub fn new(ctx: &mut Context, input_size: u64, output_size: u64) -> Self {
+        let weight = Tensor::new(ctx, GgmlType::default(), [input_size, output_size, 1]);
 
         Self { weight, bias: None }
     }
@@ -30,8 +30,8 @@ mod tests {
     #[test]
     fn test_linear() {
         let mut ctx = Context::new(128 * 1024 * 1024, 1);
-        let input = Tensor::new(&mut ctx, GgmlType::F32, [128, 3, 5]);
-        let linear = Linear::new(&mut ctx, GgmlType::F32, 128, 256);
+        let input = Tensor::new(&mut ctx, GgmlType::default(), [128, 3, 5]);
+        let linear = Linear::new(&mut ctx, 128, 256);
         let output = linear.forward(&input);
         assert_eq!(output.shape(), [256, 3, 5]);
     }

@@ -4,9 +4,10 @@ use std::sync::Arc;
 use crate::context::InnerContext;
 use crate::{Context, Dims, DimsGt, DimsPlusOne, ValidDims};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[allow(non_camel_case_types)]
 pub enum GgmlType {
+    #[default]
     F32,
     F16,
     Q4_0,
@@ -30,7 +31,7 @@ pub enum GgmlType {
 }
 
 impl GgmlType {
-    fn as_raw(&self) -> usize {
+    fn as_raw(&self) -> u32 {
         match &self {
             GgmlType::F32 => 0,
             GgmlType::F16 => 1,
@@ -63,42 +64,6 @@ where
     ctx: Arc<InnerContext>,
     type_: GgmlType,
     ptr: NonNull<ggml_sys::ggml_tensor>,
-}
-
-impl Tensor<1> {
-    pub fn copy_from_slice(&mut self, slice: &[f32]) {
-        if slice.len() != self.shape()[0] as usize {
-            panic!("slice length does not match tensor shape");
-        }
-
-        if self.type_ != GgmlType::F32 {
-            panic!("tensor type does not match slice type");
-        }
-
-        unsafe {
-            let ptr = self.ptr.as_ptr().as_ref().unwrap().data;
-            (ptr as *mut f32).copy_from_nonoverlapping(slice.as_ptr(), slice.len());
-        }
-    }
-
-    pub fn copy_to_slice(&self, out: &mut [f32]) {
-        if out.len() != self.shape()[0] as usize {
-            panic!("slice length does not match tensor shape");
-        }
-
-        if self.type_ != GgmlType::F32 {
-            panic!("tensor type does not match slice type");
-        }
-
-        let data = unsafe {
-            std::slice::from_raw_parts(
-                self.ptr.as_ptr().as_ref().unwrap().data as *const f32,
-                self.shape()[0] as usize,
-            )
-        };
-
-        out.copy_from_slice(data);
-    }
 }
 
 impl<const DIMS: usize> Tensor<DIMS>
@@ -155,6 +120,48 @@ where
         self.ptr.as_ptr()
     }
 
+    pub fn num_bytes(&self) -> usize {
+        unsafe { ggml_sys::ggml_nbytes(self.ptr.as_ptr()) }
+    }
+
+    pub fn copy_from_slice(&mut self, slice: &[f32]) {
+        if slice.len() as u64 != self.num_elements() {
+            panic!("slice length does not match tensor shape");
+        }
+
+        if self.type_ != GgmlType::F32 {
+            panic!("tensor type does not match slice type");
+        }
+
+        unsafe {
+            let ptr = self.ptr.as_ptr().as_ref().unwrap().data;
+            (ptr as *mut f32).copy_from_nonoverlapping(slice.as_ptr(), slice.len());
+        }
+    }
+
+    pub fn copy_to_slice(&self, out: &mut [f32]) {
+        if out.len() as u64 != self.num_elements() {
+            panic!("slice length does not match tensor shape");
+        }
+
+        if self.type_ != GgmlType::F32 {
+            panic!("tensor type does not match slice type");
+        }
+
+        let data = unsafe {
+            std::slice::from_raw_parts(
+                self.ptr.as_ptr().as_ref().unwrap().data as *const f32,
+                self.num_elements() as usize,
+            )
+        };
+
+        out.copy_from_slice(data);
+    }
+
+    pub fn num_elements(&self) -> u64 {
+        self.shape().into_iter().product()
+    }
+
     pub fn shape(&self) -> [u64; DIMS] {
         let shape = unsafe { self.ptr.as_ptr().as_ref().unwrap().ne };
 
@@ -175,7 +182,7 @@ where
         Dims<ROW_DIMS>: ValidDims,
         Dims<OUT_DIMS>: DimsPlusOne<ROW_DIMS> + ValidDims,
     {
-        assert_eq!(rows.type_, GgmlType::I32, "rows tensor must be of type I32");
+        debug_assert_eq!(rows.type_, GgmlType::I32, "rows tensor must be of type I32");
 
         let ptr = unsafe {
             ggml_sys::ggml_get_rows(self.ctx.as_ptr(), self.ptr.as_ptr(), rows.ptr.as_ptr())
@@ -209,7 +216,7 @@ where
     {
         debug_assert_eq!(
             shape.into_iter().product::<u64>(),
-            self.shape().into_iter().product::<u64>(),
+            self.num_elements(),
             "reshape must not change the number of elements"
         );
 
@@ -338,6 +345,46 @@ where
             ptr: NonNull::new(ptr).unwrap(),
         }
     }
+
+    pub fn as_type(&self, type_: GgmlType) -> Tensor<DIMS> {
+        let ptr =
+            unsafe { ggml_sys::ggml_cast(self.ctx.as_ptr(), self.ptr.as_ptr(), type_.as_raw()) };
+
+        Tensor {
+            ctx: Arc::clone(&self.ctx),
+            type_,
+            ptr: NonNull::new(ptr).unwrap(),
+        }
+    }
+
+    pub fn norm(&self, eps: f32) -> Tensor<DIMS> {
+        let ptr = unsafe { ggml_sys::ggml_norm(self.ctx.as_ptr(), self.ptr.as_ptr(), eps) };
+
+        Tensor {
+            ctx: Arc::clone(&self.ctx),
+            type_: self.type_,
+            ptr: NonNull::new(ptr).unwrap(),
+        }
+    }
+
+    pub fn load_bytes(&mut self, bytes: &[u8]) {
+        debug_assert_eq!(
+            bytes.len(),
+            self.num_bytes(),
+            "bytes must be the same size as the tensor"
+        );
+
+        unsafe {
+            debug_assert_ne!(
+                self.as_ptr().as_mut().unwrap().data,
+                std::ptr::null_mut(),
+                "tensor must be allocated"
+            );
+
+            (self.as_ptr().as_mut().unwrap().data as *mut u8)
+                .copy_from_nonoverlapping(bytes.as_ptr(), self.num_bytes());
+        }
+    }
 }
 
 macro_rules! std_ops_impl {
@@ -348,6 +395,50 @@ macro_rules! std_ops_impl {
         {
             type Output = Tensor<DIMS>;
             fn $std_func(self, rhs: Self) -> Self::Output {
+                if self.type_ != rhs.type_ {
+                    panic!("tensor types do not match");
+                }
+
+                let ptr = unsafe {
+                    ggml_sys::$func(self.ctx.as_ptr(), self.ptr.as_ptr(), rhs.ptr.as_ptr())
+                };
+
+                Self::Output {
+                    ctx: Arc::clone(&self.ctx),
+                    type_: self.type_,
+                    ptr: NonNull::new(ptr).unwrap(),
+                }
+            }
+        }
+
+        impl<'a, const DIMS: usize> std::ops::$trait<Tensor<DIMS>> for &'a Tensor<DIMS>
+        where
+            Dims<DIMS>: ValidDims,
+        {
+            type Output = Tensor<DIMS>;
+            fn $std_func(self, rhs: Tensor<DIMS>) -> Self::Output {
+                if self.type_ != rhs.type_ {
+                    panic!("tensor types do not match");
+                }
+
+                let ptr = unsafe {
+                    ggml_sys::$func(self.ctx.as_ptr(), self.ptr.as_ptr(), rhs.ptr.as_ptr())
+                };
+
+                Self::Output {
+                    ctx: Arc::clone(&self.ctx),
+                    type_: self.type_,
+                    ptr: NonNull::new(ptr).unwrap(),
+                }
+            }
+        }
+
+        impl<'b, const DIMS: usize> std::ops::$trait<&'b Tensor<DIMS>> for Tensor<DIMS>
+        where
+            Dims<DIMS>: ValidDims,
+        {
+            type Output = Tensor<DIMS>;
+            fn $std_func(self, rhs: &'b Tensor<DIMS>) -> Self::Output {
                 if self.type_ != rhs.type_ {
                     panic!("tensor types do not match");
                 }
@@ -392,21 +483,6 @@ std_ops_impl!(Add, add, ggml_add);
 std_ops_impl!(Sub, sub, ggml_sub);
 std_ops_impl!(Mul, mul, ggml_mul_mat);
 
-// impl<const DIMS: usize> Tensor<DIMS> {
-//     pub fn concat(&self, other: &Tensor<DIMS>) -> Tensor<DIMS+1> {
-//         let ptr = unsafe {
-//             ggml_sys::ggml_concat(self.ctx.as_ptr(), self.ptr.as_ptr(), other.ptr.as_ptr())
-//         };
-//
-//         Self {
-//             ctx: Arc::clone(&self.ctx),
-//             type_: self.type_,
-//             shape: self.shape,
-//             ptr: NonNull::new(ptr).unwrap(),
-//         }
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -442,4 +518,18 @@ mod tests {
     test_1d!(add_1d, add, [1.0, 2.0], [2.0, 2.0], [3.0, 4.0]);
     test_1d!(mul_1d, mul, [2.0, 5.0], [2.0, 3.0], [19.0]);
     test_1d!(sub_1d, sub, [3.0, 10.0], [2.0, 4.0], [1.0, 6.0]);
+
+    #[test]
+    fn num_bytes() {
+        let mut ctx = Context::new(128 * 1024 * 1024, 1);
+        let at = Tensor::new(&mut ctx, GgmlType::F32, [2, 3, 4]);
+        assert_eq!(at.num_bytes(), 32 * 2 * 3 * 4 / 8);
+    }
+
+    #[test]
+    fn load_bytes() {
+        let mut ctx = Context::new(128 * 1024 * 1024, 1);
+        let mut at = Tensor::new(&mut ctx, GgmlType::F32, [2]);
+        at.load_bytes(&[1, 2, 3, 4, 5, 6, 7, 8]);
+    }
 }

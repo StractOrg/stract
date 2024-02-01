@@ -47,6 +47,7 @@ flate2 = {workspace = true}
 fnv = {workspace = true}
 fst = {workspace = true}
 futures = {workspace = true}
+ggml = {path = "../ggml"}
 half = {workspace = true}
 hashbrown = {workspace = true}
 http = {workspace = true}

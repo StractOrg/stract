@@ -35,6 +35,7 @@ impl Clone for ClonableTensor {
 
 pub struct OpenAiApi {
     api: String,
+    key: Option<String>,
     top_p: f64,
     temp: f64,
     model: String,
@@ -65,13 +66,18 @@ impl OpenAiApi {
 
     pub async fn generate(&self, prompt: &str) -> Result<String> {
         let client = reqwest::Client::new();
-        let res = client
-            .post(format!("{}/v1/completions", &self.api))
+        let mut req = client.post(format!("{}/completions", &self.api));
+
+        if let Some(key) = &self.key {
+            req = req.bearer_auth(key);
+        }
+
+        let res = req
             .json(&self.payload(prompt)?)
             .send()
+            .await?
+            .text()
             .await?;
-
-        let res = res.text().await?;
 
         let res: serde_json::Value = serde_json::from_str(&res)?;
 
@@ -94,8 +100,13 @@ impl OpenAiApi {
         let mut payload = self.payload(prompt)?;
         payload["stream"] = serde_json::json!(true);
 
-        Ok(client
-            .post(format!("{}/v1/completions", &self.api))
+        let mut req = client.post(format!("{}/completions", &self.api));
+
+        if let Some(key) = &self.key {
+            req = req.bearer_auth(key);
+        }
+
+        Ok(req
             .json(&payload)
             .send()
             .await?
@@ -122,6 +133,7 @@ impl OpenAiApi {
 
 pub struct OpenAiApiBuilder {
     api: String,
+    key: Option<String>,
     model: String,
     top_p: f64,
     temp: f64,
@@ -131,6 +143,12 @@ pub struct OpenAiApiBuilder {
 
 impl OpenAiApiBuilder {
     pub fn new(api: String, model: String) -> Self {
+        let mut api = api;
+
+        if let Some(p) = api.strip_suffix('/') {
+            api = p.to_string();
+        }
+
         Self {
             api,
             model,
@@ -138,7 +156,13 @@ impl OpenAiApiBuilder {
             temp: 1.0,
             max_tokens: None,
             stop: vec![],
+            key: None,
         }
+    }
+
+    pub fn api_key(mut self, key: String) -> Self {
+        self.key = Some(key);
+        self
     }
 
     pub fn top_p(mut self, top_p: f64) -> Self {
@@ -166,6 +190,7 @@ impl OpenAiApiBuilder {
             api: self.api,
             top_p: self.top_p,
             temp: self.temp,
+            key: self.key,
             max_tokens: self.max_tokens,
             stop: self.stop,
             model: self.model,

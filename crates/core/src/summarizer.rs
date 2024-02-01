@@ -258,15 +258,16 @@ pub struct Summarizer {
 impl Summarizer {
     pub fn new<P: AsRef<Path>>(
         path: P,
-        openai_api_uri: String,
+        llm_api_base: String,
         model_name: String,
+        api_key: Option<String>,
     ) -> Result<Self> {
         Ok(Self {
             extractive: ExtractiveSummarizer::open(
                 path.as_ref().join("dual_encoder").as_path(),
                 16,
             )?,
-            abstractive: AbstractiveSummarizer::new(openai_api_uri, model_name),
+            abstractive: AbstractiveSummarizer::new(llm_api_base, model_name, api_key),
         })
     }
 
@@ -362,11 +363,16 @@ const TRUNCATE_WORDS_ABSTRACTIVE: usize = 1024;
 pub struct AbstractiveSummarizer {
     api: String,
     model: String,
+    api_key: Option<String>,
 }
 
 impl AbstractiveSummarizer {
-    pub fn new(api: String, model: String) -> Self {
-        Self { api, model }
+    pub fn new(api: String, model: String, api_key: Option<String>) -> Self {
+        Self {
+            api,
+            model,
+            api_key,
+        }
     }
 
     fn client(&self, max_tokens: Option<u64>) -> OpenAiApi {
@@ -374,6 +380,10 @@ impl AbstractiveSummarizer {
             .top_p(0.9)
             .temp(0.0)
             .stop(vec!["</s>", "<|endoftext|>"]);
+
+        if let Some(api_key) = &self.api_key {
+            builder = builder.api_key(api_key.clone());
+        }
 
         if let Some(max_tokens) = max_tokens {
             builder = builder.max_tokens(max_tokens);

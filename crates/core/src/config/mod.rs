@@ -187,6 +187,13 @@ impl Default for ApiThresholds {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LLMConfig {
+    pub api_base: String,
+    pub model: String,
+    pub api_key: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
     pub summarizer_path: String,
     pub queries_csv_path: String,
@@ -196,12 +203,12 @@ pub struct ApiConfig {
     pub lambda_model_path: Option<String>,
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
-    pub openai_api_uri: String,
-    pub openai_api_model: String,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
+
+    pub llm: LLMConfig,
 
     #[serde(default)]
     pub collector: CollectorConfig,
