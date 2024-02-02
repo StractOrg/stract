@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use optics::HostRankings;
+use rand::seq::SliceRandom;
 use stract::{
     bangs::Bangs,
     config::{
@@ -149,10 +150,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         },
     };
 
-    let queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)
+    let mut queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)
         .unwrap()
         .all()
         .unwrap();
+
+    queries.shuffle(&mut rand::thread_rng());
 
     let mut searcher = LocalSearcher::new(index);
     searcher.set_inbound_similarity(

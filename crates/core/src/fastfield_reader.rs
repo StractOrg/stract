@@ -98,6 +98,7 @@ impl From<FieldValue> for Option<u64> {
     }
 }
 
+#[derive(Clone)]
 pub enum FieldReader {
     U64(Arc<dyn ColumnValues<u64>>),
 }

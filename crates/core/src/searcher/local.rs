@@ -194,7 +194,7 @@ where
 
         let mut ranker = Ranker::new(
             aggregator,
-            guard.inverted_index().fastfield_reader(&ctx.tv_searcher),
+            guard.inverted_index().fastfield_reader(),
             self.collector_config.clone(),
         );
 
@@ -290,7 +290,7 @@ where
             ranker.collector(ctx.clone()),
         )?;
 
-        let fastfield_reader = guard.inverted_index().fastfield_reader(&ctx.tv_searcher);
+        let fastfield_reader = guard.inverted_index().fastfield_reader();
 
         let ranking_websites = guard.inverted_index().retrieve_ranking_websites(
             ctx,

@@ -163,6 +163,7 @@ pub struct InvertedIndex {
     reader: IndexReader,
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
+    fastfield_reader: FastFieldReader,
 }
 
 impl InvertedIndex {
@@ -223,6 +224,8 @@ impl InvertedIndex {
 
         let reader: IndexReader = tantivy_index.reader_builder().try_into()?;
 
+        let fastfield_reader = FastFieldReader::new(&reader.searcher());
+
         Ok(InvertedIndex {
             writer: None,
             reader,
@@ -230,7 +233,12 @@ impl InvertedIndex {
             path: path.as_ref().to_str().unwrap().to_string(),
             tantivy_index,
             snippet_config: SnippetConfig::default(),
+            fastfield_reader,
         })
+    }
+
+    pub fn fastfield_reader(&self) -> FastFieldReader {
+        self.fastfield_reader.clone()
     }
 
     pub fn prepare_writer(&mut self) -> Result<()> {
@@ -262,10 +270,6 @@ impl InvertedIndex {
             .set_merge_policy(Box::new(merge_policy));
     }
 
-    pub fn fastfield_reader(&self, tv_searcher: &tantivy::Searcher) -> FastFieldReader {
-        FastFieldReader::new(tv_searcher)
-    }
-
     pub fn tokenizers(&self) -> &TokenizerManager {
         self.tantivy_index.tokenizers()
     }
@@ -295,6 +299,7 @@ impl InvertedIndex {
             .expect("writer has not been prepared")
             .commit()?;
         self.reader.reload()?;
+        self.fastfield_reader = FastFieldReader::new(&self.reader.searcher());
 
         Ok(())
     }
@@ -354,7 +359,7 @@ impl InvertedIndex {
     pub fn local_search_ctx(&self) -> Ctx {
         let tv_searcher = self.tv_searcher();
         Ctx {
-            fastfield_reader: self.fastfield_reader(&tv_searcher),
+            fastfield_reader: self.fastfield_reader.clone(),
             tv_searcher,
         }
     }
