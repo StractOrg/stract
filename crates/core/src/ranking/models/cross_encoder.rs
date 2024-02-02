@@ -16,127 +16,134 @@
 
 use anyhow::anyhow;
 use anyhow::Result;
+use candle_core::Module;
+use candle_core::{Device, Tensor};
+use candle_nn::Linear;
+use candle_nn::VarBuilder;
 use std::path::Path;
+use tokenizers::PaddingParams;
+use tokenizers::TruncationParams;
 
-#[cfg(feature = "libtorch")]
-pub use model::*;
+use crate::models::bert;
+use crate::models::bert::BertModel;
 
-#[cfg(feature = "libtorch")]
-mod model {
-    use super::*;
+const TRUNCATE_INPUT: usize = 128;
 
-    use itertools::Itertools;
-    use tch::Tensor;
-    use tokenizers::PaddingParams;
-    use tokenizers::TruncationParams;
+pub struct CrossEncoderModel {
+    tokenizer: tokenizers::Tokenizer,
+    encoder: BertModel,
+    classifier: Linear,
+    device: Device,
+    dtype: candle_core::DType,
+}
 
-    const TRUNCATE_INPUT: usize = 128;
+impl CrossEncoderModel {
+    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        let device = Device::Cpu;
+        let dtype = candle_core::DType::F16;
 
-    pub struct CrossEncoderModel {
-        tokenizer: tokenizers::Tokenizer,
-        model: tch::CModule,
+        let truncation = TruncationParams {
+            max_length: TRUNCATE_INPUT,
+            ..Default::default()
+        };
+
+        let padding = PaddingParams {
+            ..Default::default()
+        };
+
+        let mut tokenizer =
+            tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))
+                .map_err(|_| anyhow!("couldn't open tokenizer"))?;
+
+        tokenizer
+            .with_truncation(Some(truncation))
+            .map_err(|_| anyhow!("tokenizer truncation settings"))?;
+        tokenizer.with_padding(Some(padding));
+
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(
+                &[folder.as_ref().join("model.safetensors")],
+                dtype,
+                &device,
+            )?
+        };
+        let config = std::fs::read_to_string(folder.as_ref().join("config.json"))?;
+        let mut config: bert::Config = serde_json::from_str(&config)?;
+        config.hidden_act = bert::HiddenAct::GeluApproximate;
+
+        let classifier: Linear = candle_nn::linear(config.hidden_size, 1, vb.pp("classifier"))?;
+
+        // all tensors can be loaded with (useful for debugging):
+        // candle_core::safetensors::load(folder.as_ref().join("model.safetensors"), &device)
+
+        let encoder = BertModel::load(vb, &config)?;
+
+        Ok(Self {
+            tokenizer,
+            encoder,
+            classifier,
+            device,
+            dtype,
+        })
     }
+}
 
-    impl CrossEncoderModel {
-        pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
-            let truncation = TruncationParams {
-                max_length: TRUNCATE_INPUT,
-                ..Default::default()
-            };
-
-            let padding = PaddingParams {
-                ..Default::default()
-            };
-
-            let mut tokenizer =
-                tokenizers::Tokenizer::from_file(folder.as_ref().join("tokenizer.json"))
-                    .map_err(|_| anyhow!("couldn't open tokenizer"))?;
-
-            tokenizer
-                .with_truncation(Some(truncation))
-                .map_err(|_| anyhow!("tokenizer truncation settings"))?;
-            tokenizer.with_padding(Some(padding));
-
-            let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
-
-            Ok(Self { tokenizer, model })
+impl CrossEncoder for CrossEncoderModel {
+    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
+        if bodies.is_empty() {
+            return Vec::new();
         }
-    }
 
-    impl CrossEncoder for CrossEncoderModel {
-        fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
-            if bodies.is_empty() {
-                return Vec::new();
-            }
-
-            let bs = bodies.len();
-
-            let input: Vec<_> = bodies
-                .iter()
-                .map(|body| {
-                    (
-                        query.to_string(),
-                        body.split_whitespace()
-                            .take(TRUNCATE_INPUT)
-                            .collect::<String>(),
-                    )
-                })
-                .collect();
-
-            let encoded = self.tokenizer.encode_batch(input, true).unwrap();
-
-            let num_tokens = encoded
-                .iter()
-                .map(|enc| enc.get_ids().len())
-                .max()
-                .unwrap_or(0);
-
-            let ids = encoded
-                .iter()
-                .flat_map(|enc| enc.get_ids().iter().map(|i| *i as i64).take(TRUNCATE_INPUT))
-                .collect_vec();
-
-            let attention_mask = encoded
-                .iter()
-                .flat_map(|enc| {
-                    enc.get_attention_mask()
-                        .iter()
-                        .map(|i| *i as i64)
+        let input: Vec<_> = bodies
+            .iter()
+            .map(|body| {
+                (
+                    query.to_string(),
+                    body.split_whitespace()
                         .take(TRUNCATE_INPUT)
-                })
-                .collect_vec();
+                        .collect::<String>(),
+                )
+            })
+            .collect();
 
-            let type_ids = encoded
-                .iter()
-                .flat_map(|enc| {
-                    enc.get_type_ids()
-                        .iter()
-                        .map(|i| *i as i64)
-                        .take(TRUNCATE_INPUT)
-                })
-                .collect_vec();
+        let encoded = self.tokenizer.encode_batch(input, true).unwrap();
 
-            let ids = Tensor::from_slice(&ids).reshape([bs as i64, num_tokens as i64]);
-            let attention_mask =
-                Tensor::from_slice(&attention_mask).reshape([bs as i64, num_tokens as i64]);
-            let type_ids = Tensor::from_slice(&type_ids).reshape([bs as i64, num_tokens as i64]);
+        let ids = encoded
+            .iter()
+            .map(|enc| Tensor::new(enc.get_ids(), &self.device).map_err(|e| anyhow!(e)))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        let input_ids = Tensor::stack(&ids, 0).unwrap();
 
-            let output = self
-                .model
-                .forward_ts(&[ids, attention_mask, type_ids])
-                .unwrap();
+        let token_type_ids = input_ids.zeros_like().unwrap();
 
-            let mut res = Vec::with_capacity(bs);
+        let attention_mask = encoded
+            .iter()
+            .map(|enc| Tensor::new(enc.get_attention_mask(), &self.device).map_err(|e| anyhow!(e)))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        let attention_mask = Tensor::stack(&attention_mask, 0)
+            .unwrap()
+            .to_dtype(self.dtype)
+            .unwrap();
 
-            for i in 0..bs {
-                let s = output.double_value(&[i as i64, 0]);
-                let s = s.exp();
-                let s = s / (s + 1.0);
-                res.push(s);
-            }
+        let logits = self
+            .encoder
+            .forward(&input_ids, &token_type_ids, &attention_mask)
+            .unwrap();
 
-            res
-        }
+        let scores = self
+            .classifier
+            .forward(&logits)
+            .unwrap()
+            .squeeze(1)
+            .unwrap()
+            .to_dtype(candle_core::DType::F64)
+            .unwrap();
+
+        let scores = candle_nn::ops::sigmoid(&scores).unwrap();
+
+        scores.to_vec1().unwrap()
     }
 }
 
@@ -153,12 +160,15 @@ impl CrossEncoder for DummyCrossEncoder {
 }
 
 #[cfg(test)]
-#[cfg(feature = "libtorch")]
 mod tests {
     use super::*;
 
     #[test]
     fn sanity_check() {
+        if !Path::new("../../data/cross_encoder").exists() {
+            return;
+        }
+
         let model = CrossEncoderModel::open("../../data/cross_encoder")
             .expect("Failed to find cross-encoder model");
 
@@ -177,14 +187,14 @@ mod tests {
             );
         }
 
-        assert!(
-            model.run(
-                "how many people live in paris",
-                &["there are currently 1234 people living in paris".to_string()]
-            )[0] > model.run(
-                "how many people live in paris",
-                &["I really like cake and my favorite cake is probably brownie".to_string()]
-            )[0]
+        let res = model.run(
+            "how many people live in paris",
+            &[
+                "there are currently 1234 people living in paris".to_string(),
+                "I really like cake and my favorite cake is probably brownie".to_string(),
+            ],
         );
+
+        assert!(res[0] > res[1]);
     }
 }

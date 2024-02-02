@@ -1,20 +1,9 @@
 #!.venv/bin/python3
 import os
-import transformers
-import torch
-import torch.nn.functional as F
 import sys
+import transformers
 
-# MODEL = "nreimers/MiniLM-L6-H384-uncased"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-
-question = "Where is amazon rain forest located"
-context = """The Amazon rainforest (Portuguese: Floresta Amazônica or Amazônia; Spanish: Selva Amazónica, Amazonía or usually Amazonia; French: Forêt amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of 
-which 5,500,000 square kilometres (2,100,000 sq mi) are covered by the rainforest. This region includes territory belonging to nine nations. 
-The majority of the forest is contained within Brazil, with 60% of the rainforest, followed by Peru with 13%, Colombia with 10%, and with 
-minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain 
-"Amazonas" in their names. The Amazon represents over half of the planet's remaining rainforests, and comprises the largest and most biodiverse tract 
-of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species."""
 
 if os.path.exists("data/summarizer/dual_encoder/"):
     print("data/summarizer/dual_encoder/ already exists. Exiting...")
@@ -23,48 +12,7 @@ if os.path.exists("data/summarizer/dual_encoder/"):
 os.system("mkdir data/summarizer/dual_encoder")
 
 model = transformers.AutoModel.from_pretrained(MODEL)
-
-model.eval()
-for p in model.parameters():
-    p.requires_grad_(False)
-
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
+
+model.save_pretrained("data/summarizer/dual_encoder")
 tokenizer.save_pretrained("data/summarizer/dual_encoder")
-
-features = tokenizer(
-    [question, context],
-    padding="max_length",
-    truncation=True,
-    return_tensors="pt",
-)
-input_ids = features["input_ids"]
-attention_mask = features["attention_mask"]
-token_type_ids = features["token_type_ids"]
-
-
-def mean_pooling(model_output, attention_mask):
-    token_embeddings = model_output[
-        0
-    ]  # First element of model_output contains all token embeddings
-    input_mask_expanded = (
-        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    )
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
-        input_mask_expanded.sum(1), min=1e-9
-    )
-
-
-def run_model(input_ids, token_type_ids, attention_mask):
-    res = model(
-        input_ids=input_ids,
-        token_type_ids=token_type_ids,
-        attention_mask=attention_mask,
-        return_dict=False,
-    )
-    embs = mean_pooling(res, attention_mask)
-    return F.normalize(embs, p=2, dim=1)
-
-
-traced_model = torch.jit.trace(run_model, ((input_ids, token_type_ids, attention_mask)))
-
-traced_model.save("data/summarizer/dual_encoder/model.pt")

@@ -1,8 +1,7 @@
 #!.venv/bin/python3
 import os
-import transformers
-import torch
 import sys
+import transformers
 
 MODEL = "cross-encoder/ms-marco-TinyBERT-L-2-v2"
 
@@ -12,40 +11,8 @@ if os.path.exists("data/cross_encoder/"):
 
 os.system("mkdir data/cross_encoder")
 
-
 model = transformers.AutoModelForSequenceClassification.from_pretrained(MODEL)
-
-model.eval()
-for p in model.parameters():
-    p.requires_grad_(False)
-
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
-features = tokenizer(
-    ["How many people live in Berlin?", "How many people live in Berlin?"],
-    [
-        "Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.",
-        "New York City is famous for the Metropolitan Museum of Art.",
-    ],
-    padding="max_length",
-    truncation=True,
-    return_tensors="pt",
-)
-input_ids = features["input_ids"]
-attention_mask = features["attention_mask"]
-token_type_ids = features["token_type_ids"]
+
+model.save_pretrained("data/cross_encoder")
 tokenizer.save_pretrained("data/cross_encoder")
-
-
-def run_model(input_ids, attention_mask, token_type_ids):
-    res = model(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        return_dict=False,
-    )[0]
-    return res
-
-
-traced_model = torch.jit.trace(run_model, ((input_ids, attention_mask, token_type_ids)))
-
-traced_model.save("data/cross_encoder/model.pt")

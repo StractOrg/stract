@@ -19,19 +19,7 @@ use anyhow::anyhow;
 use eventsource_stream::Eventsource;
 use futures::stream::Stream;
 #[cfg(feature = "libtorch")]
-use tch::Tensor;
 use tokio_stream::StreamExt;
-
-#[cfg(feature = "libtorch")]
-pub struct ClonableTensor(pub Tensor);
-
-#[cfg(feature = "libtorch")]
-impl Clone for ClonableTensor {
-    fn clone(&self) -> Self {
-        let out = Tensor::empty(self.0.size(), (self.0.kind(), self.0.device()));
-        ClonableTensor(self.0.clone(&out))
-    }
-}
 
 pub struct OpenAiApi {
     api: String,

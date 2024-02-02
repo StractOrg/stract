@@ -1,1 +1,1 @@
-mod bert;
+pub mod bert;

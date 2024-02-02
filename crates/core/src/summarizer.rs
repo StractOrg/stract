@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use anyhow::anyhow;
+use candle_core::{Device, Tensor};
+use candle_nn::VarBuilder;
 use futures::stream::Stream;
 use std::{
     cmp::Reverse,
@@ -23,9 +26,12 @@ use std::{
 };
 use tokio_stream::StreamExt;
 
-use crate::{llm_utils::OpenAiApi, Result};
+use crate::{
+    llm_utils::OpenAiApi,
+    models::bert::{self, BertModel},
+    Result,
+};
 use itertools::{intersperse, Itertools};
-use tch::Tensor;
 use tokenizers::{PaddingParams, TruncationParams};
 
 use crate::ceil_char_boundary;
@@ -284,12 +290,17 @@ impl Summarizer {
 }
 
 pub struct DualEncoder {
-    model: tch::CModule,
+    model: BertModel,
     tokenizer: tokenizers::Tokenizer,
+    device: Device,
+    dtype: candle_core::DType,
 }
 
 impl DualEncoder {
     pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        let device = Device::Cpu;
+        let dtype = candle_core::DType::F16;
+
         let truncation = TruncationParams {
             max_length: 256,
             ..Default::default()
@@ -305,36 +316,62 @@ impl DualEncoder {
         tokenizer.with_truncation(Some(truncation)).unwrap();
         tokenizer.with_padding(Some(padding));
 
-        let model = tch::CModule::load(folder.as_ref().join("model.pt"))?;
-        Ok(Self { model, tokenizer })
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(
+                &[folder.as_ref().join("model.safetensors")],
+                dtype,
+                &device,
+            )?
+        };
+        let config = std::fs::read_to_string(folder.as_ref().join("config.json"))?;
+        let mut config: bert::Config = serde_json::from_str(&config)?;
+        config.hidden_act = bert::HiddenAct::GeluApproximate;
+
+        // all tensors can be loaded with (useful for debugging):
+        // candle_core::safetensors::load(folder.as_ref().join("model.safetensors"), &device)
+
+        let mut model = BertModel::load(vb, &config)?;
+        model.set_pooler(None); // model should use mean pooling
+
+        Ok(Self {
+            model,
+            tokenizer,
+            device,
+            dtype,
+        })
     }
 
-    fn embed(&self, text: &str) -> Result<Tensor> {
-        let query = self.tokenizer.encode(text, false).unwrap();
+    pub fn embed(&self, texts: &[&str]) -> Result<Tensor> {
+        let enc = self
+            .tokenizer
+            .encode_batch(texts.to_vec(), true)
+            .map_err(|e| anyhow!(e))?;
 
-        let ids = query
-            .get_ids()
+        let ids = enc
             .iter()
-            .map(|&id| id as i64)
-            .collect::<Vec<_>>();
+            .map(|enc| Tensor::new(enc.get_ids(), &self.device).map_err(|e| anyhow!(e)))
+            .collect::<Result<Vec<_>>>()?;
 
-        let types = query
-            .get_type_ids()
+        let input_ids = Tensor::stack(&ids, 0)?;
+
+        let token_type_ids = input_ids.zeros_like()?;
+
+        let attention_mask = enc
             .iter()
-            .map(|&id| id as i64)
-            .collect::<Vec<_>>();
+            .map(|enc| Tensor::new(enc.get_attention_mask(), &self.device).map_err(|e| anyhow!(e)))
+            .collect::<Result<Vec<_>>>()?;
+        let attention_mask = Tensor::stack(&attention_mask, 0)?.to_dtype(self.dtype)?;
 
-        let mask = query
-            .get_attention_mask()
-            .iter()
-            .map(|&id| id as i64)
-            .collect::<Vec<_>>();
+        let emb = self
+            .model
+            .forward(&input_ids, &token_type_ids, &attention_mask)?;
 
-        let ids = Tensor::from_slice(&ids).reshape([1, -1]);
-        let types = Tensor::from_slice(&types).reshape([1, -1]);
-        let mask = Tensor::from_slice(&mask).reshape([1, -1]);
+        let (_n_sentence, n_tokens, _hidden_size) = emb.dims3()?;
 
-        Ok(self.model.forward_ts(&[ids, types, mask])?.squeeze())
+        let emb = (emb.sum(1)? / (n_tokens as f64))?; // mean pooling
+        let emb = emb.broadcast_div(&emb.sqr()?.sum_keepdim(1)?.sqrt()?)?; // l2 normalization
+
+        Ok(emb)
     }
 }
 
@@ -344,17 +381,25 @@ impl PassageScorer for DualEncoder {
     type PassageEmbedding = Tensor;
 
     fn embed_query(&self, query: &str) -> Option<Self::QueryEmbedding> {
-        self.embed(query).ok()
+        self.embed(&[query]).ok()
     }
 
     fn embed_passage(&self, passage: &str) -> Option<Self::PassageEmbedding> {
-        self.embed(passage).ok()
+        self.embed(&[passage]).ok()
     }
 
     fn score(&self, query: &Self::QueryEmbedding, passage: &Self::PassageEmbedding) -> f32 {
-        let score = query.dot(&passage.transpose(0, 0));
-
-        score.double_value(&[]) as f32
+        query
+            .matmul(&passage.t().unwrap())
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .squeeze(0)
+            .unwrap()
+            .to_dtype(candle_core::DType::F32)
+            .unwrap()
+            .to_vec0()
+            .unwrap()
     }
 }
 
@@ -496,5 +541,25 @@ mod tests {
         for (p, range) in it {
             assert_eq!(p, &text[range]);
         }
+    }
+
+    #[test]
+    fn test_dual_encoder() {
+        if !Path::new("../../data/summarizer/dual_encoder").exists() {
+            return;
+        }
+
+        let model =
+            DualEncoder::open("../../data/summarizer/dual_encoder").expect("Failed to load model");
+        let query = "What is the capital of France?";
+        let pos = "The capital of France is Paris.";
+        let neg = "The best baguette in Paris can be found at Boulangerie Pichard.";
+
+        let query_emb = model.embed_query(query).unwrap();
+        let pos_emb = model.embed_passage(pos).unwrap();
+        let neg_emb = model.embed_passage(neg).unwrap();
+
+        assert!(model.score(&query_emb, &pos_emb) > 0.0);
+        assert!(model.score(&query_emb, &pos_emb) > model.score(&query_emb, &neg_emb));
     }
 }
