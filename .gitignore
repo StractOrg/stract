@@ -14,3 +14,4 @@ ltr_scores.json
 .venv
 proptest-regressions
 *.pending-snap
+.ipynb_checkpoints

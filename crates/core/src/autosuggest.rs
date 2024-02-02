@@ -60,4 +60,8 @@ impl Autosuggest {
             .take(10)
             .collect())
     }
+
+    pub fn all(&self) -> Result<Vec<String>> {
+        Ok(self.queries.into_stream().into_strs()?)
+    }
 }

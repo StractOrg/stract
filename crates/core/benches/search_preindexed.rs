@@ -101,12 +101,8 @@ macro_rules! bench {
                         .search(&SearchQuery {
                             query: $query.to_string(),
                             host_rankings: Some(HostRankings {
-                                liked: vec![
-                                    "docs.rs".to_string(),
-                                    "ycombinator.com".to_string(),
-                                    "nih.gov".to_string(),
-                                ],
-                                disliked: vec!["pinterest.com".to_string()],
+                                liked: vec![],
+                                disliked: vec![],
                                 blocked: vec![],
                             }),
                             ..Default::default()
@@ -153,6 +149,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         },
     };
 
+    let queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)
+        .unwrap()
+        .all()
+        .unwrap();
+
     let mut searcher = LocalSearcher::new(index);
     searcher.set_inbound_similarity(
         InboundSimilarity::open("data/centrality/inbound_similarity").unwrap(),
@@ -168,16 +169,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
         ApiSearcher::new(searcher, None, None, None, bangs, config);
 
-    for _ in 0..1000 {
-        bench!("the", searcher, c);
-        bench!("dtu", searcher, c);
-        bench!("the best", searcher, c);
-        bench!("the circle of life", searcher, c);
-        bench!("what", searcher, c);
-        bench!("a", searcher, c);
-        bench!("sun", searcher, c);
-        bench!("what a sun", searcher, c);
+    for query in &queries {
+        bench!(query, searcher, c);
     }
+
+    // for _ in 0..1000 {
+    //     bench!("the", searcher, c);
+    //     bench!("dtu", searcher, c);
+    //     bench!("the best", searcher, c);
+    //     bench!("the circle of life", searcher, c);
+    //     bench!("what", searcher, c);
+    //     bench!("a", searcher, c);
+    //     bench!("sun", searcher, c);
+    //     bench!("what a sun", searcher, c);
+    // }
 }
 
 criterion_group!(benches, criterion_benchmark);

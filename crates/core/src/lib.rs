@@ -32,7 +32,7 @@ pub mod inverted_index;
 pub mod mapreduce;
 
 mod api;
-mod autosuggest;
+pub mod autosuggest;
 pub mod bangs;
 mod bloom;
 mod collector;
