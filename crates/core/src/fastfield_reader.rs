@@ -52,7 +52,7 @@ impl FastFieldReader {
                 let field_reader = match field.data_type() {
                     DataType::U64 => {
                         let reader = fastfield_readers.u64(field.name()).unwrap();
-                        FieldReader::U64(reader.values)
+                        FieldReader::U64(Arc::new(reader.values.iter().collect()))
                     }
                 };
 
@@ -100,13 +100,13 @@ impl From<FieldValue> for Option<u64> {
 
 #[derive(Clone)]
 pub enum FieldReader {
-    U64(Arc<dyn ColumnValues<u64>>),
+    U64(Arc<Vec<u64>>),
 }
 
 impl FieldReader {
     pub fn get(&self, doc: &DocId) -> FieldValue {
         match self {
-            FieldReader::U64(reader) => FieldValue::U64(reader.get_val(*doc)),
+            FieldReader::U64(reader) => FieldValue::U64(reader[*doc as usize]),
         }
     }
 }
