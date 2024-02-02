@@ -1,11 +1,11 @@
-#[cfg(not(feature = "libtorch"))]
 use criterion::{criterion_group, criterion_main, Criterion};
-#[cfg(not(feature = "libtorch"))]
 use optics::Optic;
-#[cfg(not(feature = "libtorch"))]
 use stract::{
     bangs::Bangs,
-    config::{ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, WidgetsConfig},
+    config::{
+        ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig, WidgetsConfig,
+    },
+    entity_index::EntityMatch,
     image_store::Image,
     index::Index,
     inverted_index::RetrievedWebpage,
@@ -13,10 +13,8 @@ use stract::{
     searcher::{api::ApiSearcher, live::LiveSearcher, LocalSearcher, SearchQuery, ShardId},
     Result,
 };
-#[cfg(not(feature = "libtorch"))]
 struct Searcher(LocalSearcher<Index>);
 
-#[cfg(not(feature = "libtorch"))]
 impl stract::searcher::distributed::SearchClient for Searcher {
     async fn search_initial(
         &self,
@@ -81,9 +79,12 @@ impl stract::searcher::distributed::SearchClient for Searcher {
     ) -> Result<Option<Image>> {
         Ok(None)
     }
+
+    async fn search_entity(&self, _query: &str) -> Option<EntityMatch> {
+        None
+    }
 }
 
-#[cfg(not(feature = "libtorch"))]
 macro_rules! bench {
     ($query:tt, $searcher:ident, $optic:ident, $c:ident) => {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -111,7 +112,6 @@ macro_rules! bench {
     };
 }
 
-#[cfg(not(feature = "libtorch"))]
 pub fn criterion_benchmark(c: &mut Criterion) {
     let index = Index::open("data/index").unwrap();
     let optic = include_str!("../../optics/testcases/samples/discussions.optic");
@@ -136,6 +136,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             calculator_fetch_currencies_exchange: false,
         },
         correction_config: CorrectionConfig::default(),
+        llm: LLMConfig {
+            api_base: "http://localhost:4000/v1".to_string(),
+            model: "data/mistral-7b-instruct-v0.2.Q4_K_M.gguf".to_string(),
+            api_key: None,
+        },
     };
 
     let mut searcher = LocalSearcher::new(index);
@@ -147,7 +152,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let searcher = Searcher(searcher);
 
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
-        ApiSearcher::new(searcher, None, None, bangs, config);
+        ApiSearcher::new(searcher, None, None, None, bangs, config);
 
     for _ in 0..1000 {
         bench!("the", searcher, optic, c);
@@ -161,10 +166,5 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     }
 }
 
-#[cfg(not(feature = "libtorch"))]
 criterion_group!(benches, criterion_benchmark);
-#[cfg(not(feature = "libtorch"))]
 criterion_main!(benches);
-
-#[cfg(feature = "libtorch")]
-fn main() {}

@@ -1,5 +1,5 @@
 #!/bin/bash
 set -e
 ./scripts/ci/check
-just cargo t
+cargo t
 ./scripts/licenses.sh

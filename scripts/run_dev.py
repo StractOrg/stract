@@ -3,10 +3,6 @@ import argparse
 import subprocess
 import os
 
-os.environ["LIBTORCH"] = "libtorch"
-os.environ["LD_LIBRARY_PATH"] = "libtorch/lib"
-os.environ["DYLD_LIBRARY_PATH"] = "libtorch/lib"
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--release", action="store_true")

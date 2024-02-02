@@ -35,7 +35,6 @@ pub struct SummarizeParams {
     pub query: String,
 }
 
-#[cfg(feature = "libtorch")]
 async fn summarize(
     params: SummarizeParams,
     state: Arc<State>,
@@ -59,16 +58,6 @@ async fn summarize(
         Sse::new(stream.map(|term| Event::default().data(term)).map(Ok))
             .keep_alive(KeepAlive::default()),
     )
-}
-
-#[cfg(not(feature = "libtorch"))]
-async fn summarize(
-    params: SummarizeParams,
-    state: Arc<State>,
-) -> Result<Sse<impl Stream<Item = std::result::Result<Event, Infallible>>>> {
-    use futures::stream::BoxStream;
-
-    Err::<Sse<BoxStream<_>>, anyhow::Error>(anyhow::anyhow!("Summarization is not enabled"))
 }
 
 #[utoipa::path(

@@ -11,10 +11,9 @@ publish = false
 
 [features]
 cors = []
-default = ["cors", "libtorch"]
+default = ["cors"]
 dev = ["cors"]
-libtorch = ["dep:tch"]
-prod = ["cors", "libtorch"]
+prod = ["cors"]
 
 [[bin]]
 name = "stract"
@@ -89,7 +88,6 @@ serde = {workspace = true}
 serde_json = {workspace = true}
 serde_urlencoded = {workspace = true}
 tantivy = {workspace = true}
-tch = {workspace = true, optional = true}
 thiserror = {workspace = true}
 tokenizers = {workspace = true}
 tokio = {workspace = true}

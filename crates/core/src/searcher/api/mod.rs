@@ -28,10 +28,7 @@ use crate::bangs::{Bang, BangHit};
 use crate::config::{ApiConfig, CollectorConfig};
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
-#[cfg(feature = "libtorch")]
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
-#[cfg(not(feature = "libtorch"))]
-use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::pipeline::{AsRankingWebsite, RankingWebsite, RetrievedWebpageRanking};
 use crate::ranking::ALL_SIGNALS;
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
@@ -140,7 +137,6 @@ pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[Scored
     }
 }
 
-#[cfg(feature = "libtorch")]
 pub struct ApiSearcher<S, L> {
     distributed_searcher: Arc<S>,
     sidebar_manager: SidebarManager<S>,
@@ -153,24 +149,11 @@ pub struct ApiSearcher<S, L> {
     spell_checker: Option<SpellChecker>,
 }
 
-#[cfg(not(feature = "libtorch"))]
-pub struct ApiSearcher<S, L> {
-    distributed_searcher: Arc<S>,
-    live_searcher: Option<L>,
-    sidebar_manager: SidebarManager<S>,
-    lambda_model: Option<Arc<LambdaMART>>,
-    bangs: Bangs,
-    collector_config: CollectorConfig,
-    widget_manager: WidgetManager,
-    spell_checker: Option<SpellChecker>,
-}
-
 impl<S, L> ApiSearcher<S, L>
 where
     S: distributed::SearchClient,
     L: live::SearchClient,
 {
-    #[cfg(feature = "libtorch")]
     pub fn new(
         dist_searcher: S,
         live_searcher: Option<L>,
@@ -192,35 +175,6 @@ where
             sidebar_manager,
             live_searcher,
             cross_encoder: cross_encoder.map(Arc::new),
-            lambda_model,
-            bangs,
-            collector_config: config.collector,
-            widget_manager,
-            spell_checker: config
-                .spell_checker_path
-                .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
-        }
-    }
-
-    #[cfg(not(feature = "libtorch"))]
-    pub fn new(
-        dist_searcher: S,
-        live_searcher: Option<L>,
-        lambda_model: Option<LambdaMART>,
-        bangs: Bangs,
-        config: ApiConfig,
-    ) -> Self {
-        let dist_searcher = Arc::new(dist_searcher);
-        let sidebar_manager =
-            SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
-        let lambda_model = lambda_model.map(Arc::new);
-
-        let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
-
-        Self {
-            distributed_searcher: dist_searcher,
-            sidebar_manager,
-            live_searcher,
             lambda_model,
             bangs,
             collector_config: config.collector,
@@ -444,21 +398,10 @@ where
             ..query.clone()
         };
 
-        #[cfg(feature = "libtorch")]
         let reranking_pipeline: RankingPipeline<RetrievedWebpageRanking> =
             RankingPipeline::reranker(
                 &mut search_query,
                 self.cross_encoder.clone(),
-                self.lambda_model.clone(),
-                self.collector_config.clone(),
-                query.num_results,
-            )?;
-
-        #[cfg(not(feature = "libtorch"))]
-        let reranking_pipeline: RankingPipeline<RetrievedWebpageRanking> =
-            RankingPipeline::reranker::<DummyCrossEncoder>(
-                &mut search_query,
-                None,
                 self.lambda_model.clone(),
                 self.collector_config.clone(),
                 query.num_results,

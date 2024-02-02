@@ -24,8 +24,6 @@ use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
 use crate::query::Query;
 use crate::ranking::inbound_similarity::InboundSimilarity;
-#[cfg(not(feature = "libtorch"))]
-use crate::ranking::models::cross_encoder::DummyCrossEncoder;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
@@ -357,7 +355,6 @@ where
         let start = Instant::now();
         let mut search_query = query.clone();
 
-        #[cfg(feature = "libtorch")]
         let pipeline = {
             use crate::ranking::models::cross_encoder::CrossEncoderModel;
             match CrossEncoderModel::open("data/cross_encoder") {
@@ -376,18 +373,6 @@ where
                     query.num_results,
                 )?,
             }
-        };
-
-        #[cfg(not(feature = "libtorch"))]
-        let pipeline = {
-            use crate::ranking::models::cross_encoder::DummyCrossEncoder;
-            RankingPipeline::reranker::<DummyCrossEncoder>(
-                &mut search_query,
-                None,
-                None,
-                self.collector_config.clone(),
-                query.num_results,
-            )?
         };
 
         let search_result = self.search_initial(&search_query, true)?;

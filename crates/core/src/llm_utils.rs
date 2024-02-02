@@ -18,7 +18,6 @@ use crate::Result;
 use anyhow::anyhow;
 use eventsource_stream::Eventsource;
 use futures::stream::Stream;
-#[cfg(feature = "libtorch")]
 use tokio_stream::StreamExt;
 
 pub struct OpenAiApi {

@@ -39,7 +39,7 @@ mod collector;
 pub mod config;
 pub mod crawler;
 mod distributed;
-mod entity_index;
+pub mod entity_index;
 mod enum_map;
 mod executor;
 mod external_sort;
@@ -69,7 +69,6 @@ pub mod searcher;
 mod simhash;
 pub mod similar_hosts;
 mod snippet;
-#[cfg(feature = "libtorch")]
 pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]

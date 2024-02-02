@@ -35,7 +35,6 @@ use crate::{
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
 };
 
-#[cfg(feature = "libtorch")]
 use crate::{ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer};
 
 use anyhow::Result;
@@ -71,7 +70,6 @@ pub struct Counters {
     pub daily_active_users: user_count::UserCount<user_count::Daily>,
 }
 
-#[cfg(feature = "libtorch")]
 pub struct State {
     pub config: ApiConfig,
     pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
@@ -79,17 +77,6 @@ pub struct State {
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
-    pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
-    pub cluster: Arc<Cluster>,
-}
-
-#[cfg(not(feature = "libtorch"))]
-pub struct State {
-    pub config: ApiConfig,
-    pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
-    pub remote_webgraph: RemoteWebgraph,
-    pub autosuggest: Autosuggest,
-    pub counters: Counters,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub cluster: Arc<Cluster>,
 }
@@ -135,7 +122,6 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
 
-    #[cfg(feature = "libtorch")]
     let state = {
         let mut cross_encoder = None;
 
@@ -164,27 +150,6 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                 config.llm.model.clone(),
                 config.llm.api_key.clone(),
             )?),
-            improvement_queue: query_store_queue,
-            cluster,
-        })
-    };
-
-    #[cfg(not(feature = "libtorch"))]
-    let state = {
-        let searcher = ApiSearcher::new(
-            dist_searcher,
-            Some(live_searcher),
-            lambda_model,
-            bangs,
-            config.clone(),
-        );
-
-        Arc::new(State {
-            config: config.clone(),
-            searcher,
-            autosuggest,
-            counters,
-            remote_webgraph,
             improvement_queue: query_store_queue,
             cluster,
         })

@@ -12,6 +12,5 @@ notes
 *.csv
 ltr_scores.json
 .venv
-libtorch
 proptest-regressions
 *.pending-snap

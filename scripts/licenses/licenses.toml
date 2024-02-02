@@ -1,5 +1,6 @@
 no-clearly-defined = true
 private = { ignore = true }
+
 accepted = [
     "Apache-2.0",
     "MIT",
@@ -21,3 +22,6 @@ workarounds = [
 
 [stract]
 accepted = ["AGPL-3.0"]
+
+[wav]
+accepted = ["LGPL-3.0"]
