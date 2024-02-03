@@ -52,7 +52,9 @@ impl FastFieldReader {
                 let field_reader = match field.data_type() {
                     DataType::U64 => {
                         let reader = fastfield_readers.u64(field.name()).unwrap();
-                        FieldReader::U64(Arc::new(reader.values.iter().collect()))
+                        FieldReader {
+                            data: Arc::new(reader.values.iter().collect()),
+                        }
                     }
                 };
 
@@ -75,39 +77,14 @@ impl FastFieldReader {
     }
 }
 
-pub enum FieldValue {
-    U64(u64),
-    U64s(Vec<u64>),
-}
-
-impl From<FieldValue> for Option<Vec<u64>> {
-    fn from(val: FieldValue) -> Self {
-        match val {
-            FieldValue::U64s(vec) => Some(vec),
-            _ => None,
-        }
-    }
-}
-
-impl From<FieldValue> for Option<u64> {
-    fn from(val: FieldValue) -> Self {
-        match val {
-            FieldValue::U64(res) => Some(res),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Clone)]
-pub enum FieldReader {
-    U64(Arc<Vec<u64>>),
+pub struct FieldReader {
+    data: Arc<Vec<u64>>,
 }
 
 impl FieldReader {
-    pub fn get(&self, doc: &DocId) -> FieldValue {
-        match self {
-            FieldReader::U64(reader) => FieldValue::U64(reader[*doc as usize]),
-        }
+    pub fn get(&self, doc: &DocId) -> u64 {
+        self.data[*doc as usize]
     }
 }
 

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::fastfield_reader::FieldValue;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::Result;
@@ -330,14 +329,14 @@ impl Signal {
         })
     }
 
-    fn fastfield_value(&self, aggregator: &SignalAggregator, doc: DocId) -> Option<FieldValue> {
+    fn fastfield_value(&self, aggregator: &SignalAggregator, doc: &DocId) -> Option<u64> {
         aggregator.segment_reader.as_ref().and_then(|reader| {
-            self.as_fastfield().map(|fast_field| {
+            self.as_fastfield().as_ref().map(|fast_field| {
                 reader
-                    .borrow_mut()
+                    .borrow()
                     .fastfield_reader
-                    .get_field_reader(&fast_field)
-                    .get(&doc)
+                    .get_field_reader(fast_field)
+                    .get(doc)
             })
         })
     }
@@ -351,28 +350,28 @@ impl Signal {
         let value: Option<f64> = match self {
             Signal::HostCentrality | Signal::PageCentrality => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|val| val as f64 / FLOAT_SCALING as f64)
             }
             Signal::HostCentralityRank | Signal::PageCentralityRank => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|val| val as f64).map(score_rank)
             }
             Signal::IsHomepage => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|val| val as f64)
             }
             Signal::LinkDensity => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value
@@ -381,7 +380,7 @@ impl Signal {
             }
             Signal::FetchTimeMs => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|v| v as usize).map(|fetch_time_ms| {
@@ -394,7 +393,7 @@ impl Signal {
             }
             Signal::UpdateTimestamp => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value
@@ -403,28 +402,28 @@ impl Signal {
             }
             Signal::TrackerScore => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|num_trackers| score_trackers(num_trackers as f64))
             }
             Signal::UrlDigits => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|num_digits| score_digits(num_digits as f64))
             }
             Signal::UrlSlashes => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value.map(|num_slashes| score_slashes(num_slashes as f64))
             }
             Signal::Region => {
                 let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, doc)
+                    .fastfield_value(signal_aggregator, &doc)
                     .and_then(|val| val.into());
 
                 field_value

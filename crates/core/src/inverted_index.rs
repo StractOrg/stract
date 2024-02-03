@@ -449,7 +449,7 @@ impl InvertedIndex {
                 let snippet = if let Some(description) = page.description.as_deref() {
                     let snip = description.split_whitespace().take(50).join(" ");
 
-                    if snip.split_ascii_whitespace().count() < 10 {
+                    if snip.split_whitespace().count() < 10 {
                         page.body.split_whitespace().take(50).join(" ")
                     } else {
                         snip
@@ -464,8 +464,14 @@ impl InvertedIndex {
             } else {
                 let min_body_len = if url.is_homepage() { 1024 } else { 256 };
 
-                if page.body.len() < min_body_len
-                    && !page.description.as_deref().unwrap_or_default().is_empty()
+                if page.body.split_whitespace().count() < min_body_len
+                    && page
+                        .description
+                        .as_deref()
+                        .unwrap_or_default()
+                        .split_whitespace()
+                        .count()
+                        >= 8
                 {
                     page.snippet = snippet::generate(
                         query,
