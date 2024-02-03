@@ -25,6 +25,7 @@ use itertools::{intersperse, Itertools};
 use url::Url;
 
 use crate::bangs::{Bang, BangHit};
+use crate::collector::Doc;
 use crate::config::{ApiConfig, CollectorConfig};
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
@@ -130,8 +131,6 @@ pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[Scored
                 signals.insert(signal, *signal_value);
             }
         }
-
-        website.score = Some(pointer.as_ranking().score);
 
         website.ranking_signals = Some(signals);
     }
@@ -421,6 +420,10 @@ where
 
         if query.return_ranking_signals {
             add_ranking_signals(&mut retrieved_webpages, &top_websites);
+        }
+
+        for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {
+            website.score = Some(pointer.score());
         }
 
         let search_duration_ms = start.elapsed().as_millis();

@@ -73,7 +73,6 @@ export const load = async ({ locals, fetch, url, getClientAddress }) => {
             safeSearch: params.safeSearch,
             selectedRegion: params.selectedRegion,
             hostRankings: params.host_rankings,
-            returnRankingSignals: true,
             countResults: false,
           },
           { fetch, headers: { 'X-Forwarded-For': getClientAddress() } },
