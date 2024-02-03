@@ -42,7 +42,6 @@ pub trait SearchableIndex {
         Self: 'a;
 
     fn guard(&self) -> Self::SearchGuard<'_>;
-    fn optimize_for_search(&mut self);
     fn set_snippet_config(&mut self, config: SnippetConfig);
 }
 
@@ -58,10 +57,6 @@ impl SearchableIndex for Index {
 
     fn guard(&self) -> Self::SearchGuard<'_> {
         NormalIndexSearchGuard { search_index: self }
-    }
-
-    fn optimize_for_search(&mut self) {
-        self.optimize_for_search().unwrap();
     }
 
     fn set_snippet_config(&mut self, config: SnippetConfig) {
@@ -86,10 +81,6 @@ impl SearchableIndex for Arc<live_index::Index> {
         LiveIndexSearchGuard {
             lock_guard: self.read(),
         }
-    }
-
-    fn optimize_for_search(&mut self) {
-        self.write().optimize_for_search().unwrap();
     }
 
     fn set_snippet_config(&mut self, config: SnippetConfig) {
@@ -135,9 +126,6 @@ where
     I: SearchableIndex,
 {
     pub fn new(index: I) -> Self {
-        let mut index = index;
-        index.optimize_for_search();
-
         LocalSearcher {
             index,
             inbound_similarity: None,

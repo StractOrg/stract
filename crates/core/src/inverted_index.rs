@@ -653,12 +653,6 @@ impl InvertedIndex {
         res.pop()
             .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
     }
-
-    pub fn optimize_for_search(&mut self) -> Result<()> {
-        self.tantivy_index.set_default_multithread_executor()?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug, Serialize)]

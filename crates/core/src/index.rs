@@ -58,12 +58,6 @@ impl Index {
         })
     }
 
-    pub fn optimize_for_search(&mut self) -> Result<()> {
-        self.inverted_index.optimize_for_search()?;
-
-        Ok(())
-    }
-
     pub fn set_auto_merge_policy(&mut self) {
         self.inverted_index.set_auto_merge_policy();
     }
