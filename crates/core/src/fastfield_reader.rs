@@ -60,20 +60,22 @@ impl FastFieldReader {
             }
 
             for doc in 0..reader.max_doc() as usize {
-                let mut field_reader = FieldReader {
-                    data: EnumMap::new(),
-                };
+                let mut data = Vec::new();
 
                 for field in Field::all().filter_map(|field| field.as_fast()) {
                     match field.data_type() {
                         DataType::U64 => {
                             let reader = tv_readers.get(field).unwrap();
-                            field_reader
-                                .data
-                                .insert(field, reader.values.get_val(doc as u32))
+                            data.push((field as usize, reader.values.get_val(doc as u32)));
                         }
                     };
                 }
+
+                data.sort_by_key(|(a, _)| *a);
+
+                let field_reader = FieldReader {
+                    data: data.into_iter().map(|(_, val)| val).collect(),
+                };
 
                 field_readers.push(field_reader);
             }
@@ -91,12 +93,12 @@ impl FastFieldReader {
 }
 
 pub struct FieldReader {
-    data: EnumMap<FastField, u64>,
+    data: Vec<u64>,
 }
 
 impl FieldReader {
     pub fn get(&self, field: &FastField) -> u64 {
-        self.data.get(*field).copied().unwrap()
+        self.data[*field as usize]
     }
 }
 
