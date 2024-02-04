@@ -453,6 +453,8 @@ impl Indexer {
             std::fs::remove_dir_all(other_path).unwrap();
         }
 
+        index.inverted_index.merge_into_max_segments(1).unwrap();
+
         Ok(())
     }
 }

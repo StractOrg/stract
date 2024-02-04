@@ -116,14 +116,6 @@ proptest-derive = {workspace = true}
 
 [[bench]]
 harness = false
-name = "search_preindexed"
-
-[[bench]]
-harness = false
-name = "search_preindexed_optic"
-
-[[bench]]
-harness = false
 name = "harmonic_centrality"
 
 [[bench]]
@@ -145,6 +137,9 @@ name = "naive_bayes"
 [[bench]]
 harness = false
 name = "bitvec_similarity"
+
+[[example]]
+name = "search_preindexed"
 
 [[example]]
 name = "bitvec_similarity"

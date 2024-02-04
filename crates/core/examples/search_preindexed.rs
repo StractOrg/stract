@@ -1,11 +1,11 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use optics::Optic;
+use optics::HostRankings;
+use rand::seq::SliceRandom;
 use stract::{
     bangs::Bangs,
     config::{
-        ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig, WidgetsConfig,
+        ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig, SnippetConfig,
+        WidgetsConfig,
     },
-    entity_index::EntityMatch,
     image_store::Image,
     index::Index,
     inverted_index::RetrievedWebpage,
@@ -80,41 +80,18 @@ impl stract::searcher::distributed::SearchClient for Searcher {
         Ok(None)
     }
 
-    async fn search_entity(&self, _query: &str) -> Option<EntityMatch> {
+    async fn search_entity(&self, _query: &str) -> Option<stract::entity_index::EntityMatch> {
         None
     }
 }
 
-macro_rules! bench {
-    ($query:tt, $searcher:ident, $optic:ident, $c:ident) => {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap();
-
-        let mut desc = "search '".to_string();
-        desc.push_str($query);
-        desc.push('\'');
-        desc.push_str(" with optic");
-        $c.bench_function(desc.as_str(), |b| {
-            b.iter(|| {
-                runtime.block_on(async {
-                    $searcher
-                        .search(&SearchQuery {
-                            query: $query.to_string(),
-                            optic: Some(Optic::parse($optic).unwrap()),
-                            ..Default::default()
-                        })
-                        .await
-                        .unwrap()
-                })
-            })
-        });
-    };
-}
-
-pub fn criterion_benchmark(c: &mut Criterion) {
+#[tokio::main]
+pub async fn main() {
     let index = Index::open("data/index").unwrap();
-    let optic = include_str!("../../optics/testcases/samples/discussions.optic");
+
+    let collector_conf = CollectorConfig {
+        ..Default::default()
+    };
 
     let config = ApiConfig {
         queries_csv_path: "data/queries_us.csv".to_string(),
@@ -129,7 +106,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         cluster_id: "api".to_string(),
         gossip_seed_nodes: None,
         gossip_addr: "0.0.0.0:8002".parse().unwrap(),
-        collector: CollectorConfig::default(),
+        collector: collector_conf.clone(),
         thresholds: ApiThresholds::default(),
         widgets: WidgetsConfig {
             thesaurus_paths: vec!["data/english-wordnet-2022-subset.ttl".to_string()],
@@ -143,10 +120,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         },
     };
 
+    let mut queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)
+        .unwrap()
+        .all()
+        .unwrap();
+
+    queries.shuffle(&mut rand::thread_rng());
+
     let mut searcher = LocalSearcher::new(index);
     searcher.set_inbound_similarity(
         InboundSimilarity::open("data/centrality/inbound_similarity").unwrap(),
     );
+    searcher.set_collector_config(collector_conf);
+    searcher.set_snippet_config(SnippetConfig {
+        ..Default::default()
+    });
     let bangs = Bangs::from_path(&config.bangs_path);
 
     let searcher = Searcher(searcher);
@@ -154,17 +142,24 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
         ApiSearcher::new(searcher, None, None, None, bangs, config);
 
-    for _ in 0..1000 {
-        bench!("the", searcher, optic, c);
-        bench!("dtu", searcher, optic, c);
-        bench!("the best", searcher, optic, c);
-        bench!("the circle of life", searcher, optic, c);
-        bench!("what", searcher, optic, c);
-        bench!("a", searcher, optic, c);
-        bench!("sun", searcher, optic, c);
-        bench!("what a sun", searcher, optic, c);
+    for query in &queries {
+        let mut desc = "search '".to_string();
+        desc.push_str(query);
+        desc.push('\'');
+
+        println!("{}", desc);
+
+        searcher
+            .search(&SearchQuery {
+                query: query.to_string(),
+                host_rankings: Some(HostRankings {
+                    liked: vec![],
+                    disliked: vec![],
+                    blocked: vec![],
+                }),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
     }
 }
-
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
