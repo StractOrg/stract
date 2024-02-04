@@ -141,19 +141,11 @@ pub struct TopSegmentCollector {
 
 impl TopSegmentCollector {
     fn get_hash(&self, doc: &DocId, field1: &FastField, field2: &FastField) -> Prehashed {
-        let hash: Option<u64> = self
-            .fastfield_segment_reader
-            .get_field_reader(field1)
-            .get(doc)
-            .into();
-        let hash1 = hash.unwrap();
+        let field_reader = self.fastfield_segment_reader.get_field_reader(doc);
 
-        let hash: Option<u64> = self
-            .fastfield_segment_reader
-            .get_field_reader(field2)
-            .get(doc)
-            .into();
-        let hash2 = hash.unwrap();
+        let hash1 = field_reader.get(field1).into();
+
+        let hash2 = field_reader.get(field2).into();
 
         let hash = [hash1, hash2];
         combine_u64s(hash).into()
@@ -178,8 +170,8 @@ impl TopSegmentCollector {
 
         let simhash: Option<u64> = self
             .fastfield_segment_reader
-            .get_field_reader(&FastField::SimHash)
-            .get(&doc)
+            .get_field_reader(&doc)
+            .get(&FastField::SimHash)
             .into();
 
         self.bucket_collector.insert(SegmentDoc {

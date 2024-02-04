@@ -48,26 +48,39 @@ impl FastFieldReader {
 
             let mut field_readers = Vec::new();
 
+            let mut tv_readers = EnumMap::new();
+
             for field in Field::all().filter_map(|field| field.as_fast()) {
-                let field_reader = match field.data_type() {
+                match field.data_type() {
                     DataType::U64 => {
                         let reader = fastfield_readers.u64(field.name()).unwrap();
-                        FieldReader {
-                            data: Arc::new(reader.values.iter().collect()),
-                        }
+                        tv_readers.insert(field, reader);
                     }
                 };
-
-                field_readers.push((field, field_reader));
             }
 
-            field_readers.sort_by_key(|(field, _)| *field as usize);
+            for doc in 0..reader.max_doc() as usize {
+                let mut field_reader = FieldReader {
+                    data: EnumMap::new(),
+                };
+
+                for field in Field::all().filter_map(|field| field.as_fast()) {
+                    match field.data_type() {
+                        DataType::U64 => {
+                            let reader = tv_readers.get(field).unwrap();
+                            field_reader
+                                .data
+                                .insert(field, reader.values.get_val(doc as u32))
+                        }
+                    };
+                }
+
+                field_readers.push(field_reader);
+            }
 
             segments.insert(
                 reader.segment_id(),
-                Arc::new(SegmentReader {
-                    field_readers: field_readers.into_iter().collect(),
-                }),
+                Arc::new(SegmentReader { field_readers }),
             );
         }
 
@@ -77,23 +90,22 @@ impl FastFieldReader {
     }
 }
 
-#[derive(Clone)]
 pub struct FieldReader {
-    data: Arc<Vec<u64>>,
+    data: EnumMap<FastField, u64>,
 }
 
 impl FieldReader {
-    pub fn get(&self, doc: &DocId) -> u64 {
-        self.data[*doc as usize]
+    pub fn get(&self, field: &FastField) -> u64 {
+        self.data.get(*field).copied().unwrap()
     }
 }
 
 pub struct SegmentReader {
-    field_readers: EnumMap<FastField, FieldReader>,
+    field_readers: Vec<FieldReader>,
 }
 
 impl SegmentReader {
-    pub fn get_field_reader(&self, field: &FastField) -> &FieldReader {
-        self.field_readers.get(*field).unwrap()
+    pub fn get_field_reader(&self, doc: &DocId) -> &FieldReader {
+        &self.field_readers.as_slice()[*doc as usize]
     }
 }

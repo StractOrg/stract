@@ -311,131 +311,78 @@ impl Signal {
         }
     }
 
-    fn host_id(&self, aggregator: &SignalAggregator, doc: DocId) -> Option<NodeID> {
-        aggregator.segment_reader.as_ref().and_then(|reader| {
-            let node_id: Option<u64> = reader
-                .borrow_mut()
-                .fastfield_reader
-                .get_field_reader(&FastField::HostNodeID)
-                .get(&doc)
-                .into();
-            let node_id = node_id.unwrap();
-
-            if node_id == u64::MAX {
-                None
-            } else {
-                Some(node_id.into())
-            }
-        })
-    }
-
-    fn fastfield_value(&self, aggregator: &SignalAggregator, doc: &DocId) -> Option<u64> {
-        aggregator.segment_reader.as_ref().and_then(|reader| {
-            self.as_fastfield().as_ref().map(|fast_field| {
-                reader
-                    .borrow()
-                    .fastfield_reader
-                    .get_field_reader(fast_field)
-                    .get(doc)
-            })
-        })
-    }
-
     fn compute(self, signal_aggregator: &SignalAggregator, doc: DocId) -> Option<ComputedSignal> {
         let coefficient = signal_aggregator.coefficient(&self);
         if coefficient == 0.0 {
             return None;
         }
 
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(&doc);
+
+        let node_id = fastfield_reader.get(&FastField::HostNodeID);
+        let host_id: Option<NodeID> = if node_id == u64::MAX {
+            None
+        } else {
+            Some(node_id.into())
+        };
+
         let value: Option<f64> = match self {
             Signal::HostCentrality | Signal::PageCentrality => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|val| val as f64 / FLOAT_SCALING as f64)
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(val as f64 / FLOAT_SCALING as f64)
             }
             Signal::HostCentralityRank | Signal::PageCentralityRank => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|val| val as f64).map(score_rank)
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(score_rank(val as f64))
             }
             Signal::IsHomepage => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|val| val as f64)
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(val as f64)
             }
             Signal::LinkDensity => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value
-                    .map(|val| val as f64 / FLOAT_SCALING as f64)
-                    .map(score_link_density)
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
             }
             Signal::FetchTimeMs => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
+                let fetch_time_ms = fastfield_reader.get(&self.as_fastfield().unwrap()) as usize;
 
-                field_value.map(|v| v as usize).map(|fetch_time_ms| {
-                    if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
-                        0.0
-                    } else {
-                        signal_aggregator.fetch_time_ms_cache[fetch_time_ms]
-                    }
-                })
+                if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
+                    Some(0.0)
+                } else {
+                    Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
+                }
             }
             Signal::UpdateTimestamp => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap()) as usize;
 
-                field_value
-                    .map(|v| v as usize)
-                    .map(|update_timestamp| score_timestamp(update_timestamp, signal_aggregator))
+                Some(score_timestamp(val, signal_aggregator))
             }
             Signal::TrackerScore => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|num_trackers| score_trackers(num_trackers as f64))
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(score_trackers(val as f64))
             }
             Signal::UrlDigits => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|num_digits| score_digits(num_digits as f64))
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(score_digits(val as f64))
             }
             Signal::UrlSlashes => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value.map(|num_slashes| score_slashes(num_slashes as f64))
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                Some(score_slashes(val as f64))
             }
             Signal::Region => {
-                let field_value: Option<u64> = self
-                    .fastfield_value(signal_aggregator, &doc)
-                    .and_then(|val| val.into());
-
-                field_value
-                    .map(Region::from_id)
-                    .map(|region| score_region(region, signal_aggregator))
+                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let region = Region::from_id(val);
+                Some(score_region(region, signal_aggregator))
             }
             Signal::QueryCentrality => {
-                let host_id = self.host_id(signal_aggregator, doc);
                 host_id.and_then(|host_id| signal_aggregator.query_centrality(host_id))
             }
             Signal::InboundSimilarity => {
-                let host_id = self.host_id(signal_aggregator, doc);
                 host_id.map(|host_id| signal_aggregator.inbound_similarity(host_id))
             }
             Signal::Bm25Title
@@ -457,14 +404,10 @@ impl Signal {
             | Signal::Bm25DomainNameIfHomepageNoTokenizer
             | Signal::Bm25DomainIfHomepageNoTokenizer
             | Signal::Bm25TitleIfHomepage
-            | Signal::Bm25BacklinkText => signal_aggregator.segment_reader.as_ref().map(|reader| {
-                reader
-                    .borrow_mut()
-                    .text_fields
-                    .get_mut(self.as_textfield().unwrap())
-                    .map(|field| bm25(field, doc))
-                    .unwrap_or(0.0)
-            }),
+            | Signal::Bm25BacklinkText => seg_reader
+                .text_fields
+                .get_mut(self.as_textfield().unwrap())
+                .map(|field| bm25(field, doc)),
 
             Signal::CrossEncoderSnippet => None, // this is calculated in a later step
             Signal::CrossEncoderTitle => None,   // this is calculated in a later step
