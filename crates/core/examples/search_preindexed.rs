@@ -133,6 +133,8 @@ pub async fn main() {
     );
     searcher.set_collector_config(collector_conf);
     searcher.set_snippet_config(SnippetConfig {
+        num_words_for_lang_detection: Some(250),
+        max_considered_words: Some(10_000),
         ..Default::default()
     });
     let bangs = Bangs::from_path(&config.bangs_path);
