@@ -24,14 +24,14 @@ Block: RawOpticBlock = {
 }
 
 Rule: RawRule = {
-    "Rule" "{" <matches:RawMatchBlock> <action:RawAction?> "}" => RawRule {
+    "Rule" "{" <matches:Sep<",", RawMatchBlock>> <action:RawAction?> "}" => RawRule {
         matches,
         action
     }
 }
 
 RawMatchBlock: RawMatchBlock = {
-    "Matches" "{" <Sep<",", RawMatchPart>> "}" ","? => RawMatchBlock(<>)
+    "Matches" "{" <Sep<",", RawMatchPart>> "}" => RawMatchBlock(<>)
 }
 
 RawMatchPart: RawMatchPart = {

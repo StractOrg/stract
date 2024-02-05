@@ -101,7 +101,7 @@ pub enum RawOpticBlock {
 
 #[derive(Debug, PartialEq)]
 pub struct RawRule {
-    pub matches: RawMatchBlock,
+    pub matches: Vec<RawMatchBlock>,
     pub action: Option<RawAction>,
 }
 
@@ -196,16 +196,16 @@ mod tests {
             RawOptic {
                 rules: vec![
                     RawRule {
-                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Url(
                             "/this/is/a/*/pattern".to_string()
-                        )]),
+                        )])],
                         action: None,
                     },
                     RawRule {
-                        matches: RawMatchBlock(vec![
+                        matches: vec![RawMatchBlock(vec![
                             RawMatchPart::Url("/this/is/a/pattern".to_string()),
                             RawMatchPart::Site("example.com".to_string()),
-                        ],),
+                        ])],
                         action: None,
                     },
                 ],
@@ -250,13 +250,13 @@ mod tests {
             RawOptic {
                 rules: vec![
                     RawRule {
-                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Url(
                             "/this/is/a/*/pattern".to_string()
-                        )]),
+                        )])],
                         action: Some(RawAction::Boost(2)),
                     },
                     RawRule {
-                        matches: RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())],),
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())])],
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],
@@ -293,13 +293,13 @@ mod tests {
             RawOptic {
                 rules: vec![
                     RawRule {
-                        matches: RawMatchBlock(vec![RawMatchPart::Url(
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Url(
                             "/this/is/a/*/pattern".to_string()
-                        )]),
+                        )])],
                         action: Some(RawAction::Boost(2)),
                     },
                     RawRule {
-                        matches: RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())],),
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())])],
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],

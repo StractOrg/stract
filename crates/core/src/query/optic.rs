@@ -95,7 +95,26 @@ impl AsSearchableRule for Rule {
         let mut subqueries: Vec<_> = self
             .matches
             .iter()
-            .map(|matching| (Occur::Must, matching.as_tantivy(schema, fastfield_reader)))
+            .filter_map(|and_rule| {
+                let mut and_queries: Vec<_> = and_rule
+                    .iter()
+                    .map(|matching| (Occur::Must, matching.as_tantivy(schema, fastfield_reader)))
+                    .collect();
+
+                // Empty queries never match anything. A priori these shouldn't exist, but it doesn't
+                // really cost us anything to check.
+                // (though, technically it's an extra check or two for every rule? But rules aren't parsed very often)
+                if and_queries.is_empty() {
+                    None
+                } else {
+                    let query = if and_queries.len() == 1 {
+                        and_queries.pop().unwrap().1
+                    } else {
+                        Box::new(BooleanQuery::from(and_queries))
+                    };
+                    Some((Occur::Should, query))
+                }
+            })
             .collect();
 
         if subqueries.is_empty() {
@@ -946,9 +965,6 @@ mod tests {
                         Matches {
                             Site("stackoverflow.blog")
                         },
-                        Action(Boost(1))
-                    };
-                    Rule {
                         Matches {
                             Site("chat.b.eu")
                         },
