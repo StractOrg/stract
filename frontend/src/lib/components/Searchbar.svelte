@@ -93,12 +93,12 @@
   <label
     for="searchbar"
     class={twJoin(
-      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-400 pl-5 transition focus-within:shadow',
+      'border-base-400 group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border pl-5 transition focus-within:shadow',
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
       hasFocus && 'shadow',
     )}
   >
-    <MagnifyingGlass class="w-5 text-base-content" />
+    <MagnifyingGlass class="text-base-content w-5" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
       type="search"
@@ -107,7 +107,7 @@
       {autofocus}
       placeholder="Search"
       autocomplete="off"
-      class="border-none bg-transparent focus:ring-0 text-lg"
+      class="border-none bg-transparent text-lg focus:ring-0"
       on:focus={() => {
         hasFocus = true;
       }}
@@ -121,8 +121,6 @@
         // @ts-ignore
         if (window.requestIdleCallback) {
           requestIdleCallback(() => (hasFocus = false));
-        } else {
-          hasFocus = false;
         }
       }}
       bind:value={query}
@@ -133,16 +131,16 @@
     </div>
 
     {#if suggestions.length > 0}
-      <div class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block" />
+      <div class="bg-base-300 absolute inset-x-5 bottom-px hidden h-px group-focus-within:block" />
       <div
         class={twJoin(
-          'absolute inset-x-5 bottom-px h-px bg-base-300',
+          'bg-base-300 absolute inset-x-5 bottom-px h-px',
           hasFocus ? 'block' : 'hidden',
         )}
       />
       <div
         class={twJoin(
-          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-400 bg-base-100 shadow',
+          'border-base-400 bg-base-100 absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 shadow',
           hasFocus ? 'flex' : 'hidden',
         )}
         role="listbox"
@@ -151,7 +149,7 @@
         {#each suggestions as s, index}
           <button
             class={twJoin(
-              'flex space-x-3 py-1.5 pl-5 hover:bg-base-200',
+              'hover:bg-base-200 flex space-x-3 py-1.5 pl-5',
               selected == index && 'bg-base-200',
             )}
             on:click={() => {
@@ -160,7 +158,7 @@
             }}
             type="submit"
           >
-            <MagnifyingGlass class="w-4 text-neutral" />
+            <MagnifyingGlass class="text-neutral w-4" />
             <span>
               {@html splitAtOverlap(s)[0]}<span class="font-medium"
                 >{@html splitAtOverlap(s)[1]}</span
