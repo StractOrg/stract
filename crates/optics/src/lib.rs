@@ -406,17 +406,27 @@ impl ToString for HostRankings {
             res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
         }
 
-        // TODO: this can be reformatted as a single rule.
-        for blocked in &self.blocked {
+        let matches : Vec<_> = self.blocked
+            .iter()
+            .map(|host| {
+                host.strip_prefix("www.")
+                    .map(|host| host.to_string())
+                    .unwrap_or(host.clone())
+            })
+            .map(|host| vec![Matching {
+                pattern: vec![
+                    PatternPart::Anchor,
+                    PatternPart::Raw(host.clone()),
+                    PatternPart::Anchor,
+                ],
+                location: MatchLocation::Site,
+            }]
+            )
+            .collect();
+
+        if !matches.is_empty() {
             let rule = Rule {
-                matches: vec![vec![Matching {
-                    pattern: vec![
-                        PatternPart::Anchor,
-                        PatternPart::Raw(blocked.clone()),
-                        PatternPart::Anchor,
-                    ],
-                    location: MatchLocation::Site,
-                }]],
+                matches,
                 action: Action::Discard,
             };
 
@@ -428,26 +438,29 @@ impl ToString for HostRankings {
 }
 
 impl HostRankings {
-    pub fn rules(&self) -> Vec<Rule> {
-        self.blocked
+    pub fn rules(&self) -> Rule {
+        let matches : Vec<_> = self.blocked
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
                     .map(|host| host.to_string())
                     .unwrap_or(host.clone())
             })
-            .map(|host| Rule { // TODO: this can be reformatted as a single rule.
-                matches: vec![vec![Matching {
+            .map(|host| vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw(host.clone()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Site,
-                }]],
-                action: Action::Discard,
-            })
-            .collect()
+                }]
+            )
+            .collect();
+
+        Rule {
+            matches,
+            action: Action::Discard,
+        }
     }
 
     pub fn into_optic(self) -> Optic {
