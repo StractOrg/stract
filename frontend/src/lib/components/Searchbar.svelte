@@ -121,6 +121,8 @@
         // @ts-ignore
         if (window.requestIdleCallback) {
           requestIdleCallback(() => (hasFocus = false));
+        } else {
+          setTimeout(() => (hasFocus = false), 0);
         }
       }}
       bind:value={query}
