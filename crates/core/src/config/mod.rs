@@ -236,9 +236,13 @@ pub struct SnippetConfig {
     pub max_considered_words: Option<usize>,
     pub num_words_for_lang_detection: Option<usize>,
 
+    #[serde(default = "defaults::Snippet::empty_query_snippet_words")]
     pub empty_query_snippet_words: usize,
+    #[serde(default = "defaults::Snippet::min_description_words")]
     pub min_description_words: usize,
+    #[serde(default = "defaults::Snippet::min_body_length")]
     pub min_body_length: usize,
+    #[serde(default = "defaults::Snippet::min_body_length_homepage")]
     pub min_body_length_homepage: usize,
 }
 
