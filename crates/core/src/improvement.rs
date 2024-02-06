@@ -120,14 +120,14 @@ impl ScyllaConn {
         session.query("CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}", &[]).await?;
         session
         .query(
-            "CREATE TABLE IF NOT EXISTS ks.queries (qid uuid, query text, urls text, timestamp timestamp, primary key (qid, timestamp))",
+            "CREATE TABLE IF NOT EXISTS ks.queries (qid uuid, query text, urls text, timestamp timestamp, primary key (qid, timestamp)) WITH default_time_to_live = 7776000", // ttl 90 days
             &[],
         )
         .await?;
 
         session
             .query(
-                "CREATE TABLE IF NOT EXISTS ks.clicks (qid uuid, click tinyint, primary key (qid))",
+                "CREATE TABLE IF NOT EXISTS ks.clicks (qid uuid, click tinyint, primary key (qid)) WITH default_time_to_live = 7776000", // ttl 90 days
                 &[],
             )
             .await?;
