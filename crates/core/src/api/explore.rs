@@ -44,14 +44,14 @@ pub async fn explore_export_optic(
         .into_iter()
         .chain(chosen_hosts.clone().into_iter())
         .map(|site| optics::Rule {
-            matches: vec![optics::Matching {
+            matches: vec![vec![optics::Matching { // TODO: these can be compressed into a single rule.
                 pattern: vec![
                     optics::PatternPart::Anchor,
                     optics::PatternPart::Raw(site),
                     optics::PatternPart::Anchor,
                 ],
                 location: optics::MatchLocation::Domain,
-            }],
+            }]],
             action: optics::Action::Boost(0),
         })
         .collect();

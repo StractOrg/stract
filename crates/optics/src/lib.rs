@@ -107,15 +107,24 @@ impl TryFrom<RawRule> for Rule {
     type Error = Error;
 
     fn try_from(raw: RawRule) -> Result<Self> {
-        let mut matches = Vec::new();
+        let RawRule {
+            matches,
+            action,
+        } = raw;
 
-        for matching in raw.matches.0 {
-            matches.push(matching.try_into()?);
-        }
+        let matches = matches
+            .into_iter()
+            .map(|m|
+                m.0
+                    .into_iter()
+                    .map(|m| <RawMatchPart as TryInto<Matching>>::try_into(m))
+                    .collect::<Result<Vec<Matching>>>()
+            )
+            .collect::<Result<Vec<Vec<Matching>>>>()?;
 
         Ok(Rule {
             matches,
-            action: raw.action.map(Action::from).unwrap_or(Action::Boost(0)),
+            action: action.map(Action::from).unwrap_or(Action::Boost(0)),
         })
     }
 }
@@ -349,7 +358,9 @@ impl ToString for Optic {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Rule {
-    pub matches: Vec<Matching>,
+    /// A list of matchings, structured as an OR of ANDs (i.e. the rule matches if all of the matchings inside one list match).
+    pub matches: Vec<Vec<Matching>>,
+    /// What action to take if the rule matches.
     pub action: Action,
 }
 
@@ -359,11 +370,13 @@ impl ToString for Rule {
 
         res.push_str("Rule {\n");
         if !self.matches.is_empty() {
-            res.push_str("\tMatches {\n");
-            for m in &self.matches {
-                res.push_str(&format!("\t\t{},\n", m.to_string()));
+            for matcher in &self.matches {
+                res.push_str("\tMatches {\n");
+                for m in matcher {
+                    res.push_str(&format!("\t\t{},\n", m.to_string()));
+                }
+                res.push_str("\t}")
             }
-            res.push_str("\t}")
         }
 
         res.push_str(&format!("\t{}\n", self.action.to_string()));
@@ -393,16 +406,17 @@ impl ToString for HostRankings {
             res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
         }
 
+        // TODO: this can be reformatted as a single rule.
         for blocked in &self.blocked {
             let rule = Rule {
-                matches: vec![Matching {
+                matches: vec![vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw(blocked.clone()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Site,
-                }],
+                }]],
                 action: Action::Discard,
             };
 
@@ -422,15 +436,15 @@ impl HostRankings {
                     .map(|host| host.to_string())
                     .unwrap_or(host.clone())
             })
-            .map(|host| Rule {
-                matches: vec![Matching {
+            .map(|host| Rule { // TODO: this can be reformatted as a single rule.
+                matches: vec![vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw(host.clone()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Site,
-                }],
+                }]],
                 action: Action::Discard,
             })
             .collect()
@@ -492,14 +506,14 @@ mod tests {
                 blocked: vec![],
             },
             rules: vec![Rule {
-                matches: vec![Matching {
+                matches: vec![vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw("test".to_string()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Site,
-                }],
+                }]],
                 action: Action::Boost(0),
             }],
             discard_non_matching: true,
