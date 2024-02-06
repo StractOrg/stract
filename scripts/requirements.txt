@@ -1,6 +1,4 @@
 transformers
-tensorboard>1.15.0
-torch>=2.0.0
 datasets
 gensim
 safetensors
@@ -8,4 +6,3 @@ pandas
 llama-cpp-python[server]
 llama-cpp-python
 huggingface-hub>=0.20.3
-gguf

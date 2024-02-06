@@ -235,6 +235,11 @@ pub struct SnippetConfig {
 
     pub max_considered_words: Option<usize>,
     pub num_words_for_lang_detection: Option<usize>,
+
+    pub empty_query_snippet_words: usize,
+    pub min_description_words: usize,
+    pub min_body_length: usize,
+    pub min_body_length_homepage: usize,
 }
 
 impl Default for SnippetConfig {
@@ -245,6 +250,10 @@ impl Default for SnippetConfig {
             min_passage_width: defaults::Snippet::min_passage_width(),
             max_considered_words: None,
             num_words_for_lang_detection: None,
+            empty_query_snippet_words: defaults::Snippet::empty_query_snippet_words(),
+            min_description_words: defaults::Snippet::min_description_words(),
+            min_body_length: defaults::Snippet::min_body_length(),
+            min_body_length_homepage: defaults::Snippet::min_body_length_homepage(),
         }
     }
 }

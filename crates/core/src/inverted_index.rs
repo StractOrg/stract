@@ -447,22 +447,35 @@ impl InvertedIndex {
         }) {
             if query.simple_terms().is_empty() {
                 let snippet = if let Some(description) = page.description.as_deref() {
-                    let snip = description.split_whitespace().take(50).join(" ");
+                    let snip = description
+                        .split_whitespace()
+                        .take(self.snippet_config.empty_query_snippet_words)
+                        .join(" ");
 
-                    if snip.split_whitespace().count() < 10 {
-                        page.body.split_whitespace().take(50).join(" ")
+                    if snip.split_whitespace().count() < self.snippet_config.min_description_words {
+                        page.body
+                            .split_whitespace()
+                            .take(self.snippet_config.empty_query_snippet_words)
+                            .join(" ")
                     } else {
                         snip
                     }
                 } else {
-                    page.body.split_whitespace().take(50).join(" ")
+                    page.body
+                        .split_whitespace()
+                        .take(self.snippet_config.empty_query_snippet_words)
+                        .join(" ")
                 };
 
                 page.snippet = TextSnippet {
                     fragments: vec![TextSnippetFragment::new_unhighlighted(snippet)],
                 };
             } else {
-                let min_body_len = if url.is_homepage() { 1024 } else { 256 };
+                let min_body_len = if url.is_homepage() {
+                    self.snippet_config.min_body_length_homepage
+                } else {
+                    self.snippet_config.min_body_length
+                };
 
                 if page.body.split_whitespace().count() < min_body_len
                     && page
@@ -471,7 +484,7 @@ impl InvertedIndex {
                         .unwrap_or_default()
                         .split_whitespace()
                         .count()
-                        >= 8
+                        >= self.snippet_config.min_description_words
                 {
                     page.snippet = snippet::generate(
                         query,

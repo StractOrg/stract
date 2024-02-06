@@ -64,6 +64,22 @@ impl Snippet {
     pub fn min_passage_width() -> usize {
         20
     }
+
+    pub fn empty_query_snippet_words() -> usize {
+        50
+    }
+
+    pub fn min_description_words() -> usize {
+        10
+    }
+
+    pub fn min_body_length() -> usize {
+        256
+    }
+
+    pub fn min_body_length_homepage() -> usize {
+        1024
+    }
 }
 
 pub struct Crawler;
