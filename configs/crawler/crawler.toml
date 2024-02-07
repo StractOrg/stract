@@ -7,7 +7,7 @@ timeout_seconds = 30
 
 [user_agent]
 full = "<user_agent>" 
-token = "<user_agent_token>" # e.g. 'StractBot'
+token = "<user_agent_token>" # e.g. 'CrawlBot'
 
 [s3]
 access_key = "<access_key>"
