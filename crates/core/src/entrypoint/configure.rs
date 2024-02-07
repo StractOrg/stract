@@ -46,6 +46,7 @@ fn download_files() {
                 "lambdamart.txt",
                 "test.zim",
                 "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+                "internet_archive.warc.gz",
             ] {
                 let path = Path::new(DATA_PATH).join(name);
 

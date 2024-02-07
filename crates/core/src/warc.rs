@@ -230,7 +230,7 @@ impl Request {
             url: record
                 .header
                 .get("WARC-TARGET-URI")
-                .ok_or(Error::WarcParse("No target url"))?
+                .ok_or(Error::WarcParse("No target url".to_string()))?
                 .to_owned(),
         })
     }
@@ -257,7 +257,7 @@ impl FromStr for PayloadType {
             "application/rss+xml" => Ok(Self::Rss),
             "application/atom" => Ok(Self::Atom),
             "application/atom+xml" => Ok(Self::Atom),
-            _ => Err(Error::WarcParse("Unknown payload type")),
+            _ => Err(Error::WarcParse("Unknown payload type".to_string())),
         }
     }
 }
@@ -286,7 +286,7 @@ impl Response {
 
         let (_header, content) = content
             .split_once("\r\n\r\n")
-            .ok_or(Error::WarcParse("Invalid http body"))?;
+            .ok_or(Error::WarcParse("Invalid http body".to_string()))?;
 
         Ok(Self {
             body: content.to_string(),
@@ -322,7 +322,7 @@ impl Metadata {
             }
         }
 
-        Err(Error::WarcParse("Failed to parse metadata").into())
+        Err(Error::WarcParse("Failed to parse metadata".to_string()).into())
     }
 }
 
@@ -346,7 +346,9 @@ impl<R: Read> RecordIterator<R> {
         rtrim(&mut version);
 
         if !version.to_uppercase().starts_with("WARC/1.") {
-            return Some(Err(Error::WarcParse("Unknown WARC version").into()));
+            return Some(Err(
+                Error::WarcParse("Unknown WARC version".to_string()).into()
+            ));
         }
 
         let mut header = BTreeMap::<String, String>::new();
@@ -377,10 +379,10 @@ impl<R: Read> RecordIterator<R> {
                 line_buf.pop(); // remove colon
                 let key = line_buf;
 
-                header.insert(key.to_ascii_uppercase(), value);
+                header.insert(key.to_uppercase(), value);
             } else {
                 return Some(Err(Error::WarcParse(
-                    "All header lines must contain a colon",
+                    "All header lines must contain a colon".to_string(),
                 )
                 .into()));
             }
@@ -388,14 +390,18 @@ impl<R: Read> RecordIterator<R> {
 
         let content_len = header.get("CONTENT-LENGTH");
         if content_len.is_none() {
-            return Some(Err(Error::WarcParse("Record has no content-length").into()));
+            return Some(Err(Error::WarcParse(
+                "Record has no content-length".to_string(),
+            )
+            .into()));
         }
 
         let content_len = content_len.unwrap().parse::<usize>();
         if content_len.is_err() {
-            return Some(Err(
-                Error::WarcParse("Could not parse content length").into()
-            ));
+            return Some(Err(Error::WarcParse(
+                "Could not parse content length".to_string(),
+            )
+            .into()));
         }
 
         let content_len = content_len.unwrap();
@@ -410,7 +416,9 @@ impl<R: Read> RecordIterator<R> {
         }
 
         if linefeed != [13, 10, 13, 10] {
-            return Some(Err(Error::WarcParse("Invalid record ending").into()));
+            return Some(Err(
+                Error::WarcParse("Invalid record ending".to_string()).into()
+            ));
         }
 
         let record = RawWarcRecord { header, content };
@@ -429,6 +437,8 @@ impl<R: Read> Iterator for RecordIterator<R> {
         self.num_reads += 1;
 
         let mut request = None;
+        let mut response = None;
+        let mut metadata = None;
 
         while let Some(item) = self.next_raw() {
             if item.is_err() {
@@ -439,84 +449,73 @@ impl<R: Read> Iterator for RecordIterator<R> {
 
             if let Some(warc_type) = item.header.get("WARC-TYPE") {
                 if warc_type.as_str() == "request" {
-                    request = Some(Request::from_raw(item));
-                    break;
+                    if request.is_some() {
+                        return Some(Err(Error::WarcParse(
+                            "Already have a request but got another.".to_string(),
+                        )
+                        .into()));
+                    }
+
+                    match Request::from_raw(item) {
+                        Ok(req) => {
+                            request = Some(req);
+                        }
+                        Err(err) => return Some(Err(Error::WarcParse(err.to_string()).into())),
+                    };
+                } else if warc_type.as_str() == "response" || warc_type.as_str() == "revisit" {
+                    if let Some(content_type) = item.header.get("CONTENT-TYPE") {
+                        if !content_type.starts_with("application/http") {
+                            continue;
+                        }
+                    }
+
+                    if response.is_some() {
+                        return Some(Err(Error::WarcParse(
+                            "Already have a response but got another.".to_string(),
+                        )
+                        .into()));
+                    }
+
+                    match Response::from_raw(item) {
+                        Ok(res) => {
+                            response = Some(res);
+                        }
+                        Err(err) => {
+                            return Some(Err(Error::WarcParse(err.to_string()).into()));
+                        }
+                    };
+                } else if warc_type.as_str() == "metadata" {
+                    if let Some(content_type) = item.header.get("CONTENT-TYPE") {
+                        if !content_type.starts_with("application/warc-fields") {
+                            continue;
+                        }
+                    }
+
+                    if metadata.is_some() {
+                        return Some(Err(Error::WarcParse(
+                            "Already have metadata but got another.".to_string(),
+                        )
+                        .into()));
+                    }
+
+                    match Metadata::from_raw(item) {
+                        Ok(met) => {
+                            metadata = Some(met);
+                        }
+                        Err(err) => return Some(Err(Error::WarcParse(err.to_string()).into())),
+                    }
                 }
             }
-        }
 
-        let request = request?;
-
-        // next 2 should be response and metadata
-        let response = self.next_raw()?;
-
-        if response.is_err() {
-            return Some(Err(response.err().unwrap()));
-        }
-
-        let response = response.unwrap();
-
-        match response.header.get("WARC-TYPE") {
-            Some(warc_type) => {
-                if warc_type.as_str() != "response" {
-                    return Some(Err(Error::WarcParse(
-                        "Expected response, got something else",
-                    )
-                    .into()));
-                }
-            }
-            None => {
-                return Some(Err(Error::WarcParse(
-                    "Expected response, got something else",
-                )
-                .into()));
+            if request.is_some() && response.is_some() && metadata.is_some() {
+                break;
             }
         }
-
-        let response = Response::from_raw(response);
-
-        let metadata = self.next_raw()?;
-
-        if metadata.is_err() {
-            return Some(Err(metadata.err().unwrap()));
-        }
-
-        let metadata = metadata.unwrap();
-
-        match metadata.header.get("WARC-TYPE") {
-            Some(warc_type) => {
-                if warc_type.as_str() != "metadata" {
-                    return Some(Err(Error::WarcParse(
-                        "Expected metadata, got something else",
-                    )
-                    .into()));
-                }
-            }
-            None => {
-                return Some(Err(Error::WarcParse(
-                    "Expected metadata, got something else",
-                )
-                .into()));
-            }
-        }
-
-        let metadata = Metadata::from_raw(metadata);
-
-        if request.is_err() || response.is_err() || metadata.is_err() {
-            return Some(Err(Error::WarcParse(
-                "Request, response or metadata is error",
-            )
-            .into()));
-        }
-
-        let request = request.unwrap();
-        let response = response.unwrap();
-        let metadata = metadata.unwrap();
 
         Some(Ok(WarcRecord {
-            request,
-            response,
-            metadata,
+            request: request?,
+            response: response?,
+            metadata: metadata?,
         }))
     }
 }
@@ -675,6 +674,7 @@ impl Default for WarcWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::panic;
     use flate2::write::GzEncoder;
     use flate2::Compression;
     use proptest::prelude::*;
@@ -723,6 +723,25 @@ mod tests {
         assert_eq!(&records[0].request.url, "http://0575ls.cn/news-52300.htm");
         assert_eq!(&records[0].response.body, "body of response");
         assert_eq!(records[0].metadata.fetch_time_ms, 937);
+    }
+
+    #[test]
+    fn internet_archive_parse() {
+        if !Path::new("../../../data/internet_archive.warc.gz").exists() {
+            return;
+        }
+
+        let file = File::open("../../../data/internet_archive.warc.gz").unwrap();
+        let mut reader = BufReader::new(MultiGzDecoder::new(BufReader::new(file)));
+
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).unwrap();
+
+        for record in WarcFile::new(bytes).records() {
+            if let Err(err) = record {
+                panic!("Error: {:?}", err);
+            }
+        }
     }
 
     #[test]

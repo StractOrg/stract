@@ -81,8 +81,8 @@ mod widgets;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Failed to parse WARC file")]
-    WarcParse(&'static str),
+    #[error("Failed to parse WARC file: {0}")]
+    WarcParse(String),
 
     #[error("Encountered an empty required field ({0}) when converting to tantivy")]
     EmptyField(&'static str),
