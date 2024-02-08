@@ -19,6 +19,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
+use std::fmt::Display;
 
 use csv::Writer;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -65,11 +66,11 @@ pub enum Gl {
     Us,
 }
 
-impl ToString for Gl {
-    fn to_string(&self) -> String {
-        match self {
-            Gl::Us => "us".to_string(),
-        }
+impl Display for Gl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Gl::Us => "us",
+        })
     }
 }
 

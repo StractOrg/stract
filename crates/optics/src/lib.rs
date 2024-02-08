@@ -20,6 +20,7 @@ mod lexer;
 use ast::RankingCoeff;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+use std::fmt::Display;
 use thiserror::Error;
 use utoipa::ToSchema;
 
@@ -145,30 +146,25 @@ pub struct Matching {
     pub location: MatchLocation,
 }
 
-impl ToString for Matching {
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        match self.location {
-            MatchLocation::Site => s.push_str("Site"),
-            MatchLocation::Url => s.push_str("Url"),
-            MatchLocation::Domain => s.push_str("Domain"),
-            MatchLocation::Title => s.push_str("Title"),
-            MatchLocation::Description => s.push_str("Description"),
-            MatchLocation::Content => s.push_str("Content"),
-            MatchLocation::MicroformatTag => s.push_str("MicroformatTag"),
-            MatchLocation::Schema => s.push_str("Schema"),
-        }
-        s.push('(');
-        s.push('"');
+impl Display for Matching {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self.location {
+            MatchLocation::Site => "Site",
+            MatchLocation::Url => "Url",
+            MatchLocation::Domain => "Domain",
+            MatchLocation::Title => "Title",
+            MatchLocation::Description => "Description",
+            MatchLocation::Content => "Content",
+            MatchLocation::MicroformatTag => "MicroformatTag",
+            MatchLocation::Schema => "Schema",
+        };
+        write!(f, "{}(\"", s)?;
 
         for part in &self.pattern {
-            s.push_str(&part.to_string());
+            write!(f, "{}", part)?;
         }
 
-        s.push('"');
-        s.push(')');
-
-        s
+        write!(f, "\")")
     }
 }
 
@@ -274,12 +270,12 @@ pub enum PatternPart {
     Anchor,
 }
 
-impl ToString for PatternPart {
-    fn to_string(&self) -> String {
+impl Display for PatternPart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PatternPart::Raw(s) => s.to_string(),
-            PatternPart::Wildcard => "*".to_string(),
-            PatternPart::Anchor => "|".to_string(),
+            PatternPart::Raw(s) => write!(f, "{}", s),
+            PatternPart::Wildcard => write!(f, "*"),
+            PatternPart::Anchor => write!(f, "|"),
         }
     }
 }
@@ -303,20 +299,17 @@ pub enum Action {
     Discard,
 }
 
-impl ToString for Action {
-    fn to_string(&self) -> String {
-        let mut res = String::new();
-        res.push_str("Action(");
+impl Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Action(")?;
 
         match self {
-            Action::Boost(b) => res.push_str(&format!("Boost({})", b)),
-            Action::Downrank(d) => res.push_str(&format!("Downrank({})", d)),
-            Action::Discard => res.push_str("Discard"),
+            Action::Boost(b) => write!(f, "Boost({})", b)?,
+            Action::Downrank(d) => write!(f, "Downrank({})", d)?,
+            Action::Discard => write!(f, "Discard")?,
         }
 
-        res.push(')');
-
-        res
+        write!(f, ")")
     }
 }
 
@@ -334,25 +327,21 @@ impl Optic {
     }
 }
 
-impl ToString for Optic {
-    fn to_string(&self) -> String {
-        let mut res = String::new();
-
+impl Display for Optic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.discard_non_matching {
-            res.push_str("DiscardNonMatching;\n");
+            writeln!(f, "DiscardNonMatching;")?;
         }
 
         for rule in &self.rules {
-            res.push_str(&rule.to_string());
+            write!(f, "{}", rule)?;
         }
 
         for ranking in &self.rankings {
-            res.push_str(&format!("{};\n", ranking.to_string()));
+            writeln!(f, "{};", ranking)?;
         }
 
-        res.push_str(&self.host_rankings.to_string());
-
-        res
+        write!(f, "{}", self.host_rankings)
     }
 }
 
@@ -364,25 +353,20 @@ pub struct Rule {
     pub action: Action,
 }
 
-impl ToString for Rule {
-    fn to_string(&self) -> String {
-        let mut res = String::new();
-
-        res.push_str("Rule {\n");
+impl Display for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Rule {{")?;
         if !self.matches.is_empty() {
             for matcher in &self.matches {
-                res.push_str("\tMatches {\n");
+                writeln!(f, "\tMatches {{")?;
                 for m in matcher {
-                    res.push_str(&format!("\t\t{},\n", m.to_string()));
+                    writeln!(f, "\t\t{},", m)?;
                 }
-                res.push_str("\t}")
+                writeln!(f, "\t}},")?;
             }
         }
 
-        res.push_str(&format!("\t{}\n", self.action.to_string()));
-        res.push_str("};\n");
-
-        res
+        writeln!(f, "\t{}\n}};", self.action.to_string())
     }
 }
 
@@ -394,16 +378,14 @@ pub struct HostRankings {
     pub blocked: Vec<String>,
 }
 
-impl ToString for HostRankings {
-    fn to_string(&self) -> String {
-        let mut res = String::new();
-
+impl Display for HostRankings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for liked in &self.liked {
-            res.push_str(&format!("Like(Site(\"{}\"));\n", liked));
+            writeln!(f, "Like(Site(\"{}\"));", liked)?;
         }
 
         for disliked in &self.disliked {
-            res.push_str(&format!("Dislike(Site(\"{}\"));\n", disliked));
+            writeln!(f, "Dislike(Site(\"{}\"));", disliked)?;
         }
 
         let matches : Vec<_> = self.blocked
@@ -416,7 +398,7 @@ impl ToString for HostRankings {
             .map(|host| vec![Matching {
                 pattern: vec![
                     PatternPart::Anchor,
-                    PatternPart::Raw(host.clone()),
+                    PatternPart::Raw(host),
                     PatternPart::Anchor,
                 ],
                 location: MatchLocation::Site,
@@ -430,10 +412,10 @@ impl ToString for HostRankings {
                 action: Action::Discard,
             };
 
-            res.push_str(&rule.to_string());
+            write!(f, "{}", rule)?;
         }
 
-        res
+        Ok(())
     }
 }
 

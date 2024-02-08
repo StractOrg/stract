@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use tantivy::{
     query::{BooleanQuery, Occur, PhraseQuery, TermQuery},
     tokenizer::Tokenizer,
@@ -82,17 +83,17 @@ pub enum Term {
     PossibleBang(String),
 }
 
-impl ToString for Term {
-    fn to_string(&self) -> String {
+impl Display for Term {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Term::Simple(term) => term.0.clone(),
-            Term::Phrase(phrase) => "\"".to_string() + phrase.as_str() + "\"",
-            Term::Not(term) => "-".to_string() + term.to_string().as_str(),
-            Term::Site(site) => "site:".to_string() + site.as_str(),
-            Term::Title(title) => "intitle:".to_string() + title.as_str(),
-            Term::Body(body) => "inbody:".to_string() + body.as_str(),
-            Term::Url(url) => "inurl:".to_string() + url.as_str(),
-            Term::PossibleBang(bang) => BANG_PREFIXES[0].to_string() + bang.as_str(),
+            Term::Simple(term) => write!(f, "{}", term.0),
+            Term::Phrase(phrase) => write!(f, "\"{}\"", phrase),
+            Term::Not(term) => write!(f, "-{}", term),
+            Term::Site(site) => write!(f, "site:{}", site),
+            Term::Title(title) => write!(f, "intitle:{}", title),
+            Term::Body(body) => write!(f, "inbody:{}", body),
+            Term::Url(url) => write!(f, "inurl:{}", url),
+            Term::PossibleBang(bang) => write!(f, "{}{}", BANG_PREFIXES[0], bang),
         }
     }
 }

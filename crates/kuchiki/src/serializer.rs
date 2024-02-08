@@ -1,10 +1,10 @@
+use std::fmt::Display;
 use html5ever::serialize::TraversalScope::*;
 use html5ever::serialize::{serialize, Serialize, SerializeOpts, Serializer, TraversalScope};
 use html5ever::QualName;
 use std::fs::File;
 use std::io::{Result, Write};
 use std::path::Path;
-use std::string::ToString;
 
 use crate::tree::{NodeData, NodeRef};
 
@@ -71,12 +71,11 @@ impl Serialize for NodeRef {
     }
 }
 
-impl ToString for NodeRef {
-    #[inline]
-    fn to_string(&self) -> String {
+impl Display for NodeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut u8_vec = Vec::new();
         self.serialize(&mut u8_vec).unwrap();
-        String::from_utf8(u8_vec).unwrap()
+        write!(f, "{}", String::from_utf8(u8_vec).unwrap())
     }
 }
 
