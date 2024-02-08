@@ -420,26 +420,29 @@ impl Display for HostRankings {
 }
 
 impl HostRankings {
-    pub fn rules(&self) -> Vec<Rule> {
-        self.blocked
+    pub fn rules(&self) -> Rule {
+        let matches : Vec<_> = self.blocked
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
                     .map(|host| host.to_string())
                     .unwrap_or(host.clone())
             })
-            .map(|host| Rule { // TODO: this can be reformatted as a single rule.
-                matches: vec![vec![Matching {
+            .map(|host| vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw(host.clone()),
                         PatternPart::Anchor,
                     ],
                     location: MatchLocation::Site,
-                }]],
-                action: Action::Discard,
-            })
-            .collect()
+                }]
+            )
+            .collect();
+
+        Rule {
+            matches,
+            action: Action::Discard,
+        }
     }
 
     pub fn into_optic(self) -> Optic {
