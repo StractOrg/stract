@@ -40,28 +40,30 @@ pub async fn explore_export_optic(
         similar_hosts,
     }): extract::Json<ExploreExportOpticParams>,
 ) -> Result<String, StatusCode> {
-    let rules = similar_hosts
+    let matches = similar_hosts
         .into_iter()
         .chain(chosen_hosts.clone().into_iter())
-        .map(|site| optics::Rule {
-            matches: vec![vec![optics::Matching { // TODO: these can be compressed into a single rule.
+        .map(|site| vec![optics::Matching {
                 pattern: vec![
                     optics::PatternPart::Anchor,
                     optics::PatternPart::Raw(site),
                     optics::PatternPart::Anchor,
                 ],
                 location: optics::MatchLocation::Domain,
-            }]],
-            action: optics::Action::Boost(0),
-        })
+            }]
+        )
         .collect();
+    let rule = optics::Rule {
+        matches,
+        action: optics::Action::Boost(0),
+    };
 
     let optic = Optic {
         host_rankings: HostRankings {
             liked: chosen_hosts,
             ..Default::default()
         },
-        rules,
+        rules: vec![rule],
         discard_non_matching: true,
         ..Default::default()
     };

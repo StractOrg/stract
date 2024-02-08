@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::iter;
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
 use tantivy::{
@@ -53,7 +54,7 @@ impl AsMultipleTantivyQuery for Optic {
                 UnionQuery::from(
                     self.rules
                         .iter()
-                        .chain(self.host_rankings.rules().iter())
+                        .chain(iter::once(&self.host_rankings.rules()))
                         .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
                         .map(|(occur, rule)| {
                             BooleanQuery::from(vec![(occur, rule.query)]).box_clone()
@@ -65,7 +66,7 @@ impl AsMultipleTantivyQuery for Optic {
         } else {
             self.rules
                 .iter()
-                .chain(self.host_rankings.rules().iter())
+                .chain(iter::once(&self.host_rankings.rules()))
                 .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
                 .map(|(occur, rule)| (occur, rule.query))
                 .collect()
