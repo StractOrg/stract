@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::path::Path;
 
@@ -32,12 +33,12 @@ pub enum Label {
     NSFW,
 }
 
-impl ToString for Label {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
             Label::SFW => "SFW".to_string(),
             Label::NSFW => "NSFW".to_string(),
-        }
+        })
     }
 }
 

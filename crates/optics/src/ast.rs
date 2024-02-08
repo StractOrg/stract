@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use super::Error;
 use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
@@ -38,23 +39,17 @@ pub struct RankingCoeff {
     pub value: f64,
 }
 
-impl ToString for RankingCoeff {
-    fn to_string(&self) -> String {
-        let mut res = String::new();
-
-        res.push_str("Ranking(");
+impl Display for RankingCoeff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Ranking(")?;
 
         match &self.target {
             RankingTarget::Signal(signal) => {
-                res.push_str(&format!("Signal(\"{}\")", signal));
+                write!(f, "Signal(\"{}\")", signal)?;
             }
         }
 
-        res.push_str(", ");
-        res.push_str(&self.value.to_string());
-        res.push(')');
-
-        res
+        write!(f, ", {})", self.value)
     }
 }
 

@@ -17,6 +17,7 @@
 use crate::distributed::retry_strategy::ExponentialBackoff;
 use crate::{config::S3Config, config::WarcSource, Error, Result};
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, Write};
 use std::path::Path;
@@ -262,14 +263,15 @@ impl FromStr for PayloadType {
     }
 }
 
-impl ToString for PayloadType {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Html => "text/html".to_string(),
-            Self::Pdf => "application/pdf".to_string(),
-            Self::Rss => "application/rss".to_string(),
-            Self::Atom => "application/atom".to_string(),
-        }
+impl Display for PayloadType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Self::Html => "text/html",
+            Self::Pdf => "application/pdf",
+            Self::Rss => "application/rss",
+            Self::Atom => "application/atom",
+        };
+        write!(f, "{}", str)
     }
 }
 
