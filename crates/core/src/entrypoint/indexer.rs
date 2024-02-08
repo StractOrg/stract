@@ -277,7 +277,7 @@ pub fn process_job(job: &Job, worker: &IndexingWorker) -> Index {
                 .flatten()
                 .filter(|record| match &record.response.payload_type {
                     Some(payload_type) => matches!(payload_type, PayloadType::Html),
-                    None => false,
+                    None => true,
                 })
         {
             if let Ok(webpage) = worker.prepare_webpage(
@@ -387,7 +387,7 @@ impl Indexer {
             .map(|warc_paths| Job {
                 source_config: job_config.clone(),
                 warc_paths,
-                base_path: config.output_path.clone().expect("output path not set"),
+                base_path: config.output_path.clone(),
                 settings: JobSettings {
                     host_centrality_threshold: config.host_centrality_threshold,
                     minimum_clean_words: config.minimum_clean_words,

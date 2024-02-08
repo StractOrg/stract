@@ -26,12 +26,12 @@ use std::net::SocketAddr;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexingLocalConfig {
+    pub output_path: String,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
     pub batch_size: Option<usize>,
     pub page_webgraph_path: Option<String>,
-    pub output_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,
     pub topics_path: Option<String>,
     pub host_centrality_store_path: String,

@@ -727,21 +727,23 @@ mod tests {
 
     #[test]
     fn internet_archive_parse() {
-        if !Path::new("../../../data/internet_archive.warc.gz").exists() {
+        if !Path::new("../../data/internet_archive.warc.gz").exists() {
             return;
         }
 
-        let file = File::open("../../../data/internet_archive.warc.gz").unwrap();
-        let mut reader = BufReader::new(MultiGzDecoder::new(BufReader::new(file)));
+        let mut records = 0;
 
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).unwrap();
-
-        for record in WarcFile::new(bytes).records() {
+        for record in WarcFile::open("../../data/internet_archive.warc.gz")
+            .unwrap()
+            .records()
+        {
+            records += 1;
             if let Err(err) = record {
                 panic!("Error: {:?}", err);
             }
         }
+
+        assert!(records > 0);
     }
 
     #[test]
