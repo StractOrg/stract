@@ -1,7 +1,7 @@
 # Adding Stract to the Web Browser 
 
 While it is not currently recommended to use Stract as your primary search option, you can add stract 
-to your browser by doing following the instructions listed under the following browsers. 
+to your browser by following the instructions listed below for your respective browser. 
 
 ## Chrome
 
