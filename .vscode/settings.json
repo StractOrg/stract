@@ -20,7 +20,7 @@
   "tailwindCSS.experimental.configFile": "frontend/tailwind.config.ts",
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
-    "optics-lsp/Cargo.toml",
+    "./crates/optics-lsp/Cargo.toml",
     "./crates/core/Cargo.toml"
   ]
 }
