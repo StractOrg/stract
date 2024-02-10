@@ -149,10 +149,7 @@ impl ScyllaConn {
 
     async fn store_query(&self, query: StoredQuery) {
         let urls = serde_json::to_string(&query.result_urls).unwrap();
-        let timestamp = query
-            .timestamp
-            .map(|timestamp| chrono::Duration::seconds(timestamp.timestamp()))
-            .unwrap_or_else(|| chrono::Duration::seconds(0));
+        let timestamp = query.timestamp.unwrap_or_else(chrono::Utc::now);
         let qid = query.qid;
 
         let res = self
@@ -163,7 +160,7 @@ impl ScyllaConn {
                     qid,
                     query.query,
                     urls,
-                    scylla::frame::value::Timestamp(timestamp),
+                    scylla::frame::value::CqlTimestamp::from(timestamp),
                 ),
             )
             .await;
