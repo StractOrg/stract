@@ -7,13 +7,14 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2.83"
-lsp-types = "0.93.2"
-js-sys = "0.3.60"
 console_error_panic_hook = "0.1.7"
+itertools = "0.12.1"
+js-sys = "0.3.60"
+lsp-types = "0.95.0"
 serde = { version = "1.0.137", features = ["rc", "derive"] }
-serde-wasm-bindgen = "0.4.5"
+serde-wasm-bindgen = "0.6.3"
 thiserror = "1.0.31"
+wasm-bindgen = "0.2.83"
 
 optics = { path = "../optics" }
 
