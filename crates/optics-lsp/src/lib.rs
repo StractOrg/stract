@@ -18,6 +18,7 @@ mod docs;
 
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover,
@@ -200,29 +201,23 @@ impl OpticsBackend {
 fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
     match err {
         optics::Error::UnexpectedEof { expected } => {
-            let mut message = String::new();
+            let message = [
+                "Unexpected EOF.".to_string(),
+                "Expected one of the following tokens:".to_string(),
+            ]
+            .into_iter()
+            .chain(expected.iter().map(|ex| format!(" - {ex}")))
+            .join("\n");
 
-            message.push_str("Unexpected EOF.\n");
-            message.push_str("Expected one of the following tokens:");
-
-            for ex in expected {
-                message.push('\n');
-                message.push_str(" - ");
-                message.push_str(ex.as_str());
-            }
+            let eof_position = Position {
+                line: source.lines().count() as u32,
+                character: source.lines().last().unwrap_or_default().len() as u32,
+            };
 
             Diagnostic {
                 range: Range {
-                    start: Position {
-                        line: source.lines().count() as u32,
-                        character: source.lines().last().map(|l| l.len()).unwrap_or_default()
-                            as u32,
-                    },
-                    end: Position {
-                        line: source.lines().count() as u32,
-                        character: source.lines().last().map(|l| l.len()).unwrap_or_default()
-                            as u32,
-                    },
+                    start: eof_position,
+                    end: eof_position,
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -233,15 +228,13 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
             token: (start, tok, end),
             expected,
         } => {
-            let mut message = String::new();
-            message.push_str(&format!("Unexpected token \"{tok}\"\n"));
-            message.push_str("Expected one of the following tokens:");
-
-            for ex in expected {
-                message.push('\n');
-                message.push_str(" - ");
-                message.push_str(ex.as_str());
-            }
+            let message = [
+                format!("Unexpected token \"{tok}\""),
+                "Expected one of the following tokens:".to_string(),
+            ]
+            .into_iter()
+            .chain(expected.iter().map(|ex| format!(" - {ex}")))
+            .join("\n");
 
             Diagnostic {
                 range: Range {
@@ -321,7 +314,7 @@ fn offset_to_pos(offset: usize, src: &str) -> Position {
         Position::new(l as _, 0)
     } else {
         let l = src[..offset].lines().count() - 1;
-        let c = src[..offset].lines().last().unwrap().len();
+        let c = src[..offset].lines().last().unwrap_or_default().len();
         Position::new(l as _, c as _)
     }
 }
