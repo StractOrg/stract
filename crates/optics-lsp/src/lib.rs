@@ -21,7 +21,8 @@ use std::collections::HashMap;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover,
-    HoverContents, HoverParams, MarkedString, Position, PublishDiagnosticsParams, Range, Url,
+    HoverContents, HoverParams, LanguageString, MarkedString, Position, PublishDiagnosticsParams,
+    Range, Url,
 };
 use optics::Optic;
 use thiserror::Error;
@@ -148,7 +149,13 @@ impl OpticsBackend {
                         .and_then(|(start, token, end)| {
                             let msg = docs::token_docs(&token);
                             msg.map(|msg| Hover {
-                                contents: HoverContents::Scalar(MarkedString::String(msg)),
+                                contents: HoverContents::Array(vec![
+                                    MarkedString::LanguageString(LanguageString {
+                                        language: "optic".to_string(),
+                                        value: token.to_string(),
+                                    }),
+                                    MarkedString::String(msg.to_string()),
+                                ]),
                                 range: Some(Range {
                                     start: offset_to_pos(start, &file.source),
                                     end: offset_to_pos(end, &file.source),
