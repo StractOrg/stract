@@ -6,7 +6,7 @@ This small sample hopefully gives you a quick introduction to the optics languag
 
 ```
 // Most optics contains a sequence of rules that applies an action to matching search results
-// This rule mathes all urls that contains the term "/forum" and boosts their score by 3
+// This rule matches all urls that contain the term "/forum" and boosts their score by 3
 Rule {
     Matches {
         Url("/forum")
