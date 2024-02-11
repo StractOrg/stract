@@ -12,7 +12,6 @@
   import Result from './Result.svelte';
   import Sidebar from './Sidebar.svelte';
   import Widget from './Widget.svelte';
-  import DirectAnswer from './DirectAnswer.svelte';
   import Discussions from './Discussions.svelte';
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';

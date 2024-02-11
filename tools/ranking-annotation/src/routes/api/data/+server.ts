@@ -1,6 +1,7 @@
+import type { RequestEvent } from "@sveltejs/kit";
 import { getDataset } from "$lib/dataset";
 
-export async function GET({}): Promise<Response> {
+export async function GET({}: RequestEvent): Promise<Response> {
   const data = getDataset();
 
   if (data) {

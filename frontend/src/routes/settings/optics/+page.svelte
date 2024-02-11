@@ -4,7 +4,7 @@
   import Eye from '~icons/heroicons/eye';
   import Button from '$lib/components/Button.svelte';
   import { opticsShowStore, opticsStore } from '$lib/stores';
-  import { DEFAULT_OPTICS, fetchRemoteOptic, opticKey, type OpticOption } from '$lib/optics';
+  import { DEFAULT_OPTICS, opticKey, type OpticOption } from '$lib/optics';
   import { derived } from 'svelte/store';
   import Callout from '$lib/components/Callout.svelte';
 
@@ -17,10 +17,20 @@
   const addOptic = async () => {
     error = void 0;
     try {
-      await fetchRemoteOptic({
-        opticUrl: url,
-        fetch,
+      const res = await fetch('optics/validate', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          opticUrl: url,
+        }),
       });
+
+      if (res.status != 200) {
+        const desc = await res.text();
+        throw TypeError(desc);
+      }
 
       opticsShowStore.update(($opticsShow) => ({
         ...$opticsShow,
@@ -138,7 +148,7 @@
             disabled={!removable}
           >
             <MinusCircle
-              class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
+              class="text-neutral group-enabled:text-error group-enabled:group-hover:text-error transition"
             />
           </button>
           <label class="flex w-6 items-start hover:cursor-pointer">
@@ -147,8 +157,8 @@
               bind:checked={$opticsShowStore[opticKey(optic)]}
               class="peer hidden"
             />
-            <EyeSlash class="inline-flex text-neutral transition peer-checked:hidden" />
-            <Eye class="hidden text-neutral transition peer-checked:inline-flex" />
+            <EyeSlash class="text-neutral inline-flex transition peer-checked:hidden" />
+            <Eye class="text-neutral hidden transition peer-checked:inline-flex" />
           </label>
           <div class="text-sm">{optic.name}</div>
           <div class="text-sm">

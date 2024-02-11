@@ -116,7 +116,7 @@ pub async fn search(
 
     if let Err(err) = query {
         tracing::error!("{:?}", err);
-        return Ok(err.to_string().into_response());
+        return Err(StatusCode::BAD_REQUEST);
     }
     let mut query = query.unwrap();
 
