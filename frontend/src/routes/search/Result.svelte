@@ -13,8 +13,6 @@
   import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
-  import Article from '$lib/components/Article.svelte';
-  import BiglogoBeta from '$lib/images/BiglogoBeta.svelte';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;

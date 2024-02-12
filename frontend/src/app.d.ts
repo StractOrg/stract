@@ -17,7 +17,6 @@ declare global {
           /** Show the divider between the header and the content */
           divider?: boolean;
         };
-        highlightjs?: { HighlightAuto: typeof import('svelte-highlight').HighlightAuto };
       };
     }
     // interface Platform {}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HighlightAuto } from 'svelte-highlight';
+  import DynamicHighlightAuto from './DynamicHighlightAuto.svelte';
 
   export let code: string;
   export let transparentBackground = false;
@@ -9,18 +9,18 @@
 
 {#if isInline}
   <span
-    class="code rounded-md {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus inline-block mx-1"
+    class="code rounded-md {transparentBackground
+      ? ''
+      : 'bg-base-200'} text-neutral-focus mx-1 inline-block"
   >
     <span class="overflow-auto px-2">
       <code>{code}</code>
     </span>
   </span>
 {:else}
-  <div
-    class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus my-2"
-  >
+  <div class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus my-2">
     <div class="overflow-auto px-3 py-2">
-      <HighlightAuto {code} />
+      <DynamicHighlightAuto {code} />
     </div>
   </div>
 {/if}
