@@ -809,13 +809,13 @@ mod tests {
         assert_eq!(
             tokenize_simple("this is a relatively simple123 test    string"),
             vec![
-                "this".to_string(),
-                "is".to_string(),
-                "a".to_string(),
-                "relatively".to_string(),
-                "simple123".to_string(),
-                "test".to_string(),
-                "string".to_string()
+                "this",
+                "is",
+                "a",
+                "relatively",
+                "simple123",
+                "test",
+                "string"
             ]
         );
     }
@@ -834,34 +834,21 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
 
     #[test]
     fn special_character_tokenization() {
-        assert_eq!(
-            tokenize_simple("example.com"),
-            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
-        );
+        assert_eq!(tokenize_simple("example.com"), vec!["example", ".", "com",]);
         assert_eq!(
             tokenize_simple("example. com"),
-            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
+            vec!["example", ".", "com",]
         );
         assert_eq!(
             tokenize_simple("example . com"),
-            vec!["example".to_string(), ".".to_string(), "com".to_string(),]
+            vec!["example", ".", "com",]
         );
 
         assert_eq!(
             tokenize_simple("a c++ blog post"),
-            vec![
-                "a".to_string(),
-                "c".to_string(),
-                "+".to_string(),
-                "+".to_string(),
-                "blog".to_string(),
-                "post".to_string()
-            ]
+            vec!["a", "c", "+", "+", "blog", "post"]
         );
-        assert_eq!(
-            tokenize_simple("path/test"),
-            vec!["path".to_string(), "/".to_string(), "test".to_string(),]
-        );
+        assert_eq!(tokenize_simple("path/test"), vec!["path", "/", "test",]);
     }
 
     #[test]
@@ -872,11 +859,7 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
                 Test.field="value"
             "#
             ),
-            vec![
-                "Test".to_string(),
-                "field".to_string(),
-                "\"value\"".to_string(),
-            ]
+            vec!["Test", "field", "\"value\"",]
         );
         assert_eq!(
             tokenize_json(
@@ -884,11 +867,7 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
                 Test.field="this is the value"
             "#
             ),
-            vec![
-                "Test".to_string(),
-                "field".to_string(),
-                "\"this is the value\"".to_string(),
-            ]
+            vec!["Test", "field", "\"this is the value\"",]
         );
         assert_eq!(
             tokenize_json(
@@ -896,19 +875,11 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
                 Test.field="this is\" the value"
             "#
             ),
-            vec![
-                "Test".to_string(),
-                "field".to_string(),
-                "\"this is\\\" the value\"".to_string(),
-            ]
+            vec!["Test", "field", "\"this is\\\" the value\"",]
         );
         assert_eq!(
             tokenize_json("\n        Test.field=\"this*@# is\\\" the\\\" \nvalue\"\n    "),
-            vec![
-                "Test".to_string(),
-                "field".to_string(),
-                "\"this*@# is\\\" the\\\" \nvalue\"".to_string(),
-            ]
+            vec!["Test", "field", "\"this*@# is\\\" the\\\" \nvalue\"",]
         );
     }
 
@@ -1007,18 +978,15 @@ key1.key2="this\" is @ a # test""#;
         assert!(tokenize_bigram("").is_empty());
         assert!(tokenize_bigram("test").is_empty());
 
-        assert_eq!(tokenize_bigram("this is"), vec!["thisis".to_string()]);
-        assert_eq!(
-            tokenize_bigram("this is a"),
-            vec!["thisis".to_string(), "isa".to_string(),]
-        );
+        assert_eq!(tokenize_bigram("this is"), vec!["thisis"]);
+        assert_eq!(tokenize_bigram("this is a"), vec!["thisis", "isa",]);
         assert_eq!(
             tokenize_bigram("this is a test"),
-            vec!["thisis".to_string(), "isa".to_string(), "atest".to_string(),]
+            vec!["thisis", "isa", "atest",]
         );
 
         // '.' is a stopword
-        assert_eq!(tokenize_bigram("this.is"), vec!["thisis".to_string()]);
+        assert_eq!(tokenize_bigram("this.is"), vec!["thisis"]);
     }
 
     #[test]
@@ -1027,10 +995,10 @@ key1.key2="this\" is @ a # test""#;
         assert!(tokenize_trigram("test").is_empty());
         assert!(tokenize_trigram("this is").is_empty());
 
-        assert_eq!(tokenize_trigram("this is a"), vec!["thisisa".to_string(),]);
+        assert_eq!(tokenize_trigram("this is a"), vec!["thisisa",]);
         assert_eq!(
             tokenize_trigram("this is a test"),
-            vec!["thisisa".to_string(), "isatest".to_string(),]
+            vec!["thisisa", "isatest",]
         );
     }
 
@@ -1038,12 +1006,7 @@ key1.key2="this\" is @ a # test""#;
     fn han() {
         assert_eq!(
             tokenize_simple("test 漢.com"),
-            vec![
-                "test".to_string(),
-                "漢".to_string(),
-                ".".to_string(),
-                "com".to_string()
-            ]
+            vec!["test", "漢", ".", "com"]
         );
     }
 
@@ -1051,12 +1014,7 @@ key1.key2="this\" is @ a # test""#;
     fn hiragana() {
         assert_eq!(
             tokenize_simple("test あ.com"),
-            vec![
-                "test".to_string(),
-                "あ".to_string(),
-                ".".to_string(),
-                "com".to_string()
-            ]
+            vec!["test", "あ", ".", "com"]
         );
     }
 
@@ -1064,88 +1022,39 @@ key1.key2="this\" is @ a # test""#;
     fn katakana() {
         assert_eq!(
             tokenize_simple("test ダ.com"),
-            vec![
-                "test".to_string(),
-                "ダ".to_string(),
-                ".".to_string(),
-                "com".to_string()
-            ]
+            vec!["test", "ダ", ".", "com"]
         );
     }
 
     #[test]
     fn cyrillic() {
-        assert_eq!(
-            tokenize_simple("test б.com"),
-            vec![
-                "test".to_string(),
-                "б".to_string(),
-                ".".to_string(),
-                "com".to_string()
-            ]
-        );
+        assert_eq!(tokenize_simple("test б.com"), vec!["test", "б", ".", "com"]);
     }
 
     #[test]
     fn arabic() {
-        assert_eq!(
-            tokenize_simple("test ب.com"),
-            vec![
-                "test".to_string(),
-                "ب".to_string(),
-                ".".to_string(),
-                "com".to_string()
-            ]
-        );
+        assert_eq!(tokenize_simple("test ب.com"), vec!["test", "ب", ".", "com"]);
     }
 
     #[test]
     fn url() {
         assert_eq!(
             tokenize_url("https://www.example.com"),
-            vec![
-                "www".to_string(),
-                ".".to_string(),
-                "example".to_string(),
-                ".".to_string(),
-                "com ".to_string(),
-            ]
+            vec!["www", ".", "example", ".", "com ",]
         );
 
         assert_eq!(
             tokenize_url("https://www.example.com/test"),
-            vec![
-                "www".to_string(),
-                ".".to_string(),
-                "example".to_string(),
-                ".".to_string(),
-                "com ".to_string(),
-                "/".to_string(),
-                "test".to_string(),
-            ]
+            vec!["www", ".", "example", ".", "com ", "/", "test",]
         );
 
-        assert_eq!(
-            tokenize_url("example.com"),
-            vec!["example".to_string(), ".".to_string(), "com ".to_string(),]
-        );
+        assert_eq!(tokenize_url("example.com"), vec!["example", ".", "com ",]);
 
         assert_eq!(
             tokenize_url("example.com/another/path"),
-            vec![
-                "example".to_string(),
-                ".".to_string(),
-                "com ".to_string(),
-                "/".to_string(),
-                "another".to_string(),
-                "/".to_string(),
-                "path".to_string(),
-            ]
+            vec!["example", ".", "com ", "/", "another", "/", "path",]
         );
 
-        assert_eq!(
-            tokenize_url(".com"),
-            vec![".".to_string(), "com ".to_string(),]
-        )
+        assert_eq!(tokenize_url(".com"), vec![".", "com ",])
     }
 }
