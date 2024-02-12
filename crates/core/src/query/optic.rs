@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::iter;
 use itertools::Itertools;
 use optics::{Action, MatchLocation, Matching, Optic, Rule};
+use std::iter;
 use tantivy::{
     query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
@@ -49,12 +49,12 @@ impl AsMultipleTantivyQuery for Optic {
         fastfields: &FastFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         if self.discard_non_matching {
-            vec![(
+            let block = (
                 Occur::Must,
                 UnionQuery::from(
                     self.rules
                         .iter()
-                        .chain(iter::once(&self.host_rankings.rules()))
+                        .filter(|rule| !matches!(rule.action, Action::Discard))
                         .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
                         .map(|(occur, rule)| {
                             BooleanQuery::from(vec![(occur, rule.query)]).box_clone()
@@ -62,7 +62,16 @@ impl AsMultipleTantivyQuery for Optic {
                         .collect_vec(),
                 )
                 .box_clone(),
-            )]
+            );
+
+            self.rules
+                .iter()
+                .filter(|rule| matches!(rule.action, Action::Discard))
+                .chain(iter::once(&self.host_rankings.rules()))
+                .filter_map(|rule| rule.as_searchable_rule(schema, fastfields))
+                .map(|(occur, rule)| (occur, rule.query))
+                .chain(iter::once(block))
+                .collect()
         } else {
             self.rules
                 .iter()
@@ -1699,5 +1708,183 @@ mod tests {
             .webpages;
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://example.com/test");
+    }
+
+    #[test]
+    fn apostrophe_token() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>Mikkel's collection</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>Another's collection</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://another-example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>A thirds's site</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://a-third-example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Title(\"*'s collection\") }, Action(Discard) }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://a-third-example.com/");
+    }
+
+    #[test]
+    fn discard_double_matching() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>Mikkel's collection</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>Another's collection</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://another-example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>A thirds's site</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://a-third-example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("".to_string());
+
+        index.insert(page).expect("failed to insert webpage");
+
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("DiscardNonMatching; Rule { Matches { Title(\"*'s collection\") }, Action(Discard) }; Rule { Matches { Site(\"*.com\") } }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://a-third-example.com/");
     }
 }
