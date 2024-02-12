@@ -82,10 +82,6 @@ impl intmap::Key for NodeID {
         NodeID(self.0.wrapping_mul(rhs.0))
     }
 
-    fn as_usize(self) -> usize {
-        self.0 as usize
-    }
-
     fn modulus_usize(self, rhs: usize) -> usize {
         (self.0 % (rhs as u64)) as usize
     }

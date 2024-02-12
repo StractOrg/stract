@@ -14,11 +14,10 @@ accepted = [
     "WTFPL",
     "Unlicense",
     "zlib-acknowledgement",
+    "GPL-3.0",              # aglpv3 software can link glpv3 libraries under section 13 of gplv3
 ]
 
-workarounds = [
-    "ring",
-]
+workarounds = ["ring"]
 
 [stract]
 accepted = ["AGPL-3.0"]

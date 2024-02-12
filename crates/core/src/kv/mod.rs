@@ -29,14 +29,6 @@ where
     fn flush(&self);
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a>;
 
-    fn delete_raw(&mut self, key: &[u8]);
-
-    fn delete(&mut self, key: &K) {
-        let key_bytes = bincode::serialize(key).expect("failed to serialize key");
-
-        self.delete_raw(&key_bytes);
-    }
-
     fn get(&self, key: &K) -> Option<V> {
         let key_bytes = bincode::serialize(key).expect("failed to serialize key");
 

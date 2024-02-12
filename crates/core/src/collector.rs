@@ -53,7 +53,6 @@ pub struct Hashes {
 
 pub trait Doc: Clone {
     fn score(&self) -> f64;
-    fn id(&self) -> &DocId;
     fn hashes(&self) -> Hashes;
 }
 
@@ -355,10 +354,6 @@ pub struct SegmentDoc {
 impl Doc for SegmentDoc {
     fn score(&self) -> f64 {
         self.score.total
-    }
-
-    fn id(&self) -> &DocId {
-        &self.id
     }
 
     fn hashes(&self) -> Hashes {

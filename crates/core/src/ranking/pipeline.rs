@@ -47,10 +47,6 @@ where
         self.as_ranking().score
     }
 
-    fn id(&self) -> &tantivy::DocId {
-        &self.as_ranking().pointer.address.doc_id
-    }
-
     fn hashes(&self) -> collector::Hashes {
         self.as_ranking().pointer.hashes
     }

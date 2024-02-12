@@ -147,10 +147,6 @@ where
             value: PhantomData,
         })
     }
-
-    fn delete_raw(&mut self, key: &[u8]) {
-        self.db.delete(key).unwrap();
-    }
 }
 
 pub struct IntoIter<'a, K, V>

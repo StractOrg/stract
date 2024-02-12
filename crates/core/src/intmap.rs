@@ -21,7 +21,6 @@ pub trait Key: PartialOrd + Ord + PartialEq + Copy + std::fmt::Debug {
 
     fn wrapping_mul(self, rhs: Self) -> Self;
     fn modulus_usize(self, rhs: usize) -> usize;
-    fn as_usize(self) -> usize;
 }
 
 impl Key for u64 {
@@ -33,10 +32,6 @@ impl Key for u64 {
 
     fn modulus_usize(self, rhs: usize) -> usize {
         self as usize % rhs
-    }
-
-    fn as_usize(self) -> usize {
-        self as usize
     }
 }
 
@@ -71,7 +66,8 @@ impl<K: Key, V> IntMap<K, V> {
     }
 
     fn bin_idx(&self, key: &K) -> usize {
-        key.modulus_usize(self.bins.len())
+        key.wrapping_mul(K::BIG_PRIME)
+            .modulus_usize(self.bins.len())
     }
 
     pub fn insert(&mut self, key: K, value: V) {
