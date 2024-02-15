@@ -1072,17 +1072,17 @@ impl NGramSignalOrder {
         doc: DocId,
         signal_aggregator: &'a SignalAggregator,
     ) -> impl Iterator<Item = ComputedSignal> + 'a {
-        let mut hits = 0.0;
+        let mut hits = 0;
 
         self.signals
             .iter()
             .map(|(_, s)| s)
             .filter_map(move |signal| {
                 signal.compute(signal_aggregator, doc).map(|mut c| {
-                    c.score.coefficient *= NGRAM_DAMPENING.powf(hits);
+                    c.score.coefficient *= NGRAM_DAMPENING.powi(hits);
 
                     if c.score.value > 0.0 {
-                        hits += 1.0;
+                        hits += 1;
                     }
 
                     c
