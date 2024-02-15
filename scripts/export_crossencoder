@@ -9,7 +9,7 @@ if os.path.exists("data/cross_encoder/"):
     print("data/cross_encoder/ already exists. Exiting...")
     sys.exit()
 
-os.system("mkdir data/cross_encoder")
+os.system("mkdir -p data/cross_encoder")
 
 model = transformers.AutoModelForSequenceClassification.from_pretrained(MODEL)
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)

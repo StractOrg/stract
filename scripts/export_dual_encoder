@@ -5,11 +5,11 @@ import transformers
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-if os.path.exists("data/summarizer/dual_encoder/"):
-    print("data/summarizer/dual_encoder/ already exists. Exiting...")
+if os.path.exists("data/summarizer/"):
+    print("data/summarizer/ already exists. Exiting...")
     sys.exit()
 
-os.system("mkdir data/summarizer/dual_encoder")
+os.system("mkdir -p data/summarizer/dual_encoder")
 
 model = transformers.AutoModel.from_pretrained(MODEL)
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL)
