@@ -33,6 +33,10 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
+      - name: Install liburing
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y liburing-dev
       - name: Run CI
         run: ./scripts/ci/all
       - name: Test
