@@ -240,11 +240,7 @@ impl EntityIndex {
                 })
                 .filter(|entity_match| {
                     if let Some(image_id) = &entity_match.entity.image_id {
-                        let res = !images.contains(image_id);
-
-                        images.insert(image_id.clone());
-
-                        res
+                        images.insert(image_id.clone())
                     } else {
                         false
                     }
