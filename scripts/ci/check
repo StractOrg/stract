@@ -3,4 +3,4 @@ set -e
 
 cargo check
 cargo check --no-default-features
-cd frontend && npm run check
+cd frontend && npm install && npm run check
