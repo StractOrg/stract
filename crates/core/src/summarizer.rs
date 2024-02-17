@@ -545,12 +545,12 @@ mod tests {
 
     #[test]
     fn test_dual_encoder() {
-        if !Path::new("../../data/summarizer/dual_encoder").exists() {
+        let data_path = Path::new("../../data/summarizer/dual_encoder");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
             return;
         }
-
-        let model =
-            DualEncoder::open("../../data/summarizer/dual_encoder").expect("Failed to load model");
+        let model = DualEncoder::open(data_path).expect("Failed to load model");
         let query = "What is the capital of France?";
         let pos = "The capital of France is Paris.";
         let neg = "The best baguette in Paris can be found at Boulangerie Pichard.";
