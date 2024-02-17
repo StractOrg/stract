@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::Display;
 use super::Error;
 use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt::Display;
 
 use super::lexer;
 
@@ -251,7 +251,9 @@ mod tests {
                         action: Some(RawAction::Boost(2)),
                     },
                     RawRule {
-                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())])],
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site(
+                            "example.com".to_string()
+                        )])],
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],
@@ -294,7 +296,9 @@ mod tests {
                         action: Some(RawAction::Boost(2)),
                     },
                     RawRule {
-                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site("example.com".to_string())])],
+                        matches: vec![RawMatchBlock(vec![RawMatchPart::Site(
+                            "example.com".to_string()
+                        )])],
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],

@@ -250,7 +250,7 @@ impl BertSelfAttention {
 
         let attention_scores = query_layer.matmul(&key_layer.t()?)?;
         let attention_scores = (attention_scores / (self.attention_head_size as f64).sqrt())?;
-        let attention_scores = attention_scores.broadcast_add(&attention_mask)?;
+        let attention_scores = attention_scores.broadcast_add(attention_mask)?;
 
         let attention_probs = {
             let _enter_sm = self.span_softmax.enter();
@@ -556,7 +556,7 @@ impl BertModel {
             });
         }
 
-        let attention_mask = self.extended_attention_mask(attention_mask, &dims)?;
+        let attention_mask = self.extended_attention_mask(attention_mask, dims)?;
 
         let embedding_output = self.embeddings.forward(input_ids, token_type_ids)?;
         let sequence_output = self.encoder.forward(&embedding_output, &attention_mask)?;

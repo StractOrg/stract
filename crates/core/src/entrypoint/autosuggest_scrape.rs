@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use std::{
     collections::{HashSet, VecDeque},
     path::Path,
     str::FromStr,
 };
-use std::fmt::Display;
 
 use csv::Writer;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -68,9 +68,10 @@ pub enum Gl {
 
 impl Display for Gl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
+        let code = match self {
             Gl::Us => "us",
-        })
+        };
+        write!(f, "{code}")
     }
 }
 
