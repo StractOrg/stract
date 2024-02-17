@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
