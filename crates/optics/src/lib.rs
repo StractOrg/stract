@@ -18,6 +18,7 @@ pub mod ast;
 mod lexer;
 
 use ast::RankingCoeff;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::Display;
@@ -108,20 +109,16 @@ impl TryFrom<RawRule> for Rule {
     type Error = Error;
 
     fn try_from(raw: RawRule) -> Result<Self> {
-        let RawRule {
-            matches,
-            action,
-        } = raw;
+        let RawRule { matches, action } = raw;
 
         let matches = matches
             .into_iter()
-            .map(|m|
-                m.0
-                    .into_iter()
-                    .map(|m| <RawMatchPart as TryInto<Matching>>::try_into(m))
-                    .collect::<Result<Vec<Matching>>>()
-            )
-            .collect::<Result<Vec<Vec<Matching>>>>()?;
+            .map(|m| {
+                m.0.into_iter()
+                    .map(Matching::try_from)
+                    .collect::<Result<_>>()
+            })
+            .collect::<Result<_>>()?;
 
         Ok(Rule {
             matches,
@@ -366,7 +363,7 @@ impl Display for Rule {
             }
         }
 
-        writeln!(f, "\t{}\n}};", self.action.to_string())
+        writeln!(f, "\t{}\n}};", self.action)
     }
 }
 
@@ -388,23 +385,25 @@ impl Display for HostRankings {
             writeln!(f, "Dislike(Site(\"{}\"));", disliked)?;
         }
 
-        let matches : Vec<_> = self.blocked
+        let matches = self
+            .blocked
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
                     .map(|host| host.to_string())
                     .unwrap_or(host.clone())
             })
-            .map(|host| vec![Matching {
-                pattern: vec![
-                    PatternPart::Anchor,
-                    PatternPart::Raw(host),
-                    PatternPart::Anchor,
-                ],
-                location: MatchLocation::Site,
-            }]
-            )
-            .collect();
+            .map(|host| {
+                vec![Matching {
+                    pattern: vec![
+                        PatternPart::Anchor,
+                        PatternPart::Raw(host),
+                        PatternPart::Anchor,
+                    ],
+                    location: MatchLocation::Site,
+                }]
+            })
+            .collect_vec();
 
         if !matches.is_empty() {
             let rule = Rule {
@@ -421,14 +420,16 @@ impl Display for HostRankings {
 
 impl HostRankings {
     pub fn rules(&self) -> Rule {
-        let matches : Vec<_> = self.blocked
+        let matches: Vec<_> = self
+            .blocked
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
                     .map(|host| host.to_string())
                     .unwrap_or(host.clone())
             })
-            .map(|host| vec![Matching {
+            .map(|host| {
+                vec![Matching {
                     pattern: vec![
                         PatternPart::Anchor,
                         PatternPart::Raw(host.clone()),
@@ -436,7 +437,7 @@ impl HostRankings {
                     ],
                     location: MatchLocation::Site,
                 }]
-            )
+            })
             .collect();
 
         Rule {

@@ -614,11 +614,7 @@ impl WarcWriter {
 
         if let Some(payload_type) = &record.response.payload_type {
             self.writer.write_all(
-                format!(
-                    "WARC-Identified-Payload-Type: {}\r\n",
-                    payload_type.to_string()
-                )
-                .as_bytes(),
+                format!("WARC-Identified-Payload-Type: {payload_type}\r\n").as_bytes(),
             )?;
         }
 
