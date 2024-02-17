@@ -9,6 +9,9 @@
   <a target="_blank" href="https://stract.com/beta/api/docs">
     <img src="https://img.shields.io/badge/api-docs-0b7bff?labelColor=white" style="max-width: 100%;">
   </a>
+  <a target="_blank" href="https://stract.com/webmasters">
+    <img src="https://img.shields.io/badge/webmaster-info-0b7bff?labelColor=white" style="max-width: 100%;">
+  </a>
 </p>
 <br />
 
@@ -23,7 +26,7 @@ Stract is an open source web search engine hosted at [stract.com](https://stract
 
 # 💡 Features
 * Keyword search that respects your search query.
-* Fully independent search index.
+* Fully independent search index [with our own crawler](https://stract.com/webmasters).
 * Advanced query syntax (`site:`, `intitle:` etc.).
 * DDG-style [!bang syntax](https://duckduckgo.com/bang)
 * Wikipedia and stackoverflow sidebar

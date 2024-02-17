@@ -1,9 +1,9 @@
 # Background
 Stract is an open source company that tries to fix search.
 All our code is licensed under AGPLv3.
-The main idea is that if we ever do anything that is against the best interest of the users, someone else can take our code and do better. You can read more about the [thought process here](https://github.com/StractOrg/stract/discussions/150#discussioncomment-8476851) if you are interested.
+The main idea is that if we ever do anything that's against the best interest of the users, someone else can take our code and do better. You can read more about the [thought process here](https://github.com/StractOrg/stract/discussions/150#discussioncomment-8476851) if you are interested.
 
-Please don't contribute unless you feel comfortable doing so.
+Please only contribute if you feel comfortable doing so.
 
 # Contributing to Stract
 There are many ways to contribute to Stract.

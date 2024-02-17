@@ -1,4 +1,6 @@
 # Crawler
+[Information for webmasters here](https://stract.com/webmasters)
+
 ![Overview of Crawler Architecture](assets/images/crawler_overview.svg)
 The crawler is a distributed system that scours the web. It has a coordinator process that determines which URLs to crawl and a set of worker processes that fetch the content of those URLs. Each worker receives a batch of crawl jobs to process, stores the fetched contents in an S3 bucket and sends newly discovered URLs back to the coordinator. This continues until the coordinator has determined that the crawl is complete.
 
