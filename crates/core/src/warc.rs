@@ -725,16 +725,15 @@ mod tests {
 
     #[test]
     fn internet_archive_parse() {
-        if !Path::new("../../data/internet_archive.warc.gz").exists() {
+        let data_path = Path::new("../../data/internet_archive.warc.gz");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
             return;
         }
 
         let mut records = 0;
 
-        for record in WarcFile::open("../../data/internet_archive.warc.gz")
-            .unwrap()
-            .records()
-        {
+        for record in WarcFile::open(data_path).unwrap().records() {
             records += 1;
             if let Err(err) = record {
                 panic!("Error: {:?}", err);

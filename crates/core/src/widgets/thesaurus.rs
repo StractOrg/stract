@@ -504,7 +504,12 @@ mod tests {
 
     #[test]
     fn build_dict() {
-        let dict = Dictionary::build("../../data/english-wordnet-2022-subset.ttl").unwrap();
+        let data_path = Path::new("../../data/english-wordnet-2022-subset.ttl");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
+            return;
+        }
+        let dict = Dictionary::build(data_path).unwrap();
 
         let infos = dict.get(Lemma("barely".to_string()));
 

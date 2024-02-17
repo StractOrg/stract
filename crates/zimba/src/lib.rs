@@ -636,11 +636,13 @@ mod tests {
 
     #[test]
     fn it_works() {
-        if !Path::new("../../data/test.zim").exists() {
+        let data_path = Path::new("../../data/test.zim");
+        if !data_path.exists() {
+            // Skip test if data file is not present
             return;
         }
 
-        let zim = ZimFile::open("../../data/test.zim").unwrap();
+        let zim = ZimFile::open(data_path).unwrap();
 
         assert_eq!(zim.header.magic, 72173914);
         assert_eq!(zim.header.major_version, 5);

@@ -165,12 +165,12 @@ mod tests {
 
     #[test]
     fn sanity_check() {
-        if !Path::new("../../data/cross_encoder").exists() {
+        let data_path = Path::new("../../data/cross_encoder");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
             return;
         }
-
-        let model = CrossEncoderModel::open("../../data/cross_encoder")
-            .expect("Failed to find cross-encoder model");
+        let model = CrossEncoderModel::open(data_path).expect("Failed to find cross-encoder model");
 
         let s = model.run(
             "how many people live in paris",
