@@ -39,6 +39,9 @@ jobs:
         run: |
             sudo apt-get update
             sudo apt-get install -y liburing-dev
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
       - name: Run CI
         run: ./scripts/ci/all
       - name: Test
