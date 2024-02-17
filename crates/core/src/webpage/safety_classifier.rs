@@ -35,10 +35,11 @@ pub enum Label {
 
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Label::SFW => "SFW".to_string(),
-            Label::NSFW => "NSFW".to_string(),
-        })
+        let label = match self {
+            Label::SFW => "SFW",
+            Label::NSFW => "NSFW",
+        };
+        write!(f, "{label}")
     }
 }
 

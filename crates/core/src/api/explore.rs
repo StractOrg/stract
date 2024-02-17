@@ -43,7 +43,8 @@ pub async fn explore_export_optic(
     let matches = similar_hosts
         .into_iter()
         .chain(chosen_hosts.clone().into_iter())
-        .map(|site| vec![optics::Matching {
+        .map(|site| {
+            vec![optics::Matching {
                 pattern: vec![
                     optics::PatternPart::Anchor,
                     optics::PatternPart::Raw(site),
@@ -51,7 +52,7 @@ pub async fn explore_export_optic(
                 ],
                 location: optics::MatchLocation::Domain,
             }]
-        )
+        })
         .collect();
     let rule = optics::Rule {
         matches,
