@@ -45,7 +45,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use super::bm25::Bm25Weight;
+use super::bm25::MultiBm25Weight;
 use super::models::linear::LinearRegression;
 use super::{inbound_similarity, query_centrality};
 
@@ -249,19 +249,17 @@ fn bm25(field: &mut TextFieldData, doc: DocId) -> f64 {
         return 0.0;
     }
 
-    let mut term_freq = 0;
-    for posting in &mut field.postings {
-        if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
-            term_freq += posting.term_freq();
-        }
-    }
-
-    if term_freq == 0 {
-        return 0.0;
-    }
-
     let fieldnorm_id = field.fieldnorm_reader.fieldnorm_id(doc);
-    field.weight.score(fieldnorm_id, term_freq) as f64
+
+    field
+        .weight
+        .score(field.postings.iter_mut().map(move |posting| {
+            if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                (fieldnorm_id, posting.term_freq())
+            } else {
+                (fieldnorm_id, 0)
+            }
+        })) as f64
 }
 
 impl Signal {
@@ -635,7 +633,7 @@ impl SignalCoefficient {
 #[derive(Clone)]
 struct TextFieldData {
     postings: Vec<SegmentPostings>,
-    weight: Bm25Weight,
+    weight: MultiBm25Weight,
     fieldnorm_reader: FieldNormReader,
 }
 
@@ -797,19 +795,20 @@ impl SignalAggregator {
                             continue;
                         }
 
-                        let weight = Bm25Weight::for_terms(tv_searcher, &terms)?;
-
                         let fieldnorm_reader = segment_reader.get_fieldnorms_reader(tv_field)?;
                         let inverted_index = segment_reader.inverted_index(tv_field)?;
 
+                        let mut matching_terms = Vec::with_capacity(terms.len());
                         let mut postings = Vec::with_capacity(terms.len());
                         for term in &terms {
                             if let Some(p) =
                                 inverted_index.read_postings(term, text_field.index_option())?
                             {
                                 postings.push(p);
+                                matching_terms.push(term.clone());
                             }
                         }
+                        let weight = MultiBm25Weight::for_terms(tv_searcher, &matching_terms)?;
 
                         text_fields.insert(
                             text_field,
