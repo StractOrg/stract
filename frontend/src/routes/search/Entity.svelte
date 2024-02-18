@@ -52,7 +52,7 @@
     {#if entity.relatedEntities.length > 0}
       <div class="mt-5 flex w-full flex-col text-neutral">
         <div class="font-light">Related Searches</div>
-        <div class="flex overflow-scroll">
+        <div class="flex overflow-auto">
           {#each entity.relatedEntities as related (related.title)}
             <div class="flex flex-col items-center p-4">
               {#if related.imageId != null}
