@@ -23,7 +23,6 @@ use tantivy::tokenizer::Tokenizer;
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    ranking::bm25::Bm25Weight,
     schema::{Field, TextField},
 };
 
@@ -126,32 +125,16 @@ impl PatternQuery {
 impl tantivy::query::Query for PatternQuery {
     fn weight(
         &self,
-        scoring: tantivy::query::EnableScoring<'_>,
+        _scoring: tantivy::query::EnableScoring<'_>,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
-        let bm25_weight = match scoring {
-            tantivy::query::EnableScoring::Enabled {
-                searcher,
-                statistics_provider: _,
-            } => {
-                if self.raw_terms.is_empty() {
-                    None
-                } else {
-                    Some(Bm25Weight::for_terms(searcher, &self.raw_terms)?)
-                }
-            }
-            tantivy::query::EnableScoring::Disabled { .. } => None,
-        };
-
         if self.can_optimize_site_domain {
             return Ok(Box::new(FastSiteDomainPatternWeight {
                 term: self.raw_terms[0].clone(),
                 field: self.field,
-                similarity_weight: bm25_weight,
             }));
         }
 
         Ok(Box::new(PatternWeight {
-            similarity_weight: bm25_weight,
             raw_terms: self.raw_terms.clone(),
             patterns: self.patterns.clone(),
             field: self.field,

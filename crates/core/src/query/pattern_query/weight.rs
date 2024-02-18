@@ -24,7 +24,6 @@ use tantivy::{
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    ranking::bm25::Bm25Weight,
     schema::{FastField, Field, TextField},
 };
 
@@ -36,7 +35,6 @@ use super::SmallPatternPart;
 pub struct FastSiteDomainPatternWeight {
     pub term: tantivy::Term,
     pub field: tantivy::schema::Field,
-    pub similarity_weight: Option<Bm25Weight>,
 }
 
 impl FastSiteDomainPatternWeight {
@@ -44,24 +42,13 @@ impl FastSiteDomainPatternWeight {
         &self,
         reader: &tantivy::SegmentReader,
     ) -> tantivy::Result<FieldNormReader> {
-        if self.similarity_weight.is_some() {
-            if let Some(fieldnorm_reader) = reader.fieldnorms_readers().get_field(self.field)? {
-                return Ok(fieldnorm_reader);
-            }
-        }
         Ok(FieldNormReader::constant(reader.max_doc(), 1))
     }
 
     fn pattern_scorer(
         &self,
         reader: &tantivy::SegmentReader,
-        boost: tantivy::Score,
     ) -> tantivy::Result<Option<FastSiteDomainPatternScorer>> {
-        let similarity_weight = self
-            .similarity_weight
-            .as_ref()
-            .map(|weight| weight.boost_by(boost));
-
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
         let field_no_tokenizer = match Field::get(self.field.field_id() as usize) {
@@ -87,7 +74,6 @@ impl FastSiteDomainPatternWeight {
             .read_postings(&self.term, opt)?
         {
             Some(posting) => Ok(Some(FastSiteDomainPatternScorer {
-                similarity_weight,
                 posting,
                 fieldnorm_reader,
             })),
@@ -100,9 +86,9 @@ impl tantivy::query::Weight for FastSiteDomainPatternWeight {
     fn scorer(
         &self,
         reader: &tantivy::SegmentReader,
-        boost: tantivy::Score,
+        _boost: tantivy::Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
-        if let Some(scorer) = self.pattern_scorer(reader, boost)? {
+        if let Some(scorer) = self.pattern_scorer(reader)? {
             Ok(Box::new(PatternScorer::FastSiteDomain(scorer)))
         } else {
             Ok(Box::new(EmptyScorer))
@@ -114,7 +100,7 @@ impl tantivy::query::Weight for FastSiteDomainPatternWeight {
         reader: &tantivy::SegmentReader,
         doc: tantivy::DocId,
     ) -> tantivy::Result<tantivy::query::Explanation> {
-        let scorer_opt = self.pattern_scorer(reader, 1.0)?;
+        let scorer_opt = self.pattern_scorer(reader)?;
         if scorer_opt.is_none() {
             return Err(TantivyError::InvalidArgument(format!(
                 "Document #({doc}) does not match (empty scorer)"
@@ -126,22 +112,12 @@ impl tantivy::query::Weight for FastSiteDomainPatternWeight {
                 "Document #({doc}) does not match"
             )));
         }
-        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
-        let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
-        let term_freq = scorer.term_freq();
-        let mut explanation = Explanation::new("Pattern Scorer", scorer.score());
-        explanation.add_detail(
-            self.similarity_weight
-                .as_ref()
-                .unwrap()
-                .explain(fieldnorm_id, term_freq),
-        );
+        let explanation = Explanation::new("Pattern Scorer", scorer.score());
         Ok(explanation)
     }
 }
 
 pub struct PatternWeight {
-    pub similarity_weight: Option<Bm25Weight>,
     pub patterns: Vec<PatternPart>,
     pub raw_terms: Vec<tantivy::Term>,
     pub field: tantivy::schema::Field,
@@ -149,22 +125,9 @@ pub struct PatternWeight {
 }
 
 impl PatternWeight {
-    fn fieldnorm_reader(
-        &self,
-        reader: &tantivy::SegmentReader,
-    ) -> tantivy::Result<FieldNormReader> {
-        if self.similarity_weight.is_some() {
-            if let Some(fieldnorm_reader) = reader.fieldnorms_readers().get_field(self.field)? {
-                return Ok(fieldnorm_reader);
-            }
-        }
-        Ok(FieldNormReader::constant(reader.max_doc(), 1))
-    }
-
     pub(crate) fn pattern_scorer(
         &self,
         reader: &tantivy::SegmentReader,
-        boost: tantivy::Score,
     ) -> tantivy::Result<Option<PatternScorer>> {
         if self.patterns.is_empty() {
             return Ok(None);
@@ -226,13 +189,6 @@ impl PatternWeight {
             })));
         }
 
-        let similarity_weight = self
-            .similarity_weight
-            .as_ref()
-            .map(|weight| weight.boost_by(boost));
-
-        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
-
         let mut term_postings_list = Vec::with_capacity(self.raw_terms.len());
         for term in &self.raw_terms {
             if let Some(postings) = reader
@@ -256,9 +212,7 @@ impl PatternWeight {
             .collect();
 
         Ok(Some(PatternScorer::Normal(NormalPatternScorer::new(
-            similarity_weight,
             term_postings_list,
-            fieldnorm_reader,
             small_patterns,
             reader.segment_id(),
             num_tokens_fastfield,
@@ -271,9 +225,9 @@ impl tantivy::query::Weight for PatternWeight {
     fn scorer(
         &self,
         reader: &tantivy::SegmentReader,
-        boost: tantivy::Score,
+        _boost: tantivy::Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
-        if let Some(scorer) = self.pattern_scorer(reader, boost)? {
+        if let Some(scorer) = self.pattern_scorer(reader)? {
             Ok(Box::new(scorer))
         } else {
             Ok(Box::new(EmptyScorer))
@@ -285,7 +239,7 @@ impl tantivy::query::Weight for PatternWeight {
         reader: &tantivy::SegmentReader,
         doc: tantivy::DocId,
     ) -> tantivy::Result<tantivy::query::Explanation> {
-        let scorer_opt = self.pattern_scorer(reader, 1.0)?;
+        let scorer_opt = self.pattern_scorer(reader)?;
         if scorer_opt.is_none() {
             return Err(TantivyError::InvalidArgument(format!(
                 "Document #({doc}) does not match (empty scorer)"
@@ -297,16 +251,7 @@ impl tantivy::query::Weight for PatternWeight {
                 "Document #({doc}) does not match"
             )));
         }
-        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
-        let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
-        let term_freq = scorer.term_freq();
-        let mut explanation = Explanation::new("Pattern Scorer", scorer.score());
-        explanation.add_detail(
-            self.similarity_weight
-                .as_ref()
-                .unwrap()
-                .explain(fieldnorm_id, term_freq),
-        );
+        let explanation = Explanation::new("Pattern Scorer", scorer.score());
         Ok(explanation)
     }
 }
