@@ -181,3 +181,28 @@ impl Bm25Weight {
         explanation
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bm25_idf_scaling() {
+        // assume the query is something like 'the end'
+        // 'the' appears in almost all docs (98)
+        // 'end' appears in a smalle subset (20)
+        let weight = MultiBm25Weight {
+            weights: vec![
+                Bm25Weight::for_one_term(98, 100, 1.0),
+                Bm25Weight::for_one_term(20, 100, 1.0),
+            ],
+        };
+
+        // if a document has high frequency of 'end'
+        // it should have a higher score than a document that
+        // has an almost equally high frequency of 'the'
+        let high_the = weight.score(vec![(0, 15), (0, 10)].into_iter());
+        let high_end = weight.score(vec![(0, 8), (0, 13)].into_iter());
+        assert!(high_end > high_the);
+    }
+}
