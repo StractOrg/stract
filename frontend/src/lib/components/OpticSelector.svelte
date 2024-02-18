@@ -3,6 +3,7 @@
   import { opticsStore, opticsShowStore } from '$lib/stores';
   import Select from './Select.svelte';
   import { derived } from 'svelte/store';
+  import * as m from '$paraglide/messages';
 
   export let searchOnChange: boolean;
   export let selected = '';
@@ -19,7 +20,7 @@
   const optics = derived(opticsStore, ($optics) => [...$optics, ...DEFAULT_OPTICS]);
 
   $: options = [
-    { value: '', label: 'No Optic' },
+    { value: '', label: m.noOptic() },
     ...$optics
       .filter((optic) => $opticsShowStore[opticKey(optic)])
       .map((optic) => ({ value: optic.url, label: optic.name })),
@@ -31,7 +32,7 @@
     form="searchbar-form"
     id="optics-selector"
     name="optic"
-    class="m-0 text-neutral-focus text-xs cursor-pointer"
+    class="m-0 cursor-pointer text-xs text-neutral-focus"
     submitOnChange={searchOnChange}
     bind:value={selected}
     {options}

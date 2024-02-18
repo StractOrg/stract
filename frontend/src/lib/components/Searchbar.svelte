@@ -8,6 +8,7 @@
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
   import { P, match } from 'ts-pattern';
+  import * as m from '$paraglide/messages';
 
   export let autofocus = false;
 
@@ -93,12 +94,12 @@
   <label
     for="searchbar"
     class={twJoin(
-      'border-base-400 group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border pl-5 transition focus-within:shadow',
+      'group relative grid w-full grid-cols-[auto_1fr_auto] items-center rounded-3xl border border-base-400 pl-5 transition focus-within:shadow',
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
       hasFocus && 'shadow',
     )}
   >
-    <MagnifyingGlass class="text-base-content w-5" />
+    <MagnifyingGlass class="w-5 text-base-content" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
       type="search"
@@ -129,20 +130,20 @@
       on:keydown={onKeydown}
     />
     <div class="h-full py-0.5 pr-0.5">
-      <Button _class="py-0 h-full" type="submit">search</Button>
+      <Button _class="py-0 h-full" type="submit">{m.search()}</Button>
     </div>
 
     {#if suggestions.length > 0}
-      <div class="bg-base-300 absolute inset-x-5 bottom-px hidden h-px group-focus-within:block" />
+      <div class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block" />
       <div
         class={twJoin(
-          'bg-base-300 absolute inset-x-5 bottom-px h-px',
+          'absolute inset-x-5 bottom-px h-px bg-base-300',
           hasFocus ? 'block' : 'hidden',
         )}
       />
       <div
         class={twJoin(
-          'border-base-400 bg-base-100 absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 shadow',
+          'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-400 bg-base-100 shadow',
           hasFocus ? 'flex' : 'hidden',
         )}
         role="listbox"
@@ -151,7 +152,7 @@
         {#each suggestions as s, index}
           <button
             class={twJoin(
-              'hover:bg-base-200 flex space-x-3 py-1.5 pl-5',
+              'flex space-x-3 py-1.5 pl-5 hover:bg-base-200',
               selected == index && 'bg-base-200',
             )}
             on:click={() => {
@@ -160,7 +161,7 @@
             }}
             type="submit"
           >
-            <MagnifyingGlass class="text-neutral w-4" />
+            <MagnifyingGlass class="w-4 text-neutral" />
             <span>
               {@html splitAtOverlap(s)[0]}<span class="font-medium"
                 >{@html splitAtOverlap(s)[1]}</span
