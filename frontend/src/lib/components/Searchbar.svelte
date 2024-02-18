@@ -116,9 +116,8 @@
         // don't blur yet since the clicked element would disapper
         if (e.relatedTarget instanceof Node && suggestionsDiv?.contains(e.relatedTarget)) return;
 
-        // requestIdleCallback is not supported in Safari
+        // @ts-expect-error requestIdleCallback is not supported in Safari
         // https://caniuse.com/requestidlecallback
-        // @ts-ignore
         if (window.requestIdleCallback) {
           requestIdleCallback(() => (hasFocus = false));
         } else {

@@ -39,7 +39,7 @@
 
   $: expanded = false;
 
-  const posName = (pos: PartOfSpeech): String => {
+  const posName = (pos: PartOfSpeech): string => {
     switch (pos) {
       case 'noun':
         return 'Noun';
