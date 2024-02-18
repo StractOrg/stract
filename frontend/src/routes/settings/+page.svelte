@@ -28,9 +28,10 @@
     },
     {
       title: 'Mark results that contains paywall',
-      description: 'Add a marker to search results where it is likely that the page contains a paywall',
+      description:
+        'Add a marker to search results where it is likely that the page contains a paywall',
       type: 'mark-pages-with-paywall',
-    }
+    },
   ] as const;
 </script>
 

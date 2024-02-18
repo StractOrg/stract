@@ -74,8 +74,10 @@ const MARK_PAGES_WITH_ADS_KEY = 'markPagesWithAds';
 export const markPagesWithAdsStore = writableLocalStorage<boolean>(MARK_PAGES_WITH_ADS_KEY, false);
 
 const MARK_PAGES_WITH_PAYWALL_KEY = 'markPagesWithPaywall';
-export const markPagesWithPaywallStore = writableLocalStorage<boolean>(MARK_PAGES_WITH_PAYWALL_KEY, true);
-
+export const markPagesWithPaywallStore = writableLocalStorage<boolean>(
+  MARK_PAGES_WITH_PAYWALL_KEY,
+  true,
+);
 
 const THEME_KEY = 'theme';
 export const themeStore = writableLocalStorage<string | void>(THEME_KEY, void 0);
@@ -86,7 +88,7 @@ if (browser)
     document.documentElement.className = `${c} ${theme}`.trim();
   });
 
-type SummaryState = { inProgress: boolean; tokens: string[]} | undefined;
+type SummaryState = { inProgress: boolean; tokens: string[] } | undefined;
 export const summariesStore = writable<Record<string, SummaryState>>({});
 
 // Actions
@@ -108,14 +110,14 @@ export const summarize = (query: string, site: DisplayedWebpage) => {
       .with({ type: 'message' }, ({ data }) =>
         updateSummary((summary) => ({
           inProgress: true,
-          tokens: [...(summary?.tokens ?? []), data]
+          tokens: [...(summary?.tokens ?? []), data],
         })),
       )
       .with({ type: 'error' }, () => {
         cancel();
         updateSummary((summary) => ({
           inProgress: false,
-          tokens: [...(summary?.tokens ?? [])]
+          tokens: [...(summary?.tokens ?? [])],
         }));
       })
       .exhaustive();

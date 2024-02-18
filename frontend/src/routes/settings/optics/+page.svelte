@@ -148,7 +148,7 @@
             disabled={!removable}
           >
             <MinusCircle
-              class="text-neutral group-enabled:text-error group-enabled:group-hover:text-error transition"
+              class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
           <label class="flex w-6 items-start hover:cursor-pointer">
@@ -157,8 +157,8 @@
               bind:checked={$opticsShowStore[opticKey(optic)]}
               class="peer hidden"
             />
-            <EyeSlash class="text-neutral inline-flex transition peer-checked:hidden" />
-            <Eye class="text-neutral hidden transition peer-checked:inline-flex" />
+            <EyeSlash class="inline-flex text-neutral transition peer-checked:hidden" />
+            <Eye class="hidden text-neutral transition peer-checked:inline-flex" />
           </label>
           <div class="text-sm">{optic.name}</div>
           <div class="text-sm">
