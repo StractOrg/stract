@@ -24,7 +24,6 @@ use tantivy::{
 use crate::{
     fastfield_reader::{self, FastFieldReader},
     query::intersection::Intersection,
-    ranking::bm25::Bm25Weight,
     schema::FastField,
 };
 
@@ -82,17 +81,6 @@ impl DocSet for PatternScorer {
             PatternScorer::FastSiteDomain(scorer) => scorer.size_hint(),
             PatternScorer::Everything(scorer) => scorer.size_hint(),
             PatternScorer::EmptyField(scorer) => scorer.size_hint(),
-        }
-    }
-}
-
-impl PatternScorer {
-    pub fn term_freq(&self) -> u32 {
-        match self {
-            PatternScorer::Normal(scorer) => scorer.phrase_count(),
-            PatternScorer::FastSiteDomain(scorer) => scorer.term_freq(),
-            PatternScorer::Everything(_) => 0,
-            PatternScorer::EmptyField(_) => 0,
         }
     }
 }
@@ -190,27 +178,13 @@ impl Scorer for EmptyFieldScorer {
 }
 
 pub struct FastSiteDomainPatternScorer {
-    pub similarity_weight: Option<Bm25Weight>,
     pub posting: SegmentPostings,
     pub fieldnorm_reader: FieldNormReader,
-}
-impl FastSiteDomainPatternScorer {
-    pub fn term_freq(&self) -> u32 {
-        self.posting.term_freq()
-    }
 }
 
 impl Scorer for FastSiteDomainPatternScorer {
     fn score(&mut self) -> Score {
-        self.similarity_weight
-            .as_ref()
-            .map(|w| {
-                w.score(
-                    self.fieldnorm_reader.fieldnorm_id(self.doc()),
-                    self.posting.term_freq(),
-                )
-            })
-            .unwrap_or_default()
+        1.0
     }
 }
 
@@ -230,8 +204,6 @@ impl DocSet for FastSiteDomainPatternScorer {
 
 pub struct NormalPatternScorer {
     pattern_all_simple: bool,
-    similarity_weight: Option<Bm25Weight>,
-    fieldnorm_reader: FieldNormReader,
     intersection_docset: Intersection<SegmentPostings>,
     pattern: Vec<SmallPatternPart>,
     num_query_terms: usize,
@@ -244,9 +216,7 @@ pub struct NormalPatternScorer {
 
 impl NormalPatternScorer {
     pub fn new(
-        similarity_weight: Option<Bm25Weight>,
         term_postings_list: Vec<SegmentPostings>,
-        fieldnorm_reader: FieldNormReader,
         pattern: Vec<SmallPatternPart>,
         segment: tantivy::SegmentId,
         num_tokens_field: FastField,
@@ -259,8 +229,6 @@ impl NormalPatternScorer {
             pattern_all_simple: pattern.iter().all(|p| matches!(p, SmallPatternPart::Term)),
             intersection_docset: Intersection::new(term_postings_list),
             num_query_terms,
-            similarity_weight,
-            fieldnorm_reader,
             pattern,
             left: Vec::with_capacity(100),
             right: Vec::with_capacity(100),
@@ -274,9 +242,6 @@ impl NormalPatternScorer {
         }
 
         s
-    }
-    fn phrase_count(&self) -> u32 {
-        self.phrase_count
     }
 
     fn pattern_match(&mut self) -> bool {
@@ -377,14 +342,7 @@ impl NormalPatternScorer {
 
 impl Scorer for NormalPatternScorer {
     fn score(&mut self) -> Score {
-        self.similarity_weight
-            .as_ref()
-            .map(|scorer| {
-                let doc = self.doc();
-                let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
-                scorer.score(fieldnorm_id, self.phrase_count())
-            })
-            .unwrap_or_default()
+        1.0
     }
 }
 
