@@ -5,7 +5,7 @@ num_tree_per_iteration=1
 label_index=0
 max_feature_idx=28
 objective=lambdarank
-feature_names=bm25_backlink_text inbound_similarity bm25_clean_body_bigrams bm25_domain_if_homepage_no_tokenizer page_centrality is_homepage bm25_title_if_homepage url_slashes fetch_time_ms region tracker_score bm25_domain bm25_domain_no_tokenizer bm25_title bm25_stemmed_title bm25_domain_name_no_tokenizer host_centrality url_digits bm25_domain_name_if_homepage_no_tokenizer bm25_title_trigrams bm25_clean_body_trigrams bm25_title_bigrams bm25_stemmed_clean_body bm25_site bm25_site_no_tokenizer bm25_url bm25_domain_if_homepage update_timestamp bm25_clean_body
+feature_names=idf_sum_backlink_text inbound_similarity bm25_clean_body_bigrams idf_sum_domain_if_homepage_no_tokenizer page_centrality is_homepage idf_sum_title_if_homepage url_slashes fetch_time_ms region tracker_score idf_sum_domain idf_sum_domain_no_tokenizer bm25_title bm25_stemmed_title idf_sum_domain_name_no_tokenizer host_centrality url_digits idf_sum_domain_name_if_homepage_no_tokenizer bm25_title_trigrams bm25_clean_body_trigrams bm25_title_bigrams bm25_stemmed_clean_body idf_sum_site idf_sum_site_no_tokenizer idf_sum_url idf_sum_domain_if_homepage update_timestamp bm25_clean_body
 feature_infos=[0:71.599037170410156] none [0:59.439960479736328] none [0:0.041696587] [0:1] [0:24.348766326904297] [0.14285714285714285:0.5] [0:0.16666666666666666] [0:0.70508371084865562] [0.009433962264150943:1] none none [6.0304698944091797:45.648475646972656] [0:44.676078796386719] none [7.6000000000000006e-08:0.045836137999999998] [0.066666666666666666:1] none none none [0:48.516033172607422] [0:40.354255676269531] [0:44.526699066162109] none [0:44.291984558105469] none none [4.4346046447753906:41.890125274658203]
 tree_sizes=1051 753 851 859 958 856 759 960 858 651 862 971 753 861 861 973 859 761 865 869 982 763 986 763 984 759 764 765 861 762 767 765 869 869 874 872 873 879 871 883 773 774 877 768 765 777 988 878 767 879
 
@@ -965,9 +965,9 @@ feature_importances:
 fetch_time_ms=40
 host_centrality=35
 bm25_title_bigrams=34
-bm25_url=33
+idf_sum_url=33
 bm25_clean_body_bigrams=26
-bm25_backlink_text=21
+idf_sum_backlink_text=21
 page_centrality=20
 bm25_stemmed_title=20
 bm25_title=18
@@ -976,9 +976,9 @@ url_slashes=9
 bm25_stemmed_clean_body=6
 bm25_clean_body=5
 is_homepage=2
-bm25_title_if_homepage=2
+idf_sum_title_if_homepage=2
 region=2
-bm25_site=1
+idf_sum_site=1
 
 parameters:
 [boosting: gbdt]

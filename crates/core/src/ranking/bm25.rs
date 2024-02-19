@@ -88,6 +88,10 @@ impl MultiBm25Weight {
             .sum()
     }
 
+    pub fn idf(&self) -> impl Iterator<Item = f32> + '_ {
+        self.weights.iter().map(|w| w.weight)
+    }
+
     pub fn boost_by(&self, boost: Score) -> Self {
         Self {
             weights: self.weights.iter().map(|w| w.boost_by(boost)).collect(),
