@@ -29,7 +29,7 @@
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
         <a
-          class="text-neutral-focus max-w-[calc(100%-100px)] truncate"
+          class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
           href={webpage.url}
           use:improvements={resultIndex}
         >
@@ -37,7 +37,7 @@
         </a>
       </div>
       <a
-        class="text-link visited:text-link-visited max-w-[calc(100%-30px)] truncate text-xl font-medium hover:underline"
+        class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
         title={webpage.title}
         href={webpage.url}
         use:improvements={resultIndex}
@@ -46,14 +46,14 @@
       </a>
     </div>
     <button
-      class="noscript:hidden text-neutral hover:text-neutral-focus flex w-5 min-w-fit items-center justify-center bg-transparent hover:cursor-pointer"
+      class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
       bind:this={button}
       on:click|stopPropagation={() => dispatch('modal', button)}
     >
       <AdjustVertical class="text-md" />
     </button>
   </div>
-  <div class="text-neutral-focus text-sm font-normal [&>b]:font-bold">
+  <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">
     {#if $summary}
       <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
     {:else if webpage.snippet.type == 'normal'}
@@ -63,21 +63,21 @@
             <span id="snippet-text" class="snippet-text">
               {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
                 <span
-                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
                   title="page likely has ads and paywall"
                 >
                   has ads + paywall
                 </span>
               {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
                 <span
-                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
                   title="page likely has ads"
                 >
                   has ads
                 </span>
               {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
                 <span
-                  class="text-neutral border-primary rounded border p-0.5 text-center text-xs"
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
                   title="page likely has paywall"
                 >
                   paywall

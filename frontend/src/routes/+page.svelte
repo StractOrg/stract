@@ -8,10 +8,10 @@
   <div class="mb-2 flex w-64">
     <BiglogoWithText />
   </div>
-  <div class="px-3 w-full md:mx-0 md:max-w-xl">
+  <div class="w-full px-3 md:mx-0 md:max-w-xl">
     <Searchbar autofocus={true} />
   </div>
-  <div class="px-5 mt-3 flex space-x-2 text-neutral text-sm md:text-sm">
+  <div class="mt-3 flex space-x-2 px-5 text-sm text-neutral md:text-sm">
     <div>
       Customise your search with an{' '}
       <a class="font-medium underline" href="/settings/optics">optic</a>:

@@ -19,7 +19,7 @@
 
   interface Meaning {
     type: MeaningType.meaning;
-    meaning: WordMeaning
+    meaning: WordMeaning;
   }
 
   type MeaningOrPos = Pos | Meaning;
@@ -27,21 +27,19 @@
   $: meanings = widget.meanings.flatMap((meaning) => {
     return [
       { type: MeaningType.pos, pos: meaning.pos },
-      ...meaning.meanings.map((meaning) => ({
+      ...(meaning.meanings.map((meaning) => ({
         type: MeaningType.meaning,
         meaning: meaning,
-      })) as MeaningOrPos[],
+      })) as MeaningOrPos[]),
     ];
   }) as MeaningOrPos[];
 
   $: nonExpandedMeanings = meanings.slice(0, 2);
   $: expandedMeanings = meanings.slice(2);
 
-
   $: expanded = false;
 
-
-  const posName = (pos: PartOfSpeech): String => {
+  const posName = (pos: PartOfSpeech): string => {
     switch (pos) {
       case 'noun':
         return 'Noun';
@@ -71,30 +69,31 @@
         {/if}
       {/each}
       {#if expanded}
-      <div transition:slide={{duration: 200}} class="space-y-3">
-      {#each expandedMeanings as m}
-        {#if m.type == MeaningType.pos}
-          <div class="text-sm italic">
-            {posName(m.pos)}
-          </div>
-        {:else if m.type == MeaningType.meaning}
-          <ThesaurusWidgetMeaning meaning={m.meaning} />
-        {/if}
-      {/each}
-      </div>
+        <div transition:slide={{ duration: 200 }} class="space-y-3">
+          {#each expandedMeanings as m}
+            {#if m.type == MeaningType.pos}
+              <div class="text-sm italic">
+                {posName(m.pos)}
+              </div>
+            {:else if m.type == MeaningType.meaning}
+              <ThesaurusWidgetMeaning meaning={m.meaning} />
+            {/if}
+          {/each}
+        </div>
       {/if}
     </div>
     {#if expandedMeanings.length > 0}
-    <button
-      class="h-6 w-6 cursor-pointer rounded-full text-primary"
-      aria-label={expanded ? "Show less word definitions" : "Show more word definitions"}
-      on:click={() => expanded = !expanded}>
-      {#if expanded}
-        <ChevronUp />
-      {:else}
-        <ChevronDown />
-      {/if}
-    </button>
+      <button
+        class="h-6 w-6 cursor-pointer rounded-full text-primary"
+        aria-label={expanded ? 'Show less word definitions' : 'Show more word definitions'}
+        on:click={() => (expanded = !expanded)}
+      >
+        {#if expanded}
+          <ChevronUp />
+        {:else}
+          <ChevronDown />
+        {/if}
+      </button>
     {/if}
     <div class="float-right mt-1 text-xs italic text-neutral">
       Data from <a href="https://en-word.net/" class="hover:underline">Open English WordNet</a> and

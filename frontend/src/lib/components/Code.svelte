@@ -11,14 +11,14 @@
   <span
     class="code rounded-md {transparentBackground
       ? ''
-      : 'bg-base-200'} text-neutral-focus mx-1 inline-block"
+      : 'bg-base-200'} mx-1 inline-block text-neutral-focus"
   >
     <span class="overflow-auto px-2">
       <code>{code}</code>
     </span>
   </span>
 {:else}
-  <div class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} text-neutral-focus my-2">
+  <div class="code rounded-lg {transparentBackground ? '' : 'bg-base-200'} my-2 text-neutral-focus">
     <div class="overflow-auto px-3 py-2">
       <DynamicHighlightAuto {code} />
     </div>

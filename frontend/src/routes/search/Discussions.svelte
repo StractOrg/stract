@@ -34,21 +34,21 @@
 {#if shownDiscussions && shownDiscussions.length > 0}
   <div class="row-start-5 flex flex-col space-y-1.5 overflow-hidden">
     <div class="flex items-center space-x-1 text-lg">
-      <ChatBubbleLeftRight class="text-neutral text-sm" />
+      <ChatBubbleLeftRight class="text-sm text-neutral" />
       <span>Discussions</span>
     </div>
     <div class="flex flex-col">
       {#each shownDiscussions as discussion}
         <div class="overflow-hidden">
           <div>
-            <a class="text-neutral-focus text-sm" href={discussion.url}>
+            <a class="text-sm text-neutral-focus" href={discussion.url}>
               {discussion.domain}
             </a>
           </div>
           <details class="group">
             <summary class="flex cursor-pointer list-none items-center space-x-2">
               <a
-                class="text-md text-neutral-focus inline-block max-w-[calc(100%-10px)] truncate font-medium group-open:underline"
+                class="text-md inline-block max-w-[calc(100%-10px)] truncate font-medium text-neutral-focus group-open:underline"
                 title={discussion.title}
                 href={discussion.url}
               >
@@ -60,7 +60,7 @@
             </summary>
 
             {#if discussion.snippet.type == 'normal'}
-              <div class="text-neutral-focus mb-3 text-sm font-normal">
+              <div class="mb-3 text-sm font-normal text-neutral-focus">
                 {#if typeof discussion.snippet.date == 'string'}
                   <span class="text-neutral">{discussion.snippet.date}</span>
                 {/if}

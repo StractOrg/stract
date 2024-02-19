@@ -83,7 +83,7 @@
           kind == 'warning' && 'bg-warning text-warning-content hover:bg-warning-focus',
           kind == 'error' && 'bg-error text-error-content hover:bg-error-focus',
         ],
-        _class,
+    _class,
   )}
 >
   <slot />

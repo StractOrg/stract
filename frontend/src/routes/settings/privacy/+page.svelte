@@ -14,7 +14,8 @@
     It is important to note, that <b class="font-extrabold">no</b>{' '}
     personal information is stored about your search. We don't store your IP, browser fingerprint or
     even a precise timestamp. In fact, you can see exactly what gets stored{' '}
-    <a href="https://github.com/StractOrg/Stract/blob/main/crates/core/src/improvement.rs#L37-#L51">here</a
+    <a href="https://github.com/StractOrg/Stract/blob/main/crates/core/src/improvement.rs#L37-#L51"
+      >here</a
     >.
   </div>
 

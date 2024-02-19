@@ -13,7 +13,7 @@
           <div class="h-40">
             <img
               alt="Image of {entity.title}"
-              class="h-full w-full object-contain rounded-full"
+              class="h-full w-full rounded-full object-contain"
               src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
             />
           </div>

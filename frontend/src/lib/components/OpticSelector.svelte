@@ -31,7 +31,7 @@
     form="searchbar-form"
     id="optics-selector"
     name="optic"
-    class="m-0 text-neutral-focus text-xs cursor-pointer"
+    class="m-0 cursor-pointer text-xs text-neutral-focus"
     submitOnChange={searchOnChange}
     bind:value={selected}
     {options}

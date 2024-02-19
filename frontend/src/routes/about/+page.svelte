@@ -11,7 +11,7 @@
 <Article>
   {@html data.md}
 
-  <div class="flex justify-center mt-10">
+  <div class="mt-10 flex justify-center">
     <div class="flex space-x-10">
       <Link href="https://discord.gg/BmzKHffWJM" label="Join our Discord server" round>
         <IconDiscord />

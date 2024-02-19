@@ -64,7 +64,7 @@
 <div
   class={twJoin(
     'absolute -translate-y-1/2 transition-all',
-    'bg-base-100 h-fit flex-col items-center overflow-hidden rounded-lg border px-2 py-5 text-sm drop-shadow-md',
+    'h-fit flex-col items-center overflow-hidden rounded-lg border bg-base-100 px-2 py-5 text-sm drop-shadow-md',
   )}
   style="top: {top}px; left: calc({left}px); width: {widthPixels}px;"
   transition:scale={{ duration: 150 }}
