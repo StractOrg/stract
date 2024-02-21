@@ -24,6 +24,7 @@ use crate::{
     webgraph::NodeID,
     webpage::Webpage,
 };
+use itertools::Itertools;
 use optics::ast::RankingTarget;
 use optics::Optic;
 use serde::{Deserialize, Serialize};
@@ -45,7 +46,7 @@ use crate::{
     webpage::region::{Region, RegionCount},
 };
 
-use super::bm25::Bm25Weight;
+use super::bm25::MultiBm25Weight;
 use super::models::linear::LinearRegression;
 use super::{inbound_similarity, query_centrality};
 
@@ -75,28 +76,28 @@ pub enum Signal {
     Bm25StemmedCleanBody,
     #[serde(rename = "bm25_all_body")]
     Bm25AllBody,
-    #[serde(rename = "bm25_url")]
-    Bm25Url,
-    #[serde(rename = "bm25_site")]
-    Bm25Site,
-    #[serde(rename = "bm25_domain")]
-    Bm25Domain,
-    #[serde(rename = "bm25_site_no_tokenizer")]
-    Bm25SiteNoTokenizer,
-    #[serde(rename = "bm25_domain_no_tokenizer")]
-    Bm25DomainNoTokenizer,
-    #[serde(rename = "bm25_domain_name_no_tokenizer")]
-    Bm25DomainNameNoTokenizer,
-    #[serde(rename = "bm25_domain_if_homepage")]
-    Bm25DomainIfHomepage,
-    #[serde(rename = "bm25_domain_name_if_homepage_no_tokenizer")]
-    Bm25DomainNameIfHomepageNoTokenizer,
-    #[serde(rename = "bm25_domain_if_homepage_no_tokenizer")]
-    Bm25DomainIfHomepageNoTokenizer,
-    #[serde(rename = "bm25_title_if_homepage")]
-    Bm25TitleIfHomepage,
-    #[serde(rename = "bm25_backlink_text")]
-    Bm25BacklinkText,
+    #[serde(rename = "idf_sum_url")]
+    IdfSumUrl,
+    #[serde(rename = "idf_sum_site")]
+    IdfSumSite,
+    #[serde(rename = "idf_sum_domain")]
+    IdfSumDomain,
+    #[serde(rename = "idf_sum_site_no_tokenizer")]
+    IdfSumSiteNoTokenizer,
+    #[serde(rename = "idf_sum_domain_no_tokenizer")]
+    IdfSumDomainNoTokenizer,
+    #[serde(rename = "idf_sum_domain_name_no_tokenizer")]
+    IdfSumDomainNameNoTokenizer,
+    #[serde(rename = "idf_sum_domain_if_homepage")]
+    IdfSumDomainIfHomepage,
+    #[serde(rename = "idf_sum_domain_name_if_homepage_no_tokenizer")]
+    IdfSumDomainNameIfHomepageNoTokenizer,
+    #[serde(rename = "idf_sum_domain_if_homepage_no_tokenizer")]
+    IdfSumDomainIfHomepageNoTokenizer,
+    #[serde(rename = "idf_sum_title_if_homepage")]
+    IdfSumTitleIfHomepage,
+    #[serde(rename = "idf_sum_backlink_text")]
+    IdfSumBacklinkText,
     #[serde(rename = "cross_encoder_snippet")]
     CrossEncoderSnippet,
     #[serde(rename = "cross_encoder_title")]
@@ -149,17 +150,17 @@ pub const ALL_SIGNALS: [Signal; 37] = [
     Signal::Bm25StemmedTitle,
     Signal::Bm25StemmedCleanBody,
     Signal::Bm25AllBody,
-    Signal::Bm25Url,
-    Signal::Bm25Site,
-    Signal::Bm25Domain,
-    Signal::Bm25SiteNoTokenizer,
-    Signal::Bm25DomainNoTokenizer,
-    Signal::Bm25DomainNameNoTokenizer,
-    Signal::Bm25DomainIfHomepage,
-    Signal::Bm25DomainNameIfHomepageNoTokenizer,
-    Signal::Bm25DomainIfHomepageNoTokenizer,
-    Signal::Bm25TitleIfHomepage,
-    Signal::Bm25BacklinkText,
+    Signal::IdfSumUrl,
+    Signal::IdfSumSite,
+    Signal::IdfSumDomain,
+    Signal::IdfSumSiteNoTokenizer,
+    Signal::IdfSumDomainNoTokenizer,
+    Signal::IdfSumDomainNameNoTokenizer,
+    Signal::IdfSumDomainIfHomepage,
+    Signal::IdfSumDomainNameIfHomepageNoTokenizer,
+    Signal::IdfSumDomainIfHomepageNoTokenizer,
+    Signal::IdfSumTitleIfHomepage,
+    Signal::IdfSumBacklinkText,
     Signal::CrossEncoderSnippet,
     Signal::CrossEncoderTitle,
     Signal::HostCentrality,
@@ -249,19 +250,36 @@ fn bm25(field: &mut TextFieldData, doc: DocId) -> f64 {
         return 0.0;
     }
 
-    let mut term_freq = 0;
-    for posting in &mut field.postings {
-        if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
-            term_freq += posting.term_freq();
-        }
-    }
+    let fieldnorm_id = field.fieldnorm_reader.fieldnorm_id(doc);
 
-    if term_freq == 0 {
+    field
+        .weight
+        .score(field.postings.iter_mut().map(move |posting| {
+            if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                (fieldnorm_id, posting.term_freq())
+            } else {
+                (fieldnorm_id, 0)
+            }
+        })) as f64
+}
+
+fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
+    if field.postings.is_empty() {
         return 0.0;
     }
 
-    let fieldnorm_id = field.fieldnorm_reader.fieldnorm_id(doc);
-    field.weight.score(fieldnorm_id, term_freq) as f64
+    field
+        .postings
+        .iter_mut()
+        .zip_eq(field.weight.idf())
+        .filter_map(|(posting, idf)| {
+            if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                Some(idf)
+            } else {
+                None
+            }
+        })
+        .sum::<f32>() as f64
 }
 
 impl Signal {
@@ -280,17 +298,17 @@ impl Signal {
             Signal::Bm25StemmedTitle => 0.003,
             Signal::Bm25StemmedCleanBody => 0.001,
             Signal::Bm25AllBody => 0.0,
-            Signal::Bm25Url => 0.0003,
-            Signal::Bm25Site => 0.00015,
-            Signal::Bm25Domain => 0.0003,
-            Signal::Bm25SiteNoTokenizer => 0.00015,
-            Signal::Bm25DomainNoTokenizer => 0.0002,
-            Signal::Bm25DomainNameNoTokenizer => 0.0002,
-            Signal::Bm25DomainIfHomepage => 0.0004,
-            Signal::Bm25DomainNameIfHomepageNoTokenizer => 0.0036,
-            Signal::Bm25DomainIfHomepageNoTokenizer => 0.0036,
-            Signal::Bm25TitleIfHomepage => 0.00022,
-            Signal::Bm25BacklinkText => 0.003,
+            Signal::IdfSumUrl => 0.0003,
+            Signal::IdfSumSite => 0.00015,
+            Signal::IdfSumDomain => 0.0003,
+            Signal::IdfSumSiteNoTokenizer => 0.00015,
+            Signal::IdfSumDomainNoTokenizer => 0.0002,
+            Signal::IdfSumDomainNameNoTokenizer => 0.0002,
+            Signal::IdfSumDomainIfHomepage => 0.0004,
+            Signal::IdfSumDomainNameIfHomepageNoTokenizer => 0.0036,
+            Signal::IdfSumDomainIfHomepageNoTokenizer => 0.0036,
+            Signal::IdfSumTitleIfHomepage => 0.00022,
+            Signal::IdfSumBacklinkText => 0.003,
             Signal::CrossEncoderSnippet => 0.17,
             Signal::CrossEncoderTitle => 0.17,
             Signal::HostCentrality => 0.5,
@@ -393,21 +411,25 @@ impl Signal {
             | Signal::Bm25CleanBodyTrigrams
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
-            | Signal::Bm25AllBody
-            | Signal::Bm25Url
-            | Signal::Bm25Site
-            | Signal::Bm25Domain
-            | Signal::Bm25SiteNoTokenizer
-            | Signal::Bm25DomainNoTokenizer
-            | Signal::Bm25DomainNameNoTokenizer
-            | Signal::Bm25DomainIfHomepage
-            | Signal::Bm25DomainNameIfHomepageNoTokenizer
-            | Signal::Bm25DomainIfHomepageNoTokenizer
-            | Signal::Bm25TitleIfHomepage
-            | Signal::Bm25BacklinkText => seg_reader
+            | Signal::Bm25AllBody => seg_reader
                 .text_fields
                 .get_mut(self.as_textfield().unwrap())
                 .map(|field| bm25(field, doc)),
+
+            Signal::IdfSumUrl
+            | Signal::IdfSumSite
+            | Signal::IdfSumDomain
+            | Signal::IdfSumSiteNoTokenizer
+            | Signal::IdfSumDomainNoTokenizer
+            | Signal::IdfSumDomainNameNoTokenizer
+            | Signal::IdfSumDomainIfHomepage
+            | Signal::IdfSumDomainNameIfHomepageNoTokenizer
+            | Signal::IdfSumDomainIfHomepageNoTokenizer
+            | Signal::IdfSumTitleIfHomepage
+            | Signal::IdfSumBacklinkText => seg_reader
+                .text_fields
+                .get_mut(self.as_textfield().unwrap())
+                .map(|field| idf_sum(field, doc)),
 
             Signal::CrossEncoderSnippet => None, // this is calculated in a later step
             Signal::CrossEncoderTitle => None,   // this is calculated in a later step
@@ -501,17 +523,17 @@ impl Signal {
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
             | Signal::Bm25AllBody
-            | Signal::Bm25Url
-            | Signal::Bm25Site
-            | Signal::Bm25Domain
-            | Signal::Bm25SiteNoTokenizer
-            | Signal::Bm25DomainNoTokenizer
-            | Signal::Bm25DomainNameNoTokenizer
-            | Signal::Bm25DomainIfHomepage
-            | Signal::Bm25DomainNameIfHomepageNoTokenizer
-            | Signal::Bm25DomainIfHomepageNoTokenizer
-            | Signal::Bm25TitleIfHomepage
-            | Signal::Bm25BacklinkText
+            | Signal::IdfSumUrl
+            | Signal::IdfSumSite
+            | Signal::IdfSumDomain
+            | Signal::IdfSumSiteNoTokenizer
+            | Signal::IdfSumDomainNoTokenizer
+            | Signal::IdfSumDomainNameNoTokenizer
+            | Signal::IdfSumDomainIfHomepage
+            | Signal::IdfSumDomainNameIfHomepageNoTokenizer
+            | Signal::IdfSumDomainIfHomepageNoTokenizer
+            | Signal::IdfSumTitleIfHomepage
+            | Signal::IdfSumBacklinkText
             | Signal::CrossEncoderSnippet
             | Signal::CrossEncoderTitle
             | Signal::InboundSimilarity
@@ -560,19 +582,21 @@ impl Signal {
             Signal::Bm25StemmedTitle => Some(TextField::StemmedTitle),
             Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
             Signal::Bm25AllBody => Some(TextField::AllBody),
-            Signal::Bm25Url => Some(TextField::Url),
-            Signal::Bm25Site => Some(TextField::SiteWithout),
-            Signal::Bm25Domain => Some(TextField::Domain),
-            Signal::Bm25SiteNoTokenizer => Some(TextField::SiteNoTokenizer),
-            Signal::Bm25DomainNoTokenizer => Some(TextField::DomainNoTokenizer),
-            Signal::Bm25DomainNameNoTokenizer => Some(TextField::DomainNameNoTokenizer),
-            Signal::Bm25DomainIfHomepage => Some(TextField::DomainIfHomepage),
-            Signal::Bm25DomainNameIfHomepageNoTokenizer => {
+            Signal::IdfSumUrl => Some(TextField::Url),
+            Signal::IdfSumSite => Some(TextField::SiteWithout),
+            Signal::IdfSumDomain => Some(TextField::Domain),
+            Signal::IdfSumSiteNoTokenizer => Some(TextField::SiteNoTokenizer),
+            Signal::IdfSumDomainNoTokenizer => Some(TextField::DomainNoTokenizer),
+            Signal::IdfSumDomainNameNoTokenizer => Some(TextField::DomainNameNoTokenizer),
+            Signal::IdfSumDomainIfHomepage => Some(TextField::DomainIfHomepage),
+            Signal::IdfSumDomainNameIfHomepageNoTokenizer => {
                 Some(TextField::DomainNameIfHomepageNoTokenizer)
             }
-            Signal::Bm25TitleIfHomepage => Some(TextField::TitleIfHomepage),
-            Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
-            Signal::Bm25DomainIfHomepageNoTokenizer => Some(TextField::DomainIfHomepageNoTokenizer),
+            Signal::IdfSumTitleIfHomepage => Some(TextField::TitleIfHomepage),
+            Signal::IdfSumBacklinkText => Some(TextField::BacklinkText),
+            Signal::IdfSumDomainIfHomepageNoTokenizer => {
+                Some(TextField::DomainIfHomepageNoTokenizer)
+            }
             _ => None,
         }
     }
@@ -635,7 +659,7 @@ impl SignalCoefficient {
 #[derive(Clone)]
 struct TextFieldData {
     postings: Vec<SegmentPostings>,
-    weight: Bm25Weight,
+    weight: MultiBm25Weight,
     fieldnorm_reader: FieldNormReader,
 }
 
@@ -797,19 +821,20 @@ impl SignalAggregator {
                             continue;
                         }
 
-                        let weight = Bm25Weight::for_terms(tv_searcher, &terms)?;
-
                         let fieldnorm_reader = segment_reader.get_fieldnorms_reader(tv_field)?;
                         let inverted_index = segment_reader.inverted_index(tv_field)?;
 
+                        let mut matching_terms = Vec::with_capacity(terms.len());
                         let mut postings = Vec::with_capacity(terms.len());
                         for term in &terms {
                             if let Some(p) =
                                 inverted_index.read_postings(term, text_field.index_option())?
                             {
                                 postings.push(p);
+                                matching_terms.push(term.clone());
                             }
                         }
+                        let weight = MultiBm25Weight::for_terms(tv_searcher, &matching_terms)?;
 
                         text_fields.insert(
                             text_field,

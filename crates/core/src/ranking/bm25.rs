@@ -1,5 +1,6 @@
 // source: https://github.com/quickwit-oss/tantivy/blob/main/src/query/bm25.rs
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use tantivy::fieldnorm::FieldNormReader;
@@ -35,27 +36,20 @@ pub struct Bm25Params {
 }
 
 #[derive(Clone)]
-pub struct Bm25Weight {
-    idf_explain: Explanation,
-    weight: Score,
-    cache: [Score; 256],
-    average_fieldnorm: Score,
+pub struct MultiBm25Weight {
+    weights: Vec<Bm25Weight>,
 }
 
-impl Bm25Weight {
-    pub fn boost_by(&self, boost: Score) -> Bm25Weight {
-        Bm25Weight {
-            idf_explain: self.idf_explain.clone(),
-            weight: self.weight * boost,
-            cache: self.cache,
-            average_fieldnorm: self.average_fieldnorm,
+impl MultiBm25Weight {
+    pub fn for_terms(searcher: &Searcher, terms: &[Term]) -> tantivy::Result<Self> {
+        if terms.is_empty() {
+            return Ok(Self {
+                weights: Vec::new(),
+            });
         }
-    }
 
-    pub fn for_terms(searcher: &Searcher, terms: &[Term]) -> tantivy::Result<Bm25Weight> {
-        assert!(!terms.is_empty(), "Bm25 requires at least one term");
         let field = terms[0].field();
-        for term in &terms[1..] {
+        for term in terms.iter().skip(1) {
             assert_eq!(
                 term.field(),
                 field,
@@ -72,21 +66,54 @@ impl Bm25Weight {
         }
         let average_fieldnorm = total_num_tokens as Score / total_num_docs as Score;
 
-        if terms.len() == 1 {
-            let term_doc_freq = searcher.doc_freq(&terms[0])?;
-            Ok(Bm25Weight::for_one_term(
+        let mut weights = Vec::new();
+
+        for term in terms {
+            let term_doc_freq = searcher.doc_freq(term)?;
+            weights.push(Bm25Weight::for_one_term(
                 term_doc_freq,
                 total_num_docs,
                 average_fieldnorm,
-            ))
-        } else {
-            let mut idf_sum: Score = 0.0;
-            for term in terms {
-                let term_doc_freq = searcher.doc_freq(term)?;
-                idf_sum += idf(term_doc_freq, total_num_docs);
-            }
-            let idf_explain = Explanation::new("idf", idf_sum);
-            Ok(Bm25Weight::new(idf_explain, average_fieldnorm))
+            ));
+        }
+
+        Ok(Self { weights })
+    }
+
+    #[inline]
+    pub fn score(&self, stats: impl Iterator<Item = (u8, u32)>) -> Score {
+        stats
+            .zip_eq(self.weights.iter())
+            .map(|((fieldnorm_id, term_freq), weight)| weight.score(fieldnorm_id, term_freq))
+            .sum()
+    }
+
+    pub fn idf(&self) -> impl Iterator<Item = f32> + '_ {
+        self.weights.iter().map(|w| w.weight)
+    }
+
+    pub fn boost_by(&self, boost: Score) -> Self {
+        Self {
+            weights: self.weights.iter().map(|w| w.boost_by(boost)).collect(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Bm25Weight {
+    idf_explain: Explanation,
+    weight: Score,
+    cache: [Score; 256],
+    average_fieldnorm: Score,
+}
+
+impl Bm25Weight {
+    pub fn boost_by(&self, boost: Score) -> Bm25Weight {
+        Bm25Weight {
+            idf_explain: self.idf_explain.clone(),
+            weight: self.weight * boost,
+            cache: self.cache,
+            average_fieldnorm: self.average_fieldnorm,
         }
     }
 
@@ -156,5 +183,30 @@ impl Bm25Weight {
         explanation.add_detail(self.idf_explain.clone());
         explanation.add_detail(tf_explanation);
         explanation
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bm25_idf_scaling() {
+        // assume the query is something like 'the end'
+        // 'the' appears in almost all docs (98)
+        // 'end' appears in a smalle subset (20)
+        let weight = MultiBm25Weight {
+            weights: vec![
+                Bm25Weight::for_one_term(98, 100, 1.0),
+                Bm25Weight::for_one_term(20, 100, 1.0),
+            ],
+        };
+
+        // if a document has high frequency of 'end'
+        // it should have a higher score than a document that
+        // has an almost equally high frequency of 'the'
+        let high_the = weight.score(vec![(0, 15), (0, 10)].into_iter());
+        let high_end = weight.score(vec![(0, 8), (0, 13)].into_iter());
+        assert!(high_end > high_the);
     }
 }
