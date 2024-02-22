@@ -44,7 +44,7 @@ jobs:
           tool: cargo-about
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.10
+          node-version: 20.10.x
       - name: Run CI
         run: ./scripts/ci/all
       - name: Test
