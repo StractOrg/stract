@@ -115,6 +115,6 @@
       <Button on:click={clearAndExport({ clear })}>{text}</Button>
     {/each}
     <input type="file" accept=".optic" id="optic-import" multiple hidden/>
-    <Button on:click={importOpticFile}>Import optic</Button>
+    <Button on:click={importOpticFile}>Import from optic</Button>
   </div>
 </div>
