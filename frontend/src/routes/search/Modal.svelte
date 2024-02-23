@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Ranking } from '$lib/rankings';
+  import { Ranking } from '$lib/rankings';
   import { hostRankingsStore, summarize } from '$lib/stores';
   import type { DisplayedWebpage } from '$lib/api';
   import { twJoin } from 'tailwind-merge';
@@ -31,17 +31,17 @@
 
   const rankingChoices = [
     {
-      ranking: 'liked',
+      ranking: Ranking.LIKED,
       kind: 'success',
       Icon: HandThumbUp,
     },
     {
-      ranking: 'disliked',
+      ranking: Ranking.DISLIKED,
       kind: 'warning',
       Icon: HandThumbDown,
     },
     {
-      ranking: 'blocked',
+      ranking: Ranking.BLOCKED,
       kind: 'error',
       Icon: NoSymbol,
     },

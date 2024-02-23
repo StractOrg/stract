@@ -2,7 +2,7 @@
   import { api } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
-  import { rankingsToRanked } from '$lib/rankings';
+  import { rankingsToRanked, importedOpticToRankings, Ranking } from '$lib/rankings';
   import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import { derived } from 'svelte/store';
@@ -12,20 +12,20 @@
       title: 'Liked Sites',
       description:
         'Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.',
-      section: 'liked',
+      section: Ranking.LIKED,
     },
     {
       title: 'Disliked Sites',
       description:
         'Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.',
-      section: 'disliked',
+      section: Ranking.DISLIKED,
     },
 
     {
       title: 'Blocked Sites',
       description:
         "These are the sites you have blocked. They won't appear in any of your searches.",
-      section: 'blocked',
+      section: Ranking.BLOCKED,
     },
   ] as const;
 
@@ -35,6 +35,46 @@
   ] as const;
 
   const ranked = derived(hostRankingsStore, ($rankings) => rankingsToRanked($rankings));
+
+  // Allow the user to import a .optic file
+  const importOpticFile = () => {
+    // Select the "optic-import" input field in the DOM
+    const input = document.getElementById("optic-import")
+
+    if (input){
+      input.onchange = e => { 
+        // Get an array of the uploaded files
+        let files: File[] = [...(<HTMLInputElement>e.target)?.files ?? new FileList]
+
+        // Iterate through all files, attempt to get the contents & parse the optic
+        files.forEach((file) => {
+          if (file) {
+            const reader = new FileReader();
+            reader.readAsText(file,'UTF-8');
+
+            reader.onload = readerEvent => {
+              const content = readerEvent.target?.result ?? "";
+              const extractedRankings = importedOpticToRankings(content as string);
+              // Iterate through SiteRecords and pass each site/rank to rankSite
+              for (const site in extractedRankings) {
+                const rank = extractedRankings[site]
+                if (rank) rankSite(site, rank)
+              }
+            }
+          }
+        })
+      }
+      // Activate the input (bring up file prompt)
+      input.click()
+    }
+  }
+
+  const rankSite = (site: string, ranking: Ranking) => {
+    hostRankingsStore?.update(($rankings) => ({
+      ...$rankings,
+      [site]: $rankings[site] == ranking ? void 0 : ranking,
+    }));
+  };
 
   const unrankSite = (site: string) => () => {
     hostRankingsStore.update(($rankings) => ({ ...$rankings, [site]: void 0 }));
@@ -74,5 +114,7 @@
     {#each buttons as { text, clear }}
       <Button on:click={clearAndExport({ clear })}>{text}</Button>
     {/each}
+    <input type="file" accept=".optic" id="optic-import" multiple hidden/>
+    <Button on:click={importOpticFile}>Import optic</Button>
   </div>
 </div>

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{extract, Json};
+use axum::{body::Body, extract, response::{IntoResponse, Response}, Json};
 use http::StatusCode;
 use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
@@ -34,11 +34,11 @@ pub struct HostsExportOpticParams {
 )]
 pub async fn hosts_export_optic(
     extract::Json(HostsExportOpticParams { host_rankings }): extract::Json<HostsExportOpticParams>,
-) -> Result<Json<String>, StatusCode> {
+) -> Result<Response<Body>, StatusCode> {
     let optic = Optic {
         host_rankings,
         ..Default::default()
     };
 
-    Ok(Json(optic.to_string()))
+    Ok(optic.to_string().into_response())
 }
