@@ -2,9 +2,12 @@
   "name": "frontend",
   "version": "0.0.1",
   "private": true,
+  "workspaces": [
+    "../crates/client-wasm/pkg"
+  ],
   "scripts": {
-    "dev": "vite dev --port 8000",
-    "build": "vite build",
+    "dev": "npm run wasm && vite dev --port 8000",
+    "build": "npm run wasm && vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -13,7 +16,9 @@
     "format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write .",
     "openapi": "abeye generate http://localhost:3000/beta/api/docs/openapi.json -t ts --api-prefix /beta/api -o src/lib/api/index.ts && prettier --write src/lib/api/index.ts",
     "test:integration": "playwright test",
-    "test:unit": "vitest"
+    "test:unit": "vitest",
+    "wasm-client-wasm": "wasm-pack build ../crates/client-wasm --target web",
+    "wasm": "npm run wasm-client-wasm"
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.1.16",
@@ -50,6 +55,8 @@
     "typescript": "^5.3.3",
     "unplugin-icons": "^0.18.1",
     "vite": "^5.0.10",
+    "vite-plugin-top-level-await": "^1.4.1",
+    "vite-plugin-wasm": "^3.3.0",
     "vitest": "^1.0.4"
   },
   "type": "module",
@@ -59,6 +66,7 @@
     "highlight.js": "^11.9.0",
     "lz-string": "^1.5.0",
     "tailwind-merge": "^2.1.0",
-    "ts-pattern": "^5.0.6"
+    "ts-pattern": "^5.0.6",
+    "client-wasm": "^0.1.0"
   }
 }

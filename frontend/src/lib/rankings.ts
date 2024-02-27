@@ -35,35 +35,6 @@ export const rankedToRankings = (ranked: RankedSites): SiteRankings => {
   return result;
 };
 
-// Map regexs to their respective rankings
-const reToRankMap = {
-  [Ranking.LIKED]: /Like\(\s*Site\s*\(\s*"(\S*)"\s*\)\s*\);/g,
-  [Ranking.DISLIKED]: /Dislike\(\s*Site\s*\(\s*"(\S*)"\s*\)\s*\);/g,
-  [Ranking.BLOCKED]: /Rule\s*{\s*Matches\s*{\s*Site\("\|(\S*)\|"\),\s*},\s*Action\(Discard\)\s*};/g
-}
-
-export const importedOpticToRankings = (optic: string): SiteRankings => {
-  const rankedSites: RankedSites = {
-    liked: [],
-    disliked: [],
-    blocked: [],
-  };
-
-  for(const [_, ranking] of Object.entries(Ranking)){
-    let re = reToRankMap[ranking]
-    let match: RegExpExecArray | null
-
-    do {
-      match = re.exec(optic);
-      if (match) {
-        rankedSites[ranking].push(match[1])
-      }
-    } while (match)
-  }
-
-  return rankedToRankings(rankedSites)
-}
-
 export const compressRanked = (ranked: RankedSites): string =>
   LZString.compressToBase64(JSON.stringify(ranked));
 export const decompressRanked = (compressedRanked: string): RankedSites =>

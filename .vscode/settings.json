@@ -21,6 +21,7 @@
   "rust-analyzer.linkedProjects": [
     "Cargo.toml",
     "./crates/optics-lsp/Cargo.toml",
+    "./crates/client-wasm/Cargo.toml",
     "./crates/core/Cargo.toml"
   ]
 }
