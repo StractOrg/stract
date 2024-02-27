@@ -10,7 +10,7 @@
     "build": "npm run wasm && vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "npm run wasm && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "lint": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --check . && eslint .",
     "format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write .",
@@ -57,12 +57,11 @@
     "vite": "^5.1.4",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
-    "vite-plugin-wasm-pack": "^0.1.12",
-    "vitest": "^1.0.4"
+    "vitest": "^1.0.4",
+    "client-wasm": "^0.1.0"
   },
   "type": "module",
   "dependencies": {
-    "client-wasm": "^0.1.0",
     "colord": "^2.9.3",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.9.0",

@@ -7,7 +7,7 @@
   import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import { derived } from 'svelte/store';
-  import init, {Optic} from 'client-wasm';
+  import init, { Optic } from 'client-wasm';
   import { onMount } from 'svelte';
 
   onMount(async () => {
