@@ -27,13 +27,13 @@ const config = {
     adapter: adapter(),
     csp: {
       directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'", 'wasm-unsafe-eval'],
+        'default-src': ['self'],
+        'script-src': ['self', 'wasm-unsafe-eval'],
         // NOTE: Disabled in order to fetch optic sources client-side
         // 'connect-src': ["'self'", 'http://localhost:3000/'],
         'connect-src': ['*'],
-        'img-src': ["'self'", 'data:', 'stract.com', '0.0.0.0:3000', 'localhost:3000'],
-        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ['self', 'data:', 'stract.com', '0.0.0.0:3000', 'localhost:3000'],
+        'style-src': ['self', 'unsafe-inline'],
       },
     },
   },
