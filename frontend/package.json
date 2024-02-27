@@ -68,5 +68,8 @@
     "tailwind-merge": "^2.1.0",
     "ts-pattern": "^5.0.6",
     "client-wasm": "^0.1.0"
+  },
+  "engines": {
+    "node": "20.10.x"
   }
 }
