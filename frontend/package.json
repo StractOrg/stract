@@ -54,20 +54,21 @@
     "tslib": "^2.6.2",
     "typescript": "^5.3.3",
     "unplugin-icons": "^0.18.1",
-    "vite": "^5.0.10",
+    "vite": "^5.1.4",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
+    "vite-plugin-wasm-pack": "^0.1.12",
     "vitest": "^1.0.4"
   },
   "type": "module",
   "dependencies": {
+    "client-wasm": "^0.1.0",
     "colord": "^2.9.3",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.9.0",
     "lz-string": "^1.5.0",
     "tailwind-merge": "^2.1.0",
-    "ts-pattern": "^5.0.6",
-    "client-wasm": "^0.1.0"
+    "ts-pattern": "^5.0.6"
   },
   "engines": {
     "node": "20.10.x"
