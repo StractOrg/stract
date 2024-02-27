@@ -5,4 +5,4 @@ cargo install wasm-pack
 
 cargo check
 cargo check --no-default-features
-cd frontend && npm install && npm run check
+cd frontend && npm run wasm && npm install && npm run check
