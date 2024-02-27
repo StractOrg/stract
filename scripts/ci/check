@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+cargo install wasm-pack
+
 cargo check
 cargo check --no-default-features
 cd frontend && npm install && npm run check
