@@ -334,6 +334,13 @@ mod tests {
             .search(&SearchQuery {
                 query: "title".to_string(),
                 return_ranking_signals: true,
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("update_timestamp".to_string()),
+                        value: 1_000_000.0,
+                    }],
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .expect("Search failed");
