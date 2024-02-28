@@ -18,7 +18,6 @@
 //!
 //! To be packaged with wasm-pack + vite and served to the browser
 
-use optics;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -26,6 +25,12 @@ use wasm_bindgen::prelude::*;
 pub enum Error {
     #[error("Failed to serialize")]
     Serialization(#[from] serde_wasm_bindgen::Error),
+
+    #[error("Optics error: {0}")]
+    OpticParse(#[from] optics::Error),
+
+    #[error("Json serialization error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
 }
 
 impl From<Error> for JsValue {
@@ -51,10 +56,10 @@ impl Optic {
     /// Takes the contents of a .optic file and converts it to a Result containing either an error or a JSON serialized [`HostRankings`]
     #[wasm_bindgen(js_name = parsePreferenceOptic)]
     pub fn parse_preference_optic(contents: JsValue) -> Result<JsValue, Error> {
-        let optic_contents: String = serde_wasm_bindgen::from_value(contents).unwrap();
-        let host_rankings = optics::Optic::parse(&optic_contents).unwrap().host_rankings;
+        let optic_contents: String = serde_wasm_bindgen::from_value(contents)?;
+        let host_rankings = optics::Optic::parse(&optic_contents)?.host_rankings;
 
-        let rankings_json = serde_json::to_string(&host_rankings).unwrap();
+        let rankings_json = serde_json::to_string(&host_rankings)?;
 
         console_log(&("Parsed rankings to JSON: ".to_owned() + &rankings_json));
 
