@@ -262,7 +262,10 @@ impl AsTantivyQuery for Matching {
 
 #[cfg(test)]
 mod tests {
-    use optics::{HostRankings, Optic};
+    use optics::{
+        ast::{RankingCoeff, RankingTarget},
+        HostRankings, Optic,
+    };
 
     use crate::{
         gen_temp_path,
@@ -726,16 +729,18 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic: Some(
-                    Optic::parse(
-                        r#"
-                    Like(Site("www.a.com"));
-                    Like(Site("www.b.com"));
-                    Dislike(Site("www.c.com"));
-                "#,
-                    )
-                    .unwrap(),
-                ),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("inbound_similarity".to_string()),
+                        value: 100_000.0,
+                    }],
+                    host_rankings: HostRankings {
+                        liked: vec!["www.a.com".to_string(), "www.b.com".to_string()],
+                        disliked: vec!["www.c.com".to_string()],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .unwrap()

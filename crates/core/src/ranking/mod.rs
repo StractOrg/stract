@@ -126,7 +126,10 @@ impl Ranker {
 #[cfg(test)]
 mod tests {
 
-    use optics::Optic;
+    use optics::{
+        ast::{RankingCoeff, RankingTarget},
+        Optic,
+    };
 
     use crate::{
         index::Index,
@@ -638,6 +641,13 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("fetch_time_ms".to_string()),
+                        value: 100_000.0,
+                    }],
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .expect("Search failed");

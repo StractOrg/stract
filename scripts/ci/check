@@ -5,4 +5,6 @@ cargo install wasm-pack
 
 cargo check
 cargo check --no-default-features
-cd frontend && npm run wasm && npm install && npm run check
+
+# skip frontend check until https://github.com/sveltejs/kit/issues/11906 is fixed
+# cd frontend && npm run wasm && npm install && npm run check

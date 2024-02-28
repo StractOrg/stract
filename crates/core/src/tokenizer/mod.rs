@@ -804,6 +804,18 @@ mod tests {
         res
     }
 
+    fn tokenize_identity(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut tokenizer = Identity {};
+        let mut stream = tokenizer.token_stream(s);
+
+        while let Some(token) = stream.next() {
+            res.push(token.text.clone());
+        }
+
+        res
+    }
+
     #[test]
     fn simple_tokenization() {
         assert_eq!(
@@ -1056,5 +1068,11 @@ key1.key2="this\" is @ a # test""#;
         );
 
         assert_eq!(tokenize_url(".com"), vec![".", "com ",])
+    }
+
+    #[test]
+    fn identity() {
+        assert_eq!(tokenize_identity("this is a test"), vec!["this is a test"]);
+        assert_eq!(tokenize_identity("a-b"), vec!["a-b"]);
     }
 }
