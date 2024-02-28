@@ -28,7 +28,7 @@ const config = {
     csp: {
       directives: {
         'default-src': ['self'],
-        'script-src': ['self'],
+        'script-src': ['self', 'wasm-unsafe-eval'],
         // NOTE: Disabled in order to fetch optic sources client-side
         // 'connect-src': ["'self'", 'http://localhost:3000/'],
         'connect-src': ['*'],

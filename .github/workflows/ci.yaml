@@ -29,7 +29,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -37,8 +37,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install liburing
         run: |
-            sudo apt-get update
-            sudo apt-get install -y liburing-dev
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-about

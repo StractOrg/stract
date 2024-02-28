@@ -1,0 +1,19 @@
+[package]
+name = "client-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+js-sys = "0.3.60"
+serde = { version = "1.0.137", features = ["rc", "derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.6.3"
+thiserror = "1.0.31"
+wasm-bindgen = "0.2.83"
+
+optics = { path = "../optics" }
+
+[workspace]

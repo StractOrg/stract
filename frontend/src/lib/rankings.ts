@@ -1,10 +1,15 @@
 import LZString from 'lz-string';
 
-export type Ranking = 'liked' | 'disliked' | 'blocked';
-export type SiteRakings = Record<string, Ranking | undefined>;
+export enum Ranking {
+  LIKED = 'liked',
+  DISLIKED = 'disliked',
+  BLOCKED = 'blocked',
+}
+
+export type SiteRankings = Record<string, Ranking | undefined>;
 export type RankedSites = Record<Ranking, string[]>;
 
-export const rankingsToRanked = (rankings: SiteRakings): RankedSites => {
+export const rankingsToRanked = (rankings: SiteRankings): RankedSites => {
   const result: RankedSites = {
     liked: [],
     disliked: [],
@@ -17,10 +22,11 @@ export const rankingsToRanked = (rankings: SiteRakings): RankedSites => {
 
   return result;
 };
-export const rankedToRankings = (ranked: RankedSites): SiteRakings => {
-  const result: SiteRakings = {};
 
-  for (const ranking of ['liked', 'disliked', 'blocked'] as const) {
+export const rankedToRankings = (ranked: RankedSites): SiteRankings => {
+  const result: SiteRankings = {};
+
+  for (const [_, ranking] of Object.entries(Ranking)) {
     for (const site of ranked[ranking]) {
       result[site] = ranking;
     }

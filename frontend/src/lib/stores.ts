@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import type { OpticOption } from './optics';
-import type { SiteRakings } from './rankings';
+import type { SiteRankings } from './rankings';
 import { api, type DisplayedWebpage } from './api';
 import { match } from 'ts-pattern';
 
@@ -62,7 +62,7 @@ const ALLOW_STATS_KEY = 'allowStats';
 export const allowStatsStore = writableLocalStorage<boolean>(ALLOW_STATS_KEY, true);
 
 const HOST_RANKINGS_KEY = 'host_rankings';
-export const hostRankingsStore = writableLocalStorage<SiteRakings>(HOST_RANKINGS_KEY, {});
+export const hostRankingsStore = writableLocalStorage<SiteRankings>(HOST_RANKINGS_KEY, {});
 
 const SEARCH_QUERY_KEY = 'searchQuery';
 export const searchQueryStore = writableLocalStorage<string | undefined>(SEARCH_QUERY_KEY, void 0);

@@ -2,30 +2,38 @@
   import { api } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
-  import { rankingsToRanked } from '$lib/rankings';
+  import { getButtonTailwindStyle } from '$lib/themes';
+  import { rankingsToRanked, type RankedSites, Ranking } from '$lib/rankings';
   import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import { derived } from 'svelte/store';
+  import init, { Optic } from 'client-wasm';
+  import { onMount } from 'svelte';
+
+  onMount(async () => {
+    // Initialize the wasm module
+    await init();
+  });
 
   const sections = [
     {
       title: 'Liked Sites',
       description:
         'Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.',
-      section: 'liked',
+      section: Ranking.LIKED,
     },
     {
       title: 'Disliked Sites',
       description:
         'Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.',
-      section: 'disliked',
+      section: Ranking.DISLIKED,
     },
 
     {
       title: 'Blocked Sites',
       description:
         "These are the sites you have blocked. They won't appear in any of your searches.",
-      section: 'blocked',
+      section: Ranking.BLOCKED,
     },
   ] as const;
 
@@ -35,6 +43,45 @@
   ] as const;
 
   const ranked = derived(hostRankingsStore, ($rankings) => rankingsToRanked($rankings));
+
+  // Called when the user selects an optic file for import
+  const importOpticFile = (e: Event) => {
+    // Get an array of the uploaded files
+    let files: File[] = [...((<HTMLInputElement>e.target)?.files ?? new FileList())];
+
+    // Iterate through all files, attempt to get the contents & parse the optic
+    files.forEach((file) => {
+      if (file) {
+        const reader = new FileReader();
+        reader.readAsText(file, 'UTF-8');
+
+        reader.onload = (readerEvent) => {
+          const content = readerEvent.target?.result ?? '';
+          try {
+            const extractedRankings: RankedSites = JSON.parse(
+              Optic.parsePreferenceOptic(content as string),
+            );
+            // Iterate through all sites in each Ranking and pass them to rankSite
+            for (const [_, ranking] of Object.entries(Ranking)) {
+              const sites = extractedRankings[ranking];
+              sites.forEach((site) => rankSite(site, ranking));
+            }
+          } catch {
+            console.error(
+              `Failed to import optic from "${file.name}", please check the formatting.`,
+            );
+          }
+        };
+      }
+    });
+  };
+
+  const rankSite = (site: string, ranking: Ranking) => {
+    hostRankingsStore?.update(($rankings) => ({
+      ...$rankings,
+      [site]: $rankings[site] == ranking ? void 0 : ranking,
+    }));
+  };
 
   const unrankSite = (site: string) => () => {
     hostRankingsStore.update(($rankings) => ({ ...$rankings, [site]: void 0 }));
@@ -74,5 +121,16 @@
     {#each buttons as { text, clear }}
       <Button on:click={clearAndExport({ clear })}>{text}</Button>
     {/each}
+    <input
+      type="file"
+      accept=".optic"
+      id="optic-import"
+      multiple
+      on:change={importOpticFile}
+      hidden
+    />
+    <label for="optic-import" class={getButtonTailwindStyle(false, false, 'primary', '')}>
+      Import from optic
+    </label>
   </div>
 </div>

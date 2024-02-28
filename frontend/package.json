@@ -2,9 +2,12 @@
   "name": "frontend",
   "version": "0.0.1",
   "private": true,
+  "workspaces": [
+    "../crates/client-wasm/pkg"
+  ],
   "scripts": {
     "dev": "vite dev --port 8000",
-    "build": "vite build",
+    "build": "npm run wasm && vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -49,7 +52,9 @@
     "tslib": "^2.6.2",
     "typescript": "^5.3.3",
     "unplugin-icons": "^0.18.1",
-    "vite": "^5.0.10",
+    "vite": "^5.1.4",
+    "vite-plugin-top-level-await": "^1.4.1",
+    "vite-plugin-wasm": "^3.3.0",
     "vitest": "^1.0.4"
   },
   "type": "module",
