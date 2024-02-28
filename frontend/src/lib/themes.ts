@@ -1,4 +1,4 @@
-import { twMerge } from "tailwind-merge";
+import { twMerge } from 'tailwind-merge';
 
 const theme = (name: string, c: string) => ({ name, class: c });
 
@@ -12,7 +12,6 @@ export const THEMES = [
   theme('Nord', 'theme-nord'),
   theme('Ayu Mirage', 'theme-ayu-mirage'),
 ];
-
 
 /*
   Button Styling
@@ -30,11 +29,11 @@ export type ButtonKind =
   | 'error';
 
 export const getButtonTailwindStyle = (
-    padding: boolean,
-    pale: boolean,
-    kind: ButtonKind,
-    _class: string
-  ) => {
+  padding: boolean,
+  pale: boolean,
+  kind: ButtonKind,
+  _class: string,
+) => {
   return twMerge(
     'rounded-full py-2 transition active:scale-[98%]',
     padding ? 'px-4' : 'px-2',
@@ -93,5 +92,5 @@ export const getButtonTailwindStyle = (
           kind == 'error' && 'bg-error text-error-content hover:bg-error-focus',
         ],
     _class,
-  )
-}
+  );
+};

@@ -2,7 +2,9 @@
   "name": "frontend",
   "version": "0.0.1",
   "private": true,
-  "workspaces": ["../crates/client-wasm/pkg"],
+  "workspaces": [
+    "../crates/client-wasm/pkg"
+  ],
   "scripts": {
     "dev": "vite dev --port 8000",
     "build": "npm run wasm && vite build",

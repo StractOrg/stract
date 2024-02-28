@@ -3,7 +3,7 @@ import LZString from 'lz-string';
 export enum Ranking {
   LIKED = 'liked',
   DISLIKED = 'disliked',
-  BLOCKED = 'blocked'
+  BLOCKED = 'blocked',
 }
 
 export type SiteRankings = Record<string, Ranking | undefined>;

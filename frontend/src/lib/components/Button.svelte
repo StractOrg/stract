@@ -12,12 +12,6 @@
   export let _class: string = '';
 </script>
 
-<button
-  on:click
-  {title}
-  {form}
-  {type}
-  class={getButtonTailwindStyle(padding, pale, kind, _class)}
->
+<button on:click {title} {form} {type} class={getButtonTailwindStyle(padding, pale, kind, _class)}>
   <slot />
 </button>
