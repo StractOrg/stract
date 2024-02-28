@@ -18,9 +18,9 @@
 //!
 //! To be packaged with wasm-pack + vite and served to the browser
 
-use wasm_bindgen::prelude::*;
-use thiserror::Error;
 use optics;
+use thiserror::Error;
+use wasm_bindgen::prelude::*;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -47,7 +47,7 @@ extern "C" {
 pub struct Optic;
 
 #[wasm_bindgen]
-impl Optic{
+impl Optic {
     /// Takes the contents of a .optic file and converts it to a Result containing either an error or a JSON serialized [`HostRankings`]
     #[wasm_bindgen(js_name = parsePreferenceOptic)]
     pub fn parse_preference_optic(contents: JsValue) -> Result<JsValue, Error> {
@@ -61,4 +61,3 @@ impl Optic{
         Ok(serde_wasm_bindgen::to_value(&rankings_json)?)
     }
 }
-
