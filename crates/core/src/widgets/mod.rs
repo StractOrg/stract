@@ -31,6 +31,9 @@ pub mod thesaurus;
 pub enum Error {
     #[error("Calculator parse")]
     CalculatorParse,
+
+    #[error("Failed to parse float")]
+    FloatParse(#[from] std::num::ParseFloatError),
 }
 
 pub struct Widgets {

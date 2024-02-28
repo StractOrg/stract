@@ -191,21 +191,22 @@ impl Calculator {
             return Err(Error::CalculatorParse);
         }
 
-        let result: String = res
-            .get_main_result_spans()
-            .map(|span| match span.kind() {
+        let mut result: String = String::new();
+
+        for span in res.get_main_result_spans() {
+            match span.kind() {
                 fend_core::SpanKind::Number => {
-                    let num = span.string().parse::<f64>().unwrap();
+                    let num = span.string().parse::<f64>()?;
 
                     if num.fract() > 0.01 {
-                        format!("{:.2}", num)
+                        result.push_str(format!("{:.2}", num).as_str());
                     } else {
-                        num.to_string()
+                        result.push_str(num.to_string().as_str());
                     }
                 }
-                _ => span.string().to_string(),
-            })
-            .collect();
+                _ => result.push_str(span.string()),
+            }
+        }
 
         Ok(Calculation {
             input: expr.to_string(),
