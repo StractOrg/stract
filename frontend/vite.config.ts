@@ -3,10 +3,14 @@ import { defineConfig } from 'vitest/config';
 import Icons from 'unplugin-icons/vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
+import wasmPack from './src/wasm-pack-plugin';
 
 export default defineConfig({
   plugins: [
     wasm(),
+    wasmPack({
+      crates: ['../crates/client-wasm/'],
+    }),
     topLevelAwait(),
     sveltekit(),
     Icons({ compiler: 'svelte' }),
@@ -16,7 +20,7 @@ export default defineConfig({
   },
   server: {
     fs: {
-      allow: ['../crates/client-wasm/pkg/']
-    }
-  }
+      allow: ['../crates/client-wasm/pkg/'],
+    },
+  },
 });

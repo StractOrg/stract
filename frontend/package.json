@@ -2,11 +2,9 @@
   "name": "frontend",
   "version": "0.0.1",
   "private": true,
-  "workspaces": [
-    "../crates/client-wasm/pkg"
-  ],
+  "workspaces": ["../crates/client-wasm/pkg"],
   "scripts": {
-    "dev": "npm run wasm && vite dev --port 8000",
+    "dev": "vite dev --port 8000",
     "build": "npm run wasm && vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
@@ -16,9 +14,7 @@
     "format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write .",
     "openapi": "abeye generate http://localhost:3000/beta/api/docs/openapi.json -t ts --api-prefix /beta/api -o src/lib/api/index.ts && prettier --write src/lib/api/index.ts",
     "test:integration": "playwright test",
-    "test:unit": "vitest",
-    "wasm-client-wasm": "wasm-pack build ../crates/client-wasm --target web",
-    "wasm": "npm run wasm-client-wasm"
+    "test:unit": "vitest"
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.1.16",

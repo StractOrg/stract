@@ -40,7 +40,7 @@ if they take our code without making theirs open source, which would breach the 
 * Install [just](https://github.com/casey/just) by running `cargo install just`. This allows you to run the scripts in the `justfile` file. A justfile is basically a simple Makefile.
 * Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) by running `cargo install wasm-pack`. This will allow for generation and packaging of client side WebAssembly code.
 * Run the command `just configure` which should automatically configures the rest of your dev environment. The script creates a python virtual environment, installs relevant dependencies, traces and exports the ML models and creates a small local index which you can use for development.
-* (Optional) Install [cargo-watch](https://github.com/watchexec/cargo-watch) by running `cargo install cargo-watch`. This makes frontend development easier.
+* Install [cargo-watch](https://github.com/watchexec/cargo-watch) by running `cargo install cargo-watch`.
 * (Optional) Install [abeye](https://github.com/oeb25/abeye) by running `cargo install --git https://github.com/oeb25/abeye --locked`. This is used for generating the API client used by the frontend by running `just openapi`.
 
 After the non optional steps you can now run `cargo test` and should see all tests passing. If you have installced `cargo-watch`, you should be able to run `just dev` to start the search server and launch the frontend at `0.0.0.0:8000`.
