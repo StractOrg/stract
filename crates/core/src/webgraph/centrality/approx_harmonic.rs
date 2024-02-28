@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Mutex};
+use std::path::Path;
 
+use dashmap::DashMap;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
@@ -44,31 +45,35 @@ impl ApproxHarmonic {
 
         tracing::info!("sampling {} nodes", num_samples);
 
-        let sampled = graph.random_nodes(num_samples);
+        let sampled = graph.random_nodes_with_outgoing(num_samples);
 
-        let res = Mutex::new(Self {
-            inner: RocksDbStore::open(output),
-        });
+        let centralities: DashMap<NodeID, f32> = DashMap::new();
 
-        let norm = num_nodes as f64 / (num_samples as f64 * (num_nodes as f64 - 1.0));
+        let norm = num_nodes as f32 / (num_samples as f32 * (num_nodes as f32 - 1.0));
 
         sampled.into_par_iter().progress().for_each(|source| {
             let dists = graph.raw_distances_with_max(source, 5);
 
-            let res = res.lock().unwrap();
             for (target, dist) in dists {
                 if dist == 0 {
                     continue;
                 }
 
-                let dist = dist as f64;
+                let dist = dist as f32;
 
-                let old = res.inner.get(&target).unwrap_or(0.0);
-                res.inner.insert(target, old + ((1.0 / dist) * norm));
+                *centralities.entry(target).or_default() += (1.0 / dist) * norm;
             }
         });
 
-        res.into_inner().unwrap()
+        let res = Self {
+            inner: RocksDbStore::open(output),
+        };
+
+        for (node, centrality) in centralities {
+            res.inner.insert(node, centrality as f64);
+        }
+
+        res
     }
 
     pub fn get(&self, node: &NodeID) -> Option<f64> {

@@ -22,6 +22,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, fs};
 
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use url::Url;
@@ -864,9 +865,14 @@ impl Webgraph {
         self.id2node.keys()
     }
 
-    pub fn random_nodes(&self, num: usize) -> Vec<NodeID> {
+    pub fn random_nodes_with_outgoing(&self, num: usize) -> Vec<NodeID> {
         let mut rng = rand::thread_rng();
-        let mut nodes = self.nodes().take(num).collect::<Vec<_>>();
+        let mut nodes = self
+            .edges()
+            .map(|e| e.from)
+            .unique()
+            .take(num)
+            .collect::<Vec<_>>();
         nodes.shuffle(&mut rng);
         nodes.into_iter().take(num).collect()
     }
