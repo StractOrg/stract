@@ -1,6 +1,7 @@
 {
   "recommendations": [
     "svelte.svelte-vscode",
-    "bradlc.vscode-tailwindcss"
+    "bradlc.vscode-tailwindcss",
+    "inlang.vs-code-extension"
   ]
 }

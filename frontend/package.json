@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite dev --port 8000",
-    "build": "vite build",
+    "build": "paraglide-js compile --project ./project.inlang && vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -13,12 +13,15 @@
     "format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write .",
     "openapi": "abeye generate http://localhost:3000/beta/api/docs/openapi.json -t ts --api-prefix /beta/api -o src/lib/api/index.ts && prettier --write src/lib/api/index.ts",
     "test:integration": "playwright test",
-    "test:unit": "vitest"
+    "test:unit": "vitest",
+    "postinstall": "paraglide-js compile --project ./project.inlang"
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.1.16",
     "@iconify-json/simple-icons": "^1.1.84",
     "@iconify/svelte": "^3.1.6",
+    "@inlang/paraglide-js": "1.2.5",
+    "@inlang/paraglide-js-adapter-sveltekit": "^0.4.1",
     "@playwright/test": "^1.40.1",
     "@sveltejs/adapter-auto": "^3.0.0",
     "@sveltejs/adapter-node": "^2.0.0",

@@ -8,6 +8,7 @@
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
   import { P, match } from 'ts-pattern';
+  import * as m from '$paraglide/messages';
 
   export let autofocus = false;
 
@@ -128,7 +129,7 @@
       on:keydown={onKeydown}
     />
     <div class="h-full py-0.5 pr-0.5">
-      <Button _class="py-0 h-full" type="submit">search</Button>
+      <Button _class="py-0 h-full" type="submit">{m.search()}</Button>
     </div>
 
     {#if suggestions.length > 0}

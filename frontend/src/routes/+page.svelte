@@ -2,6 +2,7 @@
   import OpticSelector from '$lib/components/OpticSelector.svelte';
   import Searchbar from '$lib/components/Searchbar.svelte';
   import BiglogoWithText from '$lib/images/BiglogoWithText.svelte';
+  import * as m from '$paraglide/messages';
 </script>
 
 <div class="mt-[25vh] flex w-full flex-1 flex-col items-center justify-start">
@@ -13,7 +14,7 @@
   </div>
   <div class="mt-3 flex space-x-2 px-5 text-sm text-neutral md:text-sm">
     <div>
-      Customise your search with an{' '}
+      {m.fontpageCustomize()}{' '}
       <a class="font-medium underline" href="/settings/optics">optic</a>:
     </div>
     <OpticSelector searchOnChange={false} />

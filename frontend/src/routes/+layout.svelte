@@ -2,7 +2,9 @@
   import '../app.css';
   import Header from '$lib/components/Header.svelte';
   import Footer from '$lib/components/Footer.svelte';
+  import { i18n } from '$lib/i18n';
   import { page } from '$app/stores';
+  import { ParaglideJS } from '@inlang/paraglide-js-adapter-sveltekit';
 </script>
 
 <svelte:head>
@@ -12,18 +14,20 @@
   <meta name="viewport" content="width=device-width" />
 </svelte:head>
 
-<div class="grid min-h-screen grid-rows-[auto_1fr_auto] font-light">
-  <Header />
+<ParaglideJS {i18n}>
+  <div class="grid min-h-screen grid-rows-[auto_1fr_auto] font-light">
+    <Header />
 
-  <slot />
+    <slot />
 
-  <Footer />
-</div>
+    <Footer />
+  </div>
 
-<noscript>
-  <style lang="postcss">
-    .noscript\:hidden {
-      @apply hidden;
-    }
-  </style>
-</noscript>
+  <noscript>
+    <style lang="postcss">
+      .noscript\:hidden {
+        @apply hidden;
+      }
+    </style>
+  </noscript>
+</ParaglideJS>
