@@ -118,6 +118,7 @@ impl TempFile {
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&path)?,
             path,
         })

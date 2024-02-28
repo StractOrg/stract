@@ -52,6 +52,7 @@ impl DictBuilder {
     fn build<P: AsRef<Path>>(self, path: P) -> Result<StoredDict> {
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref())?;
 
@@ -87,6 +88,7 @@ impl StoredDict {
     fn merge<P: AsRef<Path>>(dicts: Vec<Self>, path: P) -> Result<Self> {
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref())?;
 
@@ -349,6 +351,7 @@ impl TermDict {
             let uuid = uuid::Uuid::new_v4();
             let file = OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(self.path.join(format!("{}.dict", uuid)))?;
 

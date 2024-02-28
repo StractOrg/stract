@@ -47,6 +47,7 @@ where
 
         let file = std::fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .read(true)
             .open(path.as_ref().join(DATA_KEY))?;
@@ -103,6 +104,7 @@ impl FilePointer {
 
         let file = std::fs::OpenOptions::new()
             .create(true)
+            .truncate(false)
             .write(true)
             .read(true)
             .open(path.as_ref().join(POINTER_KEY))?;

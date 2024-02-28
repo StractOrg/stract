@@ -31,7 +31,7 @@ use super::SmallPatternPart;
 
 pub enum PatternScorer {
     Normal(NormalPatternScorer),
-    FastSiteDomain(FastSiteDomainPatternScorer),
+    FastSiteDomain(Box<FastSiteDomainPatternScorer>),
     Everything(AllScorer),
     EmptyField(EmptyFieldScorer),
 }

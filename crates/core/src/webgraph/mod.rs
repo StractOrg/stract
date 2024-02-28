@@ -441,6 +441,7 @@ impl Meta {
         let mut reader = BufReader::new(
             File::options()
                 .create(true)
+                .truncate(false)
                 .write(true)
                 .read(true)
                 .open(path)

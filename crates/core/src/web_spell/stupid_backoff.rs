@@ -99,6 +99,7 @@ impl StupidBackoffTrainer {
         }
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref().join("ngrams.bin"))?;
 
@@ -114,6 +115,7 @@ impl StupidBackoffTrainer {
 
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref().join("rotated_ngrams.bin"))?;
 
@@ -235,6 +237,7 @@ impl StupidBackoff {
 
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref().join("n_counts.bin"))?;
 
@@ -242,6 +245,7 @@ impl StupidBackoff {
 
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref().join("ngrams.bin"))?;
 
@@ -257,6 +261,7 @@ impl StupidBackoff {
 
         let file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path.as_ref().join("rotated_ngrams.bin"))?;
 

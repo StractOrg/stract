@@ -339,6 +339,7 @@ impl EdgeStore {
         let edge_labels_file = File::options()
             .read(true)
             .create(true)
+            .truncate(false)
             .write(true)
             .open(path.as_ref().join("labels"))
             .unwrap();
@@ -348,6 +349,7 @@ impl EdgeStore {
         let edge_nodes_file = File::options()
             .read(true)
             .create(true)
+            .truncate(false)
             .write(true)
             .open(path.as_ref().join("nodes"))
             .unwrap();

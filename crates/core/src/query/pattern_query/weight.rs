@@ -89,7 +89,7 @@ impl tantivy::query::Weight for FastSiteDomainPatternWeight {
         _boost: tantivy::Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
         if let Some(scorer) = self.pattern_scorer(reader)? {
-            Ok(Box::new(PatternScorer::FastSiteDomain(scorer)))
+            Ok(Box::new(PatternScorer::FastSiteDomain(Box::new(scorer))))
         } else {
             Ok(Box::new(EmptyScorer))
         }

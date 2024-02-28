@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
+
 use logos::{Lexer, Logos};
 
 use super::{Error, Result};
@@ -54,39 +56,39 @@ pub enum Token<'a> {
     Number(&'a str),
 }
 
-impl<'a> ToString for Token<'a> {
-    fn to_string(&self) -> String {
+impl<'a> Display for Token<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::SemiColon => ";".to_string(),
-            Token::Comma => ",".to_string(),
-            Token::OpenBracket => "{".to_string(),
-            Token::CloseBracket => "}".to_string(),
-            Token::OpenParenthesis => "(".to_string(),
-            Token::CloseParenthesis => ")".to_string(),
-            Token::DiscardNonMatching => "DiscardNonMatching".to_string(),
-            Token::Rule => "Rule".to_string(),
-            Token::RankingPipeline => "RankingPipeline".to_string(),
-            Token::Ranking => "Ranking".to_string(),
-            Token::Stage => "Stage".to_string(),
-            Token::Signal => "Signal".to_string(),
-            Token::Field => "Field".to_string(),
-            Token::Matches => "Matches".to_string(),
-            Token::Site => "Site".to_string(),
-            Token::Url => "Url".to_string(),
-            Token::Domain => "Domain".to_string(),
-            Token::Title => "Title".to_string(),
-            Token::Description => "Description".to_string(),
-            Token::Content => "Content".to_string(),
-            Token::MicroformatTag => "MicroformatTag".to_string(),
-            Token::Schema => "Schema".to_string(),
-            Token::Action => "Action".to_string(),
-            Token::Boost => "Boost".to_string(),
-            Token::Downrank => "Downrank".to_string(),
-            Token::Discard => "Discard".to_string(),
-            Token::Like => "Like".to_string(),
-            Token::Dislike => "Dislike".to_string(),
-            Token::String(s) => format!("\"{s}\""),
-            Token::Number(n) => n.to_string(),
+            Token::SemiColon => f.write_str(";"),
+            Token::Comma => f.write_str(","),
+            Token::OpenBracket => f.write_str("{"),
+            Token::CloseBracket => f.write_str("}"),
+            Token::OpenParenthesis => f.write_str("("),
+            Token::CloseParenthesis => f.write_str(")"),
+            Token::DiscardNonMatching => f.write_str("DiscardNonMatching"),
+            Token::Rule => f.write_str("Rule"),
+            Token::RankingPipeline => f.write_str("RankingPipeline"),
+            Token::Ranking => f.write_str("Ranking"),
+            Token::Stage => f.write_str("Stage"),
+            Token::Signal => f.write_str("Signal"),
+            Token::Field => f.write_str("Field"),
+            Token::Matches => f.write_str("Matches"),
+            Token::Site => f.write_str("Site"),
+            Token::Url => f.write_str("Url"),
+            Token::Domain => f.write_str("Domain"),
+            Token::Title => f.write_str("Title"),
+            Token::Description => f.write_str("Description"),
+            Token::Content => f.write_str("Content"),
+            Token::MicroformatTag => f.write_str("MicroformatTag"),
+            Token::Schema => f.write_str("Schema"),
+            Token::Action => f.write_str("Action"),
+            Token::Boost => f.write_str("Boost"),
+            Token::Downrank => f.write_str("Downrank"),
+            Token::Discard => f.write_str("Discard"),
+            Token::Like => f.write_str("Like"),
+            Token::Dislike => f.write_str("Dislike"),
+            Token::String(s) => write!(f, "\"{s}\""),
+            Token::Number(n) => write!(f, "{n}"),
         }
     }
 }
