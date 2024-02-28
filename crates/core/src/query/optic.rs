@@ -337,6 +337,13 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("host_centrality".to_string()),
+                        value: 1_000_000.0,
+                    }],
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .unwrap()
@@ -380,7 +387,7 @@ mod tests {
                             Matches {
                                 Domain("a.com")
                             },
-                            Action(Boost(10))
+                            Action(Boost(100))
                         }
                     "#,
                     )

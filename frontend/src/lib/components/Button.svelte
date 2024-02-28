@@ -10,8 +10,16 @@
   export let padding: boolean = true;
   export let kind: ButtonKind = 'primary';
   export let _class: string = '';
+  export let aria_label: string | undefined = void 0;
 </script>
 
-<button on:click {title} {form} {type} class={getButtonTailwindStyle(padding, pale, kind, _class)}>
+<button
+  on:click
+  {title}
+  {form}
+  {type}
+  class={getButtonTailwindStyle(padding, pale, kind, _class)}
+  aria-label={aria_label}
+>
   <slot />
 </button>

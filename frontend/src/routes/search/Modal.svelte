@@ -34,16 +34,22 @@
       ranking: Ranking.LIKED,
       kind: 'success',
       Icon: HandThumbUp,
+      title: 'Like Site',
+      aria_label: 'I want more results like this site.',
     },
     {
       ranking: Ranking.DISLIKED,
       kind: 'warning',
       Icon: HandThumbDown,
+      title: 'Dislike Site',
+      aria_label: 'I want fewer results like this site.',
     },
     {
       ranking: Ranking.BLOCKED,
       kind: 'error',
       Icon: NoSymbol,
+      title: 'Block Site',
+      aria_label: 'I never want to see results from this site.',
     },
   ] as const;
 
@@ -74,9 +80,11 @@
     <h2 class="w-full text-center">Do you like results from</h2>
     <p class="text-center">{modal.site.site}?</p>
     <div class="flex justify-center space-x-1.5 pt-2">
-      {#each rankingChoices as { ranking, kind, Icon }}
+      {#each rankingChoices as { ranking, kind, Icon, title, aria_label }}
         <Button
           {kind}
+          {title}
+          {aria_label}
           pale={$hostRankingsStore[modal.site.site] != ranking}
           padding={false}
           form="searchbar-form"
