@@ -41,7 +41,7 @@ impl Html {
         }
         let title = title.unwrap();
 
-        Ok(self.pretokenize_string(title))
+        Ok(self.pretokenize_string(title, TextField::Title))
     }
 
     fn pretokenize_all_text(&self) -> Result<PreTokenizedString> {
@@ -52,35 +52,35 @@ impl Html {
         }
         let all_text = all_text.unwrap();
 
-        Ok(self.pretokenize_string(all_text))
+        Ok(self.pretokenize_string(all_text, TextField::AllBody))
     }
 
     fn pretokenize_clean_text(&self) -> PreTokenizedString {
         let clean_text = self.clean_text().cloned().unwrap_or_default();
-        self.pretokenize_string(clean_text)
+        self.pretokenize_string(clean_text, TextField::CleanBody)
     }
 
     fn pretokenize_url(&self) -> PreTokenizedString {
         let url = self.url().to_string();
-        self.pretokenize_string(url)
+        self.pretokenize_string(url, TextField::Url)
     }
 
     fn pretokenize_domain(&self) -> PreTokenizedString {
         let domain = self.url().root_domain().unwrap_or_default().to_string();
 
-        self.pretokenize_string(domain)
+        self.pretokenize_string(domain, TextField::Domain)
     }
 
     fn pretokenize_site(&self) -> PreTokenizedString {
         let site = self.url().normalized_host().unwrap_or_default().to_string();
 
-        self.pretokenize_string(site)
+        self.pretokenize_string(site, TextField::SiteWithout)
     }
 
     fn pretokenize_description(&self) -> PreTokenizedString {
         let text = self.description().unwrap_or_default();
 
-        self.pretokenize_string(text)
+        self.pretokenize_string(text, TextField::Description)
     }
 
     fn pretokenize_microformats(&self) -> PreTokenizedString {
@@ -91,11 +91,11 @@ impl Html {
             text.push(' ');
         }
 
-        self.pretokenize_string(text)
+        self.pretokenize_string(text, TextField::MicroformatTags)
     }
 
-    fn pretokenize_string(&self, text: String) -> PreTokenizedString {
-        self.pretokenize_string_with(text, tokenizer::Tokenizer::default())
+    fn pretokenize_string(&self, text: String, field: TextField) -> PreTokenizedString {
+        self.pretokenize_string_with(text, field.indexing_tokenizer())
     }
 
     fn pretokenize_string_with(
@@ -381,7 +381,19 @@ impl Html {
                 }
                 Field::Text(TextField::DomainIfHomepageNoTokenizer) => {
                     if self.is_homepage() {
-                        doc.add_pre_tokenized_text(tantivy_field, domain.clone());
+                        doc.add_pre_tokenized_text(
+                            tantivy_field,
+                            PreTokenizedString {
+                                text: domain.text.clone(),
+                                tokens: vec![tantivy::tokenizer::Token {
+                                    offset_from: 0,
+                                    offset_to: domain.text.len(),
+                                    position: 0,
+                                    text: domain.text.clone(),
+                                    position_length: 1,
+                                }],
+                            },
+                        );
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
