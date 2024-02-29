@@ -82,9 +82,12 @@ impl TryFrom<RawOptic> for Optic {
         for rule in raw.rules {
             let rule = Rule::try_from(rule)?;
 
-            match rule.as_blocked_site() {
-                Some(site) => blocked.push(site),
-                None => rules.push(rule),
+            let blocked_sites = rule.as_blocked_sites();
+
+            if blocked_sites.is_empty() {
+                rules.push(rule);
+            } else {
+                blocked.extend(blocked_sites);
             }
         }
 
@@ -356,22 +359,35 @@ pub struct Rule {
     pub action: Action,
 }
 impl Rule {
-    /// If the rule is on the form `Rule { Matches { Site("|...|") }, Action(Discard) }`, return the site to block.
-    fn as_blocked_site(&self) -> Option<String> {
-        if self.action == Action::Discard {
-            let matching = self.matches.first()?.first()?;
+    /// If the rule is on the form `Rule { Matches { Site("|...|") }*, Action(Discard) }`, return the sites to block.
+    /// If the rule is not on this exact form, return an empty vector instead.
+    fn as_blocked_sites(&self) -> Vec<String> {
+        let mut res = Vec::new();
 
-            if matching.location == MatchLocation::Site
-                && matching.pattern.first()? == &PatternPart::Anchor
-                && matching.pattern.get(2)? == &PatternPart::Anchor
-            {
-                if let PatternPart::Raw(site) = matching.pattern.get(1)? {
-                    return Some(site.clone());
+        if self.action == Action::Discard {
+            for matching in &self.matches {
+                if let Some(matching) = matching.first() {
+                    if matching.pattern.len() != 3 {
+                        return Vec::new();
+                    }
+
+                    if matching.location == MatchLocation::Site
+                        && matching.pattern[0] == PatternPart::Anchor
+                        && matching.pattern[2] == PatternPart::Anchor
+                    {
+                        if let PatternPart::Raw(site) = &matching.pattern[1] {
+                            res.push(site.clone());
+                        } else {
+                            return Vec::new();
+                        }
+                    } else {
+                        return Vec::new();
+                    }
                 }
             }
         }
 
-        None
+        res
     }
 }
 
