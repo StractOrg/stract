@@ -77,9 +77,18 @@ impl TryFrom<RawOptic> for Optic {
 
     fn try_from(raw: RawOptic) -> Result<Self> {
         let mut rules = Vec::new();
+        let mut blocked = Vec::new();
 
         for rule in raw.rules {
-            rules.push(Rule::try_from(rule)?);
+            let rule = Rule::try_from(rule)?;
+
+            let blocked_sites = rule.as_blocked_sites();
+
+            if blocked_sites.is_empty() {
+                rules.push(rule);
+            } else {
+                blocked.extend(blocked_sites);
+            }
         }
 
         let mut liked_hosts = Vec::new();
@@ -99,7 +108,7 @@ impl TryFrom<RawOptic> for Optic {
             host_rankings: HostRankings {
                 liked: liked_hosts,
                 disliked: disliked_hosts,
-                blocked: Vec::new(), // blocked hosts are handled by `$discard` syntax.
+                blocked,
             },
         })
     }
@@ -348,6 +357,42 @@ pub struct Rule {
     pub matches: Vec<Vec<Matching>>,
     /// What action to take if the rule matches.
     pub action: Action,
+}
+impl Rule {
+    /// If the rule is on the form `Rule { Matches { Site("|...|") }*, Action(Discard) }`, return the sites to block.
+    /// If the rule is not on this exact form, return an empty vector instead.
+    fn as_blocked_sites(&self) -> Vec<String> {
+        let mut res = Vec::new();
+
+        if self.action == Action::Discard {
+            for matching in &self.matches {
+                if matching.len() != 1 {
+                    return Vec::new();
+                }
+
+                let matching = &matching[0];
+
+                if matching.pattern.len() != 3 {
+                    return Vec::new();
+                }
+
+                if matching.location == MatchLocation::Site
+                    && matching.pattern[0] == PatternPart::Anchor
+                    && matching.pattern[2] == PatternPart::Anchor
+                {
+                    if let PatternPart::Raw(site) = &matching.pattern[1] {
+                        res.push(site.clone());
+                    } else {
+                        return Vec::new();
+                    }
+                } else {
+                    return Vec::new();
+                }
+            }
+        }
+
+        res
+    }
 }
 
 impl Display for Rule {

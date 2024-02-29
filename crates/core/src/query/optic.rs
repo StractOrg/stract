@@ -1720,6 +1720,20 @@ mod tests {
             .webpages;
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://example.com/test");
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].url, "https://another-example.com/");
     }
 
     #[test]

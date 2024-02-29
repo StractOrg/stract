@@ -745,6 +745,19 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
+                optic: Some(Optic {
+                    rankings: vec![
+                        RankingCoeff {
+                            target: RankingTarget::Signal("url_slashes".to_string()),
+                            value: 100_000.0,
+                        },
+                        RankingCoeff {
+                            target: RankingTarget::Signal("url_digits".to_string()),
+                            value: 100_000.0,
+                        },
+                    ],
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .expect("Search failed");
