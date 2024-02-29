@@ -55,8 +55,7 @@
     "vite": "^5.1.4",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
-    "vitest": "^1.0.4",
-    "client-wasm": "file:../crates/client-wasm/pkg"
+    "vitest": "^1.0.4"
   },
   "type": "module",
   "dependencies": {
@@ -65,9 +64,10 @@
     "highlight.js": "^11.9.0",
     "lz-string": "^1.5.0",
     "tailwind-merge": "^2.1.0",
-    "ts-pattern": "^5.0.6"
+    "ts-pattern": "^5.0.6",
+    "client-wasm": "file:../crates/client-wasm/pkg"
   },
   "engines": {
-    "node": "20.10.x"
+    "node": "^20.10.x"
   }
 }

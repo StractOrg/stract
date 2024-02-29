@@ -23,7 +23,8 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cd frontend && npm run openapi
 
 @setup *ARGS:
-    python3 -m venv .venv || true
+    cd crates/client-wasm && wasm-pack build --target web
+    just setup_python_env
 
 @prepare_models:
     just setup_python_env
