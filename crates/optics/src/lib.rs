@@ -366,23 +366,27 @@ impl Rule {
 
         if self.action == Action::Discard {
             for matching in &self.matches {
-                if let Some(matching) = matching.first() {
-                    if matching.pattern.len() != 3 {
-                        return Vec::new();
-                    }
+                if matching.len() != 1 {
+                    return Vec::new();
+                }
 
-                    if matching.location == MatchLocation::Site
-                        && matching.pattern[0] == PatternPart::Anchor
-                        && matching.pattern[2] == PatternPart::Anchor
-                    {
-                        if let PatternPart::Raw(site) = &matching.pattern[1] {
-                            res.push(site.clone());
-                        } else {
-                            return Vec::new();
-                        }
+                let matching = &matching[0];
+
+                if matching.pattern.len() != 3 {
+                    return Vec::new();
+                }
+
+                if matching.location == MatchLocation::Site
+                    && matching.pattern[0] == PatternPart::Anchor
+                    && matching.pattern[2] == PatternPart::Anchor
+                {
+                    if let PatternPart::Raw(site) = &matching.pattern[1] {
+                        res.push(site.clone());
                     } else {
                         return Vec::new();
                     }
+                } else {
+                    return Vec::new();
                 }
             }
         }
