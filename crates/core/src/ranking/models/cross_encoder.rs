@@ -86,10 +86,8 @@ impl CrossEncoderModel {
             dtype,
         })
     }
-}
 
-impl CrossEncoder for CrossEncoderModel {
-    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
+    fn scores(&self, query: &str, bodies: &[String]) -> Vec<f64> {
         if bodies.is_empty() {
             return Vec::new();
         }
@@ -144,6 +142,27 @@ impl CrossEncoder for CrossEncoderModel {
         let scores = candle_nn::ops::sigmoid(&scores).unwrap();
 
         scores.to_vec1().unwrap()
+    }
+}
+
+impl CrossEncoder for CrossEncoderModel {
+    fn run(&self, query: &str, bodies: &[String]) -> Vec<f64> {
+        let mut scores = self
+            .scores(query, bodies)
+            .into_iter()
+            .enumerate()
+            .collect::<Vec<_>>();
+
+        scores.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        let mut ranked_scores = scores
+            .into_iter()
+            .enumerate()
+            .map(|(rank, (i, _))| (i, (1.0 / (rank as f64 + 1.0))))
+            .collect::<Vec<_>>();
+
+        ranked_scores.sort_by(|a, b| a.0.cmp(&b.0));
+        ranked_scores.into_iter().map(|(_, score)| score).collect()
     }
 }
 

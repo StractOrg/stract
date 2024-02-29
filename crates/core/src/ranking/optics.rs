@@ -16,7 +16,10 @@
 
 #[cfg(test)]
 mod tests {
-    use optics::HostRankings;
+    use optics::{
+        ast::{RankingCoeff, RankingTarget},
+        HostRankings, Optic,
+    };
 
     use crate::{
         gen_temp_path,
@@ -169,22 +172,12 @@ mod tests {
                     disliked: vec![],
                     blocked: vec![],
                 }),
-                ..Default::default()
-            })
-            .expect("Search failed");
-
-        assert_eq!(result.webpages.len(), 3);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
-        assert_eq!(result.webpages[1].url, "https://www.second.com/");
-        assert_eq!(result.webpages[2].url, "https://www.third.com/");
-
-        let result = searcher
-            .search(&SearchQuery {
-                query: "test".to_string(),
-                host_rankings: Some(HostRankings {
-                    liked: vec!["www.first.com".to_string()],
-                    disliked: vec![],
-                    blocked: vec![],
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("inbound_similarity".to_string()),
+                        value: 100_000_000.0,
+                    }],
+                    ..Default::default()
                 }),
                 ..Default::default()
             })
@@ -203,6 +196,13 @@ mod tests {
                     disliked: vec!["www.second.com".to_string()],
                     blocked: vec!["first.com".to_string()],
                 }),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("inbound_similarity".to_string()),
+                        value: 100_000_000.0,
+                    }],
+                    ..Default::default()
+                }),
                 return_ranking_signals: true,
                 ..Default::default()
             })
@@ -220,6 +220,13 @@ mod tests {
                     disliked: vec![],
                     blocked: vec!["www.first.com".to_string()],
                 }),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("inbound_similarity".to_string()),
+                        value: 100_000_000.0,
+                    }],
+                    ..Default::default()
+                }),
                 return_ranking_signals: true,
                 ..Default::default()
             })
@@ -236,6 +243,13 @@ mod tests {
                     liked: vec!["first.com".to_string()],
                     disliked: vec![],
                     blocked: vec!["abc.first.com".to_string()],
+                }),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("inbound_similarity".to_string()),
+                        value: 100_000_000.0,
+                    }],
+                    ..Default::default()
                 }),
                 return_ranking_signals: true,
                 ..Default::default()
