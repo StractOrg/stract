@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "vite dev --port 8000",
-    "build": "npm run wasm && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -55,7 +55,8 @@
     "vite": "^5.1.4",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
-    "vitest": "^1.0.4"
+    "vitest": "^1.0.4",
+    "client-wasm": "file:../crates/client-wasm/pkg"
   },
   "type": "module",
   "dependencies": {

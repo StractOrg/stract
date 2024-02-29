@@ -79,7 +79,7 @@
   const rankSite = (site: string, ranking: Ranking) => {
     hostRankingsStore?.update(($rankings) => ({
       ...$rankings,
-      [site]: $rankings[site] == ranking ? void 0 : ranking,
+      [site]: ranking,
     }));
   };
 
