@@ -77,9 +77,15 @@ impl TryFrom<RawOptic> for Optic {
 
     fn try_from(raw: RawOptic) -> Result<Self> {
         let mut rules = Vec::new();
+        let mut blocked = Vec::new();
 
         for rule in raw.rules {
-            rules.push(Rule::try_from(rule)?);
+            let rule = Rule::try_from(rule)?;
+
+            match rule.as_blocked_site() {
+                Some(site) => blocked.push(site),
+                None => rules.push(rule),
+            }
         }
 
         let mut liked_hosts = Vec::new();
@@ -99,7 +105,7 @@ impl TryFrom<RawOptic> for Optic {
             host_rankings: HostRankings {
                 liked: liked_hosts,
                 disliked: disliked_hosts,
-                blocked: Vec::new(), // blocked hosts are handled by `$discard` syntax.
+                blocked,
             },
         })
     }
@@ -348,6 +354,25 @@ pub struct Rule {
     pub matches: Vec<Vec<Matching>>,
     /// What action to take if the rule matches.
     pub action: Action,
+}
+impl Rule {
+    /// If the rule is on the form `Rule { Matches { Site("|...|") }, Action(Discard) }`, return the site to block.
+    fn as_blocked_site(&self) -> Option<String> {
+        if self.action == Action::Discard {
+            let matching = self.matches.first()?.first()?;
+
+            if matching.location == MatchLocation::Site
+                && matching.pattern.first()? == &PatternPart::Anchor
+                && matching.pattern.get(2)? == &PatternPart::Anchor
+            {
+                if let PatternPart::Raw(site) = matching.pattern.get(1)? {
+                    return Some(site.clone());
+                }
+            }
+        }
+
+        None
+    }
 }
 
 impl Display for Rule {
