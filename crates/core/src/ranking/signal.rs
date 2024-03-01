@@ -76,6 +76,10 @@ pub enum Signal {
     Bm25StemmedCleanBody,
     #[serde(rename = "bm25_all_body")]
     Bm25AllBody,
+    #[serde(rename = "bm25_keywords")]
+    Bm25Keywords,
+    #[serde(rename = "bm25_backlink_text")]
+    Bm25BacklinkText,
     #[serde(rename = "idf_sum_url")]
     IdfSumUrl,
     #[serde(rename = "idf_sum_site")]
@@ -96,8 +100,6 @@ pub enum Signal {
     IdfSumDomainIfHomepageNoTokenizer,
     #[serde(rename = "idf_sum_title_if_homepage")]
     IdfSumTitleIfHomepage,
-    #[serde(rename = "idf_sum_backlink_text")]
-    IdfSumBacklinkText,
     #[serde(rename = "cross_encoder_snippet")]
     CrossEncoderSnippet,
     #[serde(rename = "cross_encoder_title")]
@@ -140,7 +142,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 37] = [
+pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -150,6 +152,8 @@ pub const ALL_SIGNALS: [Signal; 37] = [
     Signal::Bm25StemmedTitle,
     Signal::Bm25StemmedCleanBody,
     Signal::Bm25AllBody,
+    Signal::Bm25BacklinkText,
+    Signal::Bm25Keywords,
     Signal::IdfSumUrl,
     Signal::IdfSumSite,
     Signal::IdfSumDomain,
@@ -160,7 +164,6 @@ pub const ALL_SIGNALS: [Signal; 37] = [
     Signal::IdfSumDomainNameIfHomepageNoTokenizer,
     Signal::IdfSumDomainIfHomepageNoTokenizer,
     Signal::IdfSumTitleIfHomepage,
-    Signal::IdfSumBacklinkText,
     Signal::CrossEncoderSnippet,
     Signal::CrossEncoderTitle,
     Signal::HostCentrality,
@@ -308,7 +311,8 @@ impl Signal {
             Signal::IdfSumDomainNameIfHomepageNoTokenizer => 0.0036,
             Signal::IdfSumDomainIfHomepageNoTokenizer => 0.0036,
             Signal::IdfSumTitleIfHomepage => 0.00022,
-            Signal::IdfSumBacklinkText => 0.003,
+            Signal::Bm25BacklinkText => 0.003,
+            Signal::Bm25Keywords => 0.0005,
             Signal::CrossEncoderSnippet => 0.17,
             Signal::CrossEncoderTitle => 0.17,
             Signal::HostCentrality => 0.5,
@@ -411,7 +415,9 @@ impl Signal {
             | Signal::Bm25CleanBodyTrigrams
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
-            | Signal::Bm25AllBody => seg_reader
+            | Signal::Bm25AllBody
+            | Signal::Bm25Keywords
+            | Signal::Bm25BacklinkText => seg_reader
                 .text_fields
                 .get_mut(self.as_textfield().unwrap())
                 .map(|field| bm25(field, doc)),
@@ -425,8 +431,7 @@ impl Signal {
             | Signal::IdfSumDomainIfHomepage
             | Signal::IdfSumDomainNameIfHomepageNoTokenizer
             | Signal::IdfSumDomainIfHomepageNoTokenizer
-            | Signal::IdfSumTitleIfHomepage
-            | Signal::IdfSumBacklinkText => seg_reader
+            | Signal::IdfSumTitleIfHomepage => seg_reader
                 .text_fields
                 .get_mut(self.as_textfield().unwrap())
                 .map(|field| idf_sum(field, doc)),
@@ -523,6 +528,8 @@ impl Signal {
             | Signal::Bm25StemmedTitle
             | Signal::Bm25StemmedCleanBody
             | Signal::Bm25AllBody
+            | Signal::Bm25BacklinkText
+            | Signal::Bm25Keywords
             | Signal::IdfSumUrl
             | Signal::IdfSumSite
             | Signal::IdfSumDomain
@@ -533,7 +540,6 @@ impl Signal {
             | Signal::IdfSumDomainNameIfHomepageNoTokenizer
             | Signal::IdfSumDomainIfHomepageNoTokenizer
             | Signal::IdfSumTitleIfHomepage
-            | Signal::IdfSumBacklinkText
             | Signal::CrossEncoderSnippet
             | Signal::CrossEncoderTitle
             | Signal::InboundSimilarity
@@ -582,6 +588,8 @@ impl Signal {
             Signal::Bm25StemmedTitle => Some(TextField::StemmedTitle),
             Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
             Signal::Bm25AllBody => Some(TextField::AllBody),
+            Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
+            Signal::Bm25Keywords => Some(TextField::Keywords),
             Signal::IdfSumUrl => Some(TextField::Url),
             Signal::IdfSumSite => Some(TextField::SiteWithout),
             Signal::IdfSumDomain => Some(TextField::Domain),
@@ -593,7 +601,6 @@ impl Signal {
                 Some(TextField::DomainNameIfHomepageNoTokenizer)
             }
             Signal::IdfSumTitleIfHomepage => Some(TextField::TitleIfHomepage),
-            Signal::IdfSumBacklinkText => Some(TextField::BacklinkText),
             Signal::IdfSumDomainIfHomepageNoTokenizer => {
                 Some(TextField::DomainIfHomepageNoTokenizer)
             }

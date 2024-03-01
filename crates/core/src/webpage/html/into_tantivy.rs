@@ -17,6 +17,7 @@
 use crate::{
     ceil_char_boundary,
     prehashed::hash,
+    rake::RakeModel,
     schema::{FastField, TextField},
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
@@ -116,7 +117,23 @@ impl Html {
 
         PreTokenizedString { text, tokens }
     }
-    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+
+    pub fn keywords(&self, rake: &RakeModel) -> Vec<String> {
+        self.clean_text()
+            .map(|text| {
+                rake.keywords(text, self.lang.unwrap_or(Lang::Eng))
+                    .into_iter()
+                    .map(|k| k.text)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn into_tantivy(
+        self,
+        schema: &tantivy::schema::Schema,
+        rake: &RakeModel,
+    ) -> Result<TantivyDocument> {
         let mut doc = TantivyDocument::new();
 
         let title = self.pretokenize_title()?;
@@ -397,6 +414,10 @@ impl Html {
                     } else {
                         doc.add_text(tantivy_field, "");
                     }
+                }
+                Field::Text(TextField::Keywords) => {
+                    let rake_keywords = self.keywords(rake);
+                    doc.add_text(tantivy_field, rake_keywords.join("\n"));
                 }
                 Field::Text(TextField::AllBody) => {
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    rake::RakeModel,
     schema::{FastField, TextField},
     webgraph::NodeID,
     Result,
@@ -101,12 +102,16 @@ impl Webpage {
         })
     }
 
-    pub fn into_tantivy(self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+    pub fn into_tantivy(
+        self,
+        schema: &tantivy::schema::Schema,
+        rake: &RakeModel,
+    ) -> Result<TantivyDocument> {
         let region = Region::guess_from(&self);
 
         let dmoz_description = self.dmoz_description();
 
-        let mut doc = self.html.into_tantivy(schema)?;
+        let mut doc = self.html.into_tantivy(schema, rake)?;
 
         if let Ok(region) = region {
             doc.add_u64(

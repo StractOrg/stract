@@ -61,6 +61,7 @@ pub enum TextField {
     SafetyClassification,
     InsertionTimestamp,
     RecipeFirstIngredientTagId,
+    Keywords,
 }
 
 impl From<TextField> for usize {
@@ -103,6 +104,7 @@ impl TextField {
             TextField::SafetyClassification => 1,
             TextField::InsertionTimestamp => 1,
             TextField::RecipeFirstIngredientTagId => 1,
+            TextField::Keywords => 1,
         }
     }
 
@@ -141,6 +143,7 @@ impl TextField {
             TextField::SafetyClassification => TextField::SafetyClassification,
             TextField::InsertionTimestamp => TextField::InsertionTimestamp,
             TextField::RecipeFirstIngredientTagId => TextField::RecipeFirstIngredientTagId,
+            TextField::Keywords => TextField::Keywords,
         }
     }
 
@@ -187,6 +190,7 @@ impl TextField {
             TextField::SafetyClassification => Tokenizer::Identity(Identity {}),
             TextField::InsertionTimestamp => Tokenizer::Identity(Identity {}),
             TextField::RecipeFirstIngredientTagId => Tokenizer::Identity(Identity {}),
+            TextField::Keywords => Tokenizer::default(),
         }
     }
 
@@ -231,6 +235,7 @@ impl TextField {
             TextField::SafetyClassification => false,
             TextField::InsertionTimestamp => false,
             TextField::RecipeFirstIngredientTagId => false,
+            TextField::Keywords => false,
         }
     }
 
@@ -267,6 +272,7 @@ impl TextField {
             TextField::SafetyClassification => "safety_classification",
             TextField::InsertionTimestamp => "insertion_timestamp",
             TextField::RecipeFirstIngredientTagId => "recipe_first_ingredient_tag_id",
+            TextField::Keywords => "keywords",
         }
     }
 }
@@ -368,7 +374,7 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 66] = [
+static ALL_FIELDS: [Field; 67] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -399,6 +405,7 @@ static ALL_FIELDS: [Field; 66] = [
     Field::Text(TextField::MicroformatTags),
     Field::Text(TextField::SafetyClassification),
     Field::Text(TextField::InsertionTimestamp),
+    Field::Text(TextField::Keywords),
     // FAST FIELDS
     Field::Fast(FastField::IsHomepage),
     Field::Fast(FastField::HostCentrality),
@@ -554,6 +561,9 @@ impl Field {
             }
             Field::Text(TextField::InsertionTimestamp) => {
                 IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
+            }
+            Field::Text(TextField::Keywords) => {
+                IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Fast(FastField::IsHomepage) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())

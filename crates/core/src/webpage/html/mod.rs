@@ -493,6 +493,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
+        rake::RakeModel,
         schema::create_schema,
         webpage::{url_ext::UrlExt, Link},
     };
@@ -740,7 +741,9 @@ mod tests {
         assert!(!webpage.all_text().unwrap().is_empty());
 
         let schema = create_schema();
-        webpage.into_tantivy(&schema).unwrap();
+        webpage
+            .into_tantivy(&schema, &RakeModel::default())
+            .unwrap();
     }
 
     #[test]
