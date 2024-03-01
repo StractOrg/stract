@@ -61,6 +61,7 @@ mod models;
 pub mod naive_bayes;
 pub mod prehashed;
 mod query;
+mod rake;
 pub mod ranking;
 mod schema;
 mod search_ctx;
@@ -69,6 +70,7 @@ pub mod searcher;
 mod simhash;
 pub mod similar_hosts;
 mod snippet;
+mod stopwords;
 pub mod summarizer;
 mod tokenizer;
 #[allow(unused)]
