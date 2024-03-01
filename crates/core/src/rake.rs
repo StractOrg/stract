@@ -55,9 +55,9 @@ fn phrases<'a>(
         .collect()
 }
 
-fn smmry<'a, 'b>(
+fn smmry<'a>(
     sents: Vec<Sentence<'a>>,
-    stopwords: &'b HashSet<String>,
+    stopwords: &HashSet<String>,
     top_sentences: usize,
 ) -> Vec<Sentence<'a>> {
     let mut word_frequency = HashMap::new();
@@ -114,7 +114,7 @@ struct Phrase(Vec<Word>);
 
 #[derive(Debug, Clone)]
 pub struct Keyword {
-    pub keyword: String,
+    pub text: String,
     pub score: f64,
 }
 
@@ -197,11 +197,11 @@ impl RakeModel {
             .into_iter()
             .sorted_by(|(_, score1), (_, score2)| score2.partial_cmp(score1).unwrap())
             .map(|(phrase, score)| Keyword {
-                keyword: phrase.0.join(" "),
+                text: phrase.0.join(" "),
                 score,
             })
             .take(word_degree.len() / 3)
-            .filter(|k| k.keyword.len() > 1)
+            .filter(|k| k.text.len() > 1)
             .filter(|k| k.score > 0.0)
             .collect()
     }

@@ -41,6 +41,7 @@ use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
+use crate::rake::RakeModel;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
@@ -164,6 +165,7 @@ pub struct InvertedIndex {
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
     fastfield_reader: FastFieldReader,
+    rake: RakeModel,
 }
 
 impl InvertedIndex {
@@ -234,6 +236,7 @@ impl InvertedIndex {
             tantivy_index,
             snippet_config: SnippetConfig::default(),
             fastfield_reader,
+            rake: RakeModel::default(),
         })
     }
 
@@ -288,7 +291,7 @@ impl InvertedIndex {
         self.writer
             .as_ref()
             .expect("writer has not been prepared")
-            .add_document(webpage.into_tantivy(&self.schema)?)?;
+            .add_document(webpage.into_tantivy(&self.schema, &self.rake)?)?;
         Ok(())
     }
 
@@ -689,6 +692,7 @@ pub struct RetrievedWebpage {
     pub likely_has_ads: bool,
     pub likely_has_paywall: bool,
     pub recipe_first_ingredient_tag_id: Option<String>,
+    pub keywords: Vec<String>,
 }
 impl RetrievedWebpage {
     pub fn description(&self) -> Option<&String> {
@@ -799,6 +803,16 @@ impl From<TantivyDocument> for RetrievedWebpage {
                     if !tag_id.is_empty() {
                         webpage.recipe_first_ingredient_tag_id = Some(tag_id);
                     }
+                }
+                Some(Field::Text(TextField::Keywords)) => {
+                    let keywords = value
+                        .value()
+                        .as_value()
+                        .as_str()
+                        .expect("Keywords field should be stored as text")
+                        .to_string();
+
+                    webpage.keywords = keywords.split('\n').map(|s| s.to_string()).collect();
                 }
                 _ => {}
             }

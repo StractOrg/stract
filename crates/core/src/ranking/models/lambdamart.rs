@@ -310,7 +310,7 @@ mod tests {
         assert!(!model.trees.is_empty());
 
         let mut features = EnumMap::new();
-        features.insert(Signal::IdfSumBacklinkText, 85.7750244140625);
+        features.insert(Signal::Bm25BacklinkText, 85.7750244140625);
         features.insert(Signal::Bm25CleanBody, 67.41311645507812);
         features.insert(Signal::Bm25CleanBodyBigrams, 0.0);
         features.insert(Signal::Bm25CleanBodyTrigrams, 0.0);
