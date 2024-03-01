@@ -19,16 +19,18 @@
   </button>
 
   <p class="line-clamp-3" aria-live="polite" aria-busy={inProgress ? 'true' : 'false'}>
-    {#if tokens.length > 0}
-      {#each tokens as tok}
-        <span transition:fade={{ duration: 500 }}>{tok}</span>
-      {/each}
-    {:else}
+    {#if inProgress && tokens.length === 0}
       <span class="flex">
         <span class="inline-block animate-bounce [animation-delay:000ms]">.</span>
         <span class="inline-block animate-bounce [animation-delay:100ms]">.</span>
         <span class="inline-block animate-bounce [animation-delay:200ms]">.</span>
       </span>
+    {:else if !inProgress && tokens.length === 0}
+      <span>No summary available</span>
+    {:else}
+      {#each tokens as tok}
+        <span transition:fade={{ duration: 500 }}>{tok}</span>
+      {/each}
     {/if}
   </p>
 </Callout>
