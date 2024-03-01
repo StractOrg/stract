@@ -53,54 +53,50 @@
       <AdjustVertical class="text-md" />
     </button>
   </div>
-  <div class="text-sm font-normal text-neutral-focus [&>b]:font-bold">
+  <div class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
     {#if $summary}
       <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
-    {:else if webpage.snippet.type == 'normal'}
-      <div class="snippet">
-        <div class="line-clamp-3">
-          <div class="inline">
-            <span id="snippet-text" class="snippet-text">
-              {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
-                <span
-                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                  title="page likely has ads and paywall"
-                >
-                  has ads + paywall
-                </span>
-              {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
-                <span
-                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                  title="page likely has ads"
-                >
-                  has ads
-                </span>
-              {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
-                <span
-                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                  title="page likely has paywall"
-                >
-                  paywall
-                </span>
-              {/if}
-              {#if webpage.snippet.date}
-                <span class="text-neutral">
-                  {webpage.snippet.date}
-                </span> -
-              {/if}
-              <span>
-                <TextSnippet snippet={webpage.snippet.text} />
+    {:else if webpage.richSnippet && webpage.richSnippet.type == 'stackOverflowQA'}
+      <StackOverflowSnippet
+        question={webpage.richSnippet.question}
+        answers={webpage.richSnippet.answers}
+      />
+    {:else}
+      <div class="line-clamp-3">
+        <div class="inline">
+          <span id="snippet-text" class="snippet-text">
+            {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+              <span
+                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                title="page likely has ads and paywall"
+              >
+                has ads + paywall
               </span>
+            {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
+              <span
+                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                title="page likely has ads"
+              >
+                has ads
+              </span>
+            {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+              <span
+                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                title="page likely has paywall"
+              >
+                paywall
+              </span>
+            {/if}
+            {#if webpage.snippet.date}
+              <span class="text-neutral">
+                {webpage.snippet.date}
+              </span> -
+            {/if}
+            <span>
+              <TextSnippet snippet={webpage.snippet.text} />
             </span>
-          </div>
+          </span>
         </div>
-      </div>
-    {:else if webpage.snippet.type == 'stackOverflowQA'}
-      <div class="snippet">
-        <StackOverflowSnippet
-          question={webpage.snippet.question}
-          answers={webpage.snippet.answers}
-        />
       </div>
     {/if}
   </div>

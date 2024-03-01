@@ -365,18 +365,11 @@ to the project are from community members.[15]
 Rust won first place for "most loved programming language" in the Stack Overflow Developer
 Survey in 2016, 2017, and 2018."#;
 
-    fn text_snippet(snippet: Snippet) -> TextSnippet {
-        match snippet {
-            Snippet::Normal { date: _, text } => text,
-            _ => panic!("The snippet was not text"),
-        }
-    }
-
     const HIGHLIGHTEN_PREFIX: &str = "<b>";
     const HIGHLIGHTEN_POSTFIX: &str = "</b>";
 
     fn highlight(snippet: Snippet) -> String {
-        let text = text_snippet(snippet);
+        let text = snippet.text;
 
         text.fragments
             .into_iter()
@@ -512,7 +505,7 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_query() {
         assert_eq!(
-            highlight(Snippet::Normal {
+            highlight(Snippet {
                 date: None,
                 text: snippet_string(
                     "this is a test",
@@ -529,7 +522,7 @@ Survey in 2016, 2017, and 2018."#;
     #[test]
     fn empty_text() {
         assert_eq!(
-            highlight(Snippet::Normal {
+            highlight(Snippet {
                 date: None,
                 text: snippet_string(
                     "",
@@ -543,7 +536,7 @@ Survey in 2016, 2017, and 2018."#;
         );
 
         assert_eq!(
-            highlight(Snippet::Normal {
+            highlight(Snippet {
                 date: None,
                 text: snippet_string("", &[], whatlang::Lang::Eng, SnippetConfig::default())
             })
@@ -566,7 +559,7 @@ Survey in 2016, 2017, and 2018."#;
         terms.insert("thisis".to_string());
 
         assert_eq!(
-            highlight(Snippet::Normal {
+            highlight(Snippet {
                 date: None,
                 text: snip.build()
             })

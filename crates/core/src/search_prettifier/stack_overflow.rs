@@ -24,7 +24,7 @@ use crate::{
     Error,
 };
 
-use super::{DisplayedSidebar, Snippet};
+use super::DisplayedSidebar;
 use crate::Result;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -162,7 +162,9 @@ fn limit_chars(passages: &[CodeOrText], limit: usize) -> Vec<CodeOrText> {
     res
 }
 
-pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
+pub fn stackoverflow_snippet(
+    webpage: &RetrievedWebpage,
+) -> Result<(StackOverflowQuestion, Vec<StackOverflowAnswer>)> {
     let schema_org = &webpage.schema_org;
 
     match schema_org
@@ -225,7 +227,7 @@ pub fn stackoverflow_snippet(webpage: &RetrievedWebpage) -> Result<Snippet> {
                 .take(3)
                 .collect();
 
-            Ok(Snippet::StackOverflowQA { question, answers })
+            Ok((question, answers))
         }
         None => Err(Error::InvalidStackoverflowSchema.into()),
     }

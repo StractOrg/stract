@@ -53,6 +53,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::DisplayedAnswer,
                 crate::search_prettifier::DisplayedSidebar,
                 crate::search_prettifier::Snippet,
+                crate::search_prettifier::RichSnippet,
                 crate::search_prettifier::StackOverflowAnswer,
                 crate::search_prettifier::StackOverflowQuestion,
                 crate::search_prettifier::CodeOrText,

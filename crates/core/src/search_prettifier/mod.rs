@@ -38,25 +38,19 @@ pub use entity::DisplayedEntity;
 pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Snippet {
+    pub date: Option<String>,
+    pub text: TextSnippet,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum Snippet {
-    Normal {
-        date: Option<String>,
-        text: TextSnippet,
-    },
+pub enum RichSnippet {
     StackOverflowQA {
         question: StackOverflowQuestion,
         answers: Vec<StackOverflowAnswer>,
     },
-}
-
-impl Snippet {
-    pub fn text(&self) -> Option<&TextSnippet> {
-        match self {
-            Snippet::Normal { text, .. } => Some(text),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -146,6 +140,13 @@ fn prettify_date(date: NaiveDateTime) -> String {
 fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
     let last_updated = webpage.updated_time.map(prettify_date);
 
+    Snippet {
+        date: last_updated,
+        text: webpage.snippet.clone(),
+    }
+}
+
+fn generate_rich_snippet(webpage: &RetrievedWebpage) -> Option<RichSnippet> {
     let url = Url::parse(&webpage.url).unwrap();
 
     if url.root_domain().unwrap_or_default() == "stackoverflow.com"
@@ -154,15 +155,12 @@ fn generate_snippet(webpage: &RetrievedWebpage) -> Snippet {
             .iter()
             .any(|item| item.types_contains("QAPage"))
     {
-        if let Ok(snippet) = stackoverflow_snippet(webpage) {
-            return snippet;
+        if let Ok((question, answers)) = stackoverflow_snippet(webpage) {
+            return Some(RichSnippet::StackOverflowQA { question, answers });
         }
     }
 
-    Snippet::Normal {
-        date: last_updated,
-        text: webpage.snippet.clone(),
-    }
+    None
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -174,6 +172,7 @@ pub struct DisplayedWebpage {
     pub domain: String,
     pub pretty_url: String,
     pub snippet: Snippet,
+    pub rich_snippet: Option<RichSnippet>,
     pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
     pub score: Option<f64>,
     pub likely_has_ads: bool,
@@ -193,6 +192,7 @@ pub struct DisplayedAnswer {
 impl From<RetrievedWebpage> for DisplayedWebpage {
     fn from(webpage: RetrievedWebpage) -> Self {
         let snippet = generate_snippet(&webpage);
+        let rich_snippet = generate_rich_snippet(&webpage);
 
         let url = Url::parse(&webpage.url).unwrap();
         let domain = url.root_domain().unwrap_or_default().to_string();
@@ -209,6 +209,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             score: None,
             likely_has_ads: webpage.likely_has_ads,
             likely_has_paywall: webpage.likely_has_paywall,
+            rich_snippet,
         }
     }
 }

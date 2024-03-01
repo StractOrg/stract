@@ -59,16 +59,14 @@
               </span>
             </summary>
 
-            {#if discussion.snippet.type == 'normal'}
-              <div class="mb-3 text-sm font-normal text-neutral-focus">
-                {#if typeof discussion.snippet.date == 'string'}
-                  <span class="text-neutral">{discussion.snippet.date}</span>
-                {/if}
-                <span class="[&:nth-child(2)]:before:content-['—']">
-                  <TextSnippet snippet={discussion.snippet.text} />
-                </span>
-              </div>
-            {/if}
+            <div class="mb-3 text-sm font-normal text-neutral-focus">
+              {#if typeof discussion.snippet.date == 'string'}
+                <span class="text-neutral">{discussion.snippet.date}</span>
+              {/if}
+              <span class="[&:nth-child(2)]:before:content-['—']">
+                <TextSnippet snippet={discussion.snippet.text} />
+              </span>
+            </div>
           </details>
         </div>
       {/each}

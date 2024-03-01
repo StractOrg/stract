@@ -5,11 +5,11 @@ import {
   type SearchResults,
 } from '$lib/search';
 import { redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoadEvent } from './$types';
 import { api } from '$lib/api';
 import { fetchRemoteOptic } from '$lib/optics';
 
-export const load = async ({ locals, fetch, url, getClientAddress }) => {
+export const load = async ({ locals, fetch, url, getClientAddress }: PageServerLoadEvent) => {
   const searchParams: SearchParams | undefined =
     (locals['form'] && extractSearchParams(locals['form'])) || undefined;
 

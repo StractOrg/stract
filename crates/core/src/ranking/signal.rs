@@ -312,7 +312,7 @@ impl Signal {
             Signal::IdfSumDomainIfHomepageNoTokenizer => 0.0036,
             Signal::IdfSumTitleIfHomepage => 0.00022,
             Signal::Bm25BacklinkText => 0.003,
-            Signal::Bm25Keywords => 0.0005,
+            Signal::Bm25Keywords => 0.001,
             Signal::CrossEncoderSnippet => 0.17,
             Signal::CrossEncoderTitle => 0.17,
             Signal::HostCentrality => 0.5,

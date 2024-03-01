@@ -267,6 +267,7 @@ export type DisplayedWebpage = {
   likelyHasPaywall: boolean;
   prettyUrl: string;
   rankingSignals?: {};
+  richSnippet?: RichSnippet;
   score?: number;
   site: string;
   snippet: Snippet;
@@ -334,6 +335,11 @@ export type PartOfSpeechMeaning = {
 };
 export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
 export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];
+export type RichSnippet = {
+  answers: StackOverflowAnswer[];
+  question: StackOverflowQuestion;
+  type: 'stackOverflowQA';
+};
 export type ScoredHost = {
   description?: string;
   host: string;
@@ -350,17 +356,10 @@ export type SimilarHostsParams = {
   hosts: string[];
   topN: number;
 };
-export type Snippet =
-  | {
-      date?: string;
-      text: TextSnippet;
-      type: 'normal';
-    }
-  | {
-      answers: StackOverflowAnswer[];
-      question: StackOverflowQuestion;
-      type: 'stackOverflowQA';
-    };
+export type Snippet = {
+  date?: string;
+  text: TextSnippet;
+};
 export type SpellcheckQuery = {
   query: string;
 };
