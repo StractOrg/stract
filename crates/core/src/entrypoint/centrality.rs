@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use std::{cmp::Reverse, fs::File, path::Path};
 
 use crate::{
@@ -26,6 +25,7 @@ use crate::{
         centrality::{approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality},
         Node, WebgraphBuilder,
     },
+    SortableFloat,
 };
 
 fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
@@ -44,29 +44,6 @@ fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
             .unwrap();
     }
     wtr.flush().unwrap();
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct SortableFloat(f64);
-
-impl PartialEq for SortableFloat {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for SortableFloat {}
-
-impl PartialOrd for SortableFloat {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for SortableFloat {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.total_cmp(&other.0)
-    }
 }
 
 pub struct Centrality;

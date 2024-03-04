@@ -85,7 +85,7 @@ where
         let file = self.writer.into_inner()?;
 
         Ok(FileQueue {
-            pointer: FilePointer::new(self.path)?,
+            pointer: FilePointer::open(self.path)?,
             file: unsafe { Mmap::map(&file)? },
             _marker: std::marker::PhantomData,
         })
@@ -97,7 +97,7 @@ struct FilePointer {
 }
 
 impl FilePointer {
-    fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+    fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
             std::fs::create_dir_all(path.as_ref())?;
         }
@@ -142,7 +142,7 @@ impl<T> FileQueue<T>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
             std::fs::create_dir_all(path.as_ref())?;
         }
@@ -151,7 +151,7 @@ where
         let file = unsafe { Mmap::map(&file)? };
 
         Ok(Self {
-            pointer: FilePointer::new(path)?,
+            pointer: FilePointer::open(path)?,
             file,
             _marker: std::marker::PhantomData,
         })

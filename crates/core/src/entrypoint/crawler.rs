@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config,
-    crawler::{self, planner::make_crawl_plan, CrawlCoordinator, Crawler},
+    crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
     distributed::sonic::{self, service::Message},
     kv::rocksdb_store::RocksDbStore,
     sonic_service,
@@ -75,14 +75,15 @@ pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
     let host_graph = WebgraphBuilder::new(&config.host_graph_path).open();
     let output_path = config.output_path.clone();
 
-    make_crawl_plan(
+    let planner = CrawlPlanner::new(
         host_centrality,
         page_centrality,
         host_graph,
         page_graph,
         config,
-        output_path,
     )?;
+
+    planner.build(output_path)?;
 
     Ok(())
 }

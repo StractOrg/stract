@@ -23,6 +23,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::missing_errors_doc)]
 
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -189,6 +190,41 @@ pub fn split_u128(num: u128) -> [u64; 2] {
 
 pub fn combine_u64s(nums: [u64; 2]) -> u128 {
     ((nums[0] as u128) << 64) | (nums[1] as u128)
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct SortableFloat(f64);
+
+impl From<f64> for SortableFloat {
+    fn from(f: f64) -> Self {
+        SortableFloat(f)
+    }
+}
+
+impl From<SortableFloat> for f64 {
+    fn from(f: SortableFloat) -> Self {
+        f.0
+    }
+}
+
+impl PartialEq for SortableFloat {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for SortableFloat {}
+
+impl PartialOrd for SortableFloat {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SortableFloat {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.total_cmp(&other.0)
+    }
 }
 
 #[cfg(test)]

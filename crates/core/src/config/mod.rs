@@ -394,6 +394,8 @@ pub struct CrawlPlannerConfig {
     pub top_host_fraction: f64,
     pub wander_fraction: f64,
     pub top_n_hosts_surplus: usize,
+
+    pub num_threads: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -102,6 +102,20 @@ pub struct WeightedUrl {
     pub weight: f64,
 }
 
+impl PartialEq for WeightedUrl {
+    fn eq(&self, other: &Self) -> bool {
+        self.url == other.url
+    }
+}
+
+impl Eq for WeightedUrl {}
+
+impl std::hash::Hash for WeightedUrl {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.url.hash(state);
+    }
+}
+
 /// All urls in a job must be from the same domain and only one job per domain.
 /// at a time. This ensures that we stay polite when crawling.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
