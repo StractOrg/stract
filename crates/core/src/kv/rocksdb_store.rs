@@ -144,6 +144,7 @@ where
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_verify_checksums(false);
+        opts.set_async_io(true);
 
         let iter = self.db.iterator_opt(IteratorMode::Start, opts);
 

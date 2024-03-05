@@ -122,6 +122,7 @@ impl EdgeStoreWriter {
     pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = InnerEdge<L>> + '_ + Send + Sync {
         let mut read_opts = rocksdb::ReadOptions::default();
         read_opts.set_verify_checksums(false);
+        read_opts.set_async_io(true);
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
@@ -244,6 +245,7 @@ impl PrefixDb {
 
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_verify_checksums(false);
+        opts.set_async_io(true);
 
         let iter = self.db.iterator_opt(
             rocksdb::IteratorMode::From(&start, rocksdb::Direction::Forward),
@@ -609,6 +611,7 @@ impl EdgeStore {
 
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_verify_checksums(false);
+        opts.set_async_io(true);
 
         self.ranges
             .iterator_cf_opt(node_cf, opts, rocksdb::IteratorMode::Start)

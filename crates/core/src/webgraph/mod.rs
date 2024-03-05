@@ -528,6 +528,7 @@ impl Id2NodeDb {
     fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_verify_checksums(false);
+        opts.set_async_io(true);
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, opts)
