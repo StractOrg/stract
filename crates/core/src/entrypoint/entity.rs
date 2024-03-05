@@ -238,6 +238,7 @@ mod tests {
     use std::path::Path;
 
     use crate::entity_index::entity::EntitySnippet;
+    use insta::assert_snapshot;
     use itertools::Itertools;
 
     use super::*;
@@ -245,7 +246,7 @@ mod tests {
     #[macro_export]
     macro_rules! expect {
         ($($t:tt)*) => {
-            |res| ::insta::assert_display_snapshot!(res, $($t)*)
+            |res| assert_snapshot!(res, $($t)*)
         };
     }
 
