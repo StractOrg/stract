@@ -202,6 +202,7 @@ impl PrefixDb {
 
         options.set_level_zero_slowdown_writes_trigger(-1);
         options.set_level_zero_stop_writes_trigger(-1);
+        options.set_compression_type(rocksdb::DBCompressionType::None);
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         options.set_level_compaction_dynamic_level_bytes(true);
@@ -213,7 +214,6 @@ impl PrefixDb {
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
 
         options.set_block_based_table_factory(&block_options);
-        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         let db = rocksdb::DB::open(&options, path).unwrap();
 
