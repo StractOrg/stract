@@ -51,7 +51,7 @@ where
         options.set_level_compaction_dynamic_level_bytes(true);
         options.set_bytes_per_sync(1048576);
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_block_size(16 * 1024);
+        block_options.set_block_size(1024 * 1024 * 1024); // 1 GB
         block_options.set_format_version(5);
         block_options.set_cache_index_and_filter_blocks(true);
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
@@ -117,7 +117,10 @@ where
     V: Serialize + DeserializeOwned + 'static + Send + Sync,
 {
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.db.get(key).expect("failed to retrieve key")
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
+        self.db.get_opt(key, &opts).expect("failed to retrieve key")
     }
 
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>) {
@@ -139,7 +142,11 @@ where
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
-        let iter = self.db.iterator(IteratorMode::Start);
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+        opts.set_async_io(true);
+
+        let iter = self.db.iterator_opt(IteratorMode::Start, opts);
 
         Box::new(IntoIter {
             inner: iter,

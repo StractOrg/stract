@@ -470,6 +470,7 @@ impl Meta {
 
 struct Id2NodeDb {
     db: rocksdb::DB,
+    _cache: rocksdb::Cache, // needs to be kept alive for as long as the db is alive
 }
 
 impl Id2NodeDb {
@@ -484,22 +485,25 @@ impl Id2NodeDb {
         opts.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
         opts.set_target_file_size_multiplier(10);
 
+        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
         let mut block_opts = rocksdb::BlockBasedOptions::default();
+        let cache = rocksdb::Cache::new_lru_cache(8 * 1024 * 1024 * 1024); // 8 gb
+        opts.set_block_based_table_factory(&block_opts);
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         opts.set_level_compaction_dynamic_level_bytes(true);
         opts.set_bytes_per_sync(1048576);
+
         block_opts.set_block_size(16 * 1024);
         block_opts.set_format_version(5);
         block_opts.set_cache_index_and_filter_blocks(true);
         block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
-
-        opts.set_block_based_table_factory(&block_opts);
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        block_opts.set_block_cache(&cache);
 
         let db = rocksdb::DB::open(&opts, path).unwrap();
 
-        Self { db }
+        Self { db, _cache: cache }
     }
 
     fn put(&mut self, id: &NodeID, node: &Node) {
@@ -516,15 +520,22 @@ impl Id2NodeDb {
     }
 
     fn get(&self, id: &NodeID) -> Option<Node> {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.db
-            .get(id.as_u64().to_le_bytes())
+            .get_opt(id.as_u64().to_le_bytes(), &opts)
             .unwrap()
             .map(|bytes| bincode::deserialize(&bytes).unwrap())
     }
 
     fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+        opts.set_async_io(true);
+
         self.db
-            .iterator(rocksdb::IteratorMode::Start)
+            .iterator_opt(rocksdb::IteratorMode::Start, opts)
             .filter_map(|r| {
                 let (key, _) = r.ok()?;
                 Some(NodeID(u64::from_le_bytes((*key).try_into().unwrap())))
@@ -540,8 +551,11 @@ impl Id2NodeDb {
     }
 
     fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.db
-            .iterator(rocksdb::IteratorMode::Start)
+            .iterator_opt(rocksdb::IteratorMode::Start, opts)
             .filter_map(|r| {
                 let (key, value) = r.ok()?;
 
