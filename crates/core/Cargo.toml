@@ -4,8 +4,8 @@ default-run = "stract"
 edition = "2021"
 license = "AGPL-3.0"
 name = "stract"
-version = "0.1.0"
 publish = false
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -33,9 +33,10 @@ bitvec = {workspace = true}
 bytemuck = {workspace = true}
 byteorder = {workspace = true}
 bzip2 = {workspace = true}
-candle-transformers = {workspace = true}
-candle-nn = {workspace = true}
 candle-core = {workspace = true}
+candle-nn = {workspace = true}
+candle-transformers = {workspace = true}
+chardetng = {workspace = true}
 chitchat = {workspace = true}
 chrono = {workspace = true}
 clap = {workspace = true}
