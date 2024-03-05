@@ -516,15 +516,21 @@ impl Id2NodeDb {
     }
 
     fn get(&self, id: &NodeID) -> Option<Node> {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.db
-            .get(id.as_u64().to_le_bytes())
+            .get_opt(id.as_u64().to_le_bytes(), &opts)
             .unwrap()
             .map(|bytes| bincode::deserialize(&bytes).unwrap())
     }
 
     fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.db
-            .iterator(rocksdb::IteratorMode::Start)
+            .iterator_opt(rocksdb::IteratorMode::Start, opts)
             .filter_map(|r| {
                 let (key, _) = r.ok()?;
                 Some(NodeID(u64::from_le_bytes((*key).try_into().unwrap())))
@@ -540,8 +546,11 @@ impl Id2NodeDb {
     }
 
     fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.db
-            .iterator(rocksdb::IteratorMode::Start)
+            .iterator_opt(rocksdb::IteratorMode::Start, opts)
             .filter_map(|r| {
                 let (key, value) = r.ok()?;
 

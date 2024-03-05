@@ -120,7 +120,8 @@ impl EdgeStoreWriter {
     }
 
     pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = InnerEdge<L>> + '_ + Send + Sync {
-        let read_opts = rocksdb::ReadOptions::default();
+        let mut read_opts = rocksdb::ReadOptions::default();
+        read_opts.set_verify_checksums(false);
 
         self.db
             .iterator_opt(rocksdb::IteratorMode::Start, read_opts)
@@ -241,10 +242,13 @@ impl PrefixDb {
 
         let mut res = Vec::new();
 
-        let iter = self.db.iterator(rocksdb::IteratorMode::From(
-            &start,
-            rocksdb::Direction::Forward,
-        ));
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
+        let iter = self.db.iterator_opt(
+            rocksdb::IteratorMode::From(&start, rocksdb::Direction::Forward),
+            opts,
+        );
 
         for item in iter {
             let (key, _) = item.unwrap();
@@ -514,9 +518,12 @@ impl EdgeStore {
         let node_cf = self.ranges.cf_handle("nodes").unwrap();
         let edge_cf = self.ranges.cf_handle("labels").unwrap();
 
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         match (
-            self.ranges.get_cf(node_cf, node_bytes).unwrap(),
-            self.ranges.get_cf(edge_cf, node_bytes).unwrap(),
+            self.ranges.get_cf_opt(node_cf, node_bytes, &opts).unwrap(),
+            self.ranges.get_cf_opt(edge_cf, node_bytes, &opts).unwrap(),
         ) {
             (Some(node_range_bytes), Some(edge_range_bytes)) => {
                 let node_range = bincode::deserialize::<Range<usize>>(&node_range_bytes).unwrap();
@@ -559,7 +566,10 @@ impl EdgeStore {
 
         let node_cf = self.ranges.cf_handle("nodes").unwrap();
 
-        match self.ranges.get_cf(node_cf, node_bytes).unwrap() {
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
+        match self.ranges.get_cf_opt(node_cf, node_bytes, &opts).unwrap() {
             Some(node_range_bytes) => {
                 let node_range = bincode::deserialize::<Range<usize>>(&node_range_bytes).unwrap();
 
@@ -597,8 +607,11 @@ impl EdgeStore {
     pub fn iter_without_label(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
         let node_cf = self.ranges.cf_handle("nodes").unwrap();
 
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+
         self.ranges
-            .iterator_cf(node_cf, rocksdb::IteratorMode::Start)
+            .iterator_cf_opt(node_cf, opts, rocksdb::IteratorMode::Start)
             .flat_map(move |res| {
                 let (key, val) = res.unwrap();
 
