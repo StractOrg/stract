@@ -42,19 +42,17 @@ fn rtrim(s: &mut String) {
     s.truncate(s.trim_end().len());
 }
 
-fn decode(raw: &[u8]) -> String {
+fn decode_string(raw: &[u8]) -> String {
     if let Ok(res) = String::from_utf8(raw.to_owned()) {
         res
     } else {
-        let encodings = [
-            encoding_rs::WINDOWS_1251,
-            encoding_rs::GBK,
-            encoding_rs::SHIFT_JIS,
-            encoding_rs::EUC_JP,
-            encoding_rs::EUC_KR,
-        ];
+        let mut detector = chardetng::EncodingDetector::new();
+        detector.feed(raw, true);
+        let (enc, conf) = detector.guess_assess(None, true);
 
-        for enc in encodings {
+        if conf {
+            dbg!(enc.name());
+
             let (cow, _, had_errors) = enc.decode(raw);
             if !had_errors {
                 return cow.to_string();
@@ -284,7 +282,7 @@ pub struct Response {
 
 impl Response {
     fn from_raw(record: RawWarcRecord) -> Result<Self> {
-        let content = decode(&record.content[..]);
+        let content = decode_string(&record.content[..]);
 
         let (_header, content) = content
             .split_once("\r\n\r\n")
@@ -850,6 +848,23 @@ mod tests {
         assert_eq!(&records[0].request.url, "https://a.com");
         assert_eq!(&records[0].response.body, body);
         assert_eq!(records[0].metadata.fetch_time_ms, 0);
+    }
+
+    #[test]
+    fn character_encodings() {
+        for (encoding, s) in [
+            (
+                encoding_rs::WINDOWS_1252,
+                "Groupe CROISEUR LEGER après 10 courses",
+            ),
+            (encoding_rs::EUC_JP, "あいうえお"),
+            (encoding_rs::EUC_KR, "안녕하세요"),
+        ] {
+            let encoded = encoding.encode(s).0;
+            let string = decode_string(&encoded);
+
+            assert_eq!(s, string, "Failed for encoding {:?}", encoding.name());
+        }
     }
 
     proptest! {
