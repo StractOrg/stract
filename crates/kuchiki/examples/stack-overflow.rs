@@ -11,7 +11,7 @@ fn main() {
             node = parent;
         }
 
-        println!("Trying to drop {} nodes...", depth);
+        println!("Trying to drop {depth} nodes...");
         // Without an explicit `impl Drop for Node`,
         // depth = 20_000 causes "thread '<main>' has overflowed its stack"
         // on my machine (Linux x86_64).

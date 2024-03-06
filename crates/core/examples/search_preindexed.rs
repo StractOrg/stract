@@ -149,7 +149,7 @@ pub async fn main() {
         desc.push_str(query);
         desc.push('\'');
 
-        println!("{}", desc);
+        println!("{desc}");
 
         searcher
             .search(&SearchQuery {

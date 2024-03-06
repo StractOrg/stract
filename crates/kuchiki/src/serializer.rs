@@ -1,4 +1,4 @@
-use html5ever::serialize::TraversalScope::*;
+use html5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use html5ever::serialize::{serialize, Serialize, SerializeOpts, Serializer, TraversalScope};
 use html5ever::QualName;
 use std::fmt::Display;
@@ -38,22 +38,22 @@ impl Serialize for NodeRef {
                     serializer.start_elem(
                         element.name.clone(),
                         attrs.iter().map(|&(ref name, value)| (name, &**value)),
-                    )?
+                    )?;
                 }
 
                 for child in self.children() {
-                    Serialize::serialize(&child, serializer, IncludeNode)?
+                    Serialize::serialize(&child, serializer, IncludeNode)?;
                 }
 
                 if *scope == IncludeNode {
-                    serializer.end_elem(element.name.clone())?
+                    serializer.end_elem(element.name.clone())?;
                 }
                 Ok(())
             }
 
-            (_, &NodeData::DocumentFragment) | (_, &NodeData::Document(_)) => {
+            (_, &NodeData::DocumentFragment | &NodeData::Document(_)) => {
                 for child in self.children() {
-                    Serialize::serialize(&child, serializer, IncludeNode)?
+                    Serialize::serialize(&child, serializer, IncludeNode)?;
                 }
                 Ok(())
             }

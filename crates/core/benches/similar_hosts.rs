@@ -21,7 +21,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     for _ in 0..10 {
         c.bench_function("similar_hosts", |b| {
-            b.iter(|| finder.find_similar_hosts(&["google.com".to_string()], 100))
+            b.iter(|| finder.find_similar_hosts(&["google.com".to_string()], 100));
         });
     }
 }

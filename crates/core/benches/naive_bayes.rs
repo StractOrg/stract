@@ -68,7 +68,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 "{:.2} ms/pred",
                 start.elapsed().as_millis() as f32 / num_samples as f32
             );
-        })
+        });
     });
 }
 

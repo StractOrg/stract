@@ -236,7 +236,7 @@ impl<'source> Iterator for LexerBridge<'source> {
                     }
 
                     self.lexer = inner.morph();
-                    tok = self.lex_next()
+                    tok = self.lex_next();
                 }
                 Outer::StartLineComment => {
                     let mut inner: Lexer<LineComment> = self.lexer.clone().morph();
@@ -247,7 +247,7 @@ impl<'source> Iterator for LexerBridge<'source> {
                     }
 
                     self.lexer = inner.morph();
-                    tok = self.lex_next()
+                    tok = self.lex_next();
                 }
                 _ => break,
             }
@@ -359,7 +359,7 @@ mod tests {
 
         let lexer = LexerBridge::new(s);
 
-        let result: Vec<Token> = lexer.filter_map(|r| r.ok()).map(|(_, t, _)| t).collect();
+        let result: Vec<Token> = lexer.filter_map(std::result::Result::ok).map(|(_, t, _)| t).collect();
 
         let expected = vec![
             Token::Ranking,
@@ -394,7 +394,7 @@ mod tests {
             Token::CloseBracket,
         ];
 
-        assert_eq!(result, expected)
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
 
         let lexer = LexerBridge::new(s);
 
-        let result: Vec<Token> = lexer.filter_map(|r| r.ok()).map(|(_, t, _)| t).collect();
+        let result: Vec<Token> = lexer.filter_map(std::result::Result::ok).map(|(_, t, _)| t).collect();
 
         let expected = vec![
             Token::Ranking,
@@ -419,15 +419,15 @@ mod tests {
             Token::CloseParenthesis,
         ];
 
-        assert_eq!(result, expected)
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn empty_program() {
-        let s = r#""#;
+        let s = r"";
 
         let lexer = LexerBridge::new(s);
 
-        assert_eq!(lexer.filter_map(|r| r.ok()).count(), 0);
+        assert_eq!(lexer.filter_map(std::result::Result::ok).count(), 0);
     }
 }

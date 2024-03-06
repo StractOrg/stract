@@ -37,31 +37,31 @@ pub struct Attribute {
 }
 
 impl Attributes {
-    /// Like IndexMap::contains
+    /// Like `IndexMap::contains`
     pub fn contains<A: Into<LocalName>>(&self, local_name: A) -> bool {
         self.map.contains_key(&ExpandedName::new(ns!(), local_name))
     }
 
-    /// Like IndexMap::get
+    /// Like `IndexMap::get`
     pub fn get<A: Into<LocalName>>(&self, local_name: A) -> Option<&str> {
         self.map
             .get(&ExpandedName::new(ns!(), local_name))
             .map(|attr| &*attr.value)
     }
 
-    /// Like IndexMap::get_mut
+    /// Like `IndexMap::get_mut`
     pub fn get_mut<A: Into<LocalName>>(&mut self, local_name: A) -> Option<&mut String> {
         self.map
             .get_mut(&ExpandedName::new(ns!(), local_name))
             .map(|attr| &mut attr.value)
     }
 
-    /// Like IndexMap::entry
+    /// Like `IndexMap::entry`
     pub fn entry<A: Into<LocalName>>(&mut self, local_name: A) -> Entry<ExpandedName, Attribute> {
         self.map.entry(ExpandedName::new(ns!(), local_name))
     }
 
-    /// Like IndexMap::insert
+    /// Like `IndexMap::insert`
     pub fn insert<A: Into<LocalName>>(
         &mut self,
         local_name: A,
@@ -76,7 +76,7 @@ impl Attributes {
         )
     }
 
-    /// Like IndexMap::remove
+    /// Like `IndexMap::remove`
     pub fn remove<A: Into<LocalName>>(&mut self, local_name: A) -> Option<Attribute> {
         self.map.remove(&ExpandedName::new(ns!(), local_name))
     }

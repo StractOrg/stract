@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic] //< unfortunately the panic message is not propagated
+    #[should_panic(expected = "panic should propagate")]
     fn test_panic_propagates_multi_thread() {
         let _result: Vec<usize> = Executor::with_threads(1, "search-test")
             .unwrap()

@@ -64,7 +64,7 @@ impl<'a> ArticleIterator<'a> {
                     title,
                 };
 
-                let key = cluster_number as u64;
+                let key = u64::from(cluster_number);
 
                 articles.entry(key).or_insert(Vec::new()).push(article_ref);
             }
@@ -180,7 +180,7 @@ impl<'a> ImageIterator<'a> {
                     mime_type: zim.mime_types()[mime_type].clone(),
                 };
 
-                let key = cluster_number as u64;
+                let key = u64::from(cluster_number);
 
                 images.entry(key).or_insert(Vec::new()).push(image_ref);
             }
@@ -210,7 +210,7 @@ pub struct Image {
     pub content: Vec<u8>,
 }
 impl Image {
-    pub fn bytes(&self) -> &[u8] {
+    #[must_use] pub fn bytes(&self) -> &[u8] {
         &self.content
     }
 }

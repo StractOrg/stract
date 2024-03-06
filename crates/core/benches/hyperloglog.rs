@@ -13,7 +13,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             for _ in 0..1_000_000_000 {
                 log.size();
             }
-        })
+        });
     });
 }
 

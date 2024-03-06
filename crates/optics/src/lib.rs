@@ -131,7 +131,7 @@ impl TryFrom<RawRule> for Rule {
 
         Ok(Rule {
             matches,
-            action: action.map(Action::from).unwrap_or(Action::Boost(0)),
+            action: action.map_or(Action::Boost(0), Action::from),
         })
     }
 }
@@ -164,10 +164,10 @@ impl Display for Matching {
             MatchLocation::MicroformatTag => "MicroformatTag",
             MatchLocation::Schema => "Schema",
         };
-        write!(f, "{}(\"", s)?;
+        write!(f, "{s}(\"")?;
 
         for part in &self.pattern {
-            write!(f, "{}", part)?;
+            write!(f, "{part}")?;
         }
 
         write!(f, "\")")
@@ -279,7 +279,7 @@ pub enum PatternPart {
 impl Display for PatternPart {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PatternPart::Raw(s) => write!(f, "{}", s),
+            PatternPart::Raw(s) => write!(f, "{s}"),
             PatternPart::Wildcard => write!(f, "*"),
             PatternPart::Anchor => write!(f, "|"),
         }
@@ -310,8 +310,8 @@ impl Display for Action {
         write!(f, "Action(")?;
 
         match self {
-            Action::Boost(b) => write!(f, "Boost({})", b)?,
-            Action::Downrank(d) => write!(f, "Downrank({})", d)?,
+            Action::Boost(b) => write!(f, "Boost({b})")?,
+            Action::Downrank(d) => write!(f, "Downrank({d})")?,
             Action::Discard => write!(f, "Discard")?,
         }
 
@@ -340,11 +340,11 @@ impl Display for Optic {
         }
 
         for rule in &self.rules {
-            write!(f, "{}", rule)?;
+            write!(f, "{rule}")?;
         }
 
         for ranking in &self.rankings {
-            writeln!(f, "{};", ranking)?;
+            writeln!(f, "{ranking};")?;
         }
 
         write!(f, "{}", self.host_rankings)
@@ -402,7 +402,7 @@ impl Display for Rule {
             for matcher in &self.matches {
                 writeln!(f, "\tMatches {{")?;
                 for m in matcher {
-                    writeln!(f, "\t\t{},", m)?;
+                    writeln!(f, "\t\t{m},")?;
                 }
                 writeln!(f, "\t}},")?;
             }
@@ -423,11 +423,11 @@ pub struct HostRankings {
 impl Display for HostRankings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for liked in &self.liked {
-            writeln!(f, "Like(Site(\"{}\"));", liked)?;
+            writeln!(f, "Like(Site(\"{liked}\"));")?;
         }
 
         for disliked in &self.disliked {
-            writeln!(f, "Dislike(Site(\"{}\"));", disliked)?;
+            writeln!(f, "Dislike(Site(\"{disliked}\"));")?;
         }
 
         let matches = self
@@ -435,7 +435,7 @@ impl Display for HostRankings {
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
-                    .map(|host| host.to_string())
+                    .map(std::string::ToString::to_string)
                     .unwrap_or(host.clone())
             })
             .map(|host| {
@@ -456,7 +456,7 @@ impl Display for HostRankings {
                 action: Action::Discard,
             };
 
-            write!(f, "{}", rule)?;
+            write!(f, "{rule}")?;
         }
 
         Ok(())
@@ -464,13 +464,13 @@ impl Display for HostRankings {
 }
 
 impl HostRankings {
-    pub fn rules(&self) -> Rule {
+    #[must_use] pub fn rules(&self) -> Rule {
         let matches: Vec<_> = self
             .blocked
             .iter()
             .map(|host| {
                 host.strip_prefix("www.")
-                    .map(|host| host.to_string())
+                    .map(std::string::ToString::to_string)
                     .unwrap_or(host.clone())
             })
             .map(|host| {
@@ -491,7 +491,7 @@ impl HostRankings {
         }
     }
 
-    pub fn into_optic(self) -> Optic {
+    #[must_use] pub fn into_optic(self) -> Optic {
         Optic {
             host_rankings: self,
             ..Default::default()
@@ -562,7 +562,7 @@ mod tests {
 
         let exported = optic.to_string();
 
-        println!("{:}", exported);
+        println!("{exported:}");
 
         let parsed = Optic::parse(&exported).unwrap();
 

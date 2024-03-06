@@ -20,12 +20,12 @@ pub struct ParseOpts {
 }
 
 /// Parse an HTML document with html5ever and the default configuration.
-pub fn parse_html() -> html5ever::Parser<Sink> {
+#[must_use] pub fn parse_html() -> html5ever::Parser<Sink> {
     parse_html_with_options(ParseOpts::default())
 }
 
 /// Parse an HTML document with html5ever with custom configuration.
-pub fn parse_html_with_options(opts: ParseOpts) -> html5ever::Parser<Sink> {
+#[must_use] pub fn parse_html_with_options(opts: ParseOpts) -> html5ever::Parser<Sink> {
     let sink = Sink {
         document_node: NodeRef::new_document(),
         on_parse_error: opts.on_parse_error,
@@ -38,7 +38,7 @@ pub fn parse_html_with_options(opts: ParseOpts) -> html5ever::Parser<Sink> {
 }
 
 /// Parse an HTML fragment with html5ever and the default configuration.
-pub fn parse_fragment(ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever::Parser<Sink> {
+#[must_use] pub fn parse_fragment(ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever::Parser<Sink> {
     parse_fragment_with_options(ParseOpts::default(), ctx_name, ctx_attr)
 }
 
@@ -77,7 +77,7 @@ impl TreeSink for Sink {
     #[inline]
     fn parse_error(&mut self, message: Cow<'static, str>) {
         if let Some(ref mut handler) = self.on_parse_error {
-            handler(message)
+            handler(message);
         }
     }
 
@@ -92,7 +92,7 @@ impl TreeSink for Sink {
             .as_document()
             .unwrap()
             ._quirks_mode
-            .set(mode)
+            .set(mode);
     }
 
     #[inline]
@@ -149,7 +149,7 @@ impl TreeSink for Sink {
                         return;
                     }
                 }
-                parent.append(NodeRef::new_text(text))
+                parent.append(NodeRef::new_text(text));
             }
         }
     }
@@ -165,7 +165,7 @@ impl TreeSink for Sink {
                         return;
                     }
                 }
-                sibling.insert_before(NodeRef::new_text(text))
+                sibling.insert_before(NodeRef::new_text(text));
             }
         }
     }
@@ -178,7 +178,7 @@ impl TreeSink for Sink {
         system_id: StrTendril,
     ) {
         self.document_node
-            .append(NodeRef::new_doctype(name, public_id, system_id))
+            .append(NodeRef::new_doctype(name, public_id, system_id));
     }
 
     #[inline]
@@ -203,7 +203,7 @@ impl TreeSink for Sink {
 
     #[inline]
     fn remove_from_parent(&mut self, target: &NodeRef) {
-        target.detach()
+        target.detach();
     }
 
     #[inline]
@@ -211,7 +211,7 @@ impl TreeSink for Sink {
         // FIXME: Can this be done more effciently in rctree,
         // by moving the whole linked list of children at once?
         for child in node.children() {
-            new_parent.append(child)
+            new_parent.append(child);
         }
     }
 
@@ -237,9 +237,9 @@ impl TreeSink for Sink {
         child: NodeOrText<NodeRef>,
     ) {
         if element.parent().is_some() {
-            self.append_before_sibling(element, child)
+            self.append_before_sibling(element, child);
         } else {
-            self.append(prev_element, child)
+            self.append(prev_element, child);
         }
     }
 }

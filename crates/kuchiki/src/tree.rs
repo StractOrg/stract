@@ -6,7 +6,7 @@ use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use crate::attributes::{Attribute, Attributes, ExpandedName};
-use crate::cell_extras::*;
+use crate::cell_extras::{CellOption, CellOptionRc, CellOptionWeak};
 use crate::iter::NodeIterator;
 
 /// Node data specific to the node type.
@@ -126,7 +126,7 @@ pub struct Node {
 impl fmt::Debug for Node {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{:?} @ {:?}", self.data, self as *const Node)
+        write!(f, "{:?} @ {:?}", self.data, std::ptr::from_ref::<Node>(self))
     }
 }
 
@@ -267,14 +267,14 @@ impl NodeRef {
 
     /// Create a new document node.
     #[inline]
-    pub fn new_document() -> NodeRef {
+    #[must_use] pub fn new_document() -> NodeRef {
         NodeRef::new(NodeData::Document(DocumentData {
             _quirks_mode: Cell::new(QuirksMode::NoQuirks),
         }))
     }
 
     /// Return the concatenation of all text nodes in this subtree.
-    pub fn text_contents(&self) -> String {
+    #[must_use] pub fn text_contents(&self) -> String {
         let mut s = String::new();
         for text_node in self.inclusive_descendants().text_nodes() {
             s.push_str(&text_node.borrow());
@@ -375,7 +375,7 @@ impl Node {
 
         let previous_sibling_opt = previous_sibling_weak
             .as_ref()
-            .and_then(|weak| weak.upgrade());
+            .and_then(std::rc::Weak::upgrade);
 
         if let Some(next_sibling_ref) = next_sibling_strong.as_ref() {
             next_sibling_ref

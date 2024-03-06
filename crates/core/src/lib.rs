@@ -18,10 +18,6 @@
 
 #![doc(html_logo_url = "https://stract.com/images/biglogo.svg")]
 // #![warn(clippy::pedantic)]
-// #![warn(missing_docs)]
-// #![warn(clippy::missing_docs_in_private_items)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::missing_errors_doc)]
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

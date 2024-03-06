@@ -1,6 +1,6 @@
 extern crate kuchiki;
 
-use kuchiki::traits::*;
+use kuchiki::traits::TendrilSink;
 
 fn main() {
     let html = r"
@@ -43,6 +43,6 @@ fn main() {
         //
         //  "Hello, world!"
         //  "I love HTML"
-        println!("{:?}", text);
+        println!("{text:?}");
     }
 }

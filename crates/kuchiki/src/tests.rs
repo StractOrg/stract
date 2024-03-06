@@ -182,7 +182,7 @@ fn specificity() {
     let specificities = selectors
         .0
         .iter()
-        .map(|s| s.specificity())
+        .map(super::select::Selector::specificity)
         .collect::<Vec<_>>();
     assert_eq!(specificities.len(), 3);
     assert!(specificities[0] == specificities[1]);
