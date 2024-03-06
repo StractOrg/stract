@@ -30,7 +30,6 @@ pub struct IndexingLocalConfig {
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
-    pub batch_size: Option<usize>,
     pub page_webgraph_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,
     pub topics_path: Option<String>,
@@ -38,6 +37,9 @@ pub struct IndexingLocalConfig {
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub minimum_clean_words: Option<usize>,
+
+    #[serde(default = "defaults::Indexing::batch_size")]
+    pub batch_size: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]

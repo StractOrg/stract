@@ -41,7 +41,6 @@ use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
-use crate::rake::RakeModel;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RankingWebsite;
 use crate::ranking::SignalAggregator;
@@ -165,7 +164,6 @@ pub struct InvertedIndex {
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
     fastfield_reader: FastFieldReader,
-    rake: RakeModel,
 }
 
 impl InvertedIndex {
@@ -236,7 +234,6 @@ impl InvertedIndex {
             tantivy_index,
             snippet_config: SnippetConfig::default(),
             fastfield_reader,
-            rake: RakeModel::default(),
         })
     }
 
@@ -287,11 +284,11 @@ impl InvertedIndex {
         Ok(s)
     }
 
-    pub fn insert(&self, webpage: Webpage) -> Result<()> {
+    pub fn insert(&self, webpage: &Webpage) -> Result<()> {
         self.writer
             .as_ref()
             .expect("writer has not been prepared")
-            .add_document(webpage.into_tantivy(&self.schema, &self.rake)?)?;
+            .add_document(webpage.as_tantivy(&self.schema)?)?;
         Ok(())
     }
 
@@ -880,7 +877,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
                         <html>
@@ -919,7 +916,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
                         <html>
@@ -967,7 +964,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -1015,7 +1012,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -1063,7 +1060,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -1081,7 +1078,7 @@ mod tests {
             )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1143,7 +1140,7 @@ mod tests {
 
             index
                 .insert(
-                    Webpage::new(
+                    &Webpage::new(
                         &format!(
                             r#"
                     <html>
@@ -1192,7 +1189,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
                     <html>
@@ -1240,7 +1237,7 @@ mod tests {
 
         index1
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -1264,7 +1261,7 @@ mod tests {
 
         index2
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -1337,7 +1334,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
                         <html>
@@ -1375,7 +1372,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
                         <html>
@@ -1422,7 +1419,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::new(
                 &format!(
                     r#"
                     <html>
@@ -1501,7 +1498,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::new(
                 &format!(
                     r#"
                     <html>
@@ -1535,7 +1532,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::new(
                 &format!(
                     r#"
                     <html>
@@ -1617,8 +1614,8 @@ mod tests {
             ..Default::default()
         };
 
-        index.insert(a).unwrap();
-        index.insert(b).unwrap();
+        index.insert(&a).unwrap();
+        index.insert(&b).unwrap();
 
         index.commit().expect("failed to commit index");
 

@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    rake::RakeModel,
     schema::{FastField, TextField},
     webgraph::NodeID,
     Result,
@@ -53,6 +52,7 @@ pub struct Webpage {
     pub dmoz_description: Option<String>,
     pub safety_classification: Option<safety_classifier::Label>,
     pub inserted_at: DateTime<Utc>,
+    pub keywords: Vec<String>,
 }
 
 #[cfg(test)]
@@ -71,6 +71,7 @@ impl Default for Webpage {
             dmoz_description: Default::default(),
             safety_classification: Default::default(),
             inserted_at: Utc::now(),
+            keywords: Default::default(),
         }
     }
 }
@@ -102,16 +103,12 @@ impl Webpage {
         })
     }
 
-    pub fn into_tantivy(
-        self,
-        schema: &tantivy::schema::Schema,
-        rake: &RakeModel,
-    ) -> Result<TantivyDocument> {
-        let region = Region::guess_from(&self);
+    pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+        let region = Region::guess_from(self);
 
         let dmoz_description = self.dmoz_description();
 
-        let mut doc = self.html.into_tantivy(schema, rake)?;
+        let mut doc = self.html.as_tantivy(schema)?;
 
         if let Ok(region) = region {
             doc.add_u64(
@@ -130,13 +127,20 @@ impl Webpage {
         }
 
         let backlink_text: String =
-            itertools::intersperse(self.backlink_labels, "\n".to_string()).collect();
+            itertools::intersperse(self.backlink_labels.clone(), "\n".to_string()).collect();
 
         doc.add_text(
             schema
                 .get_field(Field::Text(TextField::BacklinkText).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
+        );
+
+        doc.add_text(
+            schema
+                .get_field(Field::Text(TextField::Keywords).name())
+                .expect("Failed to get keywords field"),
+            self.keywords.join("\n"),
         );
 
         doc.add_date(

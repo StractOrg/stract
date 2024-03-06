@@ -51,7 +51,7 @@ where
         options.set_level_compaction_dynamic_level_bytes(true);
         options.set_bytes_per_sync(1048576);
         let mut block_options = BlockBasedOptions::default();
-        block_options.set_block_size(1024 * 1024 * 1024); // 1 GB
+        block_options.set_block_size(32 * 1024); // 32 kb
         block_options.set_format_version(5);
         block_options.set_cache_index_and_filter_blocks(true);
         block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);

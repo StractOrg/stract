@@ -19,7 +19,7 @@ use tokio::io;
 use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
-use crate::config::{LocalConfig, WebSpellConfig};
+use crate::config::{defaults, LocalConfig, WebSpellConfig};
 use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
@@ -169,11 +169,12 @@ fn create_inverted_index() -> Result<()> {
             folder: ".".to_string(),
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
-        warc_paths: vec![warc_path.to_str().unwrap().to_string()],
+        warc_path: warc_path.to_str().unwrap().to_string(),
         base_path: out_path_tmp.to_str().unwrap().to_string(),
         settings: JobSettings {
             host_centrality_threshold: None,
             minimum_clean_words: None,
+            batch_size: defaults::Indexing::batch_size(),
         },
     };
 
@@ -195,7 +196,7 @@ fn create_inverted_index() -> Result<()> {
         None,
     );
 
-    let index = indexer::process_job(&job, &worker);
+    let index = job.process(&worker);
     std::fs::rename(index.path, out_path)?;
     std::fs::remove_dir_all(&out_path_tmp)?;
 

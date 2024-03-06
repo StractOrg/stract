@@ -76,8 +76,8 @@ impl Index {
         Ok(s)
     }
 
-    pub fn insert(&self, webpage: Webpage) -> Result<()> {
-        if let Ok(region) = Region::guess_from(&webpage) {
+    pub fn insert(&self, webpage: &Webpage) -> Result<()> {
+        if let Ok(region) = Region::guess_from(webpage) {
             let mut reg = self.region_count.lock().unwrap_or_else(|e| e.into_inner());
             reg.increment(&region);
         }
@@ -165,7 +165,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -186,7 +186,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>
@@ -207,7 +207,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                Webpage::new(
+                &Webpage::new(
                     &format!(
                         r#"
             <html>

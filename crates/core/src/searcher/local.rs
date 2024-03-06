@@ -430,7 +430,7 @@ mod tests {
 
         for i in 0..NUM_WEBSITES {
             index
-                .insert(Webpage {
+                .insert(&Webpage {
                     html: Html::parse(
                         r#"
             <html>

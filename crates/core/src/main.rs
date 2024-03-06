@@ -243,7 +243,7 @@ fn main() -> Result<()> {
         Commands::Indexer { options } => match options {
             IndexingOptions::Search { config_path } => {
                 let config = load_toml_config(config_path);
-                entrypoint::Indexer::run(&config)?;
+                entrypoint::indexer::run(&config)?;
             }
             IndexingOptions::Entity {
                 wikipedia_dump_path,
@@ -258,7 +258,7 @@ fn main() -> Result<()> {
                     .into_iter()
                     .map(entrypoint::indexer::IndexPointer::from)
                     .collect::<Vec<_>>();
-                entrypoint::indexer::Indexer::merge(pointers)?;
+                entrypoint::indexer::merge(pointers)?;
             }
         },
         Commands::Centrality { mode } => {

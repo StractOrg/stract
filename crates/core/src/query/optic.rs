@@ -283,7 +283,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -307,7 +307,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -408,7 +408,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -431,7 +431,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -505,7 +505,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -529,7 +529,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -553,7 +553,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -653,7 +653,7 @@ mod tests {
         let graph = writer.finalize();
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -678,7 +678,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -703,7 +703,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -764,7 +764,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -800,7 +800,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r##"
@@ -943,7 +943,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1009,7 +1009,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1033,7 +1033,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1095,7 +1095,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1251,7 +1251,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1319,7 +1319,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1374,7 +1374,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1398,7 +1398,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1516,7 +1516,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = LocalSearcher::from(index);
@@ -1589,7 +1589,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1612,7 +1612,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = LocalSearcher::from(index);
@@ -1668,7 +1668,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1691,7 +1691,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
         let searcher = LocalSearcher::from(index);
@@ -1760,7 +1760,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1782,7 +1782,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1804,7 +1804,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 
@@ -1849,7 +1849,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1871,7 +1871,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1893,7 +1893,7 @@ mod tests {
 
         page.html.set_clean_text("".to_string());
 
-        index.insert(page).expect("failed to insert webpage");
+        index.insert(&page).expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 

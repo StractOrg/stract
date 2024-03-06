@@ -51,8 +51,6 @@ fn decode_string(raw: &[u8]) -> String {
         let (enc, conf) = detector.guess_assess(None, true);
 
         if conf {
-            dbg!(enc.name());
-
             let (cow, _, had_errors) = enc.decode(raw);
             if !had_errors {
                 return cow.to_string();
