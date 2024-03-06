@@ -106,7 +106,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
         } else {
             exact_changed_nodes = BTreeSet::default();
             graph.edges().for_each(|edge| {
-                if changed_nodes.contains(&edge.from.as_u64()) {
+                if changed_nodes.contains(edge.from.as_u64()) {
                     if let (Some(counter_to), Some(counter_from)) =
                         (new_counters.get_mut(&edge.to), counters.get(&edge.from))
                     {

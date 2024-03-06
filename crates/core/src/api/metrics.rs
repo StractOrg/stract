@@ -24,5 +24,5 @@ use axum_macros::debug_handler;
 pub async fn route(
     extract::State(registry): extract::State<Arc<crate::metrics::PrometheusRegistry>>,
 ) -> impl IntoResponse {
-    format!("{}", registry)
+    format!("{registry}");
 }

@@ -396,7 +396,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -414,7 +414,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -444,7 +444,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -462,7 +462,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -512,7 +512,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -530,7 +530,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -564,7 +564,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -582,7 +582,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     r#"
                         <html>
                             <head>
@@ -652,7 +652,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -673,7 +673,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -725,7 +725,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -746,7 +746,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -790,7 +790,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -812,7 +812,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -855,7 +855,7 @@ mod tests {
     #[test]
     fn safe_search() {
         let mut index = Index::temporary().expect("Unable to open index");
-        let mut webpage = Webpage::new(
+        let mut webpage = Webpage::test_parse(
             &format!(
                 r#"
                 <html>
@@ -878,7 +878,7 @@ mod tests {
 
         index.insert(&webpage).expect("failed to insert webpage");
 
-        let mut webpage = Webpage::new(
+        let mut webpage = Webpage::test_parse(
             &format!(
                 r#"
                 <html>
@@ -931,7 +931,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -952,7 +952,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -973,7 +973,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>

@@ -128,7 +128,7 @@ impl Index {
     }
 
     pub fn merge(self, other: Self) -> Self {
-        self.inverted_index.merge(other.inverted_index);
+        let _ = self.inverted_index.merge(other.inverted_index);
 
         let mut self_region_count = self
             .region_count
@@ -165,7 +165,7 @@ mod tests {
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -186,7 +186,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -207,7 +207,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>

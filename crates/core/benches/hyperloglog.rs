@@ -7,11 +7,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut log: HyperLogLog<128> = HyperLogLog::default();
             for i in 0..10_000_000 {
                 log.add(i);
-                log.size();
+                let _ = log.size();
             }
 
             for _ in 0..1_000_000_000 {
-                log.size();
+                let _ = log.size();
             }
         });
     });

@@ -98,7 +98,7 @@ impl DerivedCentrality {
 
         page_graph.node_ids().for_each(|(node, id)| {
             pb.inc(1);
-            if has_outgoing.contains(&id.as_u64()) {
+            if has_outgoing.contains(id.as_u64()) {
                 let host_node = node.clone().into_host().id();
 
                 if let Some(harmonic) = host_harmonic.get(&host_node) {

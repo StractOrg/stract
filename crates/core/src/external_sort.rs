@@ -344,7 +344,7 @@ mod tests {
             data.push(item);
         }
 
-        expected.sort();
+        expected.sort_unstable();
 
         let sorted = ExternalSorter::new()
             .with_chunk_size(100_000)

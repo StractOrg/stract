@@ -50,7 +50,7 @@ impl FastFieldReader {
 
             let mut tv_readers = EnumMap::new();
 
-            for field in Field::all().filter_map(|field| field.as_fast()) {
+            for field in Field::all().filter_map(Field::as_fast) {
                 match field.data_type() {
                     DataType::U64 => {
                         let reader = fastfield_readers.u64(field.name()).unwrap();
@@ -62,7 +62,7 @@ impl FastFieldReader {
             for doc in 0..reader.max_doc() as usize {
                 let mut data = Vec::new();
 
-                for field in Field::all().filter_map(|field| field.as_fast()) {
+                for field in Field::all().filter_map(Field::as_fast) {
                     match field.data_type() {
                         DataType::U64 => {
                             let reader = tv_readers.get(field).unwrap();
@@ -96,8 +96,8 @@ pub struct FieldReader<'a> {
 }
 
 impl<'a> FieldReader<'a> {
-    pub fn get(&self, field: &FastField) -> u64 {
-        self.data[*field as usize]
+    pub fn get(&self, field: FastField) -> u64 {
+        self.data[field as usize]
     }
 }
 
@@ -107,9 +107,9 @@ pub struct SegmentReader {
 }
 
 impl SegmentReader {
-    pub fn get_field_reader(&self, doc: &DocId) -> FieldReader<'_> {
+    pub fn get_field_reader(&self, doc: DocId) -> FieldReader<'_> {
         let data =
-            &self.data[(*doc as usize) * self.num_fields..(*doc as usize + 1) * self.num_fields];
+            &self.data[(doc as usize) * self.num_fields..(doc as usize + 1) * self.num_fields];
         FieldReader { data }
     }
 }

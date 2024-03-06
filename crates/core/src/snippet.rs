@@ -388,7 +388,7 @@ Survey in 2016, 2017, and 2018."#;
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -427,7 +427,7 @@ Survey in 2016, 2017, and 2018."#;
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -466,7 +466,7 @@ Survey in 2016, 2017, and 2018."#;
 
         index
             .insert(
-                &Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>

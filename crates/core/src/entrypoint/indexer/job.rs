@@ -62,7 +62,6 @@ impl Job {
 
         for file in warc_files.by_ref() {
             let mut batch = Vec::with_capacity(self.settings.batch_size);
-            let mut batch_webpages = Vec::with_capacity(self.settings.batch_size);
 
             for chunk in &file
                 .records()
@@ -79,9 +78,9 @@ impl Job {
                     batch.push(IndexableWebpage::from(record));
                 }
 
-                worker.prepare_webpage(&batch, &mut batch_webpages);
+                let prepared = worker.prepare_webpages(&batch);
 
-                for webpage in &batch_webpages {
+                for webpage in &prepared {
                     if webpage.host_centrality > 0.0 {
                         has_host_centrality = true;
                     }

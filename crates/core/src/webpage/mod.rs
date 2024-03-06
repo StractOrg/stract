@@ -76,9 +76,29 @@ impl Default for Webpage {
     }
 }
 
+impl From<Html> for Webpage {
+    fn from(html: Html) -> Self {
+        Self {
+            html,
+            backlink_labels: Default::default(),
+            host_centrality: Default::default(),
+            host_centrality_rank: u64::MAX as f64,
+            page_centrality: Default::default(),
+            page_centrality_rank: u64::MAX as f64,
+            fetch_time_ms: Default::default(),
+            pre_computed_score: Default::default(),
+            node_id: Default::default(),
+            dmoz_description: Default::default(),
+            safety_classification: Default::default(),
+            inserted_at: Utc::now(),
+            keywords: Default::default(),
+        }
+    }
+}
+
 impl Webpage {
     #[cfg(test)]
-    pub fn new(html: &str, url: &str) -> Result<Self> {
+    pub fn test_parse(html: &str, url: &str) -> Result<Self> {
         let html = Html::parse(html, url)?;
 
         Ok(Self {

@@ -231,11 +231,10 @@ impl Indexer {
             return;
         }
 
-        let mut out = Vec::new();
-        self.worker.prepare_webpage(&batch, &mut out);
+        let prepared = self.worker.prepare_webpages(&batch);
 
         let search_index = self.search_index.write().unwrap_or_else(|e| e.into_inner());
-        for webpage in &out {
+        for webpage in &prepared {
             search_index.insert(webpage).ok();
         }
     }
@@ -247,11 +246,10 @@ impl Indexer {
             return;
         }
 
-        let mut out = Vec::new();
-        self.worker.prepare_webpage(&batch, &mut out);
+        let prepared = self.worker.prepare_webpages(&batch);
 
         let search_index = self.search_index.write().unwrap_or_else(|e| e.into_inner());
-        for webpage in &out {
+        for webpage in &prepared {
             search_index.insert(webpage).ok();
         }
     }

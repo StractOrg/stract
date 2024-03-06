@@ -90,6 +90,58 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
+fn build_router(state: Arc<State>) -> Router {
+    Router::new()
+        .merge(
+            Router::new()
+                .route("/beta/api/search", post(search::search))
+                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
+                .layer(cors_layer()),
+        )
+        .route("/favicon.ico", get(favicon))
+        .merge(
+            Router::new()
+                .route("/improvement/click", post(improvement::click))
+                .route("/improvement/store", post(improvement::store))
+                .layer(cors_layer()),
+        )
+        .layer(CompressionLayer::new())
+        .merge(docs::router())
+        .nest(
+            "/beta",
+            Router::new()
+                .route("/api/search/widget", post(search::widget))
+                .route("/api/search/sidebar", post(search::sidebar))
+                .route("/api/search/spellcheck", post(search::spellcheck))
+                .route("/api/autosuggest", post(autosuggest::route))
+                .route("/api/autosuggest/browser", get(autosuggest::browser))
+                .route("/api/summarize", get(summarize::summarize_route))
+                .route("/api/webgraph/host/similar", post(webgraph::host::similar))
+                .route("/api/webgraph/host/knows", post(webgraph::host::knows))
+                .route(
+                    "/api/webgraph/host/ingoing",
+                    post(webgraph::host::ingoing_hosts),
+                )
+                .route(
+                    "/api/webgraph/host/outgoing",
+                    post(webgraph::host::outgoing_hosts),
+                )
+                .route(
+                    "/api/webgraph/page/ingoing",
+                    post(webgraph::page::ingoing_pages),
+                )
+                .route(
+                    "/api/webgraph/page/outgoing",
+                    post(webgraph::page::outgoing_pages),
+                )
+                .route("/api/hosts/export", post(hosts::hosts_export_optic))
+                .route("/api/explore/export", post(explore::explore_export_optic))
+                .route("/api/entity_image", get(search::entity_image))
+                .layer(cors_layer()),
+        )
+        .with_state(state)
+}
+
 pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
 
@@ -155,55 +207,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         })
     };
 
-    Ok(Router::new()
-        .merge(
-            Router::new()
-                .route("/beta/api/search", post(search::search))
-                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
-                .layer(cors_layer()),
-        )
-        .route("/favicon.ico", get(favicon))
-        .merge(
-            Router::new()
-                .route("/improvement/click", post(improvement::click))
-                .route("/improvement/store", post(improvement::store))
-                .layer(cors_layer()),
-        )
-        .layer(CompressionLayer::new())
-        .merge(docs::router())
-        .nest(
-            "/beta",
-            Router::new()
-                .route("/api/search/widget", post(search::widget))
-                .route("/api/search/sidebar", post(search::sidebar))
-                .route("/api/search/spellcheck", post(search::spellcheck))
-                .route("/api/autosuggest", post(autosuggest::route))
-                .route("/api/autosuggest/browser", get(autosuggest::browser))
-                .route("/api/summarize", get(summarize::summarize_route))
-                .route("/api/webgraph/host/similar", post(webgraph::host::similar))
-                .route("/api/webgraph/host/knows", post(webgraph::host::knows))
-                .route(
-                    "/api/webgraph/host/ingoing",
-                    post(webgraph::host::ingoing_hosts),
-                )
-                .route(
-                    "/api/webgraph/host/outgoing",
-                    post(webgraph::host::outgoing_hosts),
-                )
-                .route(
-                    "/api/webgraph/page/ingoing",
-                    post(webgraph::page::ingoing_pages),
-                )
-                .route(
-                    "/api/webgraph/page/outgoing",
-                    post(webgraph::page::outgoing_pages),
-                )
-                .route("/api/hosts/export", post(hosts::hosts_export_optic))
-                .route("/api/explore/export", post(explore::explore_export_optic))
-                .route("/api/entity_image", get(search::entity_image))
-                .layer(cors_layer()),
-        )
-        .with_state(state))
+    Ok(build_router(state))
 }
 
 /// Enables CORS for development where the API and frontend are on

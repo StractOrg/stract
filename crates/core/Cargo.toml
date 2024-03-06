@@ -30,6 +30,7 @@ axum-macros = {workspace = true}
 base64 = {workspace = true}
 bincode = {workspace = true}
 bitvec = {workspace = true}
+bytecount = {workspace = true}
 bytemuck = {workspace = true}
 byteorder = {workspace = true}
 bzip2 = {workspace = true}

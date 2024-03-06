@@ -111,7 +111,7 @@ impl BaseImageStore {
             image = filter.transform(image);
         }
 
-        self.store.insert(key, image)
+        self.store.insert(key, image);
     }
 
     fn flush(&self) {
@@ -122,7 +122,7 @@ impl BaseImageStore {
         self.store.get(key)
     }
 
-    fn merge(&mut self, other: BaseImageStore) {
+    fn merge(&mut self, other: &Self) {
         for (key, image) in other.store.iter() {
             self.insert(key, image);
         }
@@ -179,11 +179,11 @@ impl ImageStore<String> for EntityImageStore {
     }
 
     fn merge(&mut self, other: Self) {
-        self.store.merge(other.store)
+        self.store.merge(&other.store);
     }
 
     fn flush(&self) {
-        self.store.flush()
+        self.store.flush();
     }
 }
 
@@ -221,10 +221,12 @@ impl Image {
         bytes
     }
 
+    #[must_use]
     pub fn resize_max(self, width: u32, height: u32) -> Self {
         MaxSizeFilter { width, height }.transform(self)
     }
 
+    #[must_use]
     pub fn empty(width: u32, height: u32) -> Self {
         Self(image::DynamicImage::new_rgb8(width, height))
     }
