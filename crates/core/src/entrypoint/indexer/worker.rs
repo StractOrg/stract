@@ -424,17 +424,17 @@ mod tests {
         }
 
         let worker = IndexingWorker::new(IndexingLocalConfig {
-            host_centrality_store_path: "".to_string(),
+            host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
             page_webgraph_path: None,
             topics_path: None,
             safety_classifier_path: None,
             dual_encoder_model_path: Some(data_path.to_str().unwrap().to_string()),
-            output_path: "".to_string(),
+            output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             limit_warc_files: None,
             skip_warc_files: None,
             warc_source: WarcSource::Local(crate::config::LocalConfig {
-                folder: ".".to_string(),
+                folder: crate::gen_temp_path().to_str().unwrap().to_string(),
                 names: vec!["".to_string()],
             }),
             host_centrality_threshold: None,
