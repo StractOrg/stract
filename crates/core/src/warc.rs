@@ -47,7 +47,8 @@ fn decode_string(raw: &[u8]) -> String {
         res
     } else {
         let mut detector = chardetng::EncodingDetector::new();
-        detector.feed(raw, true);
+        let end = std::cmp::min(64, raw.len());
+        detector.feed(&raw[..end], false);
         let (enc, conf) = detector.guess_assess(None, true);
 
         if conf {

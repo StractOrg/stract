@@ -145,3 +145,6 @@ name = "search_preindexed"
 
 [[example]]
 name = "bitvec_similarity"
+
+[[example]]
+name = "indexer"
