@@ -19,7 +19,9 @@ use tokio::io;
 use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
-use crate::config::{defaults, IndexingLocalConfig, LocalConfig, WebSpellConfig};
+use crate::config::{
+    defaults, IndexingDualEncoderConfig, IndexingLocalConfig, LocalConfig, WebSpellConfig,
+};
 use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
@@ -202,7 +204,10 @@ fn create_inverted_index() -> Result<()> {
         safety_classifier_path: None,
         minimum_clean_words: None,
         batch_size: defaults::Indexing::batch_size(),
-        dual_encoder_model_path: Some(dual_encoder_path.to_str().unwrap().to_string()),
+        dual_encoder: Some(IndexingDualEncoderConfig {
+            model_path: dual_encoder_path.to_str().unwrap().to_string(),
+            page_centrality_rank_threshold: Some(100_000),
+        }),
     });
 
     let index = job.process(&worker);

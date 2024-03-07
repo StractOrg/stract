@@ -52,7 +52,12 @@ fn main() -> anyhow::Result<()> {
         safety_classifier_path: None,
         minimum_clean_words: None,
         batch_size: 512,
-        dual_encoder_model_path: args.dual_encoder_path,
+        dual_encoder: args
+            .dual_encoder_path
+            .map(|p| stract::config::IndexingDualEncoderConfig {
+                model_path: p,
+                page_centrality_rank_threshold: Some(1_000_000),
+            }),
     })?;
 
     println!("Indexing took {:?}", start.elapsed());

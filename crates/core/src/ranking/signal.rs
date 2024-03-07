@@ -458,9 +458,9 @@ impl Signal {
 
         let value = match self {
             Signal::HostCentrality => Some(webpage.host_centrality),
-            Signal::HostCentralityRank => Some(webpage.host_centrality_rank),
             Signal::PageCentrality => Some(webpage.page_centrality),
-            Signal::PageCentralityRank => Some(webpage.page_centrality_rank),
+            Signal::HostCentralityRank => Some(score_rank(webpage.host_centrality_rank as f64)),
+            Signal::PageCentralityRank => Some(score_rank(webpage.page_centrality_rank as f64)),
             Signal::IsHomepage => Some(webpage.html.is_homepage().into()),
             Signal::FetchTimeMs => {
                 let fetch_time_ms = webpage.fetch_time_ms as usize;

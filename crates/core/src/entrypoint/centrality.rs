@@ -63,7 +63,8 @@ impl Centrality {
         }
         store.flush();
 
-        let rank_store = RocksDbStore::open(base_output.as_ref().join("harmonic_rank"));
+        let rank_store: RocksDbStore<crate::webgraph::NodeID, u64> =
+            RocksDbStore::open(base_output.as_ref().join("harmonic_rank"));
         let mut top_harmonics = Vec::new();
         for (rank, node, centrality) in ExternalSorter::new()
             .with_chunk_size(100_000_000)
@@ -78,7 +79,7 @@ impl Centrality {
                 (rank, node_id, centrality)
             })
         {
-            rank_store.insert(node, rank as f64);
+            rank_store.insert(node, rank as u64);
 
             if top_harmonics.len() < 1_000_000 {
                 top_harmonics.push((graph.id2node(&node).unwrap(), centrality));
@@ -110,7 +111,8 @@ impl Centrality {
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("approx_harmonic"));
-        let approx_rank = RocksDbStore::open(base_output.as_ref().join("approx_harmonic_rank"));
+        let approx_rank: RocksDbStore<crate::webgraph::NodeID, u64> =
+            RocksDbStore::open(base_output.as_ref().join("approx_harmonic_rank"));
 
         let mut top_nodes = Vec::new();
 
@@ -126,7 +128,7 @@ impl Centrality {
                 (rank, node_id, centrality)
             })
         {
-            approx_rank.insert(node, rank as f64);
+            approx_rank.insert(node, rank as u64);
             if top_nodes.len() < 1_000_000 {
                 top_nodes.push((graph.id2node(&node).unwrap(), centrality));
             }

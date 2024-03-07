@@ -41,7 +41,16 @@ pub struct IndexingLocalConfig {
     #[serde(default = "defaults::Indexing::batch_size")]
     pub batch_size: usize,
 
-    pub dual_encoder_model_path: Option<String>,
+    pub dual_encoder: Option<IndexingDualEncoderConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingDualEncoderConfig {
+    pub model_path: String,
+
+    /// Only compute embeddings for pages that has a
+    /// centrality rank less than this threshold
+    pub page_centrality_rank_threshold: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

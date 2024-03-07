@@ -44,9 +44,9 @@ pub struct Webpage {
     pub html: Html,
     pub backlink_labels: Vec<String>,
     pub host_centrality: f64,
-    pub host_centrality_rank: f64,
+    pub host_centrality_rank: u64,
     pub page_centrality: f64,
-    pub page_centrality_rank: f64,
+    pub page_centrality_rank: u64,
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
@@ -65,9 +65,9 @@ impl Default for Webpage {
             html: Html::parse_without_text("<html></html>", "https://example.com/").unwrap(),
             backlink_labels: Default::default(),
             host_centrality: Default::default(),
-            host_centrality_rank: u64::MAX as f64,
+            host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
-            page_centrality_rank: u64::MAX as f64,
+            page_centrality_rank: u64::MAX,
             fetch_time_ms: Default::default(),
             pre_computed_score: Default::default(),
             node_id: Default::default(),
@@ -87,9 +87,9 @@ impl From<Html> for Webpage {
             html,
             backlink_labels: Default::default(),
             host_centrality: Default::default(),
-            host_centrality_rank: u64::MAX as f64,
+            host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
-            page_centrality_rank: u64::MAX as f64,
+            page_centrality_rank: u64::MAX,
             fetch_time_ms: Default::default(),
             pre_computed_score: Default::default(),
             node_id: Default::default(),
@@ -202,7 +202,7 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::HostCentralityRank).name())
                 .expect("Failed to get host_centrality_rank field"),
-            self.host_centrality_rank as u64,
+            self.host_centrality_rank,
         );
 
         doc.add_u64(
@@ -216,7 +216,7 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::PageCentralityRank).name())
                 .expect("Failed to get page_centrality_rank field"),
-            self.page_centrality_rank as u64,
+            self.page_centrality_rank,
         );
 
         doc.add_u64(
