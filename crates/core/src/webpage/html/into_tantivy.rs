@@ -554,6 +554,7 @@ impl Html {
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
+                | Field::Fast(FastField::TitleEmbeddings)
                 | Field::Text(TextField::Keywords)
                 | Field::Text(TextField::DmozDescription) => {}
             }

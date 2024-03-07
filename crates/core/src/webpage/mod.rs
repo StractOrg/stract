@@ -233,6 +233,25 @@ impl Webpage {
             (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
         );
 
+        if let Some(title_embedding) = &self.title_embedding {
+            let mut serialized = Vec::new();
+            title_embedding.write_bytes(&mut serialized)?;
+
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .expect("Failed to get title_embeddings field"),
+                serialized,
+            );
+        } else {
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .expect("Failed to get title_embeddings field"),
+                Vec::new(),
+            );
+        }
+
         match &self.node_id {
             Some(node_id) => {
                 doc.add_u64(

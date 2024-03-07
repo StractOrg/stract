@@ -782,6 +782,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
+    use candle_core::Tensor;
     use maplit::hashmap;
 
     use crate::{
@@ -1622,5 +1623,93 @@ mod tests {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
 
         assert_eq!(result.documents.len(), 1);
+    }
+
+    #[test]
+    fn test_title_embeddings_stored() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let mut webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website A</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.a.com",
+        )
+        .unwrap();
+
+        webpage.title_embedding =
+            Some(Tensor::rand(0.0, 1.0, &[2, 2], &candle_core::Device::Cpu).unwrap());
+
+        index.insert(&webpage).unwrap();
+
+        let mut webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website B</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.b.com",
+        )
+        .unwrap();
+
+        webpage.title_embedding = None;
+
+        index.insert(&webpage).unwrap();
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let ranker = Ranker::new(
+            SignalAggregator::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            CollectorConfig::default(),
+        );
+
+        let res = index
+            .search_initial(&query, &ctx, ranker.collector(ctx.clone()))
+            .unwrap();
+
+        let fastfield_reader = index.fastfield_reader();
+
+        let ranking_websites = index
+            .retrieve_ranking_websites(
+                &ctx,
+                res.top_websites,
+                ranker.aggregator(),
+                &fastfield_reader,
+            )
+            .unwrap();
+
+        assert_eq!(ranking_websites.len(), 2);
+        assert!(ranking_websites[0].title_embedding.is_some());
+        assert!(ranking_websites[1].title_embedding.is_none());
     }
 }

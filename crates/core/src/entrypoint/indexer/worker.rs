@@ -500,7 +500,7 @@ mod tests {
         let emb1 = webpages[0].title_embedding.as_ref().unwrap();
         let emb2 = webpages[1].title_embedding.as_ref().unwrap();
 
-        let query = "best brownie recipe";
+        let query = "best chocolate cake";
         let query_emb = worker
             .dual_encoder
             .as_ref()

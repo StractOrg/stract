@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::schema::{IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions};
+use tantivy::{
+    schema::{BytesOptions, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions},
+    DateOptions,
+};
 
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
@@ -316,6 +319,7 @@ pub enum FastField {
     LikelyHasAds,
     LikelyHasPaywall,
     LinkDensity,
+    TitleEmbeddings,
 }
 
 impl FastField {
@@ -358,6 +362,7 @@ impl FastField {
             FastField::LikelyHasAds => "likely_has_ads",
             FastField::LikelyHasPaywall => "likely_has_paywall",
             FastField::LinkDensity => "link_density",
+            FastField::TitleEmbeddings => "title_embeddings",
         }
     }
 }
@@ -374,7 +379,7 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 67] = [
+static ALL_FIELDS: [Field; 69] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -443,6 +448,8 @@ static ALL_FIELDS: [Field; 67] = [
     Field::Fast(FastField::NumPathAndQueryDigits),
     Field::Fast(FastField::LikelyHasAds),
     Field::Fast(FastField::LikelyHasPaywall),
+    Field::Fast(FastField::LinkDensity),
+    Field::Fast(FastField::TitleEmbeddings),
 ];
 
 impl Field {
@@ -703,6 +710,9 @@ impl Field {
             Field::Fast(FastField::LinkDensity) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_stored())
             }
+            Field::Fast(FastField::TitleEmbeddings) => {
+                IndexingOption::Bytes(BytesOptions::default().set_fast())
+            }
         }
     }
 
@@ -768,6 +778,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
             IndexingOption::DateTime(options) => builder.add_date_field(field.name(), options),
+            IndexingOption::Bytes(options) => builder.add_bytes_field(field.name(), options),
         };
     }
 
@@ -775,13 +786,15 @@ pub fn create_schema() -> tantivy::schema::Schema {
 }
 
 pub enum IndexingOption {
-    Text(tantivy::schema::TextOptions),
-    Integer(tantivy::schema::NumericOptions),
-    DateTime(tantivy::schema::DateOptions),
+    Text(TextOptions),
+    Integer(NumericOptions),
+    DateTime(DateOptions),
+    Bytes(BytesOptions),
 }
 
 pub enum DataType {
     U64,
+    Bytes,
 }
 
 impl FastField {
@@ -824,6 +837,7 @@ impl FastField {
             FastField::LikelyHasAds => DataType::U64,
             FastField::LikelyHasPaywall => DataType::U64,
             FastField::LinkDensity => DataType::U64,
+            FastField::TitleEmbeddings => DataType::Bytes,
         }
     }
 }

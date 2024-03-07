@@ -23,6 +23,7 @@ use crate::{
     config::CollectorConfig,
     enum_map::EnumMap,
     inverted_index::{RetrievedWebpage, WebsitePointer},
+    schema::FastField,
     searcher::SearchQuery,
     Result,
 };
@@ -107,6 +108,7 @@ pub struct RankingWebsite {
     pub title: Option<String>,
     pub snippet: Option<String>,
     pub optic_boost: Option<f64>,
+    pub title_embedding: Option<Vec<u8>>,
     pub score: f64,
 }
 
@@ -119,6 +121,7 @@ impl RankingWebsite {
             optic_boost: None,
             snippet: None,
             pointer: pointer.clone(),
+            title_embedding: None,
         };
 
         for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
@@ -129,6 +132,13 @@ impl RankingWebsite {
         if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
             res.optic_boost = Some(boost);
         }
+
+        res.title_embedding = aggregator
+            .fastfield_readers()
+            .unwrap()
+            .get_field_reader(pointer.address.doc_id)
+            .get(FastField::TitleEmbeddings)
+            .into();
 
         res
     }
@@ -492,6 +502,7 @@ mod tests {
                     optic_boost: None,
                     title: None,
                     snippet: None,
+                    title_embedding: None,
                     score: 1.0 / i as f64,
                 }
             })

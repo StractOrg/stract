@@ -134,6 +134,8 @@ pub enum Signal {
     UrlSlashes,
     #[serde(rename = "link_density")]
     LinkDensity,
+    #[serde(rename = "title_embedding_similarity")]
+    TitleEmbeddingSimilarity,
 }
 
 impl From<Signal> for usize {
@@ -142,7 +144,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 38] = [
+pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -181,6 +183,7 @@ pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::UrlDigits,
     Signal::UrlSlashes,
     Signal::LinkDensity,
+    Signal::TitleEmbeddingSimilarity,
 ];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
@@ -329,7 +332,8 @@ impl Signal {
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
             Signal::UrlDigits => 0.01,
-            Signal::LinkDensity => 0.00,
+            Signal::LinkDensity => 0.0,
+            Signal::TitleEmbeddingSimilarity => 0.01,
         }
     }
 
@@ -346,7 +350,11 @@ impl Signal {
             .borrow_mut();
         let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
 
-        let node_id = fastfield_reader.get(FastField::HostNodeID);
+        let node_id = fastfield_reader
+            .get(FastField::HostNodeID)
+            .as_u64()
+            .unwrap();
+
         let host_id: Option<NodeID> = if node_id == u64::MAX {
             None
         } else {
@@ -355,23 +363,38 @@ impl Signal {
 
         let value: Option<f64> = match self {
             Signal::HostCentrality | Signal::PageCentrality => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(val as f64 / FLOAT_SCALING as f64)
             }
             Signal::HostCentralityRank | Signal::PageCentralityRank => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(score_rank(val as f64))
             }
             Signal::IsHomepage => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(val as f64)
             }
             Signal::LinkDensity => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
             }
             Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield_reader.get(self.as_fastfield().unwrap()) as usize;
+                let fetch_time_ms = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap() as usize;
 
                 if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
                     Some(0.0)
@@ -380,24 +403,39 @@ impl Signal {
                 }
             }
             Signal::UpdateTimestamp => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap()) as usize;
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap() as usize;
 
                 Some(score_timestamp(val, signal_aggregator))
             }
             Signal::TrackerScore => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(score_trackers(val as f64))
             }
             Signal::UrlDigits => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(score_digits(val as f64))
             }
             Signal::UrlSlashes => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 Some(score_slashes(val as f64))
             }
             Signal::Region => {
-                let val = fastfield_reader.get(self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .as_u64()
+                    .unwrap();
                 let region = Region::from_id(val);
                 Some(score_region(region, signal_aggregator))
             }
@@ -438,6 +476,7 @@ impl Signal {
 
             Signal::CrossEncoderSnippet => None, // this is calculated in a later step
             Signal::CrossEncoderTitle => None,   // this is calculated in a later step
+            Signal::TitleEmbeddingSimilarity => None, // this is calculated in a later step
             Signal::LambdaMART => None,
         };
 
@@ -544,6 +583,7 @@ impl Signal {
             | Signal::CrossEncoderTitle
             | Signal::InboundSimilarity
             | Signal::LambdaMART
+            | Signal::TitleEmbeddingSimilarity
             | Signal::QueryCentrality => {
                 tracing::error!("signal {self:?} cannot be precomputed");
                 None
@@ -573,6 +613,7 @@ impl Signal {
             Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
             Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
             Signal::LinkDensity => Some(FastField::LinkDensity),
+            Signal::TitleEmbeddingSimilarity => Some(FastField::TitleEmbeddings),
             _ => None,
         }
     }
@@ -794,6 +835,12 @@ impl SignalAggregator {
         s.set_current_timestamp(chrono::Utc::now().timestamp() as usize);
 
         s
+    }
+
+    pub fn fastfield_readers(&self) -> Option<Arc<fastfield_reader::SegmentReader>> {
+        self.segment_reader
+            .as_ref()
+            .map(|segment_reader| segment_reader.borrow().fastfield_reader.clone())
     }
 
     fn prepare_textfields(
