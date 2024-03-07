@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -19,7 +19,7 @@ use tokio::io;
 use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
-use crate::config::{defaults, LocalConfig, WebSpellConfig};
+use crate::config::{defaults, IndexingLocalConfig, LocalConfig, WebSpellConfig};
 use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
@@ -181,20 +181,29 @@ fn create_inverted_index() -> Result<()> {
     let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");
     let centrality_path = Path::new(DATA_PATH).join("centrality");
     let page_centrality_path = Path::new(DATA_PATH).join("centrality_page");
+    let dual_encoder_path = Path::new(DATA_PATH).join("summarizer").join("dual_encoder");
 
-    let worker = indexer::IndexingWorker::new(
-        centrality_path.to_str().unwrap().to_string(),
-        Some(page_centrality_path.to_str().unwrap().to_string()),
-        Some(webgraph_path.to_str().unwrap().to_string()),
-        Some(
+    let worker = indexer::IndexingWorker::new(IndexingLocalConfig {
+        host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
+        page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
+        page_webgraph_path: Some(webgraph_path.to_str().unwrap().to_string()),
+        topics_path: Some(
             Path::new(DATA_PATH)
                 .join("human_annotations")
                 .to_str()
                 .unwrap()
                 .to_string(),
         ),
-        None,
-    );
+        output_path: out_path_tmp.to_str().unwrap().to_string(),
+        limit_warc_files: None,
+        skip_warc_files: None,
+        warc_source: job.source_config.clone(),
+        host_centrality_threshold: None,
+        safety_classifier_path: None,
+        minimum_clean_words: None,
+        batch_size: defaults::Indexing::batch_size(),
+        dual_encoder_model_path: Some(dual_encoder_path.to_str().unwrap().to_string()),
+    });
 
     let index = job.process(&worker);
     std::fs::rename(index.path, out_path)?;

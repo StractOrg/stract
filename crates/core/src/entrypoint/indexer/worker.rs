@@ -22,6 +22,8 @@ use tracing::debug;
 
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
+use crate::config::{IndexingLocalConfig, LiveIndexConfig};
+use crate::models::dual_encoder::DualEncoder;
 use crate::Result;
 
 use crate::human_website_annotations;
@@ -33,6 +35,41 @@ use crate::ranking::SignalAggregator;
 use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
+pub struct Config {
+    pub host_centrality_store_path: String,
+    pub page_centrality_store_path: Option<String>,
+    pub page_webgraph_path: Option<String>,
+    pub topics_path: Option<String>,
+    pub safety_classifier_path: Option<String>,
+    pub dual_encoder_model_path: Option<String>,
+}
+
+impl From<IndexingLocalConfig> for Config {
+    fn from(config: IndexingLocalConfig) -> Self {
+        Self {
+            host_centrality_store_path: config.host_centrality_store_path,
+            page_centrality_store_path: config.page_centrality_store_path,
+            page_webgraph_path: config.page_webgraph_path,
+            topics_path: config.topics_path,
+            safety_classifier_path: config.safety_classifier_path,
+            dual_encoder_model_path: config.dual_encoder_model_path,
+        }
+    }
+}
+
+impl From<LiveIndexConfig> for Config {
+    fn from(config: LiveIndexConfig) -> Self {
+        Self {
+            host_centrality_store_path: config.host_centrality_store_path,
+            page_centrality_store_path: config.page_centrality_store_path,
+            page_webgraph_path: config.page_webgraph_path,
+            topics_path: None,
+            safety_classifier_path: config.safety_classifier_path,
+            dual_encoder_model_path: None,
+        }
+    }
+}
+
 pub struct IndexingWorker {
     host_centrality_store: RocksDbStore<NodeID, f64>,
     host_centrality_rank_store: RocksDbStore<NodeID, f64>,
@@ -43,36 +80,50 @@ pub struct IndexingWorker {
     safety_classifier: Option<safety_classifier::Model>,
     job_settings: Option<JobSettings>,
     rake: RakeModel,
+    dual_encoder: Option<DualEncoder>,
 }
 
 impl IndexingWorker {
-    pub fn new(
-        host_centrality_store_path: String,
-        page_centrality_store_path: Option<String>,
-        page_webgraph_path: Option<String>,
-        topics_path: Option<String>,
-        safety_classifier_path: Option<String>,
-    ) -> Self {
+    pub fn new<C>(config: C) -> Self
+    where
+        Config: From<C>,
+    {
+        let config = Config::from(config);
+
         Self {
             host_centrality_store: RocksDbStore::open(
-                Path::new(&host_centrality_store_path).join("harmonic"),
+                Path::new(&config.host_centrality_store_path).join("harmonic"),
             ),
             host_centrality_rank_store: RocksDbStore::open(
-                Path::new(&host_centrality_store_path).join("harmonic_rank"),
+                Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
             ),
-            page_centrality_store: page_centrality_store_path
+            page_centrality_store: config
+                .page_centrality_store_path
                 .as_ref()
                 .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic"))),
-            page_centrality_rank_store: page_centrality_store_path
+            page_centrality_rank_store: config
+                .page_centrality_store_path
                 .as_ref()
                 .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic_rank"))),
-            page_webgraph: page_webgraph_path
+            page_webgraph: config
+                .page_webgraph_path
+                .as_ref()
                 .map(|path| WebgraphBuilder::new(path).single_threaded().open()),
-            topics: topics_path.map(|path| human_website_annotations::Mapper::open(path).unwrap()),
-            safety_classifier: safety_classifier_path
+            topics: config
+                .topics_path
+                .as_ref()
+                .map(|path| human_website_annotations::Mapper::open(path).unwrap()),
+            safety_classifier: config
+                .safety_classifier_path
+                .as_ref()
                 .map(|path| safety_classifier::Model::open(path).unwrap()),
             job_settings: None,
             rake: RakeModel::default(),
+            dual_encoder: config.dual_encoder_model_path.as_ref().map(|path| {
+                DualEncoder::open(path).unwrap_or_else(|err| {
+                    panic!("failed to open dual encoder model: {}", err);
+                })
+            }),
         }
     }
 
@@ -258,6 +309,50 @@ impl IndexingWorker {
         }
     }
 
+    fn set_title_embeddings(&self, pages: &mut [Webpage]) {
+        if let Some(model) = self.dual_encoder.as_ref() {
+            let titles = pages
+                .iter()
+                .map(|w| w.html.title().unwrap_or_default())
+                .collect::<Vec<_>>();
+
+            let title_emb = model
+                .embed(&titles)
+                .ok()
+                .and_then(|t| t.to_dtype(candle_core::DType::BF16).ok());
+
+            if let Some(title_emb) = title_emb {
+                for (i, page) in pages.iter_mut().enumerate() {
+                    if let Ok(emb) = title_emb.get(i) {
+                        page.title_embedding = Some(emb);
+                    }
+                }
+            }
+        }
+    }
+
+    fn set_keyword_embeddings(&self, pages: &mut [Webpage]) {
+        if let Some(model) = self.dual_encoder.as_ref() {
+            let keywords = pages
+                .iter()
+                .map(|w| w.keywords.join("\n"))
+                .collect::<Vec<_>>();
+
+            let keyword_emb = model
+                .embed(&keywords)
+                .ok()
+                .and_then(|t| t.to_dtype(candle_core::DType::BF16).ok());
+
+            if let Some(keyword_emb) = keyword_emb {
+                for (i, page) in pages.iter_mut().enumerate() {
+                    if let Ok(emb) = keyword_emb.get(i) {
+                        page.keyword_embedding = Some(emb);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn prepare_webpages(&self, batch: &[IndexableWebpage]) -> Vec<Webpage> {
         let mut res = Vec::with_capacity(batch.len());
         let mut signal_aggregator = SignalAggregator::new(None);
@@ -275,7 +370,7 @@ impl IndexingWorker {
                 continue;
             }
 
-            let backlink_labels: Vec<String> = self.backlink_labels(prepared.html.url());
+            prepared.backlink_labels = self.backlink_labels(prepared.html.url());
 
             self.set_page_centralities(&mut prepared);
             self.set_dmoz_description(&mut prepared);
@@ -285,7 +380,7 @@ impl IndexingWorker {
             // make sure we remember to set everything
             let mut webpage = Webpage {
                 html: prepared.html,
-                backlink_labels,
+                backlink_labels: prepared.backlink_labels,
                 page_centrality: prepared.page_centrality,
                 page_centrality_rank: prepared.page_centrality_rank,
                 host_centrality: prepared.host_centrality,
@@ -297,6 +392,8 @@ impl IndexingWorker {
                 safety_classification: prepared.safety_classification,
                 inserted_at: Utc::now(),
                 keywords: prepared.keywords,
+                title_embedding: None,   // set later
+                keyword_embedding: None, // set later
             };
 
             signal_aggregator.set_current_timestamp(Utc::now().timestamp().max(0) as usize);
@@ -305,6 +402,135 @@ impl IndexingWorker {
             res.push(webpage);
         }
 
+        self.set_title_embeddings(&mut res);
+        self.set_keyword_embeddings(&mut res);
+
         res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::WarcSource;
+
+    use super::*;
+
+    #[test]
+    fn title_embeddings() {
+        let data_path = Path::new("../../data/summarizer/dual_encoder");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
+            return;
+        }
+
+        let worker = IndexingWorker::new(IndexingLocalConfig {
+            host_centrality_store_path: "".to_string(),
+            page_centrality_store_path: None,
+            page_webgraph_path: None,
+            topics_path: None,
+            safety_classifier_path: None,
+            dual_encoder_model_path: Some(data_path.to_str().unwrap().to_string()),
+            output_path: "".to_string(),
+            limit_warc_files: None,
+            skip_warc_files: None,
+            warc_source: WarcSource::Local(crate::config::LocalConfig {
+                folder: ".".to_string(),
+                names: vec!["".to_string()],
+            }),
+            host_centrality_threshold: None,
+            minimum_clean_words: None,
+            batch_size: 10,
+        });
+
+        let webpages = vec![
+            IndexableWebpage {
+                url: "https://a.com".to_string(),
+                body: "<html><head><title>Homemade Heart Brownie Recipe</title></head><body>Example</body></html>"
+                    .to_string(),
+                fetch_time_ms: 0,
+            },
+            IndexableWebpage {
+                url: "https://b.com".to_string(),
+                body: "<html><head><title>How To Use an iMac as a Monitor for a PC</title></head><body>Example</body></html>"
+                    .to_string(),
+                fetch_time_ms: 0,
+            },
+        ];
+
+        let webpages = worker.prepare_webpages(&webpages);
+
+        assert_eq!(webpages.len(), 2);
+
+        assert_eq!(
+            webpages[0].html.title(),
+            Some("Homemade Heart Brownie Recipe".to_string())
+        );
+        assert_eq!(
+            webpages[1].html.title(),
+            Some("How To Use an iMac as a Monitor for a PC".to_string())
+        );
+
+        assert!(webpages.iter().all(|w| w.title_embedding.is_some()));
+
+        let emb1 = webpages[0].title_embedding.as_ref().unwrap();
+        let emb2 = webpages[1].title_embedding.as_ref().unwrap();
+
+        let query = "best brownie recipe";
+        let query_emb = worker
+            .dual_encoder
+            .as_ref()
+            .unwrap()
+            .embed(&[query.to_string()])
+            .unwrap()
+            .to_dtype(candle_core::DType::F16)
+            .unwrap()
+            .get(0)
+            .unwrap();
+
+        let sim1: f32 = query_emb
+            .unsqueeze(0)
+            .unwrap()
+            .matmul(
+                &emb1
+                    .to_dtype(candle_core::DType::F16)
+                    .unwrap()
+                    .unsqueeze(0)
+                    .unwrap()
+                    .t()
+                    .unwrap(),
+            )
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .squeeze(0)
+            .unwrap()
+            .to_dtype(candle_core::DType::F32)
+            .unwrap()
+            .to_vec0()
+            .unwrap();
+
+        let sim2: f32 = query_emb
+            .unsqueeze(0)
+            .unwrap()
+            .matmul(
+                &emb2
+                    .to_dtype(candle_core::DType::F16)
+                    .unwrap()
+                    .unsqueeze(0)
+                    .unwrap()
+                    .t()
+                    .unwrap(),
+            )
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .squeeze(0)
+            .unwrap()
+            .to_dtype(candle_core::DType::F32)
+            .unwrap()
+            .to_vec0()
+            .unwrap();
+
+        assert!(sim1 > sim2);
     }
 }

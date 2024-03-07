@@ -360,13 +360,7 @@ impl IndexManager {
         let index = Index::new(&config.index_path)?;
         let indexer = Arc::new(Indexer {
             search_index: index.clone_inner_index(),
-            worker: IndexingWorker::new(
-                config.host_centrality_store_path.clone(),
-                config.page_centrality_store_path.clone(),
-                config.page_webgraph_path.clone(),
-                None,
-                config.safety_classifier_path.clone(),
-            ),
+            worker: IndexingWorker::new(config.clone()),
             write_batch: Arc::new(Mutex::new(Vec::new())),
         });
 

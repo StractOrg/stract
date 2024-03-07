@@ -69,13 +69,7 @@ pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
 
     let job_config: WarcSource = config.warc_source.clone();
 
-    let worker = IndexingWorker::new(
-        config.host_centrality_store_path.clone(),
-        config.page_centrality_store_path.clone(),
-        config.page_webgraph_path.clone(),
-        config.topics_path.clone(),
-        config.safety_classifier_path.clone(),
-    );
+    let worker = IndexingWorker::new(config.clone());
 
     let indexes = warc_paths
         .into_par_iter()

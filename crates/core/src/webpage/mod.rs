@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ use crate::{
     webgraph::NodeID,
     Result,
 };
+use candle_core::Tensor;
 use chrono::{DateTime, Utc};
 
 use std::collections::HashMap;
@@ -53,6 +54,8 @@ pub struct Webpage {
     pub safety_classification: Option<safety_classifier::Label>,
     pub inserted_at: DateTime<Utc>,
     pub keywords: Vec<String>,
+    pub title_embedding: Option<Tensor>,
+    pub keyword_embedding: Option<Tensor>,
 }
 
 #[cfg(test)]
@@ -72,6 +75,8 @@ impl Default for Webpage {
             safety_classification: Default::default(),
             inserted_at: Utc::now(),
             keywords: Default::default(),
+            title_embedding: Default::default(),
+            keyword_embedding: Default::default(),
         }
     }
 }
@@ -92,6 +97,8 @@ impl From<Html> for Webpage {
             safety_classification: Default::default(),
             inserted_at: Utc::now(),
             keywords: Default::default(),
+            title_embedding: Default::default(),
+            keyword_embedding: Default::default(),
         }
     }
 }
