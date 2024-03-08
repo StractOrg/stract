@@ -48,15 +48,15 @@ impl<M: CrossEncoder> ReRanker<M> {
     fn crossencoder_snippet_coeff(&self) -> f64 {
         self.signal_coefficients
             .as_ref()
-            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoderSnippet))
-            .unwrap_or(Signal::CrossEncoderSnippet.default_coefficient())
+            .map(|coeff| coeff.get(&Signal::CrossEncoderSnippet))
+            .unwrap_or_else(|| Signal::CrossEncoderSnippet.default_coefficient())
     }
 
     fn crossencoder_title_coeff(&self) -> f64 {
         self.signal_coefficients
             .as_ref()
-            .and_then(|coeffs| coeffs.get(&Signal::CrossEncoderSnippet))
-            .unwrap_or(Signal::CrossEncoderSnippet.default_coefficient())
+            .map(|coeff| coeff.get(&Signal::CrossEncoderTitle))
+            .unwrap_or_else(|| Signal::CrossEncoderTitle.default_coefficient())
     }
 
     fn crossencoder_score_webpages(&self, webpage: &mut [PrecisionRankingWebpage]) {
@@ -100,7 +100,7 @@ impl<M: CrossEncoder> Scorer<PrecisionRankingWebpage> for ReRanker<M> {
         for webpage in webpages.iter_mut() {
             webpage.set_score(calculate_score(
                 &self.lambda_mart,
-                &self.signal_coefficients,
+                self.signal_coefficients.clone().unwrap_or_default(),
                 &webpage.ranking.signals,
             ));
         }

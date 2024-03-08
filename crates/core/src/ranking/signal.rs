@@ -666,8 +666,11 @@ pub struct SignalCoefficient {
 }
 
 impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> Option<f64> {
-        self.map.get(*signal).copied()
+    pub fn get(&self, signal: &Signal) -> f64 {
+        self.map
+            .get(*signal)
+            .copied()
+            .unwrap_or(signal.default_coefficient())
     }
 
     pub fn new(coefficients: impl Iterator<Item = (Signal, f64)>) -> Self {
@@ -692,7 +695,7 @@ impl SignalCoefficient {
 
     pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
         for signal in ALL_SIGNALS {
-            if let Some(coeff) = coeffs.get(&signal) {
+            if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
                     None => {
@@ -1044,7 +1047,7 @@ impl SignalAggregator {
     pub fn coefficient(&self, signal: &Signal) -> f64 {
         self.query_signal_coefficients
             .as_ref()
-            .and_then(|coefficients| coefficients.get(signal))
+            .map(|coefficients| coefficients.get(signal))
             .or_else(|| {
                 self.linear_regression
                     .as_ref()

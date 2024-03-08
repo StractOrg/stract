@@ -162,13 +162,18 @@ impl<'a> FieldReader<'a> {
                 let reader = self.readers.bytes.get(field).unwrap();
                 let ord = reader.ords().values.get_val(self.doc);
 
-                if ord > reader.num_terms() as u64 || ord == 0 {
+                if ord > reader.num_terms() as u64 {
                     return Value::Bytes(None);
                 }
 
                 let mut bytes = Vec::new();
                 reader.ord_to_bytes(ord, &mut bytes).unwrap();
-                bytes.into()
+
+                if bytes.is_empty() {
+                    Value::Bytes(None)
+                } else {
+                    bytes.into()
+                }
             }
         }
     }

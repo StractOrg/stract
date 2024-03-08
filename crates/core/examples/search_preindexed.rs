@@ -99,6 +99,7 @@ pub async fn main() {
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
         crossencoder_model_path: None,
         lambda_model_path: None,
+        dual_encoder_model_path: None,
         spell_checker_path: Some("data/web_spell".to_string()),
         bangs_path: "data/bangs.json".to_string(),
         summarizer_path: "data/summarizer".to_string(),
@@ -142,7 +143,7 @@ pub async fn main() {
     let searcher = Searcher(searcher);
 
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
-        ApiSearcher::new(searcher, None, None, None, bangs, config);
+        ApiSearcher::new(searcher, None, None, None, None, bangs, config);
 
     for query in &queries {
         let mut desc = "search '".to_string();

@@ -126,13 +126,18 @@ impl Ranker {
 #[cfg(test)]
 mod tests {
 
+    use std::path::Path;
+
     use optics::{
         ast::{RankingCoeff, RankingTarget},
         Optic,
     };
 
     use crate::{
+        config::{IndexingDualEncoderConfig, IndexingLocalConfig, WarcSource},
+        entrypoint::indexer::IndexingWorker,
         index::Index,
+        models::dual_encoder::DualEncoder,
         searcher::{LocalSearcher, SearchQuery},
         webpage::{Html, Webpage},
     };
@@ -767,4 +772,113 @@ mod tests {
         assert_eq!(result.webpages[1].url, "https://www.second.com/one/two");
         assert_eq!(result.webpages[2].url, "https://www.third.com/one/two123");
     }
+
+    fn setup_worker(data_path: &Path) -> IndexingWorker {
+        IndexingWorker::new(IndexingLocalConfig {
+            host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+            page_centrality_store_path: None,
+            page_webgraph_path: None,
+            topics_path: None,
+            safety_classifier_path: None,
+            dual_encoder: Some(IndexingDualEncoderConfig {
+                model_path: data_path.to_str().unwrap().to_string(),
+                page_centrality_rank_threshold: None,
+            }),
+            output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+            limit_warc_files: None,
+            skip_warc_files: None,
+            warc_source: WarcSource::Local(crate::config::LocalConfig {
+                folder: crate::gen_temp_path().to_str().unwrap().to_string(),
+                names: vec!["".to_string()],
+            }),
+            host_centrality_threshold: None,
+            minimum_clean_words: None,
+            batch_size: 10,
+        })
+    }
+
+    #[test]
+    fn title_embeddings() {
+        let data_path = Path::new("../../data/summarizer/dual_encoder");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
+            return;
+        }
+
+        let worker = setup_worker(data_path);
+
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut pages = vec![
+            Webpage::test_parse(
+                &format!(
+                    r#"
+                <html>
+                    <head>
+                        <title>Homemade Heart Brownie Recipe</title>
+                    </head>
+                    <body>
+                        best chocolate cake {CONTENT} {}
+                    </body>
+                </html>
+            "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.a.com/",
+            )
+            .unwrap(),
+            Webpage::test_parse(
+                &format!(
+                    r#"
+                <html>
+                    <head>
+                        <title>How To Best Use an iMac as a Monitor for a PC</title>
+                    </head>
+                    <body>
+                        best chocolate cake {CONTENT} {}
+                    </body>
+                </html>
+            "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.b.com/",
+            )
+            .unwrap(),
+        ];
+
+        worker.set_title_embeddings(&mut pages);
+        assert!(pages.iter().all(|p| p.title_embedding.is_some()));
+
+        for page in pages {
+            index.insert(&page).expect("failed to insert webpage");
+        }
+
+        index.commit().expect("failed to commit index");
+
+        let mut searcher = LocalSearcher::new(index);
+        searcher
+            .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "best chocolate cake".to_string(),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("title_embedding_similarity".to_string()),
+                        value: 100_000.0,
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.a.com/");
+    }
+
+    // #[test]
+    // fn keyword_embeddings() {
+    //     todo!();
+    // }
 }

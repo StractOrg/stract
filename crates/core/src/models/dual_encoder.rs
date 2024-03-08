@@ -30,6 +30,7 @@ pub struct DualEncoder {
     tokenizer: tokenizers::Tokenizer,
     device: Device,
     dtype: candle_core::DType,
+    config: bert::Config,
 }
 
 impl DualEncoder {
@@ -74,6 +75,7 @@ impl DualEncoder {
             tokenizer,
             device,
             dtype,
+            config,
         })
     }
 
@@ -108,5 +110,9 @@ impl DualEncoder {
         let emb = emb.broadcast_div(&emb.sqr()?.sum_keepdim(1)?.sqrt()?)?; // l2 normalization
 
         Ok(emb)
+    }
+
+    pub fn hidden_size(&self) -> usize {
+        self.config.hidden_size
     }
 }

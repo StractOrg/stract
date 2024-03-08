@@ -312,7 +312,7 @@ impl IndexingWorker {
         }
     }
 
-    fn set_title_embeddings(&self, pages: &mut [Webpage]) {
+    pub fn set_title_embeddings(&self, pages: &mut [Webpage]) {
         if let Some(dual_encoder) = self.dual_encoder.as_ref() {
             let (page_indexes, titles): (Vec<_>, Vec<_>) = pages
                 .iter()
@@ -342,7 +342,7 @@ impl IndexingWorker {
         }
     }
 
-    fn set_keyword_embeddings(&self, pages: &mut [Webpage]) {
+    pub fn set_keyword_embeddings(&self, pages: &mut [Webpage]) {
         if let Some(dual_encoder) = self.dual_encoder.as_ref() {
             let (page_indexes, keywords): (Vec<_>, Vec<_>) = pages
                 .iter()

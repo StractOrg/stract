@@ -18,4 +18,4 @@ mod precision;
 mod recall;
 
 pub use precision::PrecisionRankingWebpage;
-pub use recall::RecallRankingWebpage;
+pub use recall::{RecallRankingWebpage, StoredEmbeddings};

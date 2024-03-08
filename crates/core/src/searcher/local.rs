@@ -23,6 +23,7 @@ use url::Url;
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
+use crate::models::dual_encoder::DualEncoder;
 use crate::query::Query;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::ranking::models::lambdamart::LambdaMART;
@@ -104,6 +105,7 @@ pub struct LocalSearcher<I: SearchableIndex> {
     inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
+    dual_encoder: Option<Arc<DualEncoder>>,
     collector_config: CollectorConfig,
 }
 
@@ -132,6 +134,7 @@ where
             inbound_similarity: None,
             linear_regression: None,
             lambda_model: None,
+            dual_encoder: None,
             collector_config: CollectorConfig::default(),
         }
     }
@@ -146,6 +149,10 @@ where
 
     pub fn set_lambda_model(&mut self, model: LambdaMART) {
         self.lambda_model = Some(Arc::new(model));
+    }
+
+    pub fn set_dual_encoder(&mut self, dual_encoder: DualEncoder) {
+        self.dual_encoder = Some(Arc::new(dual_encoder));
     }
 
     pub fn set_collector_config(&mut self, config: CollectorConfig) {
@@ -231,6 +238,7 @@ where
             RankingPipeline::<RecallRankingWebpage>::recall_stage(
                 &mut query,
                 self.lambda_model.clone(),
+                self.dual_encoder.clone(),
                 self.collector_config.clone(),
                 100,
             );

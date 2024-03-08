@@ -214,6 +214,7 @@ pub struct ApiConfig {
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
+    pub dual_encoder_model_path: Option<String>,
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
     pub query_store_db_host: Option<String>,
@@ -285,6 +286,7 @@ pub struct SearchServerConfig {
     pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
+    pub dual_encoder_model_path: Option<String>,
     pub host: SocketAddr,
 
     #[serde(default)]

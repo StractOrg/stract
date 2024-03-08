@@ -29,6 +29,7 @@ use crate::collector::{self, Doc};
 use crate::config::{ApiConfig, CollectorConfig};
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
+use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
 use crate::ranking::ALL_SIGNALS;
@@ -162,6 +163,7 @@ pub struct ApiSearcher<S, L> {
     live_searcher: Option<L>,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
+    dual_encoder: Option<Arc<DualEncoder>>,
     bangs: Bangs,
     collector_config: CollectorConfig,
     widget_manager: WidgetManager,
@@ -178,6 +180,7 @@ where
         live_searcher: Option<L>,
         cross_encoder: Option<CrossEncoderModel>,
         lambda_model: Option<LambdaMART>,
+        dual_encoder: Option<DualEncoder>,
         bangs: Bangs,
         config: ApiConfig,
     ) -> Self {
@@ -186,6 +189,7 @@ where
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
 
         let lambda_model = lambda_model.map(Arc::new);
+        let dual_encoder = dual_encoder.map(Arc::new);
 
         let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
 
@@ -195,6 +199,7 @@ where
             live_searcher,
             cross_encoder: cross_encoder.map(Arc::new),
             lambda_model,
+            dual_encoder,
             bangs,
             collector_config: config.collector,
             widget_manager,
@@ -388,6 +393,7 @@ where
             RankingPipeline::<ScoredWebpagePointer>::recall_stage(
                 &mut search_query,
                 self.lambda_model.clone(),
+                self.dual_encoder.clone(),
                 self.collector_config.clone(),
                 top_n,
             );

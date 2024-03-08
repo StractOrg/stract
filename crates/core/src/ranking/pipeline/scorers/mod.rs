@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod initial;
+pub mod embedding;
+pub mod recall;
 pub mod reranker;
 
 use std::sync::Arc;
 
-pub use initial::Initial;
+pub use recall::Recall;
 pub use reranker::ReRanker;
 
 use crate::{
@@ -43,26 +44,21 @@ impl<T: RankableWebpage> Scorer<T> for IdentityScorer {
 
 fn calculate_score(
     model: &Option<Arc<LambdaMART>>,
-    signal_coefficients: &Option<SignalCoefficient>,
+    coefficients: SignalCoefficient,
     signals: &EnumMap<Signal, SignalScore>,
 ) -> f64 {
     let lambda_score = match model {
-        Some(model) => match signal_coefficients {
-            Some(coefficients) => match coefficients.get(&Signal::LambdaMART) {
-                Some(coeff) => {
-                    if coeff == 0.0 {
-                        signals
-                            .values()
-                            .map(|score| score.coefficient * score.value)
-                            .sum()
-                    } else {
-                        coeff * model.predict(signals)
-                    }
-                }
-                None => Signal::LambdaMART.default_coefficient() * model.predict(signals),
-            },
-            None => Signal::LambdaMART.default_coefficient() * model.predict(signals),
-        },
+        Some(model) => {
+            let coeff = coefficients.get(&Signal::LambdaMART);
+            if coeff == 0.0 {
+                signals
+                    .values()
+                    .map(|score| score.coefficient * score.value)
+                    .sum()
+            } else {
+                coeff * model.predict(signals)
+            }
+        }
         None => signals
             .values()
             .map(|score| score.coefficient * score.value)
@@ -70,4 +66,28 @@ fn calculate_score(
     };
 
     lambda_score
+}
+
+pub struct MultiScorer<T: RankableWebpage> {
+    scorers: Vec<Box<dyn Scorer<T>>>,
+}
+
+impl<T: RankableWebpage> MultiScorer<T> {
+    pub fn new(scorers: Vec<Box<dyn Scorer<T>>>) -> Self {
+        Self { scorers }
+    }
+}
+
+impl<T: RankableWebpage> Scorer<T> for MultiScorer<T> {
+    fn score(&self, webpages: &mut [T]) {
+        for scorer in &self.scorers {
+            scorer.score(webpages);
+        }
+    }
+
+    fn set_query_info(&mut self, query: &SearchQuery) {
+        for scorer in &mut self.scorers {
+            scorer.set_query_info(query);
+        }
+    }
 }

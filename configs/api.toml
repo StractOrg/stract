@@ -4,6 +4,7 @@ gossip_addr = "0.0.0.0:3005"
 gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 host = "0.0.0.0:3000"
 # lambda_model_path = "data/lambdamart.txt"
+dual_encoder_model_path = "data/summarizer/dual_encoder"
 prometheus_host = "0.0.0.0:3001"
 queries_csv_path = "data/queries_us.csv"
 spell_checker_path = "data/web_spell/checker"

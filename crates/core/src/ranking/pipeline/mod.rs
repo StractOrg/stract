@@ -19,6 +19,7 @@ use std::sync::Arc;
 use crate::{
     collector::{self, BucketCollector},
     config::CollectorConfig,
+    models::dual_encoder::DualEncoder,
     searcher::SearchQuery,
 };
 
@@ -30,10 +31,10 @@ use super::{
 mod scorers;
 mod stages;
 
-pub use scorers::{Initial, ReRanker, Scorer};
+pub use scorers::{ReRanker, Recall, Scorer};
 pub use stages::{PrecisionRankingWebpage, RecallRankingWebpage};
 
-pub trait RankableWebpage: collector::Doc {
+pub trait RankableWebpage: collector::Doc + Send + Sync {
     fn set_score(&mut self, score: f64);
     fn boost(&self) -> Option<f64>;
 
@@ -104,12 +105,16 @@ pub struct RankingPipeline<T> {
 
 impl RankingPipeline<crate::searcher::api::ScoredWebpagePointer> {
     fn create_recall_stage(
-        model: Option<Arc<LambdaMART>>,
+        lambdamart: Option<Arc<LambdaMART>>,
+        dual_encoder: Option<Arc<DualEncoder>>,
         collector_config: CollectorConfig,
         stage_top_n: usize,
     ) -> Self {
         let last_stage = RankingStage {
-            scorer: Box::new(Initial::new(model)),
+            scorer: Box::new(Recall::<crate::searcher::api::ScoredWebpagePointer>::new(
+                lambdamart,
+                dual_encoder,
+            )),
             stage_top_n,
             derank_similar: true,
         };
@@ -124,11 +129,13 @@ impl RankingPipeline<crate::searcher::api::ScoredWebpagePointer> {
 
     pub fn recall_stage(
         query: &mut SearchQuery,
-        model: Option<Arc<LambdaMART>>,
+        lambdamart: Option<Arc<LambdaMART>>,
+        dual_encoder: Option<Arc<DualEncoder>>,
         collector_config: CollectorConfig,
         top_n_considered: usize,
     ) -> Self {
-        let mut pipeline = Self::create_recall_stage(model, collector_config, top_n_considered);
+        let mut pipeline =
+            Self::create_recall_stage(lambdamart, dual_encoder, collector_config, top_n_considered);
         pipeline.set_query_info(query);
 
         pipeline
@@ -227,6 +234,7 @@ mod tests {
                 ..Default::default()
             },
             None,
+            None,
             CollectorConfig::default(),
             20,
         );
@@ -256,6 +264,7 @@ mod tests {
                 num_results,
                 ..Default::default()
             },
+            None,
             None,
             CollectorConfig::default(),
             num_results,
@@ -290,6 +299,7 @@ mod tests {
                 ..Default::default()
             },
             None,
+            None,
             CollectorConfig::default(),
             num_results,
         );
@@ -302,6 +312,7 @@ mod tests {
                     page: p,
                     ..Default::default()
                 },
+                None,
                 None,
                 CollectorConfig::default(),
                 num_results,

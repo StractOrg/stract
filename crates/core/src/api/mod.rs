@@ -31,6 +31,7 @@ use crate::{
     },
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
+    models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
 };
@@ -150,6 +151,11 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         None => None,
     };
 
+    let dual_encoder_model = match &config.dual_encoder_model_path {
+        Some(path) => Some(DualEncoder::open(path)?),
+        None => None,
+    };
+
     let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
         let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
         tokio::spawn(store_improvements_loop(query_store_queue.clone(), db_host));
@@ -186,6 +192,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             Some(live_searcher),
             cross_encoder,
             lambda_model,
+            dual_encoder_model,
             bangs,
             config.clone(),
         );

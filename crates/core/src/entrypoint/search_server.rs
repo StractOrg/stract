@@ -29,6 +29,7 @@ use crate::{
     },
     index::Index,
     inverted_index::{self, RetrievedWebpage},
+    models::dual_encoder::DualEncoder,
     ranking::{
         inbound_similarity::InboundSimilarity,
         models::{lambdamart::LambdaMART, linear::LinearRegression},
@@ -73,6 +74,10 @@ impl SearchService {
 
         if let Some(model_path) = config.lambda_model_path {
             local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
+        }
+
+        if let Some(model_path) = config.dual_encoder_model_path {
+            local_searcher.set_dual_encoder(DualEncoder::open(model_path)?);
         }
 
         local_searcher.set_collector_config(config.collector);
