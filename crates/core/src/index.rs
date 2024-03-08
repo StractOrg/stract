@@ -121,7 +121,7 @@ impl Index {
 
     pub fn retrieve_websites(
         &self,
-        websites: &[inverted_index::WebsitePointer],
+        websites: &[inverted_index::WebpagePointer],
         query: &Query,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         self.inverted_index.retrieve_websites(websites, query)

@@ -27,7 +27,7 @@ use crate::{
     combine_u64s,
     config::CollectorConfig,
     fastfield_reader,
-    inverted_index::{DocAddress, WebsitePointer},
+    inverted_index::{DocAddress, WebpagePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
     schema::FastField,
@@ -385,7 +385,7 @@ impl<TScoreTweaker> Collector for TweakedScoreTopCollector<TScoreTweaker>
 where
     TScoreTweaker: ScoreTweaker<Score> + Send + Sync,
 {
-    type Fruit = Vec<WebsitePointer>;
+    type Fruit = Vec<WebpagePointer>;
 
     type Child = TopTweakedScoreSegmentCollector<TScoreTweaker::Child>;
 
@@ -429,7 +429,7 @@ where
             .into_sorted_vec(self.top_docs.de_rank_similar)
             .into_iter()
             .skip(self.top_docs.offset)
-            .map(|doc| WebsitePointer {
+            .map(|doc| WebpagePointer {
                 score: doc.score,
                 hashes: doc.hashes,
                 address: DocAddress {

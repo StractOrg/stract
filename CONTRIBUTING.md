@@ -34,8 +34,9 @@ if they take our code without making theirs open source, which would breach the 
 
 # Development
 ## Setup
-* Install rust by following the steps outlined [here](https://www.rust-lang.org/tools/install)
-* Install clang and npm
+* Install rust by following the steps outlined [here](https://www.rust-lang.org/tools/install).
+* Install clang and npm.
+* Install liburing. If you're using a Debian based Linux, you can install it by running `sudo apt install liburing-dev`.
 * Update ulimit. RocksDB tends to exceed the max number of allowed open files, so you will have to run `ulimit -n 10240` to increase the allowed max number of open files.
 * Install [just](https://github.com/casey/just) by running `cargo install just`. This allows you to run the scripts in the `justfile` file. A justfile is basically a simple Makefile.
 * Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) by running `cargo install wasm-pack`. This will allow for generation and packaging of client side WebAssembly code.

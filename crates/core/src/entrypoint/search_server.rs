@@ -100,7 +100,7 @@ impl SearchService {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrieveWebsites {
-    pub websites: Vec<inverted_index::WebsitePointer>,
+    pub websites: Vec<inverted_index::WebpagePointer>,
     pub query: String,
 }
 impl sonic::service::Message<SearchService> for RetrieveWebsites {

@@ -42,7 +42,7 @@ use crate::fastfield_reader::FastFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
-use crate::ranking::pipeline::RankingWebsite;
+use crate::ranking::pipeline::RecallRankingWebpage;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
@@ -65,11 +65,11 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
     pub num_websites: Option<usize>,
-    pub top_websites: Vec<WebsitePointer>,
+    pub top_websites: Vec<WebpagePointer>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct WebsitePointer {
+pub struct WebpagePointer {
     pub score: Score,
     pub hashes: Hashes,
     pub address: DocAddress,
@@ -371,10 +371,10 @@ impl InvertedIndex {
     pub fn retrieve_ranking_websites(
         &self,
         ctx: &Ctx,
-        pointers: Vec<WebsitePointer>,
+        pointers: Vec<WebpagePointer>,
         mut aggregator: SignalAggregator,
         fastfield_reader: &FastFieldReader,
-    ) -> Result<Vec<RankingWebsite>> {
+    ) -> Result<Vec<RecallRankingWebpage>> {
         let mut top_websites = Vec::new();
 
         let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
@@ -400,7 +400,10 @@ impl InvertedIndex {
 
             prev_segment = Some(pointer.address.segment);
 
-            top_websites.push((orig_index, RankingWebsite::new(pointer, &mut aggregator)));
+            top_websites.push((
+                orig_index,
+                RecallRankingWebpage::new(pointer, &mut aggregator),
+            ));
         }
 
         top_websites.sort_by(|a, b| a.0.cmp(&b.0));
@@ -411,7 +414,7 @@ impl InvertedIndex {
             .collect())
     }
 
-    pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
+    pub fn website_host_node(&self, website: &WebpagePointer) -> Result<Option<NodeID>> {
         let searcher = self.reader.searcher();
         let doc: TantivyDocument = searcher.doc(website.address.into())?;
 
@@ -431,7 +434,7 @@ impl InvertedIndex {
 
     pub fn retrieve_websites(
         &self,
-        websites: &[WebsitePointer],
+        websites: &[WebpagePointer],
         query: &Query,
     ) -> Result<Vec<RetrievedWebpage>> {
         let tv_searcher = self.reader.searcher();

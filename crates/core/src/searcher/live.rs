@@ -25,8 +25,8 @@ use crate::{
     },
     entrypoint::search_server::{self, SearchService},
     feed::scheduler::SplitId,
-    inverted_index::{RetrievedWebpage, WebsitePointer},
-    ranking::pipeline::{RankingWebsite, RetrievedWebpageRanking},
+    inverted_index::{RetrievedWebpage, WebpagePointer},
+    ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
 };
 
 use std::future::Future;
@@ -39,8 +39,8 @@ use itertools::Itertools;
 use super::{InitialWebsiteResult, SearchQuery};
 
 #[derive(Clone, Debug)]
-pub struct ScoredWebsitePointer {
-    pub website: RankingWebsite,
+pub struct ScoredWebpagePointer {
+    pub website: RecallRankingWebpage,
     pub split_id: SplitId,
 }
 
@@ -86,9 +86,9 @@ impl LiveSearcher {
         split: SplitId,
         client: &ShardedClient<SearchService, SplitId>,
         query: &str,
-        pointers: Vec<(usize, WebsitePointer)>,
+        pointers: Vec<(usize, WebpagePointer)>,
     ) -> Vec<(usize, RetrievedWebpage)> {
-        let (idxs, pointers): (Vec<usize>, Vec<WebsitePointer>) = pointers.into_iter().unzip();
+        let (idxs, pointers): (Vec<usize>, Vec<WebpagePointer>) = pointers.into_iter().unzip();
 
         match client
             .send(
@@ -144,9 +144,9 @@ impl SearchClient for LiveSearcher {
 
     async fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, ScoredWebsitePointer)],
+        top_websites: &[(usize, ScoredWebpagePointer)],
         query: &str,
-    ) -> Vec<(usize, RetrievedWebpageRanking)> {
+    ) -> Vec<(usize, PrecisionRankingWebpage)> {
         let mut rankings = FnvHashMap::default();
         let mut pointers: HashMap<_, Vec<_>> = HashMap::new();
 
@@ -169,7 +169,7 @@ impl SearchClient for LiveSearcher {
         for pages in join_all(futures).await {
             for (i, page) in pages {
                 retrieved_webpages
-                    .push((i, RetrievedWebpageRanking::new(page, rankings[&i].clone())));
+                    .push((i, PrecisionRankingWebpage::new(page, rankings[&i].clone())));
             }
         }
 
@@ -188,7 +188,7 @@ pub trait SearchClient {
     ) -> impl Future<Output = Vec<InitialSearchResultSplit>> + Send;
     fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, ScoredWebsitePointer)],
+        top_websites: &[(usize, ScoredWebpagePointer)],
         query: &str,
-    ) -> impl Future<Output = Vec<(usize, RetrievedWebpageRanking)>> + Send;
+    ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
 }
