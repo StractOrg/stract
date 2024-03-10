@@ -35,7 +35,7 @@
     },
     {
       title: 'Open results in a new tab',
-      description: 'Keep the search results window open and have links open in new tabs.',
+      description: 'Keep the search results window open and have links open in new tabs',
       type: 'results-in-new-tabs',
     },
   ] as const;
