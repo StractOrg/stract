@@ -7,12 +7,14 @@
     summariesStore,
     markPagesWithAdsStore,
     markPagesWithPaywallStore,
+    resultsInNewTab,
   } from '$lib/stores';
   import Summary from './Summary.svelte';
   import { derived } from 'svelte/store';
   import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
+  import ResultLink from './ResultLink.svelte';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;
@@ -28,22 +30,22 @@
   <div class="flex min-w-0">
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
-        <a
-          class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
+        <ResultLink
+          _class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
           href={webpage.url}
-          use:improvements={resultIndex}
+          {resultIndex}
         >
           {webpage.prettyUrl}
-        </a>
+        </ResultLink>
       </div>
-      <a
-        class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+      <ResultLink
+        _class="max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
         title={webpage.title}
         href={webpage.url}
-        use:improvements={resultIndex}
+        {resultIndex}
       >
         {webpage.title}
-      </a>
+      </ResultLink>
     </div>
     <button
       class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"

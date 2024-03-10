@@ -3,6 +3,7 @@
   import type { StackOverflowAnswer } from '$lib/api';
   import Code from '$lib/components/Code.svelte';
   import StackOverflowText from './StackOverflowText.svelte';
+  import ResultLink from './ResultLink.svelte';
 
   export let title: string;
   export let answer: StackOverflowAnswer;
@@ -11,7 +12,9 @@
 <div class="flex flex-col space-y-5 overflow-hidden rounded-lg border p-5 md:max-w-lg">
   <div class="flex flex-col space-y-1">
     <div class="flex grow justify-between space-x-2">
-      <a class="flex text-lg font-medium leading-6" href={answer.url}>{title}</a>
+      <ResultLink _class="flex text-lg font-medium leading-6" href={answer.url}>
+        {title}
+      </ResultLink>
       <div class="flex items-center space-x-1">
         <span class="h-fit">
           {answer.upvotes}
@@ -23,7 +26,9 @@
     </div>
     <div class="flex grow justify-between space-x-2 text-sm">
       <div>
-        <a href={answer.url}>{answer.url}</a>
+        <ResultLink href={answer.url}>
+          {answer.url}
+        </ResultLink>
       </div>
       <div>{answer.date}</div>
     </div>

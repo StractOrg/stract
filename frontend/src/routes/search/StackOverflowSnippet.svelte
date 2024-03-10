@@ -4,6 +4,7 @@
   import HandThumbUp from '~icons/heroicons/hand-thumb-up';
   import Check from '~icons/heroicons/check';
   import StackOverflowText from './StackOverflowText.svelte';
+  import ResultLink from './ResultLink.svelte';
 
   export let question: StackOverflowQuestion;
   export let answers: StackOverflowAnswer[];
@@ -19,8 +20,8 @@
 <div class="flex space-x-4 pt-2 text-xs">
   {#each answers.slice(0, 3) as answer}
     <div class="w-1/3 overflow-hidden">
-      <a
-        class="block h-56 overflow-hidden rounded-lg border p-2 hover:bg-base-200/80"
+      <ResultLink
+        _class="block h-56 overflow-hidden rounded-lg border p-2 hover:bg-base-200/80"
         href={answer.url}
       >
         <div class="mb-1 flex w-full items-center justify-between space-x-1 text-xs text-neutral">
@@ -50,7 +51,7 @@
             {/if}
           {/each}
         </div>
-      </a>
+      </ResultLink>
     </div>
   {/each}
 </div>
