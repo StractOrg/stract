@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { twMerge } from 'tailwind-merge';
   import { getButtonTailwindStyle, type ButtonKind } from '$lib/themes';
 
   export let title: string | undefined = void 0;

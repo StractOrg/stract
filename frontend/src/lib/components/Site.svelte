@@ -7,25 +7,27 @@
   const dispatch = createEventDispatcher<{ delete: null }>();
 </script>
 
-<span class="group flex overflow-hidden rounded-lg bg-secondary transition">
+<span class="bg-secondary group flex overflow-hidden rounded-lg transition">
   <a
     {href}
     target="_blank"
     class={twMerge(
       'bg-secondary py-2',
       'text-primary-content',
-      'transition hover:bg-secondary-focus',
+      'hover:bg-secondary-focus transition',
       'pl-3 pr-2',
     )}
   >
     <slot />
   </a>
-  <span class="my-2 w-px bg-primary-content transition group-hover:bg-transparent" />
+  <span
+    class="noscript:hidden bg-primary-content my-2 w-px transition group-hover:bg-transparent"
+  />
   <button
     class={twMerge(
-      'cursor-pointer bg-secondary px-2 text-sm',
+      'bg-secondary cursor-pointer px-2 text-sm',
       'text-primary-content',
-      'transition hover:bg-secondary-focus',
+      'hover:bg-secondary-focus noscript:hidden transition',
     )}
     on:click={() => dispatch('delete')}
   >

@@ -2,7 +2,7 @@
   import XMark from '~icons/heroicons/x-mark';
   import PlusCircleOutline from '~icons/heroicons/plus-circle';
   import ChevronDown from '~icons/heroicons/chevron-down';
-  import { api, type ScoredHost } from '$lib/api';
+  import { api } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -11,15 +11,22 @@
   import { twJoin } from 'tailwind-merge';
   import { match } from 'ts-pattern';
   import Callout from '$lib/components/Callout.svelte';
+  import type { PageData } from './$types';
+  import { LIMIT_OPTIONS } from './conf';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
 
-  const LIMIT_OPTIONS = [10, 25, 50, 125, 250, 500, 1000];
+  export let data: PageData;
 
   let inputWebsite = '';
-  let limit = LIMIT_OPTIONS[0];
-  let chosenHosts: string[] = [];
-  let similarHosts: ScoredHost[] = [];
 
-  let errorMessage = false;
+  let limit = data.limit;
+  let chosenHosts = data.chosenHosts;
+  let similarHosts = data.similarHosts;
+  let errorMessage = data.errorMessage;
+
+  $: chosenHostString = chosenHosts.join(',');
 
   $: {
     api
@@ -27,11 +34,37 @@
       .data.then((res) => (similarHosts = res));
   }
 
+  $: {
+    limit;
+    updateBrowserState();
+  }
+
+  const updateBrowserState = () => {
+    if (!browser) {
+      return;
+    }
+    $page.url.searchParams.set('chosenHosts', chosenHosts.join(','));
+    $page.url.searchParams.set('limit', limit.toString());
+    goto($page.url, { replaceState: true });
+  };
+
+  $: {
+    if (browser) {
+      chosenHosts =
+        $page.url.searchParams
+          .get('chosenHosts')
+          ?.split(',')
+          .filter((host) => host.length > 0) ?? [];
+    }
+  }
+
   const removeWebsite = async (host: string) => {
     if (chosenHosts.includes(host)) {
       chosenHosts = chosenHosts.filter((s) => s != host);
+      updateBrowserState();
     }
   };
+
   const addWebsite = async (host: string, clear = false) => {
     errorMessage = false;
     host = host.trim();
@@ -45,6 +78,7 @@
       .with({ type: 'known' }, async ({ host }) => {
         if (clear) inputWebsite = '';
         if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
+        updateBrowserState();
       })
       .exhaustive();
   };
@@ -71,7 +105,7 @@
       </div>
       <form
         class={twJoin(
-          'mb-2 flex w-full max-w-lg rounded-full border border-base-400 bg-base-100 p-[1px] pl-3 transition focus-within:shadow',
+          'border-base-400 bg-base-100 mb-2 flex w-full max-w-lg rounded-full border p-[1px] pl-3 transition focus-within:shadow',
         )}
         id="site-input-container"
         on:submit|preventDefault={() => addWebsite(inputWebsite, true)}
@@ -86,8 +120,16 @@
           placeholder="www.example.com"
           bind:value={inputWebsite}
         />
+        <input class="hidden" type="text" name="chosenHosts" bind:value={chosenHostString} />
         <Button>Add</Button>
       </form>
+      <noscript>
+        <div class="mb-2">
+          <form>
+            <Button pale kind="info">Clear All Sites</Button>
+          </form>
+        </div>
+      </noscript>
       {#if errorMessage}
         <div class="my-2" transition:slide>
           <Callout kind="warning" title="Unable to add page">
@@ -102,10 +144,7 @@
       <div class="flex flex-wrap justify-center gap-x-5 gap-y-3" id="sites-list">
         {#each chosenHosts as site (site)}
           <div transition:slide={{ duration: 100 }} animate:flip={{ duration: 200 }}>
-            <Site
-              href="http://{site}"
-              on:delete={() => (chosenHosts = chosenHosts.filter((s) => s != site))}
-            >
+            <Site href="http://{site}" on:delete={() => removeWebsite(site)}>
               {site}
             </Site>
           </div>
@@ -120,13 +159,15 @@
           <div class="flex space-x-1">
             <Select
               id="limit"
+              name="limit"
+              form="site-input-container"
               class="cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
               options={LIMIT_OPTIONS.map((value) => ({ value, label: value.toString() }))}
             />
           </div>
           <div />
-          <Button on:click={exportAsOptic}>Export as optic</Button>
+          <Button _class="noscript:hidden" on:click={exportAsOptic}>Export as optic</Button>
         </div>
         <div class="grid items-center gap-y-2">
           {#each similarHosts as host (host.host)}
@@ -137,7 +178,7 @@
             >
               <div>
                 <button
-                  class={twJoin('group')}
+                  class={twJoin('noscript:hidden group')}
                   on:click={() =>
                     chosenHosts.includes(host.host)
                       ? removeWebsite(host.host)
@@ -145,8 +186,7 @@
                 >
                   <PlusCircleOutline
                     class={twJoin(
-                      'text-xl transition group-hover:scale-105 group-active:scale-95',
-                      chosenHosts.includes(host.host) ? 'rotate-45 text-error' : 'text-success',
+                      'text-success text-xl group-hover:scale-105 group-active:scale-95',
                     )}
                   />
                 </button>
@@ -158,9 +198,9 @@
             </div>
           {/each}
         </div>
-        <div class="flex w-full justify-center">
+        <div class="noscript:hidden flex w-full justify-center">
           <button
-            class="h-6 w-6 cursor-pointer rounded-full text-accent"
+            class="text-accent h-6 w-6 cursor-pointer rounded-full"
             aria-label="Show more similar sites"
             on:click={() => {
               if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {

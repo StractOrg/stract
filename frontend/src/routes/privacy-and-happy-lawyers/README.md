@@ -8,12 +8,10 @@ This keeps things simple, both for you and for us.
 Here is a brief overview of your privacy:
 
 - We don't store your IP address.
-- We don't store any information that can be used to fingerprint your device,
-  browser etc.
+- We don't store any information that can be used to fingerprint your device, browser etc.
 - We don't share any user data with any third parties.
 - We collect only the data needed to provide and improve the service.
-- We serve all content directly from our servers to prevent tracking from third
-  parties.
+- We serve all content directly from our servers to prevent tracking from third parties.
 - We use HTTPS encryption everywhere.
 
 By default, we do store some usage statistics in order to improve the search
@@ -34,6 +32,16 @@ improve our services tremendously. You can opt-out of this at any time from the
 
 You don't have to take our word for these claims as our
 [source code is available to everyone.](https://github.com/StractOrg/stract)
+
+## Browser Features
+
+Most of the site should function with only a minimal set of browser features enabled. We use javascript and some other browser features to optionally enhance the user experience in some places. We try to provide an overview here so you can optionally enable the features and functionality you want to use.
+
+- [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) is used to store your optics and all other settings. The preferences that influence the search results, e.g. liked/disliked/blocked sites, gets send to the backend in the GET request parameters of your search.
+- [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) is used in a number of places but we strive to solely use it to enhance the user experience. You should be able to perform searches and find similar sites in 'explore' without javascript enabled. Please [submit a bug report](https://github.com/StractOrg/stract/issues/new) if this is not the case so we can look into it. Javascript is however needed to provide functionality like changing your settings, liking/disliking sites, managing optics, easily remove a single site in 'explore' etc.
+- [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) are used to stream the summary back to your browser when you request to summarize a search result.
+
+We do not use any first-party, and especially not third-party, cookies.
 
 ## Terms of Service
 
@@ -103,6 +111,10 @@ the event of a conflict between a translated version of these terms and the
 English language version, the English language version shall control.
 
 ## Changelog
+
+#### 10-03-2024:
+
+Added overview of which browser features that are used.
 
 #### 16-08-2023:
 
